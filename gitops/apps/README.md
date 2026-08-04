@@ -34,6 +34,7 @@ Directories present:
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` |
 | `rag` | local chart, `gitops/charts/rag-service` |
+| `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) |
 | `agent-runtime` | local chart, `gitops/charts/agent-runtime` (applied by the `llm` role, see its README) |
 | `agents` | local chart, `gitops/charts/namespaces` |
 | `api` | local chart, `gitops/charts/tekos` |

@@ -9,14 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-ENV PYTHONUNBUFFERED=1 \
-    PROVIDER_ROUTING_PATH=/app/config/provider-routing.yaml
+ENV PYTHONUNBUFFERED=1
 
-# provider-routing.yaml is NOT baked into the image: it is mounted at
-# /app/config/provider-routing.yaml from the `zuno-provider-routing`
-# ConfigMap (generated from platform/ai-gateway/provider-routing.yaml by
-# ansible/roles/llm's GitOps app) so a routing-policy change doesn't
-# require rebuilding/redeploying this image — see gitops/charts/agent-runtime.
+# No provider-routing config or provider API keys here anymore (ADR-0009
+# split) — this service only needs AI_GATEWAY_URL, set at deploy time; see
+# components/ai-gateway for where the routing config now lives.
 
 EXPOSE 8080
 

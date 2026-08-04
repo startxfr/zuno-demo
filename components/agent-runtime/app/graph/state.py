@@ -31,5 +31,8 @@ class AgentState(TypedDict, total=False):
     tool_results: Dict[str, Any]
     reply: str
     citations: List[Citation]
+    # Always "ai-gateway" now (ADR-0009 split) — this runtime no longer
+    # knows which downstream provider actually served the request; that
+    # detail lives in components/ai-gateway's own OTel traces.
     provider_used: Optional[str]
     errors: List[str]

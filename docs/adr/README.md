@@ -12,7 +12,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0006](0006-extend-okf-with-zuno-agent-specific-metadata.md) | v0 | Implemented | Extend OKF with Zuno agent-specific metadata |
 | [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md) | v0 | Implemented | Separate agent instances from reusable platform components |
 | [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md) | v0 | Implemented | Use one frontend and one BFF deployment per agent |
-| [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md) | v0 | Accepted | Separate Agent Runtime from AI Inference Gateway |
+| [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md) | v0 | Implemented | Separate Agent Runtime from AI Inference Gateway |
 | [ADR-0010](0010-introduce-a-central-mcp-gateway.md) | v0 | Implemented | Introduce a central MCP Gateway |
 | [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) | v0 | Implemented | Define tool authorization as policy intersection |
 | [ADR-0012](0012-use-keycloak-as-the-central-identity-provider.md) | v0 | Implemented | Use Keycloak as the central identity provider |

@@ -30,40 +30,8 @@ spec:
               value: {{ .Values.ragServiceUrl | quote }}
             - name: MCP_GATEWAY_URL
               value: {{ .Values.mcpGatewayUrl | quote }}
-            - name: LOCAL_MODEL_ENDPOINT
-              value: {{ .Values.localModelEndpoint | quote }}
-            - name: LOCAL_MODEL_NAME
-              value: {{ .Values.localModelName | quote }}
-            - name: PROVIDER_ROUTING_PATH
-              value: /app/config/provider-routing.yaml
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.providerSecrets.openai }}
-                  key: api_key
-                  optional: true
-            - name: GEMINI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.providerSecrets.gemini }}
-                  key: api_key
-                  optional: true
-            - name: ANTHROPIC_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.providerSecrets.anthropic }}
-                  key: api_key
-                  optional: true
-            - name: MISTRAL_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.providerSecrets.mistral }}
-                  key: api_key
-                  optional: true
-          volumeMounts:
-            - name: provider-routing
-              mountPath: /app/config
-              readOnly: true
+            - name: AI_GATEWAY_URL
+              value: {{ .Values.aiGatewayUrl | quote }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -78,7 +46,3 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      volumes:
-        - name: provider-routing
-          configMap:
-            name: {{ .Values.providerRoutingConfigMap }}

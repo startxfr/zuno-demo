@@ -1,0 +1,26 @@
+---
+# AI Inference Gateway (ADR-0009) — see gitops/charts/ai-gateway and
+# components/ai-gateway. Applied by the `llm` Ansible role's configure.yml,
+# alongside the provider-routing config it shares a ConfigMap with, and
+# before gitops/apps/agent-runtime (which now only needs this gateway's
+# URL, not the routing config or provider secrets directly).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-gateway
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/ai-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -85,8 +85,10 @@ def _build_context_block(state: AgentState) -> str:
 
 
 async def reason_node(state: AgentState) -> Dict[str, Any]:
-    """Calls the routed model (local vLLM InferenceService by default,
-    falling back through the approved SaaS providers per ADR-0020/0021).
+    """Calls the AI Inference Gateway (components/ai-gateway, ADR-0009),
+    which resolves the local vLLM model first, falling back through the
+    approved SaaS providers per ADR-0020/0021 -- this node itself no
+    longer makes that routing decision.
     """
     context = _build_context_block(state)
     system = SystemMessage(

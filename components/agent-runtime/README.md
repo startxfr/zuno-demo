@@ -2,11 +2,13 @@
 
 Shared stateful orchestration runtime (ADR-0009): owns task orchestration,
 LangChain/LangGraph workflows, RAG invocation and MCP tool invocation,
-kept deliberately separate from model routing/quotas/fallback (that's the
-AI Inference Gateway's job, `components/ai-gateway`, owned by another
-track — this service calls providers directly today via
-`app/clients/model_router.py` per ADR-0020/0021, and can be pointed at the
-AI Inference Gateway instead once it exists without changing the graph).
+kept separate from model routing/quotas/fallback — that's
+`components/ai-gateway`'s job. `app/clients/model_router.py` is a thin
+client: it builds a `langchain_openai.ChatOpenAI` pointed at
+`AI_GATEWAY_URL`, and the gateway resolves classification-eligible
+providers and fallback order server-side (ADR-0020/0021). See
+`components/ai-gateway/README.md` for why this split needs zero changes to
+this service's LangGraph streaming mechanism.
 
 v0 implements **one** agent workflow: Tekos (technical consultants) — the
 first vertical slice per MEMORY.md section 9. The other four agents are
@@ -87,11 +89,15 @@ START -> retrieve -> [conditional] -> reason -> respond -> END
   call.
 - **`reason`** (`reason_node`) — builds a grounded prompt from retrieved
   docs + tool results, then calls `ModelRouter.invoke_with_fallback()`
-  (`app/clients/model_router.py`): tries the local vLLM model first, then
-  falls through OpenAI -> Gemini -> Anthropic -> Mistral in the order
-  declared by `platform/ai-gateway/provider-routing.yaml`, filtered to
-  providers eligible for the request's classification (ADR-0021 — fails
-  closed, never silently escalates to an ineligible provider).
+  (`app/clients/model_router.py`), a single HTTP call to
+  `components/ai-gateway`'s `POST /v1/chat/completions`. The gateway tries
+  the local vLLM model first, then falls through OpenAI -> Gemini ->
+  Anthropic -> Mistral in the order declared by
+  `platform/ai-gateway/provider-routing.yaml`, filtered to providers
+  eligible for the request's classification (ADR-0021 — fails closed,
+  never silently escalates to an ineligible provider) — none of that
+  fallback logic lives in this repo's `agent-runtime` code anymore
+  (ADR-0009).
 - **`respond`** (`respond_node`) — assembles the final
   `{reply, citations}` contract from retrieved-doc sources and any live
   Confluence results, de-duplicated.
@@ -116,22 +122,19 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 | `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.example.com/realms/zuno` | JWT issuer / JWKS base |
 | `RAG_SERVICE_URL` | `http://rag-service.zuno-platform.svc:8080` | retrieve node |
 | `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-platform.svc:8080` | tool_call node |
-| `PROVIDER_ROUTING_PATH` | `/app/config/provider-routing.yaml` | model_router config (ConfigMap-mounted, not baked into the image) |
-| `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-datascience.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
-| `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `secret/zuno/providers/<name>` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-platform.svc:4318` | where `app/telemetry.py` sends traces/metrics (ADR-0029) |
+| `AI_GATEWAY_URL` | `http://ai-gateway.zuno-platform.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-platform.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
 
 ## Observability (ADR-0029)
 
-`app/telemetry.py` initializes an OTLP tracer/meter at startup
+`app/telemetry.py` initializes an OTLP tracer at startup
 (`init_telemetry()`, called from `app/main.py`) against the Collector
-`ansible/roles/observability` installs. `ModelRouter.invoke_with_fallback()`
-wraps every provider attempt in a `model_call` span (provider, model,
-classification, latency, outcome) and, when the model response exposes
-`usage_metadata`, records prompt/completion token counts plus an estimated
-USD cost (`zuno.model_tokens` / `zuno.model_cost_usd` metrics) — the
-reference instrumentation pattern `mcp-gateway` and `rag-service` should
-adopt next (not yet done there).
+`ansible/roles/observability` installs — service registration only today,
+no spans of its own yet. Model-call-level telemetry (per-provider spans,
+token/cost metrics) moved to `components/ai-gateway/app/telemetry.py` as
+part of the ADR-0009 split: that service now makes the actual provider
+call, so it's the correct owner of that detail. `rag-service` and
+`mcp-gateway` already have their own equivalent instrumentation.
 
 ## Local development
 
@@ -142,6 +145,6 @@ docker run -p 8080:8080 \
   -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.example.com/realms/zuno \
   -e RAG_SERVICE_URL=http://localhost:8081 \
   -e MCP_GATEWAY_URL=http://localhost:8082 \
-  -v $(pwd)/../../platform/ai-gateway/provider-routing.yaml:/app/config/provider-routing.yaml:ro \
+  -e AI_GATEWAY_URL=http://localhost:8083 \
   zuno/agent-runtime:local
 ```

@@ -361,9 +361,12 @@ planning narrative — see README.md's "v0 build status" for a summary:
 - Data: a from-scratch PostgreSQL-native schema for section 10's SXA
   domain (`data/sxa/schema/`), synthetic fixtures, and the sales-db MCP
   server.
-- AI/model layer: local Qwen2.5-7B-Instruct serving, the provider-routing
-  config (section 6), the MCP Gateway, RAG service, and the Tekos LangGraph
-  workflow (`components/agent-runtime`).
+- AI/model layer: local Qwen2.5-7B-Instruct serving, the AI Inference
+  Gateway (`components/ai-gateway`, ADR-0009) owning provider routing/
+  fallback/classification-eligibility (section 6) behind an
+  OpenAI-compatible API, the MCP Gateway, RAG service, and the Tekos
+  LangGraph workflow (`components/agent-runtime`, now a thin
+  `ai-gateway` client with no provider secret of its own).
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only
@@ -373,8 +376,11 @@ planning narrative — see README.md's "v0 build status" for a summary:
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
   deploys as a plain `Deployment` instead.
 
-All three Python services (`agent-runtime`, `mcp-gateway`, `rag-service`)
-now instrument themselves with OTel per `ansible/roles/observability/README.md`.
+All four Python services (`agent-runtime`, `ai-gateway`, `mcp-gateway`,
+`rag-service`) instrument themselves with OTel per
+`ansible/roles/observability/README.md` — `ai-gateway` now owns the
+per-provider model-call spans/token/cost metrics that used to live in
+`agent-runtime`, moved there as part of implementing ADR-0009.
 The cluster's real apps domain is auto-discovered from
 `Ingress.config.openshift.io/cluster`, persisted to Vault
 (`secret/zuno/platform/cluster-domain`), and substituted into every GitOps
