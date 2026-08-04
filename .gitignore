@@ -1,0 +1,35 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.kubeconfig
+kubeconfig
+vault-password*
+
+# Real / unapproved business data
+*.dump
+*.sql.gz
+data/sxa/fixtures/private/
+data/sxa/fixtures/raw/
+data/sxa/source-data/
+
+# Python / Ansible
+__pycache__/
+*.pyc
+.ansible/
+*.retry
+
+# Go / Node
+bin/
+node_modules/
+dist/
+coverage/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
