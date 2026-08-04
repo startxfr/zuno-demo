@@ -8,6 +8,13 @@ Implementation: FastAPI (Python 3.11), `asyncpg`. Deployed by
 `ansible/roles/rag` via `gitops/apps/rag/application.yaml` ->
 `gitops/charts/rag-service` into the shared `zuno-platform` namespace.
 
+## Observability (ADR-0029)
+
+`app/telemetry.py` initializes an OTLP tracer/meter at startup and wraps
+`POST /v1/search` in a `rag_search` span (query length, `top_k`, latency,
+outcome) plus the `zuno.rag_searches` counter and
+`zuno.rag_result_count` histogram.
+
 ## HTTP API contract
 
 ### `POST /v1/search`

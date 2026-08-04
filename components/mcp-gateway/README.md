@@ -8,6 +8,14 @@ Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
 `ansible/roles/mcp` via `gitops/apps/mcp/application.yaml` ->
 `gitops/charts/mcp-gateway` into the shared `zuno-platform` namespace.
 
+## Observability (ADR-0029)
+
+`app/telemetry.py` initializes an OTLP tracer/meter at startup and wraps
+every `/v1/tools/{tool}/invoke` call in a `tool_invoke` span (tool, caller
+classification, latency, and a precise outcome — `allowed`, `denied`,
+`unknown_tool`, `bad_request`, `downstream_error`, or `error`) plus the
+`zuno.tool_invocations` counter.
+
 ## HTTP API contract
 
 ### `POST /v1/tools/{tool_name}/invoke`

@@ -21,9 +21,12 @@ from app.auth import CallerIdentity, validate_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyStore, evaluate
+from app.telemetry import init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("mcp_gateway")
+
+init_telemetry("mcp-gateway")  # ADR-0029: traces/metrics to the shared OTel Collector
 
 app = FastAPI(
     title="Zuno MCP Gateway",
@@ -86,52 +89,62 @@ async def invoke_tool(
 ) -> Dict[str, Any]:
     request_id = str(uuid.uuid4())
     started = time.monotonic()
+    classification = x_zuno_data_classification.upper()
 
-    if tool_name not in KNOWN_TOOLS:
-        raise HTTPException(status_code=404, detail=f"unknown tool '{tool_name}'")
+    with tool_invoke_span(tool_name, classification) as call:
+        if tool_name not in KNOWN_TOOLS:
+            call.outcome = "unknown_tool"
+            raise HTTPException(status_code=404, detail=f"unknown tool '{tool_name}'")
 
-    raw_body = await request.body()
-    if raw_body:
+        raw_body = await request.body()
+        if raw_body:
+            try:
+                arguments = json.loads(raw_body)
+            except json.JSONDecodeError as exc:
+                call.outcome = "bad_request"
+                raise HTTPException(status_code=400, detail=f"request body is not valid JSON: {exc}") from exc
+        else:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            call.outcome = "bad_request"
+            raise HTTPException(status_code=400, detail="request body must be a JSON object of tool arguments")
+
+        decision = evaluate(
+            store=policy_store,
+            tool_name=tool_name,
+            caller_groups=identity.groups,
+            request_classification=classification,
+        )
+        call.mcp_server = decision.mcp_server
+        call.reason = decision.reason
+
+        logger.info(
+            "tool=%s caller=%s groups=%s classification=%s allowed=%s reason=%s request_id=%s",
+            tool_name,
+            identity.sub,
+            identity.groups,
+            x_zuno_data_classification,
+            decision.allowed,
+            decision.reason,
+            request_id,
+        )
+
+        if not decision.allowed:
+            call.outcome = "denied"
+            raise HTTPException(status_code=403, detail=decision.reason)
+
         try:
-            arguments = json.loads(raw_body)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"request body is not valid JSON: {exc}") from exc
-    else:
-        arguments = {}
-    if not isinstance(arguments, dict):
-        raise HTTPException(status_code=400, detail="request body must be a JSON object of tool arguments")
+            result = await invoke_downstream(tool_name, arguments, identity.sub, identity.token)
+        except DownstreamError as exc:
+            call.outcome = "downstream_error"
+            raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
-    decision = evaluate(
-        store=policy_store,
-        tool_name=tool_name,
-        caller_groups=identity.groups,
-        request_classification=x_zuno_data_classification.upper(),
-    )
-
-    logger.info(
-        "tool=%s caller=%s groups=%s classification=%s allowed=%s reason=%s request_id=%s",
-        tool_name,
-        identity.sub,
-        identity.groups,
-        x_zuno_data_classification,
-        decision.allowed,
-        decision.reason,
-        request_id,
-    )
-
-    if not decision.allowed:
-        raise HTTPException(status_code=403, detail=decision.reason)
-
-    try:
-        result = await invoke_downstream(tool_name, arguments, identity.sub, identity.token)
-    except DownstreamError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
-
-    duration_ms = (time.monotonic() - started) * 1000
-    return {
-        "tool": tool_name,
-        "request_id": request_id,
-        "mcp_server": decision.mcp_server,
-        "duration_ms": round(duration_ms, 1),
-        "result": result,
-    }
+        call.outcome = "allowed"
+        duration_ms = (time.monotonic() - started) * 1000
+        return {
+            "tool": tool_name,
+            "request_id": request_id,
+            "mcp_server": decision.mcp_server,
+            "duration_ms": round(duration_ms, 1),
+            "result": result,
+        }

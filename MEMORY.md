@@ -373,10 +373,10 @@ planning narrative — see README.md's "v0 build status" for a summary:
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
   deploys as a plain `Deployment` instead.
 
-Not yet built even for Tekos: OTel instrumentation exists in
-`agent-runtime` only (`mcp-gateway`/`rag-service` still need it, see
-`ansible/roles/observability/README.md`); the cluster's real apps domain
-must be hand-edited into a few GitOps `Application` manifests before a real
-deploy (`gitops/apps/README.md`'s "Known follow-up"); and everything here
-was built and validated (Helm lint/template, YAML/JSON/Python syntax)
-without a live OpenShift cluster to run it against.
+All three Python services (`agent-runtime`, `mcp-gateway`, `rag-service`)
+now instrument themselves with OTel per `ansible/roles/observability/README.md`.
+Still open: the cluster's real apps domain must be hand-edited into a few
+GitOps `Application` manifests before a real deploy
+(`gitops/apps/README.md`'s "Known follow-up"); and everything here was
+built and validated (Helm lint/template, YAML/JSON/Python syntax) without a
+live OpenShift cluster to run it against.

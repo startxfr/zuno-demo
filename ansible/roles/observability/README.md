@@ -14,8 +14,14 @@ touches this role's Collector `spec.config.exporters` — every instrumented
 service already points at the Collector by its stable in-cluster name and
 needs no changes.
 
-See `components/agent-runtime/app/telemetry.py` for the reference
-instrumentation pattern (token usage, estimated cost, and a span per model
-call, per ADR-0029) — `mcp-gateway` and `rag-service` should adopt the same
-pattern; that wiring is not yet done in those two services (flagged here
-rather than silently left unmentioned).
+Every one of the three Python services instruments itself the same way —
+`init_telemetry()` at startup plus a span around its notable operation —
+each with its own `app/telemetry.py` (duplicated per-service rather than
+shared across independently-deployed images, per
+`components/agent-runtime/app/telemetry.py`'s docstring):
+
+| Service | Span | What it records |
+|---|---|---|
+| `agent-runtime` | `model_call` | provider/model, latency, outcome, token usage, estimated cost |
+| `mcp-gateway` | `tool_invoke` | tool, classification, latency, precise outcome (allowed/denied/unknown_tool/...) |
+| `rag-service` | `rag_search` | query length, `top_k`, latency, result count |
