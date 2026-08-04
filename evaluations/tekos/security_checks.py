@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Security-negative checks for ADR-0032 (propagate trusted identity end to
-end) and ADR-0033 (derive user identity only from validated tokens).
+"""Security-negative checks for ADR-0032/0033 (identity propagation) and
+ADR-0034/0035 (classification aggregation and source-level external-model
+restrictions).
 
 Kept separate from scenarios.yaml/run_scenarios.py rather than added as
 scenarios 21+: ADR-0027 fixes Tekos's acceptance suite at exactly 20
-scenarios, and these are security-negative checks for a specific pair of
-ADRs, not part of that fixed acceptance count. Reuses run_scenarios.py's
-token-fetch helpers rather than duplicating them.
+scenarios, and these are security-negative checks for specific ADRs, not
+part of that fixed acceptance count. Reuses run_scenarios.py's token-fetch
+helpers rather than duplicating them.
 
 This cannot be executed in the sandbox this repo was built in (no live
 cluster) - written to be genuinely runnable once one exists, same as
@@ -14,13 +15,20 @@ run_scenarios.py.
 """
 from __future__ import annotations
 
+import os
+import pathlib
 import sys
 import uuid
 from dataclasses import dataclass
 
 import httpx
+import yaml
 
 from run_scenarios import BFF_URL, RUNTIME_URL, auth_headers
+
+# Not part of run_scenarios.py's URL set since none of the 20 fixed
+# scenarios call ai-gateway directly (only agent-runtime does, internally).
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai.svc.cluster.local:8080")
 
 
 @dataclass
@@ -79,9 +87,61 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     )
 
 
+def confluence_policy_is_c2_and_local_only() -> CheckResult:
+    """ADR-0034/0035 config-consistency check (no live cluster needed, same
+    style as run_scenarios.py's model_router_fails_closed): Confluence must
+    be classified C2 (not the old, incorrect C1) in both
+    policies/data-classification/classification.yaml and
+    policies/tools/tool-policy.yaml's search_confluence entry, and that
+    entry must declare external_model_policy.allow_context: false.
+    """
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    classification = yaml.safe_load((repo_root / "policies/data-classification/classification.yaml").read_text())
+    tool_policy = yaml.safe_load((repo_root / "policies/tools/tool-policy.yaml").read_text())
+
+    confluence_domain = classification.get("data_domains", {}).get("confluence")
+    entry = next((t for t in tool_policy.get("tools", []) if t["tool"] == "search_confluence"), None)
+    min_classification = entry.get("min_classification") if entry else None
+    allow_context = (entry or {}).get("external_model_policy", {}).get("allow_context", True)
+
+    ok = confluence_domain == "C2" and min_classification == "C2" and allow_context is False
+    return CheckResult(
+        "confluence_policy_is_c2_and_local_only",
+        ok,
+        f"confluence_domain={confluence_domain} min_classification={min_classification} allow_context={allow_context}",
+    )
+
+
+def ai_gateway_local_only_forces_local_provider() -> CheckResult:
+    """ADR-0035's mandatory acceptance test: a C2 request with
+    X-Zuno-Local-Only: true must be served by the local provider even
+    though C2 alone would otherwise permit an approved SaaS provider
+    (policies/data-classification/classification.yaml: C2 is
+    "approved-saas-only", not "local-only" - X-Zuno-Local-Only is what
+    forces local regardless).
+    """
+    resp = httpx.post(
+        f"{AI_GATEWAY_URL}/v1/chat/completions",
+        headers={
+            **auth_headers("chris"),
+            "X-Zuno-Data-Classification": "C2",
+            "X-Zuno-Local-Only": "true",
+        },
+        json={"model": "zuno-auto", "messages": [{"role": "user", "content": "Say OK."}]},
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return CheckResult("ai_gateway_local_only_forces_local_provider", False, f"status={resp.status_code} body={resp.text[:200]}")
+    provider = resp.json().get("zuno_provider")
+    ok = provider == "local"
+    return CheckResult("ai_gateway_local_only_forces_local_provider", ok, f"zuno_provider={provider}")
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
+    confluence_policy_is_c2_and_local_only,
+    ai_gateway_local_only_forces_local_provider,
 ]
 
 

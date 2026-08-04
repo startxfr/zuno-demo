@@ -48,14 +48,30 @@
 #   allowed_groups:    list of Keycloak `zuno` realm group names (see
 #                       platform/identity/README.md) permitted to invoke this tool,
 #                       subject to the other four factors above still applying.
+#   external_model_policy.allow_context (optional, default true): ADR-0035 -
+#                       a source-level restriction independent of
+#                       min_classification. When false, this tool's result
+#                       content must only ever be processed by local
+#                       inference, regardless of the broader
+#                       min_classification's own SaaS-eligibility (e.g. C2
+#                       otherwise permits an approved-SaaS allow-list) - the
+#                       MCP Gateway reports this flag back to the caller in
+#                       its invoke response so the Agent Runtime's model
+#                       routing can enforce it (X-Zuno-Local-Only header to
+#                       components/ai-gateway).
 
 tools:
   - tool: search_confluence
     mcp_server: confluence
-    min_classification: C1
+    # C2 per ADR-0035 (was incorrectly C1) - internal Confluence content is
+    # business-sensitive, matching the `confluence` domain in
+    # policies/data-classification/classification.yaml.
+    min_classification: C2
     allowed_groups:
       - consultant
       - board
+    external_model_policy:
+      allow_context: false
 
   - tool: list_drive_files
     mcp_server: google-workspace

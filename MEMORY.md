@@ -373,10 +373,20 @@ planning narrative - see README.md's "v0 build status" for a summary:
   BFF -> Runtime call was silently unauthenticated), and the Runtime
   forwards it again to `ai-gateway` instead of the `"not-required"`
   placeholder. The Runtime also now derives `user_sub` exclusively from
-  the validated token, never the request body (ADR-0033) -
-  `evaluations/tekos/security_checks.py` covers both with security-
-  negative checks kept separate from the fixed 20-scenario acceptance
-  suite (ADR-0027).
+  the validated token, never the request body (ADR-0033).
+- Data classification is now computed per turn instead of a static
+  constant (ADR-0034): `effective_classification` starts at the
+  technical-docs baseline (C1) and escalates to C2 the moment Confluence
+  content enters context, never downgrading. Confluence is corrected from
+  C1 to C2 in both policy files and gains a source-level
+  `external_model_policy.allow_context: false` (ADR-0035) that forces
+  local-only inference for the rest of that turn regardless of what C2's
+  own SaaS-eligibility would otherwise permit - enforced via a new
+  `X-Zuno-Local-Only` header the MCP Gateway's tool response, Agent
+  Runtime and AI Gateway all now understand.
+  `evaluations/tekos/security_checks.py` covers all four ADRs (0032-0035)
+  with checks kept separate from the fixed 20-scenario acceptance suite
+  (ADR-0027).
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only

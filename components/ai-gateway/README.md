@@ -28,19 +28,26 @@ tracked as "Accepted, not Implemented" for. Extracting it here means:
 
 ### `POST /v1/chat/completions`
 
-OpenAI-compatible on the wire, with one Zuno-specific header and one
+OpenAI-compatible on the wire, with two Zuno-specific headers and one
 Zuno-specific response field:
 
 - **Auth:** `Authorization: Bearer <keycloak-jwt>` (required - validated
   against the realm's JWKS; this gateway does not do group-based
   authorization, only authenticated-caller verification).
 - **Header:** `X-Zuno-Data-Classification: C1|C2|C3` (optional, default
-  `C1`) - the single input that actually selects the provider/fallback
-  chain (ADR-0021). **`model` in the request body is accepted for
-  wire-format compatibility but ignored for v0** - routing never looks at
-  it; a future version could let a specific value pin/override the
-  classification-driven decision (not built, tracked as follow-up, not a
-  v0 requirement).
+  `C1`) - the primary input that selects the provider/fallback chain
+  (ADR-0021). **`model` in the request body is accepted for wire-format
+  compatibility but ignored for v0** - routing never looks at it; a future
+  version could let a specific value pin/override the classification-driven
+  decision (not built, tracked as follow-up, not a v0 requirement).
+- **Header:** `X-Zuno-Local-Only: true|false` (optional, default `false`,
+  ADR-0035) - a source-level restriction independent of classification:
+  when `true`, candidates are filtered to local providers only regardless
+  of what the declared classification's own SaaS-eligibility would
+  otherwise permit. Set by the Agent Runtime when a contributing source
+  this turn (e.g. Confluence, via the MCP Gateway's
+  `external_model_policy.allow_context: false`) must never leave the
+  cluster.
 - **Body:**
   ```json
   {

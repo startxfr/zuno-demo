@@ -146,5 +146,11 @@ async def invoke_tool(
             "request_id": request_id,
             "mcp_server": decision.mcp_server,
             "duration_ms": round(duration_ms, 1),
+            # ADR-0035: tells the caller (Agent Runtime) whether this
+            # result may be processed by an external SaaS model or must
+            # stay local, independent of the classification the caller
+            # itself declared - the Agent Runtime uses this to set
+            # X-Zuno-Local-Only on its own downstream model call.
+            "external_model_policy": {"allow_context": decision.allow_external_context},
             "result": result,
         }

@@ -36,3 +36,15 @@ class AgentState(TypedDict, total=False):
     # detail lives in components/ai-gateway's own OTel traces.
     provider_used: Optional[str]
     errors: List[str]
+
+    # ADR-0034: the highest classification of every context source
+    # contributed so far (retrieved docs, tool results) - monotonically
+    # non-decreasing, never downgraded once escalated. Drives the model
+    # call's X-Zuno-Data-Classification header, replacing the old static
+    # per-agent constant.
+    effective_classification: str
+    # ADR-0035: set True the moment any contributing source declares
+    # external_model_policy.allow_context: false (e.g. Confluence results) -
+    # forces the model call to local-only inference regardless of what
+    # effective_classification's own SaaS-eligibility would otherwise allow.
+    local_only_required: bool

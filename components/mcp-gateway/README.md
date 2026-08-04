@@ -36,9 +36,17 @@ classification, latency, and a precise outcome - `allowed`, `denied`,
     "request_id": "…",
     "mcp_server": "confluence-demo",
     "duration_ms": 12.3,
+    "external_model_policy": { "allow_context": false },
     "result": { "...": "tool-specific payload" }
   }
   ```
+  `external_model_policy.allow_context` (ADR-0035) mirrors the tool's
+  `external_model_policy.allow_context` in `tool-policy.yaml` (default
+  `true`) - `false` means this result must only be processed by local
+  inference regardless of the classification-driven SaaS-eligibility that
+  would otherwise apply. The caller (Agent Runtime) is expected to set
+  `X-Zuno-Local-Only: true` on its own downstream model call when this is
+  `false`.
 - **Response `403`:** `{"detail": "<human-readable reason policy denied the call>"}`
 - **Response `401`:** missing/invalid/expired JWT.
 - **Response `404`:** unknown tool name.

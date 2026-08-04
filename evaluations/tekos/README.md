@@ -34,12 +34,16 @@ This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what "make
 check" and a full evaluation run require.
 
-## Security-negative checks (ADR-0032, ADR-0033)
+## Security-negative checks (ADR-0032, ADR-0033, ADR-0034, ADR-0035)
 
 `security_checks.py` (same setup as above, run from this directory) checks
-identity-propagation behavior that isn't part of the fixed 20-scenario
-acceptance count (ADR-0027 fixes that count; these are negative/security
-checks for a specific pair of ADRs, not acceptance coverage): the BFF
-actually forwards the caller's token to the Agent Runtime, and the Runtime
+identity-propagation and classification behavior that isn't part of the
+fixed 20-scenario acceptance count (ADR-0027 fixes that count; these are
+negative/security checks for specific ADRs, not acceptance coverage): the
+BFF actually forwards the caller's token to the Agent Runtime, the Runtime
 ignores a forged `user_sub` in the request body rather than treating it as
-authoritative.
+authoritative, Confluence is correctly classified C2 with
+`external_model_policy.allow_context: false` (a config-only check, no live
+cluster needed), and `X-Zuno-Local-Only: true` actually forces
+`components/ai-gateway` to pick the local provider even for a C2 request
+that would otherwise be SaaS-eligible.

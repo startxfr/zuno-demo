@@ -44,6 +44,13 @@ levels:
 # identified; every domain must resolve to one of the levels above.
 data_domains:
   technical-docs: C1
+  # C2 per ADR-0035, not C1 - internal Confluence content is
+  # business-sensitive. Additionally never eligible for external SaaS
+  # models regardless of C2's general "restricted SaaS allowed" policy
+  # above (see policies/tools/tool-policy.yaml's search_confluence entry,
+  # external_model_policy.allow_context: false) - a source-level
+  # restriction stricter than this domain's own classification level.
+  confluence: C2
   sales-data: C2
   financial-data: C3
   hr-data: C3

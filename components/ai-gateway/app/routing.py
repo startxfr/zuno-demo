@@ -76,13 +76,21 @@ class RoutingTable:
             return {}
         return next(p for p in self._config["providers"] if p["name"] == name)
 
-    def candidates_for(self, classification: str) -> List[ProviderCandidate]:
+    def candidates_for(self, classification: str, local_only: bool = False) -> List[ProviderCandidate]:
+        """`local_only` (ADR-0035) is a source-level restriction independent
+        of `classification`: when true, candidates are further filtered to
+        `kind == "local"` regardless of which SaaS providers the
+        classification alone would otherwise permit - set by the Agent
+        Runtime when a contributing source (e.g. Confluence) declared
+        `external_model_policy.allow_context: false`.
+        """
         classification = classification.upper()
         if classification not in CLASSIFICATION_RANK:
             raise RoutingError(f"unknown classification '{classification}'")
 
         providers = self._config.get("providers", [])
         if not providers:
+            # Fail-closed default (no config loaded) is already local-only.
             return [ProviderCandidate(name="local", kind="local")]
 
         candidates = [
@@ -90,10 +98,14 @@ class RoutingTable:
             for p in providers
             if classification in p.get("eligible_for", [])
         ]
+        if local_only:
+            candidates = [c for c in candidates if c.kind == "local"]
         if not candidates:
-            raise RoutingError(
-                f"no provider in {self._routing_path} is eligible for classification "
-                f"{classification}; failing closed per ADR-0021 rather than risk violating "
-                "data-handling policy"
+            reason = (
+                f"no local-only provider in {self._routing_path} is eligible for "
+                f"classification {classification}"
+                if local_only
+                else f"no provider in {self._routing_path} is eligible for classification {classification}"
             )
+            raise RoutingError(f"{reason}; failing closed per ADR-0021 rather than risk violating data-handling policy")
         return candidates

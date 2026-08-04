@@ -87,21 +87,28 @@ START -> retrieve -> [conditional] -> reason -> respond -> END
   `app/graph/nodes.py` for the full rationale.
 - **`tool_call`** (`tool_call_node`) - calls the MCP Gateway's
   `POST /v1/tools/search_confluence/invoke`, forwarding the caller's own
-  Bearer JWT (ADR-0013) and a declared `X-Zuno-Data-Classification: C1`
-  (technical-docs, per `policies/data-classification/classification.yaml`).
-  Degrades to no tool context (logged) if the gateway denies or fails the
-  call.
+  Bearer JWT (ADR-0013) and a declared `X-Zuno-Data-Classification: C2`
+  (confluence, per `policies/data-classification/classification.yaml` -
+  escalated from whatever the turn's baseline was, ADR-0034; the tool's own
+  `min_classification` requires at least C2). Degrades to no tool context
+  (logged) if the gateway denies or fails the call. On success, escalates
+  `effective_classification` for the rest of the turn and, per the
+  gateway's `external_model_policy.allow_context` verdict (ADR-0035), may
+  set `local_only_required` so the `reason` step below is forced to local
+  inference regardless of classification.
 - **`reason`** (`reason_node`) - builds a grounded prompt from retrieved
   docs + tool results, then calls `ModelRouter.invoke_with_fallback()`
   (`app/clients/model_router.py`), a single HTTP call to
-  `components/ai-gateway`'s `POST /v1/chat/completions`. The gateway tries
+  `components/ai-gateway`'s `POST /v1/chat/completions`, declaring the
+  turn's aggregated `effective_classification` (ADR-0034, not a static
+  per-agent constant) and `X-Zuno-Local-Only` (ADR-0035). The gateway tries
   the local vLLM model first, then falls through OpenAI -> Gemini ->
   Anthropic -> Mistral in the order declared by
   `platform/ai-gateway/provider-routing.yaml`, filtered to providers
   eligible for the request's classification (ADR-0021 - fails closed,
-  never silently escalates to an ineligible provider) - none of that
-  fallback logic lives in this repo's `agent-runtime` code anymore
-  (ADR-0009).
+  never silently escalates to an ineligible provider) and further filtered
+  to local-only when `X-Zuno-Local-Only: true` - none of that fallback
+  logic lives in this repo's `agent-runtime` code anymore (ADR-0009).
 - **`respond`** (`respond_node`) - assembles the final
   `{reply, citations}` contract from retrieved-doc sources and any live
   Confluence results, de-duplicated.

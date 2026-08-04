@@ -50,7 +50,7 @@ class ModelRouterError(RuntimeError):
 
 
 class ModelRouter:
-    def chat_model_for(self, classification: str, bearer_token: str) -> BaseChatModel:
+    def chat_model_for(self, classification: str, bearer_token: str, local_only: bool = False) -> BaseChatModel:
         return ChatOpenAI(
             base_url=f"{AI_GATEWAY_URL}/v1",
             # ADR-0032: forward the same validated end-user token the
@@ -71,18 +71,29 @@ class ModelRouter:
             # default_header below), not model-name-driven. Required by
             # the OpenAI wire schema regardless.
             model="zuno-auto",
-            default_headers={"X-Zuno-Data-Classification": classification.upper()},
+            default_headers={
+                "X-Zuno-Data-Classification": classification.upper(),
+                # ADR-0035: source-level restriction independent of
+                # classification - set when a source this turn (e.g.
+                # Confluence) declared external_model_policy.allow_context:
+                # false, forcing the gateway to only consider local
+                # candidates regardless of what this classification would
+                # otherwise allow.
+                "X-Zuno-Local-Only": "true" if local_only else "false",
+            },
         )
 
-    async def invoke_with_fallback(self, classification: str, messages: List[Any], bearer_token: str):
+    async def invoke_with_fallback(
+        self, classification: str, messages: List[Any], bearer_token: str, local_only: bool = False
+    ):
         """Kept as async + same name/signature as before this split (plus
-        `bearer_token`, added for ADR-0032) so app/graph/nodes.py:reason_node
-        barely changes. The multi-provider fallback loop this name used to
-        describe runs server-side in the gateway now
-        (app/main.py:_invoke_with_fallback there) - this is a single HTTP
-        call.
+        `bearer_token`/`local_only`, added for ADR-0032/ADR-0035) so
+        app/graph/nodes.py:reason_node barely changes. The multi-provider
+        fallback loop this name used to describe runs server-side in the
+        gateway now (app/main.py:_invoke_with_fallback there) - this is a
+        single HTTP call.
         """
-        model = self.chat_model_for(classification, bearer_token)
+        model = self.chat_model_for(classification, bearer_token, local_only)
         try:
             result = await model.ainvoke(messages)
         except Exception as exc:

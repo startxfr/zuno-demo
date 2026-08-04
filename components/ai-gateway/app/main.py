@@ -83,10 +83,12 @@ async def chat_completions(
     payload: ChatCompletionRequest,
     identity: CallerIdentity = Depends(validate_token),
     x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_local_only: str = Header(default="false", alias="X-Zuno-Local-Only"),
 ):
     classification = x_zuno_data_classification.upper()
+    local_only = x_zuno_local_only.strip().lower() == "true"
     try:
-        candidates = routing_table.candidates_for(classification)
+        candidates = routing_table.candidates_for(classification, local_only=local_only)
     except RoutingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

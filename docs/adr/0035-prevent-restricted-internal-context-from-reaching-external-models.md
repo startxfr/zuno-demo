@@ -1,6 +1,6 @@
 # ADR-0035: Prevent restricted internal context from reaching external models
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,32 @@ Correct `search_confluence` classification, add source metadata, and add a manda
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05).** `policies/tools/tool-policy.yaml`'s
+`search_confluence` entry is corrected from `min_classification: C1` to
+`C2`, and gains a new `external_model_policy.allow_context: false` field -
+a source-level restriction independent of classification. This flows
+through the whole chain rather than being duplicated as separate config:
+`components/mcp-gateway/app/policy.py` parses it onto `ToolPolicyEntry`/
+`PolicyDecision`, `app/main.py`'s `/v1/tools/{tool}/invoke` response echoes
+it back as `external_model_policy.allow_context`, `components/agent-runtime/
+app/graph/nodes.py`'s `tool_call_node` reads that response field and sets
+`local_only_required` in graph state, and `reason_node` /
+`app/clients/model_router.py` forward it as a new `X-Zuno-Local-Only`
+header to `components/ai-gateway`, whose `app/routing.py:candidates_for()`
+filters to `kind == "local"` providers when set - regardless of what the
+declared classification's own SaaS-eligibility would otherwise permit
+(C2 alone allows an approved-SaaS allow-list per
+`policies/data-classification/classification.yaml`).
+
+Mandatory acceptance test (Operational considerations above):
+`evaluations/tekos/security_checks.py`'s
+`ai_gateway_local_only_forces_local_provider` sends a C2 request with
+`X-Zuno-Local-Only: true` directly to `components/ai-gateway` and asserts
+`zuno_provider == "local"`, proving the "C2 Confluence + SaaS denied,
+C2 Confluence + local allowed" requirement - the local provider is
+eligible for every classification level (`provider-routing.yaml`), so
+"local allowed" is inherent to the filter and doesn't need a separate
+positive-path assertion beyond that same call succeeding.
 
 ## Acceptance criteria
 

@@ -45,6 +45,12 @@ class ToolPolicyEntry:
     mcp_server: str
     min_classification: str
     allowed_groups: List[str]
+    # ADR-0035: source-level restriction independent of min_classification.
+    # False means this tool's result must only ever reach local inference,
+    # regardless of what min_classification's own SaaS-eligibility would
+    # otherwise permit. Defaults true (no source-level restriction beyond
+    # classification) for every tool that doesn't declare otherwise.
+    allow_external_context: bool = True
 
 
 class PolicyStore:
@@ -76,6 +82,9 @@ class PolicyStore:
                         mcp_server=item["mcp_server"],
                         min_classification=item["min_classification"],
                         allowed_groups=list(item.get("allowed_groups", [])),
+                        allow_external_context=bool(
+                            (item.get("external_model_policy") or {}).get("allow_context", True)
+                        ),
                     )
             except FileNotFoundError:
                 msg = (
@@ -134,6 +143,10 @@ class PolicyDecision:
     allowed: bool
     reason: str
     mcp_server: Optional[str] = None
+    # ADR-0035: mirrors the matched entry's allow_external_context so the
+    # caller (main.py) can report it back to the Agent Runtime. True when
+    # no entry matched (denied calls never reach a model anyway).
+    allow_external_context: bool = True
 
 
 def evaluate(
@@ -201,4 +214,9 @@ def evaluate(
             ),
         )
 
-    return PolicyDecision(allowed=True, reason="allowed", mcp_server=entry.mcp_server)
+    return PolicyDecision(
+        allowed=True,
+        reason="allowed",
+        mcp_server=entry.mcp_server,
+        allow_external_context=entry.allow_external_context,
+    )
