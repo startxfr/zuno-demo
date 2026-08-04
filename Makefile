@@ -54,5 +54,5 @@ check:
 # Component/scope tokens are intentionally no-op Make targets. The first target
 # reads the second goal and dispatches it to Ansible. This preserves commands
 # such as `make precheck keycloak` without requiring COMPONENT=keycloak.
-$(PREP_COMPONENTS) $(CONFIG_SCOPES):
+$(sort $(PREP_COMPONENTS) $(CONFIG_SCOPES)):
 	@:
