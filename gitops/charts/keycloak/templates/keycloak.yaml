@@ -31,6 +31,11 @@
 # the exact env-var-naming transform should be re-verified against the
 # specific RHBK version the cluster installs (documented in this role's
 # README.md), since this could not be validated against a live cluster.
+#
+# KC_VAULT_DEMO_PERSONAS_PASSWORD (ADR-0041): the same mechanism resolves
+# every fixture user's `${vault.demo_personas_password}` credential in
+# files/realm-zuno.json - one shared, vault-generated password, never
+# hardcoded in Git.
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -74,4 +79,10 @@ spec:
                   secretKeyRef:
                     name: tekos-frontend-client-secret
                     key: client_secret
+                    optional: true
+              - name: KC_VAULT_DEMO_PERSONAS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: demo-personas-password
+                    key: password
                     optional: true

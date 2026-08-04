@@ -12,7 +12,15 @@ forwarding the caller's OIDC access token as a Bearer credential.
    JWKS, plus issuer/audience/expiry (ADR-0013 identity propagation - the
    BFF independently revalidates identity rather than trusting the
    frontend).
-2. Calls the shared Agent Runtime's documented chat contract, owned by a
+2. Enforces agent entitlement server-side (ADR-0040): the validated token's
+   `groups` claim must contain `agent_<AGENT_NAME>` (e.g. `agent_tekos`),
+   otherwise the call is rejected `403`. This is a distinct dimension from
+   the business-role groups (`consultant`, `sales`, `adv`, `finance`,
+   `board`, ...) that gate individual tools downstream at the MCP Gateway -
+   a caller can hold one without the other. Frontend tile visibility
+   (`components/agent-frontend/internal/portal`) is UX only, not
+   authorization; this check is the actual enforcement point.
+3. Calls the shared Agent Runtime's documented chat contract, owned by a
    parallel track, forwarding the same validated bearer token it just
    checked (ADR-0032 - identity must propagate all the way to the Runtime,
    not stop at the BFF; the Runtime requires this header and rejects calls
@@ -29,13 +37,13 @@ forwarding the caller's OIDC access token as a Bearer credential.
    informational/correlation only on the Runtime side (ADR-0033) - the
    Runtime derives the authoritative identity from the forwarded token
    itself, never from this field.
-3. Relays the runtime's reply back to the frontend.
+4. Relays the runtime's reply back to the frontend.
 
 ## This service's own API surface (what the frontend calls)
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
-| POST | `/api/chat` | `Authorization: Bearer <access_token>` | `{"session_id": string, "message": string}` | `200 {"reply": string, "citations": [{"source","title"}]}` / `401 {"error"}` if the token is missing, invalid or expired / `400 {"error"}` on a bad request body / `502 {"error"}` if the Agent Runtime call fails |
+| POST | `/api/chat` | `Authorization: Bearer <access_token>` | `{"session_id": string, "message": string}` | `200 {"reply": string, "citations": [{"source","title"}]}` / `401 {"error"}` if the token is missing, invalid or expired / `403 {"error"}` if the token lacks the `agent_<AGENT_NAME>` entitlement group (ADR-0040) / `400 {"error"}` on a bad request body / `502 {"error"}` if the Agent Runtime call fails |
 | GET | `/healthz` | none | - | `200 ok` |
 
 ## Configuration (environment variables)

@@ -32,8 +32,10 @@ spec:
       Placeholder pending v1 build; C2 anticipated because Gmail content
       requires context filtering rather than unrestricted SaaS use.
   access:
+    # ADR-0040: agent entitlement group, orthogonal to the `sales` business
+    # role that governs tool/data permissions inside Comage.
     groups:
-      - sales
+      - agent_comage
   ui:
     displayName: Comage
     tileDescription: Sales follow-up and pipeline assistant - coming soon.

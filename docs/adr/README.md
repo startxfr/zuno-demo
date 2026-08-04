@@ -43,8 +43,8 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md) | v0 | To be implemented | Protect MCP servers with network and workload identity boundaries |
 | [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | v0 | To be implemented | Use standards-compliant OKF v0.2 Markdown bundles |
 | [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | To be implemented | Make Agent Runtime execute the OKF agent contract |
-| [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | v0 | To be implemented | Separate agent entitlement from business role authorization |
-| [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | v0 | To be implemented | Remove nominative demo identities and static passwords from Git |
+| [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | v0 | Implemented | Separate agent entitlement from business role authorization |
+| [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | v0 | Implemented | Remove nominative demo identities and static passwords from Git |
 | [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v1 | To be implemented | Use opaque browser sessions with server-side token storage |
 | [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md) | v1 | To be implemented | Use standard MCP protocol behind the Zuno MCP Gateway |
 | [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | To be implemented | Use PatternFly React for the agent frontend |

@@ -34,8 +34,10 @@ spec:
       Placeholder pending v1 build; C3 anticipated because sovereign-marked
       DAT workflows are local-model-only per MEMORY.md section 5.
   access:
+    # ADR-0040: agent entitlement group, orthogonal to the `board` business
+    # role that governs tool/data permissions inside Arkos.
     groups:
-      - board
+      - agent_arkos
   ui:
     displayName: Arkos
     tileDescription: Architecture DAT and workshop assistant - coming soon.

@@ -1,6 +1,6 @@
 # ADR-0040: Separate agent entitlement from business role authorization
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,35 @@ Migrate Keycloak realm fixtures and policy tests. Add tests for users with entit
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05).** `gitops/charts/keycloak/files/realm-zuno.json`
+now defines two orthogonal group dimensions instead of one: five
+`agent_<name>` entitlement groups (`agent_comage`, `agent_tekos`,
+`agent_advantage`, `agent_finage`, `agent_arkos` - each holding the
+`clientRoles` mapping to its frontend's `access` role, the only groups that
+carry one), and five business-role groups (`sales`, `consultant`, `adv`,
+`finance`, `board`) with no `clientRoles` of their own, plus a `sales_admin`
+subgroup of `sales` (reserved - Comage has no runtime yet in v0, so no
+policy consumes it). `agents/*/agent.okf.yaml`'s `spec.access.groups` was
+updated from the business group to the matching `agent_<name>` group for
+all five agents.
+
+Per the Security considerations above, frontend tile visibility
+(`components/agent-frontend/internal/portal`) was never itself
+authorization and remains only a UX signal. The actual enforcement is now
+server-side in two places: `components/agent-bff/main.go`'s `chatHandler`
+rejects a call with `403` unless the validated token's `groups` claim
+contains `agent_<AGENT_NAME>` (new code - this check did not exist before),
+and `components/mcp-gateway/app/policy.py`'s existing `user_group_rights`
+factor continues to enforce the business-role groups against
+`policies/tools/tool-policy.yaml`'s `allowed_groups`, unchanged in name.
+
+Mandatory acceptance tests (Operational considerations above), added to
+`evaluations/tekos/security_checks.py`: `entitlement_without_business_role_denied_confluence`
+(persona `tekos-entitlement-only-user-01`: `agent_tekos` only, no business
+role - MCP Gateway must still deny `search_confluence` with 403) and
+`business_role_without_entitlement_denied_by_bff` (persona
+`consultant-role-only-user-01`: `consultant` only, no `agent_tekos` - the
+BFF must deny the call with 403 before it reaches the Agent Runtime).
 
 ## Acceptance criteria
 

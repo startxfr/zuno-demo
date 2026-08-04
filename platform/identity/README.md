@@ -23,19 +23,25 @@ claim to the access token, ID token and userinfo response:
 ```json
 {
   "sub": "3fabc12e-...-b2a1",
-  "preferred_username": "chris",
-  "email": "chris@zuno-demo.internal",
-  "groups": ["/consultant"],
+  "preferred_username": "consultant-user-01",
+  "email": "consultant-user-01@zuno-demo.internal",
+  "groups": ["/consultant", "/agent_tekos"],
   "iss": "https://keycloak.<cluster-apps-domain>/realms/zuno",
   "aud": "tekos-frontend",
   "exp": 1234567890
 }
 ```
 
-- `groups` is always an array of full group paths (leading `/`), e.g.
-  `["/consultant"]`. A user belongs to exactly one of the platform's five
-  groups today (`sales`, `consultant`, `adv`, `finance`, `board`), but
-  downstream services must not assume cardinality 1 - treat it as a set.
+- `groups` is always an array of full group paths (leading `/`). Per
+  ADR-0040 there are two orthogonal dimensions: one **agent entitlement**
+  group (`agent_comage`, `agent_tekos`, `agent_advantage`, `agent_finage`,
+  `agent_arkos` - governs frontend/BFF access to that agent) and one
+  **business role** group (`sales`, `consultant`, `adv`, `finance`, `board`,
+  or `sales_admin` - governs tool/data permissions inside an already
+  authorized agent). A fixture user typically holds one of each, but
+  downstream services must not assume any particular cardinality - treat
+  `groups` as a set and check for the specific claim(s) each check cares
+  about.
 - Group name to agent-client mapping, and group membership, is defined in
   `gitops/charts/keycloak/files/realm-zuno.json`; the current members are
   documented in `ansible/roles/keycloak/README.md`.

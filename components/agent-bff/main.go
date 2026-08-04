@@ -30,7 +30,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthzHandler)
-	mux.HandleFunc("/api/chat", chatHandler(verifier, runtimeClient))
+	mux.HandleFunc("/api/chat", chatHandler(verifier, runtimeClient, cfg.AgentName))
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -65,7 +65,8 @@ type apiErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client) http.HandlerFunc {
+func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -83,6 +84,16 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client) http.Ha
 		if err != nil {
 			log.Printf("agent-bff: token verification failed: %v", err)
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
+			return
+		}
+
+		// ADR-0040: agent entitlement (agent_<name>) is a distinct,
+		// server-enforced dimension from the business-role groups that
+		// gate individual tools downstream (MCP Gateway policy). Frontend
+		// tile visibility is not authorization - this is the actual gate.
+		if !hasGroup(claims.Groups, entitlementGroup) {
+			log.Printf("agent-bff: subject %q lacks entitlement group %q", claims.Subject, entitlementGroup)
+			writeError(w, http.StatusForbidden, "not entitled to this agent")
 			return
 		}
 
@@ -116,6 +127,18 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client) http.Ha
 			Citations: resp.Citations,
 		})
 	}
+}
+
+// hasGroup reports whether want (a bare group name) is among groups (the
+// JWT's "groups" claim entries, e.g. "/agent_tekos" - full paths with a
+// leading "/", per platform/identity/README.md).
+func hasGroup(groups []string, want string) bool {
+	for _, g := range groups {
+		if strings.TrimPrefix(g, "/") == want {
+			return true
+		}
+	}
+	return false
 }
 
 func bearerToken(r *http.Request) string {

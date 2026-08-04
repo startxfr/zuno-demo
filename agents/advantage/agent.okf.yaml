@@ -30,8 +30,10 @@ spec:
       Placeholder pending v1 build; C2 anticipated for commercial sales-data
       handling consistent with policies/data-classification.
   access:
+    # ADR-0040: agent entitlement group, orthogonal to the `adv` business
+    # role that governs tool/data permissions inside Advantage.
     groups:
-      - adv
+      - agent_advantage
   ui:
     displayName: Advantage
     tileDescription: Sales administration and PO tracking - coming soon.

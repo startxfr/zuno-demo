@@ -30,9 +30,13 @@ RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster
 SALES_DB_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai.svc.cluster.local:8000")
 
 REALM = "zuno"
-# Every persona's password (ansible/roles/keycloak/README.md's "Two
-# integration fixes" note explains why credentials are non-temporary).
-DEMO_PASSWORD = "ZunoDemo!2026"
+# Shared demo-persona password (ADR-0041) - never hardcoded; read from the
+# same place `make configure keycloak` puts it (an operator running this
+# script fetches it once, e.g.
+# `vault kv get -field=password secret/zuno/keycloak/demo-personas`).
+# ansible/roles/keycloak/README.md's "Two integration fixes" note explains
+# why every fixture user's credential is non-temporary.
+DEMO_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD")
 # Confidential client's own secret - never hardcoded; read from the same
 # place `make configure keycloak` puts it (an operator running this script
 # fetches it once, e.g. `vault kv get -field=client_secret secret/zuno/keycloak/tekos-frontend`).
@@ -69,6 +73,8 @@ def get_token(persona: str) -> str:
         return _token_cache[persona]
     if not TEKOS_FRONTEND_CLIENT_SECRET:
         raise RuntimeError("TEKOS_FRONTEND_CLIENT_SECRET is required to obtain persona tokens")
+    if not DEMO_PASSWORD:
+        raise RuntimeError("DEMO_PERSONA_PASSWORD is required to obtain persona tokens")
 
     resp = httpx.post(
         f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token",

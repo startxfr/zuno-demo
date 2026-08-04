@@ -29,8 +29,10 @@ spec:
       Placeholder pending v1 build; C2 anticipated for financial/commercial
       data handling consistent with policies/data-classification.
   access:
+    # ADR-0040: agent entitlement group, orthogonal to the `finance`
+    # business role that governs tool/data permissions inside Finage.
     groups:
-      - finance
+      - agent_finage
   ui:
     displayName: Finage
     tileDescription: Billing and invoice reporting assistant - coming soon.

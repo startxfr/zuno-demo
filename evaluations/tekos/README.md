@@ -11,6 +11,7 @@ pip install -r requirements.txt
 export KEYCLOAK_URL=https://sso.apps.<cluster-domain>
 export FRONTEND_URL=https://tekos.apps.<cluster-domain>
 export TEKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret secret/zuno/keycloak/tekos-frontend)
+export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password secret/zuno/keycloak/demo-personas)
 # BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL
 # default to their in-cluster Service DNS names - override if running this
 # from outside the cluster via a port-forward instead.
@@ -34,16 +35,21 @@ This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what "make
 check" and a full evaluation run require.
 
-## Security-negative checks (ADR-0032, ADR-0033, ADR-0034, ADR-0035)
+## Security-negative checks (ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0040)
 
 `security_checks.py` (same setup as above, run from this directory) checks
-identity-propagation and classification behavior that isn't part of the
-fixed 20-scenario acceptance count (ADR-0027 fixes that count; these are
-negative/security checks for specific ADRs, not acceptance coverage): the
-BFF actually forwards the caller's token to the Agent Runtime, the Runtime
-ignores a forged `user_sub` in the request body rather than treating it as
-authoritative, Confluence is correctly classified C2 with
-`external_model_policy.allow_context: false` (a config-only check, no live
-cluster needed), and `X-Zuno-Local-Only: true` actually forces
+identity-propagation, classification and entitlement behavior that isn't
+part of the fixed 20-scenario acceptance count (ADR-0027 fixes that count;
+these are negative/security checks for specific ADRs, not acceptance
+coverage): the BFF actually forwards the caller's token to the Agent
+Runtime, the Runtime ignores a forged `user_sub` in the request body rather
+than treating it as authoritative, Confluence is correctly classified C2
+with `external_model_policy.allow_context: false` (a config-only check, no
+live cluster needed), `X-Zuno-Local-Only: true` actually forces
 `components/ai-gateway` to pick the local provider even for a C2 request
-that would otherwise be SaaS-eligible.
+that would otherwise be SaaS-eligible, and ADR-0040's two-dimension group
+model is enforced server-side in both directions: a caller with the
+`agent_tekos` entitlement but no business role is denied `search_confluence`
+by the MCP Gateway (403), and a caller with the `consultant` business role
+but no `agent_tekos` entitlement is denied by the BFF itself (403) before
+the request ever reaches the Agent Runtime.

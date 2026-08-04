@@ -354,10 +354,13 @@ planning narrative - see README.md's "v0 build status" for a summary:
   exactly one credential (OpenShift API endpoint + cluster-admin token),
   via ArgoCD + External Secrets Operator + a self-bootstrapping Vault
   (ADR-0022, ADR-0024).
-- Identity: the `zuno` Keycloak realm with the 11 named personas across all
-  five agents' groups (section 9's agent catalog), real Google IdP broker
-  federation (section 8, ADR-0014), and the policy-intersection data files
-  (`policies/tools/tool-policy.yaml`, `policies/data-classification/classification.yaml`).
+- Identity: the `zuno` Keycloak realm with 13 anonymized synthetic personas
+  (ADR-0041 - no nominative demo identity or hardcoded password in Git; the
+  shared password is vault-generated at `secret/zuno/keycloak/demo-personas`)
+  across all five agents' groups (section 9's agent catalog), real Google
+  IdP broker federation (section 8, ADR-0014), and the policy-intersection
+  data files (`policies/tools/tool-policy.yaml`,
+  `policies/data-classification/classification.yaml`).
 - Data: a from-scratch PostgreSQL-native schema for section 10's SXA
   domain (`data/sxa/schema/`), synthetic fixtures, and the sales-db MCP
   server.
@@ -387,6 +390,15 @@ planning narrative - see README.md's "v0 build status" for a summary:
   `evaluations/tekos/security_checks.py` covers all four ADRs (0032-0035)
   with checks kept separate from the fixed 20-scenario acceptance suite
   (ADR-0027).
+- Agent entitlement and business role are now two orthogonal Keycloak group
+  dimensions (ADR-0040): `agent_<name>` groups gate frontend/BFF access to
+  an agent, while `sales`/`consultant`/`adv`/`finance`/`board` (plus a
+  `sales_admin` subgroup, reserved for Comage) gate tool/data permissions
+  once inside. Each agent's BFF now enforces the entitlement claim
+  server-side (`components/agent-bff/main.go`, 403 if missing) rather than
+  relying on frontend tile visibility. `agents/*/agent.okf.yaml`'s
+  `access.groups` was updated from the business group to the matching
+  `agent_<name>` group accordingly.
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only

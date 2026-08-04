@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Security-negative checks for ADR-0032/0033 (identity propagation) and
+"""Security-negative checks for ADR-0032/0033 (identity propagation),
 ADR-0034/0035 (classification aggregation and source-level external-model
-restrictions).
+restrictions) and ADR-0040 (agent entitlement vs. business-role
+separation).
 
 Kept separate from scenarios.yaml/run_scenarios.py rather than added as
 scenarios 21+: ADR-0027 fixes Tekos's acceptance suite at exactly 20
@@ -24,7 +25,7 @@ from dataclasses import dataclass
 import httpx
 import yaml
 
-from run_scenarios import BFF_URL, RUNTIME_URL, auth_headers
+from run_scenarios import BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers
 
 # Not part of run_scenarios.py's URL set since none of the 20 fixed
 # scenarios call ai-gateway directly (only agent-runtime does, internally).
@@ -48,7 +49,7 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
     """
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
-        headers=auth_headers("chris"),
+        headers=auth_headers("consultant-user-01"),
         json={"session_id": "sec-check-1", "message": "What GPU does the local model run on?"},
         timeout=30,
     )
@@ -63,15 +64,15 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
 def runtime_ignores_mismatched_user_sub() -> CheckResult:
     """ADR-0033: a request body's user_sub is informational only - the
     Runtime must derive the authoritative subject from the validated token,
-    not this field. Submitting a token for one real persona (chris) with a
-    body user_sub claiming to be an unrelated, nonexistent identity must
-    not be rejected or otherwise change the outcome (impersonation via the
-    body field is impossible because the field is never trusted).
+    not this field. Submitting a token for a real persona (consultant-user-01)
+    with a body user_sub claiming to be an unrelated, nonexistent identity
+    must not be rejected or otherwise change the outcome (impersonation via
+    the body field is impossible because the field is never trusted).
     """
     forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/tekos/chat",
-        headers=auth_headers("chris"),
+        headers=auth_headers("consultant-user-01"),
         json={
             "session_id": "sec-check-2",
             "user_sub": forged_sub,
@@ -123,7 +124,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     resp = httpx.post(
         f"{AI_GATEWAY_URL}/v1/chat/completions",
         headers={
-            **auth_headers("chris"),
+            **auth_headers("consultant-user-01"),
             "X-Zuno-Data-Classification": "C2",
             "X-Zuno-Local-Only": "true",
         },
@@ -137,11 +138,58 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     return CheckResult("ai_gateway_local_only_forces_local_provider", ok, f"zuno_provider={provider}")
 
 
+def entitlement_without_business_role_denied_confluence() -> CheckResult:
+    """ADR-0040: agent entitlement and business role are orthogonal.
+    tekos-entitlement-only-user-01 holds agent_tekos (can sign in / reach
+    Tekos) but no business role at all - not consultant, not board. The MCP
+    Gateway's user_group_rights factor (policies/tools/tool-policy.yaml:
+    search_confluence.allowed_groups: [consultant, board]) must still deny
+    the call with 403, proving agent entitlement alone never substitutes
+    for the business-role check.
+    """
+    resp = _invoke_tool(
+        "tekos-entitlement-only-user-01",
+        "search_confluence",
+        {"query": "RHOAI 3.5 EA2 rollout"},
+        classification="C2",
+    )
+    ok = resp.status_code == 403
+    return CheckResult(
+        "entitlement_without_business_role_denied_confluence",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
+def business_role_without_entitlement_denied_by_bff() -> CheckResult:
+    """ADR-0040: the converse case. consultant-role-only-user-01 holds the
+    consultant business role (would pass the MCP Gateway's group check for
+    search_confluence) but lacks agent_tekos entitlement. The BFF's
+    server-side entitlement check (components/agent-bff/main.go) must deny
+    the call with 403 before it ever reaches the Agent Runtime, proving
+    business role alone never substitutes for agent entitlement.
+    """
+    resp = httpx.post(
+        f"{BFF_URL}/api/chat",
+        headers=auth_headers("consultant-role-only-user-01"),
+        json={"session_id": "sec-check-3", "message": "What GPU does the local model run on?"},
+        timeout=30,
+    )
+    ok = resp.status_code == 403
+    return CheckResult(
+        "business_role_without_entitlement_denied_by_bff",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
     confluence_policy_is_c2_and_local_only,
     ai_gateway_local_only_forces_local_provider,
+    entitlement_without_business_role_denied_confluence,
+    business_role_without_entitlement_denied_by_bff,
 ]
 
 

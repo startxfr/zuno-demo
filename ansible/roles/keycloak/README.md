@@ -12,9 +12,14 @@ Application (`gitops/apps/keycloak` -> local chart
 - an `ExternalSecret` resolving the Google OAuth client at
   `secret/zuno/google-oauth/client` (placeholder until an operator
   populates it - see `ansible/roles/vault/tasks/configure.yml`);
-- the `KeycloakRealmImport` CR carrying the `zuno` realm: 5 groups, 11
-  users, 5 per-agent OIDC clients and the `google` identity-provider broker.
-  See `gitops/charts/keycloak/files/realm-zuno.json`.
+- an `ExternalSecret` resolving the shared demo-persona password the
+  `vault` role auto-generates at `secret/zuno/keycloak/demo-personas`
+  (ADR-0041 - no password is ever hardcoded in Git);
+- the `KeycloakRealmImport` CR carrying the `zuno` realm: 10 groups (5
+  `agent_<name>` entitlement groups plus 5 business-role groups, one with a
+  `sales_admin` subgroup - ADR-0040), 13 anonymized fixture users
+  (ADR-0041), 5 per-agent OIDC clients and the `google` identity-provider
+  broker. See `gitops/charts/keycloak/files/realm-zuno.json`.
 
 Two integration fixes applied when wiring this against the other tracks'
 work (not present in the original per-track build):
@@ -33,7 +38,9 @@ work (not present in the original per-track build):
   action it triggers - the 20-scenario evaluation (`evaluations/tekos/`)
   authenticates each persona via a direct (ROPC) grant, which fails
   outright against a temporary credential. Passwords stay synthetic/demo
-  values either way (ADR-0025).
+  values either way (ADR-0025), and since ADR-0041 the actual value is a
+  vault-generated secret (`${vault.demo_personas_password}`), never a
+  literal in this repo.
 
 Runs after `argocd` and `external_secrets` (which registers the
 `vault-backend` `ClusterSecretStore` the two `ExternalSecret`s above
@@ -126,15 +133,49 @@ If a namespace or Route hostname changes on the other track's side, update
 `gitops/charts/keycloak/files/realm-zuno.json` (and re-run
 `make configure keycloak`) to keep the two in sync.
 
-## Group model (this track's concrete v0 decision)
+## Group model: two orthogonal dimensions (ADR-0040)
 
-Earlier architecture sketches (`docs/architecture/identity-architecture.md`,
-`docs/security/identity-and-access.md`, `MEMORY.md` section 5) referred to
-groups as `agent_<name>` plus a `sales_admin` group. This role implements a
-more specific persona-oriented scheme instead - `sales`, `consultant`,
-`adv`, `finance`, `board` - each mapped to exactly one agent's OIDC client
-via a client role (see `realm-zuno.json`'s `groups[].clientRoles`). This is
-the authoritative v0 group model; the earlier docs describe an
-earlier-stage sketch that this implementation supersedes. See
+The realm defines **two independent group dimensions**, matching
+`docs/architecture/identity-architecture.md` / `docs/security/identity-and-access.md`
+/ `MEMORY.md`'s original requirement rather than superseding it (an earlier
+version of this README described a single-dimension scheme that conflated
+the two; ADR-0040 corrected that):
+
+1. **Agent entitlement** - `agent_comage`, `agent_tekos`, `agent_advantage`,
+   `agent_finage`, `agent_arkos`. Each is the only group carrying a
+   `clientRoles` mapping to its agent's OIDC client `access` role
+   (`realm-zuno.json`'s `groups[].clientRoles`) - membership is what
+   actually grants sign-in access to that agent's frontend. Enforced
+   server-side by each agent's BFF (`components/agent-bff/main.go`: the
+   validated token's `groups` claim must contain `agent_<AGENT_NAME>`, or
+   the call is rejected `403`) - frontend tile visibility
+   (`components/agent-frontend/internal/portal`) is UX only, never the
+   actual gate.
+2. **Business role** - `sales`, `consultant`, `adv`, `finance`, `board`
+   (plus `sales_admin` as a subgroup of `sales`, reserved for Comage's
+   future all-vs-own-records data scoping - Comage has no runtime yet in
+   v0). These carry no `clientRoles`; they gate tool/data permissions
+   inside an already-authorized agent via `policies/tools/tool-policy.yaml`'s
+   `allowed_groups`, evaluated by the MCP Gateway.
+
+A user typically holds one of each (e.g. `consultant-user-01` holds both
+`/consultant` and `/agent_tekos`), but the two are independent claims -
+holding one never implies the other. `evaluations/tekos/security_checks.py`
+carries the negative tests proving both denial directions
+(`entitlement_without_business_role_denied_confluence`,
+`business_role_without_entitlement_denied_by_bff`). See
 `platform/identity/README.md` for the full JWT/`groups`-claim contract
 downstream services consume.
+
+## Fixture users (ADR-0041)
+
+13 anonymized synthetic personas replace the earlier named demo users:
+`sales-user-0{1,2}`, `consultant-user-0{1,2,3}`, `adv-user-0{1,2}`,
+`finance-user-0{1,2}`, `board-user-0{1,2}` (each holding both its business
+group and its matching `agent_<name>` entitlement group), plus two
+entitlement/business-role negative-test fixtures:
+`tekos-entitlement-only-user-01` (`agent_tekos` only, no business role) and
+`consultant-role-only-user-01` (`consultant` only, no `agent_tekos`). No
+username, email or job title in `realm-zuno.json` identifies a real person,
+and no password is stored in Git - see the "Two integration fixes" section
+above.

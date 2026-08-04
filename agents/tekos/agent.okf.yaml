@@ -52,8 +52,11 @@ spec:
       for the portions of context drawn from it, even though the task's
       ceiling here is C1.
   access:
+    # ADR-0040: agent entitlement group, orthogonal to the `consultant`
+    # business role that governs tool/data permissions inside Tekos
+    # (policies/tools/tool-policy.yaml).
     groups:
-      - consultant
+      - agent_tekos
   ui:
     displayName: Tekos
     tileDescription: Technical Q&A with citations, for consultants.

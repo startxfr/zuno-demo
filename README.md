@@ -33,8 +33,9 @@ Each agent has a dedicated frontend and BFF deployment while consuming shared pl
 Tekos is formally the sole mandatory end-to-end business path for v0
 (ADR-0031): the v0 vertical slice implements **Tekos** end to end (frontend,
 BFF, Agent Runtime with LangGraph orchestration, MCP Gateway, RAG service,
-sales-db MCP tool, real Keycloak login with 11 demo personas across all five
-agents' groups). Comage, Advantage, Finage and Arkos remain catalog-only:
+sales-db MCP tool, real Keycloak login with 13 anonymized demo personas
+(ADR-0041) across two orthogonal group dimensions - agent entitlement and
+business role (ADR-0040)). Comage, Advantage, Finage and Arkos remain catalog-only:
 they exist as OKF definitions (structurally validated by `make check`,
 ADR-0031), reserved namespaces and access-gated portal tiles, without a
 running workflow - business-functional builds for all four move to v1, see
