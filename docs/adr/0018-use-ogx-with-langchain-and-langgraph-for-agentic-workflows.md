@@ -1,6 +1,6 @@
 # ADR-0018: Use OGX with LangChain and LangGraph for agentic workflows
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

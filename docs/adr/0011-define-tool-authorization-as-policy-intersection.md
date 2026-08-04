@@ -1,6 +1,6 @@
 # ADR-0011: Define tool authorization as policy intersection
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

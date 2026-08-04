@@ -1,6 +1,6 @@
 # ADR-0027: Evaluate every agent with twenty acceptance scenarios
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

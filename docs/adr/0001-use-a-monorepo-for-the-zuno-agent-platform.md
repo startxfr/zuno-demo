@@ -1,6 +1,6 @@
 # ADR-0001: Use a monorepo for the Zuno agent platform
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

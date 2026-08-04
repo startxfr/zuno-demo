@@ -1,6 +1,6 @@
 # ADR-0008: Use one frontend and one BFF deployment per agent
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

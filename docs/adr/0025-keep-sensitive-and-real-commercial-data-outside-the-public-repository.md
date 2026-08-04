@@ -1,6 +1,6 @@
 # ADR-0025: Keep sensitive and real commercial data outside the public repository
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

@@ -1,6 +1,6 @@
 # ADR-0012: Use Keycloak as the central identity provider
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

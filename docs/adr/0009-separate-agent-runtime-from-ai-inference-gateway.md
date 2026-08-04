@@ -13,6 +13,14 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 Keep orchestration/state/tooling separate from inference routing, budgets, quotas, model policy and provider fallback.
 
+**Implementation status (2026-08-04):** not implemented as decided.
+`components/agent-runtime` (orchestration/state/tooling) was built, but
+inference routing/fallback (`ModelRouter`, `app/clients/model_router.py`)
+was implemented inside it rather than as the separate `components/ai-gateway`
+this ADR calls for — that directory remains an unimplemented README stub.
+Every other v0 ADR's decision is realized in code as decided; this is the
+one exception, tracked here rather than marked `Implemented`.
+
 ## Alternatives considered
 
 Alternatives remain valid when documented in implementation discussions, but this ADR records the selected direction for the stated target release.

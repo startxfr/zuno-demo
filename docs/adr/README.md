@@ -4,36 +4,36 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0001](0001-use-a-monorepo-for-the-zuno-agent-platform.md) | v0 | Accepted | Use a monorepo for the Zuno agent platform |
-| [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-ea2-for-the-mvp.md) | v0 | Accepted | Use OpenShift 4.20 and OpenShift AI 3.5 EA2 for the MVP |
-| [ADR-0003](0003-use-ansible-and-make-as-the-deployment-entry-point.md) | v0 | Accepted | Use Ansible and Make as the deployment entry point |
-| [ADR-0004](0004-use-github-as-the-canonical-source-repository.md) | v0 | Accepted | Use GitHub as the canonical source repository |
-| [ADR-0005](0005-use-okf-v0-2-as-the-declarative-agent-definition-contract.md) | v0 | Accepted | Use OKF v0.2 as the declarative agent definition contract |
-| [ADR-0006](0006-extend-okf-with-zuno-agent-specific-metadata.md) | v0 | Accepted | Extend OKF with Zuno agent-specific metadata |
-| [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md) | v0 | Accepted | Separate agent instances from reusable platform components |
-| [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md) | v0 | Accepted | Use one frontend and one BFF deployment per agent |
+| [ADR-0001](0001-use-a-monorepo-for-the-zuno-agent-platform.md) | v0 | Implemented | Use a monorepo for the Zuno agent platform |
+| [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-ea2-for-the-mvp.md) | v0 | Implemented | Use OpenShift 4.20 and OpenShift AI 3.5 EA2 for the MVP |
+| [ADR-0003](0003-use-ansible-and-make-as-the-deployment-entry-point.md) | v0 | Implemented | Use Ansible and Make as the deployment entry point |
+| [ADR-0004](0004-use-github-as-the-canonical-source-repository.md) | v0 | Implemented | Use GitHub as the canonical source repository |
+| [ADR-0005](0005-use-okf-v0-2-as-the-declarative-agent-definition-contract.md) | v0 | Implemented | Use OKF v0.2 as the declarative agent definition contract |
+| [ADR-0006](0006-extend-okf-with-zuno-agent-specific-metadata.md) | v0 | Implemented | Extend OKF with Zuno agent-specific metadata |
+| [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md) | v0 | Implemented | Separate agent instances from reusable platform components |
+| [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md) | v0 | Implemented | Use one frontend and one BFF deployment per agent |
 | [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md) | v0 | Accepted | Separate Agent Runtime from AI Inference Gateway |
-| [ADR-0010](0010-introduce-a-central-mcp-gateway.md) | v0 | Accepted | Introduce a central MCP Gateway |
-| [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) | v0 | Accepted | Define tool authorization as policy intersection |
-| [ADR-0012](0012-use-keycloak-as-the-central-identity-provider.md) | v0 | Accepted | Use Keycloak as the central identity provider |
-| [ADR-0013](0013-propagate-end-user-identity-through-agent-calls.md) | v0 | Accepted | Propagate end-user identity through agent calls |
-| [ADR-0014](0014-use-delegated-google-oauth-for-google-workspace-access.md) | v0 | Accepted | Use delegated Google OAuth for Google Workspace access |
-| [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md) | v0 | Accepted | Use PostgreSQL and pgvector as the persistent data platform |
-| [ADR-0016](0016-migrate-the-legacy-sxa-schema-to-postgresql.md) | v0 | Accepted | Migrate the legacy SXA schema to PostgreSQL |
-| [ADR-0017](0017-access-sales-data-through-controlled-mcp-tools.md) | v0 | Accepted | Access sales data through controlled MCP tools |
-| [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Accepted | Use OGX with LangChain and LangGraph for agentic workflows |
-| [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md) | v0 | Accepted | Use OpenShift AI model serving for local inference |
-| [ADR-0020](0020-support-both-local-and-external-llm-providers.md) | v0 | Accepted | Support both local and external LLM providers |
-| [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md) | v0 | Accepted | Route models according to C1 C2 C3 classification |
-| [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md) | v0 | Accepted | Use GitOps-managed declarative agent tasks and policies |
-| [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Accepted | Use a namespace-per-agent isolation model |
-| [ADR-0024](0024-use-vault-for-application-secrets.md) | v0 | Accepted | Use Vault for application secrets |
-| [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md) | v0 | Accepted | Keep sensitive and real commercial data outside the public repository |
+| [ADR-0010](0010-introduce-a-central-mcp-gateway.md) | v0 | Implemented | Introduce a central MCP Gateway |
+| [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) | v0 | Implemented | Define tool authorization as policy intersection |
+| [ADR-0012](0012-use-keycloak-as-the-central-identity-provider.md) | v0 | Implemented | Use Keycloak as the central identity provider |
+| [ADR-0013](0013-propagate-end-user-identity-through-agent-calls.md) | v0 | Implemented | Propagate end-user identity through agent calls |
+| [ADR-0014](0014-use-delegated-google-oauth-for-google-workspace-access.md) | v0 | Implemented | Use delegated Google OAuth for Google Workspace access |
+| [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md) | v0 | Implemented | Use PostgreSQL and pgvector as the persistent data platform |
+| [ADR-0016](0016-migrate-the-legacy-sxa-schema-to-postgresql.md) | v0 | Implemented | Migrate the legacy SXA schema to PostgreSQL |
+| [ADR-0017](0017-access-sales-data-through-controlled-mcp-tools.md) | v0 | Implemented | Access sales data through controlled MCP tools |
+| [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Implemented | Use OGX with LangChain and LangGraph for agentic workflows |
+| [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md) | v0 | Implemented | Use OpenShift AI model serving for local inference |
+| [ADR-0020](0020-support-both-local-and-external-llm-providers.md) | v0 | Implemented | Support both local and external LLM providers |
+| [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md) | v0 | Implemented | Route models according to C1 C2 C3 classification |
+| [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md) | v0 | Implemented | Use GitOps-managed declarative agent tasks and policies |
+| [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Implemented | Use a namespace-per-agent isolation model |
+| [ADR-0024](0024-use-vault-for-application-secrets.md) | v0 | Implemented | Use Vault for application secrets |
+| [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md) | v0 | Implemented | Keep sensitive and real commercial data outside the public repository |
 | [ADR-0026](0026-provide-an-aiagent-kubernetes-crd-and-operator.md) | v1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
-| [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) | v0 | Accepted | Evaluate every agent with twenty acceptance scenarios |
-| [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md) | v0 | Accepted | Require a seventy-five percent evaluation threshold |
-| [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md) | v0 | Accepted | Instrument model usage costs and distributed traces |
-| [ADR-0030](0030-use-a-command-dispatch-makefile-interface.md) | v0 | Accepted | Use a command-dispatch Makefile interface |
+| [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) | v0 | Implemented | Evaluate every agent with twenty acceptance scenarios |
+| [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md) | v0 | Implemented | Require a seventy-five percent evaluation threshold |
+| [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md) | v0 | Implemented | Instrument model usage costs and distributed traces |
+| [ADR-0030](0030-use-a-command-dispatch-makefile-interface.md) | v0 | Implemented | Use a command-dispatch Makefile interface |
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v1 | Proposed | Provide HA for shared agent platform services |
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v1 | Proposed | Target 99.9 percent platform availability |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v1 | Proposed | Persist resumable long-running agent workflows |

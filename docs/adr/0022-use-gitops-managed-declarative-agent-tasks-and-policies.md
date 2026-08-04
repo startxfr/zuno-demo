@@ -1,6 +1,6 @@
 # ADR-0022: Use GitOps-managed declarative agent tasks and policies
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

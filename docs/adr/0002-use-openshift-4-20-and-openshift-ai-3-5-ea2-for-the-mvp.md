@@ -1,6 +1,6 @@
 # ADR-0002: Use OpenShift 4.20 and OpenShift AI 3.5 EA2 for the MVP
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

@@ -1,6 +1,6 @@
 # ADR-0029: Instrument model usage costs and distributed traces
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

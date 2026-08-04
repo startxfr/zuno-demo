@@ -1,6 +1,6 @@
 # ADR-0013: Propagate end-user identity through agent calls
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

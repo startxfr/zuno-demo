@@ -1,6 +1,6 @@
 # ADR-0015: Use PostgreSQL and pgvector as the persistent data platform
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

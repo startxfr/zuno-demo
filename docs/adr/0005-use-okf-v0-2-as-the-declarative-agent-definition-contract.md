@@ -1,6 +1,6 @@
 # ADR-0005: Use OKF v0.2 as the declarative agent definition contract
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
