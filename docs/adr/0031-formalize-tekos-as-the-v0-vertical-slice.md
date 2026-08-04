@@ -1,6 +1,6 @@
 # ADR-0031: Formalize Tekos as the v0 vertical slice
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,17 @@ Update release documentation and acceptance gates so Tekos is the only mandatory
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05).** `README.md`'s "v0 build status" and
+`MEMORY.md` section 15 now state explicitly that Tekos is the only
+mandatory end-to-end business path for v0, with Comage/Advantage/Finage/
+Arkos as catalog-only (OKF definition + reserved namespace + access-gated
+portal tile, no running workflow, business-functional build moved to v1).
+Per the Security considerations above ("no security control may be
+deferred merely because an agent is catalog-only"), `ansible/roles/agents/
+tasks/check.yml` (`make check`) now structurally validates the four
+catalog-only agents' `agent.okf.yaml` files (apiVersion, kind,
+`metadata.status: placeholder`) rather than leaving them entirely
+unchecked - see `ansible/roles/agents/README.md`.
 
 ## Acceptance criteria
 

@@ -2,6 +2,42 @@
 # Basic reachability smoke check for the one functional agent (Tekos) - not
 # the 20-scenario acceptance evaluation (ADR-0027/0028), which is a
 # separate, later concern (evaluations/tekos/, run outside this role).
+#
+# The catalog-only agents (comage/advantage/finage/arkos) get a structural
+# check instead of a health check (ADR-0031): v0 formalizes Tekos as the
+# only mandatory end-to-end business path, but "catalog-only" must never
+# mean "unchecked" - their agent.okf.yaml must still parse and declare
+# status: placeholder, so a future status: active flip (v1) has a known-good
+# starting point rather than a silently-rotted definition.
+- name: "agents | load each catalog-only agent's OKF definition"
+  ansible.builtin.set_fact:
+    _agents_catalog_okf: "{{ _agents_catalog_okf | default({}) | combine({item: lookup('ansible.builtin.file', zuno_repo_root + '/agents/' + item + '/agent.okf.yaml') | from_yaml}) }}"
+  loop:
+    - comage
+    - advantage
+    - finage
+    - arkos
+
+- name: "agents | fail if a catalog-only agent's OKF definition is structurally invalid"
+  ansible.builtin.fail:
+    msg: >-
+      agents/{{ item.key }}/agent.okf.yaml is structurally invalid: expected
+      apiVersion okf.zuno.io/v0.2, kind Agent, metadata.status placeholder -
+      got apiVersion={{ item.value.apiVersion | default('missing') }}
+      kind={{ item.value.kind | default('missing') }}
+      status={{ (item.value.metadata | default({})).status | default('missing') }}.
+  when: >-
+    item.value.apiVersion | default('') != 'okf.zuno.io/v0.2' or
+    item.value.kind | default('') != 'Agent' or
+    (item.value.metadata | default({})).status | default('') != 'placeholder'
+  loop: "{{ _agents_catalog_okf | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "agents | catalog-only structural check summary"
+  ansible.builtin.debug:
+    msg: "All 4 catalog-only agent definitions (comage, advantage, finage, arkos) are structurally valid placeholders (ADR-0031)."
+
 - name: "agents | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 

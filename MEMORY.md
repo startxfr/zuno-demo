@@ -370,7 +370,11 @@ planning narrative - see README.md's "v0 build status" for a summary:
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only
-  `zuno-agent-tekos` runs workloads.
+  `zuno-agent-tekos` runs workloads. ADR-0031 formalizes this as the
+  target shape, not an in-progress gap: Tekos is the only mandatory
+  end-to-end business path for v0, and `make check` (`ansible/roles/agents`)
+  structurally validates the four catalog-only agents' `agent.okf.yaml`
+  files rather than leaving them unchecked.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos
