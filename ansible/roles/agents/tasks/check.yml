@@ -1,0 +1,4 @@
+---
+- name: Agent check scaffold
+  ansible.builtin.debug:
+    msg: "Agent validation contract registered; implementation tasks are pending."

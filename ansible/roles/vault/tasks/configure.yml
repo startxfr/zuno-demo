@@ -1,0 +1,4 @@
+---
+- name: "vault | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for vault; implementation tasks are pending."

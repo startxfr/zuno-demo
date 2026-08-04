@@ -1,0 +1,4 @@
+---
+- name: "api | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for api; implementation tasks are pending."

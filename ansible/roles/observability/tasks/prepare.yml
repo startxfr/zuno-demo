@@ -1,0 +1,4 @@
+---
+- name: "observability | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for observability; implementation tasks are pending."

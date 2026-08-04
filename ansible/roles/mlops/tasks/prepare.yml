@@ -1,0 +1,4 @@
+---
+- name: "mlops | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for mlops; implementation tasks are pending."

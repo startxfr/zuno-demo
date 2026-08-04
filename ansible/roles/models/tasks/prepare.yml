@@ -1,0 +1,4 @@
+---
+- name: "models | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for models; implementation tasks are pending."

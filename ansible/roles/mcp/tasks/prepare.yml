@@ -1,0 +1,4 @@
+---
+- name: "mcp | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for mcp; implementation tasks are pending."

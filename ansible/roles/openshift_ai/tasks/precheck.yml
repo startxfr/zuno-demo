@@ -1,0 +1,4 @@
+---
+- name: "openshift_ai | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for openshift_ai; implementation tasks are pending."

@@ -1,0 +1,28 @@
+---
+- name: Prepare Zuno Demo prerequisites
+  hosts: localhost
+  gather_facts: false
+  vars:
+    prerequisite_components:
+      - openshift_ai
+      - datascience
+      - nvidia_gpu
+      - keycloak
+      - vault
+      - postgresql
+      - observability
+      - smtp
+  tasks:
+    - name: Resolve requested prerequisite role names
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ prerequisite_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Prepare prerequisite components
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: prepare
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

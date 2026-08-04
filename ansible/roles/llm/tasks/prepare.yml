@@ -1,0 +1,4 @@
+---
+- name: "llm | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for llm; implementation tasks are pending."

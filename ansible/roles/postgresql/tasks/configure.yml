@@ -1,0 +1,4 @@
+---
+- name: "postgresql | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for postgresql; implementation tasks are pending."

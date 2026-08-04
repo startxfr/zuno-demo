@@ -1,0 +1,4 @@
+---
+- name: "models | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for models; implementation tasks are pending."

@@ -1,0 +1,4 @@
+---
+- name: "mlops | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for mlops; implementation tasks are pending."

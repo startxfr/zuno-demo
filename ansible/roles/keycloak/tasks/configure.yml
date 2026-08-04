@@ -1,0 +1,4 @@
+---
+- name: "keycloak | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for keycloak; implementation tasks are pending."

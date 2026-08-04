@@ -1,0 +1,4 @@
+---
+- name: "models | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for models; implementation tasks are pending."

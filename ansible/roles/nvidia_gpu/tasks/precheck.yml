@@ -1,0 +1,4 @@
+---
+- name: "nvidia_gpu | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for nvidia_gpu; implementation tasks are pending."

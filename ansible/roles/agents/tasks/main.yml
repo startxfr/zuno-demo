@@ -1,0 +1,4 @@
+---
+- name: Agent installation scaffold
+  ansible.builtin.debug:
+    msg: "Agent platform installation contract registered; implementation tasks are pending."

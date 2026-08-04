@@ -1,0 +1,4 @@
+---
+- name: "sql_schema | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for sql_schema; implementation tasks are pending."

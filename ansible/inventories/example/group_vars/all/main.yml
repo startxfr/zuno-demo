@@ -1,0 +1,4 @@
+---
+# Copy/adapt into the demo inventory. Keep secrets in Vault, never in Git.
+cluster_api_url: https://api.example.com:6443
+cluster_base_domain: apps.example.com

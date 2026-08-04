@@ -1,0 +1,4 @@
+---
+- name: "rag | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for rag; implementation tasks are pending."

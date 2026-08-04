@@ -1,0 +1,4 @@
+---
+- name: "openshift_ai | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for openshift_ai; implementation tasks are pending."

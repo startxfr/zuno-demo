@@ -1,0 +1,4 @@
+---
+- name: "llm | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for llm; implementation tasks are pending."

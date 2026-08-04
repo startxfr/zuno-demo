@@ -1,0 +1,4 @@
+---
+- name: "postgresql | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for postgresql; implementation tasks are pending."

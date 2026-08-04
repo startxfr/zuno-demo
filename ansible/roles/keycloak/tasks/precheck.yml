@@ -1,0 +1,4 @@
+---
+- name: "keycloak | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for keycloak; implementation tasks are pending."

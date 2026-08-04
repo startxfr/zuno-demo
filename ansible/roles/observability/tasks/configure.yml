@@ -1,0 +1,4 @@
+---
+- name: "observability | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for observability; implementation tasks are pending."

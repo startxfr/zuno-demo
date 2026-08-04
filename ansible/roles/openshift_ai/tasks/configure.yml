@@ -1,0 +1,4 @@
+---
+- name: "openshift_ai | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for openshift_ai; implementation tasks are pending."

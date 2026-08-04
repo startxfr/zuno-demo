@@ -1,0 +1,4 @@
+---
+# Non-secret demo defaults belong here. Secrets must be obtained from Vault or
+# injected through an approved runtime mechanism.
+zuno_environment: demo

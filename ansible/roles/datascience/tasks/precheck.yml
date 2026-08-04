@@ -1,0 +1,4 @@
+---
+- name: "datascience | precheck scaffold"
+  ansible.builtin.debug:
+    msg: "Precheck contract registered for datascience; implementation tasks are pending."

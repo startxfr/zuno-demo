@@ -1,0 +1,4 @@
+---
+- name: "nvidia_gpu | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for nvidia_gpu; implementation tasks are pending."

@@ -1,0 +1,4 @@
+---
+- name: "agents | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for agents; implementation tasks are pending."

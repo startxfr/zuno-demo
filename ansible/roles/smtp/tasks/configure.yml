@@ -1,0 +1,4 @@
+---
+- name: "smtp | configure scaffold"
+  ansible.builtin.debug:
+    msg: "Configuration contract registered for smtp; implementation tasks are pending."

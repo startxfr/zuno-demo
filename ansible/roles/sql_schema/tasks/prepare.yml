@@ -1,0 +1,4 @@
+---
+- name: "sql_schema | prepare scaffold"
+  ansible.builtin.debug:
+    msg: "Preparation contract registered for sql_schema; implementation tasks are pending."
