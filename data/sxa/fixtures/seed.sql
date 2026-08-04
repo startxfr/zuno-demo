@@ -1,4 +1,4 @@
--- Zuno Demo — SXA sales-operations synthetic fixtures
+-- Zuno Demo - SXA sales-operations synthetic fixtures
 --
 -- Every company, person, deal and amount in this file is fictional and
 -- invented for this demo. None of it represents real customers, contacts,

@@ -1,6 +1,6 @@
 # Zuno agent definition for Comage (sales assistant).
 # Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json.
-# v0 scope: status is `placeholder` — this file, the reserved `zuno-comage`
+# v0 scope: status is `placeholder` - this file, the reserved `zuno-comage`
 # namespace and this portal tile are the only things that exist for Comage in
 # v0. No Agent Runtime task graph, FE or BFF is deployed (ADR-0007,
 # platform/architecture/agent-platform-separation.md). Task/tool content
@@ -36,6 +36,6 @@ spec:
       - sales
   ui:
     displayName: Comage
-    tileDescription: Sales follow-up and pipeline assistant — coming soon.
+    tileDescription: Sales follow-up and pipeline assistant - coming soon.
     color: "#F0AB00"
     icon: handshake

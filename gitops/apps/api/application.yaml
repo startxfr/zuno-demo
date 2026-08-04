@@ -1,9 +1,9 @@
 ---
 # Tekos's frontend + BFF (ADR-0008): a plain Deployment/Service/Route pair,
-# not the AIAgent CRD (ADR-0026, retargeted to v1) — see
+# not the AIAgent CRD (ADR-0026, retargeted to v1) - see
 # gitops/charts/tekos/Chart.yaml and platform/architecture/agent-platform-separation.md.
 # Depends on gitops/apps/agents (creates the zuno-tekos namespace this
-# deploys into) and gitops/apps/keycloak (the tekos-frontend OIDC client) —
+# deploys into) and gitops/apps/keycloak (the tekos-frontend OIDC client) -
 # ArgoCD's own reconciliation is eventually consistent, so exact apply order
 # isn't required, but ansible/roles/agents applies `agents` before `api`.
 apiVersion: argoproj.io/v1alpha1
@@ -20,7 +20,7 @@ spec:
     helm:
       values: |
         global:
-          # Substituted by ansible/tasks/apply_gitops_app.yml — see
+          # Substituted by ansible/tasks/apply_gitops_app.yml - see
           # gitops/apps/keycloak/application.yaml's comment for how.
           clusterBaseDomain: __CLUSTER_BASE_DOMAIN__
   destination:

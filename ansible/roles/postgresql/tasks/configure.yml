@@ -25,4 +25,4 @@
 
 - name: "postgresql | configure summary"
   ansible.builtin.debug:
-    msg: "zuno-postgresql Cluster is healthy in the postgresql namespace (1 instance, demo scope — see ADR-0101 for v1 HA)."
+    msg: "zuno-postgresql Cluster is healthy in the postgresql namespace (1 instance, demo scope - see ADR-0101 for v1 HA)."

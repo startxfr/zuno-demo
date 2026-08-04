@@ -1,4 +1,4 @@
 ---
 - name: "smtp | nothing to configure"
   ansible.builtin.debug:
-    msg: "smtp is a PREP_COMPONENT only — see tasks/prepare.yml. There is no CONFIG_SCOPE for smtp."
+    msg: "smtp is a PREP_COMPONENT only - see tasks/prepare.yml. There is no CONFIG_SCOPE for smtp."

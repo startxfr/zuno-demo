@@ -1,10 +1,10 @@
-"""OpenTelemetry instrumentation (ADR-0029) — sends OTLP traces/metrics to
+"""OpenTelemetry instrumentation (ADR-0029) - sends OTLP traces/metrics to
 the shared Collector installed by ansible/roles/observability
 (`zuno-otel-collector-collector.zuno-platform.svc`).
 
 Same pattern as components/agent-runtime/app/telemetry.py and
 components/mcp-gateway/app/telemetry.py (duplicated per-service rather than
-shared across independently-deployed images — see agent-runtime's
+shared across independently-deployed images - see agent-runtime's
 docstring); this one records search latency/result-count instead of model
 tokens or tool-authorization outcomes.
 """

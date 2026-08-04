@@ -3,7 +3,7 @@ Default-deny ingress from other namespaces, per agent namespace (ADR-0023).
 Explicit allows (e.g. the frontend's Route-fronted Service accepting
 external ingress via the OpenShift router, or the BFF accepting only from
 its own frontend) are added by the workload chart (gitops/charts/tekos) that
-owns those Services, not here — this policy only establishes the default
+owns those Services, not here - this policy only establishes the default
 isolation boundary every agent namespace starts from.
 */}}
 {{- range .Values.namespaces }}

@@ -1,5 +1,5 @@
 ---
-# The sales-db MCP server (ADR-0017) — see gitops/charts/mcp-sales-db and
+# The sales-db MCP server (ADR-0017) - see gitops/charts/mcp-sales-db and
 # components/mcp-servers/sales-db. Applied by the `sql_schema` role's
 # configure.yml, after the schema/fixtures Job it runs directly (the schema
 # must exist before this server can serve anything from it).

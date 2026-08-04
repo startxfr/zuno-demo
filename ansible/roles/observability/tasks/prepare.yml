@@ -1,6 +1,6 @@
 ---
 # ADR-0029: instrument model usage, cost and distributed traces. This role
-# installs the collection path only — a Collector every service in
+# installs the collection path only - a Collector every service in
 # components/ can send OTLP traces/metrics to. It does not install a
 # long-term backend (Tempo/Prometheus storage): the Collector's debug/log
 # exporter is enough to prove the pipeline for a demo; wiring a real backend
@@ -91,7 +91,7 @@
             # Demo scope: logs the pipeline out so it's provably wired end
             # to end (`oc logs deploy/zuno-otel-collector-collector`).
             # Swap/add a real backend exporter (Tempo, an APM vendor) here
-            # once one is provisioned — nothing else in this repo needs to
+            # once one is provisioned - nothing else in this repo needs to
             # change, every service already points at this Collector by
             # its stable in-cluster name.
             debug:

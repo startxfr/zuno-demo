@@ -1,5 +1,5 @@
 # Build context is this directory (unlike agent-frontend, the BFF needs no
-# repository-root context — it has no agent.okf.yaml files to bake in).
+# repository-root context - it has no agent.okf.yaml files to bake in).
 #
 #   docker build -t zuno/agent-bff:dev components/agent-bff
 

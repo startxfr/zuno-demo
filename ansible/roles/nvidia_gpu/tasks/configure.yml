@@ -1,8 +1,8 @@
 ---
 # No configure phase: the ClusterPolicy applied in prepare.yml is the whole
-# of what "configuring" the GPU Operator means for this demo — nothing
+# of what "configuring" the GPU Operator means for this demo - nothing
 # workload-specific to layer on top. nvidia_gpu is a PREP_COMPONENT only,
 # not a CONFIG_SCOPE.
 - name: "nvidia_gpu | nothing to configure beyond the ClusterPolicy"
   ansible.builtin.debug:
-    msg: "nvidia_gpu has no configure phase — see tasks/prepare.yml."
+    msg: "nvidia_gpu has no configure phase - see tasks/prepare.yml."

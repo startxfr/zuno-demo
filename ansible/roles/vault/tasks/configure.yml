@@ -3,7 +3,7 @@
 # role/policy every ExternalSecret in the platform resolves through. Also
 # seeds self-generatable application secrets and reserves empty placeholders
 # for the handful that require an operator to supply real input (the Google
-# OAuth client secret, SMTP credentials) — see ADR-0014 and ADR-0024.
+# OAuth client secret, SMTP credentials) - see ADR-0014 and ADR-0024.
 - name: "vault | read bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret
@@ -14,7 +14,7 @@
 
 - name: "vault | fail if the bootstrap credentials are missing"
   ansible.builtin.fail:
-    msg: "vault-bootstrap-credentials not found — run `make prepare vault` first."
+    msg: "vault-bootstrap-credentials not found - run `make prepare vault` first."
   when: (_vault_creds.resources | default([]) | length) == 0
 
 - name: "vault | set connection facts"
@@ -184,10 +184,10 @@
       placeholders until an operator populates them, e.g.
       `vault kv put secret/zuno/google-oauth/client client_id=... client_secret=...`.
       This is the only remaining manual step (ADR-0014's real Google OAuth
-      delegation depends on it) — everything else in this file is unattended.
+      delegation depends on it) - everything else in this file is unattended.
 
 # Not a secret, but Vault is this platform's single source of truth for
-# runtime configuration too (ADR-0024) — storing it here means any
+# runtime configuration too (ADR-0024) - storing it here means any
 # consumer without direct cluster API access (a pod via ExternalSecret,
 # ansible/tasks/apply_gitops_app.yml on a run where this task hasn't fired
 # yet) has exactly one place to read it from instead of a second,

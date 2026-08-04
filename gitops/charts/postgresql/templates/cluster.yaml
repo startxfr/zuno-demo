@@ -1,6 +1,6 @@
 # CloudNativePG Cluster CR. Requires the CloudNativePG operator, installed
 # separately by ansible/roles/postgresql/tasks/prepare.yml (OLM
-# Subscription) — not managed by this chart.
+# Subscription) - not managed by this chart.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -26,11 +26,11 @@ spec:
       owner: {{ .Values.cluster.owner }}
       secret:
         # Vault-backed via the ExternalSecret in templates/externalsecret.yaml
-        # (secret/zuno/postgresql/app, seeded by ansible/roles/vault) — CNPG
+        # (secret/zuno/postgresql/app, seeded by ansible/roles/vault) - CNPG
         # expects a Secret with `username`/`password` keys matching `owner`.
         name: {{ .Values.credentials.secretName }}
       # Runs against the *application* database (zuno), after initdb and
-      # after the owner role/database are created — this is deliberately
+      # after the owner role/database are created - this is deliberately
       # postInitApplicationSQL, not postInitSQL (which runs against the
       # `postgres` maintenance database and would create the extension in
       # the wrong place).

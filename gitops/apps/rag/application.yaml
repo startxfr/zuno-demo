@@ -1,5 +1,5 @@
 ---
-# RAG service (pgvector + hybrid search) — see gitops/charts/rag-service and
+# RAG service (pgvector + hybrid search) - see gitops/charts/rag-service and
 # components/rag-service. Applied by the `rag` Ansible role's configure.yml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

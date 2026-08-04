@@ -13,6 +13,6 @@ external input. See ADR-0024.
 
 `configure.yml` also generates and seeds the secrets that can be
 self-generated (Keycloak admin, PostgreSQL app credentials) and reserves
-empty placeholders — never overwriting a real value — for the two secrets
+empty placeholders - never overwriting a real value - for the two secrets
 that genuinely require an operator to supply external input: the Google
 Workspace OAuth client (ADR-0014) and the SMTP technical-mail credentials.

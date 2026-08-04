@@ -1,4 +1,4 @@
 ---
 - name: "mcp | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "mcp is applied entirely by tasks/configure.yml — the MCP Gateway Deployment has no operator dependency of its own."
+    msg: "mcp is applied entirely by tasks/configure.yml - the MCP Gateway Deployment has no operator dependency of its own."

@@ -3,7 +3,7 @@ name: models
 description: >-
   KServe ServingRuntime + InferenceService for the demo's single local model
   (ADR-0019). Qwen2.5-7B-Instruct: fits one 24GB NVIDIA L4 in fp16 (~15GB
-  weights, leaving headroom for KV cache at the demo's low concurrency —
+  weights, leaving headroom for KV cache at the demo's low concurrency -
   ~5 concurrent conversations per MEMORY.md), and vLLM serves it with an
   OpenAI-compatible /v1 API, which is what components/agent-runtime's model
   router (app/clients/model_router.py) expects at

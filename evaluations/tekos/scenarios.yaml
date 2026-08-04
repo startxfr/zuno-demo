@@ -5,7 +5,7 @@
 # `persona` values are the 11 usernames from
 # gitops/charts/keycloak/files/realm-zuno.json (all in the `consultant`
 # group except where a scenario deliberately tests a non-consultant user).
-# `type` selects which handler in run_scenarios.py executes the scenario —
+# `type` selects which handler in run_scenarios.py executes the scenario -
 # each type's exact behavior is documented there, not duplicated here.
 
 scenarios:

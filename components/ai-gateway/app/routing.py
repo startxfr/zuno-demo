@@ -1,11 +1,11 @@
 """Provider-routing config loading and classification-eligibility
-resolution (ADR-0020, ADR-0021) — moved here from
+resolution (ADR-0020, ADR-0021) - moved here from
 components/agent-runtime's ModelRouter as part of ADR-0009's Agent
 Runtime / AI Inference Gateway split; the loading/eligibility logic itself
 is unchanged.
 
 Reads `platform/ai-gateway/provider-routing.yaml` (mounted read-only at
-`PROVIDER_ROUTING_PATH`, default `/app/config/provider-routing.yaml`) —
+`PROVIDER_ROUTING_PATH`, default `/app/config/provider-routing.yaml`) -
 see `ansible/roles/llm` for how that ConfigMap is deployed and how each
 external provider's API key reaches this pod's environment via a
 Vault-backed `ExternalSecret` (ADR-0024).

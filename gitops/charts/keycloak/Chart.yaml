@@ -5,7 +5,7 @@ description: >-
   Keycloak / Keycloak Operator), Google Workspace IdP broker federation, and
   the `zuno` realm (groups, users, per-agent OIDC clients) delivered via a
   KeycloakRealmImport. The operator itself is installed separately by
-  ansible/roles/keycloak (OLM Subscription) — see that role's README for the
+  ansible/roles/keycloak (OLM Subscription) - see that role's README for the
   prerequisite/GitOps split. See docs/adr/0012, 0013, 0014.
 type: application
 version: 0.1.0

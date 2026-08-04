@@ -4,7 +4,7 @@ description: >-
   Tekos frontend (portal + chat UI) and BFF: one plain Kubernetes
   Deployment/Service/Route (frontend) and Deployment/Service (BFF) in the
   zuno-tekos namespace (ADR-0008, ADR-0023). Deliberately a plain
-  Deployment rather than the AIAgent CRD — see ADR-0026 (retargeted to v1)
+  Deployment rather than the AIAgent CRD - see ADR-0026 (retargeted to v1)
   and platform/architecture/agent-platform-separation.md. Referenced by
   exactly one Application, gitops/apps/api/application.yaml.
 type: application

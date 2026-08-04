@@ -2,7 +2,7 @@
 # IdP broker) via the Keycloak Operator's KeycloakRealmImport CRD
 # (k8s.keycloak.org/v2alpha1). The realm is authored as plain JSON in
 # files/realm-zuno.json (a real Keycloak realm export shape) and embedded
-# inline below — the CRD's spec.realm field takes a full
+# inline below - the CRD's spec.realm field takes a full
 # RealmRepresentation object, there is no ConfigMap/file reference option in
 # this CRD version, so "inline" is the only supported delivery mechanism.
 #

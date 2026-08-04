@@ -1,6 +1,6 @@
 # One entry per agent instance (ADR-0007). `status: active` namespaces host
 # real workloads (only zuno-tekos in v0); `status: placeholder` namespaces
-# are created and labeled but stay empty/reserved — see
+# are created and labeled but stay empty/reserved - see
 # platform/architecture/agent-platform-separation.md and this chart's
 # README.md.
 namespaces:

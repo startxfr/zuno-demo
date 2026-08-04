@@ -1,10 +1,10 @@
--- Zuno Demo — SXA sales-operations schema (PostgreSQL-native target)
+-- Zuno Demo - SXA sales-operations schema (PostgreSQL-native target)
 --
 -- This is a from-scratch PostgreSQL schema for the "sales operations" domain
--- described in MEMORY.md section 10 ("SXA commercial database — source-derived
+-- described in MEMORY.md section 10 ("SXA commercial database - source-derived
 -- schema memory"). It is informed by the legacy MySQL 5.0.95 phpMyAdmin schema
 -- prose (table/column names such as `affaire`, `devis`, `commande`, `facture`)
--- but is NOT a literal migration of a real dump — no such dump exists in this
+-- but is NOT a literal migration of a real dump - no such dump exists in this
 -- repository (ADR-0016, ADR-0025). See data/sxa/migrations/README.md for the
 -- full rationale and the legacy-name-to-native-name mapping table.
 --
@@ -33,7 +33,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ---------------------------------------------------------------------------
--- users — legacy `user` table (keyed by `login`)
+-- users - legacy `user` table (keyed by `login`)
 -- ---------------------------------------------------------------------------
 -- The legacy password column is intentionally NOT carried forward. Per
 -- MEMORY.md: "the PostgreSQL demo model should map authenticated Keycloak
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS users (
 COMMENT ON TABLE users IS 'Legacy SXA `user` table, migrated: identity now maps to Keycloak rather than a local password.';
 
 -- ---------------------------------------------------------------------------
--- customers — legacy `entreprise`
+-- customers - legacy `entreprise`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS customers (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -75,10 +75,10 @@ CREATE TABLE IF NOT EXISTS customers (
     updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE customers IS 'Legacy SXA `entreprise` — company/customer identity and address/business metadata.';
+COMMENT ON TABLE customers IS 'Legacy SXA `entreprise` - company/customer identity and address/business metadata.';
 
 -- ---------------------------------------------------------------------------
--- contacts — legacy `contact`
+-- contacts - legacy `contact`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS contacts (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -95,10 +95,10 @@ CREATE TABLE IF NOT EXISTS contacts (
 
 CREATE INDEX IF NOT EXISTS ix_contacts_customer_id ON contacts (customer_id);
 
-COMMENT ON TABLE contacts IS 'Legacy SXA `contact` — contacts linked to companies.';
+COMMENT ON TABLE contacts IS 'Legacy SXA `contact` - contacts linked to companies.';
 
 -- ---------------------------------------------------------------------------
--- Status lookup tables — legacy `ref_statusaffaire`, `ref_statusdevis`,
+-- Status lookup tables - legacy `ref_statusaffaire`, `ref_statusdevis`,
 -- `ref_statuscommande`, `ref_statusfacture`
 -- ---------------------------------------------------------------------------
 -- `is_closed`/`is_billable` flags give the access-policy layer (MEMORY.md
@@ -180,7 +180,7 @@ INSERT INTO invoice_statuses (id, code, label, is_billable_visible, is_closed, s
 ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- products — legacy `produit`
+-- products - legacy `produit`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS products (
     id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -197,10 +197,10 @@ CREATE TABLE IF NOT EXISTS products (
     created_at          timestamptz NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE products IS 'Legacy SXA `produit` — product catalog, family, price and classification metadata.';
+COMMENT ON TABLE products IS 'Legacy SXA `produit` - product catalog, family, price and classification metadata.';
 
 -- ---------------------------------------------------------------------------
--- product_supplier_prices — legacy `produit_fournisseur`
+-- product_supplier_prices - legacy `produit_fournisseur`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS product_supplier_prices (
     id                      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -213,10 +213,10 @@ CREATE TABLE IF NOT EXISTS product_supplier_prices (
 
 CREATE INDEX IF NOT EXISTS ix_product_supplier_prices_product_id ON product_supplier_prices (product_id);
 
-COMMENT ON TABLE product_supplier_prices IS 'Legacy SXA `produit_fournisseur` — supplier-specific product price and rebate.';
+COMMENT ON TABLE product_supplier_prices IS 'Legacy SXA `produit_fournisseur` - supplier-specific product price and rebate.';
 
 -- ---------------------------------------------------------------------------
--- opportunities — legacy `affaire`
+-- opportunities - legacy `affaire`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS opportunities (
     id                      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -240,10 +240,10 @@ CREATE INDEX IF NOT EXISTS ix_opportunities_customer_id ON opportunities (custom
 CREATE INDEX IF NOT EXISTS ix_opportunities_owner_username ON opportunities (owner_username);
 CREATE INDEX IF NOT EXISTS ix_opportunities_status_id ON opportunities (status_id);
 
-COMMENT ON TABLE opportunities IS 'Legacy SXA `affaire` — opportunity/business case, owner, status, budget, deadlines and Drive reference.';
+COMMENT ON TABLE opportunities IS 'Legacy SXA `affaire` - opportunity/business case, owner, status, budget, deadlines and Drive reference.';
 
 -- ---------------------------------------------------------------------------
--- quotes — legacy `devis`
+-- quotes - legacy `devis`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS quotes (
     id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -265,10 +265,10 @@ CREATE INDEX IF NOT EXISTS ix_quotes_opportunity_id ON quotes (opportunity_id);
 CREATE INDEX IF NOT EXISTS ix_quotes_owner_username ON quotes (owner_username);
 CREATE INDEX IF NOT EXISTS ix_quotes_status_id ON quotes (status_id);
 
-COMMENT ON TABLE quotes IS 'Legacy SXA `devis` — quote, opportunity link, status, commercial owner, total, client PO and Drive reference.';
+COMMENT ON TABLE quotes IS 'Legacy SXA `devis` - quote, opportunity link, status, commercial owner, total, client PO and Drive reference.';
 
 -- ---------------------------------------------------------------------------
--- quote_lines — legacy `devis_produit`
+-- quote_lines - legacy `devis_produit`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS quote_lines (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -282,10 +282,10 @@ CREATE TABLE IF NOT EXISTS quote_lines (
 
 CREATE INDEX IF NOT EXISTS ix_quote_lines_quote_id ON quote_lines (quote_id);
 
-COMMENT ON TABLE quote_lines IS 'Legacy SXA `devis_produit` — quote line items, quantity, rebate and sales price.';
+COMMENT ON TABLE quote_lines IS 'Legacy SXA `devis_produit` - quote line items, quantity, rebate and sales price.';
 
 -- ---------------------------------------------------------------------------
--- orders — legacy `commande`
+-- orders - legacy `commande`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS orders (
     id                      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -307,10 +307,10 @@ CREATE INDEX IF NOT EXISTS ix_orders_quote_id ON orders (quote_id);
 CREATE INDEX IF NOT EXISTS ix_orders_owner_username ON orders (owner_username);
 CREATE INDEX IF NOT EXISTS ix_orders_status_id ON orders (status_id);
 
-COMMENT ON TABLE orders IS 'Legacy SXA `commande` — order, originating quote, status, commercial owner, sales/supplier totals, client PO and Drive reference.';
+COMMENT ON TABLE orders IS 'Legacy SXA `commande` - order, originating quote, status, commercial owner, sales/supplier totals, client PO and Drive reference.';
 
 -- ---------------------------------------------------------------------------
--- order_lines — legacy `commande_produit`
+-- order_lines - legacy `commande_produit`
 -- ---------------------------------------------------------------------------
 -- Carries both customer pricing (unit_price/discount_pct) and supplier
 -- pricing (supplier_unit_price/supplier_discount_pct) so margin can be
@@ -330,10 +330,10 @@ CREATE TABLE IF NOT EXISTS order_lines (
 
 CREATE INDEX IF NOT EXISTS ix_order_lines_order_id ON order_lines (order_id);
 
-COMMENT ON TABLE order_lines IS 'Legacy SXA `commande_produit` — order line items incl. supplier pricing for margin calculation.';
+COMMENT ON TABLE order_lines IS 'Legacy SXA `commande_produit` - order line items incl. supplier pricing for margin calculation.';
 
 -- ---------------------------------------------------------------------------
--- invoices — legacy `facture`
+-- invoices - legacy `facture`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS invoices (
     id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -357,10 +357,10 @@ CREATE INDEX IF NOT EXISTS ix_invoices_order_id ON invoices (order_id);
 CREATE INDEX IF NOT EXISTS ix_invoices_owner_username ON invoices (owner_username);
 CREATE INDEX IF NOT EXISTS ix_invoices_status_id ON invoices (status_id);
 
-COMMENT ON TABLE invoices IS 'Legacy SXA `facture` — invoice, originating order, status, sales owner, amount, payment conditions, dates, type and Drive reference.';
+COMMENT ON TABLE invoices IS 'Legacy SXA `facture` - invoice, originating order, status, sales owner, amount, payment conditions, dates, type and Drive reference.';
 
 -- ---------------------------------------------------------------------------
--- invoice_lines — legacy `facture_produit`
+-- invoice_lines - legacy `facture_produit`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS invoice_lines (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -374,10 +374,10 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 
 CREATE INDEX IF NOT EXISTS ix_invoice_lines_invoice_id ON invoice_lines (invoice_id);
 
-COMMENT ON TABLE invoice_lines IS 'Legacy SXA `facture_produit` — invoice line items.';
+COMMENT ON TABLE invoice_lines IS 'Legacy SXA `facture_produit` - invoice line items.';
 
 -- ---------------------------------------------------------------------------
--- activities — legacy `actualite`
+-- activities - legacy `actualite`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS activities (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -398,10 +398,10 @@ CREATE INDEX IF NOT EXISTS ix_activities_opportunity_id ON activities (opportuni
 CREATE INDEX IF NOT EXISTS ix_activities_customer_id ON activities (customer_id);
 CREATE INDEX IF NOT EXISTS ix_activities_occurred_at ON activities (occurred_at);
 
-COMMENT ON TABLE activities IS 'Legacy SXA `actualite` — activity/event journal referencing companies, contacts, opportunities, quotes, orders and invoices.';
+COMMENT ON TABLE activities IS 'Legacy SXA `actualite` - activity/event journal referencing companies, contacts, opportunities, quotes, orders and invoices.';
 
 -- ---------------------------------------------------------------------------
--- calls — legacy `appel`
+-- calls - legacy `appel`
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS calls (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -417,9 +417,9 @@ CREATE TABLE IF NOT EXISTS calls (
 CREATE INDEX IF NOT EXISTS ix_calls_opportunity_id ON calls (opportunity_id);
 CREATE INDEX IF NOT EXISTS ix_calls_actor_username ON calls (actor_username);
 
-COMMENT ON TABLE calls IS 'Legacy SXA `appel` — calls and reminders, including user and opportunity references.';
+COMMENT ON TABLE calls IS 'Legacy SXA `appel` - calls and reminders, including user and opportunity references.';
 
 -- Note: the legacy `projet` table ("legacy project/context object") is
 -- deliberately NOT migrated. MEMORY.md describes it only in passing with no
--- columns, and nothing in the v0 scope (MCP tools, agents) references it —
+-- columns, and nothing in the v0 scope (MCP tools, agents) references it -
 -- see data/sxa/migrations/README.md for this decision.

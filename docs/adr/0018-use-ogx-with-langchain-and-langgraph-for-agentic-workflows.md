@@ -9,7 +9,7 @@
 
 Zuno Demo requires an explicit, reviewable architecture decision so implementation, security and roadmap work remain aligned across the MVP and future releases.
 
-**Definition — OGX (OpenShift AI GenAI/RAG eXtensions):** the set of Red Hat OpenShift AI 3.5 native capabilities the platform consumes directly rather than reimplementing — KServe/vLLM-based `InferenceService` model serving, the OpenShift AI embedding and retrieval building blocks used for hybrid RAG over PostgreSQL/pgvector, and the DataScienceCluster-managed serving runtimes for the local Granite/Qwen/Llama model variants. OGX is infrastructure and inference capability, not orchestration: it has no concept of multi-step agent workflows, tool-call sequencing, or conversational state.
+**Definition - OGX (OpenShift AI GenAI/RAG eXtensions):** the set of Red Hat OpenShift AI 3.5 native capabilities the platform consumes directly rather than reimplementing - KServe/vLLM-based `InferenceService` model serving, the OpenShift AI embedding and retrieval building blocks used for hybrid RAG over PostgreSQL/pgvector, and the DataScienceCluster-managed serving runtimes for the local Granite/Qwen/Llama model variants. OGX is infrastructure and inference capability, not orchestration: it has no concept of multi-step agent workflows, tool-call sequencing, or conversational state.
 
 ## Decision
 

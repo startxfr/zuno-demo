@@ -2,7 +2,7 @@
 // (which the Go server proxies server-side to the agent's BFF, attaching
 // the caller's OIDC access token) and renders the reply plus citations.
 // No framework/build step, so the frontend ships as static files with zero
-// bundling — consistent with keeping this component dependency-light.
+// bundling - consistent with keeping this component dependency-light.
 (function () {
   "use strict";
 

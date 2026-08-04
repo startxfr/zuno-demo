@@ -28,20 +28,20 @@ needs to change to onboard it.
 
 Each agent is the same four ingredients, filled in differently:
 
-1. **OKF definition** — `agents/<name>/agent.okf.yaml`, conforming to
+1. **OKF definition** - `agents/<name>/agent.okf.yaml`, conforming to
    `platform/okf/schema/zuno-okf-v0.2.schema.json` (ADR-0005, ADR-0006).
    Declares the agent's tasks, allowed tools, model/classification hint,
    authorized Keycloak group(s) and portal UI metadata.
-2. **Namespace** — `zuno-<name>`, with `zuno.io/agent` and `zuno.io/status`
+2. **Namespace** - `zuno-<name>`, with `zuno.io/agent` and `zuno.io/status`
    labels, dedicated service account(s), quotas and NetworkPolicies
    (ADR-0023). Created by the `gitops/charts/namespaces` chart for all five
    agents regardless of whether the agent is active.
-3. **FE + BFF deployment** — one frontend and one BFF `Deployment` (plain
-   Kubernetes, not the AIAgent CRD — see "Why not the AIAgent CRD" below),
+3. **FE + BFF deployment** - one frontend and one BFF `Deployment` (plain
+   Kubernetes, not the AIAgent CRD - see "Why not the AIAgent CRD" below),
    built from the shared `components/agent-frontend` and `components/agent-bff`
    codebases and parameterized per agent (ADR-0008). Only applied for agents
    with `status: active`.
-4. **Keycloak group + OIDC client** — one realm group (`consultant`,
+4. **Keycloak group + OIDC client** - one realm group (`consultant`,
    `sales`, `adv`, `finance`, `board`) mapped to one OIDC client
    (`<name>-frontend`), owned by the identity track.
 
@@ -59,18 +59,18 @@ Comage, Advantage, Finage and Arkos each have ingredients 1 and 2 only:
   the portal can render an honest, access-gated tile;
 - a reserved, labeled, empty `zuno-<name>` namespace, so the namespace-per-agent
   isolation model (ADR-0023) is demonstrably real infrastructure and not
-  just a diagram — a reviewer can `oc get ns -l zuno.io/agent` and see all
+  just a diagram - a reviewer can `oc get ns -l zuno.io/agent` and see all
   five agent boundaries already exist.
 
 They have **no** FE/BFF `Deployment` and no Keycloak OIDC client wired up.
-This is not a partial or broken build of those four agents — it is the
+This is not a partial or broken build of those four agents - it is the
 correct v0 shape for something that is, by design, declarative-config-only
 until a later track flips its OKF `status` to `active` and a FE/BFF chart
 is added for it. The portal (`components/agent-frontend`) reads
 `spec.access.groups` from every `agent.okf.yaml` at startup and renders a
 disabled "coming soon" tile for any agent whose OKF `status` is not
 `active`, independent of whether the viewer's JWT groups would otherwise
-grant access — so a sales user sees a gated Comage tile, not a broken link.
+grant access - so a sales user sees a gated Comage tile, not a broken link.
 
 ## Why not the AIAgent CRD (ADR-0026, retargeted to v1)
 

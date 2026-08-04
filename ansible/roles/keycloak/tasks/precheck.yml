@@ -23,7 +23,7 @@
   ansible.builtin.fail:
     msg: >-
       applications.argoproj.io CRD not found. Run `make prepare argocd`
-      before preparing keycloak — the realm/Keycloak-CR instance is
+      before preparing keycloak - the realm/Keycloak-CR instance is
       installed as a GitOps Application (gitops/apps/keycloak).
   when: (_keycloak_precheck_argocd_crd.resources | default([]) | length) == 0
 

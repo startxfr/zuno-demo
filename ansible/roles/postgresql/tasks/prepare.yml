@@ -29,7 +29,7 @@
       spec:
         # "stable" is pinned deliberately: the pgvector image-volume
         # extension mechanism (CloudNativePG >= 1.27) is NOT relied upon by
-        # this demo (see gitops/charts/postgresql/image/README.md for why) —
+        # this demo (see gitops/charts/postgresql/image/README.md for why) -
         # any recent stable CNPG release is sufficient here.
         channel: stable
         name: cloudnative-pg
@@ -50,7 +50,7 @@
 - name: "postgresql | wait for the CloudNativePG controller deployment to be ready"
   # AllNamespaces install mode + the shared global OperatorGroup on OpenShift
   # lands the operator pod in the Subscription's own namespace, same as
-  # ansible/roles/argocd and ansible/roles/external_secrets — assumed here
+  # ansible/roles/argocd and ansible/roles/external_secrets - assumed here
   # to be openshift-operators. If this cluster's CNPG bundle instead creates
   # its own dedicated "cnpg-system" operand namespace, adjust the namespace
   # below (`oc get deploy -A | grep cnpg-controller-manager` confirms which).

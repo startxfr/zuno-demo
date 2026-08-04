@@ -3,16 +3,16 @@
 Moved here from components/agent-runtime/app/telemetry.py as part of
 ADR-0009's split: this service is now the one that actually knows the
 downstream provider and makes the call, so it's the correct owner of this
-telemetry (agent-runtime's own copy was removed, not duplicated — see its
+telemetry (agent-runtime's own copy was removed, not duplicated - see its
 README's "Observability" section).
 
 Sends OTLP traces/metrics to the shared Collector installed by
 ansible/roles/observability (`zuno-otel-collector-collector.zuno-platform.svc`).
 
 Cost estimates are approximate, demo-grade USD-per-1K-token rates, not a
-billing-accurate figure — good enough to demonstrate ADR-0029's "cost"
+billing-accurate figure - good enough to demonstrate ADR-0029's "cost"
 dimension is wired through, not a finance-grade cost model. Budgets/quotas
-(also named in ADR-0009's decision text) are NOT implemented — this only
+(also named in ADR-0009's decision text) are NOT implemented - this only
 *measures* cost, it doesn't enforce a ceiling. See README.md.
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ OTEL_ENDPOINT = os.getenv(
 )
 
 # USD per 1,000 tokens (input, output). Approximate public pricing at time of
-# writing; update as needed — this is a demo cost signal, not a billing feed.
+# writing; update as needed - this is a demo cost signal, not a billing feed.
 _COST_PER_1K_TOKENS = {
     "local": (0.0, 0.0),  # runs on already-provisioned GPU capacity
     "openai": (0.00015, 0.0006),
@@ -102,7 +102,7 @@ def model_call_span(provider: str, model: str, classification: str) -> Iterator[
     zuno.model_calls / zuno.model_tokens / zuno.model_cost_usd metrics
     (ADR-0029) once `.record_usage()` is called on the yielded recorder, or
     just the outcome/latency if the caller never has token counts (e.g. a
-    failed call, or a streaming call — see app/main.py's streaming path for
+    failed call, or a streaming call - see app/main.py's streaming path for
     why token accounting is best-effort there).
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")

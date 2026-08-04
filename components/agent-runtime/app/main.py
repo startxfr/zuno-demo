@@ -1,5 +1,5 @@
 """Zuno Agent Runtime (ADR-0009, ADR-0018): shared stateful orchestration
-service. This v0 build implements the Tekos workflow only — the other four
+service. This v0 build implements the Tekos workflow only - the other four
 agents are access-gated placeholder tiles built by a parallel track and do
 not have a runtime workflow yet. See README.md for the exact HTTP API
 contract.

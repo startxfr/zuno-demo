@@ -1,7 +1,7 @@
 # Demo-grade PostgreSQL: single CloudNativePG instance, no HA/replica
 # topology (ADR-0101 tracks HA for shared platform services in v1). The
 # CloudNativePG operator itself is installed imperatively via OLM
-# (ansible/roles/postgresql/tasks/prepare.yml) — this Application only
+# (ansible/roles/postgresql/tasks/prepare.yml) - this Application only
 # manages the Cluster CR and its credentials ExternalSecret, rendered from
 # the local chart at gitops/charts/postgresql.
 apiVersion: argoproj.io/v1alpha1

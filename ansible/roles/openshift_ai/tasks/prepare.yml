@@ -34,7 +34,7 @@
           zuno.io/managed-by: ansible
       spec:
         # ASSUMPTION: exact EA2 channel name not verified against a live
-        # catalog — confirm with `oc get packagemanifest rhods-operator -o
+        # catalog - confirm with `oc get packagemanifest rhods-operator -o
         # jsonpath='{.status.channels[*].name}'` before a real run and
         # adjust if it differs (ADR-0002 accepts EA2 pre-GA constraints).
         channel: eus-3.5

@@ -18,7 +18,7 @@ help:
 	  '  Required once, before any target below:' \
 	  '    export K8S_AUTH_HOST=https://api.mycluster.com:6443' \
 	  '    export K8S_AUTH_API_KEY=<cluster-admin token>' \
-	  '  This is the only manual input for the entire install — everything else' \
+	  '  This is the only manual input for the entire install - everything else' \
 	  '  (Keycloak, Vault, PostgreSQL, OpenShift AI, MLOps...) is automated.' \
 	  '' \
 	  '  make precheck                 Check all prerequisites' \
@@ -35,7 +35,7 @@ help:
 
 credentials-check:
 	@if [[ -z "$${K8S_AUTH_HOST:-}" || -z "$${K8S_AUTH_API_KEY:-}" ]]; then \
-	  echo "K8S_AUTH_HOST and K8S_AUTH_API_KEY must be exported first — see 'make help'." >&2; \
+	  echo "K8S_AUTH_HOST and K8S_AUTH_API_KEY must be exported first - see 'make help'." >&2; \
 	  exit 2; \
 	fi
 

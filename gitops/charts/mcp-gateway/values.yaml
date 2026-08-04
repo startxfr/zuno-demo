@@ -22,11 +22,11 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# Keycloak realm issuer (identity track owns the real route hostname —
+# Keycloak realm issuer (identity track owns the real route hostname -
 # override this for the target cluster; see ADR-0012).
 keycloakIssuer: https://keycloak-zuno.apps.example.com/realms/zuno
 
-# ASSUMPTION: sales-db MCP server address — see components/mcp-gateway
+# ASSUMPTION: sales-db MCP server address - see components/mcp-gateway
 # README "Assumption: sales-db MCP server address" for the reasoning and
 # what to change if this is wrong once that track's server lands.
 salesDbMcpUrl: http://sales-db-mcp.zuno-platform.svc:8000

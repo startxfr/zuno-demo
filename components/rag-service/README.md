@@ -2,7 +2,7 @@
 
 Shared RAG capabilities backed by PostgreSQL pgvector and hybrid
 (vector + full-text) search. Backs the Agent Runtime's `retrieve` node
-(ADR-0018) — currently used by Tekos.
+(ADR-0018) - currently used by Tekos.
 
 Implementation: FastAPI (Python 3.11), `asyncpg`. Deployed by
 `ansible/roles/rag` via `gitops/apps/rag/application.yaml` ->
@@ -37,7 +37,7 @@ Response `200`:
 ```
 
 `vector_search_used` is `false` when the embedding backend was unreachable
-for this request — the response still contains full-text-search-only
+for this request - the response still contains full-text-search-only
 results rather than failing outright (see "Degradation" below).
 
 ### `GET /healthz` / `GET /readyz`
@@ -77,7 +77,7 @@ reciprocal rank fusion (RRF, k=60):
    `ts_rank_cd`.
 
 RRF avoids needing the two scores (cosine similarity vs. `ts_rank_cd`) to
-be on a comparable scale — each list only contributes rank position, not
+be on a comparable scale - each list only contributes rank position, not
 its literal score, to the fused ranking.
 
 ## Embedding backend
@@ -85,11 +85,11 @@ its literal score, to the fused ranking.
 The query text is embedded via an OpenAI-compatible `POST
 {EMBEDDING_SERVICE_URL}/v1/embeddings` call (default:
 `http://embeddings-predictor.zuno-datascience.svc:8080/v1/embeddings`,
-override via env) — this assumes an embedding model is served through
+override via env) - this assumes an embedding model is served through
 OpenShift AI's KServe/vLLM serving path (ADR-0018's OGX definition), or
 any other OpenAI-compatible embeddings endpoint. **Degradation:** if that
 endpoint is unreachable or errors, this service logs a warning and falls
-back to full-text-search only rather than failing the request — the
+back to full-text-search only rather than failing the request - the
 top-level RAG capability stays available even before an embedding model is
 deployed.
 

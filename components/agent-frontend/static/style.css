@@ -6,7 +6,7 @@
  * reproducible build, and a Go binary serving hand-written CSS keeps the
  * frontend a single dependency-free static asset. If/when this module gains
  * package-manager access, swapping in the real PatternFly CSS bundle is a
- * drop-in replacement — every class name below (pf-button, pf-form-control,
+ * drop-in replacement - every class name below (pf-button, pf-form-control,
  * pf-body) intentionally mirrors PatternFly's own naming so templates in
  * internal/portal and internal/chat would not need to change.
  */

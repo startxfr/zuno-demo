@@ -12,7 +12,7 @@ COPY app ./app
 ENV PYTHONUNBUFFERED=1
 
 # No provider-routing config or provider API keys here anymore (ADR-0009
-# split) — this service only needs AI_GATEWAY_URL, set at deploy time; see
+# split) - this service only needs AI_GATEWAY_URL, set at deploy time; see
 # components/ai-gateway for where the routing config now lives.
 
 EXPOSE 8080

@@ -1,6 +1,6 @@
 # Fixed hostname (tekos.routeHost helper) since the OIDC redirect URI
 # contract https://<agent>.apps.<cluster-domain>/* and the Keycloak client's
-# registered redirect URI both depend on a predictable host — see
+# registered redirect URI both depend on a predictable host - see
 # templates/_helpers.tpl and values.yaml.
 apiVersion: route.openshift.io/v1
 kind: Route

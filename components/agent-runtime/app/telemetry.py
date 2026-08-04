@@ -1,12 +1,12 @@
 """OpenTelemetry service registration for the Agent Runtime (ADR-0029).
 
 Model-call-level telemetry (per-provider spans, token/cost metrics) moved
-to components/ai-gateway/app/telemetry.py as part of ADR-0009's split —
+to components/ai-gateway/app/telemetry.py as part of ADR-0009's split -
 that service is now the one that actually knows the provider and makes the
 call, so it's the correct owner of that detail (see its README's
 "Observability" section). This module only initializes the OTel SDK so
 this service's own future spans (e.g. around the LangGraph workflow itself)
-have a resource/exporter to attach to — nothing calls a span helper from
+have a resource/exporter to attach to - nothing calls a span helper from
 here today.
 """
 from __future__ import annotations

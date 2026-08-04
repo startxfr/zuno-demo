@@ -1,6 +1,6 @@
 ---
 # Applies the SXA-derived schema + synthetic fixtures (ADR-0016, ADR-0025)
-# directly via a one-shot Job — not a GitOps Application, since there is
+# directly via a one-shot Job - not a GitOps Application, since there is
 # nothing "declaratively running" about a schema migration once it has run
 # (see gitops/apps/README.md). The sales-db MCP server that reads this
 # schema *is* a standing workload, so it's applied afterward as a proper

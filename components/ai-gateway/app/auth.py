@@ -1,11 +1,11 @@
 """JWT validation for the AI Inference Gateway (ADR-0009, ADR-0012, ADR-0013).
 
 Structurally identical to components/mcp-gateway/app/auth.py and
-components/agent-runtime/app/auth.py — three independently deployable
+components/agent-runtime/app/auth.py - three independently deployable
 services, so the ~60 lines are duplicated rather than factored into a
 shared package the repo doesn't otherwise have (see agent-runtime's copy
 for the fuller rationale). This gateway only needs authenticated-caller
-verification (`sub`) — unlike mcp-gateway, it has no per-caller
+verification (`sub`) - unlike mcp-gateway, it has no per-caller
 authorization decision keyed on `groups` (routing is classification-driven,
 not group-driven), but `groups` is still extracted for consistency and
 future use (e.g. per-group budgets, ADR-0009's deferred scope).

@@ -21,7 +21,7 @@
   ansible.builtin.fail:
     msg: >-
       applications.argoproj.io CRD not found. Run `make prepare argocd`
-      before preparing vault — vault is installed as a GitOps Application.
+      before preparing vault - vault is installed as a GitOps Application.
   when: (_vault_precheck_argocd_crd.resources | default([]) | length) == 0
 
 - name: "vault | precheck summary"

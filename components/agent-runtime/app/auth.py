@@ -1,6 +1,6 @@
 """JWT validation for the Agent Runtime (ADR-0009, ADR-0012, ADR-0013).
 
-Structurally identical to components/mcp-gateway/app/auth.py — these are
+Structurally identical to components/mcp-gateway/app/auth.py - these are
 two independently deployable services, so the ~60 lines are duplicated
 rather than factored into a shared package the repo doesn't otherwise have
 (a `packages/zuno-common` extraction is a reasonable v1 cleanup once a

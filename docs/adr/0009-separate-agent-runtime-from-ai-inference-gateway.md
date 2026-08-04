@@ -20,8 +20,8 @@ applied by `ansible/roles/llm`) owns inference routing, provider fallback
 and classification-eligibility (ADR-0020, ADR-0021) behind an
 OpenAI-compatible `POST /v1/chat/completions`; `agent-runtime`'s
 `ModelRouter` (`app/clients/model_router.py`) is now a thin client holding
-no provider API key and no routing config. Budgets/quotas — also named in
-this ADR's decision text — remain unimplemented (measured via
+no provider API key and no routing config. Budgets/quotas - also named in
+this ADR's decision text - remain unimplemented (measured via
 `ai-gateway`'s OTel cost metric, not enforced) and are documented as
 explicit future work in `components/ai-gateway/README.md` rather than
 built now; that scope decision was confirmed with the user before this

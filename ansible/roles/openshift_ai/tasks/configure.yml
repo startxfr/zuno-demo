@@ -5,4 +5,4 @@
 # openshift_ai is a PREP_COMPONENT only, not a CONFIG_SCOPE.
 - name: "openshift_ai | nothing to configure beyond the DataScienceCluster"
   ansible.builtin.debug:
-    msg: "openshift_ai has no configure phase — see tasks/prepare.yml and the datascience role."
+    msg: "openshift_ai has no configure phase - see tasks/prepare.yml and the datascience role."

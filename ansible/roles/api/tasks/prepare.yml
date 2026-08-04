@@ -1,4 +1,4 @@
 ---
 - name: "api | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "api has no separate prepare phase — a plain Deployment/Service/Route has no operator dependency of its own."
+    msg: "api has no separate prepare phase - a plain Deployment/Service/Route has no operator dependency of its own."

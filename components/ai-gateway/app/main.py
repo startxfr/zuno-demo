@@ -163,7 +163,7 @@ async def _stream_completion(
     one, same as the non-streaming path. A candidate that fails *after*
     already streaming tokens to the caller cannot be silently retried
     (the client has already received partial content that a different
-    provider's answer wouldn't continue coherently) — that case ends the
+    provider's answer wouldn't continue coherently) - that case ends the
     stream with an error chunk instead. This mirrors the fallback boundary
     the pre-refactor `ModelRouter.streaming_model_for()` docstring
     described but never actually wired up.

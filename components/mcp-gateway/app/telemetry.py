@@ -1,4 +1,4 @@
-"""OpenTelemetry instrumentation (ADR-0029) — sends OTLP traces/metrics to
+"""OpenTelemetry instrumentation (ADR-0029) - sends OTLP traces/metrics to
 the shared Collector installed by ansible/roles/observability
 (`zuno-otel-collector-collector.zuno-platform.svc`).
 
@@ -85,7 +85,7 @@ def tool_invoke_span(tool_name: str, classification: str) -> Iterator["ToolInvok
         except Exception as exc:
             # Only fall back to the generic "error" outcome if the caller
             # hasn't already classified it more precisely (e.g. "denied",
-            # "unknown_tool") before raising — an HTTPException for a policy
+            # "unknown_tool") before raising - an HTTPException for a policy
             # denial is expected control flow, not an unhandled error.
             if recorder.outcome == "unknown":
                 recorder.outcome = "error"

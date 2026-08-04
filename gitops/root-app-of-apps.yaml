@@ -2,7 +2,7 @@
 # Root App-of-Apps. Applied once by the `argocd` role's configure task
 # (ansible/roles/argocd/tasks/configure.yml). ArgoCD recurses over
 # gitops/apps/ and turns every application.yaml it finds into a managed
-# child Application — this is the mechanism that lets `make configure`
+# child Application - this is the mechanism that lets `make configure`
 # (with no scope) bring the whole platform to its declared state from a
 # single command. See docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md.
 apiVersion: argoproj.io/v1alpha1

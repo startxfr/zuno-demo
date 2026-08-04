@@ -10,7 +10,7 @@ Referenced by exactly one Application: `gitops/apps/agents/application.yaml`
 
 ## Why all five exist, not just zuno-tekos
 
-Only `zuno-tekos` (`status: active`) hosts real workloads in v0 — the
+Only `zuno-tekos` (`status: active`) hosts real workloads in v0 - the
 Tekos FE/BFF from `gitops/charts/tekos`, plus the Agent Runtime/MCP
 Gateway/RAG service owned by other tracks. `zuno-comage`, `zuno-advantage`,
 `zuno-finage` and `zuno-arkos` (`status: placeholder`) are created and

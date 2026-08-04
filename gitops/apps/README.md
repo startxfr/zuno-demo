@@ -15,7 +15,7 @@ Operator config), or at `gitops/charts/<component>` in this repository for
 Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).
 
-Not every component has an Application here — operators with no standalone
+Not every component has an Application here - operators with no standalone
 workload of their own (`argocd`, `external_secrets`, `nvidia_gpu`,
 `openshift_ai`, `datascience`) are installed by direct `kubernetes.core.k8s`
 Subscription/CR tasks in their own Ansible role instead (mirroring
@@ -42,17 +42,17 @@ Directories present:
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) |
 
 `keycloak` and `api`'s `Application.spec.source.helm.values` reference
-`clusterBaseDomain: __CLUSTER_BASE_DOMAIN__` — a token, not a literal
+`clusterBaseDomain: __CLUSTER_BASE_DOMAIN__` - a token, not a literal
 domain. `ansible/tasks/apply_gitops_app.yml` substitutes it with the real
 cluster's apps wildcard domain, auto-discovered from
 `Ingress.config.openshift.io/cluster` and persisted to Vault at
 `secret/zuno/platform/cluster-domain` (see
 `ansible/tasks/resolve_cluster_base_domain.yml` and
-`ansible/roles/vault/tasks/configure.yml`) — no manual edit needed before a
+`ansible/roles/vault/tasks/configure.yml`) - no manual edit needed before a
 real deployment. `ansible/roles/external_secrets` also exposes that Vault
 value as a `zuno-cluster-domain` Secret in `zuno-platform` for any service
 that wants it as a live runtime value rather than a Helm-render-time one
-(not yet consumed by any service — the value only reaches K8s manifest
+(not yet consumed by any service - the value only reaches K8s manifest
 spec fields like a Route's `spec.host` or the Keycloak CR's
 `spec.hostname.hostname` through the Ansible/Helm path, since those fields
 have no `secretKeyRef`-style mechanism to source from a Secret).

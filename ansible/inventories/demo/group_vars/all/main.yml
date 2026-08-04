@@ -12,5 +12,5 @@ zuno_repo_root: "{{ playbook_dir }}/../.."
 # from Ingress.config.openshift.io/cluster and persisted to Vault (see
 # ansible/tasks/resolve_cluster_base_domain.yml). Setting a static value in
 # this file would short-circuit that discovery (Ansible facts already
-# "defined" from group_vars skip the live lookup) — only set it here if you
+# "defined" from group_vars skip the live lookup) - only set it here if you
 # deliberately want to pin/override the discovered value.

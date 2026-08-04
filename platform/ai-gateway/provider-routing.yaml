@@ -5,7 +5,7 @@
 # which provider to call and in what fallback order. Deployed as the
 # `zuno-provider-routing` ConfigMap by ansible/roles/llm via
 # gitops/apps/llm/application.yaml (see kustomization.yaml in this
-# directory — the ConfigMap is generated from this exact file, so this is
+# directory - the ConfigMap is generated from this exact file, so this is
 # the single source of truth; do not hand-copy its contents elsewhere).
 #
 # `eligible_for` lists which data classifications (from
@@ -13,7 +13,7 @@
 # may route to that provider, per ADR-0021:
 #   - C1 (e.g. technical-docs): any provider, local or SaaS.
 #   - C2 (e.g. sales-data): local model plus a restricted SaaS allow-list
-#     only (OpenAI and Anthropic below — both offer contractual
+#     only (OpenAI and Anthropic below - both offer contractual
 #     no-training-on-API-data terms suitable for a restricted allow-list;
 #     Gemini/Mistral are held back from C2 in this default until an
 #     equivalent data-handling review is done).

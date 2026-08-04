@@ -1,14 +1,14 @@
--- Zuno Demo — pgvector-backed document embeddings store
+-- Zuno Demo - pgvector-backed document embeddings store
 --
 -- Implements ADR-0015 ("Use PostgreSQL and pgvector as the persistent data
 -- platform"). This table is the shared retrieval corpus queried by the RAG
 -- service (Track D) for Tekos and, once enabled, the other agents. It is
 -- intentionally generic (source/title/content/embedding/metadata) rather
--- than SXA-specific — it indexes whatever knowledge sources are ingested
+-- than SXA-specific - it indexes whatever knowledge sources are ingested
 -- (Confluence pages, product docs, etc.), not sales transactional data.
 --
 -- Requires the `vector` extension to be present in the PostgreSQL image
--- (see gitops/charts/postgresql/image/README.md — the default CloudNativePG
+-- (see gitops/charts/postgresql/image/README.md - the default CloudNativePG
 -- operand image does not bundle pgvector; a custom image or CNPG extension
 -- image is required, and CREATE EXTENSION here will fail loudly if that
 -- prerequisite was skipped, which is the intended, non-hand-wavy behavior).
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS ix_document_embeddings_metadata_gin ON document_embed
 
 -- IVFFlat, cosine distance. `lists` is a rough starting point sized for a
 -- small demo corpus (rule of thumb ~ rows/1000, floored at a small value);
--- re-tune (and re-ANALYZE) once real ingestion volume is known — see
+-- re-tune (and re-ANALYZE) once real ingestion volume is known - see
 -- ADR-0105 (v1, automated monthly knowledge ingestion) for the pipeline that
 -- will eventually own this table's write path.
 CREATE INDEX IF NOT EXISTS ix_document_embeddings_embedding_cosine

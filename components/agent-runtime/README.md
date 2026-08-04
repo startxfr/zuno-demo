@@ -2,7 +2,7 @@
 
 Shared stateful orchestration runtime (ADR-0009): owns task orchestration,
 LangChain/LangGraph workflows, RAG invocation and MCP tool invocation,
-kept separate from model routing/quotas/fallback — that's
+kept separate from model routing/quotas/fallback - that's
 `components/ai-gateway`'s job. `app/clients/model_router.py` is a thin
 client: it builds a `langchain_openai.ChatOpenAI` pointed at
 `AI_GATEWAY_URL`, and the gateway resolves classification-eligible
@@ -10,13 +10,13 @@ providers and fallback order server-side (ADR-0020/0021). See
 `components/ai-gateway/README.md` for why this split needs zero changes to
 this service's LangGraph streaming mechanism.
 
-v0 implements **one** agent workflow: Tekos (technical consultants) — the
+v0 implements **one** agent workflow: Tekos (technical consultants) - the
 first vertical slice per MEMORY.md section 9. The other four agents are
 access-gated placeholder tiles with no runtime workflow yet.
 
 Implementation: FastAPI (Python 3.11) + LangChain + LangGraph. Deployed by
 a chart at `gitops/charts/agent-runtime` into the shared `zuno-platform`
-namespace (wired up by whichever track owns the BFF/agent-surface — see
+namespace (wired up by whichever track owns the BFF/agent-surface - see
 `gitops/apps/README.md`; this repo currently only builds the AI/model
 layer's own GitOps apps, listed in that file).
 
@@ -41,23 +41,23 @@ layer's own GitOps apps, listed in that file).
   ```
 - **Streaming:** send `Accept: text/event-stream` on the same request to
   receive Server-Sent Events instead:
-  - `event: token` — `{"delta": "<next text fragment>"}`, one per model
+  - `event: token` - `{"delta": "<next text fragment>"}`, one per model
     token/chunk as the `reason` node's chat model streams.
-  - `event: done` — `{"citations": [...]}`, emitted once at the end (same
+  - `event: done` - `{"citations": [...]}`, emitted once at the end (same
     shape as the synchronous response's `citations` field).
-  - `event: error` — `{"message": "..."}`, emitted (instead of `done`) if
+  - `event: error` - `{"message": "..."}`, emitted (instead of `done`) if
     the graph raises mid-stream.
 - **Response `401`:** missing/invalid/expired JWT.
 - **Response `500`:** unhandled graph failure (see `errors` accumulated in
-  graph state via logs — not currently surfaced in the HTTP response body
+  graph state via logs - not currently surfaced in the HTTP response body
   beyond the summary message).
 
 ### `GET /healthz` / `GET /readyz`
 
-Both always `200` for this service today — it holds no required external
+Both always `200` for this service today - it holds no required external
 state at startup beyond what individual node calls handle defensively
 per-request (retrieve/tool_call/reason each degrade gracefully rather than
-crash the whole request — see `app/graph/nodes.py`).
+crash the whole request - see `app/graph/nodes.py`).
 
 ## The Tekos workflow (LangGraph)
 
@@ -69,36 +69,36 @@ START -> retrieve -> [conditional] -> reason -> respond -> END
                     \-> tool_call -/
 ```
 
-- **`retrieve`** (`app/graph/nodes.py:retrieve_node`) — calls
+- **`retrieve`** (`app/graph/nodes.py:retrieve_node`) - calls
   `rag-service` `POST /v1/search` for technical documents relevant to the
   question (ADR-0018's OGX retrieval substrate). Degrades to an empty
   result set (logged) if rag-service is unreachable, rather than failing
   the whole request.
-- **conditional edge** (`should_call_tools`) — a v0 heuristic (regex over
+- **conditional edge** (`should_call_tools`) - a v0 heuristic (regex over
   the question for words like "confluence", "latest", "internal doc...")
   decides whether the live-data tool step is worth the extra round trip.
   This stands in for what should eventually be an OKF-declared task
   capability check once Track E authors `agents/tekos/tasks` /
-  `agents/tekos/tools` (currently stubs) — see the docstring in
+  `agents/tekos/tools` (currently stubs) - see the docstring in
   `app/graph/nodes.py` for the full rationale.
-- **`tool_call`** (`tool_call_node`) — calls the MCP Gateway's
+- **`tool_call`** (`tool_call_node`) - calls the MCP Gateway's
   `POST /v1/tools/search_confluence/invoke`, forwarding the caller's own
   Bearer JWT (ADR-0013) and a declared `X-Zuno-Data-Classification: C1`
   (technical-docs, per `policies/data-classification/classification.yaml`).
   Degrades to no tool context (logged) if the gateway denies or fails the
   call.
-- **`reason`** (`reason_node`) — builds a grounded prompt from retrieved
+- **`reason`** (`reason_node`) - builds a grounded prompt from retrieved
   docs + tool results, then calls `ModelRouter.invoke_with_fallback()`
   (`app/clients/model_router.py`), a single HTTP call to
   `components/ai-gateway`'s `POST /v1/chat/completions`. The gateway tries
   the local vLLM model first, then falls through OpenAI -> Gemini ->
   Anthropic -> Mistral in the order declared by
   `platform/ai-gateway/provider-routing.yaml`, filtered to providers
-  eligible for the request's classification (ADR-0021 — fails closed,
-  never silently escalates to an ineligible provider) — none of that
+  eligible for the request's classification (ADR-0021 - fails closed,
+  never silently escalates to an ineligible provider) - none of that
   fallback logic lives in this repo's `agent-runtime` code anymore
   (ADR-0009).
-- **`respond`** (`respond_node`) — assembles the final
+- **`respond`** (`respond_node`) - assembles the final
   `{reply, citations}` contract from retrieved-doc sources and any live
   Confluence results, de-duplicated.
 
@@ -115,7 +115,7 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 `tool_call` node can forward the *caller's* token to the MCP Gateway
 (ADR-0013) rather than a runtime service credential.
 
-## Configuration (env vars, no hardcoded secrets — ADR-0024)
+## Configuration (env vars, no hardcoded secrets - ADR-0024)
 
 | Var | Default | Purpose |
 |---|---|---|
@@ -129,7 +129,7 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 
 `app/telemetry.py` initializes an OTLP tracer at startup
 (`init_telemetry()`, called from `app/main.py`) against the Collector
-`ansible/roles/observability` installs — service registration only today,
+`ansible/roles/observability` installs - service registration only today,
 no spans of its own yet. Model-call-level telemetry (per-provider spans,
 token/cost metrics) moved to `components/ai-gateway/app/telemetry.py` as
 part of the ADR-0009 split: that service now makes the actual provider

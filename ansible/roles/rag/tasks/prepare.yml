@@ -1,4 +1,4 @@
 ---
 - name: "rag | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "rag is applied entirely by tasks/configure.yml — the RAG service Deployment has no operator dependency of its own."
+    msg: "rag is applied entirely by tasks/configure.yml - the RAG service Deployment has no operator dependency of its own."

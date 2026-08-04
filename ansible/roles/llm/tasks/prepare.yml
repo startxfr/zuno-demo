@@ -1,4 +1,4 @@
 ---
 - name: "llm | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "llm is applied entirely by tasks/configure.yml — provider routing and the Agent Runtime have no operator dependency of their own."
+    msg: "llm is applied entirely by tasks/configure.yml - provider routing and the Agent Runtime have no operator dependency of their own."

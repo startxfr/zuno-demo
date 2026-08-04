@@ -1,6 +1,6 @@
 # agent-bff
 
-Reusable Go HTTP service (`net/http`, standard library only — no external
+Reusable Go HTTP service (`net/http`, standard library only - no external
 Go modules at all, see `go.mod`) that sits between `components/agent-frontend`
 and the shared Agent Runtime for one agent (ADR-0008). It has no public
 OpenShift Route: the frontend calls it over its in-cluster `Service` only,
@@ -9,7 +9,7 @@ forwarding the caller's OIDC access token as a Bearer credential.
 ## What it does
 
 1. Validates the incoming bearer JWT's RS256 signature against Keycloak's
-   JWKS, plus issuer/audience/expiry (ADR-0013 identity propagation — the
+   JWKS, plus issuer/audience/expiry (ADR-0013 identity propagation - the
    BFF independently revalidates identity rather than trusting the
    frontend).
 2. Calls the shared Agent Runtime's documented chat contract, owned by a
@@ -30,7 +30,7 @@ forwarding the caller's OIDC access token as a Bearer credential.
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | POST | `/api/chat` | `Authorization: Bearer <access_token>` | `{"session_id": string, "message": string}` | `200 {"reply": string, "citations": [{"source","title"}]}` / `401 {"error"}` if the token is missing, invalid or expired / `400 {"error"}` on a bad request body / `502 {"error"}` if the Agent Runtime call fails |
-| GET | `/healthz` | none | — | `200 ok` |
+| GET | `/healthz` | none | - | `200 ok` |
 
 ## Configuration (environment variables)
 
@@ -43,7 +43,7 @@ forwarding the caller's OIDC access token as a Bearer credential.
 | `AGENT_RUNTIME_BASE_URL` | no (default `http://agent-runtime.zuno-tekos.svc.cluster.local:8080`) | Shared Agent Runtime in-cluster base URL |
 
 No secret is configured here: JWKS is public key material fetched over
-HTTP, and this service holds no credential of its own (ADR-0024 — nothing
+HTTP, and this service holds no credential of its own (ADR-0024 - nothing
 to source from Vault for this component).
 
 ## Assumptions flagged for other tracks
@@ -57,7 +57,7 @@ to source from Vault for this component).
 - **Agent Runtime**: this client implements the `POST /v1/agents/{agent}/chat`
   contract exactly as specified in the Track E brief. It has not been
   exercised against a live Agent Runtime in this environment (no cluster
-  access) — `internal/runtime/client.go` is written to compile and to match
+  access) - `internal/runtime/client.go` is written to compile and to match
   the documented request/response shape precisely.
 
 ## Why standard library only

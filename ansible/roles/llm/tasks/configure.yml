@@ -1,7 +1,7 @@
 ---
 # Seeds empty placeholders (never overwriting a real value) for the four
 # external provider API keys platform/ai-gateway/externalsecret-*.yaml
-# resolve — same check-then-placeholder idiom as
+# resolve - same check-then-placeholder idiom as
 # ansible/roles/vault/tasks/configure.yml's google-oauth/smtp placeholders,
 # scoped to this role since these are llm-specific secrets, not core
 # platform bootstrap secrets.
@@ -15,7 +15,7 @@
 
 - name: "llm | fail if Vault bootstrap credentials are missing"
   ansible.builtin.fail:
-    msg: "vault-bootstrap-credentials not found — run `make prepare vault` and `make configure vault` first."
+    msg: "vault-bootstrap-credentials not found - run `make prepare vault` and `make configure vault` first."
   when: (_llm_vault_creds.resources | default([]) | length) == 0
 
 - name: "llm | find the running Vault server pod"
@@ -68,7 +68,7 @@
       placeholders until an operator populates them, e.g.
       `vault kv put secret/zuno/providers/openai api_key=...`. Until then
       components/agent-runtime's ModelRouter simply fails over past that
-      provider (ADR-0020) — the local model always stays eligible.
+      provider (ADR-0020) - the local model always stays eligible.
 
 - name: "llm | apply the provider routing GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

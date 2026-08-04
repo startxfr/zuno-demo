@@ -1,5 +1,5 @@
 ---
-# Basic reachability smoke check for the one functional agent (Tekos) — not
+# Basic reachability smoke check for the one functional agent (Tekos) - not
 # the 20-scenario acceptance evaluation (ADR-0027/0028), which is a
 # separate, later concern (evaluations/tekos/, run outside this role).
 - name: "agents | resolve the cluster base domain"

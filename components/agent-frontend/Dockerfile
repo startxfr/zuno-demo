@@ -1,6 +1,6 @@
 # Build context MUST be the repository root (see gitops/charts/tekos'
 # generated build instructions / CI), because this image bakes each agent's
-# agent.okf.yaml into /agents/<name>/agent.okf.yaml at build time — the
+# agent.okf.yaml into /agents/<name>/agent.okf.yaml at build time - the
 # simplest way for this stateless portal to read every agent's declarative
 # definition without wiring a ConfigMap-per-agent-file at deploy time.
 #

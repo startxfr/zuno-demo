@@ -3,7 +3,7 @@
 # Why a custom image instead of CNPG's ImageVolume extension mechanism
 # (`.spec.postgresql.extensions`, using ghcr.io/cloudnative-pg/pgvector):
 # that mechanism requires CloudNativePG >= 1.27, PostgreSQL >= 18, and the
-# Kubernetes `ImageVolume` feature gate — which is beta and OFF BY DEFAULT
+# Kubernetes `ImageVolume` feature gate - which is beta and OFF BY DEFAULT
 # through at least Kubernetes 1.34 (only enabled by default starting 1.35).
 # OpenShift 4.20 (ADR-0002) does not reliably guarantee that feature gate is
 # on. Rather than hand-wave a dependency this demo cluster likely doesn't

@@ -1,7 +1,7 @@
 # Default values for the agent-runtime chart. This Application is listed
 # in gitops/apps/README.md's convention but ownership of *wiring it into
 # the demo* (the BFF calling it, ingress/route if any) belongs to whichever
-# track owns the agent surface (Track E) — Track D (this chart) only
+# track owns the agent surface (Track E) - Track D (this chart) only
 # guarantees the service exists, is reachable in-cluster at
 # agent-runtime.zuno-platform.svc:8080, and implements the documented API
 # contract (components/agent-runtime/README.md).
@@ -28,6 +28,6 @@ ragServiceUrl: http://rag-service.zuno-platform.svc:8080
 mcpGatewayUrl: http://mcp-gateway.zuno-platform.svc:8080
 
 # ADR-0009 split: routing config, provider secrets and the local model
-# endpoint moved to gitops/charts/ai-gateway — this service only needs the
+# endpoint moved to gitops/charts/ai-gateway - this service only needs the
 # gateway's URL now (same-namespace Service, gitops/apps/ai-gateway).
 aiGatewayUrl: http://ai-gateway.zuno-platform.svc:8080

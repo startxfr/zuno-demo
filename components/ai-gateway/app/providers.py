@@ -1,4 +1,4 @@
-"""LangChain chat-model factory per provider (ADR-0020) — moved here from
+"""LangChain chat-model factory per provider (ADR-0020) - moved here from
 components/agent-runtime's ModelRouter.chat_model_for() as part of
 ADR-0009's split; the factory logic itself is unchanged. This module never
 sees a hardcoded key: it only reads `os.environ` variable *names* declared

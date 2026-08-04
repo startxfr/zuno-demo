@@ -1,5 +1,5 @@
 # KServe pulls the model weights from Hugging Face at pod start via the
-# storageUri's `hf://` scheme (RHOAI's supported storage initializer) —
+# storageUri's `hf://` scheme (RHOAI's supported storage initializer) -
 # demo scope, no offline/mirrored model cache. First pull is slow (~15GB);
 # this is the dominant contributor to first-token latency on a cold start,
 # separate from the steady-state <6s objective (README.md).

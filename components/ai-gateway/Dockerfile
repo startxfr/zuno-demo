@@ -16,7 +16,7 @@ ENV PYTHONUNBUFFERED=1 \
 # /app/config/provider-routing.yaml from the `zuno-provider-routing`
 # ConfigMap (generated from platform/ai-gateway/provider-routing.yaml by
 # ansible/roles/llm's GitOps app) so a routing-policy change doesn't
-# require rebuilding/redeploying this image — see gitops/charts/ai-gateway.
+# require rebuilding/redeploying this image - see gitops/charts/ai-gateway.
 
 EXPOSE 8080
 

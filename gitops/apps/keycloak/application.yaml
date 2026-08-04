@@ -1,7 +1,7 @@
 ---
 # Zuno identity platform. This deploys the local chart (gitops/charts/keycloak)
 # holding the Keycloak CR instance, the Google IdP broker configuration and
-# the `zuno` realm (KeycloakRealmImport) — NOT the operator itself. The
+# the `zuno` realm (KeycloakRealmImport) - NOT the operator itself. The
 # Keycloak Operator (Red Hat build of Keycloak) is installed imperatively as
 # an OLM Subscription by ansible/roles/keycloak's prepare.yml, following the
 # same operator-then-instance split as argocd/external_secrets/vault. See
@@ -27,7 +27,7 @@ spec:
         # Ingress.config.openshift.io/cluster and persisted to Vault at
         # secret/zuno/platform/cluster-domain (see
         # ansible/tasks/resolve_cluster_base_domain.yml and
-        # ansible/roles/vault/tasks/configure.yml) — no manual edit needed.
+        # ansible/roles/vault/tasks/configure.yml) - no manual edit needed.
         # Every per-agent client redirect URI in the imported realm is
         # templated against this same value.
         clusterBaseDomain: __CLUSTER_BASE_DOMAIN__

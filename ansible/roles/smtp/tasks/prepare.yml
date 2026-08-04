@@ -1,6 +1,6 @@
 ---
 # smtp is a PREP_COMPONENT (reachable via `make prepare smtp`), not a
-# CONFIG_SCOPE — there is no SMTP server to install, only the technical
+# CONFIG_SCOPE - there is no SMTP server to install, only the technical
 # mail identity's credential to expose via ExternalSecret, seeded as an
 # empty placeholder at secret/zuno/smtp/technical by
 # ansible/roles/vault/tasks/configure.yml. An operator must populate it

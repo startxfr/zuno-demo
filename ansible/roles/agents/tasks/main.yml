@@ -1,5 +1,5 @@
 ---
-# `ansible/playbooks/install.yml` (`make install`) runs only this role —
+# `ansible/playbooks/install.yml` (`make install`) runs only this role -
 # delegate to the same logic `make configure api`/`make configure agents`
 # would use if those scopes existed, so there is exactly one place that
 # knows how to bring the agent surface to its declared state.

@@ -12,7 +12,7 @@
 # but is NOT durable across a database pod loss. Wiring this to the shared
 # PostgreSQL instance (ADR-0015, owned by another track's `postgresql` role)
 # is a documented follow-up once that service name/credentials contract
-# exists — track this alongside ADR-0112.
+# exists - track this alongside ADR-0112.
 #
 # Secret injection for the Google OAuth client (ADR-0014): the Keycloak
 # Operator's KeycloakRealmImport CRD has no native secretKeyRef-style
@@ -22,12 +22,12 @@
 # mode: `${vault.<key>}` placeholders in the realm JSON
 # (files/realm-zuno.json's identityProviders[0].config.clientId/
 # clientSecret) resolve at runtime to the environment variable
-# `KC_VAULT_<KEY-UPPERCASED-WITH-NON-ALPHANUMERICS-AS-UNDERSCORE>` — see
+# `KC_VAULT_<KEY-UPPERCASED-WITH-NON-ALPHANUMERICS-AS-UNDERSCORE>` - see
 # https://www.keycloak.org/server/vault (env provider). We enable it with
 # KC_VAULT=env below and populate KC_VAULT_GOOGLE_CLIENT_ID /
 # KC_VAULT_GOOGLE_CLIENT_SECRET from the ExternalSecret-backed
 # google-oauth-client Secret. This is the documented, supported Keycloak
-# mechanism for keeping secrets out of a realm import file — ASSUMPTION:
+# mechanism for keeping secrets out of a realm import file - ASSUMPTION:
 # the exact env-var-naming transform should be re-verified against the
 # specific RHBK version the cluster installs (documented in this role's
 # README.md), since this could not be validated against a live cluster.

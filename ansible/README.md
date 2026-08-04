@@ -1,7 +1,7 @@
 # Ansible Automation
 
 Ansible is a thin bootstrapper behind the public `make` interface, not the
-configuration engine — see ADR-0022 and ADR-0024. It exists to get from
+configuration engine - see ADR-0022 and ADR-0024. It exists to get from
 "a bare cluster-admin token" to "ArgoCD is reconciling everything else":
 
 1. `make precheck` / `make prepare` walk `PREP_COMPONENTS` in order
@@ -19,7 +19,7 @@ configuration engine — see ADR-0022 and ADR-0024. It exists to get from
    Every scope after that applies its own child ArgoCD `Application` under
    `gitops/apps/<scope>/` via the shared task
    `ansible/tasks/apply_gitops_app.yml`, rather than configuring anything
-   inline — ArgoCD reconciles the referenced Helm chart or local manifest.
+   inline - ArgoCD reconciles the referenced Helm chart or local manifest.
 
 No secret is ever written to a Git-tracked file. Anything a role needs at
 run time comes from Vault via the `community.hashi_vault` lookup plugin;

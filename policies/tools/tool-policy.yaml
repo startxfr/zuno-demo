@@ -1,37 +1,37 @@
-# Policy: tools — MCP tool authorization data (ADR-0011, ADR-0010).
+# Policy: tools - MCP tool authorization data (ADR-0011, ADR-0010).
 #
 # This file is the authoritative, GitOps-managed platform-policy layer that
 # the central MCP Gateway loads at startup and re-reads on change (see
 # ADR-0010, ADR-0022). It is ONE of five factors ADR-0011 requires to all
-# agree before a tool call is allowed — the MCP Gateway must compute the
+# agree before a tool call is allowed - the MCP Gateway must compute the
 # intersection of all five before invoking any MCP tool:
 #
 #   allowed = agent_declaration ∩ task_rights ∩ user_group_rights ∩ classification ∩ platform_policy
 #
 # Where each factor comes from:
-#   1. agent_declaration  — the calling agent's OKF bundle explicitly lists
+#   1. agent_declaration  - the calling agent's OKF bundle explicitly lists
 #                            this tool under its declared MCP tools (agents/<agent>/tools/).
 #                            An agent can only ever reach tools it declares,
 #                            regardless of what its caller is otherwise allowed.
-#   2. task_rights         — the specific OKF task being executed may further
+#   2. task_rights         - the specific OKF task being executed may further
 #                            restrict which of the agent's declared tools apply
 #                            (agents/<agent>/tasks/). A task can narrow, never widen,
 #                            the agent's declaration.
-#   3. user_group_rights   — the calling user's Keycloak `groups` claim (JWT
+#   3. user_group_rights   - the calling user's Keycloak `groups` claim (JWT
 #                            issued by the `zuno` realm, ADR-0012/ADR-0013; see
 #                            platform/identity/README.md for the exact claim shape).
 #                            Must intersect this entry's `allowed_groups`.
-#   4. classification      — the data classification of what the tool touches
+#   4. classification      - the data classification of what the tool touches
 #                            (policies/data-classification/classification.yaml) must
 #                            be routable per ADR-0021 for the model/context in play,
 #                            and must be >= this entry's `min_classification` in
 #                            sensitivity (i.e. the tool cannot be invoked in a context
 #                            cleared for a lower classification than it requires).
-#   5. platform_policy     — THIS FILE: the tool must be listed below, bound to the
+#   5. platform_policy     - THIS FILE: the tool must be listed below, bound to the
 #                            correct `mcp_server`, and the caller's groups must appear
 #                            in `allowed_groups`.
 #
-# All five must independently permit the call. Any single "no" is a "no" —
+# All five must independently permit the call. Any single "no" is a "no" -
 # there is no override. The MCP Gateway must fail closed (deny) if this file
 # fails to load, if a requested tool is absent from it, or if the caller's
 # `groups` claim cannot be validated against the realm's JWKS
@@ -41,7 +41,7 @@
 #   tool:              MCP tool name, unique key.
 #   mcp_server:        the downstream MCP server (components/mcp-servers/<name>,
 #                       or the smtp-technical reporting integration) that owns this tool.
-#   min_classification: C1 | C2 | C3 — see policies/data-classification/classification.yaml.
+#   min_classification: C1 | C2 | C3 - see policies/data-classification/classification.yaml.
 #                       This is the classification the tool's *data* carries, not a
 #                       user clearance level; it gates which model/inference route
 #                       (ADR-0021) may be used for any content flowing through the tool.

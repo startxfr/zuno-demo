@@ -2,10 +2,10 @@
 # No separate prepare phase: unlike the PREP_COMPONENTS (operators/instances
 # that must exist before anything can be configured), the agent namespaces
 # and Tekos workloads are plain GitOps Applications with no operator
-# dependency of their own — see tasks/configure.yml. `agents` is not listed
+# dependency of their own - see tasks/configure.yml. `agents` is not listed
 # in Makefile's PREP_COMPONENTS, so this file is not reachable via
 # `make prepare` today; kept for structural consistency with every other
 # role and as a placeholder should a future prerequisite appear.
 - name: "agents | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "agents has no separate prepare phase — see tasks/configure.yml."
+    msg: "agents has no separate prepare phase - see tasks/configure.yml."

@@ -3,11 +3,11 @@
 Exposes exactly three deterministic, read-only tools over the SXA-derived
 sales-operations schema (data/sxa/schema/001_init.sql): get_customer,
 list_open_opportunities, get_quote. Every query is parameterized and
-read-only — there is no path from an LLM-constructed string to SQL here,
+read-only - there is no path from an LLM-constructed string to SQL here,
 which is the entire point of ADR-0017 ("no direct LLM-to-DB freedom").
 
 Wire contract (matched exactly against components/mcp-gateway/app/downstream.py,
-the only caller — the gateway is the trust boundary; this server does not
+the only caller - the gateway is the trust boundary; this server does not
 re-validate the caller's JWT, it trusts the gateway's ADR-0011 policy
 intersection already happened):
 
@@ -41,7 +41,7 @@ def _conninfo() -> str:
     if not DB_USER or not DB_PASSWORD:
         raise RuntimeError(
             "PGUSER/PGPASSWORD are required (sourced from an ExternalSecret "
-            "against secret/zuno/postgresql/app — never hardcoded, ADR-0024)"
+            "against secret/zuno/postgresql/app - never hardcoded, ADR-0024)"
         )
     return (
         f"host={DB_HOST} port={DB_PORT} dbname={DB_NAME} "
@@ -207,7 +207,7 @@ async def mcp(request: Request) -> JSONResponse:
         result = await handler(arguments)
     except ToolError as exc:
         return _error(exc.code, exc.message)
-    except Exception as exc:  # noqa: BLE001 — surface as a JSON-RPC error, not a 500
+    except Exception as exc:  # noqa: BLE001 - surface as a JSON-RPC error, not a 500
         return _error(-32000, f"internal error: {exc}")
 
     return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": result})

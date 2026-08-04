@@ -192,7 +192,7 @@ Tasks:
 
 Finage accesses business at `A facturer`/billable and later states, including invoice information. Reporting may include revenue, outstanding amounts, delay and forecast. Finage may perform controlled status writes but must not execute financial transactions.
 
-## 10. SXA commercial database — source-derived schema memory
+## 10. SXA commercial database - source-derived schema memory
 
 The provided source is a legacy phpMyAdmin schema dump for MySQL 5.0.95. It is a schema reference, not the PostgreSQL target implementation. The demo must provide a PostgreSQL migration/bootstrap path and load the separate approved demo data dump.
 
@@ -348,7 +348,7 @@ Main v3 candidates:
 
 The sections above remain the working memory for the full target vision.
 As of the v0 build pass, the following is real, reviewed code rather than
-planning narrative — see README.md's "v0 build status" for a summary:
+planning narrative - see README.md's "v0 build status" for a summary:
 
 - Bootstrap: `make precheck`/`prepare`/`configure`/`install`/`check` from
   exactly one credential (OpenShift API endpoint + cluster-admin token),
@@ -373,18 +373,18 @@ planning narrative — see README.md's "v0 build status" for a summary:
   `zuno-tekos` runs workloads.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
-- ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
+- ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos
   deploys as a plain `Deployment` instead.
 
 All four Python services (`agent-runtime`, `ai-gateway`, `mcp-gateway`,
 `rag-service`) instrument themselves with OTel per
-`ansible/roles/observability/README.md` — `ai-gateway` now owns the
+`ansible/roles/observability/README.md` - `ai-gateway` now owns the
 per-provider model-call spans/token/cost metrics that used to live in
 `agent-runtime`, moved there as part of implementing ADR-0009.
 The cluster's real apps domain is auto-discovered from
 `Ingress.config.openshift.io/cluster`, persisted to Vault
 (`secret/zuno/platform/cluster-domain`), and substituted into every GitOps
-`Application` that needs it — no manual edit required (see
+`Application` that needs it - no manual edit required (see
 `ansible/tasks/resolve_cluster_base_domain.yml`, `gitops/apps/README.md`).
 Everything here was built and validated (Helm lint/template, YAML/JSON/Python
 syntax) without a live OpenShift cluster to run it against.

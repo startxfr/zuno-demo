@@ -47,4 +47,4 @@
       `vault kv put secret/zuno/google-oauth/client client_id=... client_secret=...`
       then let the google-oauth-client ExternalSecret resync (or delete the
       Keycloak pod to pick up the refreshed KC_VAULT_GOOGLE_CLIENT_* env
-      vars) — no keycloak role step depends on this to complete.
+      vars) - no keycloak role step depends on this to complete.

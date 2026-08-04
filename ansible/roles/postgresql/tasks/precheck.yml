@@ -21,7 +21,7 @@
   ansible.builtin.fail:
     msg: >-
       applications.argoproj.io CRD not found. Run `make prepare argocd`
-      before preparing postgresql — the Cluster CR is applied as a GitOps
+      before preparing postgresql - the Cluster CR is applied as a GitOps
       Application (see ansible/roles/postgresql/tasks/configure.yml).
   when: (_postgresql_precheck_argocd_crd.resources | default([]) | length) == 0
 

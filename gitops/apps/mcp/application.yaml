@@ -1,5 +1,5 @@
 ---
-# Central MCP Gateway (ADR-0010) — see gitops/charts/mcp-gateway and
+# Central MCP Gateway (ADR-0010) - see gitops/charts/mcp-gateway and
 # components/mcp-gateway. Applied by the `mcp` Ansible role's configure.yml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

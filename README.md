@@ -20,11 +20,11 @@ Zuno Demo is an internal MVP demonstrating a reusable agentic AI platform on Red
 
 ## Initial agent catalog
 
-- **Comage** — sales assistant.
-- **Tekos** — technical consultant assistant.
-- **Arkos** — architecture assistant.
-- **Advantage** — sales administration assistant.
-- **Finage** — finance assistant.
+- **Comage** - sales assistant.
+- **Tekos** - technical consultant assistant.
+- **Arkos** - architecture assistant.
+- **Advantage** - sales administration assistant.
+- **Finage** - finance assistant.
 
 Each agent has a dedicated frontend and BFF deployment while consuming shared platform services such as the agent runtime, AI/inference gateway, MCP gateway, RAG services, model serving, identity, secrets, observability, and data services.
 
@@ -35,8 +35,8 @@ Runtime with LangGraph orchestration, MCP Gateway, RAG service, sales-db MCP
 tool, real Keycloak login with 11 demo personas across all five agents'
 groups). Comage, Advantage, Finage and Arkos exist as OKF definitions,
 reserved namespaces and access-gated portal tiles, without a running
-workflow — see `platform/architecture/agent-platform-separation.md`. The
-AIAgent CRD/operator (originally v0) is retargeted to v1 — see ADR-0026.
+workflow - see `platform/architecture/agent-platform-separation.md`. The
+AIAgent CRD/operator (originally v0) is retargeted to v1 - see ADR-0026.
 
 ## Repository principles
 
@@ -50,7 +50,7 @@ AIAgent CRD/operator (originally v0) is retargeted to v1 — see ADR-0026.
 ## Operator workflow
 
 The only manual input for the entire install is the OpenShift API endpoint
-and a cluster-admin token (ADR-0024) — everything else is automated:
+and a cluster-admin token (ADR-0024) - everything else is automated:
 
 ```bash
 export K8S_AUTH_HOST=https://api.mycluster.com:6443

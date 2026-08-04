@@ -1,5 +1,5 @@
 ---
-# Shared Agent Runtime (ADR-0009, ADR-0018 LangGraph orchestration) — see
+# Shared Agent Runtime (ADR-0009, ADR-0018 LangGraph orchestration) - see
 # gitops/charts/agent-runtime and components/agent-runtime. Applied by the
 # `llm` Ansible role's configure.yml alongside the provider-routing config
 # (platform/ai-gateway/), since both belong to the AI/model layer track;

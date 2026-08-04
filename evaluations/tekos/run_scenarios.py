@@ -4,7 +4,7 @@ deployment and reports the pass rate against the 75% threshold (ADR-0027,
 ADR-0028). See README.md for required environment variables.
 
 This cannot be executed in the sandbox this repo was built in (no live
-cluster) — it is written to be genuinely runnable once one exists, not a
+cluster) - it is written to be genuinely runnable once one exists, not a
 mock. Each `type` in scenarios.yaml maps to exactly one handler function
 below; add a new scenario by adding a YAML entry plus (if it's a new type)
 a handler.
@@ -33,7 +33,7 @@ REALM = "zuno"
 # Every persona's password (ansible/roles/keycloak/README.md's "Two
 # integration fixes" note explains why credentials are non-temporary).
 DEMO_PASSWORD = "ZunoDemo!2026"
-# Confidential client's own secret — never hardcoded; read from the same
+# Confidential client's own secret - never hardcoded; read from the same
 # place `make configure keycloak` puts it (an operator running this script
 # fetches it once, e.g. `vault kv get -field=client_secret secret/zuno/keycloak/tekos-frontend`).
 TEKOS_FRONTEND_CLIENT_SECRET = os.getenv("TEKOS_FRONTEND_CLIENT_SECRET")
@@ -61,7 +61,7 @@ _token_cache: Dict[str, str] = {}
 
 def get_token(persona: str) -> str:
     """Resource Owner Password Credentials grant against the confidential
-    tekos-frontend client — appropriate for an automated evaluation harness
+    tekos-frontend client - appropriate for an automated evaluation harness
     acting on behalf of fixture personas, not for real user login (which
     uses the authorization-code flow, see components/agent-frontend).
     """
@@ -93,7 +93,7 @@ def auth_headers(persona: str) -> Dict[str, str]:
 
 
 # --------------------------------------------------------------------------
-# Scenario handlers — one per `type` in scenarios.yaml
+# Scenario handlers - one per `type` in scenarios.yaml
 # --------------------------------------------------------------------------
 
 
@@ -274,7 +274,7 @@ def bff_rejects_missing_jwt(s: Dict[str, Any]) -> ScenarioResult:
 def bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
     # Any non-tekos-frontend-audience token would do; in practice only
     # tekos-frontend is used for login in v0 (all personas authenticate
-    # through it — see components/agent-frontend/README.md), so this
+    # through it - see components/agent-frontend/README.md), so this
     # exercises the audience check with a deliberately malformed/foreign
     # token instead of a same-realm token with a different audience.
     resp = httpx.post(
@@ -297,7 +297,7 @@ def sales_db_tool_via_gateway(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def namespace_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
-    # Requires `oc`/`kubectl` on PATH and a valid kubeconfig — the one
+    # Requires `oc`/`kubectl` on PATH and a valid kubeconfig - the one
     # scenario that inspects cluster state directly rather than an HTTP API.
     import subprocess
 
@@ -369,7 +369,7 @@ def main() -> int:
             continue
         try:
             results.append(handler(s))
-        except Exception as exc:  # noqa: BLE001 — a scenario erroring is a fail, not a crash
+        except Exception as exc:  # noqa: BLE001 - a scenario erroring is a fail, not a crash
             results.append(ScenarioResult(s["id"], s["title"], False, f"unhandled error: {exc}"))
 
     passed = sum(1 for r in results if r.passed)
@@ -383,7 +383,7 @@ def main() -> int:
             print(f"      -> {r.detail}")
 
     threshold = 0.75
-    print(f"\n{passed}/{total} passed ({rate:.0%}) — threshold {threshold:.0%} (ADR-0028)")
+    print(f"\n{passed}/{total} passed ({rate:.0%}) - threshold {threshold:.0%} (ADR-0028)")
     if rate >= threshold:
         print("RESULT: PASS")
         return 0

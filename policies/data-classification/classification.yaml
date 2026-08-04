@@ -1,15 +1,15 @@
-# Policy: data-classification — C1/C2/C3 levels and domain mapping (ADR-0021).
+# Policy: data-classification - C1/C2/C3 levels and domain mapping (ADR-0021).
 #
 # Consumed by the AI/Inference Gateway's model-routing logic (owned by
 # another track) to decide which model destinations a given request may use.
 # This file only DEFINES the levels and maps example data domains to a
 # level; the routing decision logic itself lives elsewhere. Keep this file
-# flat and machine-readable — no prose fields beyond `description`.
+# flat and machine-readable - no prose fields beyond `description`.
 #
 # Rule of thumb (ADR-0021): "Allow SaaS for C1, restricted SaaS for C2 and
 # local-only inference for C3." If no destination satisfies a request's
 # classification, the request must fail rather than violate policy
-# (MEMORY.md section 6) — there is no silent downgrade.
+# (MEMORY.md section 6) - there is no silent downgrade.
 
 levels:
   C1:

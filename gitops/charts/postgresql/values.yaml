@@ -5,7 +5,7 @@
 image:
   # Built from gitops/charts/postgresql/image/Dockerfile (stock CNPG operand
   # image + `apt-get install postgresql-16-pgvector`). This is a placeholder
-  # internal-registry reference — an operator must build and push this image
+  # internal-registry reference - an operator must build and push this image
   # once (see image/README.md) before the Cluster below can start; point
   # this at wherever your cluster's image registry actually is.
   repository: image-registry.zuno-demo.internal/zuno/postgresql-pgvector
@@ -23,7 +23,7 @@ cluster:
 credentials:
   # Path under the vault-backend ClusterSecretStore's "secret" KV v2 mount
   # (i.e. resolves to Vault path secret/zuno/postgresql/app, already seeded
-  # by ansible/roles/vault/tasks/configure.yml — this chart only consumes
+  # by ansible/roles/vault/tasks/configure.yml - this chart only consumes
   # it, never regenerates or hardcodes it, per ADR-0024).
   vaultPath: zuno/postgresql/app
   secretName: zuno-postgresql-app-credentials

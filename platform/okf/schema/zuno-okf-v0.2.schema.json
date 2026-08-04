@@ -70,7 +70,7 @@
                 "minLength": 1
               },
               "allowed_tools": {
-                "description": "MCP tool names this task may invoke, drawn from the platform tool-policy vocabulary (policies/tools/README.md). Effective authorization is the intersection of this list with the user's group/task/data-classification policy (ADR-0011) — this field is a ceiling, not a grant on its own. Empty for placeholder agents.",
+                "description": "MCP tool names this task may invoke, drawn from the platform tool-policy vocabulary (policies/tools/README.md). Effective authorization is the intersection of this list with the user's group/task/data-classification policy (ADR-0011) - this field is a ceiling, not a grant on its own. Empty for placeholder agents.",
                 "type": "array",
                 "items": {
                   "type": "string",

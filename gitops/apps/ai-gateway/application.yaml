@@ -1,5 +1,5 @@
 ---
-# AI Inference Gateway (ADR-0009) — see gitops/charts/ai-gateway and
+# AI Inference Gateway (ADR-0009) - see gitops/charts/ai-gateway and
 # components/ai-gateway. Applied by the `llm` Ansible role's configure.yml,
 # alongside the provider-routing config it shares a ConfigMap with, and
 # before gitops/apps/agent-runtime (which now only needs this gateway's

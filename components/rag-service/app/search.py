@@ -1,7 +1,7 @@
 """Hybrid search: pgvector cosine similarity + PostgreSQL full-text search,
 merged by reciprocal rank fusion (RRF).
 
-ASSUMPTION (schema owned by another track — see components/rag-service
+ASSUMPTION (schema owned by another track - see components/rag-service
 README): the `document_embeddings` table has columns
 `id, source, title, content, embedding vector, metadata jsonb`, and the
 `vector` extension (pgvector) is already enabled on the target database.

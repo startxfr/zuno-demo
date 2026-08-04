@@ -7,14 +7,14 @@ servingRuntimeName: vllm-runtime
 inferenceServiceName: qwen25-7b-instruct
 
 # Matches agent-runtime's localModelName/localModelEndpoint expectation
-# (gitops/charts/agent-runtime/values.yaml) — KServe names the predictor
+# (gitops/charts/agent-runtime/values.yaml) - KServe names the predictor
 # Service "<inferenceServiceName>-predictor".
 modelId: Qwen/Qwen2.5-7B-Instruct
 
 image:
   # Red Hat OpenShift AI's bundled vLLM runtime image (KServe ServingRuntime).
   # Override for the exact tag published by the installed RHOAI 3.5 EA2
-  # catalog — not verified against a live cluster (ASSUMPTION, see README.md).
+  # catalog - not verified against a live cluster (ASSUMPTION, see README.md).
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 

@@ -2,7 +2,7 @@
 
 Shared AI Inference Gateway (ADR-0009): resolves classification-eligible
 providers (ADR-0021), tries them in fallback order (ADR-0020), and exposes
-an OpenAI-compatible API — the single place inference routing/fallback
+an OpenAI-compatible API - the single place inference routing/fallback
 logic lives, kept separate from `components/agent-runtime`'s orchestration
 (state, LangGraph workflow, tool/RAG invocation), per ADR-0009's decision.
 
@@ -17,7 +17,7 @@ Before this, routing/fallback/classification-eligibility lived inside
 tracked as "Accepted, not Implemented" for. Extracting it here means:
 
 - `agent-runtime` no longer holds any provider API key or the routing
-  config — it only knows this gateway's URL (`AI_GATEWAY_URL`).
+  config - it only knows this gateway's URL (`AI_GATEWAY_URL`).
 - Routing/fallback/classification policy changes (which provider is
   eligible for which classification, fallback order, model names) are a
   redeploy of *this* service, not `agent-runtime`.
@@ -31,13 +31,13 @@ tracked as "Accepted, not Implemented" for. Extracting it here means:
 OpenAI-compatible on the wire, with one Zuno-specific header and one
 Zuno-specific response field:
 
-- **Auth:** `Authorization: Bearer <keycloak-jwt>` (required — validated
+- **Auth:** `Authorization: Bearer <keycloak-jwt>` (required - validated
   against the realm's JWKS; this gateway does not do group-based
   authorization, only authenticated-caller verification).
 - **Header:** `X-Zuno-Data-Classification: C1|C2|C3` (optional, default
-  `C1`) — the single input that actually selects the provider/fallback
+  `C1`) - the single input that actually selects the provider/fallback
   chain (ADR-0021). **`model` in the request body is accepted for
-  wire-format compatibility but ignored for v0** — routing never looks at
+  wire-format compatibility but ignored for v0** - routing never looks at
   it; a future version could let a specific value pin/override the
   classification-driven decision (not built, tracked as follow-up, not a
   v0 requirement).
@@ -67,7 +67,7 @@ Zuno-specific response field:
 - **Streaming (`"stream": true`):** standard OpenAI SSE chunk format
   (`data: {"id", "object": "chat.completion.chunk", "choices": [{"delta": {"content": "..."}, "finish_reason": null}]}\n\n`),
   terminated by `data: [DONE]\n\n`. **No provider-attribution header or
-  field on the streaming path** — see "Streaming and fallback" below for
+  field on the streaming path** - see "Streaming and fallback" below for
   why; check this gateway's OTel traces (`zuno.provider` span attribute)
   for provider attribution on a streaming call instead.
 - **Response `422`:** the classification header is not `C1`/`C2`/`C3`, or
@@ -75,7 +75,7 @@ Zuno-specific response field:
   for the requested classification (ADR-0021 fail-closed).
 - **Response `401`:** missing/invalid/expired JWT.
 - **Response `502`:** every eligible provider failed (non-streaming path
-  only — see below for the streaming failure shape).
+  only - see below for the streaming failure shape).
 
 ### `GET /healthz` / `GET /readyz`
 
@@ -96,7 +96,7 @@ the same way **only before the first token of a candidate has been sent**
 (`app/main.py:_stream_completion`): once a provider has streamed any
 content to the caller, a subsequent failure from that same provider ends
 the response with a `finish_reason: "error"` chunk rather than silently
-retrying — a client that already has partial output from provider A
+retrying - a client that already has partial output from provider A
 cannot be seamlessly handed a fresh answer from provider B mid-response.
 This is the fallback boundary the pre-refactor
 `ModelRouter.streaming_model_for()` docstring described but never actually
@@ -106,27 +106,27 @@ wired up; it's implemented for real here.
 
 `components/agent-runtime`'s `reason_node` still just calls
 `ChatOpenAI(...).ainvoke()`/relies on LangGraph's `astream_events` exactly
-as before this split — only the `base_url` changed, from a specific
+as before this split - only the `base_url` changed, from a specific
 provider to this gateway. LangChain's OpenAI integration decides whether
 to request `stream: true` from its target based on the surrounding
 callback/streaming context, so the SSE-vs-plain-JSON choice at this
 gateway's boundary is driven transparently by how `agent-runtime` is
 invoking its client, not by anything `agent-runtime` has to configure
 explicitly. This is the same implicit-streaming reliance the original
-(pre-split) code already depended on — moving the HTTP destination doesn't
+(pre-split) code already depended on - moving the HTTP destination doesn't
 change that assumption, it was carried over as-is.
 
 ## Budgets and quotas: not implemented
 
 ADR-0009's decision text names "budgets, quotas" alongside routing and
 fallback. Nothing in this repository tracks spend or enforces a usage
-ceiling anywhere — this gateway *measures* cost (`zuno.model_cost_usd`
+ceiling anywhere - this gateway *measures* cost (`zuno.model_cost_usd`
 OTel metric, `app/telemetry.py`) but does not enforce a limit. Confirmed
 out of scope for this build: adding a real budget/quota mechanism (e.g. a
 per-classification or per-provider request/token ceiling, likely enforced
 here and backed by Vault or a ConfigMap for the limits) is future work.
 
-## Configuration (env vars, no hardcoded secrets — ADR-0024)
+## Configuration (env vars, no hardcoded secrets - ADR-0024)
 
 | Var | Default | Purpose |
 |---|---|---|
@@ -143,7 +143,7 @@ here and backed by Vault or a ConfigMap for the limits) is future work.
 when the model response exposes `usage_metadata`, records prompt/completion
 token counts plus an estimated USD cost (`zuno.model_tokens` /
 `zuno.model_cost_usd` metrics). Streaming calls only record latency/outcome
-— LangChain does not reliably surface `usage_metadata` mid-stream across
+- LangChain does not reliably surface `usage_metadata` mid-stream across
 all providers, and guessing would produce a misleading cost figure.
 
 ## Local development
