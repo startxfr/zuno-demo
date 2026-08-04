@@ -1,8 +1,9 @@
 // Command agent-bff is the reusable per-agent BFF (ADR-0008). It validates
 // the caller's bearer JWT against Keycloak's JWKS (ADR-0013 identity
 // propagation), then calls the shared Agent Runtime's documented chat
-// contract and relays the reply back to the frontend. See README.md for
-// this service's own small API surface.
+// contract - forwarding that same validated token (ADR-0032) - and relays
+// the reply back to the frontend. See README.md for this service's own
+// small API surface.
 package main
 
 import (
@@ -98,9 +99,9 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client) http.Ha
 		ctx, cancel := context.WithTimeout(r.Context(), 55*time.Second)
 		defer cancel()
 
-		resp, err := runtimeClient.Chat(ctx, runtime.ChatRequest{
+		resp, err := runtimeClient.Chat(ctx, token, runtime.ChatRequest{
 			SessionID: req.SessionID,
-			UserSub:   claims.Subject,
+			UserSub:   claims.Subject, // informational only (ADR-0033); the Runtime derives identity from the forwarded token, not this field
 			Message:   req.Message,
 		})
 		if err != nil {

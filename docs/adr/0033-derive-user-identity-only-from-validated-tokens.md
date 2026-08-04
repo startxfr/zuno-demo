@@ -1,6 +1,6 @@
 # ADR-0033: Derive user identity only from validated tokens
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,24 @@ Update BFF OpenAPI contracts, runtime models and tests. Add a negative test that
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05).** `components/agent-runtime/app/main.py`'s
+`_initial_state()` now sets graph state's `user_sub` from
+`identity.sub` (the validated token's own claim), never from
+`payload.user_sub` (the request body). A mismatch between the two is
+logged (informational - useful for catching a BFF bug) but no longer
+influences behavior in any way; `app/schemas.py`'s `ChatRequest.user_sub`
+field comment and `README.md`'s HTTP API contract both now say explicitly
+that the field is correlation/display metadata only. This closes the
+concrete gap the ADR's Context section named: the Runtime previously used
+`payload.user_sub` for graph state (line 60's old code) despite only
+*logging* a warning on mismatch rather than ignoring the field.
+
+Security-negative coverage: `evaluations/tekos/security_checks.py`'s
+`runtime_ignores_mismatched_user_sub` submits a valid token for one
+persona with a forged, nonexistent `user_sub` in the body and verifies
+the call still succeeds normally - proving impersonation via this field
+is impossible because the field is never trusted, per this ADR's
+Operational considerations.
 
 ## Acceptance criteria
 

@@ -1,6 +1,6 @@
 # ADR-0032: Propagate trusted identity end to end
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,33 @@ Add integration tests that exercise a valid token, an expired token, a wrong aud
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05).** `components/agent-bff/internal/runtime/client.go`'s
+`Chat()` now takes the caller's validated bearer token as an explicit
+parameter and forwards it as `Authorization: Bearer <token>` to the Agent
+Runtime (`main.go`'s `chatHandler` passes through the same token it just
+verified). `components/agent-runtime/app/clients/model_router.py`'s
+`ModelRouter.chat_model_for()` no longer sends `api_key="not-required"` -
+it forwards that same end-user token to `components/ai-gateway`'s
+`/v1/chat/completions`, threaded through `invoke_with_fallback()` and
+`app/graph/nodes.py:reason_node` from `state["bearer_token"]` (already
+populated from the validated token, not request-body input).
+
+Scope decision, made explicitly rather than silently: this reuses the
+end-user token end-to-end (Frontend -> BFF -> Runtime -> AI Gateway) rather
+than introducing a separate Keycloak service-identity/On-Behalf-Of
+exchange for the Runtime -> AI Gateway hop. `ai-gateway`'s own
+`validate_token` only requires an authenticated caller and makes no
+identity/group-based authorization decision (routing is
+classification-header-driven per ADR-0020/0021) - standing up a new
+client-credentials flow for that hop would be new infrastructure nothing
+downstream currently consumes. The Runtime -> MCP Gateway hop already
+forwarded the end-user token before this ADR (ADR-0013); this ADR makes
+the Runtime -> AI Gateway hop consistent with that existing pattern rather
+than inventing a second identity mechanism.
+
+Security-negative coverage: `evaluations/tekos/security_checks.py`
+verifies the BFF-to-Runtime token forward succeeds end-to-end (previously
+the Runtime would reject an unauthenticated call from the BFF with 401).
 
 ## Acceptance criteria
 

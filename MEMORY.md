@@ -367,6 +367,16 @@ planning narrative - see README.md's "v0 build status" for a summary:
   OpenAI-compatible API, the MCP Gateway, RAG service, and the Tekos
   LangGraph workflow (`components/agent-runtime`, now a thin
   `ai-gateway` client with no provider secret of its own).
+- Identity now genuinely propagates Frontend -> BFF -> Agent Runtime ->
+  AI Gateway (ADR-0032): the BFF forwards the same validated end-user
+  bearer token to the Runtime (previously not forwarded at all - every
+  BFF -> Runtime call was silently unauthenticated), and the Runtime
+  forwards it again to `ai-gateway` instead of the `"not-required"`
+  placeholder. The Runtime also now derives `user_sub` exclusively from
+  the validated token, never the request body (ADR-0033) -
+  `evaluations/tekos/security_checks.py` covers both with security-
+  negative checks kept separate from the fixed 20-scenario acceptance
+  suite (ADR-0027).
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only

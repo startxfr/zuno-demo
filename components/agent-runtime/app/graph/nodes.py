@@ -103,7 +103,9 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
 
     try:
         result, provider = await _model_router.invoke_with_fallback(
-            classification=TEKOS_DATA_CLASSIFICATION, messages=[system, human]
+            classification=TEKOS_DATA_CLASSIFICATION,
+            messages=[system, human],
+            bearer_token=state["bearer_token"],
         )
     except ModelRouterError as exc:
         logger.error("all model providers failed: %s", exc)

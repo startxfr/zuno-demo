@@ -24,8 +24,12 @@ layer's own GitOps apps, listed in that file).
 
 ### `POST /v1/agents/tekos/chat`
 
-- **Auth:** `Authorization: Bearer <keycloak-jwt>` (required).
-- **Request body:**
+- **Auth:** `Authorization: Bearer <keycloak-jwt>` (required; the BFF forwards
+  the same end-user token it validated, ADR-0032).
+- **Request body:** `user_sub` is informational/correlation only (ADR-0033) -
+  the authoritative subject, groups and bearer token used for every
+  downstream classification/tool/model call always come from the validated
+  token, never from this field.
   ```json
   { "session_id": "abc123", "user_sub": "f47ac10b-58cc-...", "message": "How do I size an InferenceService for an L4 GPU?" }
   ```

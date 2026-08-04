@@ -35,8 +35,8 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md) | v0 | Implemented | Instrument model usage costs and distributed traces |
 | [ADR-0030](0030-use-a-command-dispatch-makefile-interface.md) | v0 | Implemented | Use a command-dispatch Makefile interface |
 | [ADR-0031](0031-formalize-tekos-as-the-v0-vertical-slice.md) | v0 | Implemented | Formalize Tekos as the v0 vertical slice |
-| [ADR-0032](0032-propagate-trusted-identity-end-to-end.md) | v0 | To be implemented | Propagate trusted identity end to end |
-| [ADR-0033](0033-derive-user-identity-only-from-validated-tokens.md) | v0 | To be implemented | Derive user identity only from validated tokens |
+| [ADR-0032](0032-propagate-trusted-identity-end-to-end.md) | v0 | Implemented | Propagate trusted identity end to end |
+| [ADR-0033](0033-derive-user-identity-only-from-validated-tokens.md) | v0 | Implemented | Derive user identity only from validated tokens |
 | [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md) | v0 | To be implemented | Compute effective classification from the complete context |
 | [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md) | v0 | To be implemented | Prevent restricted internal context from reaching external models |
 | [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md) | v0 | To be implemented | Enforce the complete MCP authorization intersection in the gateway |

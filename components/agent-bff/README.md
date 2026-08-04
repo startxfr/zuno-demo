@@ -13,16 +13,22 @@ forwarding the caller's OIDC access token as a Bearer credential.
    BFF independently revalidates identity rather than trusting the
    frontend).
 2. Calls the shared Agent Runtime's documented chat contract, owned by a
-   parallel track:
+   parallel track, forwarding the same validated bearer token it just
+   checked (ADR-0032 - identity must propagate all the way to the Runtime,
+   not stop at the BFF; the Runtime requires this header and rejects calls
+   without one):
 
    ```text
    POST {AGENT_RUNTIME_BASE_URL}/v1/agents/{AGENT_NAME}/chat
+     headers: Authorization: Bearer <end-user token>
      body:  {"session_id": string, "user_sub": string, "message": string}
      reply: {"reply": string, "citations": [{"source": string, "title": string}]}
    ```
 
-   `user_sub` is taken from the validated token's `sub` claim, never from
-   client input.
+   `user_sub` is taken from the validated token's `sub` claim, but is
+   informational/correlation only on the Runtime side (ADR-0033) - the
+   Runtime derives the authoritative identity from the forwarded token
+   itself, never from this field.
 3. Relays the runtime's reply back to the frontend.
 
 ## This service's own API surface (what the frontend calls)

@@ -45,19 +45,24 @@ async def readyz() -> Dict[str, str]:
 
 
 def _initial_state(payload: ChatRequest, identity: CallerIdentity) -> Dict[str, Any]:
+    # ADR-0033: user_sub in the request body is informational/correlation
+    # only, never an authorization input - the graph state's "user_sub"
+    # (and every downstream classification/tool-authorization decision) is
+    # always derived from the validated token's own `sub` claim, never from
+    # this JSON field. A mismatch is not a security failure (nothing here
+    # was ever trusted from the body), just worth a log line since the BFF
+    # is expected to send its own claims.Subject value (ADR-0032) and a
+    # persistent mismatch would indicate a BFF bug, not an attack.
     if identity.sub != payload.user_sub:
-        # Not fatal (the BFF may resolve user_sub slightly differently than
-        # the raw JWT `sub`), but worth a loud log line since ADR-0013
-        # expects these to agree.
         logger.warning(
-            "user_sub mismatch: request body=%s JWT sub=%s (session=%s)",
+            "informational user_sub did not match validated token sub (ignored): body=%s token=%s (session=%s)",
             payload.user_sub,
             identity.sub,
             payload.session_id,
         )
     return {
         "session_id": payload.session_id,
-        "user_sub": payload.user_sub,
+        "user_sub": identity.sub,
         "groups": identity.groups,
         "bearer_token": identity.token,
         "message": payload.message,

@@ -50,10 +50,22 @@ class ModelRouterError(RuntimeError):
 
 
 class ModelRouter:
-    def chat_model_for(self, classification: str) -> BaseChatModel:
+    def chat_model_for(self, classification: str, bearer_token: str) -> BaseChatModel:
         return ChatOpenAI(
             base_url=f"{AI_GATEWAY_URL}/v1",
-            api_key="not-required",
+            # ADR-0032: forward the same validated end-user token the
+            # Runtime itself received (langchain-openai sends `api_key` as
+            # `Authorization: Bearer <api_key>`) - never the
+            # "not-required" placeholder ADR-0032 explicitly forbids
+            # outside local dev mocks. ai-gateway's own validate_token
+            # (components/ai-gateway/app/auth.py) only needs a valid
+            # authenticated caller and doesn't key any authorization
+            # decision on identity/groups (routing is classification-header
+            # driven, see that module's docstring) - reusing the end-user
+            # token here satisfies that requirement without standing up a
+            # separate Keycloak service-identity/client-credentials flow
+            # that nothing downstream would actually consume yet.
+            api_key=bearer_token,
             # Ignored by the gateway for v0 - routing is entirely
             # classification-driven (see the X-Zuno-Data-Classification
             # default_header below), not model-name-driven. Required by
@@ -62,14 +74,15 @@ class ModelRouter:
             default_headers={"X-Zuno-Data-Classification": classification.upper()},
         )
 
-    async def invoke_with_fallback(self, classification: str, messages: List[Any]):
-        """Kept as async + same name/signature as before this split so
-        app/graph/nodes.py:reason_node doesn't need to change. The
-        multi-provider fallback loop this name used to describe runs
-        server-side in the gateway now (app/main.py:_invoke_with_fallback
-        there) - this is a single HTTP call.
+    async def invoke_with_fallback(self, classification: str, messages: List[Any], bearer_token: str):
+        """Kept as async + same name/signature as before this split (plus
+        `bearer_token`, added for ADR-0032) so app/graph/nodes.py:reason_node
+        barely changes. The multi-provider fallback loop this name used to
+        describe runs server-side in the gateway now
+        (app/main.py:_invoke_with_fallback there) - this is a single HTTP
+        call.
         """
-        model = self.chat_model_for(classification)
+        model = self.chat_model_for(classification, bearer_token)
         try:
             result = await model.ainvoke(messages)
         except Exception as exc:

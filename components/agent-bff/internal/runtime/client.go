@@ -3,8 +3,17 @@
 // implements exactly:
 //
 //	POST /v1/agents/{agent}/chat
+//	  headers: Authorization: Bearer <end-user token>
 //	  body:  {"session_id": string, "user_sub": string, "message": string}
 //	  reply: {"reply": string, "citations": [{"source": string, "title": string}]}
+//
+// The Authorization header carries the same validated bearer token the BFF
+// itself received from the frontend (ADR-0032: identity must propagate
+// Frontend -> BFF -> Agent Runtime, not stop at the BFF) - the Agent
+// Runtime requires it (app/auth.py:validate_token) and rejects calls
+// without one. `user_sub` in the body is correlation/display metadata only
+// (ADR-0033): the Runtime derives the authoritative identity from the
+// token, not from this field.
 //
 // This package makes no assumption about the Agent Runtime's internals
 // (task graph, RAG, MCP) - it only speaks this HTTP contract.
@@ -58,7 +67,11 @@ func NewClient(baseURL, agentName string) *Client {
 }
 
 // Chat calls POST /v1/agents/{agent}/chat and returns its parsed response.
-func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+// bearerToken is the same validated end-user token the BFF received on
+// /api/chat - it is forwarded as-is (ADR-0032), never replaced by a
+// service credential, since the Agent Runtime needs the actual end user's
+// identity/groups for classification and MCP tool authorization downstream.
+func (c *Client) Chat(ctx context.Context, bearerToken string, req ChatRequest) (*ChatResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("encoding chat request: %w", err)
@@ -70,6 +83,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return nil, fmt.Errorf("building chat request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+bearerToken)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

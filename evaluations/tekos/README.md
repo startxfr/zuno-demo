@@ -33,3 +33,13 @@ namespace isolation (19), and service health (20).
 This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what "make
 check" and a full evaluation run require.
+
+## Security-negative checks (ADR-0032, ADR-0033)
+
+`security_checks.py` (same setup as above, run from this directory) checks
+identity-propagation behavior that isn't part of the fixed 20-scenario
+acceptance count (ADR-0027 fixes that count; these are negative/security
+checks for a specific pair of ADRs, not acceptance coverage): the BFF
+actually forwards the caller's token to the Agent Runtime, and the Runtime
+ignores a forged `user_sub` in the request body rather than treating it as
+authoritative.
