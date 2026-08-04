@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0011: Define tool authorization as policy intersection
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Allow a tool only when agent declaration, task rights, user/group rights, classification and platform policy all permit it.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0011` when applicable.
 
 ## Related ADRs
 

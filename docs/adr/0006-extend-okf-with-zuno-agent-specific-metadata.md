@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0006: Extend OKF with Zuno agent-specific metadata
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Define a Zuno profile for runtime concerns not prescribed by OKF, including tasks, models, tools, policies, permissions and UI metadata.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0006` when applicable.
 
 ## Related ADRs
 

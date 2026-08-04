@@ -1,7 +1,7 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0202: Adopt A2A as the inter-agent protocol
 
-- **Status:** Accepted
-- **Target:** v0
+- **Status:** Proposed
+- **Target:** v2
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
 
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Use a standard protocol for agent delegation instead of bespoke point-to-point contracts.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0202` when applicable.
 
 ## Related ADRs
 

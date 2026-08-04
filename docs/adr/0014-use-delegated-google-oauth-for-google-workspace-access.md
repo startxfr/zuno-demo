@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0014: Use delegated Google OAuth for Google Workspace access
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Use per-user OAuth delegation so Gmail and Drive actions preserve the user effective Google permissions.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0014` when applicable.
 
 ## Related ADRs
 

@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0001: Use a monorepo for the Zuno agent platform
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Keep shared components, agent definitions, platform automation, documentation and evaluation assets in one repository to maximize reuse and coordinated change review.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0001` when applicable.
 
 ## Related ADRs
 

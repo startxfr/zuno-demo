@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0025: Keep sensitive and real commercial data outside the public repository
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Commit only anonymized or synthetic business fixtures; never commit real SXA records or nominative data.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0025` when applicable.
 
 ## Related ADRs
 

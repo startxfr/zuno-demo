@@ -3,31 +3,36 @@
 - **Status:** Accepted
 - **Target:** v0
 - **Date:** 2026-08-04
+- **Decision owners:** Zuno Demo architecture team
 
 ## Context
 
-Workflow orchestration and model governance have different responsibilities and security boundaries.
+Zuno Demo requires an explicit, reviewable architecture decision so implementation, security and roadmap work remain aligned across the MVP and future releases.
 
 ## Decision
 
-Agent Runtime owns state, tasks, LangChain/LangGraph, RAG, MCP, memory, and approvals. AI Gateway owns inference routing, model policy, metering, quotas, fallback, streaming, and cache.
+Keep orchestration/state/tooling separate from inference routing, budgets, quotas, model policy and provider fallback.
 
 ## Alternatives considered
 
-One combined AI backend; direct model calls from each agent.
+Alternatives remain valid when documented in implementation discussions, but this ADR records the selected direction for the stated target release.
 
 ## Consequences
 
-Clear boundaries improve policy enforcement and allow independent evolution.
+Implementation and documentation must follow this decision. Any material change requires a superseding ADR and an explicit migration/evolution note.
 
 ## Security considerations
 
-Only the runtime may orchestrate business tools; all model traffic must pass through the AI Gateway.
+Security implications must be evaluated during implementation. This decision must not weaken identity propagation, data classification, least privilege, secret management or auditability.
 
 ## Operational considerations
 
-Two shared services must be monitored and versioned.
+Operational checks, observability and rollback/diagnostic procedures must be added as the corresponding capability becomes executable.
 
 ## Migration / evolution
 
-The split remains foundational through v3.
+Future changes must be documented by a new ADR using `Supersedes ADR-0009` when applicable.
+
+## Related ADRs
+
+See [ADR index](README.md).

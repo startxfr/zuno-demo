@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0004: Use GitHub as the canonical source repository
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Use startxfr/zuno-demo as the source of truth for code, GitOps content, agent definitions, documentation and ADRs.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0004` when applicable.
 
 ## Related ADRs
 

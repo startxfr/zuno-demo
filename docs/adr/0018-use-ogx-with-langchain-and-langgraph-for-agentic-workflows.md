@@ -1,6 +1,6 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0018: Use OGX with LangChain and LangGraph for agentic workflows
 
-- **Status:** Accepted
+- **Status:** Proposed
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Combine OpenShift AI-native GenAI/RAG capabilities with explicit application workflow orchestration where it improves control and portability.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0018` when applicable.
 
 ## Related ADRs
 

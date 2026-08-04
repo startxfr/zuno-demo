@@ -1,4 +1,4 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0021: Route models according to C1 C2 C3 classification
 
 - **Status:** Accepted
 - **Target:** v0
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Allow SaaS for C1, restricted SaaS for C2 and local-only inference for C3.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0021` when applicable.
 
 ## Related ADRs
 

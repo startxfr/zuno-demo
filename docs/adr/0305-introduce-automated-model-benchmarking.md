@@ -1,7 +1,7 @@
-# ADR-0024: Use Vault for application secrets
+# ADR-0305: Introduce automated model benchmarking
 
-- **Status:** Accepted
-- **Target:** v0
+- **Status:** Proposed
+- **Target:** v3
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
 
@@ -11,7 +11,7 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 ## Decision
 
-Keep credentials and sensitive tokens out of Git and reference secrets through Vault-backed mechanisms.
+Benchmark candidate models before routing-policy promotion.
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Operational checks, observability and rollback/diagnostic procedures must be add
 
 ## Migration / evolution
 
-Future changes must be documented by a new ADR using `Supersedes ADR-0024` when applicable.
+Future changes must be documented by a new ADR using `Supersedes ADR-0305` when applicable.
 
 ## Related ADRs
 

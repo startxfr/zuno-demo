@@ -3,31 +3,36 @@
 - **Status:** Accepted
 - **Target:** v0
 - **Date:** 2026-08-04
+- **Decision owners:** Zuno Demo architecture team
 
 ## Context
 
-Agents need a common authentication and authorization authority and Google Workspace must federate into it.
+Zuno Demo requires an explicit, reviewable architecture decision so implementation, security and roadmap work remain aligned across the MVP and future releases.
 
 ## Decision
 
-Deploy/configure Keycloak as a prerequisite and use groups such as `agent_<name>` plus task roles and `sales_admin`.
+Centralize authentication and agent/task authorization in Keycloak, including Google Workspace federation.
 
 ## Alternatives considered
 
-Application-local accounts; Google identity only.
+Alternatives remain valid when documented in implementation discussions, but this ADR records the selected direction for the stated target release.
 
 ## Consequences
 
-Centralizes identity and decouples applications from the upstream identity provider.
+Implementation and documentation must follow this decision. Any material change requires a superseding ADR and an explicit migration/evolution note.
 
 ## Security considerations
 
-Keycloak configuration and service credentials are protected by Vault.
+Security implications must be evaluated during implementation. This decision must not weaken identity propagation, data classification, least privilege, secret management or auditability.
 
 ## Operational considerations
 
-Availability of authentication is a shared dependency.
+Operational checks, observability and rollback/diagnostic procedures must be added as the corresponding capability becomes executable.
 
 ## Migration / evolution
 
-v1 hardens HA, lifecycle, and policy administration.
+Future changes must be documented by a new ADR using `Supersedes ADR-0012` when applicable.
+
+## Related ADRs
+
+See [ADR index](README.md).
