@@ -3,7 +3,7 @@
   kubernetes.core.k8s_info:
     api_version: postgresql.cnpg.io/v1
     kind: Cluster
-    namespace: postgresql
+    namespace: zuno-data
     name: zuno-postgresql
   register: _sql_schema_precheck_pg
 

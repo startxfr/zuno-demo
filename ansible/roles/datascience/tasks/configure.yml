@@ -1,7 +1,7 @@
 ---
-# Caps GPU consumption in zuno-datascience at 1 - this demo has exactly one
-# 24GB L4 budgeted for the single local model (gitops/charts/models);
-# without this a future second InferenceService could silently starve it.
+# Caps GPU consumption in zuno-ai at 1 - this demo has exactly one 24GB L4
+# budgeted for the single local model (gitops/charts/models); without this a
+# future second InferenceService could silently starve it.
 - name: "datascience | apply a GPU-capped ResourceQuota"
   kubernetes.core.k8s:
     state: present
@@ -9,8 +9,8 @@
       apiVersion: v1
       kind: ResourceQuota
       metadata:
-        name: zuno-datascience-gpu-cap
-        namespace: zuno-datascience
+        name: zuno-ai-gpu-cap
+        namespace: zuno-ai
         labels:
           zuno.io/managed-by: ansible
       spec:

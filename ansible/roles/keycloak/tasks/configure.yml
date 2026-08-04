@@ -15,7 +15,7 @@
   kubernetes.core.k8s_info:
     api_version: k8s.keycloak.org/v2alpha1
     kind: Keycloak
-    namespace: keycloak
+    namespace: zuno-auth
     name: zuno
   register: _keycloak_cr_status
   until: >-
@@ -28,7 +28,7 @@
   kubernetes.core.k8s_info:
     api_version: k8s.keycloak.org/v2alpha1
     kind: KeycloakRealmImport
-    namespace: keycloak
+    namespace: zuno-auth
     name: zuno-realm
   register: _keycloak_realmimport_status
   until: >-

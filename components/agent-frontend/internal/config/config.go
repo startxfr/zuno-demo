@@ -57,7 +57,7 @@ type Config struct {
 	SelfBaseURL string
 
 	// BFFBaseURL is the in-cluster ClusterIP Service URL for this agent's
-	// BFF, e.g. http://tekos-bff.zuno-tekos.svc.cluster.local:8080. The BFF
+	// BFF, e.g. http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080. The BFF
 	// has no OpenShift Route (ADR-0023 isolation + no need for a second
 	// public ingress) - the frontend proxies chat calls to it server-side.
 	BFFBaseURL string
@@ -79,7 +79,7 @@ func Load() (*Config, error) {
 		OIDCClientSecret:  os.Getenv("OIDC_CLIENT_SECRET"),
 		OIDCRedirectURL:   getenv("OIDC_REDIRECT_URL", ""),
 		SelfBaseURL:       getenv("SELF_BASE_URL", ""),
-		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-tekos.svc.cluster.local:8080"),
+		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080"),
 	}
 
 	if cfg.KeycloakIssuerURL == "" {

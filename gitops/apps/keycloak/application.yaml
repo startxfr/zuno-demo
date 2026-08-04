@@ -19,7 +19,7 @@ spec:
     path: gitops/charts/keycloak
     helm:
       values: |
-        namespace: keycloak
+        namespace: zuno-auth
         keycloakCRName: zuno
         # __CLUSTER_BASE_DOMAIN__ is substituted by
         # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
@@ -35,7 +35,7 @@ spec:
         googleOAuthSecretName: google-oauth-client
   destination:
     server: https://kubernetes.default.svc
-    namespace: keycloak
+    namespace: zuno-auth
   syncPolicy:
     automated:
       prune: true

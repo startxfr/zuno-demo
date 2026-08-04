@@ -14,7 +14,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: StatefulSet
-    namespace: vault
+    namespace: zuno-data
     name: vault
   register: _vault_sts
   until: (_vault_sts.resources | default([]) | length) > 0
@@ -24,7 +24,7 @@
 - name: "vault | wait for the Vault server pod to be Running (sealed is expected at this point)"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: vault
+    namespace: zuno-data
     label_selectors:
       - "app.kubernetes.io/name=vault"
       - "component=server"
@@ -37,7 +37,7 @@
 
 - name: "vault | read current seal/init status"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: vault status -format=json
@@ -87,7 +87,7 @@
 
 - name: "vault | initialize Vault with a single key share (demo scope; ADR-0112 tracks HA/production hardening for v1)"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: vault operator init -key-shares=1 -key-threshold=1 -format=json
@@ -121,7 +121,7 @@
 
 - name: "vault | unseal Vault if sealed"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-

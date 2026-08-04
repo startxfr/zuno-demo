@@ -25,7 +25,7 @@
 - name: "vault | find the running Vault server pod"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: vault
+    namespace: zuno-data
     label_selectors:
       - "app.kubernetes.io/name=vault"
       - "component=server"
@@ -33,7 +33,7 @@
 
 - name: "vault | enable the KV v2 secrets engine at secret/ (idempotent)"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault secrets enable -path=secret -version=2 kv"
@@ -47,7 +47,7 @@
 
 - name: "vault | enable the Kubernetes auth method (idempotent)"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault auth enable kubernetes"
@@ -61,7 +61,7 @@
 
 - name: "vault | point the Kubernetes auth method at this cluster's API"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault write auth/kubernetes/config kubernetes_host=https://kubernetes.default.svc:443"
@@ -71,7 +71,7 @@
 
 - name: "vault | write the eso-reader policy (read-only under secret/data/zuno/*)"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault policy write eso-reader -"
@@ -85,7 +85,7 @@
 
 - name: "vault | bind the eso-reader Kubernetes auth role to the external-secrets ServiceAccount"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -100,7 +100,7 @@
 
 - name: "vault | generate and seed self-generatable application secrets"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -123,7 +123,7 @@
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -135,7 +135,7 @@
 
 - name: "vault | generate and seed the Tekos frontend session HMAC secret"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -147,7 +147,7 @@
 
 - name: "vault | check whether operator-supplied secrets already exist"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault kv get -format=json secret/zuno/{{ item }}"
@@ -165,7 +165,7 @@
 
 - name: "vault | seed an empty placeholder only where no secret exists yet (never overwrite operator-supplied values)"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault kv put secret/zuno/{{ item.item }} _placeholder=true"
@@ -198,7 +198,7 @@
 
 - name: "vault | store the cluster's apps domain"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault kv put secret/zuno/platform/cluster-domain domain={{ cluster_base_domain }}"

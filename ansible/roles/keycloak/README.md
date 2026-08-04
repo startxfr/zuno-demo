@@ -115,11 +115,11 @@ track) must match the client's `redirectUris`/`webOrigins` host and the
 
 | Keycloak client | Agent namespace | Agent |
 |---|---|---|
-| `comage-frontend` | `zuno-comage` | Comage (sales) |
-| `tekos-frontend` | `zuno-tekos` | Tekos (technical consultants) - the only agent live in v0 |
-| `advantage-frontend` | `zuno-advantage` | Advantage (sales admin) |
-| `finage-frontend` | `zuno-finage` | Finage (finance) |
-| `arkos-frontend` | `zuno-arkos` | Arkos (architects) |
+| `comage-frontend` | `zuno-agent-comage` | Comage (sales) |
+| `tekos-frontend` | `zuno-agent-tekos` | Tekos (technical consultants) - the only agent live in v0 |
+| `advantage-frontend` | `zuno-agent-advantage` | Advantage (sales admin) |
+| `finage-frontend` | `zuno-agent-finage` | Finage (finance) |
+| `arkos-frontend` | `zuno-agent-arkos` | Arkos (architects) |
 
 If a namespace or Route hostname changes on the other track's side, update
 `clusterBaseDomain`/the per-client `redirectUris` in

@@ -7,7 +7,7 @@ telemetry (agent-runtime's own copy was removed, not duplicated - see its
 README's "Observability" section).
 
 Sends OTLP traces/metrics to the shared Collector installed by
-ansible/roles/observability (`zuno-otel-collector-collector.zuno-platform.svc`).
+ansible/roles/observability (`zuno-otel-collector-collector.zuno-telemetry.svc`).
 
 Cost estimates are approximate, demo-grade USD-per-1K-token rates, not a
 billing-accurate figure - good enough to demonstrate ADR-0029's "cost"
@@ -36,7 +36,7 @@ logger = logging.getLogger("ai_gateway.telemetry")
 
 OTEL_ENDPOINT = os.getenv(
     "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "http://zuno-otel-collector-collector.zuno-platform.svc:4318",
+    "http://zuno-otel-collector-collector.zuno-telemetry.svc:4318",
 )
 
 # USD per 1,000 tokens (input, output). Approximate public pricing at time of

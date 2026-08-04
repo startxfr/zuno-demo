@@ -43,7 +43,7 @@ spec:
           enabled: false
   destination:
     server: https://kubernetes.default.svc
-    namespace: vault
+    namespace: zuno-data
   syncPolicy:
     automated:
       prune: true

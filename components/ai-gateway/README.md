@@ -8,7 +8,7 @@ logic lives, kept separate from `components/agent-runtime`'s orchestration
 
 Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
 `ansible/roles/llm` via `gitops/apps/ai-gateway/application.yaml` ->
-`gitops/charts/ai-gateway` into the shared `zuno-platform` namespace.
+`gitops/charts/ai-gateway` into the shared `zuno-ai` namespace.
 
 ## Why this exists as a separate service
 
@@ -132,9 +132,9 @@ here and backed by Vault or a ConfigMap for the limits) is future work.
 |---|---|---|
 | `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.example.com/realms/zuno` | JWT issuer / JWKS base |
 | `PROVIDER_ROUTING_PATH` | `/app/config/provider-routing.yaml` | routing config (ConfigMap-mounted, not baked into the image) |
-| `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-datascience.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
+| `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-ai.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `secret/zuno/providers/<name>` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-platform.svc:4318` | where `app/telemetry.py` sends traces/metrics (ADR-0029) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-telemetry.svc:4318` | where `app/telemetry.py` sends traces/metrics (ADR-0029) |
 
 ## Observability (ADR-0029)
 

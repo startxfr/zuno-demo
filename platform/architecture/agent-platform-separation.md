@@ -48,7 +48,7 @@ Each agent is the same four ingredients, filled in differently:
 ## What v0 actually runs
 
 Of the five agents, **only Tekos has all four ingredients present and
-live**: `status: active` in its OKF file, a populated `zuno-tekos`
+live**: `status: active` in its OKF file, a populated `zuno-agent-tekos`
 namespace, and a running FE + BFF `Deployment`/`Service`/`Route`
 (`gitops/charts/tekos`).
 

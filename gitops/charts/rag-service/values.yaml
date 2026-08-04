@@ -1,10 +1,10 @@
 # Default values for the rag-service chart. Overridden per-environment
 # through gitops/apps/rag/application.yaml's spec.source.helm.values.
 
-namespace: zuno-platform
+namespace: zuno-data
 
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-platform/rag-service
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-data/rag-service
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -21,7 +21,7 @@ resources:
 # PostgreSQL connection target - owned by the data track (ansible/roles/postgresql).
 # Database credentials come from the ExternalSecret below, not from values.
 pg:
-  host: postgresql.zuno-platform.svc
+  host: postgresql.zuno-data.svc
   port: 5432
   database: zuno
 
@@ -31,5 +31,5 @@ pg:
 dbSecretName: rag-service-db-credentials
 
 # OpenAI-compatible embeddings endpoint - see README "Embedding backend".
-embeddingServiceUrl: http://embeddings-predictor.zuno-datascience.svc:8080/v1/embeddings
+embeddingServiceUrl: http://embeddings-predictor.zuno-ai.svc:8080/v1/embeddings
 embeddingModelName: bge-small-en-v1.5

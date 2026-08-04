@@ -12,7 +12,7 @@
       spec:
         provider:
           vault:
-            server: "http://vault.vault.svc:8200"
+            server: "http://vault.zuno-data.svc:8200"
             path: secret
             version: v2
             auth:
@@ -35,14 +35,14 @@
   retries: 30
   delay: 10
 
-- name: "external_secrets | ensure the zuno-platform namespace exists"
+- name: "external_secrets | ensure the zuno-ai namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-platform
+        name: zuno-ai
         labels:
           zuno.io/managed-by: ansible
 
@@ -64,7 +64,7 @@
       kind: ExternalSecret
       metadata:
         name: zuno-cluster-domain
-        namespace: zuno-platform
+        namespace: zuno-ai
         labels:
           zuno.io/managed-by: ansible
       spec:

@@ -370,7 +370,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only
-  `zuno-tekos` runs workloads.
+  `zuno-agent-tekos` runs workloads.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos

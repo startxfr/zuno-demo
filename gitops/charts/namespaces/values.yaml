@@ -1,22 +1,24 @@
 # One entry per agent instance (ADR-0007). `status: active` namespaces host
-# real workloads (only zuno-tekos in v0); `status: placeholder` namespaces
-# are created and labeled but stay empty/reserved - see
+# real workloads (only zuno-agent-tekos in v0); `status: placeholder`
+# namespaces are created and labeled but stay empty/reserved - see
 # platform/architecture/agent-platform-separation.md and this chart's
-# README.md.
+# README.md. Namespace names follow the zuno-agent-<agent> convention
+# (ADR-0023) so they read as a family alongside zuno-auth/zuno-ai/zuno-data/
+# zuno-telemetry.
 namespaces:
-  - name: zuno-comage
+  - name: zuno-agent-comage
     agent: comage
     status: placeholder
-  - name: zuno-tekos
+  - name: zuno-agent-tekos
     agent: tekos
     status: active
-  - name: zuno-advantage
+  - name: zuno-agent-advantage
     agent: advantage
     status: placeholder
-  - name: zuno-finage
+  - name: zuno-agent-finage
     agent: finage
     status: placeholder
-  - name: zuno-arkos
+  - name: zuno-agent-arkos
     agent: arkos
     status: placeholder
 

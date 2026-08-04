@@ -18,6 +18,6 @@ DB credentials (`PGUSER`/`PGPASSWORD`) come from an `ExternalSecret`
 resolving `secret/zuno/postgresql/app` (seeded by `ansible/roles/vault`) -
 never hardcoded, per ADR-0024. See `server.py`, `Dockerfile`,
 `requirements.txt`. Deployed alongside the rest of the data layer by
-`ansible/roles/sql_schema`'s GitOps Application, in the `zuno-platform`
+`ansible/roles/sql_schema`'s GitOps Application, in the `zuno-ai`
 namespace (matching `components/mcp-gateway`'s `salesDbMcpUrl` assumption:
-`http://sales-db-mcp.zuno-platform.svc:8000`).
+`http://sales-db-mcp.zuno-ai.svc:8000`).

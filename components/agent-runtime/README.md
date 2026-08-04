@@ -15,7 +15,7 @@ first vertical slice per MEMORY.md section 9. The other four agents are
 access-gated placeholder tiles with no runtime workflow yet.
 
 Implementation: FastAPI (Python 3.11) + LangChain + LangGraph. Deployed by
-a chart at `gitops/charts/agent-runtime` into the shared `zuno-platform`
+a chart at `gitops/charts/agent-runtime` into the shared `zuno-ai`
 namespace (wired up by whichever track owns the BFF/agent-surface - see
 `gitops/apps/README.md`; this repo currently only builds the AI/model
 layer's own GitOps apps, listed in that file).
@@ -120,10 +120,10 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 | Var | Default | Purpose |
 |---|---|---|
 | `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.example.com/realms/zuno` | JWT issuer / JWKS base |
-| `RAG_SERVICE_URL` | `http://rag-service.zuno-platform.svc:8080` | retrieve node |
-| `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-platform.svc:8080` | tool_call node |
-| `AI_GATEWAY_URL` | `http://ai-gateway.zuno-platform.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-platform.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
+| `RAG_SERVICE_URL` | `http://rag-service.zuno-data.svc:8080` | retrieve node |
+| `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-ai.svc:8080` | tool_call node |
+| `AI_GATEWAY_URL` | `http://ai-gateway.zuno-ai.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-telemetry.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
 
 ## Observability (ADR-0029)
 

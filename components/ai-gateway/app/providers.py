@@ -28,7 +28,7 @@ def chat_model_for(candidate: ProviderCandidate, cfg: Dict[str, Any]) -> BaseCha
                 "endpoint",
                 os.getenv(
                     "LOCAL_MODEL_ENDPOINT",
-                    "http://qwen25-7b-instruct-predictor.zuno-datascience.svc:8080/v1",
+                    "http://qwen25-7b-instruct-predictor.zuno-ai.svc:8080/v1",
                 ),
             ),
             api_key=os.getenv("LOCAL_MODEL_API_KEY", "not-required"),

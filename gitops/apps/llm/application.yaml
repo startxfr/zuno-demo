@@ -18,7 +18,7 @@ spec:
     path: platform/ai-gateway
   destination:
     server: https://kubernetes.default.svc
-    namespace: zuno-platform
+    namespace: zuno-ai
   syncPolicy:
     automated:
       prune: true

@@ -14,7 +14,7 @@
   kubernetes.core.k8s_info:
     api_version: postgresql.cnpg.io/v1
     kind: Cluster
-    namespace: postgresql
+    namespace: zuno-data
     name: zuno-postgresql
   register: _postgresql_cluster
   until: >-
@@ -25,4 +25,4 @@
 
 - name: "postgresql | configure summary"
   ansible.builtin.debug:
-    msg: "zuno-postgresql Cluster is healthy in the postgresql namespace (1 instance, demo scope - see ADR-0101 for v1 HA)."
+    msg: "zuno-postgresql Cluster is healthy in the zuno-data namespace (1 instance, demo scope - see ADR-0101 for v1 HA)."

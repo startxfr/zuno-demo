@@ -55,14 +55,14 @@
   retries: 30
   delay: 15
 
-- name: "observability | ensure the zuno-platform namespace exists"
+- name: "observability | ensure the zuno-telemetry namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-platform
+        name: zuno-telemetry
         labels:
           zuno.io/managed-by: ansible
 
@@ -74,7 +74,7 @@
       kind: OpenTelemetryCollector
       metadata:
         name: zuno-otel-collector
-        namespace: zuno-platform
+        namespace: zuno-telemetry
         labels:
           zuno.io/managed-by: ansible
       spec:
@@ -111,7 +111,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
-    namespace: zuno-platform
+    namespace: zuno-telemetry
     name: zuno-otel-collector-collector
   register: _observability_collector
   until: >-

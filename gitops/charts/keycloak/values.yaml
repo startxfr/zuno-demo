@@ -7,7 +7,7 @@
 # Namespace the Keycloak CR, KeycloakRealmImport and their ExternalSecrets
 # are deployed into. Must stay in sync with the destination namespace on
 # gitops/apps/keycloak/application.yaml.
-namespace: keycloak
+namespace: zuno-auth
 
 # Name of the Keycloak CR (k8s.keycloak.org/v2alpha1, kind: Keycloak).
 # spec.keycloakCRName on the KeycloakRealmImport must reference this.

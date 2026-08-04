@@ -120,7 +120,7 @@ scenarios:
   - id: 19
     title: Placeholder agent namespaces exist but host no workloads
     type: namespace_isolation_placeholder_empty
-    namespaces: [zuno-comage, zuno-advantage, zuno-finage, zuno-arkos]
+    namespaces: [zuno-agent-comage, zuno-agent-advantage, zuno-agent-finage, zuno-agent-arkos]
 
   - id: 20
     title: Every service's health endpoint returns 200

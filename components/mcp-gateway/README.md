@@ -6,7 +6,7 @@ policy intersection, then proxies to the right downstream MCP server.
 
 Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
 `ansible/roles/mcp` via `gitops/apps/mcp/application.yaml` ->
-`gitops/charts/mcp-gateway` into the shared `zuno-platform` namespace.
+`gitops/charts/mcp-gateway` into the shared `zuno-ai` namespace.
 
 ## Observability (ADR-0029)
 
@@ -74,7 +74,7 @@ the reasoning.
 `components/mcp-servers/sales-db` is owned by a different track and wasn't
 inspectable while this gateway was built. We assume it is reachable
 in-cluster as an HTTP+SSE MCP endpoint at
-`http://sales-db-mcp.zuno-platform.svc:8000` (override via
+`http://sales-db-mcp.zuno-ai.svc:8000` (override via
 `SALES_DB_MCP_URL`), and that `POST {SALES_DB_MCP_URL}/mcp` accepts a
 JSON-RPC-style `{"method": "tools/call", "params": {"name": ..., "arguments": ...}}`
 body per the MCP `tools/call` shape, forwarding the caller's Bearer JWT.

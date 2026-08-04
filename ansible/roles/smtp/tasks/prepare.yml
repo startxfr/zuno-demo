@@ -7,14 +7,14 @@
 # (`vault kv put secret/zuno/smtp/technical host=... username=... password=...`)
 # before whichever service sends the Comage weekly report (out of scope
 # here) can actually send mail.
-- name: "smtp | ensure the zuno-platform namespace exists"
+- name: "smtp | ensure the zuno-ai namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-platform
+        name: zuno-ai
         labels:
           zuno.io/managed-by: ansible
 
@@ -26,7 +26,7 @@
       kind: ExternalSecret
       metadata:
         name: smtp-technical-credentials
-        namespace: zuno-platform
+        namespace: zuno-ai
         labels:
           zuno.io/managed-by: ansible
       spec:

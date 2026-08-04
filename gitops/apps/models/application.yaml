@@ -15,7 +15,7 @@ spec:
     path: gitops/charts/models
   destination:
     server: https://kubernetes.default.svc
-    namespace: zuno-datascience
+    namespace: zuno-ai
   syncPolicy:
     automated:
       prune: true

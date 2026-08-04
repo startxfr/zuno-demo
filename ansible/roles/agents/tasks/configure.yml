@@ -1,6 +1,6 @@
 ---
 # Applies both agent-surface GitOps Applications: the five namespaces
-# (ADR-0023) first, then the Tekos workloads that land in zuno-tekos.
+# (ADR-0023) first, then the Tekos workloads that land in zuno-agent-tekos.
 # main.yml (invoked by ansible/playbooks/install.yml, i.e. `make install`)
 # includes this same file so one entry point covers `make install`. There is
 # no "agents" CONFIG_SCOPE (only "api", for re-applying just the Tekos

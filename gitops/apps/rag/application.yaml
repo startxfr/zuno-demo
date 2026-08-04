@@ -14,7 +14,7 @@ spec:
     path: gitops/charts/rag-service
   destination:
     server: https://kubernetes.default.svc
-    namespace: zuno-platform
+    namespace: zuno-data
   syncPolicy:
     automated:
       prune: true

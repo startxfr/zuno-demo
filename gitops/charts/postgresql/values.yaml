@@ -1,5 +1,5 @@
 # Default values for the postgresql chart. See gitops/apps/postgresql/application.yaml
-# for how this is deployed (namespace: postgresql) and
+# for how this is deployed (namespace: zuno-data) and
 # gitops/charts/postgresql/image/README.md for the pgvector image build step.
 
 image:

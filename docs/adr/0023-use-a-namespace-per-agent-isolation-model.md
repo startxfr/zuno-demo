@@ -13,6 +13,17 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 Separate each agent instance with dedicated namespaces, service accounts, quotas and NetworkPolicies.
 
+**Implementation status (2026-08-04):** each agent instance's namespace
+follows the `zuno-agent-<agent>` naming convention (`zuno-agent-tekos`,
+`zuno-agent-comage`, `zuno-agent-advantage`, `zuno-agent-finage`,
+`zuno-agent-arkos` - `gitops/charts/namespaces/values.yaml`), so the family
+reads clearly alongside the functional-domain namespaces from
+[ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md)
+(`zuno-auth`/`zuno-ai`/`zuno-data`/`zuno-telemetry`). Only `zuno-agent-tekos`
+hosts a real workload in v0; the default-deny-other-namespaces
+`NetworkPolicy` and per-namespace `ResourceQuota` this ADR calls for are
+unchanged in shape, just renamed with their namespace.
+
 ## Alternatives considered
 
 Alternatives remain valid when documented in implementation discussions, but this ADR records the selected direction for the stated target release.

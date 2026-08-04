@@ -20,7 +20,7 @@ spec:
         - values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: postgresql
+    namespace: zuno-data
   syncPolicy:
     automated:
       prune: true

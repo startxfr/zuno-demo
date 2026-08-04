@@ -13,7 +13,7 @@
       kind: ConfigMap
       metadata:
         name: zuno-sxa-schema
-        namespace: zuno-platform
+        namespace: zuno-data
         labels:
           zuno.io/managed-by: ansible
       data:
@@ -21,18 +21,18 @@
         002_pgvector.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/schema/002_pgvector.sql') }}"
         seed.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/fixtures/seed.sql') }}"
 
-- name: "sql_schema | ensure the zuno-platform namespace exists"
+- name: "sql_schema | ensure the zuno-data namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-platform
+        name: zuno-data
         labels:
           zuno.io/managed-by: ansible
 
-- name: "sql_schema | register the PostgreSQL credentials ExternalSecret in zuno-platform"
+- name: "sql_schema | register the PostgreSQL credentials ExternalSecret in zuno-data"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -40,7 +40,7 @@
       kind: ExternalSecret
       metadata:
         name: sql-schema-postgresql-credentials
-        namespace: zuno-platform
+        namespace: zuno-data
         labels:
           zuno.io/managed-by: ansible
       spec:
@@ -67,7 +67,7 @@
     api_version: batch/v1
     kind: Job
     name: zuno-sxa-schema-apply
-    namespace: zuno-platform
+    namespace: zuno-data
     wait: true
 
 - name: "sql_schema | run the schema + fixtures apply Job"
@@ -78,7 +78,7 @@
       kind: Job
       metadata:
         name: zuno-sxa-schema-apply
-        namespace: zuno-platform
+        namespace: zuno-data
         labels:
           zuno.io/managed-by: ansible
       spec:
@@ -93,7 +93,7 @@
                   - psql
                 env:
                   - name: PGHOST
-                    value: postgresql.postgresql.svc.cluster.local
+                    value: postgresql.zuno-data.svc.cluster.local
                   - name: PGPORT
                     value: "5432"
                   - name: PGDATABASE
@@ -129,7 +129,7 @@
   kubernetes.core.k8s_info:
     api_version: batch/v1
     kind: Job
-    namespace: zuno-platform
+    namespace: zuno-data
     name: zuno-sxa-schema-apply
   register: _sql_schema_job
   until: (_sql_schema_job.resources[0].status.succeeded | default(0)) > 0

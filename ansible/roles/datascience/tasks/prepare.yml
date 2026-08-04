@@ -1,15 +1,18 @@
 ---
 # Creates the namespace the `models` role's InferenceService (gitops/charts/models)
-# deploys into - labeled the way the RHOAI dashboard recognizes as a Data
-# Science Project, so it's visible there too, not just via `oc`.
-- name: "datascience | ensure the zuno-datascience namespace exists"
+# deploys into, alongside the rest of the AI/agent-serving stack (ai-gateway,
+# agent-runtime, mcp-gateway, mcp-sales-db) - labeled the way the RHOAI
+# dashboard recognizes as a Data Science Project, so it's visible there too,
+# not just via `oc`, even though this namespace also hosts non-RHOAI
+# workloads.
+- name: "datascience | ensure the zuno-ai namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-datascience
+        name: zuno-ai
         labels:
           zuno.io/managed-by: ansible
           opendatahub.io/dashboard: "true"

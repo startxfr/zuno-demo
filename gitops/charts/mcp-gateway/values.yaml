@@ -1,14 +1,14 @@
 # Default values for the mcp-gateway chart. Overridden per-environment
 # through gitops/apps/mcp/application.yaml's spec.source.helm.values.
 
-namespace: zuno-platform
+namespace: zuno-ai
 
 image:
   # No CI/registry pipeline exists yet in this repo (out of scope for
   # Track D) -- this points at the in-cluster OpenShift image registry
   # path the image would land at once one is wired up. Override for a
   # real environment.
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-platform/mcp-gateway
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai/mcp-gateway
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -29,7 +29,7 @@ keycloakIssuer: https://keycloak-zuno.apps.example.com/realms/zuno
 # ASSUMPTION: sales-db MCP server address - see components/mcp-gateway
 # README "Assumption: sales-db MCP server address" for the reasoning and
 # what to change if this is wrong once that track's server lands.
-salesDbMcpUrl: http://sales-db-mcp.zuno-platform.svc:8000
+salesDbMcpUrl: http://sales-db-mcp.zuno-ai.svc:8000
 
 # Domains treated as "internal" by the send_technical_report_email demo
 # handler (comma-separated). Override for the real environment.

@@ -21,7 +21,7 @@
 - name: "llm | find the running Vault server pod"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: vault
+    namespace: zuno-data
     label_selectors:
       - "app.kubernetes.io/name=vault"
       - "component=server"
@@ -29,7 +29,7 @@
 
 - name: "llm | check whether provider API keys already exist"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault kv get -format=json secret/zuno/providers/{{ item }}"
@@ -49,7 +49,7 @@
 
 - name: "llm | seed an empty placeholder only where no key exists yet"
   kubernetes.core.k8s_exec:
-    namespace: vault
+    namespace: zuno-data
     pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
     container: vault
     command: "vault kv put secret/zuno/providers/{{ item.item }} api_key=__placeholder__"

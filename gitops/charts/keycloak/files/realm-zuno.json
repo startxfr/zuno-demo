@@ -365,7 +365,7 @@
     {
       "clientId": "comage-frontend",
       "name": "Comage frontend (sales)",
-      "description": "Public SPA client for the Comage sales agent \u2014 namespace zuno-comage",
+      "description": "Public SPA client for the Comage sales agent \u2014 namespace zuno-agent-comage",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -381,7 +381,7 @@
         "https://comage.__CLUSTER_BASE_DOMAIN__"
       ],
       "attributes": {
-        "agent.namespace": "zuno-comage",
+        "agent.namespace": "zuno-agent-comage",
         "post.logout.redirect.uris": "https://comage.__CLUSTER_BASE_DOMAIN__/*"
       },
       "defaultClientScopes": [
@@ -409,7 +409,7 @@
     {
       "clientId": "tekos-frontend",
       "name": "Tekos frontend (technical consultants)",
-      "description": "Public SPA client for the Tekos technical-consultant agent \u2014 namespace zuno-tekos",
+      "description": "Public SPA client for the Tekos technical-consultant agent \u2014 namespace zuno-agent-tekos",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
@@ -425,7 +425,7 @@
         "https://tekos.__CLUSTER_BASE_DOMAIN__"
       ],
       "attributes": {
-        "agent.namespace": "zuno-tekos",
+        "agent.namespace": "zuno-agent-tekos",
         "post.logout.redirect.uris": "https://tekos.__CLUSTER_BASE_DOMAIN__/*"
       },
       "defaultClientScopes": [
@@ -455,7 +455,7 @@
     {
       "clientId": "advantage-frontend",
       "name": "Advantage frontend (sales admin)",
-      "description": "Public SPA client for the Advantage sales-admin agent \u2014 namespace zuno-advantage",
+      "description": "Public SPA client for the Advantage sales-admin agent \u2014 namespace zuno-agent-advantage",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -471,7 +471,7 @@
         "https://advantage.__CLUSTER_BASE_DOMAIN__"
       ],
       "attributes": {
-        "agent.namespace": "zuno-advantage",
+        "agent.namespace": "zuno-agent-advantage",
         "post.logout.redirect.uris": "https://advantage.__CLUSTER_BASE_DOMAIN__/*"
       },
       "defaultClientScopes": [
@@ -499,7 +499,7 @@
     {
       "clientId": "finage-frontend",
       "name": "Finage frontend (finance)",
-      "description": "Public SPA client for the Finage finance agent \u2014 namespace zuno-finage",
+      "description": "Public SPA client for the Finage finance agent \u2014 namespace zuno-agent-finage",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -515,7 +515,7 @@
         "https://finage.__CLUSTER_BASE_DOMAIN__"
       ],
       "attributes": {
-        "agent.namespace": "zuno-finage",
+        "agent.namespace": "zuno-agent-finage",
         "post.logout.redirect.uris": "https://finage.__CLUSTER_BASE_DOMAIN__/*"
       },
       "defaultClientScopes": [
@@ -543,7 +543,7 @@
     {
       "clientId": "arkos-frontend",
       "name": "Arkos frontend (architects)",
-      "description": "Public SPA client for the Arkos architects agent \u2014 namespace zuno-arkos",
+      "description": "Public SPA client for the Arkos architects agent \u2014 namespace zuno-agent-arkos",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -559,7 +559,7 @@
         "https://arkos.__CLUSTER_BASE_DOMAIN__"
       ],
       "attributes": {
-        "agent.namespace": "zuno-arkos",
+        "agent.namespace": "zuno-agent-arkos",
         "post.logout.redirect.uris": "https://arkos.__CLUSTER_BASE_DOMAIN__/*"
       },
       "defaultClientScopes": [

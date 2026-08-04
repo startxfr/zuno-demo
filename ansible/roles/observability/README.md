@@ -1,7 +1,7 @@
 # observability
 
 Installs the Red Hat build of the OpenTelemetry Operator and a shared OTLP
-`OpenTelemetryCollector` (`zuno-otel-collector`, `zuno-platform` namespace)
+`OpenTelemetryCollector` (`zuno-otel-collector`, `zuno-telemetry` namespace)
 every service sends traces/metrics to (ADR-0029). PREP_COMPONENT only - no
 CONFIG_SCOPE; application-level instrumentation lives in each service's own
 code, not here.

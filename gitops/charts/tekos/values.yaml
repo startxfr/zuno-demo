@@ -9,7 +9,7 @@
 global:
   clusterBaseDomain: apps.example.com
 
-namespace: zuno-tekos
+namespace: zuno-agent-tekos
 
 # Both images are built from this repository (components/agent-frontend,
 # components/agent-bff - see each Dockerfile) by CI/image-build tooling
@@ -18,8 +18,8 @@ namespace: zuno-tekos
 # override per environment once a real build/push pipeline exists.
 image:
   registry: image-registry.openshift-image-registry.svc:5000
-  frontendRepository: zuno-tekos/agent-frontend
-  bffRepository: zuno-tekos/agent-bff
+  frontendRepository: zuno-agent-tekos/agent-frontend
+  bffRepository: zuno-agent-tekos/agent-bff
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -54,11 +54,11 @@ bff:
   agentName: tekos
   oidcAudience: tekos-frontend
   # In-cluster Agent Runtime Service - shared platform component (ADR-0007),
-  # deployed to zuno-platform (not zuno-tekos) by gitops/charts/agent-runtime
+  # deployed to zuno-ai (not zuno-agent-tekos) by gitops/charts/agent-runtime
   # (Track D's chart, see its values.yaml header comment). Reconciled here
   # during integration; the BFF's own default in
   # components/agent-bff/internal/config/config.go matches.
-  agentRuntimeBaseUrl: "http://agent-runtime.zuno-platform.svc.cluster.local:8080"
+  agentRuntimeBaseUrl: "http://agent-runtime.zuno-ai.svc.cluster.local:8080"
 
 # Vault paths (ADR-0024) this chart's ExternalSecrets resolve. ASSUMPTION:
 # the identity track has not yet published where it seeds the Keycloak

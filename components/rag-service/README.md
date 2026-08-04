@@ -6,7 +6,7 @@ Shared RAG capabilities backed by PostgreSQL pgvector and hybrid
 
 Implementation: FastAPI (Python 3.11), `asyncpg`. Deployed by
 `ansible/roles/rag` via `gitops/apps/rag/application.yaml` ->
-`gitops/charts/rag-service` into the shared `zuno-platform` namespace.
+`gitops/charts/rag-service` into the shared `zuno-data` namespace.
 
 ## Observability (ADR-0029)
 
@@ -84,7 +84,7 @@ its literal score, to the fused ranking.
 
 The query text is embedded via an OpenAI-compatible `POST
 {EMBEDDING_SERVICE_URL}/v1/embeddings` call (default:
-`http://embeddings-predictor.zuno-datascience.svc:8080/v1/embeddings`,
+`http://embeddings-predictor.zuno-ai.svc:8080/v1/embeddings`,
 override via env) - this assumes an embedding model is served through
 OpenShift AI's KServe/vLLM serving path (ADR-0018's OGX definition), or
 any other OpenAI-compatible embeddings endpoint. **Degradation:** if that

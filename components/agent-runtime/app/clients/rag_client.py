@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-platform.svc:8080")
+RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc:8080")
 RAG_TIMEOUT_SECONDS = float(os.getenv("RAG_TIMEOUT_SECONDS", "15"))
 
 

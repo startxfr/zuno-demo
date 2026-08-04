@@ -21,7 +21,7 @@ persistent data platform").
   - an `ExternalSecret` syncing the pre-seeded `secret/zuno/postgresql/app`
     Vault path (username `zuno_app`, auto-generated password - see
     `ansible/roles/vault/tasks/configure.yml`) into a `zuno-postgresql-app-credentials`
-    Kubernetes `Secret` in the `postgresql` namespace;
+    Kubernetes `Secret` in the `zuno-data` namespace;
   - a CNPG `Cluster` (1 instance - demo scope; ADR-0101 tracks HA for v1)
     with 5Gi storage, bootstrapping the `zuno` database owned by `zuno_app`
     using that Secret, and running `CREATE EXTENSION IF NOT EXISTS vector;`

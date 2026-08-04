@@ -8,12 +8,12 @@ for every one of them regardless of status.
 Referenced by exactly one Application: `gitops/apps/agents/application.yaml`
 (applied by `ansible/roles/agents`, reachable via `make install`).
 
-## Why all five exist, not just zuno-tekos
+## Why all five exist, not just zuno-agent-tekos
 
-Only `zuno-tekos` (`status: active`) hosts real workloads in v0 - the
+Only `zuno-agent-tekos` (`status: active`) hosts real workloads in v0 - the
 Tekos FE/BFF from `gitops/charts/tekos`, plus the Agent Runtime/MCP
-Gateway/RAG service owned by other tracks. `zuno-comage`, `zuno-advantage`,
-`zuno-finage` and `zuno-arkos` (`status: placeholder`) are created and
+Gateway/RAG service owned by other tracks. `zuno-agent-comage`, `zuno-agent-advantage`,
+`zuno-agent-finage` and `zuno-agent-arkos` (`status: placeholder`) are created and
 labeled but intentionally have nothing scheduled in them: this is what
 makes the namespace-per-agent isolation model (ADR-0023) demonstrably real
 infrastructure rather than a diagram for a system that, per ADR-0007, is

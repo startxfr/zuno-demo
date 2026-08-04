@@ -50,7 +50,7 @@ cluster's apps wildcard domain, auto-discovered from
 `ansible/tasks/resolve_cluster_base_domain.yml` and
 `ansible/roles/vault/tasks/configure.yml`) - no manual edit needed before a
 real deployment. `ansible/roles/external_secrets` also exposes that Vault
-value as a `zuno-cluster-domain` Secret in `zuno-platform` for any service
+value as a `zuno-cluster-domain` Secret in `zuno-ai` for any service
 that wants it as a live runtime value rather than a Helm-render-time one
 (not yet consumed by any service - the value only reaches K8s manifest
 spec fields like a Route's `spec.host` or the Keycloak CR's

@@ -1,6 +1,6 @@
 # Zuno agent definition for Advantage (sales administration assistant).
 # Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json.
-# v0 scope: status is `placeholder` - this file, the reserved `zuno-advantage`
+# v0 scope: status is `placeholder` - this file, the reserved `zuno-agent-advantage`
 # namespace and this portal tile are the only things that exist for Advantage
 # in v0 (ADR-0007). Task/tool content reflects the intended v1 build from
 # agents/advantage/README.md and MEMORY.md section 9.

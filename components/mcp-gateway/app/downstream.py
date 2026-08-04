@@ -28,7 +28,7 @@ logger = logging.getLogger("mcp_gateway.downstream")
 # standard MCP `tools/call` semantics over a JSON-RPC-style POST. If the
 # real server instead speaks MCP-over-stdio via a sidecar, only
 # `_invoke_sales_db` below needs to change.
-SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-platform.svc:8000")
+SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai.svc:8000")
 DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "20"))
 
 SALES_DB_TOOLS = {"get_customer", "list_open_opportunities", "get_quote"}

@@ -55,7 +55,7 @@ access is available before building.**
 | `OIDC_CLIENT_SECRET` | **yes** | From an `ExternalSecret` (ADR-0024), never hardcoded |
 | `OIDC_REDIRECT_URL` | no (derived from `SELF_BASE_URL` + `/callback`) | Must match the Keycloak client's registered redirect URI |
 | `SELF_BASE_URL` | **yes** | `https://tekos.apps.<cluster-domain>` |
-| `BFF_BASE_URL` | no (default `http://tekos-bff.zuno-tekos.svc.cluster.local:8080`) | In-cluster BFF Service URL |
+| `BFF_BASE_URL` | no (default `http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080`) | In-cluster BFF Service URL |
 | `SESSION_HMAC_SECRET` | **yes** | Signs the session cookie; from an `ExternalSecret` |
 
 ## Assumption flagged for the identity track

@@ -1,6 +1,6 @@
 # Zuno agent definition for Arkos (architecture assistant).
 # Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json.
-# v0 scope: status is `placeholder` - this file, the reserved `zuno-arkos`
+# v0 scope: status is `placeholder` - this file, the reserved `zuno-agent-arkos`
 # namespace and this portal tile are the only things that exist for Arkos in
 # v0 (ADR-0007). Task/tool content reflects the intended v1 build from
 # agents/arkos/README.md and MEMORY.md sections 8-9. Access group is `board`
