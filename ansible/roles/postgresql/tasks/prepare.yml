@@ -1,4 +1,67 @@
 ---
-- name: "postgresql | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for postgresql; implementation tasks are pending."
+# Subscribes to the CloudNativePG operator via OLM (mirrors
+# ansible/roles/argocd and ansible/roles/external_secrets: Subscription in
+# the shared openshift-operators namespace, AllNamespaces install mode).
+# The actual PostgreSQL Cluster CR is applied declaratively later, by
+# ansible/roles/postgresql/tasks/configure.yml, as a GitOps Application.
+- name: "postgresql | ensure the openshift-operators namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: openshift-operators
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "postgresql | subscribe to the CloudNativePG operator"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: cloudnative-pg
+        namespace: openshift-operators
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        # "stable" is pinned deliberately: the pgvector image-volume
+        # extension mechanism (CloudNativePG >= 1.27) is NOT relied upon by
+        # this demo (see gitops/charts/postgresql/image/README.md for why) —
+        # any recent stable CNPG release is sufficient here.
+        channel: stable
+        name: cloudnative-pg
+        source: certified-operators
+        sourceNamespace: openshift-marketplace
+        installPlanApproval: Automatic
+
+- name: "postgresql | wait for the CNPG Cluster CRD to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: clusters.postgresql.cnpg.io
+  register: _postgresql_crd
+  until: (_postgresql_crd.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "postgresql | wait for the CloudNativePG controller deployment to be ready"
+  # AllNamespaces install mode + the shared global OperatorGroup on OpenShift
+  # lands the operator pod in the Subscription's own namespace, same as
+  # ansible/roles/argocd and ansible/roles/external_secrets — assumed here
+  # to be openshift-operators. If this cluster's CNPG bundle instead creates
+  # its own dedicated "cnpg-system" operand namespace, adjust the namespace
+  # below (`oc get deploy -A | grep cnpg-controller-manager` confirms which).
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-operators
+    name: cnpg-controller-manager
+  register: _postgresql_operator_deploy
+  until: >-
+    (_postgresql_operator_deploy.resources | default([]) | length) > 0 and
+    (_postgresql_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 30
+  delay: 10

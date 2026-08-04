@@ -1,0 +1,61 @@
+# Zuno agent definition for Tekos (technical consultant assistant).
+# Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json — see that file's
+# header for which fields are bare OKF v0.2 vs the Zuno extension (ADR-0005,
+# ADR-0006). Tekos is the only agent with status: active for v0 (MEMORY.md
+# section 9, docs/agents/tekos.md): it is the first vertical slice and
+# validates frontend, BFF, Keycloak, runtime, AI gateway, RAG, MCP Confluence,
+# model routing, streaming and citations end to end.
+apiVersion: okf.zuno.io/v0.2
+kind: Agent
+metadata:
+  name: tekos
+  displayName: Tekos
+  description: >-
+    Technical consultant assistant. Answers technical questions grounded in
+    official product documentation and internal Confluence content, with
+    concise citations, and helps consultants locate relevant reference
+    material across the RAG corpus and their own Drive.
+  status: active
+spec:
+  tasks:
+    - name: answer-technical-question
+      description: >-
+        Answer a free-form technical question using the Tekos RAG corpus
+        (official OpenShift/Kubernetes/Keycloak/Ansible/Argo CD/Helm/Go
+        documentation plus internal Confluence) first, falling back to a
+        constrained web search when the internal corpus has no grounded
+        answer. Every answer includes concise source citations.
+      allowed_tools:
+        - search_confluence
+        - web_search
+    - name: find-relevant-docs
+      description: >-
+        Given a topic or keyword, return the most relevant internal
+        Confluence pages and RAG-indexed documentation sections without
+        composing a full narrative answer — a lookup/browse task for
+        consultants scanning available material before a customer call.
+      allowed_tools:
+        - search_confluence
+    - name: check-my-drive-docs
+      description: >-
+        List the authenticated consultant's own Google Drive documents that
+        are relevant to a given project or topic, using delegated end-user
+        OAuth2 so only files the user can already see are listed (ADR-0014).
+      allowed_tools:
+        - list_drive_files
+  model:
+    preferred_classification: C1
+    notes: >-
+      Public vendor/product documentation and general technical Q&A are C1
+      (SaaS model use allowed). Answers that incorporate Confluence content
+      must respect Confluence's C2 classification (policies/data-classification)
+      for the portions of context drawn from it, even though the task's
+      ceiling here is C1.
+  access:
+    groups:
+      - consultant
+  ui:
+    displayName: Tekos
+    tileDescription: Technical Q&A with citations, for consultants.
+    color: "#0066CC"
+    icon: code

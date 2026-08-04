@@ -1,0 +1,40 @@
+---
+# Zuno identity platform. This deploys the local chart (gitops/charts/keycloak)
+# holding the Keycloak CR instance, the Google IdP broker configuration and
+# the `zuno` realm (KeycloakRealmImport) — NOT the operator itself. The
+# Keycloak Operator (Red Hat build of Keycloak) is installed imperatively as
+# an OLM Subscription by ansible/roles/keycloak's prepare.yml, following the
+# same operator-then-instance split as argocd/external_secrets/vault. See
+# gitops/apps/README.md and ansible/roles/keycloak/README.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/keycloak
+    helm:
+      values: |
+        namespace: keycloak
+        keycloakCRName: zuno
+        # Override for the real cluster's apps wildcard domain before
+        # go-live (matches the `cluster_base_domain` convention in
+        # ansible/inventories/*/group_vars/all/main.yml). Every per-agent
+        # client redirect URI in the imported realm is templated against
+        # this value.
+        clusterBaseDomain: apps.example.com
+        adminSecretName: keycloak-admin
+        googleOAuthSecretName: google-oauth-client
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

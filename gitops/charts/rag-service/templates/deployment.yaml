@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: rag-service
+    zuno.io/managed-by: argocd
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rag-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rag-service
+    spec:
+      containers:
+        - name: rag-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PGHOST
+              value: {{ .Values.pg.host | quote }}
+            - name: PGPORT
+              value: {{ .Values.pg.port | quote }}
+            - name: PGDATABASE
+              value: {{ .Values.pg.database | quote }}
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.dbSecretName }}
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.dbSecretName }}
+                  key: password
+            - name: EMBEDDING_SERVICE_URL
+              value: {{ .Values.embeddingServiceUrl | quote }}
+            - name: EMBEDDING_MODEL_NAME
+              value: {{ .Values.embeddingModelName | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

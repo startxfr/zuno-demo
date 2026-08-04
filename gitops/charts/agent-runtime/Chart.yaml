@@ -1,0 +1,10 @@
+apiVersion: v2
+name: agent-runtime
+description: >-
+  Zuno Agent Runtime (ADR-0009, ADR-0018): shared LangGraph orchestration
+  service. v0 implements the Tekos technical-consultant workflow. Image
+  built from components/agent-runtime. See docs/adr/0009, 0018, 0020,
+  0021.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

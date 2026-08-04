@@ -1,4 +1,30 @@
 ---
-- name: Agent check scaffold
+# Basic reachability smoke check for the one functional agent (Tekos) — not
+# the 20-scenario acceptance evaluation (ADR-0027/0028), which is a
+# separate, later concern (evaluations/tekos/, run outside this role).
+- name: "agents | resolve the Tekos frontend route host"
+  ansible.builtin.set_fact:
+    _agents_tekos_host: "tekos.{{ cluster_base_domain | default('apps.example.com') }}"
+
+- name: "agents | GET the Tekos frontend health endpoint"
+  ansible.builtin.uri:
+    url: "https://{{ _agents_tekos_host }}/healthz"
+    method: GET
+    status_code: 200
+    validate_certs: false
+    timeout: 10
+  register: _agents_tekos_health
+  failed_when: false
+
+- name: "agents | fail the check if the Tekos frontend did not report healthy"
+  ansible.builtin.fail:
+    msg: >-
+      Tekos frontend at https://{{ _agents_tekos_host }}/healthz did not
+      respond 200 (got {{ _agents_tekos_health.status | default('no response') }}).
+      Confirm cluster_base_domain matches the real cluster's apps wildcard
+      domain and that gitops/apps/api has synced.
+  when: (_agents_tekos_health.status | default(0)) != 200
+
+- name: "agents | check summary"
   ansible.builtin.debug:
-    msg: "Agent validation contract registered; implementation tasks are pending."
+    msg: "Tekos frontend healthy at https://{{ _agents_tekos_host }}/healthz."

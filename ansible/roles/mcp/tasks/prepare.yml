@@ -1,4 +1,4 @@
 ---
-- name: "mcp | prepare scaffold"
+- name: "mcp | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "Preparation contract registered for mcp; implementation tasks are pending."
+    msg: "mcp is applied entirely by tasks/configure.yml — the MCP Gateway Deployment has no operator dependency of its own."

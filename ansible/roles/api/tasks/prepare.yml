@@ -1,4 +1,4 @@
 ---
-- name: "api | prepare scaffold"
+- name: "api | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "Preparation contract registered for api; implementation tasks are pending."
+    msg: "api has no separate prepare phase — a plain Deployment/Service/Route has no operator dependency of its own."

@@ -1,4 +1,8 @@
 ---
-- name: "openshift_ai | configure scaffold"
+# No configure phase: the DataScienceCluster applied in prepare.yml is the
+# whole of what "configuring" OpenShift AI means for this demo. Namespace
+# scaffolding for the datascience project lives in the `datascience` role.
+# openshift_ai is a PREP_COMPONENT only, not a CONFIG_SCOPE.
+- name: "openshift_ai | nothing to configure beyond the DataScienceCluster"
   ansible.builtin.debug:
-    msg: "Configuration contract registered for openshift_ai; implementation tasks are pending."
+    msg: "openshift_ai has no configure phase — see tasks/prepare.yml and the datascience role."

@@ -1,0 +1,609 @@
+{
+  "realm": "zuno",
+  "enabled": true,
+  "displayName": "Zuno Demo",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "client": {
+      "comage-frontend": [
+        {
+          "name": "access",
+          "description": "Grants sign-in access to the Comage (sales) agent frontend"
+        }
+      ],
+      "tekos-frontend": [
+        {
+          "name": "access",
+          "description": "Grants sign-in access to the Tekos (technical consultant) agent frontend"
+        }
+      ],
+      "advantage-frontend": [
+        {
+          "name": "access",
+          "description": "Grants sign-in access to the Advantage (sales admin) agent frontend"
+        }
+      ],
+      "finage-frontend": [
+        {
+          "name": "access",
+          "description": "Grants sign-in access to the Finage (finance) agent frontend"
+        }
+      ],
+      "arkos-frontend": [
+        {
+          "name": "access",
+          "description": "Grants sign-in access to the Arkos (architects) agent frontend"
+        }
+      ]
+    }
+  },
+  "groups": [
+    {
+      "name": "sales",
+      "path": "/sales",
+      "attributes": {
+        "description": [
+          "Sales personas \u2014 Comage agent access"
+        ]
+      },
+      "clientRoles": {
+        "comage-frontend": [
+          "access"
+        ]
+      }
+    },
+    {
+      "name": "consultant",
+      "path": "/consultant",
+      "attributes": {
+        "description": [
+          "Technical consultant personas \u2014 Tekos agent access"
+        ]
+      },
+      "clientRoles": {
+        "tekos-frontend": [
+          "access"
+        ]
+      }
+    },
+    {
+      "name": "adv",
+      "path": "/adv",
+      "attributes": {
+        "description": [
+          "Sales admin (ADV) personas \u2014 Advantage agent access"
+        ]
+      },
+      "clientRoles": {
+        "advantage-frontend": [
+          "access"
+        ]
+      }
+    },
+    {
+      "name": "finance",
+      "path": "/finance",
+      "attributes": {
+        "description": [
+          "Finance personas \u2014 Finage agent access"
+        ]
+      },
+      "clientRoles": {
+        "finage-frontend": [
+          "access"
+        ]
+      }
+    },
+    {
+      "name": "board",
+      "path": "/board",
+      "attributes": {
+        "description": [
+          "Board / architects personas \u2014 Arkos agent access"
+        ]
+      },
+      "clientRoles": {
+        "arkos-frontend": [
+          "access"
+        ]
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "majdouline",
+      "email": "majdouline@zuno-demo.internal",
+      "firstName": "Majdouline",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Sales"
+        ]
+      },
+      "groups": [
+        "/sales"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "fabrice",
+      "email": "fabrice@zuno-demo.internal",
+      "firstName": "Fabrice",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Directeur Commercial"
+        ]
+      },
+      "groups": [
+        "/sales"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "chris",
+      "email": "chris@zuno-demo.internal",
+      "firstName": "Chris",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "CTO"
+        ]
+      },
+      "groups": [
+        "/consultant"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "adil",
+      "email": "adil@zuno-demo.internal",
+      "firstName": "Adil",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Tech Lead Container"
+        ]
+      },
+      "groups": [
+        "/consultant"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "maz",
+      "email": "maz@zuno-demo.internal",
+      "firstName": "Maz",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Consultant Senior Run"
+        ]
+      },
+      "groups": [
+        "/consultant"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "samantha",
+      "email": "samantha@zuno-demo.internal",
+      "firstName": "Samantha",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Management"
+        ]
+      },
+      "groups": [
+        "/adv"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "paolo",
+      "email": "paolo@zuno-demo.internal",
+      "firstName": "Paolo",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Op\u00e9rationnel ADV"
+        ]
+      },
+      "groups": [
+        "/adv"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "cecile",
+      "email": "cecile@zuno-demo.internal",
+      "firstName": "C\u00e9cile",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Management"
+        ]
+      },
+      "groups": [
+        "/finance"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "jean",
+      "email": "jean@zuno-demo.internal",
+      "firstName": "Jean",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Op\u00e9rationnel"
+        ]
+      },
+      "groups": [
+        "/finance"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "max",
+      "email": "max@zuno-demo.internal",
+      "firstName": "Max",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "CEO"
+        ]
+      },
+      "groups": [
+        "/board"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "raoul",
+      "email": "raoul@zuno-demo.internal",
+      "firstName": "Raoul",
+      "enabled": true,
+      "emailVerified": true,
+      "attributes": {
+        "jobTitle": [
+          "Directeur Strat\u00e9gie Groupe"
+        ]
+      },
+      "groups": [
+        "/board"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ZunoDemo!2026",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "comage-frontend",
+      "name": "Comage frontend (sales)",
+      "description": "Public SPA client for the Comage sales agent \u2014 namespace zuno-comage",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "https://comage.__CLUSTER_BASE_DOMAIN__",
+      "redirectUris": [
+        "https://comage.__CLUSTER_BASE_DOMAIN__/*"
+      ],
+      "webOrigins": [
+        "https://comage.__CLUSTER_BASE_DOMAIN__"
+      ],
+      "attributes": {
+        "agent.namespace": "zuno-comage",
+        "post.logout.redirect.uris": "https://comage.__CLUSTER_BASE_DOMAIN__/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "tekos-frontend",
+      "name": "Tekos frontend (technical consultants)",
+      "description": "Public SPA client for the Tekos technical-consultant agent \u2014 namespace zuno-tekos",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "https://tekos.__CLUSTER_BASE_DOMAIN__",
+      "redirectUris": [
+        "https://tekos.__CLUSTER_BASE_DOMAIN__/*"
+      ],
+      "webOrigins": [
+        "https://tekos.__CLUSTER_BASE_DOMAIN__"
+      ],
+      "attributes": {
+        "agent.namespace": "zuno-tekos",
+        "post.logout.redirect.uris": "https://tekos.__CLUSTER_BASE_DOMAIN__/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ],
+      "secret": "${vault.tekos_frontend_client_secret}",
+      "clientAuthenticatorType": "client-secret"
+    },
+    {
+      "clientId": "advantage-frontend",
+      "name": "Advantage frontend (sales admin)",
+      "description": "Public SPA client for the Advantage sales-admin agent \u2014 namespace zuno-advantage",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "https://advantage.__CLUSTER_BASE_DOMAIN__",
+      "redirectUris": [
+        "https://advantage.__CLUSTER_BASE_DOMAIN__/*"
+      ],
+      "webOrigins": [
+        "https://advantage.__CLUSTER_BASE_DOMAIN__"
+      ],
+      "attributes": {
+        "agent.namespace": "zuno-advantage",
+        "post.logout.redirect.uris": "https://advantage.__CLUSTER_BASE_DOMAIN__/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "finage-frontend",
+      "name": "Finage frontend (finance)",
+      "description": "Public SPA client for the Finage finance agent \u2014 namespace zuno-finage",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "https://finage.__CLUSTER_BASE_DOMAIN__",
+      "redirectUris": [
+        "https://finage.__CLUSTER_BASE_DOMAIN__/*"
+      ],
+      "webOrigins": [
+        "https://finage.__CLUSTER_BASE_DOMAIN__"
+      ],
+      "attributes": {
+        "agent.namespace": "zuno-finage",
+        "post.logout.redirect.uris": "https://finage.__CLUSTER_BASE_DOMAIN__/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "arkos-frontend",
+      "name": "Arkos frontend (architects)",
+      "description": "Public SPA client for the Arkos architects agent \u2014 namespace zuno-arkos",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "https://arkos.__CLUSTER_BASE_DOMAIN__",
+      "redirectUris": [
+        "https://arkos.__CLUSTER_BASE_DOMAIN__/*"
+      ],
+      "webOrigins": [
+        "https://arkos.__CLUSTER_BASE_DOMAIN__"
+      ],
+      "attributes": {
+        "agent.namespace": "zuno-arkos",
+        "post.logout.redirect.uris": "https://arkos.__CLUSTER_BASE_DOMAIN__/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google Workspace",
+      "providerId": "google",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": true,
+      "addReadTokenRoleOnCreate": true,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${vault.google_client_id}",
+        "clientSecret": "${vault.google_client_secret}",
+        "hideOnLoginPage": "false",
+        "syncMode": "IMPORT",
+        "useJwksUrl": "true",
+        "defaultScope": "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.readonly"
+      }
+    }
+  ]
+}

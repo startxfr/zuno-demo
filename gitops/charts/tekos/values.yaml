@@ -1,0 +1,78 @@
+# Cluster-specific values (clusterBaseDomain in particular) must be
+# overridden per environment — see gitops/apps/api/application.yaml's
+# spec.source.helm.values block, and keep it in sync with the
+# cluster_base_domain Ansible inventory variable
+# (ansible/inventories/<env>/group_vars/all/main.yml). This mirrors how
+# ansible/inventories/example is "copy/adapt into the demo inventory" per
+# its own header comment: environment values are hand-adapted, checked-in
+# configuration, not injected at apply time.
+global:
+  clusterBaseDomain: apps.example.com
+
+namespace: zuno-tekos
+
+# Both images are built from this repository (components/agent-frontend,
+# components/agent-bff — see each Dockerfile) by CI/image-build tooling
+# outside this track's scope. Defaults below point at the in-cluster
+# OpenShift image registry's conventional coordinates for this namespace;
+# override per environment once a real build/push pipeline exists.
+image:
+  registry: image-registry.openshift-image-registry.svc:5000
+  frontendRepository: zuno-tekos/agent-frontend
+  bffRepository: zuno-tekos/agent-bff
+  tag: latest
+  pullPolicy: IfNotPresent
+
+frontend:
+  replicas: 1
+  route:
+    # Empty means "tekos.<global.clusterBaseDomain>" (computed in
+    # templates/_helpers.tpl) — the fixed host the OIDC redirect URI
+    # contract (https://<agent>.apps.<cluster-domain>/*) and the Keycloak
+    # client's registered redirect URI both depend on, so it cannot be left
+    # to OpenShift's auto-generated Route host.
+    host: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  oidcClientId: tekos-frontend
+  activeAgent: tekos
+
+bff:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  agentName: tekos
+  oidcAudience: tekos-frontend
+  # In-cluster Agent Runtime Service — shared platform component (ADR-0007),
+  # deployed to zuno-platform (not zuno-tekos) by gitops/charts/agent-runtime
+  # (Track D's chart, see its values.yaml header comment). Reconciled here
+  # during integration; the BFF's own default in
+  # components/agent-bff/internal/config/config.go matches.
+  agentRuntimeBaseUrl: "http://agent-runtime.zuno-platform.svc.cluster.local:8080"
+
+# Vault paths (ADR-0024) this chart's ExternalSecrets resolve. ASSUMPTION:
+# the identity track has not yet published where it seeds the Keycloak
+# tekos-frontend client secret; secret/zuno/keycloak/tekos-frontend with
+# keys client_id/client_secret follows this repo's existing
+# secret/zuno/<component>/<item> convention (see
+# ansible/roles/vault/tasks/configure.yml). The session HMAC secret is this
+# track's own and is self-generated the same way vault's role generates
+# keycloak/admin and postgresql/app (see this chart's README.md).
+vault:
+  oidcClientSecretPath: secret/zuno/keycloak/tekos-frontend
+  sessionSecretPath: secret/zuno/tekos/frontend-session
+
+keycloak:
+  # ASSUMPTION: no Keycloak route hostname convention was published by the
+  # identity track yet — see components/agent-frontend/README.md.
+  issuerUrl: ""  # empty means "https://sso.<global.clusterBaseDomain>/realms/zuno"

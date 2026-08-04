@@ -1,0 +1,10 @@
+apiVersion: v2
+name: postgresql
+description: >-
+  Zuno Demo PostgreSQL Cluster (CloudNativePG custom resource) and its
+  Vault-backed application credentials ExternalSecret. Implements ADR-0015.
+  Requires the CloudNativePG operator, installed separately by
+  ansible/roles/postgresql (OLM Subscription, not part of this chart).
+type: application
+version: 0.1.0
+appVersion: "16"

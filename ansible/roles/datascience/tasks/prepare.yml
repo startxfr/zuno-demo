@@ -1,4 +1,15 @@
 ---
-- name: "datascience | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for datascience; implementation tasks are pending."
+# Creates the namespace the `models` role's InferenceService (gitops/charts/models)
+# deploys into — labeled the way the RHOAI dashboard recognizes as a Data
+# Science Project, so it's visible there too, not just via `oc`.
+- name: "datascience | ensure the zuno-datascience namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-datascience
+        labels:
+          zuno.io/managed-by: ansible
+          opendatahub.io/dashboard: "true"

@@ -1,0 +1,24 @@
+---
+# Local model serving (ADR-0019) — see gitops/charts/models. Applied by the
+# `models` Ansible role's configure.yml, after `openshift_ai` (DataScienceCluster
+# with kserve enabled) and `nvidia_gpu` (GPU Operator) have prepared the cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: models
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/models
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-datascience
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

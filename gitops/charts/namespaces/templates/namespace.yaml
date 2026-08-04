@@ -1,0 +1,11 @@
+{{- range .Values.namespaces }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}
+  labels:
+    zuno.io/agent: {{ .agent }}
+    zuno.io/status: {{ .status }}
+    zuno.io/managed-by: argocd
+---
+{{- end }}

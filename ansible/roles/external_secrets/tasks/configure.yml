@@ -1,0 +1,36 @@
+---
+- name: "external_secrets | register the Vault-backed ClusterSecretStore"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ClusterSecretStore
+      metadata:
+        name: vault-backend
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        provider:
+          vault:
+            server: "http://vault.vault.svc:8200"
+            path: secret
+            version: v2
+            auth:
+              kubernetes:
+                mountPath: kubernetes
+                role: eso-reader
+                serviceAccountRef:
+                  name: external-secrets
+                  namespace: external-secrets
+
+- name: "external_secrets | wait for the ClusterSecretStore to report Valid"
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1beta1
+    kind: ClusterSecretStore
+    name: vault-backend
+  register: _eso_store
+  until: >-
+    (_eso_store.resources | default([]) | length) > 0 and
+    (_eso_store.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+  retries: 30
+  delay: 10

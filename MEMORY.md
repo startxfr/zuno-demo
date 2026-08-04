@@ -343,3 +343,40 @@ Main v3 candidates:
 - end-to-end dataset-to-model MLOps pipelines;
 - dynamic adapter loading;
 - self-service agent onboarding and broader autonomous platform optimization.
+
+## 15. v0 implementation status
+
+The sections above remain the working memory for the full target vision.
+As of the v0 build pass, the following is real, reviewed code rather than
+planning narrative — see README.md's "v0 build status" for a summary:
+
+- Bootstrap: `make precheck`/`prepare`/`configure`/`install`/`check` from
+  exactly one credential (OpenShift API endpoint + cluster-admin token),
+  via ArgoCD + External Secrets Operator + a self-bootstrapping Vault
+  (ADR-0022, ADR-0024).
+- Identity: the `zuno` Keycloak realm with the 11 named personas across all
+  five agents' groups (section 9's agent catalog), real Google IdP broker
+  federation (section 8, ADR-0014), and the policy-intersection data files
+  (`policies/tools/tool-policy.yaml`, `policies/data-classification/classification.yaml`).
+- Data: a from-scratch PostgreSQL-native schema for section 10's SXA
+  domain (`data/sxa/schema/`), synthetic fixtures, and the sales-db MCP
+  server.
+- AI/model layer: local Qwen2.5-7B-Instruct serving, the provider-routing
+  config (section 6), the MCP Gateway, RAG service, and the Tekos LangGraph
+  workflow (`components/agent-runtime`).
+- Agent surface: OKF definitions for all five agents (Tekos `active`, the
+  rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
+  isolation (`gitops/charts/namespaces`) for all five even though only
+  `zuno-tekos` runs workloads.
+- Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
+  (`evaluations/tekos/`, ADR-0027/ADR-0028).
+- ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
+  deploys as a plain `Deployment` instead.
+
+Not yet built even for Tekos: OTel instrumentation exists in
+`agent-runtime` only (`mcp-gateway`/`rag-service` still need it, see
+`ansible/roles/observability/README.md`); the cluster's real apps domain
+must be hand-edited into a few GitOps `Application` manifests before a real
+deploy (`gitops/apps/README.md`'s "Known follow-up"); and everything here
+was built and validated (Helm lint/template, YAML/JSON/Python syntax)
+without a live OpenShift cluster to run it against.

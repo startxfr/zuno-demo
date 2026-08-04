@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sales-db-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: sales-db-mcp
+spec:
+  selector:
+    app.kubernetes.io/name: sales-db-mcp
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

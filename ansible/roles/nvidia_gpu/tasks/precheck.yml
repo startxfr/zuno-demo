@@ -1,4 +1,20 @@
 ---
-- name: "nvidia_gpu | precheck scaffold"
+- name: "nvidia_gpu | verify the NVIDIA GPU Operator is available in the catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: gpu-operator-certified
+  register: _nvidia_gpu_precheck_pkg
+
+- name: "nvidia_gpu | fail if the operator is not published in this cluster's catalog"
+  ansible.builtin.fail:
+    msg: >-
+      gpu-operator-certified was not found in openshift-marketplace. Confirm
+      the certified-operators CatalogSource is enabled and the two L4 GPU
+      worker nodes are labeled/schedulable.
+  when: (_nvidia_gpu_precheck_pkg.resources | default([]) | length) == 0
+
+- name: "nvidia_gpu | precheck summary"
   ansible.builtin.debug:
-    msg: "Precheck contract registered for nvidia_gpu; implementation tasks are pending."
+    msg: "NVIDIA GPU Operator is available in the catalog."

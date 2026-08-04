@@ -1,0 +1,41 @@
+# CloudNativePG Cluster CR. Requires the CloudNativePG operator, installed
+# separately by ansible/roles/postgresql/tasks/prepare.yml (OLM
+# Subscription) — not managed by this chart.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.cluster.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  instances: {{ .Values.cluster.instances }}
+
+  # Stock CNPG operand image + pgvector, built by
+  # gitops/charts/postgresql/image/Dockerfile. See image/README.md for why
+  # this demo uses a custom image rather than CNPG's newer ImageVolume
+  # extension mechanism.
+  imageName: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+  storage:
+    size: {{ .Values.cluster.storageSize }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.cluster.database }}
+      owner: {{ .Values.cluster.owner }}
+      secret:
+        # Vault-backed via the ExternalSecret in templates/externalsecret.yaml
+        # (secret/zuno/postgresql/app, seeded by ansible/roles/vault) — CNPG
+        # expects a Secret with `username`/`password` keys matching `owner`.
+        name: {{ .Values.credentials.secretName }}
+      # Runs against the *application* database (zuno), after initdb and
+      # after the owner role/database are created — this is deliberately
+      # postInitApplicationSQL, not postInitSQL (which runs against the
+      # `postgres` maintenance database and would create the extension in
+      # the wrong place).
+      postInitApplicationSQL:
+        - "CREATE EXTENSION IF NOT EXISTS vector;"
+
+  monitoring:
+    enablePodMonitor: false

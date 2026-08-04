@@ -1,4 +1,29 @@
 ---
-- name: "vault | precheck scaffold"
+- name: "vault | verify cluster API is reachable"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: default
+  register: _vault_precheck_api
+
+- name: "vault | fail if the cluster API is unreachable"
+  ansible.builtin.fail:
+    msg: "Unable to reach the OpenShift API for the vault precheck."
+  when: _vault_precheck_api.resources is not defined
+
+- name: "vault | verify the argocd role has already prepared the Application CRD"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: applications.argoproj.io
+  register: _vault_precheck_argocd_crd
+
+- name: "vault | fail if ArgoCD is not yet installed"
+  ansible.builtin.fail:
+    msg: >-
+      applications.argoproj.io CRD not found. Run `make prepare argocd`
+      before preparing vault — vault is installed as a GitOps Application.
+  when: (_vault_precheck_argocd_crd.resources | default([]) | length) == 0
+
+- name: "vault | precheck summary"
   ansible.builtin.debug:
-    msg: "Precheck contract registered for vault; implementation tasks are pending."
+    msg: "Cluster reachable and ArgoCD is installed; vault can be prepared."

@@ -1,4 +1,17 @@
 ---
-- name: "rag | precheck scaffold"
+- name: "rag | verify the postgresql role's Cluster is ready"
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    namespace: postgresql
+    name: zuno-postgresql
+  register: _rag_precheck_pg
+
+- name: "rag | fail if PostgreSQL is not ready"
+  ansible.builtin.fail:
+    msg: "PostgreSQL cluster zuno-postgresql not found/ready. Run `make prepare postgresql` and `make configure postgresql` first."
+  when: (_rag_precheck_pg.resources | default([]) | length) == 0
+
+- name: "rag | precheck summary"
   ansible.builtin.debug:
-    msg: "Precheck contract registered for rag; implementation tasks are pending."
+    msg: "PostgreSQL is present; the RAG service can be applied."

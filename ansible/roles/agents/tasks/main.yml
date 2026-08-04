@@ -1,4 +1,7 @@
 ---
-- name: Agent installation scaffold
-  ansible.builtin.debug:
-    msg: "Agent platform installation contract registered; implementation tasks are pending."
+# `ansible/playbooks/install.yml` (`make install`) runs only this role —
+# delegate to the same logic `make configure api`/`make configure agents`
+# would use if those scopes existed, so there is exactly one place that
+# knows how to bring the agent surface to its declared state.
+- name: "agents | install: delegate to configure"
+  ansible.builtin.import_tasks: configure.yml

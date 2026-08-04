@@ -1,4 +1,131 @@
 ---
-- name: "vault | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for vault; implementation tasks are pending."
+# Installs Vault via its GitOps Application (gitops/apps/vault), then
+# imperatively initializes and unseals it. This is the one component that
+# cannot depend on Vault for its own bootstrap secret: the unseal key and
+# root token are captured here and stored in a Kubernetes Secret in a
+# locked-down, admin-only namespace. See ADR-0024's "Hardened requirement".
+- name: "vault | apply the Vault GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_app_name: vault
+    gitops_app_wait_retries: 60
+
+- name: "vault | wait for the Vault StatefulSet to exist"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: vault
+    name: vault
+  register: _vault_sts
+  until: (_vault_sts.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "vault | wait for the Vault server pod to be Running (sealed is expected at this point)"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+  until: >-
+    (_vault_pod.resources | default([]) | length) > 0 and
+    (_vault_pod.resources[0].status.phase | default('')) == 'Running'
+  retries: 60
+  delay: 10
+
+- name: "vault | read current seal/init status"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: vault status -format=json
+  register: _vault_status_raw
+  failed_when: false
+  changed_when: false
+
+- name: "vault | parse status (the CLI exits non-zero while sealed; stdout is still valid JSON)"
+  ansible.builtin.set_fact:
+    _vault_status: "{{ _vault_status_raw.stdout | default('{}') | from_json }}"
+
+- name: "vault | ensure the locked-down bootstrap namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-secrets-bootstrap
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "vault | restrict the bootstrap namespace to cluster-admins only"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: zuno-secrets-bootstrap-admin-only
+        namespace: zuno-secrets-bootstrap
+      subjects:
+        - kind: Group
+          name: system:cluster-admins
+          apiGroup: rbac.authorization.k8s.io
+      roleRef:
+        kind: ClusterRole
+        name: admin
+        apiGroup: rbac.authorization.k8s.io
+
+- name: "vault | check for an existing bootstrap credentials secret"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-secrets-bootstrap
+    name: vault-bootstrap-credentials
+  register: _vault_bootstrap_secret
+
+- name: "vault | initialize Vault with a single key share (demo scope; ADR-0112 tracks HA/production hardening for v1)"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: vault operator init -key-shares=1 -key-threshold=1 -format=json
+  register: _vault_init_raw
+  when:
+    - not (_vault_status.initialized | default(false))
+    - (_vault_bootstrap_secret.resources | default([]) | length) == 0
+
+- name: "vault | persist the unseal key and root token to the locked-down bootstrap secret"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: vault-bootstrap-credentials
+        namespace: zuno-secrets-bootstrap
+      type: Opaque
+      stringData:
+        unseal_key: "{{ (_vault_init_raw.stdout | from_json).unseal_keys_b64[0] }}"
+        root_token: "{{ (_vault_init_raw.stdout | from_json).root_token }}"
+  when: _vault_init_raw is defined and _vault_init_raw.stdout is defined
+  no_log: true
+
+- name: "vault | re-read the bootstrap secret (covers the already-initialized branch)"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-secrets-bootstrap
+    name: vault-bootstrap-credentials
+  register: _vault_bootstrap_secret_final
+
+- name: "vault | unseal Vault if sealed"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      vault operator unseal
+      {{ _vault_bootstrap_secret_final.resources[0].data.unseal_key | b64decode }}
+  when: _vault_status.sealed | default(true)
+  no_log: true

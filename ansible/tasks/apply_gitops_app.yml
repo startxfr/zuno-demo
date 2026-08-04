@@ -1,0 +1,39 @@
+---
+# Shared task: apply a single ArgoCD Application manifest for one platform
+# component. Every role's `configure.yml` (and, where relevant, `prepare.yml`)
+# includes this file with `gitops_app_name` set to its own component directory
+# under gitops/apps/. See gitops/apps/README.md for the manifest convention
+# and docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md
+# for the architecture this implements.
+#
+# Applying the Application here is safe even though the root App-of-Apps
+# (gitops/root-app-of-apps.yaml) also recurses over gitops/apps/: both paths
+# converge on the same desired state, and this keeps `make configure <scope>`
+# self-sufficient for a single component without requiring a full sync.
+
+- name: "gitops | validate gitops_app_name is set"
+  ansible.builtin.assert:
+    that:
+      - gitops_app_name is defined
+      - gitops_app_name | length > 0
+    fail_msg: "apply_gitops_app.yml requires 'gitops_app_name' to be set by the including role"
+
+- name: "gitops | apply ArgoCD Application: {{ gitops_app_name }}"
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ zuno_repo_root }}/gitops/apps/{{ gitops_app_name }}/application.yaml"
+
+- name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ gitops_app_name }}"
+  register: _gitops_app_status
+  until: >-
+    (_gitops_app_status.resources | length > 0) and
+    (_gitops_app_status.resources[0].status.sync.status | default('') == 'Synced') and
+    (_gitops_app_status.resources[0].status.health.status | default('') == 'Healthy')
+  retries: "{{ gitops_app_wait_retries | default(30) }}"
+  delay: "{{ gitops_app_wait_delay | default(10) }}"
+  when: gitops_app_wait | default(true) | bool

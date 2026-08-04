@@ -1,0 +1,128 @@
+# Tekos acceptance scenarios (ADR-0027: 20 scenarios per agent;
+# ADR-0028: 75% pass threshold). Run with `python3 run_scenarios.py`
+# (see README.md for required environment variables and personas).
+#
+# `persona` values are the 11 usernames from
+# gitops/charts/keycloak/files/realm-zuno.json (all in the `consultant`
+# group except where a scenario deliberately tests a non-consultant user).
+# `type` selects which handler in run_scenarios.py executes the scenario —
+# each type's exact behavior is documented there, not duplicated here.
+
+scenarios:
+  - id: 1
+    title: Portal loads all five agent tiles
+    type: portal_lists_all_agents
+    persona: chris
+
+  - id: 2
+    title: Unauthenticated request to the portal redirects to login
+    type: portal_requires_login
+
+  - id: 3
+    title: Consultant persona (Chris) can authenticate
+    type: keycloak_login
+    persona: chris
+
+  - id: 4
+    title: Tekos tile is enabled for a consultant-group user
+    type: portal_tile_state
+    persona: chris
+    agent: tekos
+    expect_enabled: true
+
+  - id: 5
+    title: Tekos tile is disabled for a non-consultant user (Fabrice, sales)
+    type: portal_tile_state
+    persona: fabrice
+    agent: tekos
+    expect_enabled: false
+
+  - id: 6
+    title: Placeholder agent tiles (Comage) show "coming soon" for any user
+    type: portal_tile_state
+    persona: fabrice
+    agent: comage
+    expect_enabled: false
+    expect_placeholder: true
+
+  - id: 7
+    title: Basic technical Q&A returns a reply with citations
+    type: chat_basic_qa
+    persona: chris
+    message: "How do I size a KServe InferenceService for a single NVIDIA L4 GPU?"
+
+  - id: 8
+    title: First-token latency is under the 6-second interactive objective
+    type: chat_first_token_latency
+    persona: adil
+    message: "What GPU does the local model run on?"
+    max_seconds: 6
+
+  - id: 9
+    title: Streaming chat emits token events followed by a done event
+    type: chat_streaming_sse
+    persona: maz
+    message: "Summarize the OpenShift AI model serving approach in one sentence."
+
+  - id: 10
+    title: A question needing live data triggers the Confluence tool call
+    type: chat_triggers_tool
+    persona: chris
+    message: "What does the latest internal Confluence doc say about the RHOAI 3.5 EA2 rollout?"
+    expect_tool: search_confluence
+
+  - id: 11
+    title: RAG retrieval contributes at least one citation for a technical question
+    type: rag_retrieval_has_citation
+    query: "OpenShift AI model serving NVIDIA L4"
+
+  - id: 12
+    title: MCP Gateway denies a tool call outside the caller's allowed groups
+    type: mcp_gateway_denied
+    persona: chris
+    tool: get_customer
+    arguments: { customer_id: 1 }
+    expect_status: 403
+
+  - id: 13
+    title: MCP Gateway returns 404 for an unknown tool name
+    type: mcp_gateway_unknown_tool
+    persona: chris
+    tool: does_not_exist
+    expect_status: 404
+
+  - id: 14
+    title: C3-classified requests fail closed when no SaaS provider is eligible
+    type: model_router_fails_closed
+    classification: C3
+
+  - id: 15
+    title: C1-classified requests try the local model first
+    type: model_router_prefers_local
+    classification: C1
+
+  - id: 16
+    title: BFF rejects a chat request with no bearer token
+    type: bff_rejects_missing_jwt
+
+  - id: 17
+    title: BFF rejects a JWT with the wrong audience
+    type: bff_rejects_wrong_audience
+    persona: chris
+
+  - id: 18
+    title: Sales-db tool returns a synthetic customer via the MCP Gateway
+    type: sales_db_tool_via_gateway
+    persona: max
+    tool: get_customer
+    arguments: { customer_id: 1 }
+
+  - id: 19
+    title: Placeholder agent namespaces exist but host no workloads
+    type: namespace_isolation_placeholder_empty
+    namespaces: [zuno-comage, zuno-advantage, zuno-finage, zuno-arkos]
+
+  - id: 20
+    title: Every service's health endpoint returns 200
+    type: health_endpoints_all_ok
+    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service, sales-db-mcp]

@@ -1,0 +1,29 @@
+# Default values for the keycloak chart. Overridden per-environment through
+# gitops/apps/keycloak/application.yaml's spec.source.helm.values (ArgoCD
+# reads this repo's charts, so overriding here means editing that file for
+# the demo environment — see the comment there for what must change per
+# cluster).
+
+# Namespace the Keycloak CR, KeycloakRealmImport and their ExternalSecrets
+# are deployed into. Must stay in sync with the destination namespace on
+# gitops/apps/keycloak/application.yaml.
+namespace: keycloak
+
+# Name of the Keycloak CR (k8s.keycloak.org/v2alpha1, kind: Keycloak).
+# spec.keycloakCRName on the KeycloakRealmImport must reference this.
+keycloakCRName: zuno
+
+# OpenShift apps wildcard domain, e.g. "apps.<cluster>.<base-domain>".
+# Matches the `cluster_base_domain` convention already established in
+# ansible/inventories/example/group_vars/all/main.yml. Every per-agent
+# client redirect URI in files/realm-zuno.json is templated against this
+# value (placeholder token __CLUSTER_BASE_DOMAIN__, substituted in
+# templates/realmimport.yaml) — override this for the real cluster before
+# go-live; the checked-in default only works for the example domain.
+clusterBaseDomain: apps.example.com
+
+# Kubernetes Secret names populated by ExternalSecret resources (see
+# templates/externalsecret-*.yaml) resolving against the vault-backend
+# ClusterSecretStore. Never hardcode values here — see ADR-0024.
+adminSecretName: keycloak-admin
+googleOAuthSecretName: google-oauth-client

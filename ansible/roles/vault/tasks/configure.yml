@@ -1,4 +1,187 @@
 ---
-- name: "vault | configure scaffold"
+# Enables the secrets engine, Kubernetes auth, and the eso-reader
+# role/policy every ExternalSecret in the platform resolves through. Also
+# seeds self-generatable application secrets and reserves empty placeholders
+# for the handful that require an operator to supply real input (the Google
+# OAuth client secret, SMTP credentials) — see ADR-0014 and ADR-0024.
+- name: "vault | read bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-secrets-bootstrap
+    name: vault-bootstrap-credentials
+  register: _vault_creds
+  no_log: true
+
+- name: "vault | fail if the bootstrap credentials are missing"
+  ansible.builtin.fail:
+    msg: "vault-bootstrap-credentials not found — run `make prepare vault` first."
+  when: (_vault_creds.resources | default([]) | length) == 0
+
+- name: "vault | set connection facts"
+  ansible.builtin.set_fact:
+    _vault_root_token: "{{ _vault_creds.resources[0].data.root_token | b64decode }}"
+  no_log: true
+
+- name: "vault | find the running Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+
+- name: "vault | enable the KV v2 secrets engine at secret/ (idempotent)"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "vault secrets enable -path=secret -version=2 kv"
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  register: _vault_kv_enable
+  failed_when: >-
+    _vault_kv_enable.rc != 0 and 'path is already in use' not in (_vault_kv_enable.stderr | default(''))
+  changed_when: _vault_kv_enable.rc == 0
+  no_log: true
+
+- name: "vault | enable the Kubernetes auth method (idempotent)"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "vault auth enable kubernetes"
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  register: _vault_auth_enable
+  failed_when: >-
+    _vault_auth_enable.rc != 0 and 'path is already in use' not in (_vault_auth_enable.stderr | default(''))
+  changed_when: _vault_auth_enable.rc == 0
+  no_log: true
+
+- name: "vault | point the Kubernetes auth method at this cluster's API"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "vault write auth/kubernetes/config kubernetes_host=https://kubernetes.default.svc:443"
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  no_log: true
+
+- name: "vault | write the eso-reader policy (read-only under secret/data/zuno/*)"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "vault policy write eso-reader -"
+    stdin: |
+      path "secret/data/zuno/*" {
+        capabilities = ["read"]
+      }
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  no_log: true
+
+- name: "vault | bind the eso-reader Kubernetes auth role to the external-secrets ServiceAccount"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      vault write auth/kubernetes/role/eso-reader
+      bound_service_account_names=external-secrets
+      bound_service_account_namespaces=external-secrets
+      policies=eso-reader
+      ttl=1h
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  no_log: true
+
+- name: "vault | generate and seed self-generatable application secrets"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      vault kv put secret/zuno/{{ item.key }}
+      username={{ item.value.username }} password={{ item.value.password }}
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  loop: "{{ _vault_generated_secrets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    _vault_generated_secrets:
+      keycloak/admin:
+        username: admin
+        password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+      postgresql/app:
+        username: zuno_app
+        password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+  no_log: true
+
+- name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      vault kv put secret/zuno/keycloak/tekos-frontend
+      client_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  no_log: true
+
+- name: "vault | generate and seed the Tekos frontend session HMAC secret"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      vault kv put secret/zuno/tekos/frontend-session
+      hmac_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  no_log: true
+
+- name: "vault | check whether operator-supplied secrets already exist"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "vault kv get -format=json secret/zuno/{{ item }}"
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  loop:
+    - google-oauth/client
+    - smtp/technical
+  loop_control:
+    label: "{{ item }}"
+  register: _vault_existing_secrets
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "vault | seed an empty placeholder only where no secret exists yet (never overwrite operator-supplied values)"
+  kubernetes.core.k8s_exec:
+    namespace: vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: "vault kv put secret/zuno/{{ item.item }} _placeholder=true"
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  loop: "{{ _vault_existing_secrets.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.rc != 0
+  no_log: true
+
+- name: "vault | operator action required"
   ansible.builtin.debug:
-    msg: "Configuration contract registered for vault; implementation tasks are pending."
+    msg: >-
+      secret/zuno/google-oauth/client and secret/zuno/smtp/technical are
+      placeholders until an operator populates them, e.g.
+      `vault kv put secret/zuno/google-oauth/client client_id=... client_secret=...`.
+      This is the only remaining manual step (ADR-0014's real Google OAuth
+      delegation depends on it) — everything else in this file is unattended.

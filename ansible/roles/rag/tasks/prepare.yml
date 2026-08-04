@@ -1,4 +1,4 @@
 ---
-- name: "rag | prepare scaffold"
+- name: "rag | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "Preparation contract registered for rag; implementation tasks are pending."
+    msg: "rag is applied entirely by tasks/configure.yml — the RAG service Deployment has no operator dependency of its own."

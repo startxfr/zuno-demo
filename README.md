@@ -28,6 +28,16 @@ Zuno Demo is an internal MVP demonstrating a reusable agentic AI platform on Red
 
 Each agent has a dedicated frontend and BFF deployment while consuming shared platform services such as the agent runtime, AI/inference gateway, MCP gateway, RAG services, model serving, identity, secrets, observability, and data services.
 
+## v0 build status
+
+The v0 vertical slice implements **Tekos** end to end (frontend, BFF, Agent
+Runtime with LangGraph orchestration, MCP Gateway, RAG service, sales-db MCP
+tool, real Keycloak login with 11 demo personas across all five agents'
+groups). Comage, Advantage, Finage and Arkos exist as OKF definitions,
+reserved namespaces and access-gated portal tiles, without a running
+workflow — see `platform/architecture/agent-platform-separation.md`. The
+AIAgent CRD/operator (originally v0) is retargeted to v1 — see ADR-0026.
+
 ## Repository principles
 
 - GitHub is the canonical source repository for the demo.
@@ -39,7 +49,14 @@ Each agent has a dedicated frontend and BFF deployment while consuming shared pl
 
 ## Operator workflow
 
+The only manual input for the entire install is the OpenShift API endpoint
+and a cluster-admin token (ADR-0024) — everything else is automated:
+
 ```bash
+export K8S_AUTH_HOST=https://api.mycluster.com:6443
+export K8S_AUTH_API_KEY=<cluster-admin token>
+ansible-galaxy collection install -r ansible/requirements.yml
+
 make precheck
 make precheck keycloak
 make prepare

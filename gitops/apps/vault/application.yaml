@@ -1,0 +1,52 @@
+---
+# Demo-grade Vault: single replica, file storage, no HA/auto-unseal via
+# cloud KMS. Sufficient for a solo demo; production hardening is tracked by
+# ADR-0112 (production-grade backup and recovery, v1).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    chart: vault
+    targetRevision: "0.28.1"
+    helm:
+      values: |
+        server:
+          standalone:
+            enabled: true
+            config: |
+              ui = true
+              listener "tcp" {
+                address = "[::]:8200"
+                tls_disable = true
+              }
+              storage "file" {
+                path = "/vault/data"
+              }
+          dataStorage:
+            enabled: true
+            size: 2Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        ui:
+          enabled: true
+        injector:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false # Vault's seal state is managed imperatively by the vault role; avoid ArgoCD fighting a sealed pod's restart behavior.
+    syncOptions:
+      - CreateNamespace=true

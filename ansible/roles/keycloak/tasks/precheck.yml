@@ -1,4 +1,54 @@
 ---
-- name: "keycloak | precheck scaffold"
+- name: "keycloak | verify cluster API is reachable"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: default
+  register: _keycloak_precheck_api
+
+- name: "keycloak | fail if the cluster API is unreachable"
+  ansible.builtin.fail:
+    msg: >-
+      Unable to reach the OpenShift API. Verify the endpoint and token passed
+      to `make precheck` (KUBECONFIG or K8S_AUTH_HOST/K8S_AUTH_API_KEY).
+  when: _keycloak_precheck_api.resources is not defined
+
+- name: "keycloak | verify the argocd role has already prepared the Application CRD"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: applications.argoproj.io
+  register: _keycloak_precheck_argocd_crd
+
+- name: "keycloak | fail if ArgoCD is not yet installed"
+  ansible.builtin.fail:
+    msg: >-
+      applications.argoproj.io CRD not found. Run `make prepare argocd`
+      before preparing keycloak — the realm/Keycloak-CR instance is
+      installed as a GitOps Application (gitops/apps/keycloak).
+  when: (_keycloak_precheck_argocd_crd.resources | default([]) | length) == 0
+
+    # ASSUMPTION (see README.md): the redhat-operators catalog publishes Red
+    # Hat build of Keycloak under the package name "rhbk-operator". Verify
+    # against `oc get packagemanifest -n openshift-marketplace | grep -i
+    # keycloak` on the target cluster and adjust this task (and prepare.yml)
+    # if the real package name differs.
+- name: "keycloak | verify the Red Hat build of Keycloak operator is available in the catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhbk-operator
+  register: _keycloak_precheck_pkg
+
+- name: "keycloak | fail if the operator is not published in this cluster's catalog"
+  ansible.builtin.fail:
+    msg: >-
+      rhbk-operator was not found in openshift-marketplace. Confirm the
+      redhat-operators CatalogSource is enabled, or that this cluster
+      publishes Red Hat build of Keycloak under a different package name
+      (see the assumption noted in this role's README.md).
+  when: (_keycloak_precheck_pkg.resources | default([]) | length) == 0
+
+- name: "keycloak | precheck summary"
   ansible.builtin.debug:
-    msg: "Precheck contract registered for keycloak; implementation tasks are pending."
+    msg: "Cluster reachable, ArgoCD installed, and rhbk-operator is available in the catalog; keycloak can be prepared."

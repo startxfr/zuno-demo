@@ -1,0 +1,17 @@
+{{- range .Values.namespaces }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: zuno-agent-quota
+  namespace: {{ .name }}
+  labels:
+    zuno.io/agent: {{ .agent }}
+spec:
+  hard:
+    requests.cpu: {{ $.Values.quota.requestsCpu | quote }}
+    requests.memory: {{ $.Values.quota.requestsMemory | quote }}
+    limits.cpu: {{ $.Values.quota.limitsCpu | quote }}
+    limits.memory: {{ $.Values.quota.limitsMemory | quote }}
+    pods: {{ $.Values.quota.pods | quote }}
+---
+{{- end }}

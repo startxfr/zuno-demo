@@ -1,0 +1,38 @@
+# Zuno agent definition for Finage (finance assistant).
+# Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json.
+# v0 scope: status is `placeholder` — this file, the reserved `zuno-finage`
+# namespace and this portal tile are the only things that exist for Finage in
+# v0 (ADR-0007). Task/tool content reflects the intended v1 build from
+# agents/finage/README.md and MEMORY.md section 9.
+apiVersion: okf.zuno.io/v0.2
+kind: Agent
+metadata:
+  name: finage
+  displayName: Finage
+  description: >-
+    Finance assistant. Identifies business ready to invoice and produces
+    monthly invoice reporting, drawing on sales and invoice data.
+  status: placeholder
+spec:
+  tasks:
+    - name: coming-soon
+      description: >-
+        Finage is not yet built for this v0 demo. Planned v1 tasks: identify
+        billable business ("A facturer") and later invoice states; monthly
+        invoicing reporting (revenue, outstanding amounts, delay, forecast).
+        Finage may perform controlled status writes but must never execute
+        financial transactions.
+      allowed_tools: []
+  model:
+    preferred_classification: C2
+    notes: >-
+      Placeholder pending v1 build; C2 anticipated for financial/commercial
+      data handling consistent with policies/data-classification.
+  access:
+    groups:
+      - finance
+  ui:
+    displayName: Finage
+    tileDescription: Billing and invoice reporting assistant — coming soon.
+    color: "#5752D1"
+    icon: calculator

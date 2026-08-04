@@ -1,4 +1,78 @@
 ---
-- name: "keycloak | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for keycloak; implementation tasks are pending."
+# Installs the Keycloak Operator (Red Hat build of Keycloak) via OLM,
+# following the same operator-then-instance split used by
+# ansible/roles/argocd and ansible/roles/external_secrets: the operator is
+# subscribed imperatively here; the actual Keycloak CR + KeycloakRealmImport
+# instance is applied declaratively by configure.yml via the
+# gitops/apps/keycloak GitOps Application (gitops/charts/keycloak).
+- name: "keycloak | ensure the openshift-operators namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: openshift-operators
+        labels:
+          zuno.io/managed-by: ansible
+
+    # ASSUMPTION (see README.md): package name "rhbk-operator", channel
+    # "stable". RHBK's OperatorHub channels are commonly version-qualified
+    # (e.g. "stable-v26") rather than a bare "stable" alias — check
+    # `oc get packagemanifest rhbk-operator -o jsonpath='{.status.channels[*].name}'`
+    # against the target cluster and adjust the channel here if needed.
+- name: "keycloak | subscribe to the Red Hat build of Keycloak operator"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: rhbk-operator
+        namespace: openshift-operators
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        channel: stable
+        name: rhbk-operator
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+        installPlanApproval: Automatic
+
+- name: "keycloak | wait for the Keycloak CRD to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: keycloaks.k8s.keycloak.org
+  register: _keycloak_crd
+  until: (_keycloak_crd.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "keycloak | wait for the KeycloakRealmImport CRD to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: keycloakrealmimports.k8s.keycloak.org
+  register: _keycloak_realmimport_crd
+  until: (_keycloak_realmimport_crd.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+    # ASSUMPTION (see README.md): the CSV's deployment is named
+    # "rhbk-operator-controller-manager" (kubebuilder/operator-sdk scaffold
+    # convention). If the wait below times out, check
+    # `oc get deployment -n openshift-operators` for the real name and
+    # adjust here.
+- name: "keycloak | wait for the operator deployment to be ready"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-operators
+    name: rhbk-operator-controller-manager
+  register: _keycloak_operator_deploy
+  until: >-
+    (_keycloak_operator_deploy.resources | default([]) | length) > 0 and
+    (_keycloak_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 60
+  delay: 10

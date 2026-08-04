@@ -1,3 +1,7 @@
-# Ansible role: models
+# models
 
-This role owns precheck, preparation and/or configuration tasks for the **models** scope. Current files are an implementation scaffold; executable tasks are expanded incrementally as the MVP is built.
+Applies `gitops/apps/models` (`gitops/charts/models`): a KServe
+`ServingRuntime` (vLLM) + `InferenceService` serving Qwen2.5-7B-Instruct on
+the single 24GB L4 (ADR-0019). CONFIG_SCOPE only — no separate prepare
+phase. Depends on `openshift_ai` (`DataScienceCluster` Ready) and
+`nvidia_gpu` (GPU Operator) having run first.

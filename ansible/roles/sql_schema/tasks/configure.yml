@@ -1,4 +1,142 @@
 ---
-- name: "sql_schema | configure scaffold"
-  ansible.builtin.debug:
-    msg: "Configuration contract registered for sql_schema; implementation tasks are pending."
+# Applies the SXA-derived schema + synthetic fixtures (ADR-0016, ADR-0025)
+# directly via a one-shot Job — not a GitOps Application, since there is
+# nothing "declaratively running" about a schema migration once it has run
+# (see gitops/apps/README.md). The sales-db MCP server that reads this
+# schema *is* a standing workload, so it's applied afterward as a proper
+# GitOps Application.
+- name: "sql_schema | build the SQL ConfigMap from data/sxa/"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: zuno-sxa-schema
+        namespace: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+      data:
+        001_init.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/schema/001_init.sql') }}"
+        002_pgvector.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/schema/002_pgvector.sql') }}"
+        seed.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/fixtures/seed.sql') }}"
+
+- name: "sql_schema | ensure the zuno-platform namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "sql_schema | register the PostgreSQL credentials ExternalSecret in zuno-platform"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: sql-schema-postgresql-credentials
+        namespace: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: vault-backend
+          kind: ClusterSecretStore
+        target:
+          name: sql-schema-postgresql-credentials
+          creationPolicy: Owner
+        data:
+          - secretKey: username
+            remoteRef:
+              key: zuno/postgresql/app
+              property: username
+          - secretKey: password
+            remoteRef:
+              key: zuno/postgresql/app
+              property: password
+
+- name: "sql_schema | delete any previous schema-apply Job (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: zuno-sxa-schema-apply
+    namespace: zuno-platform
+    wait: true
+
+- name: "sql_schema | run the schema + fixtures apply Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: zuno-sxa-schema-apply
+        namespace: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        backoffLimit: 2
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: psql
+                image: postgres:16-bookworm
+                command:
+                  - psql
+                env:
+                  - name: PGHOST
+                    value: postgresql.postgresql.svc.cluster.local
+                  - name: PGPORT
+                    value: "5432"
+                  - name: PGDATABASE
+                    value: zuno
+                  - name: PGUSER
+                    valueFrom:
+                      secretKeyRef:
+                        name: sql-schema-postgresql-credentials
+                        key: username
+                  - name: PGPASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: sql-schema-postgresql-credentials
+                        key: password
+                args:
+                  - -v
+                  - ON_ERROR_STOP=1
+                  - -f
+                  - /sql/001_init.sql
+                  - -f
+                  - /sql/002_pgvector.sql
+                  - -f
+                  - /sql/seed.sql
+                volumeMounts:
+                  - name: sql
+                    mountPath: /sql
+            volumes:
+              - name: sql
+                configMap:
+                  name: zuno-sxa-schema
+
+- name: "sql_schema | wait for the apply Job to complete"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-platform
+    name: zuno-sxa-schema-apply
+  register: _sql_schema_job
+  until: (_sql_schema_job.resources[0].status.succeeded | default(0)) > 0
+  retries: 30
+  delay: 10
+
+- name: "sql_schema | apply the sales-db MCP server GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_app_name: mcp-sales-db

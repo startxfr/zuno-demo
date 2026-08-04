@@ -7,8 +7,10 @@
       - openshift_ai
       - datascience
       - nvidia_gpu
-      - keycloak
+      - argocd
       - vault
+      - external_secrets
+      - keycloak
       - postgresql
       - observability
       - smtp

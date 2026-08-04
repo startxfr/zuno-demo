@@ -1,3 +1,6 @@
-# Ansible role: openshift_ai
+# openshift_ai
 
-This role owns precheck, preparation and/or configuration tasks for the **openshift_ai** scope. Current files are an implementation scaffold; executable tasks are expanded incrementally as the MVP is built.
+Installs the Red Hat OpenShift AI operator (OLM `Subscription`, ADR-0002's
+3.5 EA2 channel) and applies the `DataScienceCluster` with `kserve` (model
+serving) enabled. PREP_COMPONENT only — no CONFIG_SCOPE. The `datascience`
+role owns the project namespace scaffolding that layers on top of this.

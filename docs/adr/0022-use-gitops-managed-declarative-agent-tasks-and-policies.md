@@ -13,6 +13,8 @@ Zuno Demo requires an explicit, reviewable architecture decision so implementati
 
 Keep tasks, deterministic tools, prompts, model policy and authorization policy reviewable in Git.
 
+**Bootstrap architecture (added 2026-08-04):** Ansible (ADR-0003) is a thin bootstrapper, not the configuration engine. `make prepare` installs the OpenShift GitOps (ArgoCD) operator and applies a single root `Application` (App-of-Apps) from `gitops/root-app-of-apps.yaml`, pointing at `gitops/apps/`. Every subsequent Ansible role's `configure` task applies one child `Application` manifest under `gitops/apps/<component>/application.yaml` rather than performing configuration inline — ArgoCD then reconciles the referenced Helm chart or Kustomize overlay under `gitops/charts/<component>/`. This makes the entire platform installable from exactly one manual credential (see ADR-0024) and keeps every configured component's desired state in Git, satisfying this ADR's intent literally rather than only for agent tasks/policies.
+
 ## Alternatives considered
 
 Alternatives remain valid when documented in implementation discussions, but this ADR records the selected direction for the stated target release.

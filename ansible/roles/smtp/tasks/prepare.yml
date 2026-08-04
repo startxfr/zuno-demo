@@ -1,4 +1,52 @@
 ---
-- name: "smtp | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for smtp; implementation tasks are pending."
+# smtp is a PREP_COMPONENT (reachable via `make prepare smtp`), not a
+# CONFIG_SCOPE — there is no SMTP server to install, only the technical
+# mail identity's credential to expose via ExternalSecret, seeded as an
+# empty placeholder at secret/zuno/smtp/technical by
+# ansible/roles/vault/tasks/configure.yml. An operator must populate it
+# (`vault kv put secret/zuno/smtp/technical host=... username=... password=...`)
+# before whichever service sends the Comage weekly report (out of scope
+# here) can actually send mail.
+- name: "smtp | ensure the zuno-platform namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "smtp | register the technical mail identity ExternalSecret"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: smtp-technical-credentials
+        namespace: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: vault-backend
+          kind: ClusterSecretStore
+        target:
+          name: smtp-technical-credentials
+          creationPolicy: Owner
+        data:
+          - secretKey: host
+            remoteRef:
+              key: zuno/smtp/technical
+              property: host
+          - secretKey: username
+            remoteRef:
+              key: zuno/smtp/technical
+              property: username
+          - secretKey: password
+            remoteRef:
+              key: zuno/smtp/technical
+              property: password

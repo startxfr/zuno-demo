@@ -1,4 +1,8 @@
 ---
 # Copy/adapt into the demo inventory. Keep secrets in Vault, never in Git.
+# The cluster API endpoint and token are NOT set here — export
+# K8S_AUTH_HOST and K8S_AUTH_API_KEY before running `make`, per `make help`.
 cluster_api_url: https://api.example.com:6443
 cluster_base_domain: apps.example.com
+zuno_environment: example
+zuno_repo_root: "{{ playbook_dir }}/../.."

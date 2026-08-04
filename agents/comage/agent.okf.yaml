@@ -1,0 +1,41 @@
+# Zuno agent definition for Comage (sales assistant).
+# Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json.
+# v0 scope: status is `placeholder` — this file, the reserved `zuno-comage`
+# namespace and this portal tile are the only things that exist for Comage in
+# v0. No Agent Runtime task graph, FE or BFF is deployed (ADR-0007,
+# platform/architecture/agent-platform-separation.md). Task/tool content
+# below reflects the intended v1 build from agents/comage/README.md and
+# MEMORY.md section 9, kept here so onboarding Comage later is primarily a
+# `status: active` flip plus real task implementation, not a redesign.
+apiVersion: okf.zuno.io/v0.2
+kind: Agent
+metadata:
+  name: comage
+  displayName: Comage
+  description: >-
+    Sales assistant. Prioritizes follow-ups, surfaces deals still missing a
+    client purchase order, and produces a weekly sales synthesis, drawing on
+    sales data and the user's own Gmail mailbox.
+  status: placeholder
+spec:
+  tasks:
+    - name: coming-soon
+      description: >-
+        Comage is not yet built for this v0 demo. Planned v1 tasks: identify
+        who should be followed up (using deal age, quote date, last email and
+        urgency); list current deals without a received client PO; generate a
+        weekly sales synthesis (schedulable via the technical SMTP identity).
+      allowed_tools: []
+  model:
+    preferred_classification: C2
+    notes: >-
+      Placeholder pending v1 build; C2 anticipated because Gmail content
+      requires context filtering rather than unrestricted SaaS use.
+  access:
+    groups:
+      - sales
+  ui:
+    displayName: Comage
+    tileDescription: Sales follow-up and pipeline assistant — coming soon.
+    color: "#F0AB00"
+    icon: handshake

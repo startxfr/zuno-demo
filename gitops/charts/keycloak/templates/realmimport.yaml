@@ -1,0 +1,25 @@
+# Imports the `zuno` realm (groups, users, per-agent OIDC clients, Google
+# IdP broker) via the Keycloak Operator's KeycloakRealmImport CRD
+# (k8s.keycloak.org/v2alpha1). The realm is authored as plain JSON in
+# files/realm-zuno.json (a real Keycloak realm export shape) and embedded
+# inline below — the CRD's spec.realm field takes a full
+# RealmRepresentation object, there is no ConfigMap/file reference option in
+# this CRD version, so "inline" is the only supported delivery mechanism.
+#
+# __CLUSTER_BASE_DOMAIN__ in the source JSON is a plain string placeholder
+# (not Keycloak syntax) substituted here with .Values.clusterBaseDomain
+# before parsing, so every per-agent client's redirectUris/webOrigins/
+# rootUrl resolve to the real cluster's apps domain without hand-editing the
+# JSON per environment.
+{{- $realmRaw := .Files.Get "files/realm-zuno.json" | replace "__CLUSTER_BASE_DOMAIN__" .Values.clusterBaseDomain }}
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: zuno-realm
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  keycloakCRName: {{ .Values.keycloakCRName }}
+  realm:
+{{ $realmRaw | fromJson | toYaml | indent 4 }}

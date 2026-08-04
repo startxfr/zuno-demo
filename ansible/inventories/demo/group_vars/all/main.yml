@@ -2,3 +2,16 @@
 # Non-secret demo defaults belong here. Secrets must be obtained from Vault or
 # injected through an approved runtime mechanism.
 zuno_environment: demo
+
+# Repo root, resolved relative to a playbook running from ansible/playbooks/.
+# Used by ansible/tasks/apply_gitops_app.yml and the vault role to locate
+# gitops/ manifests without hardcoding an absolute path.
+zuno_repo_root: "{{ playbook_dir }}/../.."
+
+# Used only by ansible/roles/agents/tasks/check.yml's smoke test. The
+# authoritative value each Application actually deploys with lives in
+# gitops/apps/{keycloak,api}/application.yaml's embedded Helm values (ArgoCD
+# renders those independently of Ansible) — see gitops/apps/README.md
+# "Known follow-up" note. Keep these three in sync by hand until that's
+# templated from a single source.
+cluster_base_domain: apps.example.com

@@ -1,4 +1,11 @@
 ---
-- name: "observability | configure scaffold"
+# No configure phase: the Collector applied in prepare.yml is the whole of
+# what "configuring" observability infrastructure means for this demo.
+# Application-level instrumentation (what gets sent to it) lives in each
+# service's own code — see components/agent-runtime/app/telemetry.py and
+# README.md's "Observability" section for the pattern other services
+# (mcp-gateway, rag-service) should adopt. observability is a
+# PREP_COMPONENT only, not a CONFIG_SCOPE.
+- name: "observability | nothing to configure beyond the Collector"
   ansible.builtin.debug:
-    msg: "Configuration contract registered for observability; implementation tasks are pending."
+    msg: "observability has no configure phase — see tasks/prepare.yml."

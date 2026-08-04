@@ -1,0 +1,19 @@
+---
+- name: "external_secrets | verify the External Secrets Operator is available in the catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: external-secrets-operator
+  register: _eso_precheck_pkg
+
+- name: "external_secrets | fail if the operator is not published in this cluster's catalog"
+  ansible.builtin.fail:
+    msg: >-
+      external-secrets-operator was not found in openshift-marketplace.
+      Confirm the redhat-operators CatalogSource is enabled.
+  when: (_eso_precheck_pkg.resources | default([]) | length) == 0
+
+- name: "external_secrets | precheck summary"
+  ansible.builtin.debug:
+    msg: "External Secrets Operator is available in the catalog."

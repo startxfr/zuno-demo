@@ -1,0 +1,39 @@
+# Zuno agent definition for Advantage (sales administration assistant).
+# Conforms to platform/okf/schema/zuno-okf-v0.2.schema.json.
+# v0 scope: status is `placeholder` — this file, the reserved `zuno-advantage`
+# namespace and this portal tile are the only things that exist for Advantage
+# in v0 (ADR-0007). Task/tool content reflects the intended v1 build from
+# agents/advantage/README.md and MEMORY.md section 9.
+apiVersion: okf.zuno.io/v0.2
+kind: Agent
+metadata:
+  name: advantage
+  displayName: Advantage
+  description: >-
+    Sales administration assistant. Surfaces new business whose client
+    purchase order has just been received and produces monthly in-progress
+    sales reporting, drawing on the shared sales data.
+  status: placeholder
+spec:
+  tasks:
+    - name: coming-soon
+      description: >-
+        Advantage is not yet built for this v0 demo. Planned v1 tasks:
+        identify new business whose client PO was received in the last three
+        rolling days; monthly reporting of in-progress sales (sales and
+        margin by state, customer and technology, text/table output with PDF
+        delivery). Advantage may perform controlled sales status writes.
+      allowed_tools: []
+  model:
+    preferred_classification: C2
+    notes: >-
+      Placeholder pending v1 build; C2 anticipated for commercial sales-data
+      handling consistent with policies/data-classification.
+  access:
+    groups:
+      - adv
+  ui:
+    displayName: Advantage
+    tileDescription: Sales administration and PO tracking — coming soon.
+    color: "#4CB140"
+    icon: clipboard-check

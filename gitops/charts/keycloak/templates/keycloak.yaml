@@ -1,0 +1,77 @@
+# The Keycloak CR (Keycloak Operator / Red Hat build of Keycloak,
+# k8s.keycloak.org/v2alpha1). Demo-grade: single instance, HTTP behind an
+# OpenShift edge-terminated Route (mirrors the vault chart's
+# tls_disable-at-the-pod / TLS-at-the-edge pattern) rather than a dedicated
+# serving certificate. ADR-0112 tracks production HA/backup hardening for
+# v1; this instance is sufficient for the v0 demo's ~50-user scale (see
+# MEMORY.md section 2).
+#
+# Database: spec.db is intentionally omitted. The Keycloak Operator falls
+# back to its bundled dev database when no external db is configured, which
+# is acceptable for this demo (single Keycloak instance, no HA requirement)
+# but is NOT durable across a database pod loss. Wiring this to the shared
+# PostgreSQL instance (ADR-0015, owned by another track's `postgresql` role)
+# is a documented follow-up once that service name/credentials contract
+# exists — track this alongside ADR-0112.
+#
+# Secret injection for the Google OAuth client (ADR-0014): the Keycloak
+# Operator's KeycloakRealmImport CRD has no native secretKeyRef-style
+# substitution for arbitrary IdentityProviderRepresentation fields (unlike
+# spec.db's username/password, which the CRD does support as secret
+# references). Instead this uses Keycloak's own built-in "vault" SPI in env
+# mode: `${vault.<key>}` placeholders in the realm JSON
+# (files/realm-zuno.json's identityProviders[0].config.clientId/
+# clientSecret) resolve at runtime to the environment variable
+# `KC_VAULT_<KEY-UPPERCASED-WITH-NON-ALPHANUMERICS-AS-UNDERSCORE>` — see
+# https://www.keycloak.org/server/vault (env provider). We enable it with
+# KC_VAULT=env below and populate KC_VAULT_GOOGLE_CLIENT_ID /
+# KC_VAULT_GOOGLE_CLIENT_SECRET from the ExternalSecret-backed
+# google-oauth-client Secret. This is the documented, supported Keycloak
+# mechanism for keeping secrets out of a realm import file — ASSUMPTION:
+# the exact env-var-naming transform should be re-verified against the
+# specific RHBK version the cluster installs (documented in this role's
+# README.md), since this could not be validated against a live cluster.
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: {{ .Values.keycloakCRName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  instances: 1
+  hostname:
+    hostname: "keycloak.{{ .Values.clusterBaseDomain }}"
+  http:
+    httpEnabled: true
+  ingress:
+    enabled: true
+  bootstrapAdmin:
+    user:
+      secret: {{ .Values.adminSecretName }}
+  unsupported:
+    podTemplate:
+      spec:
+        containers:
+          - name: keycloak
+            env:
+              - name: KC_VAULT
+                value: env
+              - name: KC_VAULT_GOOGLE_CLIENT_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Values.googleOAuthSecretName }}
+                    key: client_id
+                    optional: true
+              - name: KC_VAULT_GOOGLE_CLIENT_SECRET
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Values.googleOAuthSecretName }}
+                    key: client_secret
+                    optional: true
+              - name: KC_VAULT_TEKOS_FRONTEND_CLIENT_SECRET
+                valueFrom:
+                  secretKeyRef:
+                    name: tekos-frontend-client-secret
+                    key: client_secret
+                    optional: true

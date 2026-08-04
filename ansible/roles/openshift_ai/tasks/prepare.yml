@@ -1,4 +1,90 @@
 ---
-- name: "openshift_ai | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for openshift_ai; implementation tasks are pending."
+- name: "openshift_ai | ensure the redhat-ods-operator namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: redhat-ods-operator
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "openshift_ai | ensure the operator group exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1
+      kind: OperatorGroup
+      metadata:
+        name: rhods-operator-group
+        namespace: redhat-ods-operator
+      spec: {}
+
+- name: "openshift_ai | subscribe to the Red Hat OpenShift AI operator (3.5 EA2 channel)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: rhods-operator
+        namespace: redhat-ods-operator
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        # ASSUMPTION: exact EA2 channel name not verified against a live
+        # catalog — confirm with `oc get packagemanifest rhods-operator -o
+        # jsonpath='{.status.channels[*].name}'` before a real run and
+        # adjust if it differs (ADR-0002 accepts EA2 pre-GA constraints).
+        channel: eus-3.5
+        name: rhods-operator
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+        installPlanApproval: Automatic
+
+- name: "openshift_ai | wait for the DataScienceCluster CRD to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: datascienceclusters.datasciencecluster.opendatahub.io
+  register: _openshift_ai_dsc_crd
+  until: (_openshift_ai_dsc_crd.resources | default([]) | length) > 0
+  retries: 40
+  delay: 15
+
+- name: "openshift_ai | apply the DataScienceCluster with kserve enabled"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: datasciencecluster.opendatahub.io/v1
+      kind: DataScienceCluster
+      metadata:
+        name: zuno-dsc
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        components:
+          kserve:
+            managementState: Managed
+            serving:
+              managementState: Managed
+              name: knative-serving
+          workbenches:
+            managementState: Removed
+          dashboard:
+            managementState: Managed
+          modelmeshserving:
+            managementState: Removed
+
+- name: "openshift_ai | wait for the DataScienceCluster to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: datasciencecluster.opendatahub.io/v1
+    kind: DataScienceCluster
+    name: zuno-dsc
+  register: _openshift_ai_dsc
+  until: >-
+    (_openshift_ai_dsc.resources | default([]) | length) > 0 and
+    (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
+  retries: 60
+  delay: 20

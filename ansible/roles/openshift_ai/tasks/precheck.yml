@@ -1,4 +1,20 @@
 ---
-- name: "openshift_ai | precheck scaffold"
+- name: "openshift_ai | verify the Red Hat OpenShift AI operator is available in the catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhods-operator
+  register: _openshift_ai_precheck_pkg
+
+- name: "openshift_ai | fail if the operator is not published in this cluster's catalog"
+  ansible.builtin.fail:
+    msg: >-
+      rhods-operator was not found in openshift-marketplace. Confirm the
+      redhat-operators CatalogSource is enabled and this cluster has access
+      to the OpenShift AI 3.5 EA2 channel (ADR-0002).
+  when: (_openshift_ai_precheck_pkg.resources | default([]) | length) == 0
+
+- name: "openshift_ai | precheck summary"
   ansible.builtin.debug:
-    msg: "Precheck contract registered for openshift_ai; implementation tasks are pending."
+    msg: "Red Hat OpenShift AI operator is available in the catalog."

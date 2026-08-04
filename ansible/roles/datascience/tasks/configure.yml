@@ -1,4 +1,19 @@
 ---
-- name: "datascience | configure scaffold"
-  ansible.builtin.debug:
-    msg: "Configuration contract registered for datascience; implementation tasks are pending."
+# Caps GPU consumption in zuno-datascience at 1 — this demo has exactly one
+# 24GB L4 budgeted for the single local model (gitops/charts/models);
+# without this a future second InferenceService could silently starve it.
+- name: "datascience | apply a GPU-capped ResourceQuota"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: zuno-datascience-gpu-cap
+        namespace: zuno-datascience
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        hard:
+          requests.nvidia.com/gpu: "1"
+          limits.nvidia.com/gpu: "1"

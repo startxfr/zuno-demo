@@ -1,0 +1,29 @@
+# Namespace matches components/mcp-gateway's salesDbMcpUrl assumption:
+# http://sales-db-mcp.zuno-platform.svc:8000 (gitops/charts/mcp-gateway/values.yaml).
+namespace: zuno-platform
+
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-platform/mcp-sales-db
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+db:
+  host: postgresql.postgresql.svc.cluster.local
+  port: "5432"
+  database: zuno
+
+credentials:
+  vaultPath: zuno/postgresql/app
+  secretName: sales-db-postgresql-credentials
+  secretStoreName: vault-backend
+  refreshInterval: 1h

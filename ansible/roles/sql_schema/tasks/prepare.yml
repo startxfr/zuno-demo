@@ -1,4 +1,4 @@
 ---
-- name: "sql_schema | prepare scaffold"
+- name: "sql_schema | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "Preparation contract registered for sql_schema; implementation tasks are pending."
+    msg: "sql_schema is applied entirely by tasks/configure.yml."

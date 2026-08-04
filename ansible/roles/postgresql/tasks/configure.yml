@@ -1,4 +1,28 @@
 ---
-- name: "postgresql | configure scaffold"
+# Applies the PostgreSQL GitOps Application (gitops/apps/postgresql), which
+# renders the CNPG Cluster CR and its ExternalSecret via the local chart at
+# gitops/charts/postgresql, then waits for CloudNativePG to report the
+# cluster healthy. See gitops/charts/postgresql/image/README.md for how
+# pgvector is made available to this cluster.
+- name: "postgresql | apply the PostgreSQL GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_app_name: postgresql
+    gitops_app_wait_retries: 60
+
+- name: "postgresql | wait for the zuno-postgresql Cluster to report a healthy phase"
+  kubernetes.core.k8s_info:
+    api_version: postgresql.cnpg.io/v1
+    kind: Cluster
+    namespace: postgresql
+    name: zuno-postgresql
+  register: _postgresql_cluster
+  until: >-
+    (_postgresql_cluster.resources | default([]) | length) > 0 and
+    (_postgresql_cluster.resources[0].status.phase | default('')) == 'Cluster in healthy state'
+  retries: 60
+  delay: 10
+
+- name: "postgresql | configure summary"
   ansible.builtin.debug:
-    msg: "Configuration contract registered for postgresql; implementation tasks are pending."
+    msg: "zuno-postgresql Cluster is healthy in the postgresql namespace (1 instance, demo scope — see ADR-0101 for v1 HA)."

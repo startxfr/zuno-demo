@@ -21,7 +21,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md) | v0 | Accepted | Use PostgreSQL and pgvector as the persistent data platform |
 | [ADR-0016](0016-migrate-the-legacy-sxa-schema-to-postgresql.md) | v0 | Accepted | Migrate the legacy SXA schema to PostgreSQL |
 | [ADR-0017](0017-access-sales-data-through-controlled-mcp-tools.md) | v0 | Accepted | Access sales data through controlled MCP tools |
-| [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Proposed | Use OGX with LangChain and LangGraph for agentic workflows |
+| [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Accepted | Use OGX with LangChain and LangGraph for agentic workflows |
 | [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md) | v0 | Accepted | Use OpenShift AI model serving for local inference |
 | [ADR-0020](0020-support-both-local-and-external-llm-providers.md) | v0 | Accepted | Support both local and external LLM providers |
 | [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md) | v0 | Accepted | Route models according to C1 C2 C3 classification |
@@ -29,7 +29,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Accepted | Use a namespace-per-agent isolation model |
 | [ADR-0024](0024-use-vault-for-application-secrets.md) | v0 | Accepted | Use Vault for application secrets |
 | [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md) | v0 | Accepted | Keep sensitive and real commercial data outside the public repository |
-| [ADR-0026](0026-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0 | Accepted | Provide an AIAgent Kubernetes CRD and operator |
+| [ADR-0026](0026-provide-an-aiagent-kubernetes-crd-and-operator.md) | v1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) | v0 | Accepted | Evaluate every agent with twenty acceptance scenarios |
 | [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md) | v0 | Accepted | Require a seventy-five percent evaluation threshold |
 | [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md) | v0 | Accepted | Instrument model usage costs and distributed traces |

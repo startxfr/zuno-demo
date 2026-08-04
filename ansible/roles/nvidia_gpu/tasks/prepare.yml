@@ -1,4 +1,82 @@
 ---
-- name: "nvidia_gpu | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for nvidia_gpu; implementation tasks are pending."
+- name: "nvidia_gpu | ensure the nvidia-gpu-operator namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: nvidia-gpu-operator
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "nvidia_gpu | ensure the operator group exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1
+      kind: OperatorGroup
+      metadata:
+        name: nvidia-gpu-operator-group
+        namespace: nvidia-gpu-operator
+      spec:
+        targetNamespaces:
+          - nvidia-gpu-operator
+
+- name: "nvidia_gpu | subscribe to the NVIDIA GPU Operator"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: gpu-operator-certified
+        namespace: nvidia-gpu-operator
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        channel: stable
+        name: gpu-operator-certified
+        source: certified-operators
+        sourceNamespace: openshift-marketplace
+        installPlanApproval: Automatic
+
+- name: "nvidia_gpu | wait for the ClusterPolicy CRD to be established"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: clusterpolicies.nvidia.com
+  register: _nvidia_gpu_crd
+  until: (_nvidia_gpu_crd.resources | default([]) | length) > 0
+  retries: 30
+  delay: 15
+
+- name: "nvidia_gpu | apply the default ClusterPolicy"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: nvidia.com/v1
+      kind: ClusterPolicy
+      metadata:
+        name: gpu-cluster-policy
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        operator:
+          defaultRuntime: crio
+        driver:
+          enabled: true
+        toolkit:
+          enabled: true
+        devicePlugin:
+          enabled: true
+
+- name: "nvidia_gpu | wait for the ClusterPolicy to report ready"
+  kubernetes.core.k8s_info:
+    api_version: nvidia.com/v1
+    kind: ClusterPolicy
+    name: gpu-cluster-policy
+  register: _nvidia_gpu_policy
+  until: (_nvidia_gpu_policy.resources[0].status.state | default('')) == 'ready'
+  retries: 60
+  delay: 20

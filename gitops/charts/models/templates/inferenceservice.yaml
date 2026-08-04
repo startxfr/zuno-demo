@@ -1,0 +1,23 @@
+# KServe pulls the model weights from Hugging Face at pod start via the
+# storageUri's `hf://` scheme (RHOAI's supported storage initializer) —
+# demo scope, no offline/mirrored model cache. First pull is slow (~15GB);
+# this is the dominant contributor to first-token latency on a cold start,
+# separate from the steady-state <6s objective (README.md).
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ .Values.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  predictor:
+    minReplicas: {{ .Values.minReplicas }}
+    maxReplicas: {{ .Values.maxReplicas }}
+    model:
+      modelFormat:
+        name: vLLM
+      runtime: {{ .Values.servingRuntimeName }}
+      storageUri: "hf://{{ .Values.modelId }}"
+      resources:
+        {{- toYaml .Values.resources | nindent 8 }}

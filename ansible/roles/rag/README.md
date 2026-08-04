@@ -1,3 +1,6 @@
-# Ansible role: rag
+# rag
 
-This role owns precheck, preparation and/or configuration tasks for the **rag** scope. Current files are an implementation scaffold; executable tasks are expanded incrementally as the MVP is built.
+Applies `gitops/apps/rag` (`gitops/charts/rag-service`): pgvector + hybrid
+search over the `document_embeddings` table (`components/rag-service`).
+CONFIG_SCOPE only — no separate prepare phase. Depends on `postgresql`
+(and `sql_schema`, for the table itself) having run first.

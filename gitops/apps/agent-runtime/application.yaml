@@ -1,0 +1,26 @@
+---
+# Shared Agent Runtime (ADR-0009, ADR-0018 LangGraph orchestration) — see
+# gitops/charts/agent-runtime and components/agent-runtime. Applied by the
+# `llm` Ansible role's configure.yml alongside the provider-routing config
+# (platform/ai-gateway/), since both belong to the AI/model layer track;
+# see ansible/roles/llm/README.md for that judgment call.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-runtime
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/agent-runtime
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

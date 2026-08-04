@@ -1,0 +1,29 @@
+# Rendered by ArgoCD (Kustomize is auto-detected via this file) as the
+# `llm` GitOps Application — see gitops/apps/llm/application.yaml. Deploys:
+#   1. the `zuno-provider-routing` ConfigMap, generated directly from
+#      provider-routing.yaml in this directory (single source of truth,
+#      no hand-copied duplicate);
+#   2. one ExternalSecret per external provider, resolving
+#      secret/zuno/providers/<name> from the vault-backend
+#      ClusterSecretStore (ADR-0024) into a same-named Kubernetes Secret
+#      consumed by components/agent-runtime's Deployment env (see
+#      gitops/charts/agent-runtime).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: zuno-platform
+
+configMapGenerator:
+  - name: zuno-provider-routing
+    files:
+      - provider-routing.yaml
+    options:
+      disableNameSuffixHash: true
+      labels:
+        zuno.io/managed-by: argocd
+
+resources:
+  - externalsecret-openai.yaml
+  - externalsecret-gemini.yaml
+  - externalsecret-anthropic.yaml
+  - externalsecret-mistral.yaml

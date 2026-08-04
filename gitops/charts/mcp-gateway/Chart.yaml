@@ -1,0 +1,10 @@
+apiVersion: v2
+name: mcp-gateway
+description: >-
+  Zuno central MCP Gateway (ADR-0010): authorizes and proxies every MCP
+  tool call behind the ADR-0011 policy intersection before reaching a
+  downstream MCP server. Image built from components/mcp-gateway. See
+  docs/adr/0010, 0011.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

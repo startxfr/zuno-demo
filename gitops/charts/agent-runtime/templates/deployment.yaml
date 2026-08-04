@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-runtime
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: agent-runtime
+    zuno.io/managed-by: argocd
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-runtime
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-runtime
+    spec:
+      containers:
+        - name: agent-runtime
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KEYCLOAK_ISSUER
+              value: {{ .Values.keycloakIssuer | quote }}
+            - name: RAG_SERVICE_URL
+              value: {{ .Values.ragServiceUrl | quote }}
+            - name: MCP_GATEWAY_URL
+              value: {{ .Values.mcpGatewayUrl | quote }}
+            - name: LOCAL_MODEL_ENDPOINT
+              value: {{ .Values.localModelEndpoint | quote }}
+            - name: LOCAL_MODEL_NAME
+              value: {{ .Values.localModelName | quote }}
+            - name: PROVIDER_ROUTING_PATH
+              value: /app/config/provider-routing.yaml
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.providerSecrets.openai }}
+                  key: api_key
+                  optional: true
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.providerSecrets.gemini }}
+                  key: api_key
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.providerSecrets.anthropic }}
+                  key: api_key
+                  optional: true
+            - name: MISTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.providerSecrets.mistral }}
+                  key: api_key
+                  optional: true
+          volumeMounts:
+            - name: provider-routing
+              mountPath: /app/config
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: provider-routing
+          configMap:
+            name: {{ .Values.providerRoutingConfigMap }}

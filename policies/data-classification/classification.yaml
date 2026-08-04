@@ -1,0 +1,49 @@
+# Policy: data-classification — C1/C2/C3 levels and domain mapping (ADR-0021).
+#
+# Consumed by the AI/Inference Gateway's model-routing logic (owned by
+# another track) to decide which model destinations a given request may use.
+# This file only DEFINES the levels and maps example data domains to a
+# level; the routing decision logic itself lives elsewhere. Keep this file
+# flat and machine-readable — no prose fields beyond `description`.
+#
+# Rule of thumb (ADR-0021): "Allow SaaS for C1, restricted SaaS for C2 and
+# local-only inference for C3." If no destination satisfies a request's
+# classification, the request must fail rather than violate policy
+# (MEMORY.md section 6) — there is no silent downgrade.
+
+levels:
+  C1:
+    name: public-or-internal-low-risk
+    description: >-
+      Public or low-risk internal content. Safe to route through any
+      approved model provider.
+    external_saas: allowed
+    routable_providers: any
+    leaves_cluster: true
+
+  C2:
+    name: business-sensitive
+    description: >-
+      Business-sensitive internal content (customer, sales, partner data).
+      May be routed to an approved SaaS provider only, with context
+      filtering and policy validation applied before the call.
+    external_saas: restricted
+    routable_providers: approved-saas-only
+    leaves_cluster: true
+
+  C3:
+    name: local-model-only
+    description: >-
+      Highly sensitive content (financial, HR, sovereign/nominative data).
+      Must never leave the cluster; local inference only.
+    external_saas: forbidden
+    routable_providers: local-only
+    leaves_cluster: false
+
+# Example data-domain -> classification mapping. Extend as new domains are
+# identified; every domain must resolve to one of the levels above.
+data_domains:
+  technical-docs: C1
+  sales-data: C2
+  financial-data: C3
+  hr-data: C3

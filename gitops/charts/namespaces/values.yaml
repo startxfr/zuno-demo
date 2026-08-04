@@ -1,0 +1,31 @@
+# One entry per agent instance (ADR-0007). `status: active` namespaces host
+# real workloads (only zuno-tekos in v0); `status: placeholder` namespaces
+# are created and labeled but stay empty/reserved — see
+# platform/architecture/agent-platform-separation.md and this chart's
+# README.md.
+namespaces:
+  - name: zuno-comage
+    agent: comage
+    status: placeholder
+  - name: zuno-tekos
+    agent: tekos
+    status: active
+  - name: zuno-advantage
+    agent: advantage
+    status: placeholder
+  - name: zuno-finage
+    agent: finage
+    status: placeholder
+  - name: zuno-arkos
+    agent: arkos
+    status: placeholder
+
+# Default ResourceQuota applied to every agent namespace regardless of
+# status, so the isolation model (ADR-0023) is real even for namespaces
+# with nothing scheduled in them yet.
+quota:
+  requestsCpu: "4"
+  requestsMemory: 8Gi
+  limitsCpu: "8"
+  limitsMemory: 16Gi
+  pods: "20"
