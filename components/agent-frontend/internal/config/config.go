@@ -2,7 +2,7 @@
 // environment. Per ADR-0008 the frontend codebase is shared across every
 // agent; ACTIVE_AGENT plus the OIDC_* / BFF_BASE_URL values are what turn
 // this one image into "the Tekos frontend" for a given Deployment. No value
-// here is a secret — OIDC_CLIENT_SECRET and SESSION_HMAC_SECRET are injected
+// here is a secret - OIDC_CLIENT_SECRET and SESSION_HMAC_SECRET are injected
 // as environment variables sourced from an ExternalSecret (ADR-0024), never
 // hardcoded or committed.
 package config
@@ -19,7 +19,7 @@ type Config struct {
 
 	// AgentsDir is the directory containing one subdirectory per agent, each
 	// with an agent.okf.yaml (baked into the image at build time from the
-	// repository's agents/ directory — see Dockerfile).
+	// repository's agents/ directory - see Dockerfile).
 	AgentsDir string
 
 	// ActiveAgent is the agent this deployment renders a full chat UI for
@@ -46,7 +46,7 @@ type Config struct {
 	OIDCClientSecret string
 
 	// OIDCRedirectURL is this deployment's own callback URL, e.g.
-	// https://tekos.apps.<cluster-domain>/callback — must be pre-registered
+	// https://tekos.apps.<cluster-domain>/callback - must be pre-registered
 	// on the Keycloak client matching the documented redirect URI pattern
 	// https://<agent>.apps.<cluster-domain>/*.
 	OIDCRedirectURL string
@@ -59,7 +59,7 @@ type Config struct {
 	// BFFBaseURL is the in-cluster ClusterIP Service URL for this agent's
 	// BFF, e.g. http://tekos-bff.zuno-tekos.svc.cluster.local:8080. The BFF
 	// has no OpenShift Route (ADR-0023 isolation + no need for a second
-	// public ingress) — the frontend proxies chat calls to it server-side.
+	// public ingress) - the frontend proxies chat calls to it server-side.
 	BFFBaseURL string
 
 	// SessionHMACSecret signs the frontend's session cookie (subject,

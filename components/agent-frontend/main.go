@@ -37,7 +37,7 @@ func main() {
 		log.Fatalf("agent-frontend: ACTIVE_AGENT %q not found under %q", cfg.ActiveAgent, cfg.AgentsDir)
 	}
 	if !activeAgent.IsActive() {
-		log.Printf("agent-frontend: warning: ACTIVE_AGENT %q has status %q, not \"active\" — its chat UI will refuse all traffic as unauthorized by design", cfg.ActiveAgent, activeAgent.Metadata.Status)
+		log.Printf("agent-frontend: warning: ACTIVE_AGENT %q has status %q, not \"active\" - its chat UI will refuse all traffic as unauthorized by design", cfg.ActiveAgent, activeAgent.Metadata.Status)
 	}
 	log.Printf("agent-frontend: loaded %d agent definitions from %q; serving chat UI for %q", len(agents), cfg.AgentsDir, cfg.ActiveAgent)
 

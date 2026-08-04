@@ -12,7 +12,7 @@
 // auditable with zero third-party attack surface in the auth-critical path.
 // If/when this module gains real network/toolchain access, adopting
 // coreos/go-oidc for discovery caching and stricter claim validation is the
-// recommended v1 hardening step — see components/agent-frontend/README.md.
+// recommended v1 hardening step - see components/agent-frontend/README.md.
 package oidc
 
 import (
@@ -110,7 +110,7 @@ type AuthRequest struct {
 
 // NewAuthRequest generates a fresh state/nonce/PKCE-verifier triple. The
 // caller is responsible for storing State (and CodeVerifier) somewhere it
-// can retrieve on /callback — agent-frontend uses a short-lived, signed,
+// can retrieve on /callback - agent-frontend uses a short-lived, signed,
 // HttpOnly cookie for this (see internal/session).
 func NewAuthRequest() (AuthRequest, error) {
 	state, err := randomURLSafeString(32)

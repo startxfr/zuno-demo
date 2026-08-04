@@ -3,7 +3,7 @@
 // JWT groups intersect that agent's spec.access.groups AND the agent's
 // status is active. Agents that are placeholder-only (four of five in v0,
 // see platform/architecture/agent-platform-separation.md) always render as
-// a disabled "coming soon" tile, regardless of the viewer's groups — an
+// a disabled "coming soon" tile, regardless of the viewer's groups - an
 // honest reflection of what's actually deployed, not an access-control
 // decision.
 package portal

@@ -1,6 +1,6 @@
 // Package chat serves the Tekos chat UI and proxies chat requests from the
 // browser to the agent's BFF. The BFF has no public Route (ADR-0023
-// isolation — one fewer public ingress per agent); the frontend forwards
+// isolation - one fewer public ingress per agent); the frontend forwards
 // POST /api/chat to the BFF's in-cluster Service, attaching the caller's
 // OIDC access token as a Bearer credential so the BFF can independently
 // revalidate identity (ADR-0013) before calling the Agent Runtime.
@@ -23,7 +23,7 @@ const pageTemplate = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{.DisplayName}} — Zuno</title>
+  <title>{{.DisplayName}} - Zuno</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="pf-body">

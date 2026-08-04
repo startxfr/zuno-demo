@@ -1,7 +1,7 @@
 // Package jwks validates the bearer JWT the frontend forwards on every
 // /api/chat call, against Keycloak's published JWKS. This is the BFF's own
 // independent identity check (ADR-0013 identity propagation: the BFF must
-// not simply trust that the frontend already checked authorization — it
+// not simply trust that the frontend already checked authorization - it
 // revalidates the token's signature, issuer, audience and expiry itself).
 //
 // ASSUMPTION: at the time this was written, platform/identity/README.md
@@ -14,7 +14,7 @@
 // later documents something different (e.g. a sidecar-validated identity
 // header instead of a raw bearer JWT), this package is the one to update.
 //
-// Implemented against the Go standard library only — see
+// Implemented against the Go standard library only - see
 // components/agent-frontend/internal/oidc's package comment for why this
 // track avoided third-party OIDC/JWT libraries in this sandboxed
 // environment; the same reasoning applies here, and the two packages

@@ -43,7 +43,7 @@ type Manager struct {
 	secure bool
 }
 
-// NewManager builds a Manager. secure controls the cookie's Secure flag —
+// NewManager builds a Manager. secure controls the cookie's Secure flag -
 // true in every real deployment (frontend is only ever served over TLS
 // behind an OpenShift Route), false only for local plain-HTTP development.
 func NewManager(secret []byte, secure bool) *Manager {

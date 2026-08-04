@@ -7,7 +7,7 @@
 //	  reply: {"reply": string, "citations": [{"source": string, "title": string}]}
 //
 // This package makes no assumption about the Agent Runtime's internals
-// (task graph, RAG, MCP) — it only speaks this HTTP contract.
+// (task graph, RAG, MCP) - it only speaks this HTTP contract.
 package runtime
 
 import (

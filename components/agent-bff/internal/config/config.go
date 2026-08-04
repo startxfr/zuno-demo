@@ -21,20 +21,20 @@ type Config struct {
 	// KeycloakIssuerURL is the OIDC issuer whose JWKS validates incoming
 	// bearer tokens, e.g. https://sso.apps.<cluster-domain>/realms/zuno.
 	// Standard JWKS validation against
-	// <issuer>/protocol/openid-connect/certs — see README.md for the
+	// <issuer>/protocol/openid-connect/certs - see README.md for the
 	// assumption this makes in the absence of a published
 	// platform/identity/README.md contract at the time this was written.
 	KeycloakIssuerURL string
 
 	// OIDCAudience is the expected `aud`/`azp` claim on incoming access
-	// tokens — the frontend's client ID, since the frontend is the token's
+	// tokens - the frontend's client ID, since the frontend is the token's
 	// original requesting party (contract: <agent>-frontend).
 	OIDCAudience string
 
 	// AgentRuntimeBaseURL is the shared Agent Runtime's in-cluster base
 	// URL, e.g. http://agent-runtime.zuno-platform.svc.cluster.local:8080
 	// (zuno-platform: Agent Runtime is a shared platform component per
-	// ADR-0007, not per-agent — reconciled with gitops/charts/agent-runtime
+	// ADR-0007, not per-agent - reconciled with gitops/charts/agent-runtime
 	// during integration). Owned by a parallel track; this BFF only calls
 	// its documented HTTP contract (POST /v1/agents/{agent}/chat).
 	AgentRuntimeBaseURL string
