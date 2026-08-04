@@ -2,9 +2,12 @@
 # Basic reachability smoke check for the one functional agent (Tekos) — not
 # the 20-scenario acceptance evaluation (ADR-0027/0028), which is a
 # separate, later concern (evaluations/tekos/, run outside this role).
+- name: "agents | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
 - name: "agents | resolve the Tekos frontend route host"
   ansible.builtin.set_fact:
-    _agents_tekos_host: "tekos.{{ cluster_base_domain | default('apps.example.com') }}"
+    _agents_tekos_host: "tekos.{{ cluster_base_domain }}"
 
 - name: "agents | GET the Tekos frontend health endpoint"
   ansible.builtin.uri:
@@ -21,8 +24,7 @@
     msg: >-
       Tekos frontend at https://{{ _agents_tekos_host }}/healthz did not
       respond 200 (got {{ _agents_tekos_health.status | default('no response') }}).
-      Confirm cluster_base_domain matches the real cluster's apps wildcard
-      domain and that gitops/apps/api has synced.
+      Confirm gitops/apps/api has synced.
   when: (_agents_tekos_health.status | default(0)) != 200
 
 - name: "agents | check summary"

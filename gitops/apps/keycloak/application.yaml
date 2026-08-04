@@ -21,12 +21,16 @@ spec:
       values: |
         namespace: keycloak
         keycloakCRName: zuno
-        # Override for the real cluster's apps wildcard domain before
-        # go-live (matches the `cluster_base_domain` convention in
-        # ansible/inventories/*/group_vars/all/main.yml). Every per-agent
-        # client redirect URI in the imported realm is templated against
-        # this value.
-        clusterBaseDomain: apps.example.com
+        # __CLUSTER_BASE_DOMAIN__ is substituted by
+        # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
+        # wildcard domain, auto-discovered from
+        # Ingress.config.openshift.io/cluster and persisted to Vault at
+        # secret/zuno/platform/cluster-domain (see
+        # ansible/tasks/resolve_cluster_base_domain.yml and
+        # ansible/roles/vault/tasks/configure.yml) — no manual edit needed.
+        # Every per-agent client redirect URI in the imported realm is
+        # templated against this same value.
+        clusterBaseDomain: __CLUSTER_BASE_DOMAIN__
         adminSecretName: keycloak-admin
         googleOAuthSecretName: google-oauth-client
   destination:

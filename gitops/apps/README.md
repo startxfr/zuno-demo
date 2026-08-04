@@ -40,10 +40,18 @@ Directories present:
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) |
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) |
 
-**Known follow-up:** `keycloak` and `api`'s `Application.spec.source.helm.values`
-embed `clusterBaseDomain: apps.example.com` directly in the manifest rather
-than templating it from the cluster's real apps wildcard domain — edit both
-files (and `cluster_base_domain` in `ansible/inventories/demo/group_vars/all/main.yml`,
-used only by the `agents` role's smoke check) before a real deployment.
-Auto-discovering this from `ingresses.config/cluster` and threading it
-through consistently is future work, not done here.
+`keycloak` and `api`'s `Application.spec.source.helm.values` reference
+`clusterBaseDomain: __CLUSTER_BASE_DOMAIN__` — a token, not a literal
+domain. `ansible/tasks/apply_gitops_app.yml` substitutes it with the real
+cluster's apps wildcard domain, auto-discovered from
+`Ingress.config.openshift.io/cluster` and persisted to Vault at
+`secret/zuno/platform/cluster-domain` (see
+`ansible/tasks/resolve_cluster_base_domain.yml` and
+`ansible/roles/vault/tasks/configure.yml`) — no manual edit needed before a
+real deployment. `ansible/roles/external_secrets` also exposes that Vault
+value as a `zuno-cluster-domain` Secret in `zuno-platform` for any service
+that wants it as a live runtime value rather than a Helm-render-time one
+(not yet consumed by any service — the value only reaches K8s manifest
+spec fields like a Route's `spec.host` or the Keycloak CR's
+`spec.hostname.hostname` through the Ansible/Helm path, since those fields
+have no `secretKeyRef`-style mechanism to source from a Secret).

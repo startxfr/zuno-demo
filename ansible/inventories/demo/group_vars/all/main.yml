@@ -8,10 +8,9 @@ zuno_environment: demo
 # gitops/ manifests without hardcoding an absolute path.
 zuno_repo_root: "{{ playbook_dir }}/../.."
 
-# Used only by ansible/roles/agents/tasks/check.yml's smoke test. The
-# authoritative value each Application actually deploys with lives in
-# gitops/apps/{keycloak,api}/application.yaml's embedded Helm values (ArgoCD
-# renders those independently of Ansible) — see gitops/apps/README.md
-# "Known follow-up" note. Keep these three in sync by hand until that's
-# templated from a single source.
-cluster_base_domain: apps.example.com
+# cluster_base_domain is intentionally NOT set here: it's auto-discovered
+# from Ingress.config.openshift.io/cluster and persisted to Vault (see
+# ansible/tasks/resolve_cluster_base_domain.yml). Setting a static value in
+# this file would short-circuit that discovery (Ansible facts already
+# "defined" from group_vars skip the live lookup) — only set it here if you
+# deliberately want to pin/override the discovered value.

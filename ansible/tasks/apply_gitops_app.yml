@@ -18,10 +18,22 @@
       - gitops_app_name | length > 0
     fail_msg: "apply_gitops_app.yml requires 'gitops_app_name' to be set by the including role"
 
+- name: "gitops | resolve the cluster base domain (for Applications whose Helm values need it)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "gitops | render the Application manifest with __CLUSTER_BASE_DOMAIN__ substituted"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{
+        (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_app_name + '/application.yaml')
+          | replace('__CLUSTER_BASE_DOMAIN__', cluster_base_domain))
+        | from_yaml
+      }}
+
 - name: "gitops | apply ArgoCD Application: {{ gitops_app_name }}"
   kubernetes.core.k8s:
     state: present
-    src: "{{ zuno_repo_root }}/gitops/apps/{{ gitops_app_name }}/application.yaml"
+    definition: "{{ _gitops_app_definition }}"
 
 - name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy"
   kubernetes.core.k8s_info:

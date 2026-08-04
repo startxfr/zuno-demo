@@ -20,7 +20,9 @@ spec:
     helm:
       values: |
         global:
-          clusterBaseDomain: apps.example.com
+          # Substituted by ansible/tasks/apply_gitops_app.yml — see
+          # gitops/apps/keycloak/application.yaml's comment for how.
+          clusterBaseDomain: __CLUSTER_BASE_DOMAIN__
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-tekos

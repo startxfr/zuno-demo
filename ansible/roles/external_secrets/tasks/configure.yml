@@ -34,3 +34,49 @@
     (_eso_store.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
   retries: 30
   delay: 10
+
+- name: "external_secrets | ensure the zuno-platform namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+
+# The cluster's apps domain (secret/zuno/platform/cluster-domain, written
+# by ansible/roles/vault/tasks/configure.yml) baked into K8s manifest spec
+# fields — a Route's spec.host, the Keycloak CR's spec.hostname.hostname,
+# the realm's client redirect URIs — cannot come from a Secret; those are
+# resolved at Ansible/Helm-apply time via
+# ansible/tasks/apply_gitops_app.yml's __CLUSTER_BASE_DOMAIN__ substitution
+# instead, no live sync mechanism supports templating a CR spec field. This
+# ExternalSecret is for any current-or-future service that wants the same
+# value as a genuine *runtime* env var/file, refreshed on `refreshInterval`
+# without a redeploy — not yet consumed by any service in this build.
+- name: "external_secrets | expose the cluster's apps domain to runtime consumers"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: zuno-cluster-domain
+        namespace: zuno-platform
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: vault-backend
+          kind: ClusterSecretStore
+        target:
+          name: zuno-cluster-domain
+          creationPolicy: Owner
+        data:
+          - secretKey: domain
+            remoteRef:
+              key: zuno/platform/cluster-domain
+              property: domain

@@ -375,8 +375,10 @@ planning narrative — see README.md's "v0 build status" for a summary:
 
 All three Python services (`agent-runtime`, `mcp-gateway`, `rag-service`)
 now instrument themselves with OTel per `ansible/roles/observability/README.md`.
-Still open: the cluster's real apps domain must be hand-edited into a few
-GitOps `Application` manifests before a real deploy
-(`gitops/apps/README.md`'s "Known follow-up"); and everything here was
-built and validated (Helm lint/template, YAML/JSON/Python syntax) without a
-live OpenShift cluster to run it against.
+The cluster's real apps domain is auto-discovered from
+`Ingress.config.openshift.io/cluster`, persisted to Vault
+(`secret/zuno/platform/cluster-domain`), and substituted into every GitOps
+`Application` that needs it — no manual edit required (see
+`ansible/tasks/resolve_cluster_base_domain.yml`, `gitops/apps/README.md`).
+Everything here was built and validated (Helm lint/template, YAML/JSON/Python
+syntax) without a live OpenShift cluster to run it against.
