@@ -45,22 +45,28 @@ work (not present in the original per-track build):
 Runs after `argocd` and `external_secrets` (which registers the
 `vault-backend` `ClusterSecretStore` the two `ExternalSecret`s above
 resolve against) - enforced by ordering in
-`ansible/playbooks/{precheck,prepare,configure}.yml`.
+`ansible/playbooks/day0_{check,install,configure}.yml`.
 
-## Operator package/channel assumptions
+## Operator package/channel discovery
 
-This environment has no live cluster to verify catalog contents against, so
-`precheck.yml`/`prepare.yml` make a best-effort, clearly-flagged guess:
+The OLM package name `rhbk-operator` is fixed (confirmed real on a live
+cluster), but the Subscription channel and controller Deployment name are
+discovered at runtime rather than hardcoded - found via live-cluster
+testing on api.demo222.startx.fr that a hardcoded `channel: stable` hits
+OLM's `ResolutionFailed`/`ConstraintsNotSatisfiable`, since RHBK's
+channels are version-qualified (`stable-v22`, `stable-v26`, ...) with no
+bare `stable` alias on that cluster. Same lesson as ADR-0048's CNPG
+channel discovery and `ansible/roles/postgresql`'s PGO package discovery.
 
-| Item | Assumed value | Verify with |
-|---|---|---|
-| OLM package name | `rhbk-operator` | `oc get packagemanifest -n openshift-marketplace \| grep -i keycloak` |
-| Subscription channel | `stable` | `oc get packagemanifest rhbk-operator -o jsonpath='{.status.channels[*].name}'` - RHBK channels are commonly version-qualified (e.g. `stable-v26`); a bare `stable` alias may not exist |
-| Operator Deployment name | `rhbk-operator-controller-manager` | `oc get deployment -n openshift-operators` |
+| Item | How it's resolved |
+|---|---|
+| OLM package name | Fixed: `rhbk-operator` |
+| Subscription channel | `tasks/prepare.yml` reads the package's `PackageManifest`; prefers an exact `stable` channel if one exists, else falls back to the package's own `defaultChannel`; fails loudly listing every published channel if neither exists |
+| Operator Deployment name | Discovered by listing every `Deployment` in `openshift-operators` and matching one whose name looks like `rhbk\|keycloak` (same pattern as `ansible/roles/postgresql`'s PGO controller discovery) |
 
-If any of these differ on the target cluster, adjust the corresponding
-task in `tasks/precheck.yml` / `tasks/prepare.yml` - each is annotated with
-this same assumption inline.
+If discovery ever fails on a given cluster (e.g. the package isn't
+published at all), `tasks/prepare.yml` fails with a diagnostic naming the
+`oc get packagemanifest`/`oc get deployment` commands to run manually.
 
 ## Google OAuth secret injection into the realm import (ADR-0014)
 

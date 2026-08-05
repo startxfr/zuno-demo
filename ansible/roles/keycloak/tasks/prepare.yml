@@ -16,11 +16,59 @@
         labels:
           zuno.io/managed-by: ansible
 
-    # ASSUMPTION (see README.md): package name "rhbk-operator", channel
-    # "stable". RHBK's OperatorHub channels are commonly version-qualified
-    # (e.g. "stable-v26") rather than a bare "stable" alias - check
-    # `oc get packagemanifest rhbk-operator -o jsonpath='{.status.channels[*].name}'`
-    # against the target cluster and adjust the channel here if needed.
+    # Package name "rhbk-operator" in the redhat-operators catalog is
+    # confirmed real (unlike CNPG/PGO's package-name assumptions - see
+    # ansible/roles/postgresql/README.md for that history), but the
+    # channel is not: RHBK's channels are version-qualified
+    # (stable-v22/v24/v26...) with no bare "stable" alias, so a hardcoded
+    # `channel: stable` hits OLM's ResolutionFailed/ConstraintsNotSatisfiable
+    # - found via live-cluster testing on api.demo222.startx.fr, same
+    # lesson as ADR-0048's CNPG channel discovery. Prefer an exact
+    # "stable" match if one ever exists, else fall back to the package's
+    # own defaultChannel rather than guessing a version.
+- name: "keycloak | look up the rhbk-operator PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhbk-operator
+  register: _keycloak_pkg_info
+
+- name: "keycloak | fail if the rhbk-operator package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named 'rhbk-operator' was found in
+      openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i keycloak` for the correct package
+      name on this cluster and update this role's selection.
+  when: (_keycloak_pkg_info.resources | default([]) | length) == 0
+
+- name: "keycloak | select the channel to subscribe from"
+  ansible.builtin.set_fact:
+    _keycloak_pkg: "{{ _keycloak_pkg_info.resources[0] }}"
+    _keycloak_catalog_source: "{{ _keycloak_pkg_info.resources[0].status.catalogSource }}"
+    _keycloak_channel: >-
+      {{
+        'stable'
+        if (_keycloak_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_keycloak_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "keycloak | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package 'rhbk-operator' (catalog '{{ _keycloak_catalog_source }}')
+      has no "stable" channel and no defaultChannel to fall back to.
+      Published channels:
+      {{ _keycloak_pkg.status.channels | map(attribute='name') | list }}.
+  when: _keycloak_channel | length == 0
+
+- name: "keycloak | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package 'rhbk-operator', catalog
+      '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
+
 - name: "keycloak | subscribe to the Red Hat build of Keycloak operator"
   kubernetes.core.k8s:
     state: present
@@ -33,9 +81,9 @@
         labels:
           zuno.io/managed-by: ansible
       spec:
-        channel: stable
+        channel: "{{ _keycloak_channel }}"
         name: rhbk-operator
-        source: redhat-operators
+        source: "{{ _keycloak_catalog_source }}"
         sourceNamespace: openshift-marketplace
         installPlanApproval: Automatic
 
@@ -59,20 +107,41 @@
   retries: 30
   delay: 10
 
-    # ASSUMPTION (see README.md): the CSV's deployment is named
-    # "rhbk-operator-controller-manager" (kubebuilder/operator-sdk scaffold
-    # convention). If the wait below times out, check
-    # `oc get deployment -n openshift-operators` for the real name and
-    # adjust here.
+    # UNVERIFIED against a real cluster until this role's own live test
+    # ran far enough to reach it (channel discovery above was the
+    # blocker first): discover the controller Deployment name rather
+    # than hardcode "rhbk-operator-controller-manager", same reasoning
+    # as ansible/roles/postgresql/tasks/prepare.yml's PGO controller
+    # discovery.
+- name: "keycloak | discover the operator controller Deployment name once OLM creates it"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-operators
+  register: _keycloak_operator_deploys
+  until: >-
+    (_keycloak_operator_deploys.resources | default([])
+     | selectattr('metadata.name', 'search', 'rhbk|keycloak')
+     | list | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "keycloak | select the discovered operator controller Deployment name"
+  ansible.builtin.set_fact:
+    _keycloak_operator_deploy_name: >-
+      {{
+        (_keycloak_operator_deploys.resources
+         | selectattr('metadata.name', 'search', 'rhbk|keycloak')
+         | map(attribute='metadata.name') | list)[0]
+      }}
+
 - name: "keycloak | wait for the operator deployment to be ready"
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
     namespace: openshift-operators
-    name: rhbk-operator-controller-manager
+    name: "{{ _keycloak_operator_deploy_name }}"
   register: _keycloak_operator_deploy
-  until: >-
-    (_keycloak_operator_deploy.resources | default([]) | length) > 0 and
-    (_keycloak_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  until: (_keycloak_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0
   retries: 60
   delay: 10
