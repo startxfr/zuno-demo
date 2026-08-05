@@ -1,8 +1,0 @@
----
-# Re-applies just the Tekos workloads Application, without touching the
-# namespaces Application (see ansible/roles/agents for the full
-# `make install` path that applies both).
-- name: "api | apply the Tekos workloads GitOps Application"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  vars:
-    gitops_app_name: api

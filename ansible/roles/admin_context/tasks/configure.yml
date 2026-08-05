@@ -1,0 +1,57 @@
+---
+# Re-applies the PriorityClasses (idempotent - same definitions as
+# prepare.yml) and reports on the one ClusterRoleBinding this repository
+# creates outside of this role today (ansible/roles/argocd/tasks/
+# prepare.yml's zuno-argocd-application-controller-admin). This is a
+# consolidation/visibility point, not a new grant - admin_context runs
+# first in the Day 0 sequence (before argocd even installs the operator),
+# so on a fresh cluster this binding legitimately does not exist yet the
+# first time `configure` runs here; that is expected, not an error.
+- name: "admin_context | re-apply the platform-critical PriorityClass"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: scheduling.k8s.io/v1
+      kind: PriorityClass
+      metadata:
+        name: zuno-platform-critical
+        labels:
+          zuno.io/managed-by: ansible
+      value: 1000000
+      globalDefault: false
+      description: >-
+        For operators and shared platform infrastructure (Vault, Keycloak,
+        PostgreSQL, ArgoCD) - must not be preempted by ordinary workload
+        pods under node pressure.
+
+- name: "admin_context | re-apply the workload-default PriorityClass"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: scheduling.k8s.io/v1
+      kind: PriorityClass
+      metadata:
+        name: zuno-workload-default
+        labels:
+          zuno.io/managed-by: ansible
+      value: 100
+      globalDefault: false
+      description: >-
+        For agent/business workloads (Tekos frontend/BFF, Agent Runtime,
+        MCP Gateway/servers, RAG service) - lower priority than platform
+        infrastructure, above unset-priority cluster noise.
+
+- name: "admin_context | look up the ArgoCD application-controller ClusterRoleBinding"
+  kubernetes.core.k8s_info:
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: zuno-argocd-application-controller-admin
+  register: _admin_context_argocd_crb
+
+- name: "admin_context | configure summary"
+  ansible.builtin.debug:
+    msg: >-
+      PriorityClasses re-applied.
+      zuno-argocd-application-controller-admin ClusterRoleBinding:
+      {{ 'present (created by the argocd role)' if (_admin_context_argocd_crb.resources | default([]) | length) > 0
+         else 'not present yet - expected before `make d0 install argocd` has run once' }}.

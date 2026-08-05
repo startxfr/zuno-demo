@@ -1,0 +1,48 @@
+---
+# Day 1 (ADR-0056): building the platform's own component images and
+# running the platform itself. `make day1 check`/`make d1 check`.
+#
+# Component list note: your original Day 1 spec named `llm, rag, mcp,
+# agents` as the "run" components. `models`, `sql_schema` and `mlops` are
+# included here too, deliberately going beyond that exact list - dropping
+# them would make them permanently unreachable (nothing else in this
+# repository triggers the vLLM InferenceService or the SXA schema/
+# sales-db deployment), a real functional regression, not just a naming
+# choice. Flagged here and in ADR-0056's Implementation state rather than
+# silently done.
+#
+# `agents` is a deliberate special case: before this restructuring, `make
+# check` (ADR-0053) ran ansible/roles/agents/tasks/check.yml - the full
+# 20-scenario acceptance/security gate, not a dependency precheck. That
+# capability must not quietly disappear just because "check" now also
+# means "verify this component's prerequisites" for every other Day 1
+# component. So `day1 check agents` runs `tasks_from: check` (the real
+# ADR-0053 gate) while every other component here runs `tasks_from:
+# precheck` (dependency verification) - same verb, intentionally
+# different meaning for the one component that already had a richer one.
+- name: "Day 1: check components"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day1_components:
+      - llm
+      - models
+      - sql_schema
+      - rag
+      - mcp
+      - agents
+      - mlops
+  tasks:
+    - name: Resolve requested Day 1 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day1_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Run Day 1 component checks
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: "{{ 'check' if item == 'agents' else 'precheck' }}"
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

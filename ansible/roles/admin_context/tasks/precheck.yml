@@ -1,0 +1,19 @@
+---
+- name: "admin_context | verify cluster API is reachable"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: default
+  register: _admin_context_precheck_api
+
+- name: "admin_context | fail if the cluster API is unreachable"
+  ansible.builtin.fail:
+    msg: >-
+      Unable to reach the OpenShift API for the admin_context precheck.
+      Verify K8S_AUTH_HOST/K8S_AUTH_API_KEY - this is the very first Day 0
+      component, so nothing else can be checked/installed either until
+      this passes.
+  when: _admin_context_precheck_api.resources is not defined
+
+- name: "admin_context | precheck summary"
+  ansible.builtin.debug:
+    msg: "Cluster API reachable."

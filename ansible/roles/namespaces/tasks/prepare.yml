@@ -1,0 +1,22 @@
+---
+# Applies the namespaces GitOps Application (gitops/apps/agents ->
+# gitops/charts/namespaces): the 5 agent namespaces + zuno-auth/zuno-data/
+# zuno-telemetry/zuno-ai-run/zuno-ai-build, each with a ResourceQuota and
+# a default-deny NetworkPolicy baseline (ADR-0023/ADR-0052). Moved here
+# from ansible/roles/agents/tasks/configure.yml (ADR-0056) so namespace
+# creation is its own explicit, checkable Day 0 step instead of only ever
+# happening as a side effect of applying the Tekos workloads.
+#
+# Reuses the existing "agents" Application name/chart path rather than
+# renaming gitops/apps/agents - the Application's own name is an
+# ArgoCD-internal identifier, not user-facing, and renaming it would
+# needlessly touch gitops/root-app-of-apps.yaml's recursive discovery for
+# no behavioral change.
+- name: "namespaces | apply the namespaces GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_app_name: agents
+
+- name: "namespaces | prepare summary"
+  ansible.builtin.debug:
+    msg: "Namespaces Application applied and healthy."

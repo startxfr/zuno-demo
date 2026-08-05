@@ -1,6 +1,0 @@
----
-- name: Install Zuno Demo agent platform and business definitions
-  hosts: localhost
-  gather_facts: false
-  roles:
-    - role: agents

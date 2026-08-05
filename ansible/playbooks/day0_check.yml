@@ -1,0 +1,38 @@
+---
+# Day 0 (ADR-0056): every cluster-level prerequisite needed before the
+# Zuno AI platform can be installed at all. `make day0 check`/`make d0
+# check` runs this - order matters (admin_context first: nothing else can
+# be checked until the cluster API itself is reachable; namespaces after
+# argocd: namespace creation is a GitOps Application, which needs the
+# Application CRD argocd installs).
+- name: "Day 0: check prerequisites"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day0_components:
+      - admin_context
+      - argocd
+      - namespaces
+      - vault
+      - keycloak
+      - postgresql
+      - smtp
+      - external_secrets
+      - nfd
+      - nvidia_gpu
+      - observability
+      - openshift_ai
+  tasks:
+    - name: Resolve requested Day 0 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day0_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Run Day 0 component checks
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: precheck
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

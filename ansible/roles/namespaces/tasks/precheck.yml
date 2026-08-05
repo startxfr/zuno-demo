@@ -1,0 +1,48 @@
+---
+# Reads the expected namespace list directly from
+# gitops/charts/namespaces/values.yaml (single source of truth - never
+# duplicated as a separate hardcoded list here, so this can't drift from
+# what the chart itself actually creates).
+- name: "namespaces | load the expected namespace list from the chart's own values.yaml"
+  ansible.builtin.set_fact:
+    _namespaces_chart_values: >-
+      {{
+        lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/namespaces/values.yaml')
+        | from_yaml
+      }}
+
+- name: "namespaces | resolve the full expected namespace name list"
+  ansible.builtin.set_fact:
+    _namespaces_expected: >-
+      {{
+        (_namespaces_chart_values.namespaces | default([]) | map(attribute='name') | list)
+        + (_namespaces_chart_values.platformNamespaces | default([]) | map(attribute='name') | list)
+      }}
+
+- name: "namespaces | look up every expected namespace on the cluster"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: "{{ item }}"
+  register: _namespaces_lookup
+  loop: "{{ _namespaces_expected }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: "namespaces | fail if any expected namespace is missing"
+  ansible.builtin.fail:
+    msg: >-
+      The following expected namespace(s) are missing:
+      {{ _namespaces_lookup.results
+         | selectattr('resources', 'defined')
+         | selectattr('resources', 'equalto', [])
+         | map(attribute='item') | list }}.
+      Run `make d0 install namespaces` to create them.
+  when: >-
+    (_namespaces_lookup.results
+     | selectattr('resources', 'defined')
+     | selectattr('resources', 'equalto', [])
+     | list | length) > 0
+
+- name: "namespaces | precheck summary"
+  ansible.builtin.debug:
+    msg: "All {{ _namespaces_expected | length }} expected namespaces are present: {{ _namespaces_expected }}."
