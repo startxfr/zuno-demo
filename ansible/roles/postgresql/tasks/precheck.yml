@@ -36,10 +36,13 @@
 - name: "postgresql | fail if the CloudNativePG operator is not published in this cluster's catalog"
   ansible.builtin.fail:
     msg: >-
-      cloudnative-pg was not found in openshift-marketplace. Confirm a
-      CatalogSource that carries the CloudNativePG operator (EDB publishes
-      it as a certified operator; community-operators also carries it) is
-      enabled. See ansible/roles/postgresql/README.md.
+      cloudnative-pg was not found in openshift-marketplace. `make prepare
+      postgresql` will automatically register the operatorhubio-catalog
+      fallback (quay.io/operatorhubio/catalog:latest) and retry discovery
+      from there before failing for real - precheck itself stays
+      read-only and never registers a CatalogSource (matching every other
+      role's precheck/prepare split in this repo), so it still reports
+      this as a hard stop here. See ansible/roles/postgresql/README.md.
   when: (_postgresql_precheck_pkg.resources | default([]) | length) == 0
 
 - name: "postgresql | precheck summary"

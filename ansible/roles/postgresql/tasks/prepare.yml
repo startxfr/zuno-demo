@@ -15,6 +15,124 @@
         labels:
           zuno.io/managed-by: ansible
 
+# ADR-0048-style discovery: don't hardcode which catalog carries
+# cloudnative-pg (previously assumed certified-operators, which isn't
+# true on every cluster - EDB's certified build isn't always mirrored
+# into every cluster's certified-operators snapshot). Discover it first;
+# if no enabled catalog on this cluster publishes it at all, register the
+# well-known public operatorhubio-catalog (the canonical community
+# catalog that carries CloudNativePG on plain OLM) as a fallback, then
+# discover again. Fail loudly, never silently, if it's still unavailable
+# after that - see README.md for what to check.
+- name: "postgresql | discover whether cloudnative-pg is already published by an enabled catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: cloudnative-pg
+  register: _postgresql_pkg
+
+
+- name: "postgresql | register the operatorhubio-catalog fallback if cloudnative-pg was not found anywhere"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: CatalogSource
+      metadata:
+        name: operatorhubio-catalog
+        namespace: openshift-marketplace
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        sourceType: grpc
+        image: quay.io/operatorhubio/catalog:latest
+        displayName: "Community Operators (OperatorHub.io)"
+        publisher: OperatorHub.io
+  when: (_postgresql_pkg.resources | default([]) | length) == 0
+
+- name: "postgresql | wait for the operatorhubio-catalog fallback to become ready"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: CatalogSource
+    namespace: openshift-marketplace
+    name: operatorhubio-catalog
+  register: _postgresql_fallback_catalog
+  until: >-
+    (_postgresql_fallback_catalog.resources | default([]) | length) > 0 and
+    (_postgresql_fallback_catalog.resources[0].status.connectionState.lastObservedState | default('')) == 'READY'
+  retries: 30
+  delay: 10
+  when: (_postgresql_pkg.resources | default([]) | length) == 0
+
+- name: "postgresql | re-discover cloudnative-pg after registering the fallback catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    name: cloudnative-pg
+    namespace: openshift-marketplace
+  register: _postgresql_pkg2
+  when: (_postgresql_pkg.resources | default([]) | length) == 0
+
+- name: "postgresql | update _postgresql_pkg var"
+  ansible.builtin.set_fact:
+    _postgresql_pkg: "{{ _postgresql_pkg2 }}"
+  when: _postgresql_pkg2.changed
+
+- name: "postgresql | fail with a clear diagnostic if cloudnative-pg is still not published anywhere"
+  ansible.builtin.fail:
+    msg: >-
+      cloudnative-pg was not found in openshift-marketplace, even after
+      registering the operatorhubio-catalog fallback
+      (quay.io/operatorhubio/catalog:latest). Confirm this cluster has
+      outbound access to quay.io, and that no NetworkPolicy/proxy blocks
+      the CatalogSource pod from pulling that image. See
+      ansible/roles/postgresql/README.md.
+  when: (_postgresql_pkg.resources | default([]) | length) == 0
+
+- name: "postgresql | select the catalog that actually publishes cloudnative-pg"
+  ansible.builtin.set_fact:
+    _postgresql_catalog_source: "{{ _postgresql_pkg.resources[0].status.catalogSource }}"
+
+# Channel naming is not standardized across catalog snapshots either (the
+# same mismatch ADR-0048 already found for openshift_ai's channel): this
+# role previously hardcoded "stable", but at least one real cluster
+# publishes CloudNativePG under "stable-v1" instead (no bare "stable"
+# channel exists there at all, which surfaces as OLM refusing to create a
+# Subscription/InstallPlan - "wrong channel"). Prefer an exact "stable-v1"
+# match (the channel name EDB's docs and this role's own testing point at
+# for CNPG >= 1.25), then any channel whose name starts with "stable"
+# (covers a bare "stable" catalog too), then the manifest's own
+# defaultChannel, then fail loudly rather than guess.
+- name: "postgresql | select the channel actually published by this catalog"
+  ansible.builtin.set_fact:
+    _postgresql_channel: >-
+      {{
+        'stable-v1'
+        if (_postgresql_pkg.resources[0].status.channels | selectattr('name', 'equalto', 'stable-v1') | list | length) > 0
+        else ((_postgresql_pkg.resources[0].status.channels | selectattr('name', 'match', '^stable') | map(attribute='name') | list)[0])
+        if (_postgresql_pkg.resources[0].status.channels | selectattr('name', 'match', '^stable') | list | length) > 0
+        else (_postgresql_pkg.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "postgresql | fail with a clear diagnostic if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      No "stable"-family channel published for cloudnative-pg by catalog
+      '{{ _postgresql_catalog_source }}', and no defaultChannel to fall
+      back to. Published channels:
+      {{ _postgresql_pkg.resources[0].status.channels | map(attribute='name') | list }}.
+      Update ansible/roles/postgresql/tasks/prepare.yml's channel
+      selection if this catalog uses a different naming convention.
+  when: _postgresql_channel | length == 0
+
+- name: "postgresql | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      cloudnative-pg is published by catalog
+      '{{ _postgresql_catalog_source }}', channel '{{ _postgresql_channel }}'
+      - subscribing from there.
+
 - name: "postgresql | subscribe to the CloudNativePG operator"
   kubernetes.core.k8s:
     state: present
@@ -27,13 +145,18 @@
         labels:
           zuno.io/managed-by: ansible
       spec:
-        # "stable" is pinned deliberately: the pgvector image-volume
-        # extension mechanism (CloudNativePG >= 1.27) is NOT relied upon by
-        # this demo (see gitops/charts/postgresql/image/README.md for why) -
-        # any recent stable CNPG release is sufficient here.
-        channel: stable
+        # ADR-0048-style discovery (above) - never hardcoded, since neither
+        # which catalog nor which channel name a given cluster publishes
+        # cloudnative-pg under can be assumed. Tracking the channel
+        # (rather than pinning startingCSV to an exact CSV like
+        # cloudnative-pg.v1.30.0) means installPlanApproval: Automatic can
+        # stay consistent with every other Subscription in this repo; if
+        # you need to pin an exact version instead of "whatever this
+        # channel currently resolves to", add startingCSV explicitly and
+        # switch installPlanApproval to Manual.
+        channel: "{{ _postgresql_channel }}"
         name: cloudnative-pg
-        source: certified-operators
+        source: "{{ _postgresql_catalog_source }}"
         sourceNamespace: openshift-marketplace
         installPlanApproval: Automatic
 

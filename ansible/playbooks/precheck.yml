@@ -4,17 +4,17 @@
   gather_facts: false
   vars:
     prerequisite_components:
-      - openshift_ai
-      - datascience
-      - nfd
-      - nvidia_gpu
       - argocd
       - vault
-      - external_secrets
       - keycloak
       - postgresql
-      - observability
       - smtp
+      - external_secrets
+      - nfd
+      - nvidia_gpu
+      - observability
+      - openshift_ai
+      - datascience
   tasks:
     - name: Resolve requested prerequisite role names
       ansible.builtin.set_fact:

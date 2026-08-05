@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import os
 
-PGHOST = os.getenv("PGHOST", "postgresql.zuno-data.svc")
+# zuno-postgresql-rw is CNPG's own auto-created, failover-aware
+# read-write Service for the zuno-postgresql Cluster - there is no plain
+# "postgresql" Service (see ansible/roles/postgresql/README.md).
+PGHOST = os.getenv("PGHOST", "zuno-postgresql-rw.zuno-data.svc")
 PGPORT = int(os.getenv("PGPORT", "5432"))
 PGDATABASE = os.getenv("PGDATABASE", "zuno")
 PGUSER = os.getenv("PGUSER", "zuno_app")

@@ -4,16 +4,16 @@
   gather_facts: false
   vars:
     configuration_scopes:
+      - argocd
       - vault
       - external_secrets
-      - argocd
-      - datascience
       - keycloak
       - postgresql
       - sql_schema
+      - api
+      - datascience
       - models
       - llm
-      - api
       - mlops
       - rag
       - mcp

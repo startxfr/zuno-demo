@@ -9,12 +9,37 @@ persistent data platform").
 - `precheck.yml` - verifies the CloudNativePG operator (`cloudnative-pg`
   package) is published in this cluster's OperatorHub catalog, and that
   ArgoCD is already installed (the `Cluster` CR is applied as a GitOps
-  Application).
-- `prepare.yml` - subscribes to the CloudNativePG operator (OLM
-  `Subscription`, `openshift-operators` namespace, mirrors
-  `ansible/roles/argocd` and `ansible/roles/external_secrets`) and waits for
-  the `clusters.postgresql.cnpg.io` CRD and the operator's controller
-  deployment.
+  Application). Fails if `cloudnative-pg` isn't found anywhere yet -
+  `precheck` stays read-only and never registers a `CatalogSource` itself
+  (see below), so it correctly reports this as a hard stop even though
+  `prepare` may be able to resolve it automatically.
+- `prepare.yml` - **discovers** which enabled catalog actually publishes
+  `cloudnative-pg` (ADR-0048-style: never hardcodes `certified-operators`,
+  since EDB's certified build isn't mirrored into every cluster's
+  certified-operators snapshot). If no enabled catalog on this cluster
+  carries it at all, registers the well-known public
+  `operatorhubio-catalog` `CatalogSource`
+  (`quay.io/operatorhubio/catalog:latest`, the canonical community catalog
+  that carries CloudNativePG on plain OLM) as a fallback, waits for it to
+  report `READY`, and re-discovers. Fails with a clear diagnostic if
+  `cloudnative-pg` is still not found after that (check outbound access to
+  `quay.io` and any NetworkPolicy/proxy in front of it) - never silently
+  gives up or substitutes a different operator. **Channel** is discovered
+  the same way, not hardcoded either: prefers an exact `stable-v1` match
+  (confirmed against a real cluster - some catalogs publish CloudNativePG
+  under a bare `stable` channel, others under `stable-v1`, and a
+  Subscription naming a channel the catalog doesn't actually have fails
+  with an OLM "wrong channel" error), then any `stable*`-prefixed channel,
+  then the manifest's own `defaultChannel`, failing loudly (listing every
+  published channel) if none of those exist. Then subscribes to whichever
+  catalog/channel combination actually won (OLM `Subscription`,
+  `openshift-operators` namespace, mirrors `ansible/roles/argocd` and
+  `ansible/roles/external_secrets`, `installPlanApproval: Automatic` -
+  tracks the channel's latest CSV rather than pinning an exact version;
+  add `startingCSV` + switch to `Manual` approval if you need to pin one
+  specific CSV instead) and waits for the `clusters.postgresql.cnpg.io`
+  CRD and the operator's controller deployment, then reports the
+  `Subscription.status.installedCSV` it actually resolved to.
 - `configure.yml` - applies the `postgresql` GitOps Application
   (`gitops/apps/postgresql/application.yaml`, local chart
   `gitops/charts/postgresql`), which renders:
@@ -46,6 +71,16 @@ succeed - see the chart's `image/README.md` for the exact command and the
 placeholder registry reference used in `values.yaml`. This is the one
 manual prerequisite for this role, in the same spirit as the Vault
 `google-oauth`/`smtp` placeholder secrets requiring operator input.
+
+## Connecting to this cluster
+
+CNPG auto-creates three Services for a `Cluster` named `zuno-postgresql`:
+`zuno-postgresql-rw` (primary, read-write, the one every consumer below
+uses), `zuno-postgresql-ro` and `zuno-postgresql-r` (replicas - unused in
+this demo's single-instance scope). Every consumer connects to
+`zuno-postgresql-rw.zuno-data.svc.cluster.local:5432` - CNPG's own
+managed, failover-aware read-write endpoint. There is no plain
+`postgresql` Service; nothing in this repository creates one.
 
 ## Consumed by
 

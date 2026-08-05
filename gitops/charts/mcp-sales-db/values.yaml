@@ -18,7 +18,10 @@ resources:
     memory: 256Mi
 
 db:
-  host: postgresql.zuno-data.svc.cluster.local
+  # zuno-postgresql-rw is CNPG's own auto-created, failover-aware
+  # read-write Service for the zuno-postgresql Cluster - there is no
+  # plain "postgresql" Service (see ansible/roles/postgresql/README.md).
+  host: zuno-postgresql-rw.zuno-data.svc.cluster.local
   port: "5432"
   database: zuno
 
