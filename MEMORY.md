@@ -437,7 +437,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   dedicated least-privilege `ServiceAccount` per workload
   (`gitops/charts/{tekos,agent-runtime,ai-gateway,mcp-gateway,
   mcp-sales-db,rag-service}`). Operator/third-party-managed workloads
-  (Keycloak, KServe's vLLM container, CNPG, the upstream Vault chart) get a
+  (Keycloak, KServe's vLLM container, Crunchy Postgres Operator, the upstream Vault chart) get a
   documented partial treatment instead of a guessed-at CRD/chart field -
   see ADR-0052's implementation note. `zuno-auth`/`zuno-data`/
   `zuno-telemetry` gained a namespace-level default-deny `NetworkPolicy`

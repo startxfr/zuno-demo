@@ -175,7 +175,7 @@ deployed.
 ## Database credentials
 
 Sourced from individual `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`
-env vars, populated from the same `zuno_app` Vault-backed Secret the
+env vars, populated from the same `zunoapp` Vault-backed Secret the
 `vault` role already generates at `secret/zuno/postgresql/app` (see
 `ansible/roles/vault/tasks/configure.yml`), delivered via an
 `ExternalSecret` registered by this service's chart
@@ -188,7 +188,7 @@ credential is ever hardcoded (ADR-0024).
 cd components/rag-service
 docker build -t zuno/rag-service:local .
 docker run -p 8080:8080 \
-  -e PGHOST=localhost -e PGUSER=zuno_app -e PGPASSWORD=... -e PGDATABASE=zuno \
+  -e PGHOST=localhost -e PGUSER=zunoapp -e PGPASSWORD=... -e PGDATABASE=zuno \
   zuno/rag-service:local
 ```
 

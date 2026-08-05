@@ -8,10 +8,11 @@
 -- (Confluence pages, product docs, etc.), not sales transactional data.
 --
 -- Requires the `vector` extension to be present in the PostgreSQL image
--- (see gitops/charts/postgresql/image/README.md - the default CloudNativePG
--- operand image does not bundle pgvector; a custom image or CNPG extension
--- image is required, and CREATE EXTENSION here will fail loudly if that
--- prerequisite was skipped, which is the intended, non-hand-wavy behavior).
+-- (see gitops/charts/postgresql/image/README.md - the default Crunchy
+-- Postgres Operator (PGO) operand image does not bundle pgvector either;
+-- a custom image is required, and CREATE EXTENSION here will fail loudly
+-- if that prerequisite was skipped, which is the intended, non-hand-wavy
+-- behavior).
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 1536 dimensions matches common embedding model output size (e.g.

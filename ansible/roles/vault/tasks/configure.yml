@@ -117,7 +117,15 @@
         username: admin
         password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
       postgresql/app:
-        username: zuno_app
+        # No underscore/hyphen (zunoapp, not zuno_app/zuno-app): PGO's
+        # PostgresCluster derives a Kubernetes Secret name directly from
+        # spec.users[].name ("<cluster>-pguser-<user>", RFC 1123 label
+        # rules - no underscores), and unquoted PostgreSQL identifiers
+        # can't contain hyphens either - lowercase-letters-and-digits-only
+        # is the one charset valid in both. Discovered via `helm lint`
+        # while migrating this role from CloudNativePG (which had no such
+        # constraint) to PGO - see ansible/roles/postgresql/README.md.
+        username: zunoapp
         password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 

@@ -25,11 +25,11 @@ workload outright rather than hardening it - see the comments in
 `gitops/charts/keycloak/templates/keycloak.yaml` (Keycloak Operator) and
 `gitops/charts/models/templates/servingruntime.yaml` (KServe vLLM
 container: needs a writable HuggingFace/compilation cache, so
-`readOnlyRootFilesystem` is intentionally not set). CloudNativePG
-(`gitops/charts/postgresql`) and the upstream HashiCorp Vault chart
-(`gitops/apps/vault/application.yaml`) are not checked at all here: CNPG's
-operand pods are restricted-PSA-compliant by the operator's own design
-with no user-facing override field, and Vault gets `global.openshift: true`
+`readOnlyRootFilesystem` is intentionally not set). Crunchy Postgres
+Operator (PGO, `gitops/charts/postgresql`) and the upstream HashiCorp
+Vault chart (`gitops/apps/vault/application.yaml`) are not checked at all
+here: PGO's operand pods are restricted-PSA-compliant by the operator's
+own design with no user-facing override field, and Vault gets `global.openshift: true`
 (that chart's own documented OpenShift-compatibility flag) rather than a
 guessed-at securityContext override.
 

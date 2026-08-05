@@ -1,0 +1,13 @@
+# Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL -
+# PGO runs this once at cluster bootstrap, per Crunchy's own Extension
+# Management guide's documented pattern for adding pgvector this way.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.cluster.name }}-init-sql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;

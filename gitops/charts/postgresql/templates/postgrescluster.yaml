@@ -1,0 +1,77 @@
+# Crunchy Postgres Operator (PGO) PostgresCluster CR. Requires PGO,
+# installed separately by ansible/roles/postgresql/tasks/prepare.yml (OLM
+# Subscription) - not managed by this chart.
+#
+# ADR-0052: PGO's operator-managed operand pods run non-root with a
+# restricted-compatible security profile by the operator's own design
+# (same stated project goal CloudNativePG had, and the same reasoning this
+# chart used before this ADR-0015 operator swap) - there is no documented
+# PostgresCluster.spec field for overriding pod/container securityContext,
+# so this is left to the operator's default rather than a guessed-at
+# field. NetworkPolicy hardening (which this repo does fully control,
+# independent of the operator) is applied at the namespace level - see
+# gitops/charts/namespaces/values.yaml's platformNamespaces (zuno-data
+# allows zuno-ai in, covering sales-db-mcp's cross-namespace connection
+# here).
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: {{ .Values.cluster.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  postgresVersion: {{ .Values.postgresVersion }}
+
+  # Crunchy's own UBI-based operand image + pgvector, built by
+  # gitops/charts/postgresql/image/Dockerfile - PGO does not bundle
+  # pgvector out of the box either (see image/README.md).
+  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+  instances:
+    - name: instance1
+      replicas: {{ .Values.cluster.instances }}
+      dataVolumeClaimSpec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.cluster.storageSize }}
+
+  # PGO requires at least one pgBackRest repo - unlike CNPG there is no
+  # way to omit backups entirely. A single local PVC-backed repo is the
+  # minimal equivalent of this demo's "HA/backup hardening deferred to
+  # v1" scope (ADR-0101), not a real off-cluster backup destination.
+  backups:
+    pgbackrest:
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes:
+                - "ReadWriteOnce"
+              resources:
+                requests:
+                  storage: {{ .Values.backups.storageSize }}
+
+  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and (via the
+  # "bring your own password" mechanism - PGO >= 5.6) adopts the password
+  # already seeded into the {{ .Values.cluster.name }}-pguser-{{ .Values.cluster.owner }}
+  # Secret by templates/externalsecret.yaml, rather than generating its
+  # own - the Vault-backed equivalent of CNPG's
+  # bootstrap.initdb.secret.name (ADR-0024: never hand-roll a credential).
+  users:
+    - name: {{ .Values.cluster.owner }}
+      databases:
+        - {{ .Values.cluster.database }}
+
+  # Runs once at bootstrap, against the {{ .Values.cluster.owner }}-owned database created
+  # above (per Crunchy's own Extension Management guide's documented
+  # pattern for adding an extension this way) - NOT verified against a
+  # live cluster from this environment; if it lands in the wrong database
+  # instead, create the extension manually once
+  # (`psql -d {{ .Values.cluster.database }} -c "CREATE EXTENSION IF NOT EXISTS vector;"`)
+  # and adjust this block.
+  databaseInitSQL:
+    name: {{ .Values.cluster.name }}-init-sql
+    key: init.sql

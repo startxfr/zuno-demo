@@ -1,8 +1,8 @@
 ---
-- name: "sql_schema | verify the postgresql role's Cluster is ready"
+- name: "sql_schema | verify the postgresql role's PostgresCluster is ready"
   kubernetes.core.k8s_info:
-    api_version: postgresql.cnpg.io/v1
-    kind: Cluster
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
     namespace: zuno-data
     name: zuno-postgresql
   register: _sql_schema_precheck_pg

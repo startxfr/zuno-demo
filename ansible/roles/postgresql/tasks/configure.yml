@@ -1,28 +1,37 @@
 ---
 # Applies the PostgreSQL GitOps Application (gitops/apps/postgresql), which
-# renders the CNPG Cluster CR and its ExternalSecret via the local chart at
-# gitops/charts/postgresql, then waits for CloudNativePG to report the
-# cluster healthy. See gitops/charts/postgresql/image/README.md for how
-# pgvector is made available to this cluster.
+# renders the PGO PostgresCluster CR and its ExternalSecret via the local
+# chart at gitops/charts/postgresql, then waits for PGO to report the
+# cluster's rollout complete. See gitops/charts/postgresql/image/README.md
+# for how pgvector is made available to this cluster.
 - name: "postgresql | apply the PostgreSQL GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_app_name: postgresql
     gitops_app_wait_retries: 60
 
-- name: "postgresql | wait for the zuno-postgresql Cluster to report a healthy phase"
+# PGO's documented readiness signal (see
+# https://access.crunchydata.com/documentation/postgres-operator/latest/tutorials/cluster-management/administrative-tasks,
+# "kubectl wait postgrescluster prod --for=condition=Progressing=False"):
+# unlike CNPG's single status.phase string, PGO reports a "Progressing"
+# condition that goes False once the rollout is complete. Not verified
+# against a live cluster in this environment - if the condition type/
+# semantics differ on the installed PGO version, adjust this `until`.
+- name: "postgresql | wait for the zuno-postgresql PostgresCluster to finish rolling out"
   kubernetes.core.k8s_info:
-    api_version: postgresql.cnpg.io/v1
-    kind: Cluster
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
     namespace: zuno-data
     name: zuno-postgresql
   register: _postgresql_cluster
   until: >-
     (_postgresql_cluster.resources | default([]) | length) > 0 and
-    (_postgresql_cluster.resources[0].status.phase | default('')) == 'Cluster in healthy state'
+    (_postgresql_cluster.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Progressing') | map(attribute='status') | list
+     | first | default('True')) == 'False'
   retries: 60
   delay: 10
 
 - name: "postgresql | configure summary"
   ansible.builtin.debug:
-    msg: "zuno-postgresql Cluster is healthy in the zuno-data namespace (1 instance, demo scope - see ADR-0101 for v1 HA)."
+    msg: "zuno-postgresql PostgresCluster has finished rolling out in the zuno-data namespace (1 instance, demo scope - see ADR-0101 for v1 HA)."

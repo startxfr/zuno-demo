@@ -65,8 +65,8 @@ verified pod-level override in this KServe/RHOAI 3.5 profile.
 treatment via the already-established `spec.unsupported.podTemplate`
 overlay mechanism (pod-level fields + container `allowPrivilegeEscalation`/
 `capabilities.drop`, no `readOnlyRootFilesystem` for the same
-JVM-writes-its-own-caches reason). CloudNativePG
-(`gitops/charts/postgresql`) is documented as already restricted-PSA
+JVM-writes-its-own-caches reason). Crunchy Postgres Operator (PGO,
+`gitops/charts/postgresql`) is documented as already restricted-PSA
 -compliant by the operator's own design with no user-facing override
 field; the upstream HashiCorp Vault chart
 (`gitops/apps/vault/application.yaml`) gets `global.openshift: true`, that

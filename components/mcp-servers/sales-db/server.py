@@ -37,10 +37,11 @@ from psycopg.rows import dict_row
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-# zuno-postgresql-rw is CNPG's own auto-created, failover-aware
-# read-write Service for the zuno-postgresql Cluster - there is no plain
-# "postgresql" Service (see ansible/roles/postgresql/README.md).
-DB_HOST = os.getenv("PGHOST", "zuno-postgresql-rw.zuno-data.svc.cluster.local")
+# zuno-postgresql-primary is PGO's own auto-created Service for the
+# zuno-postgresql PostgresCluster - there is no plain "postgresql"
+# Service, and no "-rw"-suffixed one either (that was CloudNativePG's
+# convention - see ansible/roles/postgresql/README.md).
+DB_HOST = os.getenv("PGHOST", "zuno-postgresql-primary.zuno-data.svc.cluster.local")
 DB_PORT = os.getenv("PGPORT", "5432")
 DB_NAME = os.getenv("PGDATABASE", "zuno")
 DB_USER = os.getenv("PGUSER")

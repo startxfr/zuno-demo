@@ -1,7 +1,7 @@
 """Environment-driven configuration. No secret is ever hardcoded (ADR-0024)
 -- database credentials arrive as individual env vars mapped from the
 Kubernetes Secret populated by the ExternalSecret this service's chart
-registers against `secret/zuno/postgresql/app` (the same `zuno_app`
+registers against `secret/zuno/postgresql/app` (the same `zunoapp`
 credential the vault role already generates -- see
 ansible/roles/vault/tasks/configure.yml).
 """
@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import os
 
-# zuno-postgresql-rw is CNPG's own auto-created, failover-aware
-# read-write Service for the zuno-postgresql Cluster - there is no plain
-# "postgresql" Service (see ansible/roles/postgresql/README.md).
-PGHOST = os.getenv("PGHOST", "zuno-postgresql-rw.zuno-data.svc")
+# zuno-postgresql-primary is PGO's own auto-created Service for the
+# zuno-postgresql PostgresCluster - there is no plain "postgresql"
+# Service, and no "-rw"-suffixed one either (that was CloudNativePG's
+# convention - see ansible/roles/postgresql/README.md).
+PGHOST = os.getenv("PGHOST", "zuno-postgresql-primary.zuno-data.svc")
 PGPORT = int(os.getenv("PGPORT", "5432"))
 PGDATABASE = os.getenv("PGDATABASE", "zuno")
-PGUSER = os.getenv("PGUSER", "zuno_app")
+PGUSER = os.getenv("PGUSER", "zunoapp")
 PGPASSWORD = os.getenv("PGPASSWORD", "")
 PG_POOL_MIN_SIZE = int(os.getenv("PG_POOL_MIN_SIZE", "1"))
 PG_POOL_MAX_SIZE = int(os.getenv("PG_POOL_MAX_SIZE", "10"))

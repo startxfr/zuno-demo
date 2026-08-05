@@ -54,12 +54,12 @@
                   - psql
                 env:
                   - name: PGHOST
-                    # zuno-postgresql-rw is CNPG's own auto-created,
-                    # failover-aware read-write Service for the
-                    # zuno-postgresql Cluster - there is no plain
-                    # "postgresql" Service (see
-                    # ansible/roles/postgresql/README.md).
-                    value: zuno-postgresql-rw.zuno-data.svc.cluster.local
+                    # zuno-postgresql-primary is PGO's own auto-created
+                    # Service for the zuno-postgresql PostgresCluster -
+                    # there is no plain "postgresql" Service, and no
+                    # "-rw"-suffixed one either (that was CloudNativePG's
+                    # convention - see ansible/roles/postgresql/README.md).
+                    value: zuno-postgresql-primary.zuno-data.svc.cluster.local
                   - name: PGPORT
                     value: "5432"
                   - name: PGDATABASE

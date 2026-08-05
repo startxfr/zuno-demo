@@ -2,14 +2,17 @@
 # for how this is deployed (namespace: zuno-data) and
 # gitops/charts/postgresql/image/README.md for the pgvector image build step.
 
+postgresVersion: 16
+
 image:
-  # Built from gitops/charts/postgresql/image/Dockerfile (stock CNPG operand
-  # image + `apt-get install postgresql-16-pgvector`). This is a placeholder
-  # internal-registry reference - an operator must build and push this image
-  # once (see image/README.md) before the Cluster below can start; point
-  # this at wherever your cluster's image registry actually is.
+  # Built from gitops/charts/postgresql/image/Dockerfile (Crunchy's own
+  # UBI-based operand image + pgvector, since PGO does not bundle pgvector
+  # out of the box either - see image/README.md). This is a placeholder
+  # internal-registry reference - an operator must build and push this
+  # image once (see image/README.md) before the PostgresCluster below can
+  # start; point this at wherever your cluster's image registry actually is.
   repository: image-registry.zuno-demo.internal/zuno/postgresql-pgvector
-  tag: "16-bookworm"
+  tag: "16-crunchy"
 
 cluster:
   name: zuno-postgresql
@@ -18,7 +21,20 @@ cluster:
   instances: 1
   storageSize: 5Gi
   database: zuno
-  owner: zuno_app
+  # No underscore/hyphen: PGO derives a Kubernetes Secret name directly
+  # from this value ("<cluster>-pguser-<owner>", RFC 1123 label rules),
+  # and unquoted PostgreSQL identifiers can't contain hyphens either -
+  # lowercase-letters-and-digits-only is valid in both (see
+  # ansible/roles/postgresql/README.md).
+  owner: zunoapp
+
+# PGO requires at least one pgBackRest repository configured - unlike
+# CNPG, there is no way to omit backups entirely. A single local
+# PVC-backed repo is the minimal equivalent of this demo's "HA/backup
+# hardening deferred to v1" scope (ADR-0101) rather than a real off-cluster
+# backup destination.
+backups:
+  storageSize: 5Gi
 
 credentials:
   # Path under the vault-backend ClusterSecretStore's "secret" KV v2 mount
@@ -26,6 +42,10 @@ credentials:
   # by ansible/roles/vault/tasks/configure.yml - this chart only consumes
   # it, never regenerates or hardcodes it, per ADR-0024).
   vaultPath: zuno/postgresql/app
-  secretName: zuno-postgresql-app-credentials
+  # PGO's own fixed naming convention for a user's auto-managed Secret is
+  # "<cluster>-pguser-<user>" - not a freely-chosen name like CNPG's
+  # bootstrap.initdb.secret.name was, so this is templated from
+  # cluster.name/cluster.owner in templates/externalsecret.yaml rather than
+  # set here, to avoid two places needing to agree on the same string.
   secretStoreName: vault-backend
   refreshInterval: 1h

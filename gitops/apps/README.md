@@ -10,7 +10,7 @@ single scope can be configured without a full sync.
 
 Each `Application.spec.source` points either at an upstream Helm chart
 (`repoURL` + `chart` + `targetRevision`) for well-known third-party software
-(Keycloak Operator, CloudNativePG, vLLM/KServe runtimes, External Secrets
+(Keycloak Operator, Crunchy Postgres Operator, vLLM/KServe runtimes, External Secrets
 Operator config), or at `gitops/charts/<component>` in this repository for
 Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).

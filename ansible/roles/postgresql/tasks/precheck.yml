@@ -21,30 +21,33 @@
   ansible.builtin.fail:
     msg: >-
       applications.argoproj.io CRD not found. Run `make prepare argocd`
-      before preparing postgresql - the Cluster CR is applied as a GitOps
-      Application (see ansible/roles/postgresql/tasks/configure.yml).
+      before preparing postgresql - the PostgresCluster CR is applied as a
+      GitOps Application (see ansible/roles/postgresql/tasks/configure.yml).
   when: (_postgresql_precheck_argocd_crd.resources | default([]) | length) == 0
 
-- name: "postgresql | verify the CloudNativePG operator is available in the catalog"
+# Crunchy's PGO (ADR-0015 doesn't name a specific operator - see
+# ansible/roles/postgresql/README.md for why this repo picked PGO over
+# CloudNativePG) is published from redhat-operators, one of OpenShift's
+# four default CatalogSources - unlike CloudNativePG (which needed a
+# manual operatorhubio-catalog fallback on at least one real cluster),
+# no fallback-catalog logic is needed here: a simple existence check is
+# enough, the same style as ansible/roles/{argocd,external_secrets,keycloak}.
+- name: "postgresql | verify the Crunchy Postgres Operator is available in the catalog"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
     kind: PackageManifest
     namespace: openshift-marketplace
-    name: cloudnative-pg
+    name: crunchy-postgres-operator
   register: _postgresql_precheck_pkg
 
-- name: "postgresql | fail if the CloudNativePG operator is not published in this cluster's catalog"
+- name: "postgresql | fail if the Crunchy Postgres Operator is not published in this cluster's catalog"
   ansible.builtin.fail:
     msg: >-
-      cloudnative-pg was not found in openshift-marketplace. `make prepare
-      postgresql` will automatically register the operatorhubio-catalog
-      fallback (quay.io/operatorhubio/catalog:latest) and retry discovery
-      from there before failing for real - precheck itself stays
-      read-only and never registers a CatalogSource (matching every other
-      role's precheck/prepare split in this repo), so it still reports
-      this as a hard stop here. See ansible/roles/postgresql/README.md.
+      crunchy-postgres-operator was not found in openshift-marketplace.
+      Confirm the redhat-operators CatalogSource is enabled. See
+      ansible/roles/postgresql/README.md.
   when: (_postgresql_precheck_pkg.resources | default([]) | length) == 0
 
 - name: "postgresql | precheck summary"
   ansible.builtin.debug:
-    msg: "CloudNativePG operator is available in the catalog; cluster reachable and ArgoCD installed."
+    msg: "Crunchy Postgres Operator is available in the catalog; cluster reachable and ArgoCD installed."

@@ -34,7 +34,8 @@ this schema is future work - out of scope for this v0 demo.
   (ADR-0025).
 
 `ansible/roles/sql_schema` applies these files, in order, against the
-CloudNativePG-managed cluster provisioned by `ansible/roles/postgresql`.
+Crunchy Postgres Operator (PGO)-managed cluster provisioned by
+`ansible/roles/postgresql`.
 
 ## Legacy table -> native table mapping
 
