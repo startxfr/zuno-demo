@@ -32,7 +32,7 @@
     namespace: zuno-data
     pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv get -format=json secret/zuno/providers/{{ item }}"
+    command: "vault kv get -format=json secret/zuno/providers/{{ provider }}"
   environment:
     VAULT_TOKEN: "{{ _llm_vault_creds.resources[0].data.root_token | b64decode }}"
   loop:
@@ -41,7 +41,8 @@
     - anthropic
     - mistral
   loop_control:
-    label: "{{ item }}"
+    loop_var: provider
+    label: "{{ provider }}"
   register: _llm_existing_provider_secrets
   changed_when: false
   failed_when: false
@@ -52,13 +53,14 @@
     namespace: zuno-data
     pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv put secret/zuno/providers/{{ item.item }} api_key=__placeholder__"
+    command: "vault kv put secret/zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
   environment:
     VAULT_TOKEN: "{{ _llm_vault_creds.resources[0].data.root_token | b64decode }}"
   loop: "{{ _llm_existing_provider_secrets.results }}"
   loop_control:
-    label: "{{ item.item }}"
-  when: item.rc != 0
+    loop_var: provider_result
+    label: "{{ provider_result.provider }}"
+  when: provider_result.rc != 0
   no_log: true
 
 - name: "llm | operator action required"

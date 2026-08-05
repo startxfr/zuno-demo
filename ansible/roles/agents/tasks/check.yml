@@ -21,28 +21,31 @@
 # (index [1]) to from_yaml.
 - name: "agents | load each catalog-only agent's OKF Markdown bundle frontmatter"
   ansible.builtin.set_fact:
-    _agents_catalog_okf: "{{ _agents_catalog_okf | default({}) | combine({item: (lookup('ansible.builtin.file', zuno_repo_root + '/agents/' + item + '/agent.okf.md').split('---'))[1] | from_yaml}) }}"
+    _agents_catalog_okf: "{{ _agents_catalog_okf | default({}) | combine({catalog_agent: (lookup('ansible.builtin.file', zuno_repo_root + '/agents/' + catalog_agent + '/agent.okf.md').split('---'))[1] | from_yaml}) }}"
   loop:
     - comage
     - advantage
     - finage
     - arkos
+  loop_control:
+    loop_var: catalog_agent
 
 - name: "agents | fail if a catalog-only agent's OKF bundle is structurally invalid"
   ansible.builtin.fail:
     msg: >-
-      agents/{{ item.key }}/agent.okf.md is structurally invalid: expected
+      agents/{{ catalog_okf.key }}/agent.okf.md is structurally invalid: expected
       okf_version v0.2, type agent, zuno.status placeholder -
-      got okf_version={{ item.value.okf_version | default('missing') }}
-      type={{ item.value.type | default('missing') }}
-      status={{ (item.value.zuno | default({})).status | default('missing') }}.
+      got okf_version={{ catalog_okf.value.okf_version | default('missing') }}
+      type={{ catalog_okf.value.type | default('missing') }}
+      status={{ (catalog_okf.value.zuno | default({})).status | default('missing') }}.
   when: >-
-    item.value.okf_version | default('') != 'v0.2' or
-    item.value.type | default('') != 'agent' or
-    (item.value.zuno | default({})).status | default('') != 'placeholder'
+    catalog_okf.value.okf_version | default('') != 'v0.2' or
+    catalog_okf.value.type | default('') != 'agent' or
+    (catalog_okf.value.zuno | default({})).status | default('') != 'placeholder'
   loop: "{{ _agents_catalog_okf | dict2items }}"
   loop_control:
-    label: "{{ item.key }}"
+    loop_var: catalog_okf
+    label: "{{ catalog_okf.key }}"
 
 - name: "agents | catalog-only structural check summary"
   ansible.builtin.debug:

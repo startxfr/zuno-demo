@@ -104,13 +104,14 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      vault kv put secret/zuno/{{ item.key }}
-      username={{ item.value.username }} password={{ item.value.password }}
+      vault kv put secret/zuno/{{ generated_secret.key }}
+      username={{ generated_secret.value.username }} password={{ generated_secret.value.password }}
   environment:
     VAULT_TOKEN: "{{ _vault_root_token }}"
   loop: "{{ _vault_generated_secrets | dict2items }}"
   loop_control:
-    label: "{{ item.key }}"
+    loop_var: generated_secret
+    label: "{{ generated_secret.key }}"
   vars:
     _vault_generated_secrets:
       keycloak/admin:
@@ -182,14 +183,15 @@
     namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv get -format=json secret/zuno/{{ item }}"
+    command: "vault kv get -format=json secret/zuno/{{ secret_path }}"
   environment:
     VAULT_TOKEN: "{{ _vault_root_token }}"
   loop:
     - google-oauth/client
     - smtp/technical
   loop_control:
-    label: "{{ item }}"
+    loop_var: secret_path
+    label: "{{ secret_path }}"
   register: _vault_existing_secrets
   changed_when: false
   failed_when: false
@@ -200,13 +202,14 @@
     namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv put secret/zuno/{{ item.item }} _placeholder=true"
+    command: "vault kv put secret/zuno/{{ secret_result.secret_path }} _placeholder=true"
   environment:
     VAULT_TOKEN: "{{ _vault_root_token }}"
   loop: "{{ _vault_existing_secrets.results }}"
   loop_control:
-    label: "{{ item.item }}"
-  when: item.rc != 0
+    loop_var: secret_result
+    label: "{{ secret_result.secret_path }}"
+  when: secret_result.rc != 0
   no_log: true
 
 - name: "vault | operator action required"
