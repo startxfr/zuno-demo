@@ -4,6 +4,15 @@
 # Tekos's BFF today (cross-namespace, zuno-agent-tekos) - the equivalent
 # rule for any other agent's BFF, once active, is a documented addition
 # here, not an automatic grant.
+#
+# ADR-0053: also allows the same-namespace "acceptance-gate" identity the
+# `make check` Job runs as (ansible/roles/agents/tasks/run_acceptance_gate.yml)
+# - a real, narrowly-scoped synthetic-test caller, added the same
+# deliberate way as every other entry here, never a namespace-wide
+# baseline. sales-db-mcp's NetworkPolicy deliberately does NOT get the same
+# addition - see evaluations/tekos/security_checks.py's
+# direct_call_to_sales_db_mcp_denied_without_gateway_token for why that
+# absence is itself part of what ADR-0053's gate proves.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -26,6 +35,9 @@ spec:
             matchLabels:
               app.kubernetes.io/component: bff
               zuno.io/agent: tekos
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: acceptance-gate
       ports:
         - protocol: TCP
           port: 8080

@@ -5,6 +5,15 @@ The 20 acceptance scenarios (ADR-0027) and the 75% pass-threshold report
 agents have no evaluation scenarios yet; they have no runtime workflow to
 evaluate (`evaluations/{comage,advantage,finage,arkos}/README.md`).
 
+`run_acceptance_gate.py` (ADR-0053) is the layered entrypoint `make check`
+actually invokes (see `ansible/roles/agents/tasks/check.yml`'s
+`run_acceptance_gate.yml` include, which runs it as a one-shot in-cluster
+Job): it combines this file's 20 scenarios (75% threshold) with
+`security_checks.py` and `gate_checks.py` (both 100% mandatory) into one
+exit code and one machine-readable JSON summary line. Run any of the three
+modules directly for a narrower check, or the combined gate for what
+`make check` runs:
+
 ```bash
 cd evaluations/tekos
 pip install -r requirements.txt
@@ -12,17 +21,28 @@ export KEYCLOAK_URL=https://sso.apps.<cluster-domain>
 export FRONTEND_URL=https://tekos.apps.<cluster-domain>
 export TEKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret secret/zuno/keycloak/tekos-frontend)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password secret/zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL
-# default to their in-cluster Service DNS names - override if running this
-# from outside the cluster via a port-forward instead.
-python3 run_scenarios.py
+# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL /
+# AI_GATEWAY_URL default to their in-cluster Service DNS names - override if
+# running this from outside the cluster via a port-forward instead. Reaching
+# those in-cluster names at all requires running from a network location the
+# ADR-0037/ADR-0052 NetworkPolicies actually allow - see
+# ansible/roles/agents/tasks/run_acceptance_gate.yml for how `make check`'s
+# own Job satisfies that (the "acceptance-gate" workload identity, narrowly
+# allow-listed alongside the other real per-workload callers).
+python3 run_acceptance_gate.py     # everything make check runs, one exit code
+python3 run_scenarios.py           # just the 20 scenarios
 ```
 
 Scenarios are defined in `scenarios.yaml` (id, title, `type`, and
 type-specific parameters); `run_scenarios.py` maps each `type` to one
 handler function and prints a pass/fail table plus the overall rate against
-the 75% threshold, exiting non-zero on failure so it's CI-friendly once
-`.github/workflows/` exists (currently none do - see `.github/README.md`).
+the 75% threshold, exiting non-zero on failure so it's CI-friendly once a
+live cluster is reachable from a GitHub Actions runner (not yet true for
+this project - see `.github/README.md`). `gate_checks.py`'s one check needs
+no live cluster (same as `model_router_fails_closed`/
+`model_router_prefers_local` above) and is wired into
+`.github/workflows/lint.yml`'s `policy-as-code` job for exactly that
+reason.
 
 Coverage: portal/tile access gating (scenarios 1, 2, 4-6), authentication
 (3), the chat contract synchronous and streaming (7-9), tool-triggered

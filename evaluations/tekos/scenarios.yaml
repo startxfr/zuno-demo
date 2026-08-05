@@ -23,9 +23,10 @@ scenarios:
     type: portal_requires_login
 
   - id: 3
-    title: Consultant persona can authenticate
+    title: Consultant persona can authenticate and the token carries the expected group claims
     type: keycloak_login
     persona: consultant-user-01
+    expect_groups: [consultant, agent_tekos]
 
   - id: 4
     title: Tekos tile is enabled for a consultant-group user

@@ -1,0 +1,214 @@
+---
+# ADR-0053: runs evaluations/tekos/run_acceptance_gate.py (the 20 Tekos
+# scenarios at a 75% threshold, plus security_checks.py and gate_checks.py
+# at 100% mandatory) as a one-shot in-cluster Job - not from the Ansible
+# control node directly, because most of what this gate must call
+# (agent-runtime, mcp-gateway, ai-gateway, rag-service) has no OpenShift
+# Route and is only reachable over in-cluster Service DNS (see
+# evaluations/tekos/README.md). Same "Job, not a GitOps Application"
+# reasoning as ansible/roles/sql_schema/tasks/configure.yml: there is
+# nothing declaratively running about a test run once it has finished.
+#
+# The Job runs in zuno-ai, labeled app.kubernetes.io/name: acceptance-gate
+# - a real, narrowly-scoped synthetic-test workload identity, explicitly
+# allow-listed (and nowhere else) in gitops/charts/{agent-runtime,
+# mcp-gateway,ai-gateway}/templates/networkpolicy.yaml and the new
+# gitops/charts/tekos/templates/networkpolicy.yaml, the same deliberate,
+# additive way every other legitimate caller in this repository is
+# allow-listed - never a namespace-wide baseline. rag-service is already
+# reachable from any zuno-ai pod via zuno-data's namespace-wide platform
+# baseline (gitops/charts/namespaces/values.yaml). sales-db-mcp is
+# deliberately NOT extended - see security_checks.py's
+# direct_call_to_sales_db_mcp_denied_without_gateway_token, which now
+# treats that NetworkPolicy-level denial as itself part of what it proves.
+#
+# KEYCLOAK_URL uses the Keycloak custom resource's own actual hostname
+# (gitops/charts/keycloak/templates/keycloak.yaml: "keycloak.<domain>") -
+# ground truth, since it's what the Keycloak Operator's Route is actually
+# created with. This surfaced a real, separate, pre-existing inconsistency
+# while wiring this up: gitops/charts/tekos/templates/_helpers.tpl's
+# keycloakIssuerUrl and every eval script's KEYCLOAK_URL *default* instead
+# assume a "sso.<domain>" convention that no Route in this repository
+# actually creates. That mismatch is a real bug, but it lives in
+# ADR-0032/0033's already-"Implemented" identity plumbing, not in ADR-0053's own
+# scope (the acceptance gate itself) - flagged here and in ADR-0053's
+# Implementation state rather than silently fixed as a drive-by change
+# across three other charts' checked-in values.
+
+- name: "acceptance-gate | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "acceptance-gate | ensure the zuno-ai namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-ai
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "acceptance-gate | read the demo-persona password from zuno-auth (ADR-0041)"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: demo-personas-password
+  register: _gate_demo_password_secret
+  no_log: true
+
+- name: "acceptance-gate | read the tekos-frontend client secret from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: tekos-frontend-client-secret
+  register: _gate_client_secret_secret
+  no_log: true
+
+- name: "acceptance-gate | fail if either Keycloak secret is missing"
+  ansible.builtin.fail:
+    msg: >-
+      demo-personas-password / tekos-frontend-client-secret not found in
+      zuno-auth - run `make configure keycloak` first (see
+      ansible/roles/keycloak/README.md).
+  when: >-
+    (_gate_demo_password_secret.resources | default([]) | length) == 0 or
+    (_gate_client_secret_secret.resources | default([]) | length) == 0
+
+- name: "acceptance-gate | copy the two credentials into a zuno-ai Secret the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: acceptance-gate-credentials
+        namespace: zuno-ai
+        labels:
+          zuno.io/managed-by: ansible
+      type: Opaque
+      data:
+        demo-persona-password: "{{ _gate_demo_password_secret.resources[0].data.password }}"
+        tekos-frontend-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
+  no_log: true
+
+- name: "acceptance-gate | build the evaluations/tekos ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: acceptance-gate-scripts
+        namespace: zuno-ai
+        labels:
+          zuno.io/managed-by: ansible
+      data:
+        requirements.txt: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/requirements.txt') }}"
+        scenarios.yaml: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/scenarios.yaml') }}"
+        run_scenarios.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/run_scenarios.py') }}"
+        security_checks.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/security_checks.py') }}"
+        gate_checks.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/gate_checks.py') }}"
+        run_acceptance_gate.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/run_acceptance_gate.py') }}"
+
+- name: "acceptance-gate | delete any previous gate Job (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: zuno-acceptance-gate
+    namespace: zuno-ai
+    wait: true
+
+- name: "acceptance-gate | run the acceptance-gate Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: zuno-acceptance-gate
+        namespace: zuno-ai
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        backoffLimit: 0
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: acceptance-gate
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: acceptance-gate
+                image: "docker.io/library/python:3.12-slim"
+                command:
+                  - sh
+                  - -c
+                  - "pip install --quiet --no-cache-dir -r /gate/requirements.txt && python3 /gate/run_acceptance_gate.py"
+                workingDir: /gate
+                env:
+                  - name: PYTHONUNBUFFERED
+                    value: "1"
+                  - name: KEYCLOAK_URL
+                    value: "https://keycloak.{{ cluster_base_domain }}"
+                  - name: FRONTEND_URL
+                    value: "https://tekos.{{ cluster_base_domain }}"
+                  - name: DEMO_PERSONA_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: acceptance-gate-credentials
+                        key: demo-persona-password
+                  - name: TEKOS_FRONTEND_CLIENT_SECRET
+                    valueFrom:
+                      secretKeyRef:
+                        name: acceptance-gate-credentials
+                        key: tekos-frontend-client-secret
+                volumeMounts:
+                  - name: gate
+                    mountPath: /gate
+            volumes:
+              - name: gate
+                configMap:
+                  name: acceptance-gate-scripts
+
+- name: "acceptance-gate | wait for the Job to reach a terminal state"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai
+    name: zuno-acceptance-gate
+  register: _gate_job
+  until: >-
+    (_gate_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_gate_job.resources[0].status.failed | default(0)) > 0
+  retries: 60
+  delay: 15
+
+- name: "acceptance-gate | find the Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai
+    label_selectors:
+      - "job-name=zuno-acceptance-gate"
+  register: _gate_pod
+
+- name: "acceptance-gate | fetch the gate's full output (scenario table, security checks, JSON summary)"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai
+    name: "{{ _gate_pod.resources[0].metadata.name }}"
+  register: _gate_log
+  when: (_gate_pod.resources | default([]) | length) > 0
+
+- name: "acceptance-gate | print the gate's output"
+  ansible.builtin.debug:
+    msg: "{{ _gate_log.log_lines | default(['no pod/log found']) }}"
+
+- name: "acceptance-gate | fail the check if the mandatory gate did not pass"
+  ansible.builtin.fail:
+    msg: >-
+      The ADR-0053 acceptance gate did not pass (Job
+      zuno-acceptance-gate/zuno-ai succeeded={{ _gate_job.resources[0].status.succeeded | default(0) }}
+      failed={{ _gate_job.resources[0].status.failed | default(0) }}) - see the output above
+      for which scenario/security check/gate check failed.
+  when: (_gate_job.resources[0].status.succeeded | default(0)) == 0

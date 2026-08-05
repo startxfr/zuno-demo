@@ -118,10 +118,36 @@ def portal_requires_login(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code}")
 
 
+def _decode_claims_without_verifying(token: str) -> Dict[str, Any]:
+    """Decodes a JWT's payload segment for claim inspection only - no
+    signature verification. Safe here specifically because the token was
+    just obtained directly from Keycloak over TLS in get_token() above; this
+    never validates an externally-supplied token (that's auth.py's job in
+    every service, exercised by test_auth.py instead).
+    """
+    import base64
+
+    payload_b64 = token.split(".")[1]
+    padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+    return json.loads(base64.urlsafe_b64decode(padded))
+
+
 def keycloak_login(s: Dict[str, Any]) -> ScenarioResult:
+    """ADR-0053 "Keycloak login/claims": proves both that the persona can
+    authenticate at all, and that the resulting token actually carries the
+    group claims (ADR-0040's business-role/agent-entitlement groups) every
+    downstream authorization decision (BFF, MCP Gateway) depends on -
+    login succeeding with an empty/wrong claim set would pass a
+    "login"-only check while still breaking every scenario after it.
+    """
     try:
         token = get_token(s["persona"])
-        return ScenarioResult(s["id"], s["title"], bool(token), "token acquired")
+        claims = _decode_claims_without_verifying(token)
+        groups = [g.lstrip("/") for g in claims.get("groups", [])]
+        expected = s.get("expect_groups", [])
+        missing = [g for g in expected if g not in groups]
+        ok = bool(token) and not missing
+        return ScenarioResult(s["id"], s["title"], ok, f"groups={groups} missing={missing}")
     except Exception as exc:
         return ScenarioResult(s["id"], s["title"], False, str(exc))
 
@@ -361,7 +387,7 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
 }
 
 
-def main() -> int:
+def run() -> List[ScenarioResult]:
     import pathlib
 
     scenarios_path = pathlib.Path(__file__).parent / "scenarios.yaml"
@@ -377,6 +403,11 @@ def main() -> int:
             results.append(handler(s))
         except Exception as exc:  # noqa: BLE001 - a scenario erroring is a fail, not a crash
             results.append(ScenarioResult(s["id"], s["title"], False, f"unhandled error: {exc}"))
+    return results
+
+
+def main() -> int:
+    results = run()
 
     passed = sum(1 for r in results if r.passed)
     total = len(results)

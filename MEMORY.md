@@ -526,7 +526,34 @@ planning narrative - see README.md's "v0 build status" for a summary:
   cut - see `RELEASING.md` for that process, deliberately not fabricated
   by rewriting `targetRevision: main` to a tag that doesn't exist yet.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
-  (`evaluations/tekos/`, ADR-0027/ADR-0028).
+  (`evaluations/tekos/`, ADR-0027/ADR-0028), now one layer of ADR-0053's
+  combined acceptance/security gate (see below).
+- `make check` (ADR-0053) is the full layered gate, not a health check:
+  `ansible/roles/agents/tasks/check.yml` still does the OKF-structural and
+  frontend-`/healthz` smoke checks, then hands off to
+  `run_acceptance_gate.yml`, which runs `evaluations/tekos/
+  run_acceptance_gate.py` as a one-shot in-cluster Job in `zuno-ai`
+  (most of what it calls - agent-runtime, mcp-gateway, ai-gateway,
+  rag-service - has no Route, only in-cluster Service DNS). That script
+  combines the 20 Tekos scenarios (75% threshold) with
+  `security_checks.py` and the new `gate_checks.py` (both 100% mandatory)
+  into one exit code and one JSON summary line. New `acceptance-gate`
+  NetworkPolicy allow-list entries (`gitops/charts/{agent-runtime,
+  mcp-gateway,ai-gateway,tekos}`) exist only for this narrowly-scoped
+  synthetic-test identity - `sales-db-mcp` deliberately excluded, since
+  its ADR-0037 bypass-denial test now depends on that exact exclusion
+  (fixed a real bug where a NetworkPolicy-level deny, a connection
+  timeout, would have been misreported as the check erroring rather than
+  passing). Closed a real ADR-0053 gap ("missing/expired tokens"): new
+  fully-offline `components/{agent-runtime,mcp-gateway}/tests/test_auth.py`
+  mint their own RSA keypair and prove, by execution, that an expired or
+  untrusted-key-signed JWT is rejected - no live Keycloak needed, now in
+  CI. Surfaced but deliberately did not fix (out of this ADR's scope, and
+  already-"Implemented" elsewhere): `keycloak.<domain>` is the Keycloak
+  CR's real hostname, while the tekos frontend's OIDC issuer URL and every
+  eval script's `KEYCLOAK_URL` default assume `sso.<domain>`, which no
+  Route in this repository creates - a real bug in ADR-0032/0033's
+  identity plumbing, flagged in ADR-0053's Implementation state.
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos
   deploys as a plain `Deployment` instead.
 

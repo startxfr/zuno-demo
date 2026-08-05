@@ -56,7 +56,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v1 | To be implemented | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0 | Implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
-| [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | To be implemented | Make make check an end-to-end acceptance and security gate |
+| [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | Implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | To be implemented | Repository review change-set index |
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v1 | Proposed | Provide HA for shared agent platform services |

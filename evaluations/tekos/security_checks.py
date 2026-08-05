@@ -8,7 +8,12 @@ Kept separate from scenarios.yaml/run_scenarios.py rather than added as
 scenarios 21+: ADR-0027 fixes Tekos's acceptance suite at exactly 20
 scenarios, and these are security-negative checks for specific ADRs, not
 part of that fixed acceptance count. Reuses run_scenarios.py's token-fetch
-helpers rather than duplicating them.
+helpers rather than duplicating them. gate_checks.py holds ADR-0053's
+remaining non-negative, non-scenario capability checks (currently just
+"permitted SaaS fallback"). run_acceptance_gate.py (ADR-0053) is the single
+entrypoint `make check` actually invokes, combining this module (100%
+mandatory), gate_checks.py (100% mandatory) and run_scenarios.py (75%
+threshold) into one gate with one exit code.
 
 This cannot be executed in the sandbox this repo was built in (no live
 cluster) - written to be genuinely runnable once one exists, same as
@@ -196,21 +201,35 @@ def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
     bypasses the MCP Gateway entirely (no X-Zuno-Gateway-Token, the shared
     workload-identity secret only the gateway holds - ansible/roles/vault/
     tasks/configure.yml, secret/zuno/mcp/gateway-workload-token) must be
-    denied with 401 by the server itself, proving network location alone
-    (assuming this check even runs from an authorized network path) is not
-    sufficient - the workload-identity check is a real, independent second
-    layer, not merely documentation.
+    denied - by the server's own workload-identity check (401) if the
+    caller's network path can reach it at all, or by the NetworkPolicy
+    boundary itself (gitops/charts/mcp-sales-db's NetworkPolicy, ADR-0052)
+    if it can't. Since ADR-0053 wires this into `make check` as a Job
+    running from inside the cluster (ansible/roles/agents/tasks/check.yml),
+    that NetworkPolicy - which allows ingress only from the mcp-gateway
+    pod, deliberately never extended to the acceptance-gate identity - is
+    now the layer this check actually exercises in practice: a connection
+    timeout/refusal is just as valid a "denied" outcome as an explicit 401,
+    proving network location alone is already sufficient here and the
+    workload-identity check is defense in depth, not the only layer.
     """
-    resp = httpx.post(
-        f"{SALES_DB_MCP_URL}/mcp",
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": "get_customer", "arguments": {"customer_id": 1}},
-        },
-        timeout=15,
-    )
+    try:
+        resp = httpx.post(
+            f"{SALES_DB_MCP_URL}/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "get_customer", "arguments": {"customer_id": 1}},
+            },
+            timeout=15,
+        )
+    except httpx.TransportError as exc:
+        return CheckResult(
+            "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+            True,
+            f"denied at the network layer (NetworkPolicy) before any HTTP response: {exc}",
+        )
     ok = resp.status_code == 401
     return CheckResult(
         "direct_call_to_sales_db_mcp_denied_without_gateway_token",
@@ -230,13 +249,18 @@ CHECKS = [
 ]
 
 
-def main() -> int:
+def run() -> list:
     results = []
     for check in CHECKS:
         try:
             results.append(check())
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
             results.append(CheckResult(check.__name__, False, f"unhandled error: {exc}"))
+    return results
+
+
+def main() -> int:
+    results = run()
 
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
