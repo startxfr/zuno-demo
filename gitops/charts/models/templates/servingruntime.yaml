@@ -1,7 +1,7 @@
 # Namespace-scoped ServingRuntime (KServe), not ClusterServingRuntime, so it
 # stays inside this chart's namespace-per-agent-adjacent isolation model
 # (the model-serving layer is shared platform, per ADR-0007, but scoped to
-# zuno-ai rather than the default ClusterServingRuntime catalog).
+# zuno-ai-run rather than the default ClusterServingRuntime catalog).
 apiVersion: serving.kserve.io/v1alpha1
 kind: ServingRuntime
 metadata:

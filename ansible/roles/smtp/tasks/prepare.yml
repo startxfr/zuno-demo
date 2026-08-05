@@ -1,20 +1,21 @@
 ---
-# smtp is a PREP_COMPONENT (reachable via `make prepare smtp`), not a
-# CONFIG_SCOPE - there is no SMTP server to install, only the technical
+# smtp is a Day 0 component (ADR-0056, reachable via `make d0 install
+# smtp`) with a documented no-op configure.yml - there is no SMTP server
+# to install, only the technical
 # mail identity's credential to expose via ExternalSecret, seeded as an
 # empty placeholder at secret/zuno/smtp/technical by
 # ansible/roles/vault/tasks/configure.yml. An operator must populate it
 # (`vault kv put secret/zuno/smtp/technical host=... username=... password=...`)
 # before whichever service sends the Comage weekly report (out of scope
 # here) can actually send mail.
-- name: "smtp | ensure the zuno-ai namespace exists"
+- name: "smtp | ensure the zuno-ai-run namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-ai
+        name: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
 
@@ -26,7 +27,7 @@
       kind: ExternalSecret
       metadata:
         name: smtp-technical-credentials
-        namespace: zuno-ai
+        namespace: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
       spec:

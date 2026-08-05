@@ -14,4 +14,4 @@ The MVP assumes an existing OpenShift 4.20 AWS IPI cluster. Preparation/configur
 - DNS/routes/certificates;
 - credentials for approved model providers and integrations.
 
-`make precheck` verifies prerequisites and `make prepare` installs missing components managed by this repository.
+`make day0|d0 check` verifies prerequisites and `make day0|d0 install` installs missing components managed by this repository (ADR-0056).

@@ -1,8 +1,8 @@
 # ADR-0037's core case: sales-db-mcp must accept traffic ONLY from the MCP
-# Gateway, not from any other pod in zuno-ai (agent-runtime and ai-gateway
+# Gateway, not from any other pod in zuno-ai-run (agent-runtime and ai-gateway
 # are same-namespace neighbors but must NOT reach this server directly -
 # "Direct agent-runtime-to-MCP-server paths are forbidden"). This is why
-# zuno-ai has no namespace-wide baseline NetworkPolicy (see
+# zuno-ai-run has no namespace-wide baseline NetworkPolicy (see
 # gitops/charts/namespaces/values.yaml's platformNamespaces comment) - a
 # broad "allow same namespace" rule would silently defeat exactly this
 # restriction (Kubernetes unions the allowed ingress of every NetworkPolicy

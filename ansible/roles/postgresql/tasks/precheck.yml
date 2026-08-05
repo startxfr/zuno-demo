@@ -20,7 +20,7 @@
 - name: "postgresql | fail if ArgoCD is not yet installed"
   ansible.builtin.fail:
     msg: >-
-      applications.argoproj.io CRD not found. Run `make prepare argocd`
+      applications.argoproj.io CRD not found. Run `make d0 install argocd`
       before preparing postgresql - the PostgresCluster CR is applied as a
       GitOps Application (see ansible/roles/postgresql/tasks/configure.yml).
   when: (_postgresql_precheck_argocd_crd.resources | default([]) | length) == 0
@@ -46,7 +46,7 @@
   ansible.builtin.fail:
     msg: >-
       No PackageManifest matching /crunchy/i was found in
-      openshift-marketplace. `make prepare postgresql` will still attempt
+      openshift-marketplace. `make d0 install postgresql` will still attempt
       the operatorhubio-catalog fallback and retry before failing for
       real - precheck itself stays read-only (matching every other role's
       precheck/prepare split in this repo), so it reports this as a hard

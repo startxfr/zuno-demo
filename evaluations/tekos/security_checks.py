@@ -34,7 +34,7 @@ from run_scenarios import BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers
 
 # Not part of run_scenarios.py's URL set since none of the 20 fixed
 # scenarios call ai-gateway directly (only agent-runtime does, internally).
-AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai.svc.cluster.local:8080")
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080")
 
 # Same reasoning: only the MCP Gateway calls this directly in normal
 # operation (components/mcp-gateway/app/downstream.py) - this check
@@ -42,7 +42,7 @@ AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai.svc.clus
 # unauthorized direct caller (ADR-0037), independent of the NetworkPolicy
 # layer (gitops/charts/mcp-sales-db's NetworkPolicy), which an HTTP-level
 # check like this can't directly exercise.
-SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai.svc.cluster.local:8000")
+SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 
 @dataclass

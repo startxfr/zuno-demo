@@ -1,15 +1,11 @@
 ---
-# Applies both agent-surface GitOps Applications: the five namespaces
-# (ADR-0023) first, then the Tekos workloads that land in zuno-agent-tekos.
-# main.yml (invoked by ansible/playbooks/install.yml, i.e. `make install`)
-# includes this same file so one entry point covers `make install`. There is
-# no "agents" CONFIG_SCOPE (only "api", for re-applying just the Tekos
-# workloads) - see README.md.
-- name: "agents | apply the namespaces GitOps Application"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  vars:
-    gitops_app_name: agents
-
+# Applies the Tekos frontend/BFF workloads GitOps Application. Namespace
+# creation used to happen here too, but moved to the new `namespaces` Day 0
+# role (ADR-0056) - this role is now Day 1's "agents" run component, and
+# assumes namespaces already exist (see precheck.yml). The formerly
+# separate "api" role/CONFIG_SCOPE was retired as part of the same change:
+# once namespace-apply moved out, it was doing exactly this and nothing
+# else - one role for "apply the Tekos workloads Application" is enough.
 - name: "agents | apply the Tekos workloads GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

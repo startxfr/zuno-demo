@@ -1,4 +1,4 @@
-# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai namespace
+# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai-run namespace
 # baseline (see gitops/charts/namespaces/values.yaml's platformNamespaces
 # comment). serving.kserve.io/inferenceservice is KServe's own pod label
 # on every predictor pod it creates for this InferenceService.

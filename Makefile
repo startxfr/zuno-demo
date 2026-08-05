@@ -5,11 +5,16 @@ ANSIBLE_PLAYBOOK ?= ansible-playbook
 INVENTORY ?= ansible/inventories/demo/hosts.yml
 EXTRA_VARS ?=
 
-PREP_COMPONENTS := openshift-ai datascience nfd nvidia-gpu argocd vault external-secrets keycloak postgresql observability smtp
-CONFIG_SCOPES := vault external-secrets argocd datascience keycloak postgresql sql-schema models llm api mlops rag mcp
-DISPATCH_TARGET := $(word 2,$(MAKECMDGOALS))
+# ADR-0056: Day 0 (cluster prerequisites) / Day 1 (build + run the
+# platform) sequencing, replacing the former precheck/prepare/configure/
+# install/check interface outright. Day 1 is added in a later commit.
+DAY0_COMPONENTS := admin-context argocd namespaces vault keycloak postgresql smtp external-secrets nfd nvidia-gpu observability openshift-ai
+DAY0_VERBS := check install configure all
 
-.PHONY: help precheck prepare configure install check credentials-check $(PREP_COMPONENTS) $(CONFIG_SCOPES)
+DAY_VERB := $(word 2,$(MAKECMDGOALS))
+DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
+
+.PHONY: help credentials-check day0 d0 $(DAY0_VERBS) $(DAY0_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -21,17 +26,12 @@ help:
 	  '  This is the only manual input for the entire install - everything else' \
 	  '  (Keycloak, Vault, PostgreSQL, OpenShift AI, MLOps...) is automated.' \
 	  '' \
-	  '  make precheck                 Check all prerequisites' \
-	  '  make precheck <component>     Check one prerequisite component' \
-	  '  make prepare                  Install/prepare all prerequisites' \
-	  '  make prepare <component>      Install/prepare one prerequisite component' \
-	  '  make configure                Configure all platform scopes' \
-	  '  make configure <scope>        Configure one platform scope' \
-	  '  make install                  Install the agent platform and business definitions' \
-	  '  make check                    Validate demo components and agents' \
+	  '  make day0|d0 check [component]      Check one/all Day 0 prerequisites' \
+	  '  make day0|d0 install [component]    Install one/all Day 0 prerequisites' \
+	  '  make day0|d0 configure [component]  Configure one/all Day 0 prerequisites' \
+	  '  make day0|d0 all [component]        check + install + configure, in order' \
 	  '' \
-	  'Prerequisite components: $(PREP_COMPONENTS)' \
-	  'Configuration scopes:    $(CONFIG_SCOPES)'
+	  'Day 0 components: $(DAY0_COMPONENTS)'
 
 credentials-check:
 	@if [[ -z "$${K8S_AUTH_HOST:-}" || -z "$${K8S_AUTH_API_KEY:-}" ]]; then \
@@ -39,32 +39,32 @@ credentials-check:
 	  exit 2; \
 	fi
 
-precheck: credentials-check
-	@component="$${TARGET_COMPONENT:-$(DISPATCH_TARGET)}"; \
-	if [[ -z "$$component" ]]; then component=all; fi; \
-	case " $(PREP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported precheck component: $$component" >&2; exit 2;; esac; \
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/precheck.yml -e "target_component=$$component" $(EXTRA_VARS)
+# day0/d0 share this exact recipe (both names dispatch identically - word 2
+# of MAKECMDGOALS is the verb regardless of which name was invoked as word 1).
+define DAY0_RECIPE
+@verb="$(DAY_VERB)"; \
+component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
+if [[ -z "$$component" ]]; then component=all; fi; \
+case " $(DAY0_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day0 verb: '$$verb' (expected one of: $(DAY0_VERBS))" >&2; exit 2;; esac; \
+case " $(DAY0_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day0 component: '$$component' (expected one of: $(DAY0_COMPONENTS) or all)" >&2; exit 2;; esac; \
+run_one() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) "ansible/playbooks/day0_$$1.yml" -e "target_component=$$component" $(EXTRA_VARS); }; \
+case "$$verb" in \
+  check) run_one check ;; \
+  install) run_one install ;; \
+  configure) run_one configure ;; \
+  all) run_one check && run_one install && run_one configure ;; \
+esac
+endef
 
-prepare: credentials-check
-	@component="$${TARGET_COMPONENT:-$(DISPATCH_TARGET)}"; \
-	if [[ -z "$$component" ]]; then component=all; fi; \
-	case " $(PREP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported prepare component: $$component" >&2; exit 2;; esac; \
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/prepare.yml -e "target_component=$$component" $(EXTRA_VARS)
+day0: credentials-check
+	$(DAY0_RECIPE)
 
-configure: credentials-check
-	@scope="$${TARGET_SCOPE:-$(DISPATCH_TARGET)}"; \
-	if [[ -z "$$scope" ]]; then scope=all; fi; \
-	case " $(CONFIG_SCOPES) all " in *" $$scope "*) ;; *) echo "Unsupported configure scope: $$scope" >&2; exit 2;; esac; \
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/configure.yml -e "target_scope=$$scope" $(EXTRA_VARS)
+d0: credentials-check
+	$(DAY0_RECIPE)
 
-install: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/install.yml $(EXTRA_VARS)
-
-check: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/check.yml $(EXTRA_VARS)
-
-# Component/scope tokens are intentionally no-op Make targets. The first target
-# reads the second goal and dispatches it to Ansible. This preserves commands
-# such as `make precheck keycloak` without requiring COMPONENT=keycloak.
-$(sort $(PREP_COMPONENTS) $(CONFIG_SCOPES)):
+# Verb/component tokens are intentionally no-op Make targets. The day0/d0
+# recipe reads MAKECMDGOALS words 2 and 3 directly, so e.g.
+# `make d0 check postgresql` needs "check" and "postgresql" to resolve to
+# *something* as Make goals without erroring as unknown targets.
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS)):
 	@:

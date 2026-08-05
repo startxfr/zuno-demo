@@ -8,7 +8,7 @@
 
 - name: "llm | fail if ArgoCD is not yet installed"
   ansible.builtin.fail:
-    msg: "applications.argoproj.io CRD not found. Run `make prepare argocd` first."
+    msg: "applications.argoproj.io CRD not found. Run `make d0 install argocd` first."
   when: (_llm_precheck_argocd_crd.resources | default([]) | length) == 0
 
 - name: "llm | precheck summary"

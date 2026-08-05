@@ -2,10 +2,9 @@
 
 Installs the Node Feature Discovery Operator (OLM `Subscription`,
 redhat-operators catalog, `stable` channel) and applies a minimal
-`NodeFeatureDiscovery` instance (ADR-0047). PREP_COMPONENT only - no
-CONFIG_SCOPE, nothing to configure beyond that instance
-(`tasks/configure.yml` is a documented no-op, same convention as
-`ansible/roles/nvidia_gpu`).
+`NodeFeatureDiscovery` instance (ADR-0047). A Day 0 component (ADR-0056)
+with a documented no-op `configure.yml` - nothing to configure beyond
+that instance, same convention as `ansible/roles/nvidia_gpu`.
 
 ## Why this role exists
 
@@ -19,8 +18,8 @@ a real, previously undeclared prerequisite gap (ADR-0047: "failures
 identify the missing dependency rather than surfacing later during
 model/RAG deployment").
 
-`ansible/playbooks/{precheck,prepare}.yml` list `nfd` before `nvidia_gpu`
-in `prerequisite_components`, and `Makefile`'s `PREP_COMPONENTS` includes
-it - `make prepare nfd` (or the default `make prepare` "all" run, which
-now prepares it in the correct order) must complete before
-`make prepare nvidia-gpu`.
+`ansible/playbooks/day0_{check,install}.yml` list `nfd` before
+`nvidia_gpu` in `day0_components`, and `Makefile`'s `DAY0_COMPONENTS`
+includes it - `make d0 install nfd` (or the default `make d0 install`
+"all" run, which now installs it in the correct order) must complete
+before `make d0 install nvidia-gpu`.

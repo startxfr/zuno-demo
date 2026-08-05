@@ -3,8 +3,17 @@
 Installs the Red Hat OpenShift AI operator (OLM `Subscription`, channel
 discovered from the cluster's own catalog - ADR-0048, see below) and
 applies the `DataScienceCluster` with `kserve` (model serving) enabled.
-PREP_COMPONENT only - no CONFIG_SCOPE. The `datascience` role owns the
-project namespace scaffolding that layers on top of this.
+A Day 0 component (ADR-0056) with all three verbs: `check`/`install`
+subscribe the operator, wait for the CRD, apply the `DataScienceCluster`
+and wait for `Ready`, then create the `zuno-ai-run` project namespace (RHOAI-
+dashboard-labeled, shared with the rest of the AI/agent-serving stack -
+ai-gateway, agent-runtime, mcp-gateway, mcp-sales-db); `configure` applies
+a `ResourceQuota` capping GPU consumption at 1 (this demo has exactly one
+24GB L4 budgeted for the single local model). This role used to be split
+across `openshift_ai` (operator + DataScienceCluster) and a separate
+`datascience` role (namespace + quota) - merged into one role for one
+conceptual prerequisite as part of ADR-0056, since the split never
+reflected two genuinely independent concerns.
 
 ## Channel discovery (ADR-0048)
 

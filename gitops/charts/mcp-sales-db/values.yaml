@@ -1,9 +1,9 @@
 # Namespace matches components/mcp-gateway's salesDbMcpUrl assumption:
-# http://sales-db-mcp.zuno-ai.svc:8000 (gitops/charts/mcp-gateway/values.yaml).
-namespace: zuno-ai
+# http://sales-db-mcp.zuno-ai-run.svc:8000 (gitops/charts/mcp-gateway/values.yaml).
+namespace: zuno-ai-run
 
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai/mcp-sales-db
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-run/mcp-sales-db
   tag: latest
   pullPolicy: IfNotPresent
 

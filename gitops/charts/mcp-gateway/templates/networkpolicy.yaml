@@ -1,4 +1,4 @@
-# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai namespace
+# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai-run namespace
 # baseline (see gitops/charts/namespaces/values.yaml's platformNamespaces
 # comment). Only Agent Runtime calls the MCP Gateway - plus, per ADR-0053,
 # the same-namespace "acceptance-gate" `make check` identity (see

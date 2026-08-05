@@ -20,7 +20,7 @@
 - name: "vault | fail if ArgoCD is not yet installed"
   ansible.builtin.fail:
     msg: >-
-      applications.argoproj.io CRD not found. Run `make prepare argocd`
+      applications.argoproj.io CRD not found. Run `make d0 install argocd`
       before preparing vault - vault is installed as a GitOps Application.
   when: (_vault_precheck_argocd_crd.resources | default([]) | length) == 0
 

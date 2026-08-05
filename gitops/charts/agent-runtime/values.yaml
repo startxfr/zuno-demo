@@ -3,13 +3,13 @@
 # the demo* (the BFF calling it, ingress/route if any) belongs to whichever
 # track owns the agent surface (Track E) - Track D (this chart) only
 # guarantees the service exists, is reachable in-cluster at
-# agent-runtime.zuno-ai.svc:8080, and implements the documented API
+# agent-runtime.zuno-ai-run.svc:8080, and implements the documented API
 # contract (components/agent-runtime/README.md).
 
-namespace: zuno-ai
+namespace: zuno-ai-run
 
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai/agent-runtime
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-run/agent-runtime
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -25,9 +25,9 @@ resources:
 
 keycloakIssuer: https://keycloak-zuno.apps.example.com/realms/zuno
 ragServiceUrl: http://rag-service.zuno-data.svc:8080
-mcpGatewayUrl: http://mcp-gateway.zuno-ai.svc:8080
+mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
 
 # ADR-0009 split: routing config, provider secrets and the local model
 # endpoint moved to gitops/charts/ai-gateway - this service only needs the
 # gateway's URL now (same-namespace Service, gitops/apps/ai-gateway).
-aiGatewayUrl: http://ai-gateway.zuno-ai.svc:8080
+aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080

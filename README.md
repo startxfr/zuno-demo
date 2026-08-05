@@ -62,14 +62,18 @@ export K8S_AUTH_HOST=https://api.mycluster.com:6443
 export K8S_AUTH_API_KEY=<cluster-admin token>
 ansible-galaxy collection install -r ansible/requirements.yml
 
-make precheck
-make precheck keycloak
-make prepare
-make prepare openshift-ai
-make configure
-make configure models
-make install
-make check
+# Day 0 (ADR-0056): cluster prerequisites - operators, CRDs, namespaces,
+# secrets. "d0" is a short alias for "day0".
+make d0 check
+make d0 check keycloak
+make d0 install
+make d0 configure
+make d0 all openshift-ai   # check + install + configure, one component
+
+# Day 1: build the platform's own component images, then run the platform.
+make d1 build
+make d1 run
+make d1 check              # ADR-0053 acceptance/security gate for `agents`
 ```
 
 See [docs/README.md](docs/README.md).

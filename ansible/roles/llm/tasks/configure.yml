@@ -15,7 +15,7 @@
 
 - name: "llm | fail if Vault bootstrap credentials are missing"
   ansible.builtin.fail:
-    msg: "vault-bootstrap-credentials not found - run `make prepare vault` and `make configure vault` first."
+    msg: "vault-bootstrap-credentials not found - run `make d0 install vault` and `make d0 configure vault` first."
   when: (_llm_vault_creds.resources | default([]) | length) == 0
 
 - name: "llm | find the running Vault server pod"

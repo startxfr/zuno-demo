@@ -1,7 +1,8 @@
 # rag
 
-CONFIG_SCOPE only - no separate prepare phase. Depends on `postgresql`
-(and `sql_schema`, for the `document_embeddings` table itself) having run
+A Day 1 component (ADR-0056) with a documented no-op `prepare.yml` - no
+operator dependency of its own. Depends on `postgresql` (and
+`sql_schema`, for the `document_embeddings` table itself) having run
 first.
 
 1. Extends `document_embeddings` with ADR-0046's retrieval metadata support

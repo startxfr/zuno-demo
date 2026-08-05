@@ -9,12 +9,13 @@ Also applies the same default-deny-other-namespaces `NetworkPolicy` shape
 (ADR-0052) to three platform namespaces this chart does not itself create
 (`zuno-auth`, `zuno-data`, `zuno-telemetry` - `values.yaml`'s
 `platformNamespaces`), each with a small, explicit list of known real
-cross-namespace callers. `zuno-ai` is deliberately excluded - see
+cross-namespace callers. `zuno-ai-run` is deliberately excluded - see
 `values.yaml`'s comment on why ADR-0037 needs per-workload NetworkPolicies
 there instead of a namespace-wide baseline.
 
 Referenced by exactly one Application: `gitops/apps/agents/application.yaml`
-(applied by `ansible/roles/agents`, reachable via `make install`).
+(applied by `ansible/roles/namespaces`, a Day 0 component - ADR-0056 -
+reachable via `make d0 install namespaces` / `make d0 configure namespaces`).
 
 ## Why all five exist, not just zuno-agent-tekos
 

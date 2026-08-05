@@ -128,7 +128,7 @@ than inventing endpoints to satisfy the ADR's generic template wording.
 | `AGENT_NAME` | no (default `tekos`) | Which agent's Agent Runtime path this BFF calls |
 | `KEYCLOAK_ISSUER_URL` | **yes** | `https://sso.apps.<cluster-domain>/realms/zuno` |
 | `OIDC_AUDIENCE` | no (default `tekos-frontend`) | Expected `aud`/`azp` claim on incoming tokens |
-| `AGENT_RUNTIME_BASE_URL` | no (default `http://agent-runtime.zuno-ai.svc.cluster.local:8080`) | Shared Agent Runtime in-cluster base URL |
+| `AGENT_RUNTIME_BASE_URL` | no (default `http://agent-runtime.zuno-ai-run.svc.cluster.local:8080`) | Shared Agent Runtime in-cluster base URL |
 
 No secret is configured here: JWKS is public key material fetched over
 HTTP, and this service holds no credential of its own (ADR-0024 - nothing

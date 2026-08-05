@@ -54,11 +54,11 @@ bff:
   agentName: tekos
   oidcAudience: tekos-frontend
   # In-cluster Agent Runtime Service - shared platform component (ADR-0007),
-  # deployed to zuno-ai (not zuno-agent-tekos) by gitops/charts/agent-runtime
+  # deployed to zuno-ai-run (not zuno-agent-tekos) by gitops/charts/agent-runtime
   # (Track D's chart, see its values.yaml header comment). Reconciled here
   # during integration; the BFF's own default in
   # components/agent-bff/internal/config/config.go matches.
-  agentRuntimeBaseUrl: "http://agent-runtime.zuno-ai.svc.cluster.local:8080"
+  agentRuntimeBaseUrl: "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"
 
 # Vault paths (ADR-0024) this chart's ExternalSecrets resolve. ASSUMPTION:
 # the identity track has not yet published where it seeds the Keycloak

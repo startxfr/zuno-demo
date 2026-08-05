@@ -1,8 +1,24 @@
 ---
-# No configure phase: the DataScienceCluster applied in prepare.yml is the
-# whole of what "configuring" OpenShift AI means for this demo. Namespace
-# scaffolding for the datascience project lives in the `datascience` role.
-# openshift_ai is a PREP_COMPONENT only, not a CONFIG_SCOPE.
-- name: "openshift_ai | nothing to configure beyond the DataScienceCluster"
+# Merged in from the former `datascience` role (ADR-0056). Caps GPU
+# consumption in zuno-ai-run at 1 - this demo has exactly one 24GB L4 budgeted
+# for the single local model (gitops/charts/models); without this a future
+# second InferenceService could silently starve it.
+- name: "openshift_ai | apply a GPU-capped ResourceQuota"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: zuno-ai-run-gpu-cap
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        hard:
+          requests.nvidia.com/gpu: "1"
+          limits.nvidia.com/gpu: "1"
+
+- name: "openshift_ai | configure summary"
   ansible.builtin.debug:
-    msg: "openshift_ai has no configure phase - see tasks/prepare.yml and the datascience role."
+    msg: "GPU-capped ResourceQuota applied to zuno-ai-run."

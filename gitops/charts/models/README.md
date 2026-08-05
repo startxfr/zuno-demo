@@ -44,5 +44,5 @@ undeclared dependency gap, not a hypothetical one).
 Depends on the `openshift_ai` role's `DataScienceCluster` having the
 `kserve` component enabled, and the `nvidia_gpu` role's GPU Operator (with
 `nfd`, Node Feature Discovery, prepared first - ADR-0047) being ready -
-all are PREP_COMPONENTS applied before `models` in
-`ansible/playbooks/{precheck,prepare}.yml`.
+all are Day 0 components (ADR-0056) installed before `models` (a Day 1
+component) in `ansible/playbooks/day0_install.yml`.

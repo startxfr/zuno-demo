@@ -180,7 +180,7 @@ def main() -> int:
     for chart in DEPLOYMENT_CHARTS:
         check_deployment_chart(chart, findings)
 
-    # NetworkPolicy coverage: every zuno-ai workload chart (no namespace
+    # NetworkPolicy coverage: every zuno-ai-run workload chart (no namespace
     # baseline covers them - ADR-0037) plus the platform-namespace-baseline
     # owner and rag-service's precise cross-namespace policy.
     for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-sales-db", "rag-service", "models", "namespaces"]:

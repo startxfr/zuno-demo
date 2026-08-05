@@ -32,8 +32,8 @@ type Config struct {
 	OIDCAudience string
 
 	// AgentRuntimeBaseURL is the shared Agent Runtime's in-cluster base
-	// URL, e.g. http://agent-runtime.zuno-ai.svc.cluster.local:8080
-	// (zuno-ai: Agent Runtime is a shared platform component per
+	// URL, e.g. http://agent-runtime.zuno-ai-run.svc.cluster.local:8080
+	// (zuno-ai-run: Agent Runtime is a shared platform component per
 	// ADR-0007, not per-agent - reconciled with gitops/charts/agent-runtime
 	// during integration). Owned by a parallel track; this BFF only calls
 	// its documented HTTP contract (POST /v1/agents/{agent}/chat).
@@ -47,7 +47,7 @@ func Load() (*Config, error) {
 		AgentName:           getenv("AGENT_NAME", "tekos"),
 		KeycloakIssuerURL:   getenv("KEYCLOAK_ISSUER_URL", ""),
 		OIDCAudience:        getenv("OIDC_AUDIENCE", "tekos-frontend"),
-		AgentRuntimeBaseURL: getenv("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai.svc.cluster.local:8080"),
+		AgentRuntimeBaseURL: getenv("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
 	}
 
 	if cfg.KeycloakIssuerURL == "" {

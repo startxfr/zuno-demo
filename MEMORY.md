@@ -441,7 +441,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   documented partial treatment instead of a guessed-at CRD/chart field -
   see ADR-0052's implementation note. `zuno-auth`/`zuno-data`/
   `zuno-telemetry` gained a namespace-level default-deny `NetworkPolicy`
-  baseline (`gitops/charts/namespaces`); `zuno-ai` instead gets one precise
+  baseline (`gitops/charts/namespaces`); `zuno-ai-run` instead gets one precise
   `NetworkPolicy` per workload, because ADR-0037 requires `sales-db-mcp` to
   reject even same-namespace neighbors like `agent-runtime` - a namespace
   baseline would have silently defeated that. `sales-db-mcp` additionally
@@ -532,7 +532,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   `ansible/roles/agents/tasks/check.yml` still does the OKF-structural and
   frontend-`/healthz` smoke checks, then hands off to
   `run_acceptance_gate.yml`, which runs `evaluations/tekos/
-  run_acceptance_gate.py` as a one-shot in-cluster Job in `zuno-ai`
+  run_acceptance_gate.py` as a one-shot in-cluster Job in `zuno-ai-run`
   (most of what it calls - agent-runtime, mcp-gateway, ai-gateway,
   rag-service - has no Route, only in-cluster Service DNS). That script
   combines the 20 Tekos scenarios (75% threshold) with

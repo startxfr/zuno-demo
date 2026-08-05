@@ -9,7 +9,7 @@
   ansible.builtin.fail:
     msg: >-
       Unable to reach the OpenShift API. Verify the endpoint and token passed
-      to `make precheck` (KUBECONFIG or K8S_AUTH_HOST/K8S_AUTH_API_KEY).
+      to `make d0 check` (KUBECONFIG or K8S_AUTH_HOST/K8S_AUTH_API_KEY).
   when: _keycloak_precheck_api.resources is not defined
 
 - name: "keycloak | verify the argocd role has already prepared the Application CRD"
@@ -22,7 +22,7 @@
 - name: "keycloak | fail if ArgoCD is not yet installed"
   ansible.builtin.fail:
     msg: >-
-      applications.argoproj.io CRD not found. Run `make prepare argocd`
+      applications.argoproj.io CRD not found. Run `make d0 install argocd`
       before preparing keycloak - the realm/Keycloak-CR instance is
       installed as a GitOps Application (gitops/apps/keycloak).
   when: (_keycloak_precheck_argocd_crd.resources | default([]) | length) == 0

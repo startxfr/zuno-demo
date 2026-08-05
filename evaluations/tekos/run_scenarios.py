@@ -24,10 +24,10 @@ import yaml
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://sso.apps.example.com")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tekos.apps.example.com")
 BFF_URL = os.getenv("BFF_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080")
-RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai.svc.cluster.local:8080")
-MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai.svc.cluster.local:8080")
+RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080")
+MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")
 RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster.local:8080")
-SALES_DB_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai.svc.cluster.local:8000")
+SALES_DB_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 REALM = "zuno"
 # Shared demo-persona password (ADR-0041) - never hardcoded; read from the

@@ -7,10 +7,12 @@ OpenShift AI Operator and platform prerequisites for the RHOAI 3.5 EA2 MVP
 from the cluster's own `PackageManifest`, ADR-0048 - see that role's
 README) and applies the `DataScienceCluster` with `kserve` (model
 serving) enabled and `kserve.serving.managementState: Removed`
-(RawDeployment mode - see below). `ansible/roles/datascience` layers the
-project namespace (`zuno-ai`) and a GPU-capped `ResourceQuota` on top.
-`ansible/roles/nfd` and `ansible/roles/nvidia_gpu` (`platform/gpu`) are
-GPU-serving prerequisites, applied before both of the above.
+(RawDeployment mode - see below), then creates the project namespace
+(`zuno-ai-run`) and a GPU-capped `ResourceQuota` - formerly a separate
+`datascience` role, merged into `openshift_ai` (ADR-0056: one role for
+one conceptual prerequisite). `ansible/roles/nfd` and
+`ansible/roles/nvidia_gpu` (`platform/gpu`) are GPU-serving prerequisites,
+applied before it.
 
 ## Which OpenShift AI 3.5 capabilities this repository actually uses
 

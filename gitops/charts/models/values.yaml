@@ -1,7 +1,7 @@
 # Default values for the models chart. Overridden per-environment through
 # gitops/apps/models/application.yaml's spec.source.helm.values.
 
-namespace: zuno-ai
+namespace: zuno-ai-run
 
 servingRuntimeName: vllm-runtime
 inferenceServiceName: qwen25-7b-instruct

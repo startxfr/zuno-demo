@@ -32,8 +32,9 @@ tag for from here.
    `targetRevision: v0.1.0` in the same PR - this is the point ADR-0051's
    "production-like Argo CD applications must deploy a reviewed Git
    revision/tag" actually takes effect, and not before.
-6. Merge, then `make configure` (or let ArgoCD's automated sync pick it
-   up) to roll the cluster onto the pinned revision.
+6. Merge, then `make day0|d0 configure` / `make day1|d1 configure|run`
+   (or let ArgoCD's automated sync pick it up) to roll the cluster onto
+   the pinned revision.
 
 Subsequent releases repeat steps 1-6 with the next tag. `gitops/apps/vault/application.yaml`
 already tracks a pinned upstream chart version (`targetRevision: "0.28.1"`,

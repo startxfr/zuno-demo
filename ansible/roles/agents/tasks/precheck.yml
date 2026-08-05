@@ -8,9 +8,24 @@
 
 - name: "agents | fail if ArgoCD is not yet installed"
   ansible.builtin.fail:
-    msg: "applications.argoproj.io CRD not found. Run `make prepare argocd` first."
+    msg: "applications.argoproj.io CRD not found. Run `make d0 install argocd` first."
   when: (_agents_precheck_argocd_crd.resources | default([]) | length) == 0
+
+- name: "agents | verify the zuno-agent-tekos namespace exists"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: zuno-agent-tekos
+  register: _agents_precheck_ns
+
+- name: "agents | fail if the Day 0 namespaces component hasn't run yet"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-agent-tekos namespace not found. Run
+      `make d0 install namespaces` first (ADR-0056) - namespace creation
+      is a Day 0 prerequisite, not something this Day 1 role creates
+      itself.
+  when: (_agents_precheck_ns.resources | default([]) | length) == 0
 
 - name: "agents | precheck summary"
   ansible.builtin.debug:
-    msg: "ArgoCD is installed; agent namespaces and Tekos workloads can be applied."
+    msg: "ArgoCD installed and zuno-agent-tekos namespace present; Tekos workloads can be applied."

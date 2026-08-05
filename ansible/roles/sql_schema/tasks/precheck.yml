@@ -9,7 +9,7 @@
 
 - name: "sql_schema | fail if PostgreSQL is not present"
   ansible.builtin.fail:
-    msg: "PostgreSQL cluster zuno-postgresql not found. Run `make prepare postgresql` and `make configure postgresql` first."
+    msg: "PostgreSQL cluster zuno-postgresql not found. Run `make d0 install postgresql` and `make d0 configure postgresql` first."
   when: (_sql_schema_precheck_pg.resources | default([]) | length) == 0
 
 - name: "sql_schema | precheck summary"

@@ -9,14 +9,14 @@
 # reasoning as ansible/roles/sql_schema/tasks/configure.yml: there is
 # nothing declaratively running about a test run once it has finished.
 #
-# The Job runs in zuno-ai, labeled app.kubernetes.io/name: acceptance-gate
+# The Job runs in zuno-ai-run, labeled app.kubernetes.io/name: acceptance-gate
 # - a real, narrowly-scoped synthetic-test workload identity, explicitly
 # allow-listed (and nowhere else) in gitops/charts/{agent-runtime,
 # mcp-gateway,ai-gateway}/templates/networkpolicy.yaml and the new
 # gitops/charts/tekos/templates/networkpolicy.yaml, the same deliberate,
 # additive way every other legitimate caller in this repository is
 # allow-listed - never a namespace-wide baseline. rag-service is already
-# reachable from any zuno-ai pod via zuno-data's namespace-wide platform
+# reachable from any zuno-ai-run pod via zuno-data's namespace-wide platform
 # baseline (gitops/charts/namespaces/values.yaml). sales-db-mcp is
 # deliberately NOT extended - see security_checks.py's
 # direct_call_to_sales_db_mcp_denied_without_gateway_token, which now
@@ -38,14 +38,14 @@
 - name: "acceptance-gate | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-- name: "acceptance-gate | ensure the zuno-ai namespace exists"
+- name: "acceptance-gate | ensure the zuno-ai-run namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-ai
+        name: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
 
@@ -69,13 +69,13 @@
   ansible.builtin.fail:
     msg: >-
       demo-personas-password / tekos-frontend-client-secret not found in
-      zuno-auth - run `make configure keycloak` first (see
+      zuno-auth - run `make d0 configure keycloak` first (see
       ansible/roles/keycloak/README.md).
   when: >-
     (_gate_demo_password_secret.resources | default([]) | length) == 0 or
     (_gate_client_secret_secret.resources | default([]) | length) == 0
 
-- name: "acceptance-gate | copy the two credentials into a zuno-ai Secret the Job can mount"
+- name: "acceptance-gate | copy the two credentials into a zuno-ai-run Secret the Job can mount"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -83,7 +83,7 @@
       kind: Secret
       metadata:
         name: acceptance-gate-credentials
-        namespace: zuno-ai
+        namespace: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
       type: Opaque
@@ -100,7 +100,7 @@
       kind: ConfigMap
       metadata:
         name: acceptance-gate-scripts
-        namespace: zuno-ai
+        namespace: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
       data:
@@ -117,7 +117,7 @@
     api_version: batch/v1
     kind: Job
     name: zuno-acceptance-gate
-    namespace: zuno-ai
+    namespace: zuno-ai-run
     wait: true
 
 - name: "acceptance-gate | run the acceptance-gate Job"
@@ -128,7 +128,7 @@
       kind: Job
       metadata:
         name: zuno-acceptance-gate
-        namespace: zuno-ai
+        namespace: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
       spec:
@@ -176,7 +176,7 @@
   kubernetes.core.k8s_info:
     api_version: batch/v1
     kind: Job
-    namespace: zuno-ai
+    namespace: zuno-ai-run
     name: zuno-acceptance-gate
   register: _gate_job
   until: >-
@@ -188,14 +188,14 @@
 - name: "acceptance-gate | find the Job's pod"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: zuno-ai
+    namespace: zuno-ai-run
     label_selectors:
       - "job-name=zuno-acceptance-gate"
   register: _gate_pod
 
 - name: "acceptance-gate | fetch the gate's full output (scenario table, security checks, JSON summary)"
   kubernetes.core.k8s_log:
-    namespace: zuno-ai
+    namespace: zuno-ai-run
     name: "{{ _gate_pod.resources[0].metadata.name }}"
   register: _gate_log
   when: (_gate_pod.resources | default([]) | length) > 0
@@ -208,7 +208,7 @@
   ansible.builtin.fail:
     msg: >-
       The ADR-0053 acceptance gate did not pass (Job
-      zuno-acceptance-gate/zuno-ai succeeded={{ _gate_job.resources[0].status.succeeded | default(0) }}
+      zuno-acceptance-gate/zuno-ai-run succeeded={{ _gate_job.resources[0].status.succeeded | default(0) }}
       failed={{ _gate_job.resources[0].status.failed | default(0) }}) - see the output above
       for which scenario/security check/gate check failed.
   when: (_gate_job.resources[0].status.succeeded | default(0)) == 0

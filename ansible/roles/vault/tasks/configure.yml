@@ -14,7 +14,7 @@
 
 - name: "vault | fail if the bootstrap credentials are missing"
   ansible.builtin.fail:
-    msg: "vault-bootstrap-credentials not found - run `make prepare vault` first."
+    msg: "vault-bootstrap-credentials not found - run `make d0 install vault` first."
   when: (_vault_creds.resources | default([]) | length) == 0
 
 - name: "vault | set connection facts"

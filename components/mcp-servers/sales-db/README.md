@@ -17,7 +17,7 @@ end-user JWT.
 
 **ADR-0037**: network location (`gitops/charts/mcp-sales-db`'s
 `NetworkPolicy`, restricting ingress to the gateway's pods specifically -
-not even other same-namespace `zuno-ai` workloads like `agent-runtime` may
+not even other same-namespace `zuno-ai-run` workloads like `agent-runtime` may
 reach this server directly) is not the only control. Every `POST /mcp`
 call must also carry `X-Zuno-Gateway-Token`, a shared secret only the
 gateway holds (`MCP_GATEWAY_WORKLOAD_TOKEN` env var, sourced from an
@@ -30,6 +30,6 @@ DB credentials (`PGUSER`/`PGPASSWORD`) come from an `ExternalSecret`
 resolving `secret/zuno/postgresql/app` (seeded by `ansible/roles/vault`) -
 never hardcoded, per ADR-0024. See `server.py`, `Dockerfile`,
 `requirements.txt`. Deployed alongside the rest of the data layer by
-`ansible/roles/sql_schema`'s GitOps Application, in the `zuno-ai`
+`ansible/roles/sql_schema`'s GitOps Application, in the `zuno-ai-run`
 namespace (matching `components/mcp-gateway`'s `salesDbMcpUrl` assumption:
-`http://sales-db-mcp.zuno-ai.svc:8000`).
+`http://sales-db-mcp.zuno-ai-run.svc:8000`).

@@ -11,7 +11,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: zuno-ai
+namespace: zuno-ai-run
 
 configMapGenerator:
   - name: zuno-provider-routing

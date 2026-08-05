@@ -31,7 +31,7 @@
 
 - name: "openshift_ai | fail if the package manifest is unavailable"
   ansible.builtin.fail:
-    msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make precheck openshift-ai' first."
+    msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d0 check openshift-ai' first."
   when: (_openshift_ai_pkg.resources | default([]) | length) == 0
 
 # ADR-0048: select the 3.5-family channel this cluster's catalog actually
@@ -157,3 +157,23 @@
     (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
   retries: 60
   delay: 20
+
+# Merged in from the former `datascience` role (ADR-0056: one role for one
+# conceptual prerequisite, the DataScienceCluster, instead of two). Creates
+# the namespace the `models` role's InferenceService (gitops/charts/models)
+# deploys into, alongside the rest of the AI/agent-serving stack (ai-gateway,
+# agent-runtime, mcp-gateway, mcp-sales-db) - labeled the way the RHOAI
+# dashboard recognizes as a Data Science Project, so it's visible there too,
+# not just via `oc`, even though this namespace also hosts non-RHOAI
+# workloads.
+- name: "openshift_ai | ensure the zuno-ai-run namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-ai-run
+        labels:
+          zuno.io/managed-by: ansible
+          opendatahub.io/dashboard: "true"

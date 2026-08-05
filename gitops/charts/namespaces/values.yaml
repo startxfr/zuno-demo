@@ -3,8 +3,8 @@
 # namespaces are created and labeled but stay empty/reserved - see
 # platform/architecture/agent-platform-separation.md and this chart's
 # README.md. Namespace names follow the zuno-agent-<agent> convention
-# (ADR-0023) so they read as a family alongside zuno-auth/zuno-ai/zuno-data/
-# zuno-telemetry.
+# (ADR-0023) so they read as a family alongside zuno-auth/zuno-ai-run/
+# zuno-ai-build/zuno-data/zuno-telemetry.
 namespaces:
   - name: zuno-agent-comage
     agent: comage
@@ -36,36 +36,43 @@ quota:
 # namespaces above, applied to the platform namespaces this chart does not
 # itself create (zuno-auth, zuno-data, zuno-telemetry are created by
 # ansible/ArgoCD CreateNamespace=true - see each role's prepare.yml /
-# gitops/apps/*/application.yaml). zuno-ai is deliberately NOT here: it
-# hosts mcp-sales-db, which ADR-0037 requires NOT trust arbitrary
+# gitops/apps/*/application.yaml). zuno-ai-run (formerly just "zuno-ai" -
+# ADR-0056 split it from the new zuno-ai-build) is deliberately NOT here:
+# it hosts mcp-sales-db, which ADR-0037 requires NOT trust arbitrary
 # same-namespace pods (agent-runtime/ai-gateway specifically must not reach
 # it directly) - a namespace-wide "allow same namespace" baseline would
 # silently defeat that per-workload restriction (Kubernetes NetworkPolicy
 # selecting the same pod are additive/OR'd, so the broader baseline would
-# win). Every zuno-ai workload instead gets its own precise NetworkPolicy
-# in its own chart (gitops/charts/{agent-runtime,ai-gateway,mcp-gateway,
-# mcp-sales-db,models}).
+# win). Every zuno-ai-run workload instead gets its own precise
+# NetworkPolicy in its own chart (gitops/charts/{agent-runtime,ai-gateway,
+# mcp-gateway,mcp-sales-db,models}). zuno-ai-build is also NOT here, for a
+# different reason: it's created and given its own self-contained baseline
+# directly by the Day 1 build mechanism (ansible/tasks/
+# apply_openshift_build.yml), not by this Day 0 chart - listing it here
+# would make the Day 0 `namespaces` role's precheck (which reads this
+# file's namespaces/platformNamespaces lists to know what must already
+# exist) depend on Day 1 having partially run first.
 #
 # allowedFromNamespaces are known, real cross-namespace callers granted at
 # the namespace level rather than precisely per-workload (proportionate for
 # a demo-scale project - tightening to per-workload policies matching
-# zuno-ai's is a documented v1 follow-up, not done here to keep this pass
-# bounded).
+# zuno-ai-run's is a documented v1 follow-up, not done here to keep this
+# pass bounded).
 platformNamespaces:
   - name: zuno-auth
     # Keycloak: JWKS/token-endpoint callers.
     allowedFromNamespaces:
       - zuno-agent-tekos
-      - zuno-ai
+      - zuno-ai-run
   - name: zuno-data
     # postgresql: rag-service (same-ns, already covered) + sales-db-mcp
-    # (zuno-ai, cross-ns). vault: External Secrets Operator's
+    # (zuno-ai-run, cross-ns). vault: External Secrets Operator's
     # ClusterSecretStore controller.
     allowedFromNamespaces:
-      - zuno-ai
+      - zuno-ai-run
       - external-secrets
   - name: zuno-telemetry
     # OTel Collector: every OTel-instrumented service.
     allowedFromNamespaces:
-      - zuno-ai
+      - zuno-ai-run
       - zuno-data

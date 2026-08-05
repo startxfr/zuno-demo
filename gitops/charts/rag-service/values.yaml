@@ -35,5 +35,5 @@ pg:
 dbSecretName: rag-service-db-credentials
 
 # OpenAI-compatible embeddings endpoint - see README "Embedding backend".
-embeddingServiceUrl: http://embeddings-predictor.zuno-ai.svc:8080/v1/embeddings
+embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings
 embeddingModelName: bge-small-en-v1.5

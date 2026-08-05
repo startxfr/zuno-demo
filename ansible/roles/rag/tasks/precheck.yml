@@ -9,7 +9,7 @@
 
 - name: "rag | fail if PostgreSQL is not ready"
   ansible.builtin.fail:
-    msg: "PostgreSQL cluster zuno-postgresql not found/ready. Run `make prepare postgresql` and `make configure postgresql` first."
+    msg: "PostgreSQL cluster zuno-postgresql not found/ready. Run `make d0 install postgresql` and `make d0 configure postgresql` first."
   when: (_rag_precheck_pg.resources | default([]) | length) == 0
 
 - name: "rag | precheck summary"

@@ -8,8 +8,10 @@
 #
 # Applying the Application here is safe even though the root App-of-Apps
 # (gitops/root-app-of-apps.yaml) also recurses over gitops/apps/: both paths
-# converge on the same desired state, and this keeps `make configure <scope>`
-# self-sufficient for a single component without requiring a full sync.
+# converge on the same desired state, and this keeps
+# `make day0|d0 configure <component>` / `make day1|d1 configure|run
+# <component>` self-sufficient for a single component without requiring a
+# full sync.
 
 - name: "gitops | validate gitops_app_name is set"
   ansible.builtin.assert:

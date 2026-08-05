@@ -8,7 +8,7 @@
 
 - name: "models | fail if the DataScienceCluster is not ready"
   ansible.builtin.fail:
-    msg: "DataScienceCluster zuno-dsc not Ready. Run `make prepare openshift-ai` first."
+    msg: "DataScienceCluster zuno-dsc not Ready. Run `make d0 install openshift-ai` first."
   when: >-
     (_models_precheck_dsc.resources | default([]) | length) == 0 or
     (_models_precheck_dsc.resources[0].status.phase | default('')) != 'Ready'

@@ -11,7 +11,7 @@
 # field. NetworkPolicy hardening (which this repo does fully control,
 # independent of the operator) is applied at the namespace level - see
 # gitops/charts/namespaces/values.yaml's platformNamespaces (zuno-data
-# allows zuno-ai in, covering sales-db-mcp's cross-namespace connection
+# allows zuno-ai-run in, covering sales-db-mcp's cross-namespace connection
 # here).
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster

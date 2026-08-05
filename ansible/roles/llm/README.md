@@ -23,8 +23,9 @@ together rather than splitting into yet another role:
 
 Order matters here: `ai-gateway` before `agent-runtime`, since the latter
 calls the former. Applied in that order, always in the same `configure`
-run (`ansible/playbooks/configure.yml`'s `llm` step), so `make configure`
-with no scope brings both up together; `make configure llm` alone does the
-same.
+run (`ansible/playbooks/day1_configure.yml`'s `llm` step, ADR-0056), so
+`make day1|d1 run` with no component brings both up together;
+`make day1|d1 run llm` alone does the same.
 
-CONFIG_SCOPE only - no separate prepare phase.
+A Day 1 component (ADR-0056) with a documented no-op `prepare.yml` - no
+operator dependency of its own.

@@ -8,7 +8,7 @@
 
 - name: "smtp | fail if the ClusterSecretStore is not present"
   ansible.builtin.fail:
-    msg: "vault-backend ClusterSecretStore not found. Run `make configure external-secrets` first."
+    msg: "vault-backend ClusterSecretStore not found. Run `make d0 configure external-secrets` first."
   when: (_smtp_precheck_store.resources | default([]) | length) == 0
 
 - name: "smtp | precheck summary"

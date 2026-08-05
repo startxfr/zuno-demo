@@ -28,7 +28,7 @@ This also splits the shared `zuno-ai` namespace into `zuno-ai-run` (workloads) a
 
 ## Consequences
 
-Operators get an explicit, checkable "cluster ready" milestone distinct from "platform running," and every Day 0 component gets the same three-verb lifecycle instead of an inconsistent subset. The `zuno-ai` split adds one more namespace and its associated NetworkPolicy/RBAC surface to reason about. Removing the old top-level targets is a breaking change to any existing muscle memory or external scripts invoking `make precheck`/`prepare`/`configure`/`install`/`check` directly.
+Operators get an explicit, checkable "cluster ready" milestone distinct from "platform running," and every Day 0 component gets the same three-verb lifecycle instead of an inconsistent subset. The `zuno-ai-run` split adds one more namespace and its associated NetworkPolicy/RBAC surface to reason about. Removing the old top-level targets is a breaking change to any existing muscle memory or external scripts invoking `make precheck`/`prepare`/`configure`/`install`/`check` directly.
 
 ## Security considerations
 

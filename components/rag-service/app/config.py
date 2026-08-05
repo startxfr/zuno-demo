@@ -33,7 +33,7 @@ DOCUMENT_EMBEDDINGS_TABLE = os.getenv("DOCUMENT_EMBEDDINGS_TABLE", "document_emb
 # full-text-search-only (see app/search.py).
 EMBEDDING_SERVICE_URL = os.getenv(
     "EMBEDDING_SERVICE_URL",
-    "http://embeddings-predictor.zuno-ai.svc:8080/v1/embeddings",
+    "http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings",
 )
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "bge-small-en-v1.5")
 EMBEDDING_TIMEOUT_SECONDS = float(os.getenv("EMBEDDING_TIMEOUT_SECONDS", "10"))

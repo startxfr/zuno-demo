@@ -84,7 +84,7 @@ upstream issue `CrunchyData/postgres-operator#3706`) - same situation
 this demo already had with CloudNativePG. `gitops/charts/postgresql/
 image/Dockerfile` layers pgvector onto Crunchy's own UBI-based operand
 image via a PGDG RPM. That image must be built and pushed once by an
-operator before `make configure postgresql` can succeed - see
+operator before `make d0 configure postgresql` can succeed - see
 `image/README.md` for the exact commands, the new Crunchy Data registry
 signup step (unlike CNPG's public `ghcr.io` image), and three details
 flagged there as unverified against a real build (base image tag, package
@@ -123,8 +123,8 @@ researched from Crunchy's own documentation but not exercised end to end:
   if not).
 - The three pgvector image-build details flagged in `image/README.md`.
 
-Run `make precheck postgresql` → `make prepare postgresql` → build/push
-the image → `make configure postgresql` against the real cluster and
+Run `make d0 check postgresql` → `make d0 install postgresql` → build/push
+the image → `make d0 configure postgresql` against the real cluster and
 adjust any of the above that turns out to be wrong.
 
 ## Consumed by

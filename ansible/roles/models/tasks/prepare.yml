@@ -1,4 +1,4 @@
 ---
 - name: "models | no prerequisites to prepare"
   ansible.builtin.debug:
-    msg: "models is applied entirely by tasks/configure.yml - the ServingRuntime/InferenceService have no operator dependency of their own beyond openshift_ai/nvidia_gpu (both PREP_COMPONENTS applied earlier)."
+    msg: "models is applied entirely by tasks/configure.yml - the ServingRuntime/InferenceService have no operator dependency of their own beyond openshift_ai/nvidia_gpu (both Day 0 components, ADR-0056, installed earlier)."

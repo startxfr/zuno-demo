@@ -1,16 +1,20 @@
 # agents
 
-Applies the agent-surface GitOps Applications: the five namespaces
-(`gitops/apps/agents` → `gitops/charts/namespaces`, ADR-0023) and the Tekos
-frontend/BFF workloads (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008).
+Applies the Tekos frontend/BFF workloads GitOps Application
+(`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008). This is Day 1's
+`agents` `run` component (ADR-0056) - `precheck.yml` verifies ArgoCD is
+installed and that `zuno-agent-tekos` (created by the Day 0 `namespaces`
+role) already exists.
 
-`main.yml` is what `ansible/playbooks/install.yml` runs for `make install` -
-it delegates to `configure.yml`, which applies both Applications in order.
-There is no separate `agents` CONFIG_SCOPE (only `api`, see
-`ansible/roles/api/README.md`, for re-applying just the Tekos workloads
-without touching namespaces) and no separate prepare phase - neither
-namespaces nor a plain Deployment/Service/Route have an operator
-prerequisite the way Keycloak/Vault/PostgreSQL do.
+Namespace creation used to live in this role's `configure.yml` too (a
+separate `gitops/apps/agents` → `gitops/charts/namespaces` Application
+apply); it moved to the new Day 0 `ansible/roles/namespaces` role
+(ADR-0056), so this role no longer touches namespaces at all - `make d0
+install namespaces` must run first. The formerly separate `api` role/
+CONFIG_SCOPE was retired in the same change: once this role stopped
+applying namespaces, it was doing exactly what `api` did (apply the
+Tekos workloads Application, nothing else) - one role for that job is
+enough, and `agents` is the name Day 1's `run` component list uses.
 
 `check.yml` (`make check`) is the ADR-0053 layered acceptance and security
 gate. It structurally validates the four catalog-only agents'
@@ -22,7 +26,7 @@ against the Tekos frontend's `/healthz` route, then hands off to
 `run_acceptance_gate.yml`, which runs `evaluations/tekos/`'s full gate
 (the 20-scenario acceptance evaluation at a 75% threshold, ADR-0027/0028,
 plus every mandatory security-negative check, ADR-0032/0033/0034/0035/
-0037/0040) as a one-shot in-cluster Job in `zuno-ai` - see that file's own
+0037/0040) as a one-shot in-cluster Job in `zuno-ai-run` - see that file's own
 header comment for why a Job (most of what the gate calls has no
 OpenShift Route) and for the "acceptance-gate" workload identity's narrow
 NetworkPolicy allowances.

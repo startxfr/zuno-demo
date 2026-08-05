@@ -31,7 +31,7 @@ from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger("agent_runtime.model_router")
 
-AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai.svc:8080")
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc:8080")
 
 
 @dataclass

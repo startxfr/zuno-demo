@@ -131,7 +131,7 @@ track) must match the client's `redirectUris`/`webOrigins` host and the
 If a namespace or Route hostname changes on the other track's side, update
 `clusterBaseDomain`/the per-client `redirectUris` in
 `gitops/charts/keycloak/files/realm-zuno.json` (and re-run
-`make configure keycloak`) to keep the two in sync.
+`make d0 configure keycloak`) to keep the two in sync.
 
 ## Group model: two orthogonal dimensions (ADR-0040)
 

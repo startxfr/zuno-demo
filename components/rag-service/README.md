@@ -163,7 +163,7 @@ its literal score, to the fused ranking.
 
 The query text is embedded via an OpenAI-compatible `POST
 {EMBEDDING_SERVICE_URL}/v1/embeddings` call (default:
-`http://embeddings-predictor.zuno-ai.svc:8080/v1/embeddings`,
+`http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings`,
 override via env) - this assumes an embedding model is served through
 OpenShift AI's KServe/vLLM serving path (ADR-0018's OGX definition), or
 any other OpenAI-compatible embeddings endpoint. **Degradation:** if that

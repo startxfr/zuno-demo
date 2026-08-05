@@ -35,14 +35,14 @@
   retries: 30
   delay: 10
 
-- name: "external_secrets | ensure the zuno-ai namespace exists"
+- name: "external_secrets | ensure the zuno-ai-run namespace exists"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: zuno-ai
+        name: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
 
@@ -64,7 +64,7 @@
       kind: ExternalSecret
       metadata:
         name: zuno-cluster-domain
-        namespace: zuno-ai
+        namespace: zuno-ai-run
         labels:
           zuno.io/managed-by: ansible
       spec:
