@@ -9,3 +9,13 @@ metadata:
     zuno.io/managed-by: argocd
 ---
 {{- end }}
+{{- range .Values.platformNamespaces }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}
+  labels:
+    zuno.io/tier: platform
+    zuno.io/managed-by: argocd
+---
+{{- end }}

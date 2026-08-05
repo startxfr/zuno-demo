@@ -22,11 +22,12 @@
 - name: "namespaces | look up every expected namespace on the cluster"
   kubernetes.core.k8s_info:
     kind: Namespace
-    name: "{{ item }}"
+    name: "{{ ns_name }}"
   register: _namespaces_lookup
   loop: "{{ _namespaces_expected }}"
   loop_control:
-    label: "{{ item }}"
+    loop_var: ns_name
+    label: "{{ ns_name }}"
 
 - name: "namespaces | fail if any expected namespace is missing"
   ansible.builtin.fail:
@@ -35,7 +36,7 @@
       {{ _namespaces_lookup.results
          | selectattr('resources', 'defined')
          | selectattr('resources', 'equalto', [])
-         | map(attribute='item') | list }}.
+         | map(attribute='ns_name') | list }}.
       Run `make d0 install namespaces` to create them.
   when: >-
     (_namespaces_lookup.results

@@ -1,8 +1,9 @@
 {{/*
 ADR-0052: the same default-deny-other-namespaces shape as
 templates/networkpolicy.yaml, applied to the platform namespaces this
-chart does not create itself (see values.yaml's platformNamespaces comment
-for why zuno-ai-run is intentionally excluded here). Same-namespace traffic and
+chart also creates via templates/namespace.yaml (see values.yaml's
+platformNamespaces comment for why zuno-ai-run is intentionally excluded
+here). Same-namespace traffic and
 router ingress are always allowed; allowedFromNamespaces adds specific,
 known real cross-namespace callers on top.
 */}}
