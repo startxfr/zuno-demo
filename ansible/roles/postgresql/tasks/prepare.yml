@@ -5,14 +5,19 @@
 # The actual PostgresCluster CR is applied declaratively later, by
 # ansible/roles/postgresql/tasks/configure.yml, as a GitOps Application.
 #
-# Switched from CloudNativePG to PGO because PGO's OLM package is
-# published from redhat-operators, one of OpenShift's four *default*
-# CatalogSources - unlike CloudNativePG, which needed a manual
-# operatorhubio-catalog fallback to become installable on at least one
-# real cluster. That fallback-catalog/channel-discovery machinery is
-# deliberately NOT carried over here: a plain hardcoded source/channel,
-# the same style every other role in this repository already uses, is
-# enough given redhat-operators' near-universal availability.
+# This role originally hardcoded `source: redhat-operators, channel:
+# stable` for PGO (reasoning it'd be safer than CloudNativePG's
+# fallback-catalog dance, since redhat-operators is a default catalog) -
+# proven wrong on a real cluster: OLM's ResolutionFailed condition showed
+# `crunchy-postgres-operator` isn't published in redhat-operators there at
+# all. Same lesson as CNPG's catalog/channel mismatches, generalized one
+# step further this time: don't even trust the *package name* is exactly
+# "crunchy-postgres-operator" on every cluster - discover it by fuzzy name
+# match across every enabled catalog (ADR-0048-style), falling back to
+# registering the well-known public operatorhubio-catalog (already present
+# on at least one real cluster from the earlier CloudNativePG fallback)
+# if nothing matches anywhere, and failing loudly - listing every
+# postgres-ish package actually found - rather than guessing a fourth time.
 - name: "postgresql | ensure the openshift-operators namespace exists"
   kubernetes.core.k8s:
     state: present
@@ -24,6 +29,123 @@
         labels:
           zuno.io/managed-by: ansible
 
+- name: "postgresql | list every PackageManifest published in this cluster's catalogs"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+  register: _postgresql_all_pkgs
+
+- name: "postgresql | select whichever package looks like the Crunchy Postgres Operator"
+  ansible.builtin.set_fact:
+    _postgresql_pkg_candidates: >-
+      {{
+        _postgresql_all_pkgs.resources | default([])
+        | selectattr('metadata.name', 'search', 'crunchy', ignorecase=True) | list
+      }}
+
+- name: "postgresql | register the operatorhubio-catalog fallback if nothing crunchy-named was found anywhere"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: CatalogSource
+      metadata:
+        name: operatorhubio-catalog
+        namespace: openshift-marketplace
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        sourceType: grpc
+        image: quay.io/operatorhubio/catalog:latest
+        displayName: "Community Operators (OperatorHub.io)"
+        publisher: OperatorHub.io
+  when: (_postgresql_pkg_candidates | length) == 0
+
+- name: "postgresql | wait for the operatorhubio-catalog fallback to become ready"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: CatalogSource
+    namespace: openshift-marketplace
+    name: operatorhubio-catalog
+  register: _postgresql_fallback_catalog
+  until: >-
+    (_postgresql_fallback_catalog.resources | default([]) | length) > 0 and
+    (_postgresql_fallback_catalog.resources[0].status.connectionState.lastObservedState | default('')) == 'READY'
+  retries: 30
+  delay: 10
+  when: (_postgresql_pkg_candidates | length) == 0
+
+- name: "postgresql | re-list PackageManifests after registering the fallback catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+  register: _postgresql_all_pkgs
+  when: (_postgresql_pkg_candidates | length) == 0
+
+- name: "postgresql | re-select after the fallback catalog registration"
+  ansible.builtin.set_fact:
+    _postgresql_pkg_candidates: >-
+      {{
+        _postgresql_all_pkgs.resources | default([])
+        | selectattr('metadata.name', 'search', 'crunchy', ignorecase=True) | list
+      }}
+  when: (_postgresql_pkg_candidates | length) == 0
+
+- name: "postgresql | fail with a clear diagnostic if nothing crunchy-named was found anywhere"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest matching /crunchy/i was found in
+      openshift-marketplace, even after registering the
+      operatorhubio-catalog fallback. Every postgres-ish package this
+      cluster's catalogs actually publish:
+      {{ _postgresql_all_pkgs.resources | default([])
+         | selectattr('metadata.name', 'search', 'postgres', ignorecase=True)
+         | map(attribute='metadata.name') | list }}.
+      Confirm the correct OLM package name (e.g.
+      `oc get packagemanifest -n openshift-marketplace | grep -iE
+      "crunchy|postgres"`) and update this task's selection filter if it
+      differs from "crunchy".
+  when: (_postgresql_pkg_candidates | length) == 0
+
+# Prefer an exact "crunchy-postgres-operator" match if multiple
+# crunchy-named packages exist (e.g. published by more than one catalog);
+# otherwise take whichever fuzzy match was found.
+- name: "postgresql | pick the package name/catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _postgresql_pkg: >-
+      {{
+        (_postgresql_pkg_candidates | selectattr('metadata.name', 'equalto', 'crunchy-postgres-operator') | list
+         + _postgresql_pkg_candidates)[0]
+      }}
+
+- name: "postgresql | select the channel to subscribe from"
+  ansible.builtin.set_fact:
+    _postgresql_package_name: "{{ _postgresql_pkg.metadata.name }}"
+    _postgresql_catalog_source: "{{ _postgresql_pkg.status.catalogSource }}"
+    _postgresql_channel: >-
+      {{
+        'stable'
+        if (_postgresql_pkg.status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_postgresql_pkg.status.defaultChannel | default(''))
+      }}
+
+- name: "postgresql | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ _postgresql_package_name }}' (catalog
+      '{{ _postgresql_catalog_source }}') has no "stable" channel and no
+      defaultChannel to fall back to. Published channels:
+      {{ _postgresql_pkg.status.channels | map(attribute='name') | list }}.
+  when: _postgresql_channel | length == 0
+
+- name: "postgresql | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ _postgresql_package_name }}', catalog
+      '{{ _postgresql_catalog_source }}', channel '{{ _postgresql_channel }}'.
+
 - name: "postgresql | subscribe to the Crunchy Postgres Operator"
   kubernetes.core.k8s:
     state: present
@@ -31,14 +153,14 @@
       apiVersion: operators.coreos.com/v1alpha1
       kind: Subscription
       metadata:
-        name: crunchy-postgres-operator
+        name: "{{ _postgresql_package_name }}"
         namespace: openshift-operators
         labels:
           zuno.io/managed-by: ansible
       spec:
-        channel: stable
-        name: crunchy-postgres-operator
-        source: redhat-operators
+        channel: "{{ _postgresql_channel }}"
+        name: "{{ _postgresql_package_name }}"
+        source: "{{ _postgresql_catalog_source }}"
         sourceNamespace: openshift-marketplace
         installPlanApproval: Automatic
 
@@ -69,7 +191,7 @@
   register: _postgresql_operator_deploys
   until: >-
     (_postgresql_operator_deploys.resources | default([])
-     | selectattr('metadata.name', 'search', 'postgres-operator|^pgo')
+     | selectattr('metadata.name', 'search', 'postgres-operator|^pgo|crunchy')
      | list | length) > 0
   retries: 30
   delay: 10
@@ -79,7 +201,7 @@
     _postgresql_operator_deploy_name: >-
       {{
         (_postgresql_operator_deploys.resources
-         | selectattr('metadata.name', 'search', 'postgres-operator|^pgo')
+         | selectattr('metadata.name', 'search', 'postgres-operator|^pgo|crunchy')
          | map(attribute='metadata.name') | list)[0]
       }}
 

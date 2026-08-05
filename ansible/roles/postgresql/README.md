@@ -13,21 +13,37 @@ after two rounds of real friction on an actual cluster: CNPG's
 `cloudnative-pg` package wasn't published by any enabled catalog there
 (needing a manual `operatorhubio-catalog` fallback to fix), and once
 found, the catalog's channel name (`stable-v1`) didn't match what this
-role had hardcoded (`stable`). PGO's OLM package
-(`crunchy-postgres-operator`) is published from `redhat-operators`, one
-of OpenShift's four *default* CatalogSources - reliably present without
-any fallback/discovery workaround. That's a real, meaningful reduction in
-fragility, even though it means CNPG and PGO use different CRDs, Service
-names and Secret conventions, so this was a genuine rewrite, not a config
-tweak.
+role had hardcoded (`stable`).
 
-- `precheck.yml` - verifies the `crunchy-postgres-operator` package is
-  published in this cluster's catalog (simple existence check, no
-  fallback-catalog logic needed - see above), and that ArgoCD is already
-  installed (the `PostgresCluster` CR is applied as a GitOps Application).
-- `prepare.yml` - subscribes to PGO (OLM `Subscription`, `channel: stable`,
-  `source: redhat-operators`, `openshift-operators` namespace, mirrors
-  `ansible/roles/argocd` and `ansible/roles/external_secrets`) and waits
+PGO was first wired up assuming its OLM package
+(`crunchy-postgres-operator`) would reliably be published from
+`redhat-operators`, one of OpenShift's four *default* CatalogSources, with
+no fallback/discovery workaround needed - **also proven wrong** on a real
+cluster (OLM's `Subscription.status` reported `ResolutionFailed`: "no
+operators found in package crunchy-postgres-operator in the catalog
+referenced by subscription"). Three real-world catalog/channel/package-name
+mismatches in a row is a pattern, not a fluke: `precheck.yml`/`prepare.yml`
+now discover the package by fuzzy name match (`/crunchy/i`) across every
+catalog in this cluster's `openshift-marketplace`, not just a hardcoded
+package name in a hardcoded catalog, with the same `operatorhubio-catalog`
+public fallback CNPG's fix used if nothing crunchy-named is found anywhere.
+This is a genuine rewrite either way (CNPG and PGO use different CRDs,
+Service names and Secret conventions), not a config tweak.
+
+- `precheck.yml` - verifies *some* crunchy-named package is published
+  somewhere in this cluster's catalogs (fuzzy match, not an exact package
+  name - see above), and that ArgoCD is already installed (the
+  `PostgresCluster` CR is applied as a GitOps Application).
+- `prepare.yml` - discovers the actual package name/catalog/channel to
+  subscribe from (fuzzy-matches `/crunchy/i` across every PackageManifest
+  in `openshift-marketplace`; prefers an exact `crunchy-postgres-operator`
+  name and a `stable` channel if present, else whatever fuzzy match/
+  `defaultChannel` was found; registers `operatorhubio-catalog` as a
+  fallback and retries if nothing matched at all; fails with a clear
+  diagnostic - listing every postgres-ish package this cluster's catalogs
+  actually publish - rather than guessing a fourth time), subscribes (OLM
+  `Subscription`, `openshift-operators` namespace, mirrors
+  `ansible/roles/argocd` and `ansible/roles/external_secrets`), and waits
   for the `postgresclusters.postgres-operator.crunchydata.com` CRD. The
   controller Deployment's exact name was **not verified against a live
   cluster** (this environment has no network path to test against - see
@@ -95,6 +111,10 @@ researched from Crunchy's own documentation but not exercised end to end:
 
 - The PGO controller Deployment's exact name/labels (`prepare.yml`
   discovers it rather than hardcoding a guess - see above).
+- The exact OLM package name/catalog/channel this cluster actually
+  publishes PGO under (`prepare.yml`'s fuzzy `/crunchy/i` discovery - see
+  above - handles whatever it turns out to be, but the specific values
+  were not confirmed from this environment).
 - The `PostgresCluster.status.conditions` `Progressing` condition's exact
   semantics on the installed PGO version (`configure.yml`'s `until`).
 - Whether `spec.databaseInitSQL` runs against the `zuno` database as
