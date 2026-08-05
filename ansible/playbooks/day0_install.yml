@@ -10,10 +10,10 @@
       - argocd
       - namespaces
       - vault
+      - external_secrets
       - keycloak
       - postgresql
       - smtp
-      - external_secrets
       - nfd
       - nvidia_gpu
       - observability
