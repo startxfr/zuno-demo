@@ -19,6 +19,59 @@
       metadata:
         name: openshift-operators
 
+    # A hardcoded `source: redhat-operators` was wrong on a real cluster
+    # (api.demo222.startx.fr): the package name "external-secrets-operator"
+    # is real, but it's only published there via the community-operators
+    # catalog, not redhat-operators - OLM's ResolutionFailed/
+    # ConstraintsNotSatisfiable ("no operators found in package
+    # external-secrets-operator in the catalog referenced by subscription")
+    # gave no hint which catalog actually had it, since the catalog name is
+    # only visible on the PackageManifest itself. Same lesson as
+    # ansible/roles/postgresql's PGO catalog discovery and
+    # ansible/roles/keycloak's RHBK channel discovery: don't assume which
+    # catalog publishes a package, discover it.
+- name: "external_secrets | look up the external-secrets-operator PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: external-secrets-operator
+  register: _eso_pkg_info
+
+- name: "external_secrets | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named 'external-secrets-operator' was found in
+      openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i external-secrets` for the correct
+      package name on this cluster and update this role's selection.
+  when: (_eso_pkg_info.resources | default([]) | length) == 0
+
+- name: "external_secrets | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _eso_catalog_source: "{{ _eso_pkg_info.resources[0].status.catalogSource }}"
+    _eso_channel: >-
+      {{
+        'stable'
+        if (_eso_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_eso_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "external_secrets | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package 'external-secrets-operator' (catalog
+      '{{ _eso_catalog_source }}') has no "stable" channel and no
+      defaultChannel to fall back to. Published channels:
+      {{ _eso_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _eso_channel | length == 0
+
+- name: "external_secrets | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package 'external-secrets-operator', catalog
+      '{{ _eso_catalog_source }}', channel '{{ _eso_channel }}'.
+
 - name: "external_secrets | subscribe to the External Secrets Operator"
   kubernetes.core.k8s:
     state: present
@@ -31,9 +84,9 @@
         labels:
           zuno.io/managed-by: ansible
       spec:
-        channel: stable
+        channel: "{{ _eso_channel }}"
         name: external-secrets-operator
-        source: redhat-operators
+        source: "{{ _eso_catalog_source }}"
         sourceNamespace: openshift-marketplace
         installPlanApproval: Automatic
 
