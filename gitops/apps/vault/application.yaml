@@ -24,6 +24,18 @@ spec:
         global:
           openshift: true
         server:
+          image:
+            # Fully qualified: an unqualified "hashicorp/vault" short name
+            # resolves via this cluster's node-level short-name alias
+            # config to registry.connect.redhat.com/hashicorp/vault, which
+            # needs a paid Red Hat Connect pull secret this cluster
+            # doesn't have (ImagePullBackOff, "Please login to the Red Hat
+            # Registry" - found via live-cluster testing on
+            # api.demo222.startx.fr). docker.io's image is the same
+            # HashiCorp-published build, just reachable without that
+            # credential.
+            repository: docker.io/hashicorp/vault
+            tag: "1.17.2"
           standalone:
             enabled: true
             config: |
