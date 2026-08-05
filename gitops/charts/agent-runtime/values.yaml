@@ -8,8 +8,12 @@
 
 namespace: zuno-ai-run
 
+# Built by the Day 1 "agent" build component (ADR-0056,
+# ansible/roles/agent_build) into zuno-ai-build's ImageStream, pulled
+# cross-namespace into zuno-ai-run via the system:image-puller RoleBinding
+# ansible/tasks/apply_openshift_build.yml grants.
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-run/agent-runtime
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-runtime
   tag: latest
   pullPolicy: IfNotPresent
 

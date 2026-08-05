@@ -2,8 +2,12 @@
 # http://sales-db-mcp.zuno-ai-run.svc:8000 (gitops/charts/mcp-gateway/values.yaml).
 namespace: zuno-ai-run
 
+# Built by the Day 1 "mcp" build component (ADR-0056,
+# ansible/roles/mcp_build) into zuno-ai-build's ImageStream, pulled
+# cross-namespace into zuno-ai-run via the system:image-puller RoleBinding
+# ansible/tasks/apply_openshift_build.yml grants.
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-run/mcp-sales-db
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-sales-db
   tag: latest
   pullPolicy: IfNotPresent
 

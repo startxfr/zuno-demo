@@ -1,0 +1,189 @@
+---
+# Shared task (ADR-0056): builds one component image via native OpenShift
+# BuildConfig/ImageStream in zuno-ai-build, in the same spirit as
+# ansible/tasks/apply_gitops_app.yml. Called once per image by the Day 1
+# build roles (ansible/roles/{mcp,rag,agent}_build), each with its own
+# build_image_name/build_dockerfile_path/build_context_dir.
+#
+# Idempotent, not "always rebuild": the BuildConfig's own `ConfigChange`
+# trigger (OpenShift's standard, idiomatic mechanism for git-source
+# BuildConfigs) only starts a new build when the applied BuildConfig
+# content actually differs from what's already there (source ref,
+# Dockerfile path, etc. - the same "state: present, changed only on real
+# diff" idempotency every other `kubernetes.core.k8s` task in this repo
+# already has). Re-running `make d1 build <component>` against unchanged
+# source is a no-op, matching this repo's idempotent verb semantics
+# elsewhere. To force a rebuild against the same source ref, delete the
+# BuildConfig first or run `oc start-build` directly - a documented manual
+# escape hatch, same pattern as `models_vllm_image_override`.
+
+- name: "openshift-build | validate required vars are set"
+  ansible.builtin.assert:
+    that:
+      - build_image_name is defined
+      - build_dockerfile_path is defined
+      - build_context_dir is defined
+    fail_msg: "apply_openshift_build.yml requires build_image_name, build_dockerfile_path and build_context_dir"
+
+- name: "openshift-build | ensure the zuno-ai-build namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: zuno-ai-build
+        labels:
+          zuno.io/managed-by: ansible
+
+# Build pods pull source from git and push images out - nothing needs to
+# open an inbound connection to anything in this namespace, so a full
+# default-deny-all-ingress baseline (no exceptions, not even the
+# router-ingress/same-namespace allowances the Day 0 namespaces chart's
+# baseline grants other namespaces) is both safe and correct here, same
+# ADR-0052 hardening spirit as every other namespace in this repo.
+- name: "openshift-build | apply a default-deny-all-ingress NetworkPolicy baseline"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: zuno-ai-build-default-deny-ingress
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        podSelector: {}
+        policyTypes:
+          - Ingress
+
+# Grants the three namespaces that actually run a build-produced image
+# (zuno-ai-run: agent-runtime/mcp-gateway/mcp-sales-db; zuno-data:
+# rag-service; zuno-agent-tekos: agent-frontend/agent-bff) cross-namespace
+# pull access to zuno-ai-build's ImageStreams, via OpenShift's standard
+# system:image-puller ClusterRole bound per-namespace (not per-ServiceAccount
+# name, since each workload uses its own dedicated least-privilege
+# ServiceAccount per ADR-0052, not a shared "default" one). Applied here
+# (Day 1 build time), not by the Day 0 namespaces role: zuno-ai-build
+# doesn't exist until a build first runs, so granting on it any earlier
+# would make Day 0 depend on Day 1 having partially run first - see
+# gitops/charts/namespaces/values.yaml's comment for the same reasoning
+# applied to why zuno-ai-build isn't in that chart's platformNamespaces.
+- name: "openshift-build | grant image-pull access to the namespaces that run these images"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "zuno-ai-build-image-puller-{{ item }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: ansible
+      subjects:
+        - kind: Group
+          apiGroup: rbac.authorization.k8s.io
+          name: "system:serviceaccounts:{{ item }}"
+      roleRef:
+        kind: ClusterRole
+        name: system:image-puller
+        apiGroup: rbac.authorization.k8s.io
+  loop:
+    - zuno-ai-run
+    - zuno-data
+    - zuno-agent-tekos
+
+- name: "openshift-build | apply the ImageStream: {{ build_image_name }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: image.openshift.io/v1
+      kind: ImageStream
+      metadata:
+        name: "{{ build_image_name }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: ansible
+
+- name: "openshift-build | apply the BuildConfig: {{ build_image_name }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: build.openshift.io/v1
+      kind: BuildConfig
+      metadata:
+        name: "{{ build_image_name }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: ansible
+      spec:
+        source:
+          type: Git
+          git:
+            uri: https://github.com/startxfr/zuno-demo.git
+            ref: main
+          contextDir: "{{ build_context_dir if build_context_dir != '.' else '' }}"
+        strategy:
+          type: Docker
+          dockerStrategy:
+            dockerfilePath: "{{ build_dockerfile_path }}"
+        output:
+          to:
+            kind: ImageStreamTag
+            name: "{{ build_image_name }}:latest"
+        triggers:
+          - type: ConfigChange
+  register: _openshift_build_bc
+
+- name: "openshift-build | re-read the BuildConfig to get its current lastVersion"
+  kubernetes.core.k8s_info:
+    api_version: build.openshift.io/v1
+    kind: BuildConfig
+    namespace: zuno-ai-build
+    name: "{{ build_image_name }}"
+  register: _openshift_build_bc_info
+
+- name: "openshift-build | wait for a Build to exist for the current lastVersion"
+  kubernetes.core.k8s_info:
+    api_version: build.openshift.io/v1
+    kind: Build
+    namespace: zuno-ai-build
+    name: "{{ build_image_name }}-{{ _openshift_build_bc_info.resources[0].status.lastVersion | default(0) }}"
+  register: _openshift_build
+  until: (_openshift_build.resources | default([]) | length) > 0
+  retries: 12
+  delay: 10
+  when: (_openshift_build_bc_info.resources[0].status.lastVersion | default(0)) > 0
+
+- name: "openshift-build | wait for the Build to complete"
+  kubernetes.core.k8s_info:
+    api_version: build.openshift.io/v1
+    kind: Build
+    namespace: zuno-ai-build
+    name: "{{ build_image_name }}-{{ _openshift_build_bc_info.resources[0].status.lastVersion | default(0) }}"
+  register: _openshift_build_status
+  until: >-
+    (_openshift_build_status.resources | default([]) | length) > 0 and
+    (_openshift_build_status.resources[0].status.phase | default('')) in ['Complete', 'Failed', 'Error', 'Cancelled']
+  retries: 60
+  delay: 15
+  when: (_openshift_build_bc_info.resources[0].status.lastVersion | default(0)) > 0
+
+- name: "openshift-build | fail loudly if the build did not complete successfully"
+  ansible.builtin.fail:
+    msg: >-
+      Build {{ build_image_name }}-{{ _openshift_build_bc_info.resources[0].status.lastVersion | default(0) }}
+      in zuno-ai-build did not complete: phase=
+      {{ _openshift_build_status.resources[0].status.phase | default('unknown') }}.
+      Check `oc logs -n zuno-ai-build build/{{ build_image_name }}-{{ _openshift_build_bc_info.resources[0].status.lastVersion | default(0) }}`.
+  when: >-
+    (_openshift_build_bc_info.resources[0].status.lastVersion | default(0)) > 0 and
+    (_openshift_build_status.resources[0].status.phase | default('')) != 'Complete'
+
+- name: "openshift-build | summary"
+  ansible.builtin.debug:
+    msg: >-
+      {{ build_image_name }}: BuildConfig lastVersion=
+      {{ _openshift_build_bc_info.resources[0].status.lastVersion | default(0) }},
+      phase={{ _openshift_build_status.resources[0].status.phase | default('no build triggered - BuildConfig unchanged') }}.

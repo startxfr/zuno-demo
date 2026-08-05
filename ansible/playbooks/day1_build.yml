@@ -1,0 +1,29 @@
+---
+# Day 1 (ADR-0056): `make day1 build`/`make d1 build`. Builds the
+# platform's own component images via native OpenShift BuildConfig/
+# ImageStream in zuno-ai-build - see ansible/tasks/apply_openshift_build.yml.
+# `ai-gateway` is not part of any named Day 1 build component yet
+# (flagged in ADR-0056's Implementation state) - still built via the
+# existing GitHub Actions pipeline (ADR-0051).
+- name: "Day 1: build component images"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day1_build_components:
+      - mcp_build
+      - rag_build
+      - agent_build
+  tasks:
+    - name: Resolve requested Day 1 build component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day1_build_components if target_component | default('all') == 'all'
+             else [(target_component | replace('-', '_')) + '_build'] }}
+
+    - name: Build Day 1 component images
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: build
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

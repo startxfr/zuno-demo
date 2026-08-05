@@ -11,15 +11,14 @@ global:
 
 namespace: zuno-agent-tekos
 
-# Both images are built from this repository (components/agent-frontend,
-# components/agent-bff - see each Dockerfile) by CI/image-build tooling
-# outside this track's scope. Defaults below point at the in-cluster
-# OpenShift image registry's conventional coordinates for this namespace;
-# override per environment once a real build/push pipeline exists.
+# Both images are built by the Day 1 "agent" build component (ADR-0056,
+# ansible/roles/agent_build) into zuno-ai-build's ImageStream, pulled
+# cross-namespace into zuno-agent-tekos via the system:image-puller
+# RoleBinding ansible/tasks/apply_openshift_build.yml grants.
 image:
   registry: image-registry.openshift-image-registry.svc:5000
-  frontendRepository: zuno-agent-tekos/agent-frontend
-  bffRepository: zuno-agent-tekos/agent-bff
+  frontendRepository: zuno-ai-build/agent-frontend
+  bffRepository: zuno-ai-build/agent-bff
   tag: latest
   pullPolicy: IfNotPresent
 
