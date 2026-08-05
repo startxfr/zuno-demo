@@ -59,6 +59,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | Implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | To be implemented | Repository review change-set index |
+| [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | v0 | To be implemented | Restructure deployment into Day 0 / Day 1 sequencing |
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v1 | Proposed | Provide HA for shared agent platform services |
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v1 | Proposed | Target 99.9 percent platform availability |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v1 | Proposed | Persist resumable long-running agent workflows |
