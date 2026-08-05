@@ -57,8 +57,27 @@ spec:
   unsupported:
     podTemplate:
       spec:
+        # ADR-0052: automountServiceAccountToken/runAsNonRoot/seccompProfile
+        # are set here since spec.unsupported.podTemplate is a full
+        # corev1.PodTemplateSpec overlay - the same already-established
+        # mechanism this file uses for env injection. No
+        # readOnlyRootFilesystem on the container below: Keycloak/the JVM
+        # write caches/logs under its own filesystem at runtime, and
+        # guessing at the exact writable paths without a live cluster risks
+        # breaking the instance outright - left as a documented gap rather
+        # than a fabricated fix, same reasoning as gitops/charts/models'
+        # vLLM container.
+        automountServiceAccountToken: false
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
         containers:
           - name: keycloak
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
             env:
               - name: KC_VAULT
                 value: env

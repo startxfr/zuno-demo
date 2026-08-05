@@ -145,6 +145,18 @@
     VAULT_TOKEN: "{{ _vault_root_token }}"
   no_log: true
 
+- name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      vault kv put secret/zuno/mcp/gateway-workload-token
+      token={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}
+  environment:
+    VAULT_TOKEN: "{{ _vault_root_token }}"
+  no_log: true
+
 - name: "vault | generate and seed the Tekos frontend session HMAC secret"
   kubernetes.core.k8s_exec:
     namespace: zuno-data

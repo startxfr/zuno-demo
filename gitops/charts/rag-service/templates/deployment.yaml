@@ -16,10 +16,21 @@ spec:
       labels:
         app.kubernetes.io/name: rag-service
     spec:
+      serviceAccountName: rag-service
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: rag-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: 8080
@@ -44,6 +55,11 @@ spec:
               value: {{ .Values.embeddingServiceUrl | quote }}
             - name: EMBEDDING_MODEL_NAME
               value: {{ .Values.embeddingModelName | quote }}
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /healthz
@@ -58,3 +74,6 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

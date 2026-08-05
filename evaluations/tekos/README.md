@@ -35,7 +35,7 @@ This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what "make
 check" and a full evaluation run require.
 
-## Security-negative checks (ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0040)
+## Security-negative checks (ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0037, ADR-0040)
 
 `security_checks.py` (same setup as above, run from this directory) checks
 identity-propagation, classification and entitlement behavior that isn't
@@ -47,9 +47,17 @@ than treating it as authoritative, Confluence is correctly classified C2
 with `external_model_policy.allow_context: false` (a config-only check, no
 live cluster needed), `X-Zuno-Local-Only: true` actually forces
 `components/ai-gateway` to pick the local provider even for a C2 request
-that would otherwise be SaaS-eligible, and ADR-0040's two-dimension group
+that would otherwise be SaaS-eligible, ADR-0040's two-dimension group
 model is enforced server-side in both directions: a caller with the
 `agent_tekos` entitlement but no business role is denied `search_confluence`
 by the MCP Gateway (403), and a caller with the `consultant` business role
 but no `agent_tekos` entitlement is denied by the BFF itself (403) before
-the request ever reaches the Agent Runtime.
+the request ever reaches the Agent Runtime, and a direct call to
+`sales-db-mcp` that bypasses the MCP Gateway entirely (no
+`X-Zuno-Gateway-Token`) is denied by the server itself (401) - the
+workload-identity layer ADR-0037 requires in addition to the NetworkPolicy
+boundary (`gitops/charts/mcp-sales-db`'s `NetworkPolicy`, which an
+HTTP-level check like this can't directly exercise;
+`platform/security/check_workload_hardening.py` statically verifies that
+policy and the rest of the ADR-0052 hardening baseline exist in every
+chart's rendered manifests instead).

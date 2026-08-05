@@ -15,6 +15,14 @@ spec:
     targetRevision: "0.28.1"
     helm:
       values: |
+        # ADR-0052: the official chart's own documented flag for
+        # OpenShift SCC compatibility (arbitrary/non-root UID, no
+        # privileged context) - this repo does not otherwise control this
+        # third-party chart's PodSpec directly, so hardening beyond this
+        # flag is left to the chart's own restricted-compatible defaults
+        # rather than guessed at via undocumented value overrides.
+        global:
+          openshift: true
         server:
           standalone:
             enabled: true

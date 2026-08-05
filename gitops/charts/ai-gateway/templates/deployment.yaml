@@ -16,10 +16,21 @@ spec:
       labels:
         app.kubernetes.io/name: ai-gateway
     spec:
+      serviceAccountName: ai-gateway
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: ai-gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: 8080
@@ -56,10 +67,14 @@ spec:
                   name: {{ .Values.providerSecrets.mistral }}
                   key: api_key
                   optional: true
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
           volumeMounts:
             - name: provider-routing
               mountPath: /app/config
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /healthz
@@ -78,3 +93,5 @@ spec:
         - name: provider-routing
           configMap:
             name: {{ .Values.providerRoutingConfigMap }}
+        - name: tmp
+          emptyDir: {}

@@ -16,10 +16,21 @@ spec:
       labels:
         app.kubernetes.io/name: mcp-gateway
     spec:
+      serviceAccountName: mcp-gateway
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: mcp-gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: 8080
@@ -30,6 +41,16 @@ spec:
               value: {{ .Values.salesDbMcpUrl | quote }}
             - name: INTERNAL_EMAIL_DOMAINS
               value: {{ .Values.internalEmailDomains | quote }}
+            - name: MCP_GATEWAY_WORKLOAD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-gateway-workload-token
+                  key: token
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /healthz
@@ -44,3 +65,6 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

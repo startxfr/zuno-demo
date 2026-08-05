@@ -8,10 +8,16 @@ which is the entire point of ADR-0017 ("no direct LLM-to-DB freedom").
 
 Wire contract (matched exactly against components/mcp-gateway/app/downstream.py,
 the only caller - the gateway is the trust boundary; this server does not
-re-validate the caller's JWT, it trusts the gateway's ADR-0011 policy
-intersection already happened):
+re-validate the caller's end-user JWT, it trusts the gateway's ADR-0011
+policy intersection already happened). ADR-0037: network location alone
+(gitops/charts/mcp-sales-db's NetworkPolicy, restricting ingress to the
+gateway's pods specifically) is not trusted as the sole boundary - every
+call must also carry X-Zuno-Gateway-Token, a shared secret only the
+gateway holds (vault-generated, ansible/roles/vault/tasks/configure.yml,
+secret/zuno/mcp/gateway-workload-token):
 
     POST /mcp
+    headers: X-Zuno-Gateway-Token: <shared secret>
     {"jsonrpc": "2.0", "id": <any>, "method": "tools/call",
      "params": {"name": "<tool>", "arguments": {...}}}
     -> {"jsonrpc": "2.0", "id": <same>, "result": {...}}
@@ -21,6 +27,7 @@ intersection already happened):
 """
 from __future__ import annotations
 
+import hmac
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
@@ -35,6 +42,13 @@ DB_PORT = os.getenv("PGPORT", "5432")
 DB_NAME = os.getenv("PGDATABASE", "zuno")
 DB_USER = os.getenv("PGUSER")
 DB_PASSWORD = os.getenv("PGPASSWORD")
+
+# ADR-0037: required, not optional - unlike the gateway's own copy of this
+# value (which degrades a single tool call to a 502 if unset), this server
+# has no other purpose than serving the gateway, so a missing token is a
+# deployment/configuration error worth failing loudly on every request
+# rather than silently accepting unauthenticated callers.
+GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
 
 def _conninfo() -> str:
@@ -184,6 +198,14 @@ async def healthz() -> Dict[str, str]:
 
 @app.post("/mcp")
 async def mcp(request: Request) -> JSONResponse:
+    # ADR-0037: workload identity check, independent of and in addition to
+    # the NetworkPolicy boundary - a missing/wrong token is an
+    # authentication failure (401), not a JSON-RPC-level error, since it's
+    # about who is calling, not what they asked for.
+    caller_token = request.headers.get("x-zuno-gateway-token", "")
+    if not GATEWAY_WORKLOAD_TOKEN or not hmac.compare_digest(caller_token, GATEWAY_WORKLOAD_TOKEN):
+        return JSONResponse({"detail": "missing or invalid X-Zuno-Gateway-Token"}, status_code=401)
+
     body = await request.json()
     request_id = body.get("id")
 

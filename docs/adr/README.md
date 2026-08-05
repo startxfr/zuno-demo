@@ -40,7 +40,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md) | v0 | Implemented | Compute effective classification from the complete context |
 | [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md) | v0 | Implemented | Prevent restricted internal context from reaching external models |
 | [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md) | v0 | Implemented | Enforce the complete MCP authorization intersection in the gateway |
-| [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md) | v0 | To be implemented | Protect MCP servers with network and workload identity boundaries |
+| [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md) | v0 | Implemented | Protect MCP servers with network and workload identity boundaries |
 | [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | v0 | Implemented | Use standards-compliant OKF v0.2 Markdown bundles |
 | [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | Implemented | Make Agent Runtime execute the OKF agent contract |
 | [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | v0 | Implemented | Separate agent entitlement from business role authorization |
@@ -55,7 +55,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0049](0049-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v1 | To be implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v1 | To be implemented | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0 | To be implemented | Use immutable and verifiable software supply chain artifacts |
-| [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | To be implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
+| [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | To be implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | To be implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | To be implemented | Repository review change-set index |

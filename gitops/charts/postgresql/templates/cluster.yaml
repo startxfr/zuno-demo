@@ -1,6 +1,17 @@
 # CloudNativePG Cluster CR. Requires the CloudNativePG operator, installed
 # separately by ansible/roles/postgresql/tasks/prepare.yml (OLM
 # Subscription) - not managed by this chart.
+#
+# ADR-0052: CNPG's operator-managed operand pods run non-root with a
+# restricted-compatible security profile by the operator's own design
+# (this is a stated CNPG project goal, not something this Cluster CR
+# configures) - there is no documented Cluster.spec field for overriding
+# pod/container securityContext, so this is left to the operator's default
+# rather than a guessed-at field. NetworkPolicy hardening (which this repo
+# does fully control, independent of the operator) is applied at the
+# namespace level - see gitops/charts/namespaces/values.yaml's
+# platformNamespaces (zuno-data allows zuno-ai in, covering sales-db-mcp's
+# cross-namespace connection here).
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:

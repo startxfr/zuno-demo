@@ -31,6 +31,20 @@ logger = logging.getLogger("mcp_gateway.downstream")
 SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai.svc:8000")
 DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "20"))
 
+# ADR-0037: a shared secret (vault-generated,
+# ansible/roles/vault/tasks/configure.yml,
+# secret/zuno/mcp/gateway-workload-token) proving this call actually came
+# from the MCP Gateway, not merely from a pod that happens to be
+# network-adjacent - NetworkPolicy is the first layer (gitops/charts/
+# mcp-sales-db's NetworkPolicy restricts ingress to this service's pods
+# specifically); this is the "validate the gateway workload identity in
+# addition to relying on network location" second layer this ADR requires
+# for sensitive MCP servers. Not enforced as a hard startup requirement
+# here (unlike sales-db's own validation) so this gateway still starts and
+# serves every other tool if the secret hasn't landed yet - the sales-db
+# call itself degrades to a clear 502 from the missing/rejected header.
+MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
+
 SALES_DB_TOOLS = {"get_customer", "list_open_opportunities", "get_quote"}
 
 DEMO_MODE_HANDLERS = {
@@ -70,7 +84,7 @@ async def _invoke_sales_db(
         "method": "tools/call",
         "params": {"name": tool_name, "arguments": arguments},
     }
-    headers = {"Authorization": f"Bearer {bearer_token}"}
+    headers = {"Authorization": f"Bearer {bearer_token}", "X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
     try:
         async with httpx.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS) as client:
             resp = await client.post(f"{SALES_DB_MCP_URL}/mcp", json=payload, headers=headers)

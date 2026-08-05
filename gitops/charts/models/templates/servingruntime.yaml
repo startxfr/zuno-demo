@@ -24,6 +24,23 @@ spec:
       ports:
         - containerPort: 8080
           protocol: TCP
+      # ADR-0052, partial: allowPrivilegeEscalation/capabilities are safe
+      # to set unconditionally (spec.containers here is a raw
+      # corev1.Container list, a verified-safe injection point). No
+      # readOnlyRootFilesystem: vLLM writes a HuggingFace/compilation cache
+      # under its container filesystem at startup - setting it here without
+      # verifying the exact writable paths against a live cluster risks
+      # breaking model serving outright, so this is left as a documented
+      # gap rather than guessed at. Pod-level runAsNonRoot/seccompProfile
+      # are not set here either: KServe's InferenceService predictor
+      # (templates/inferenceservice.yaml) uses the `model:` shorthand,
+      # which does not reliably expose a verified pod-level securityContext
+      # override in this KServe/RHOAI 3.5 profile - same honest-gap
+      # reasoning, not fabricated.
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
       resources:
         {{- toYaml .Values.resources | nindent 8 }}
   multiModel: false

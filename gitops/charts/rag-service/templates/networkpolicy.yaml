@@ -1,0 +1,30 @@
+# ADR-0052: rag-service lives in zuno-data, which does get a namespace-wide
+# baseline (gitops/charts/namespaces/values.yaml's platformNamespaces,
+# allowing zuno-ai in) - that baseline alone would already let
+# agent-runtime reach this service. This precise policy is added anyway so
+# rag-service's actual caller is documented and enforced at the workload
+# level too, not only inferred from the namespace-wide rule.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rag-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rag-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-ai
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-runtime
+      ports:
+        - protocol: TCP
+          port: 8080

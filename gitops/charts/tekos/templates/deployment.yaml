@@ -19,10 +19,20 @@ spec:
         zuno.io/agent: tekos
     spec:
       serviceAccountName: tekos-frontend
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: frontend
           image: "{{ include "tekos.frontendImage" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: 8080
@@ -47,6 +57,9 @@ spec:
                 secretKeyRef:
                   name: tekos-frontend-secrets
                   key: SESSION_HMAC_SECRET
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /healthz
@@ -61,6 +74,9 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -83,10 +99,20 @@ spec:
         zuno.io/agent: tekos
     spec:
       serviceAccountName: tekos-bff
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: bff
           image: "{{ include "tekos.bffImage" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           ports:
             - name: http
               containerPort: 8080
@@ -99,6 +125,9 @@ spec:
               value: {{ .Values.bff.oidcAudience | quote }}
             - name: AGENT_RUNTIME_BASE_URL
               value: {{ .Values.bff.agentRuntimeBaseUrl | quote }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /healthz
@@ -113,3 +142,6 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.bff.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

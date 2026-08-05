@@ -429,6 +429,28 @@ planning narrative - see README.md's "v0 build status" for a summary:
   end-to-end business path for v0, and `make check` (`ansible/roles/agents`)
   structurally validates the four catalog-only agents' `agent.okf.md`
   bundles rather than leaving them unchecked.
+- Every workload this repo directly controls now runs the OpenShift
+  restricted-compatible baseline (ADR-0052): non-root, no privilege
+  escalation, all Linux capabilities dropped, `seccompProfile:
+  RuntimeDefault`, read-only root filesystem with an explicit `/tmp`
+  `emptyDir`, no autonomously-mounted service account token, and a
+  dedicated least-privilege `ServiceAccount` per workload
+  (`gitops/charts/{tekos,agent-runtime,ai-gateway,mcp-gateway,
+  mcp-sales-db,rag-service}`). Operator/third-party-managed workloads
+  (Keycloak, KServe's vLLM container, CNPG, the upstream Vault chart) get a
+  documented partial treatment instead of a guessed-at CRD/chart field -
+  see ADR-0052's implementation note. `zuno-auth`/`zuno-data`/
+  `zuno-telemetry` gained a namespace-level default-deny `NetworkPolicy`
+  baseline (`gitops/charts/namespaces`); `zuno-ai` instead gets one precise
+  `NetworkPolicy` per workload, because ADR-0037 requires `sales-db-mcp` to
+  reject even same-namespace neighbors like `agent-runtime` - a namespace
+  baseline would have silently defeated that. `sales-db-mcp` additionally
+  validates a shared `X-Zuno-Gateway-Token` workload-identity secret
+  (vault-generated, `secret/zuno/mcp/gateway-workload-token`) on every
+  call, independent of the network boundary. `platform/security/
+  check_workload_hardening.py` statically verifies the whole baseline
+  against every chart's rendered manifests (70 checks, no live cluster
+  needed).
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Security-negative checks for ADR-0032/0033 (identity propagation),
 ADR-0034/0035 (classification aggregation and source-level external-model
-restrictions) and ADR-0040 (agent entitlement vs. business-role
-separation).
+restrictions), ADR-0040 (agent entitlement vs. business-role separation)
+and ADR-0037 (MCP server network/workload-identity boundary).
 
 Kept separate from scenarios.yaml/run_scenarios.py rather than added as
 scenarios 21+: ADR-0027 fixes Tekos's acceptance suite at exactly 20
@@ -30,6 +30,14 @@ from run_scenarios import BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers
 # Not part of run_scenarios.py's URL set since none of the 20 fixed
 # scenarios call ai-gateway directly (only agent-runtime does, internally).
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai.svc.cluster.local:8080")
+
+# Same reasoning: only the MCP Gateway calls this directly in normal
+# operation (components/mcp-gateway/app/downstream.py) - this check
+# deliberately bypasses the gateway to prove the server itself denies an
+# unauthorized direct caller (ADR-0037), independent of the NetworkPolicy
+# layer (gitops/charts/mcp-sales-db's NetworkPolicy), which an HTTP-level
+# check like this can't directly exercise.
+SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai.svc.cluster.local:8000")
 
 
 @dataclass
@@ -183,6 +191,34 @@ def business_role_without_entitlement_denied_by_bff() -> CheckResult:
     )
 
 
+def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
+    """ADR-0037's mandatory acceptance test: a call to sales-db-mcp that
+    bypasses the MCP Gateway entirely (no X-Zuno-Gateway-Token, the shared
+    workload-identity secret only the gateway holds - ansible/roles/vault/
+    tasks/configure.yml, secret/zuno/mcp/gateway-workload-token) must be
+    denied with 401 by the server itself, proving network location alone
+    (assuming this check even runs from an authorized network path) is not
+    sufficient - the workload-identity check is a real, independent second
+    layer, not merely documentation.
+    """
+    resp = httpx.post(
+        f"{SALES_DB_MCP_URL}/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "get_customer", "arguments": {"customer_id": 1}},
+        },
+        timeout=15,
+    )
+    ok = resp.status_code == 401
+    return CheckResult(
+        "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -190,6 +226,7 @@ CHECKS = [
     ai_gateway_local_only_forces_local_provider,
     entitlement_without_business_role_denied_confluence,
     business_role_without_entitlement_denied_by_bff,
+    direct_call_to_sales_db_mcp_denied_without_gateway_token,
 ]
 
 

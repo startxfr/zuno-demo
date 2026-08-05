@@ -1,0 +1,24 @@
+# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai namespace
+# baseline (see gitops/charts/namespaces/values.yaml's platformNamespaces
+# comment). Only Agent Runtime calls the MCP Gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mcp-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-runtime
+      ports:
+        - protocol: TCP
+          port: 8080
