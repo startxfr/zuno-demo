@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -78,17 +78,67 @@ def _escalate(current: str, candidate: str) -> str:
 
 _model_router = ModelRouter()
 
+# ADR-0046: "Similarity alone can return an incorrect OpenShift version
+# even when the user names a version" - these deterministic pre-ranking
+# filters (rag-service's app/search.py:_filter_clause) only trigger when
+# the question actually names a product/version; order matters, since
+# "OpenShift AI 3.5" must match the more specific pattern before the bare
+# "OpenShift" one gets a chance to (it wouldn't anyway - "ai" isn't a
+# digit - but checking the specific pattern first keeps that guarantee
+# explicit rather than incidental).
+_PRODUCT_VERSION_PATTERNS: Tuple[Tuple[Any, str], ...] = (
+    (re.compile(r"\b(?:openshift\s*ai|rhoai)\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE), "openshift-ai"),
+    (re.compile(r"\bopenshift\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE), "openshift"),
+)
+
+
+def _extract_product_version(message: str) -> Tuple[Optional[str], Optional[str]]:
+    for pattern, product in _PRODUCT_VERSION_PATTERNS:
+        match = pattern.search(message)
+        if match:
+            return product, match.group(1)
+    return None, None
+
+
+# A soft ranking preference (rag-service's app/search.py:_LANGUAGE_BOOST),
+# not a hard filter - a light heuristic (accented characters or a handful
+# of common French question words) is good enough for that; returning None
+# rather than defaulting to "en" when uncertain avoids boosting English
+# results for a genuinely ambiguous short message.
+_FRENCH_INDICATOR_PATTERN = re.compile(
+    r"[éèêàçôûîï]|\b(quel|quelle|comment|pourquoi|configurer|dimensionner|réseau)\b",
+    re.IGNORECASE,
+)
+
+
+def _detect_language(message: str) -> Optional[str]:
+    return "fr" if _FRENCH_INDICATOR_PATTERN.search(message) else None
+
 
 async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     """Calls rag-service for technical documents relevant to the question.
 
-    Seeds effective_classification at the baseline technical-docs level
-    (ADR-0034) - rag-service doesn't carry per-document classification
-    metadata yet (that's ADR-0046's scope), and technical-docs is the only
-    domain it serves today, so every retrieved doc is C1 by construction.
+    ADR-0046: detects a named product/version in the question (a
+    deterministic pre-ranking filter) and a French-language hint (a soft
+    ranking preference), and forwards the caller's groups so rag-service
+    can enforce ACL-restricted documents server-side rather than trusting
+    an already-filtered response. effective_classification is now the
+    highest classification among the retrieved docs themselves (ADR-0034),
+    replacing the previous fixed C1 baseline - rag-service didn't carry
+    per-document classification metadata before this ADR, so every
+    retrieved doc really was C1 by construction; that's no longer true.
     """
+    product, version = _extract_product_version(state["message"])
+    language = _detect_language(state["message"])
     try:
-        docs = await search(query=state["message"], top_k=RAG_TOP_K)
+        docs = await search(
+            query=state["message"],
+            top_k=RAG_TOP_K,
+            product=product,
+            version=version,
+            language=language,
+            caller_groups=state.get("groups", []),
+        )
     except RagClientError as exc:
         logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)
         return {
@@ -96,7 +146,12 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             "effective_classification": TEKOS_BASE_CLASSIFICATION,
             "errors": state.get("errors", []) + [f"retrieve: {exc}"],
         }
-    return {"retrieved_docs": docs, "effective_classification": TEKOS_BASE_CLASSIFICATION}
+
+    effective_classification = TEKOS_BASE_CLASSIFICATION
+    for doc in docs:
+        effective_classification = _escalate(effective_classification, doc.get("classification", "C1"))
+
+    return {"retrieved_docs": docs, "effective_classification": effective_classification}
 
 
 def should_call_tools(state: AgentState) -> str:
@@ -162,7 +217,17 @@ async def tool_call_node(state: AgentState) -> Dict[str, Any]:
 def _build_context_block(state: AgentState) -> str:
     parts = []
     for doc in state.get("retrieved_docs", []):
-        parts.append(f"[{doc['title']}] ({doc['source']})\n{doc.get('snippet', '')}")
+        # ADR-0046: surface version/staleness in the context itself, not
+        # just in the API response - the model needs this to actually
+        # prefer the correct version's guidance (this ADR's whole point)
+        # rather than silently blending conflicting-version snippets.
+        tags = []
+        if doc.get("version"):
+            tags.append(f"version {doc['version']}")
+        if doc.get("stale"):
+            tags.append("stale/superseded - prefer a newer source if one is present")
+        tag_suffix = f" [{', '.join(tags)}]" if tags else ""
+        parts.append(f"[{doc['title']}]{tag_suffix} ({doc['source']})\n{doc.get('snippet', '')}")
 
     confluence = state.get("tool_results", {}).get("search_confluence")
     if confluence:

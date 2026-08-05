@@ -5,12 +5,20 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, TypedDict
 
 
-class RetrievedDoc(TypedDict):
+class RetrievedDoc(TypedDict, total=False):
     id: str
     source: str
     title: str
     snippet: str
     score: float
+    # ADR-0046: per-document retrieval metadata rag-service now surfaces -
+    # see that service's app/schemas.py:SearchResult. total=False because
+    # legacy/mocked callers (e.g. tests) may not populate every field.
+    classification: str
+    language: Optional[str]
+    product: Optional[str]
+    version: Optional[str]
+    stale: bool
 
 
 class Citation(TypedDict):

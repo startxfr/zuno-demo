@@ -1,0 +1,153 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Zuno Agent BFF API",
+    "version": "1.0.0",
+    "description": "Per-agent Backend-for-Frontend (ADR-0008) sitting between components/agent-frontend and the shared Agent Runtime. One BFF deployment per agent (v0: Tekos only) - AGENT_NAME selects which agent's Runtime path this instance calls. No public OpenShift Route: only components/agent-frontend calls this API, over its in-cluster Service. Authored as JSON rather than YAML so components/agent-bff's contract_test.go can parse it with encoding/json alone, preserving this component's deliberate zero-external-Go-dependency property (see README.md)."
+  },
+  "servers": [
+    {
+      "url": "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080",
+      "description": "In-cluster Service (Tekos deployment, v0's only agent)"
+    }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "summary": "Liveness probe",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "text/plain": { "schema": { "type": "string", "example": "ok" } } }
+          }
+        }
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "operationId": "chat",
+        "summary": "Submit one chat turn for this agent",
+        "description": "Validates the caller's bearer JWT and the agent_<AGENT_NAME> entitlement group (ADR-0040), then forwards the turn to the shared Agent Runtime (ADR-0032 identity propagation - the same validated token is forwarded, never a service credential). Returns a buffered JSON reply by default, or relays a Server-Sent Events stream byte-for-byte (ADR-0045) when the caller sends Accept: text/event-stream.",
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "required": false,
+            "description": "text/event-stream requests the SSE variant of this response (ADR-0045) instead of the default synchronous JSON reply.",
+            "schema": { "type": "string", "enum": ["application/json", "text/event-stream"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Synchronous JSON reply (default, Content-Type: application/json), or a Server-Sent Events stream (Content-Type: text/event-stream) when the request's Accept header asked for one (ADR-0045). The SSE variant is a sequence of frames, in order: one 'start' frame (SseStartEvent), zero or more 'tool' frames (SseToolEvent), zero or more 'token' frames (SseTokenEvent), then exactly one terminal frame - either 'done' (SseDoneEvent) or 'error' (SseErrorEvent). Each frame's data payload matches the named component schema below. OpenAPI 3.0 has no first-class way to type a stream of discriminated event payloads under one response, so they are documented in this prose plus as ordinary schemas under components.schemas rather than via a non-standard vendor extension a validator may not recognize.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ChatResponse" } },
+              "text/event-stream": { "schema": { "type": "string" } }
+            }
+          },
+          "400": {
+            "description": "Invalid request body (missing/empty message).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group (ADR-0040). The response never names which group was expected or which groups the caller actually has (Security considerations: \"document authorization failures without leaking policy internals\").",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Keycloak-issued OIDC access token (RS256) - the same token the caller (components/agent-frontend) already received from the user's browser session and this service independently revalidates against Keycloak's JWKS (ADR-0013), never a service credential of the BFF's own. Never echoed back in any response body or schema below (Security considerations: \"never expose internal tokens in schemas\")."
+      }
+    },
+    "schemas": {
+      "ChatRequest": {
+        "type": "object",
+        "required": ["session_id", "message"],
+        "properties": {
+          "session_id": { "type": "string", "description": "Caller-generated correlation ID for this chat session." },
+          "message": { "type": "string", "minLength": 1 }
+        }
+      },
+      "Citation": {
+        "type": "object",
+        "required": ["source", "title"],
+        "properties": {
+          "source": { "type": "string" },
+          "title": { "type": "string" }
+        }
+      },
+      "ChatResponse": {
+        "type": "object",
+        "required": ["reply", "citations"],
+        "properties": {
+          "reply": { "type": "string" },
+          "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string", "description": "Human-readable reason - never a raw internal error or stack trace." }
+        }
+      },
+      "SseStartEvent": {
+        "type": "object",
+        "description": "ADR-0045 request correlation - the first frame of every SSE stream.",
+        "required": ["request_id"],
+        "properties": { "request_id": { "type": "string", "format": "uuid" } }
+      },
+      "SseToolEvent": {
+        "type": "object",
+        "description": "Emitted around a live tool call (e.g. search_confluence) actually running.",
+        "required": ["name", "status"],
+        "properties": {
+          "name": { "type": "string", "example": "search_confluence" },
+          "status": { "type": "string", "enum": ["started", "finished"] }
+        }
+      },
+      "SseTokenEvent": {
+        "type": "object",
+        "description": "One per model token/chunk.",
+        "required": ["delta"],
+        "properties": { "delta": { "type": "string" } }
+      },
+      "SseDoneEvent": {
+        "type": "object",
+        "description": "Terminal frame on success.",
+        "required": ["citations"],
+        "properties": { "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } } }
+      },
+      "SseErrorEvent": {
+        "type": "object",
+        "description": "Terminal frame instead of done if the graph raised mid-stream.",
+        "required": ["message"],
+        "properties": { "message": { "type": "string" } }
+      }
+    }
+  }
+}

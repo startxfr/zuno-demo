@@ -466,6 +466,37 @@ planning narrative - see README.md's "v0 build status" for a summary:
   `evaluations/tekos/scenarios.yaml`'s pre-existing scenario 8
   (`chat_first_token_latency`, `max_seconds: 6`) already covered ADR-0045's
   required TTFT performance test.
+- RAG retrieval is now metadata-aware and bilingual (ADR-0046): every
+  indexed row's existing `metadata jsonb` column (already present, GIN
+  indexed) carries `product`/`version`/`language`/`source_type`/
+  `classification`/`acl_groups`/`last_modified`/`stale_after`/`provenance`
+  (`data/rag/schema/003_rag_metadata.sql`, extending another track's
+  `document_embeddings` table). Agent Runtime's `retrieve_node` now
+  extracts a named product/version from the question (e.g. "OpenShift AI
+  3.5") and forwards it as a deterministic pre-ranking filter rather than
+  trusting similarity alone to pick the right version, forwards a soft
+  French-language ranking preference, forwards the caller's groups so
+  rag-service enforces ACL-restricted documents server-side (fail closed),
+  and escalates `effective_classification` (ADR-0034) to the highest
+  classification among retrieved docs instead of a fixed C1 baseline. A
+  new fictional fixture corpus (`data/rag/fixtures/seed.sql`) includes
+  deliberately conflicting per-version guidance and an EN/FR document pair
+  to exercise this. This phase's sandbox turned out to have container
+  registry access too, not just npm/PyPI/Go module access (Phase 6's
+  finding) - a real `pgvector/pgvector:pg16` container was used to
+  actually run the new schema/fixtures/queries once, which caught a
+  genuine pre-existing bug unrelated to this ADR: `rag-service`'s asyncpg
+  pool never decoded `jsonb` columns to Python dicts, so any real request
+  against a live database would have crashed - fixed in `app/db.py`. The
+  agent BFF's contract is now OpenAPI-first
+  (ADR-0054): `components/agent-bff/openapi.json` (JSON, not YAML, so its
+  own `contract_test.go` - this repo's first Go test suite - can parse it
+  with `encoding/json` alone and keep the BFF's zero-Go-dependency
+  property) covers the real `/healthz`/`/api/chat` surface including the
+  SSE variant, and fails `go test` the moment the Go structs and the spec
+  disagree on a field name; `platform/api/lint_openapi.py` validates the
+  spec itself against the OpenAPI meta-schema plus two ADR-0054-specific
+  conventions.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos

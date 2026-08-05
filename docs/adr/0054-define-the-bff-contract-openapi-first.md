@@ -1,6 +1,6 @@
 # ADR-0054: Define the BFF contract OpenAPI-first
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,60 @@ Add OpenAPI linting and contract tests between frontend, BFF and Runtime adapter
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05)** for the real API surface this component
+exposes. `components/agent-bff/openapi.json` is a versioned (`1.0.0`)
+OpenAPI 3.0.3 document covering both real operations
+(`GET /healthz`, `POST /api/chat`), the JSON and SSE response variants
+(ADR-0045), `Citation`/`ChatRequest`/`ChatResponse`/`ErrorResponse` plus
+one schema per SSE event type, and a `bearerAuth` security scheme applied
+to every operation except the health probe. Authored as JSON rather than
+YAML specifically so the contract test below can parse it with
+`encoding/json` alone - this component's `go.mod` had zero external
+dependencies before this ADR (see its own README's "Why standard library
+only") and still does after it; a YAML-parsing library would have been
+the one exception a spec-only need didn't justify.
+
+**Not part of this contract**: the Decision's generic template text also
+names "task discovery" and "approvals". Neither concept exists anywhere in
+this codebase - v0 is one chat endpoint per agent with no per-task routing
+UI and no approval workflow - so `openapi.json` documents the real
+`/api/chat`/`/healthz` surface rather than inventing endpoints to satisfy
+that wording; a future agent/task-discovery feature would extend this
+same spec file, not require a new one.
+
+"Use it as the contract source ... Generate code where practical" -
+`components/agent-bff/contract_test.go` (this repository's first Go test
+suite) reads `openapi.json` and asserts the real Go wire structs
+(`apiChatRequest`, `apiChatResponse`, `apiErrorResponse`,
+`internal/runtime.Citation`) serialize to exactly the field names the spec
+declares, via `encoding/json` struct tag reflection - not full code
+generation (a two-struct API's marginal benefit from a generator like
+`oapi-codegen` didn't justify the added toolchain for this small a
+surface), but a real, running check that fails the moment either side
+drifts from the other, which is what the Context names as the actual
+problem ("identity and streaming expectations to diverge between
+components").
+
+Security considerations: `bearerAuth` is applied at the document level (every
+operation except `/healthz`, which explicitly overrides with `security: []`);
+no schema property holds a raw token (the security scheme's own
+`description` says so explicitly, and `platform/api/lint_openapi.py`
+checks it structurally - see below); `403`'s schema/description document
+only "lacks the entitlement group", never which group was expected or
+which groups the caller actually has - matching the real `main.go`
+behavior, not just documenting an aspiration.
+
+Operational considerations: "Add OpenAPI linting" -
+`platform/api/lint_openapi.py` validates the spec against the OpenAPI 3.x
+meta-schema (`openapi-spec-validator`) plus the two conventions named
+above, run and passing in this phase's development environment (3/3
+checks). "contract tests between frontend, BFF and Runtime adapters" -
+`contract_test.go` above covers the BFF's own wire contract (run and
+passing, 5/5 tests); a Runtime-side or frontend-side equivalent is a
+natural next extension of the same pattern but out of this ADR's literal
+scope ("a versioned OpenAPI specification for the agent BFF API",
+singular) - not built here to avoid scope creep into components other
+tracks/ADRs own.
 
 ## Acceptance criteria
 

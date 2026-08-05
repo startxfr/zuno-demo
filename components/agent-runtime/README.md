@@ -98,7 +98,19 @@ START -> retrieve -> [conditional] -> reason -> respond -> END
   `rag-service` `POST /v1/search` for technical documents relevant to the
   question (ADR-0018's OGX retrieval substrate). Degrades to an empty
   result set (logged) if rag-service is unreachable, rather than failing
-  the whole request.
+  the whole request. ADR-0046: `_extract_product_version` looks for a
+  named product/version in the question (e.g. "OpenShift AI 3.5") and
+  forwards it as a deterministic pre-ranking filter - "similarity alone
+  can return an incorrect OpenShift version even when the user names one"
+  is exactly the failure this closes; `_detect_language` similarly
+  forwards a soft French-language ranking preference when the question
+  looks French. The caller's own groups are forwarded too, so rag-service
+  can enforce ACL-restricted documents server-side. `effective_classification`
+  (ADR-0034) is now escalated to the highest classification among the
+  retrieved docs themselves (rag-service now tags each one, per-document,
+  rather than every result being C1 by construction as it was before this
+  ADR) - the same escalate-never-downgrade rule `tool_call_node` already
+  used for Confluence.
 - **conditional edge** (`should_call_tools`) - a v0 heuristic (regex over
   the question for words like "confluence", "latest", "internal doc...")
   decides whether the live-data tool step is worth the extra round trip.
@@ -168,6 +180,21 @@ test proving this: it loads a temporary fixture bundle, edits it, and
 asserts the registry's resolved output changes accordingly - the same
 mechanism the real `agents/tekos/` bundle exercises at every service
 startup.
+
+`components/agent-runtime/tests/test_retrieve_metadata.py` is ADR-0046's
+equivalent for the retrieval side: it asserts `_extract_product_version`
+resolves "OpenShift AI 3.5"/"RHOAI 2.16"-style mentions to the right
+`(product, version)` pair (and that the more specific pattern wins over
+the bare "OpenShift" one), `_detect_language` returns a French preference
+only when warranted, and classification escalation across retrieved docs
+never downgrades. Both test files share the same no-pytest,
+no-live-cluster, run-directly convention:
+
+```bash
+cd components/agent-runtime
+python3 tests/test_registry.py
+python3 tests/test_retrieve_metadata.py
+```
 
 ## Identity propagation
 

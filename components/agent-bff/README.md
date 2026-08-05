@@ -80,6 +80,46 @@ this service's own `http.ResponseWriter`. Two things follow from that:
   turn's Agent Runtime log lines and its SSE `start` event carry the same
   ID as this service's own logs.
 
+## OpenAPI contract (ADR-0054)
+
+`openapi.json` is this service's versioned, OpenAPI 3.0.3 contract for
+`GET /healthz` and `POST /api/chat` (both the synchronous JSON response
+and the SSE variant, documented in prose under the `200` response since
+OpenAPI 3.0 has no first-class way to type a stream of discriminated event
+payloads under one response). Authored as JSON rather than YAML
+specifically so `contract_test.go` can parse it with `encoding/json`
+alone, preserving this component's zero-external-Go-dependency property
+(see "Why standard library only" below) - a YAML-parsing dependency would
+otherwise have been the one exception.
+
+**Contract test** (ADR-0054 Operational considerations: "Add ... contract
+tests"): `contract_test.go` reads `openapi.json` and asserts the actual
+Go wire structs (`apiChatRequest`, `apiChatResponse`, `apiErrorResponse`,
+`internal/runtime.Citation`) serialize to exactly the JSON field names the
+spec declares - a change to one without the other fails `go test`, the
+identity/streaming drift ADR-0054's own Context names as the thing that
+already happened once (`user_sub`/`session_id`/`message` naming across
+components) is what this is meant to catch early the next time. Run it
+with:
+
+```sh
+go test ./...
+```
+
+**Linting** (Operational considerations: "Add OpenAPI linting"):
+`platform/api/lint_openapi.py` validates `openapi.json` against the
+OpenAPI 3.x meta-schema and a couple of ADR-0054-specific conventions
+(every non-health operation declares a security requirement; no schema
+property name looks like it holds a raw token) - see that script's own
+docstring, run from the repository root.
+
+**Not part of this contract**: the ADR's own decision text also mentions
+"task discovery" and "approvals" as things a BFF OpenAPI spec should
+cover. Neither concept exists anywhere in this codebase (v0 is a single
+chat endpoint per agent, no per-task routing UI, no approval workflow) -
+`openapi.json` documents the real `/api/chat`/`/healthz` surface rather
+than inventing endpoints to satisfy the ADR's generic template wording.
+
 ## Configuration (environment variables)
 
 | Variable | Required | Purpose |
@@ -127,8 +167,9 @@ versioned services.
 docker build -t zuno/agent-bff:dev components/agent-bff
 ```
 
-`go build ./...`, `go vet ./...` and `gofmt -l .` were all run successfully
-against Go 1.26 in this phase's development environment (the toolchain
-constraint noted in earlier phases' docs no longer applies here - see
-`components/agent-frontend/README.md`'s PatternFly section for the same
-finding on the npm side).
+`go build ./...`, `go vet ./...`, `gofmt -l .` and `go test ./...` (the
+`contract_test.go` suite above, this repository's first Go test suite)
+were all run successfully against Go 1.26 in this phase's development
+environment (the toolchain constraint noted in earlier phases' docs no
+longer applies here - see `components/agent-frontend/README.md`'s
+PatternFly section for the same finding on the npm side).

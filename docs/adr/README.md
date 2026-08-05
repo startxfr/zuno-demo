@@ -49,7 +49,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md) | v1 | To be implemented | Use standard MCP protocol behind the Zuno MCP Gateway |
 | [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Implemented | Use PatternFly React for the agent frontend |
 | [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Implemented | Stream responses end to end with SSE |
-| [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | To be implemented | Make RAG retrieval metadata-aware and bilingual |
+| [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Implemented | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | v0 | To be implemented | Manage the complete OpenShift AI prerequisite lifecycle |
 | [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | v0 | To be implemented | Discover supported operator channels and serving runtimes at deployment time |
 | [ADR-0049](0049-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v1 | To be implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
@@ -57,7 +57,7 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0 | To be implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | To be implemented | Make make check an end-to-end acceptance and security gate |
-| [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | To be implemented | Define the BFF contract OpenAPI-first |
+| [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | To be implemented | Repository review change-set index |
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v1 | Proposed | Provide HA for shared agent platform services |
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v1 | Proposed | Target 99.9 percent platform availability |

@@ -60,7 +60,14 @@ async def search(payload: SearchRequest) -> SearchResponse:
         raise HTTPException(status_code=503, detail="database not connected")
     with search_span(payload.query, payload.top_k) as call:
         try:
-            result = await hybrid_search(payload.query, payload.top_k)
+            result = await hybrid_search(
+                payload.query,
+                payload.top_k,
+                product=payload.product,
+                version=payload.version,
+                language=payload.language,
+                caller_groups=payload.caller_groups,
+            )
         except Exception as exc:
             logger.error("search failed for query=%r: %s", payload.query, exc)
             raise HTTPException(status_code=500, detail=f"search failed: {exc}") from exc
