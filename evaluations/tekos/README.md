@@ -5,14 +5,15 @@ The 20 acceptance scenarios (ADR-0027) and the 75% pass-threshold report
 agents have no evaluation scenarios yet; they have no runtime workflow to
 evaluate (`evaluations/{comage,advantage,finage,arkos}/README.md`).
 
-`run_acceptance_gate.py` (ADR-0053) is the layered entrypoint `make check`
-actually invokes (see `ansible/roles/agents/tasks/check.yml`'s
-`run_acceptance_gate.yml` include, which runs it as a one-shot in-cluster
-Job): it combines this file's 20 scenarios (75% threshold) with
-`security_checks.py` and `gate_checks.py` (both 100% mandatory) into one
-exit code and one machine-readable JSON summary line. Run any of the three
-modules directly for a narrower check, or the combined gate for what
-`make check` runs:
+`run_acceptance_gate.py` (ADR-0053) is the layered entrypoint
+`make day1|d1 check agents` actually invokes (see
+`ansible/roles/agents/tasks/check.yml`'s `run_acceptance_gate.yml`
+include, which runs it as a one-shot in-cluster Job): it combines this
+file's 20 scenarios (75% threshold) with `security_checks.py` and
+`gate_checks.py` (both 100% mandatory) into one exit code and one
+machine-readable JSON summary line. Run any of the three modules directly
+for a narrower check, or the combined gate for what
+`make day1|d1 check agents` runs:
 
 ```bash
 cd evaluations/tekos
@@ -26,10 +27,11 @@ export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password secret/zuno/keycloak
 # running this from outside the cluster via a port-forward instead. Reaching
 # those in-cluster names at all requires running from a network location the
 # ADR-0037/ADR-0052 NetworkPolicies actually allow - see
-# ansible/roles/agents/tasks/run_acceptance_gate.yml for how `make check`'s
-# own Job satisfies that (the "acceptance-gate" workload identity, narrowly
-# allow-listed alongside the other real per-workload callers).
-python3 run_acceptance_gate.py     # everything make check runs, one exit code
+# ansible/roles/agents/tasks/run_acceptance_gate.yml for how
+# `make day1|d1 check agents`'s own Job satisfies that (the
+# "acceptance-gate" workload identity, narrowly allow-listed alongside
+# the other real per-workload callers).
+python3 run_acceptance_gate.py     # everything `make day1|d1 check agents` runs, one exit code
 python3 run_scenarios.py           # just the 20 scenarios
 ```
 

@@ -350,10 +350,11 @@ The sections above remain the working memory for the full target vision.
 As of the v0 build pass, the following is real, reviewed code rather than
 planning narrative - see README.md's "v0 build status" for a summary:
 
-- Bootstrap: `make precheck`/`prepare`/`configure`/`install`/`check` from
-  exactly one credential (OpenShift API endpoint + cluster-admin token),
-  via ArgoCD + External Secrets Operator + a self-bootstrapping Vault
-  (ADR-0022, ADR-0024).
+- Bootstrap: `make day0|d0 check|install|configure|all` (cluster
+  prerequisites) then `make day1|d1 check|build|configure|run|all`
+  (build + run the platform) from exactly one credential (OpenShift API
+  endpoint + cluster-admin token), via ArgoCD + External Secrets Operator
+  + a self-bootstrapping Vault (ADR-0022, ADR-0024, ADR-0056).
 - Identity: the `zuno` Keycloak realm with 13 anonymized synthetic personas
   (ADR-0041 - no nominative demo identity or hardcoded password in Git; the
   shared password is vault-generated at `secret/zuno/keycloak/demo-personas`)
@@ -426,9 +427,9 @@ planning narrative - see README.md's "v0 build status" for a summary:
   isolation (`gitops/charts/namespaces`) for all five even though only
   `zuno-agent-tekos` runs workloads. ADR-0031 formalizes this as the
   target shape, not an in-progress gap: Tekos is the only mandatory
-  end-to-end business path for v0, and `make check` (`ansible/roles/agents`)
-  structurally validates the four catalog-only agents' `agent.okf.md`
-  bundles rather than leaving them unchecked.
+  end-to-end business path for v0, and `make day1|d1 check agents`
+  (`ansible/roles/agents`) structurally validates the four catalog-only
+  agents' `agent.okf.md` bundles rather than leaving them unchecked.
 - Every workload this repo directly controls now runs the OpenShift
   restricted-compatible baseline (ADR-0052): non-root, no privilege
   escalation, all Linux capabilities dropped, `seccompProfile:
@@ -528,7 +529,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028), now one layer of ADR-0053's
   combined acceptance/security gate (see below).
-- `make check` (ADR-0053) is the full layered gate, not a health check:
+- `make day1|d1 check agents` (ADR-0053) is the full layered gate, not a health check:
   `ansible/roles/agents/tasks/check.yml` still does the OKF-structural and
   frontend-`/healthz` smoke checks, then hands off to
   `run_acceptance_gate.yml`, which runs `evaluations/tekos/
@@ -556,6 +557,35 @@ planning narrative - see README.md's "v0 build status" for a summary:
   identity plumbing, flagged in ADR-0053's Implementation state.
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos
   deploys as a plain `Deployment` instead.
+- Deployment sequencing (ADR-0056): the old `precheck`/`prepare`/
+  `configure`/`install`/`check` interface is replaced outright by
+  `make day0|d0 <check|install|configure|all> [component]` (cluster
+  prerequisites) and `make day1|d1 <check|build|configure|run|all>
+  [component]` (build + run the platform). New Day 0 components:
+  `admin_context` (PriorityClasses, StorageClass existence check,
+  ArgoCD ClusterRoleBinding consolidation) and `namespaces` (moved out of
+  `agents`, now its own explicit checkable step). `datascience` is merged
+  into `openshift_ai` (one role, one conceptual prerequisite); the
+  formerly separate `api` role is retired into `agents` (once namespace-
+  apply moved out, they did the same thing). `day1_check.yml` special-cases
+  `agents` to run the ADR-0053 acceptance gate (what bare `make check` used
+  to run) rather than a dependency precheck, so that capability wasn't lost.
+  `zuno-ai` is split into `zuno-ai-run` (workloads) and `zuno-ai-build`
+  (new: in-cluster image builds via native OpenShift `BuildConfig`/
+  `ImageStream`, no new operator - `ansible/roles/{mcp,rag,agent}_build`,
+  covering 6 of the 8 CI-matrix images; `ai-gateway` and the pgvector base
+  image aren't covered yet, flagged as a follow-up) - a 59-file rename
+  landed as its own isolated commit. `zuno-ai-build` gets a default-deny-
+  all-ingress baseline (nothing needs inbound access to a build namespace)
+  and grants exactly the three consuming namespaces (`zuno-ai-run`,
+  `zuno-data`, `zuno-agent-tekos`) scoped `system:image-puller` access,
+  created at build time rather than by the Day 0 `namespaces` role to
+  avoid a Day0-depends-on-Day1 ordering problem. `make day1|d1 all
+  <component>` runs only the check/build/configure stages that actually
+  apply to that component, since build components (`mcp, rag, agent`) and
+  run components (`llm, models, sql_schema, rag, mcp, agents, mlops`) are
+  different, overlapping-but-not-identical sets - most visibly, "agent"
+  builds and "agents" runs, a real distinct pair, not a typo.
 
 All four Python services (`agent-runtime`, `ai-gateway`, `mcp-gateway`,
 `rag-service`) instrument themselves with OTel per

@@ -16,8 +16,8 @@ applying namespaces, it was doing exactly what `api` did (apply the
 Tekos workloads Application, nothing else) - one role for that job is
 enough, and `agents` is the name Day 1's `run` component list uses.
 
-`check.yml` (`make check`) is the ADR-0053 layered acceptance and security
-gate. It structurally validates the four catalog-only agents'
+`check.yml` (`make day1|d1 check agents`) is the ADR-0053 layered
+acceptance and security gate. It structurally validates the four catalog-only agents'
 `agent.okf.md` OKF v0.2 Markdown bundles (ADR-0038 -
 `okf_version`/`type`/`zuno.status: placeholder`) - v0 formalizes Tekos as
 the only mandatory end-to-end business path (ADR-0031), but catalog-only is

@@ -36,8 +36,8 @@ BFF, Agent Runtime with LangGraph orchestration, MCP Gateway, RAG service,
 sales-db MCP tool, real Keycloak login with 13 anonymized demo personas
 (ADR-0041) across two orthogonal group dimensions - agent entitlement and
 business role (ADR-0040)). Comage, Advantage, Finage and Arkos remain catalog-only:
-they exist as OKF definitions (structurally validated by `make check`,
-ADR-0031), reserved namespaces and access-gated portal tiles, without a
+they exist as OKF definitions (structurally validated by
+`make day1|d1 check agents`, ADR-0031), reserved namespaces and access-gated portal tiles, without a
 running workflow - business-functional builds for all four move to v1, see
 `platform/architecture/agent-platform-separation.md`. The
 AIAgent CRD/operator (originally v0) is retargeted to v1 - see ADR-0026.
