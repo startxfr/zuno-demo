@@ -17,6 +17,7 @@ from typing import Any, Dict
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app.agent_declarations import AgentDeclarationStore
 from app.auth import CallerIdentity, validate_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
@@ -38,6 +39,7 @@ app = FastAPI(
 )
 
 policy_store = PolicyStore()
+agent_declarations = AgentDeclarationStore()  # ADR-0036/0038: agents/<name>/agent.okf.md bundles
 
 KNOWN_TOOLS = {
     "search_confluence",
@@ -58,24 +60,31 @@ async def healthz() -> Dict[str, str]:
 
 @app.get("/readyz")
 async def readyz() -> JSONResponse:
-    if policy_store.loaded:
+    if policy_store.loaded and agent_declarations.loaded:
         return JSONResponse({"status": "ready"})
+    reasons = [
+        r
+        for r in (policy_store.load_error, agent_declarations.load_error)
+        if r
+    ]
     return JSONResponse(
-        {"status": "not-ready", "reason": policy_store.load_error or "policy not loaded"},
+        {"status": "not-ready", "reason": "; ".join(reasons) or "policy not loaded"},
         status_code=503,
     )
 
 
 @app.post("/admin/reload-policy")
 async def reload_policy() -> Dict[str, Any]:
-    """Operational escape hatch: re-reads tool-policy.yaml and
-    classification.yaml from disk without a pod restart, for the case where
-    Track B's policy files land after this pod already started.
+    """Operational escape hatch: re-reads tool-policy.yaml,
+    classification.yaml and the agents/ OKF bundles from disk without a pod
+    restart, for the case where Track B's policy files or an agent
+    definition land after this pod already started.
     """
     policy_store.reload()
+    agent_declarations.reload()
     return {
-        "loaded": policy_store.loaded,
-        "error": policy_store.load_error,
+        "loaded": policy_store.loaded and agent_declarations.loaded,
+        "error": policy_store.load_error or agent_declarations.load_error,
         "tools": policy_store.known_tools(),
     }
 
@@ -86,6 +95,8 @@ async def invoke_tool(
     request: Request,
     identity: CallerIdentity = Depends(validate_token),
     x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
+    x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
 ) -> Dict[str, Any]:
     request_id = str(uuid.uuid4())
     started = time.monotonic()
@@ -111,7 +122,10 @@ async def invoke_tool(
 
         decision = evaluate(
             store=policy_store,
+            agents=agent_declarations,
             tool_name=tool_name,
+            agent_name=x_zuno_agent,
+            task_name=x_zuno_task,
             caller_groups=identity.groups,
             request_classification=classification,
         )
@@ -119,8 +133,10 @@ async def invoke_tool(
         call.reason = decision.reason
 
         logger.info(
-            "tool=%s caller=%s groups=%s classification=%s allowed=%s reason=%s request_id=%s",
+            "tool=%s agent=%s task=%s caller=%s groups=%s classification=%s allowed=%s reason=%s request_id=%s",
             tool_name,
+            x_zuno_agent,
+            x_zuno_task,
             identity.sub,
             identity.groups,
             x_zuno_data_classification,

@@ -1,4 +1,8 @@
-"""ADR-0011 policy intersection, as far as the MCP Gateway can enforce it.
+"""ADR-0011 policy intersection - all five factors, enforced by this
+gateway (ADR-0036): agent_declaration and task_rights (from the OKF
+bundles under AGENTS_DIR, see app/agent_declarations.py) plus
+user_group_rights/classification/platform_policy (from the two files
+below).
 
 Loads two files authored by a parallel track (Track B) that this gateway
 only *consumes*:
@@ -28,6 +32,8 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import yaml
+
+from app.agent_declarations import AgentDeclarationStore
 
 logger = logging.getLogger("mcp_gateway.policy")
 
@@ -75,7 +81,15 @@ class PolicyStore:
 
             try:
                 with open(self._tool_policy_path, "r", encoding="utf-8") as fh:
-                    raw = yaml.safe_load(fh) or []
+                    raw_doc = yaml.safe_load(fh) or {}
+                # tool-policy.yaml's real top-level shape is {"tools": [...]}
+                # (see its own header comment) - this used to iterate raw_doc
+                # itself (a dict) rather than its "tools" list, which raised
+                # "string indices must be integers" on every real load and
+                # meant every tool call failed closed (a latent bug this
+                # ADR-0036 pass surfaced while adding the agent_declaration/
+                # task_rights checks, not something those checks caused).
+                raw = raw_doc.get("tools", [])
                 for item in raw:
                     entries[item["tool"]] = ToolPolicyEntry(
                         tool=item["tool"],
@@ -151,25 +165,62 @@ class PolicyDecision:
 
 def evaluate(
     store: PolicyStore,
+    agents: AgentDeclarationStore,
     tool_name: str,
+    agent_name: str,
+    task_name: str,
     caller_groups: List[str],
     request_classification: str,
 ) -> PolicyDecision:
-    """The ADR-0011 intersection, scoped to what this gateway can check
-    authoritatively:
+    """The full ADR-0011 intersection, now enforced entirely in this
+    gateway (ADR-0036 - previously only the last three of five factors were
+    checked here; the agent_declaration and task_rights factors were
+    aspirational, deferred to "once Track E authors per-agent OKF tool
+    declarations"):
 
-        tool-policy.yaml (routing + allowed_groups + min_classification)
+        agent_declaration (agents/<agent>/agent.okf.md, union of its tasks' tools)
+        x task_rights      (agents/<agent>/tasks/<task>.md's allowed_tools - narrows, never widens, the agent's own declaration)
+        x tool-policy.yaml (routing + allowed_groups + min_classification)
         x caller's Keycloak groups (from the validated JWT)
         x the request's declared data classification
 
-    The agent's OKF tool declaration and the current task's declared rights
-    (the other two terms of ADR-0011's intersection) are enforced upstream
-    by the Agent Runtime, which should only ever call a tool its OKF/task
-    actually grants. Track E has not authored per-agent OKF tool
-    declarations yet (agents/tekos/tasks, agents/tekos/tools are still
-    stubs), so an independent second check here is a v1 hardening item, not
-    a v0 gap in the layers this service owns.
+    agent_name/task_name come from the caller-declared X-Zuno-Agent/
+    X-Zuno-Task headers (main.py) - required, not optional: a missing or
+    unknown declaration fails closed per this ADR's Security
+    considerations, the same "any single no is a no" rule as every other
+    factor below.
     """
+    if not agent_name or not task_name:
+        return PolicyDecision(allowed=False, reason="missing X-Zuno-Agent/X-Zuno-Task declaration")
+
+    if agents.load_error:
+        return PolicyDecision(allowed=False, reason=f"agent declarations unavailable: {agents.load_error}")
+
+    agent = agents.get(agent_name)
+    if agent is None:
+        return PolicyDecision(allowed=False, reason=f"unknown calling agent '{agent_name}'")
+
+    if tool_name not in agent.declared_tools():
+        return PolicyDecision(
+            allowed=False,
+            reason=(
+                f"agent '{agent_name}' does not declare tool '{tool_name}' in any task "
+                "(ADR-0011 agent_declaration)"
+            ),
+        )
+
+    task_tools = agent.tasks.get(task_name)
+    if task_tools is None:
+        return PolicyDecision(allowed=False, reason=f"agent '{agent_name}' has no task '{task_name}'")
+    if tool_name not in task_tools:
+        return PolicyDecision(
+            allowed=False,
+            reason=(
+                f"task '{task_name}' does not allow tool '{tool_name}' (ADR-0011 task_rights) - "
+                "a task can only narrow, never widen, its agent's declaration"
+            ),
+        )
+
     if store.load_error:
         return PolicyDecision(allowed=False, reason=f"policy store unavailable: {store.load_error}")
 

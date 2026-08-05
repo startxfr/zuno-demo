@@ -69,7 +69,7 @@ func PageHandler(agent okf.Agent, sessions *session.Manager) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = tmpl.Execute(w, pageView{
-			DisplayName: agent.Spec.UI.DisplayName,
+			DisplayName: agent.Zuno.UI.DisplayName,
 			Subject:     sess.Subject,
 		})
 	}

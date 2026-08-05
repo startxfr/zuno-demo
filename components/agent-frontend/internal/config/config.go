@@ -18,12 +18,13 @@ type Config struct {
 	ListenAddr string
 
 	// AgentsDir is the directory containing one subdirectory per agent, each
-	// with an agent.okf.yaml (baked into the image at build time from the
-	// repository's agents/ directory - see Dockerfile).
+	// with an agent.okf.md OKF v0.2 Markdown bundle (ADR-0038, baked into
+	// the image at build time from the repository's agents/ directory -
+	// see Dockerfile).
 	AgentsDir string
 
 	// ActiveAgent is the agent this deployment renders a full chat UI for
-	// (its agent.okf.yaml must have status: active). All five agents are
+	// (its agent.okf.md must have zuno.status: active). All five agents are
 	// still listed on the portal tile view regardless of this value.
 	ActiveAgent string
 

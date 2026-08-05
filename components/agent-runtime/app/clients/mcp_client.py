@@ -23,11 +23,20 @@ async def invoke_tool(
     tool_name: str,
     arguments: Dict[str, Any],
     bearer_token: str,
+    agent_name: str,
+    task_name: str,
     data_classification: str = "C1",
 ) -> Dict[str, Any]:
+    """agent_name/task_name (ADR-0036) declare which OKF-defined agent/task
+    is making this call, so the gateway can enforce the agent_declaration
+    and task_rights factors of the ADR-0011 intersection - required, not
+    optional, since the gateway fails closed on a missing declaration.
+    """
     headers = {
         "Authorization": f"Bearer {bearer_token}",
         "X-Zuno-Data-Classification": data_classification,
+        "X-Zuno-Agent": agent_name,
+        "X-Zuno-Task": task_name,
     }
     try:
         async with httpx.AsyncClient(timeout=MCP_TIMEOUT_SECONDS) as client:

@@ -1,8 +1,9 @@
 # Build context MUST be the repository root (see gitops/charts/tekos'
 # generated build instructions / CI), because this image bakes each agent's
-# agent.okf.yaml into /agents/<name>/agent.okf.yaml at build time - the
-# simplest way for this stateless portal to read every agent's declarative
-# definition without wiring a ConfigMap-per-agent-file at deploy time.
+# agent.okf.md OKF v0.2 Markdown bundle (ADR-0038) into /agents/<name>/ at
+# build time - the simplest way for this stateless portal to read every
+# agent's declarative definition without wiring a ConfigMap-per-agent-file
+# at deploy time.
 #
 #   docker build -f components/agent-frontend/Dockerfile -t zuno/agent-frontend:dev .
 

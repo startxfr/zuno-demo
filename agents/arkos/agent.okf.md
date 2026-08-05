@@ -1,0 +1,48 @@
+---
+okf_version: v0.2
+type: agent
+title: Arkos
+description: >-
+  Architecture assistant for architects. Helps produce Design & Architecture
+  Testimonials (DAT) and prepare Odyssey architecture workshops, drawing on
+  the same technical RAG/Confluence knowledge base as Tekos plus Google
+  Drive/Docs and Lucidchart.
+provenance:
+  maintainer: Zuno Demo architecture team
+  repository: zuno-demo
+verification:
+  status: unverified
+freshness:
+  last_reviewed: "2026-08-05"
+sources: []
+zuno:
+  name: arkos
+  status: placeholder
+  tasks:
+    - coming-soon
+  model:
+    preferred_classification: C3
+    notes: >-
+      Placeholder pending v1 build; C3 anticipated because sovereign-marked
+      DAT workflows are local-model-only per MEMORY.md section 5.
+  access:
+    # ADR-0040: agent entitlement group, orthogonal to the `board` business
+    # role that governs tool/data permissions inside Arkos.
+    groups:
+      - agent_arkos
+  ui:
+    displayName: Arkos
+    tileDescription: Architecture DAT and workshop assistant - coming soon.
+    color: "#8F4700"
+    icon: drafting-compass
+---
+
+# Arkos
+
+v0 scope: status is `placeholder` - this bundle, the reserved
+`zuno-agent-arkos` namespace and this portal tile are the only things that
+exist for Arkos in v0 (ADR-0007). `tasks/coming-soon.md` describes the
+intended v1 build from `agents/arkos/README.md` and `MEMORY.md` sections
+8-9. Access group is `board` per the Track E contract; note this reads
+unusually for an architects' audience - flagged as an open question in the
+final report.

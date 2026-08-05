@@ -2,6 +2,14 @@
 retrieve -> tool_call (conditional) -> reason -> respond nodes, per
 ADR-0018's decision to use LangGraph as the orchestration layer over the
 OGX inference/retrieval substrate.
+
+ADR-0039's "GraphFactory" for v0: there is exactly one graph shape today
+(Tekos's), so this module doesn't select among alternatives yet - what
+ADR-0039 requires (prompts/tools/RAG/classification coming from the OKF
+contract rather than code) is satisfied by app/graph/nodes.py resolving
+those values from app/registry.py's AgentRegistry at import time. A second
+agent's graph shape would add a second build function here plus a
+selector keyed on AgentDefinition.name.
 """
 
 from __future__ import annotations

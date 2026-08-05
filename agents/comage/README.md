@@ -4,13 +4,14 @@
 - **Primary integrations:** Sales data, Gmail
 - **Initial tasks:** Follow-up prioritization; current deals without client PO; weekly sales synthesis
 
-## Planned declarative structure
+## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 
 ```text
 comage/
 ├── README.md
-├── agent.okf.yaml
+├── agent.okf.md         Agent index bundle (YAML frontmatter + Markdown body)
 ├── tasks/
+│   └── coming-soon.md
 ├── prompts/
 ├── policies/
 ├── rag/

@@ -30,14 +30,14 @@ func main() {
 
 	agents, err := okf.LoadAll(cfg.AgentsDir)
 	if err != nil {
-		log.Fatalf("agent-frontend: loading agent.okf.yaml files from %q: %v", cfg.AgentsDir, err)
+		log.Fatalf("agent-frontend: loading agent.okf.md bundles from %q: %v", cfg.AgentsDir, err)
 	}
 	activeAgent, found := okf.Find(agents, cfg.ActiveAgent)
 	if !found {
 		log.Fatalf("agent-frontend: ACTIVE_AGENT %q not found under %q", cfg.ActiveAgent, cfg.AgentsDir)
 	}
 	if !activeAgent.IsActive() {
-		log.Printf("agent-frontend: warning: ACTIVE_AGENT %q has status %q, not \"active\" - its chat UI will refuse all traffic as unauthorized by design", cfg.ActiveAgent, activeAgent.Metadata.Status)
+		log.Printf("agent-frontend: warning: ACTIVE_AGENT %q has status %q, not \"active\" - its chat UI will refuse all traffic as unauthorized by design", cfg.ActiveAgent, activeAgent.Zuno.Status)
 	}
 	log.Printf("agent-frontend: loaded %d agent definitions from %q; serving chat UI for %q", len(agents), cfg.AgentsDir, cfg.ActiveAgent)
 
@@ -59,7 +59,7 @@ func main() {
 	mux.HandleFunc("/callback", callbackHandler(oidcClient, sessions))
 	mux.HandleFunc("/logout", logoutHandler(oidcClient, sessions, cfg.SelfBaseURL))
 
-	mux.HandleFunc("/"+activeAgent.Metadata.Name, chat.PageHandler(activeAgent, sessions))
+	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, sessions))
 	mux.HandleFunc("/api/chat", chat.APIHandler(activeAgent, cfg.BFFBaseURL, sessions))
 
 	server := &http.Server{

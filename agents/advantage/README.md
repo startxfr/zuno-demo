@@ -4,13 +4,14 @@
 - **Primary integrations:** Sales data
 - **Initial tasks:** New client-PO-received business; monthly in-progress sales reporting
 
-## Planned declarative structure
+## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 
 ```text
 advantage/
 ├── README.md
-├── agent.okf.yaml
+├── agent.okf.md         Agent index bundle (YAML frontmatter + Markdown body)
 ├── tasks/
+│   └── coming-soon.md
 ├── prompts/
 ├── policies/
 ├── rag/

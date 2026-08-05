@@ -39,10 +39,10 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0033](0033-derive-user-identity-only-from-validated-tokens.md) | v0 | Implemented | Derive user identity only from validated tokens |
 | [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md) | v0 | Implemented | Compute effective classification from the complete context |
 | [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md) | v0 | Implemented | Prevent restricted internal context from reaching external models |
-| [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md) | v0 | To be implemented | Enforce the complete MCP authorization intersection in the gateway |
+| [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md) | v0 | Implemented | Enforce the complete MCP authorization intersection in the gateway |
 | [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md) | v0 | To be implemented | Protect MCP servers with network and workload identity boundaries |
-| [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | v0 | To be implemented | Use standards-compliant OKF v0.2 Markdown bundles |
-| [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | To be implemented | Make Agent Runtime execute the OKF agent contract |
+| [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | v0 | Implemented | Use standards-compliant OKF v0.2 Markdown bundles |
+| [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | Implemented | Make Agent Runtime execute the OKF agent contract |
 | [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | v0 | Implemented | Separate agent entitlement from business role authorization |
 | [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | v0 | Implemented | Remove nominative demo identities and static passwords from Git |
 | [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v1 | To be implemented | Use opaque browser sessions with server-side token storage |

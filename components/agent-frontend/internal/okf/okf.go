@@ -1,8 +1,10 @@
-// Package okf loads and represents agent.okf.yaml files (OKF v0.2 + the
-// Zuno extension, ADR-0005/ADR-0006) so the portal can render one tile per
-// agent from the same declarative source of truth the Agent Runtime and
-// policy engine consume. See platform/okf/schema/zuno-okf-v0.2.schema.json
-// for the authoritative schema this struct set mirrors.
+// Package okf loads and represents agent.okf.md OKF v0.2 Markdown bundles
+// (ADR-0038, superseding the earlier Kubernetes-style agent.okf.yaml) so the
+// portal can render one tile per agent from the same declarative source of
+// truth the Agent Runtime (ADR-0039) and MCP Gateway policy engine
+// (ADR-0036) consume. See platform/okf/schema/zuno-okf-v0.2.schema.json and
+// zuno-okf-task-v0.2.schema.json for the authoritative schemas this struct
+// set mirrors.
 package okf
 
 import (
@@ -10,53 +12,65 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Agent is the top-level agent.okf.yaml document.
+// Agent is the parsed frontmatter of an agents/<name>/agent.okf.md bundle,
+// plus its resolved tasks (each a separate linked Markdown document under
+// tasks/<task>.md).
 type Agent struct {
-	APIVersion string   `yaml:"apiVersion"`
-	Kind       string   `yaml:"kind"`
-	Metadata   Metadata `yaml:"metadata"`
-	Spec       Spec     `yaml:"spec"`
-}
-
-// Metadata mirrors the schema's metadata object.
-type Metadata struct {
-	Name        string `yaml:"name"`
-	DisplayName string `yaml:"displayName"`
+	OkfVersion  string `yaml:"okf_version"`
+	Type        string `yaml:"type"`
+	Title       string `yaml:"title"`
 	Description string `yaml:"description"`
-	Status      string `yaml:"status"` // "active" | "placeholder"
+	Zuno        Zuno   `yaml:"zuno"`
+
+	// Tasks is resolved by LoadAll from Zuno.TaskNames, not part of the
+	// index frontmatter itself.
+	Tasks []Task `yaml:"-"`
 }
 
-// Spec mirrors the schema's spec object (the Zuno profile).
-type Spec struct {
-	Tasks  []Task `yaml:"tasks"`
-	Model  Model  `yaml:"model"`
-	Access Access `yaml:"access"`
-	UI     UI     `yaml:"ui"`
+// Zuno mirrors the frontmatter's `zuno` extension object (ADR-0006).
+type Zuno struct {
+	Name      string   `yaml:"name"`
+	Status    string   `yaml:"status"` // "active" | "placeholder"
+	TaskNames []string `yaml:"tasks"`
+	Model     Model    `yaml:"model"`
+	Access    Access   `yaml:"access"`
+	UI        UI       `yaml:"ui"`
 }
 
-// Task is one entry in spec.tasks.
+// Task is a resolved agents/<name>/tasks/<task>.md bundle.
 type Task struct {
-	Name         string   `yaml:"name"`
-	Description  string   `yaml:"description"`
-	AllowedTools []string `yaml:"allowed_tools"`
+	Name         string
+	Title        string
+	AllowedTools []string
 }
 
-// Model is spec.model.
+// taskFrontmatter mirrors zuno-okf-task-v0.2.schema.json.
+type taskFrontmatter struct {
+	OkfVersion string `yaml:"okf_version"`
+	Type       string `yaml:"type"`
+	Title      string `yaml:"title"`
+	Zuno       struct {
+		AllowedTools []string `yaml:"allowed_tools"`
+	} `yaml:"zuno"`
+}
+
+// Model is zuno.model.
 type Model struct {
 	PreferredClassification string `yaml:"preferred_classification"`
 	Notes                   string `yaml:"notes"`
 }
 
-// Access is spec.access.
+// Access is zuno.access.
 type Access struct {
 	Groups []string `yaml:"groups"`
 }
 
-// UI is spec.ui, consumed directly by the portal tile template.
+// UI is zuno.ui, consumed directly by the portal tile template.
 type UI struct {
 	DisplayName     string `yaml:"displayName"`
 	TileDescription string `yaml:"tileDescription"`
@@ -66,16 +80,17 @@ type UI struct {
 
 // IsActive reports whether this agent has a real, deployed FE/BFF (ADR-0007).
 func (a Agent) IsActive() bool {
-	return a.Metadata.Status == "active"
+	return a.Zuno.Status == "active"
 }
 
 // AllowsAnyGroup reports whether any of the caller's JWT groups intersects
-// this agent's spec.access.groups. Groups are compared without a leading
-// "/" so callers can pass either the Keycloak "groups" claim's raw entries
-// (e.g. "/consultant") or bare names.
+// this agent's zuno.access.groups (ADR-0040: the agent_<name> entitlement
+// group, not a business role). Groups are compared without a leading "/" so
+// callers can pass either the Keycloak "groups" claim's raw entries (e.g.
+// "/agent_tekos") or bare names.
 func (a Agent) AllowsAnyGroup(callerGroups []string) bool {
-	allowed := make(map[string]struct{}, len(a.Spec.Access.Groups))
-	for _, g := range a.Spec.Access.Groups {
+	allowed := make(map[string]struct{}, len(a.Zuno.Access.Groups))
+	for _, g := range a.Zuno.Access.Groups {
 		allowed[normalizeGroup(g)] = struct{}{}
 	}
 	for _, g := range callerGroups {
@@ -93,9 +108,23 @@ func normalizeGroup(g string) string {
 	return g
 }
 
-// LoadAll walks dir for <dir>/<name>/agent.okf.yaml files, one per agent
-// subdirectory, and returns them sorted by agent name for stable portal
-// rendering order.
+// splitFrontmatter separates a leading "---\n<yaml>\n---\n" block from the
+// rest of a Markdown document. Splitting (rather than a regex) on every
+// "---" occurrence and keeping only the first two matters: SplitN(s, "---", 3)
+// stops after the second delimiter, so a "---" appearing later in the
+// Markdown body (e.g. a horizontal rule) is preserved intact in part [2]
+// rather than truncating the body.
+func splitFrontmatter(raw []byte) (frontmatter []byte, body []byte, err error) {
+	parts := strings.SplitN(string(raw), "---", 3)
+	if len(parts) < 3 {
+		return nil, nil, fmt.Errorf("expected a leading '---' YAML frontmatter block")
+	}
+	return []byte(parts[1]), []byte(strings.TrimSpace(parts[2])), nil
+}
+
+// LoadAll walks dir for <dir>/<name>/agent.okf.md bundles, one per agent
+// subdirectory, resolves each bundle's zuno.tasks into agents/<name>/tasks/<task>.md,
+// and returns them sorted by agent name for stable portal rendering order.
 func LoadAll(dir string) ([]Agent, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -107,7 +136,8 @@ func LoadAll(dir string) ([]Agent, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		path := filepath.Join(dir, entry.Name(), "agent.okf.yaml")
+		agentDir := filepath.Join(dir, entry.Name())
+		path := filepath.Join(agentDir, "agent.okf.md")
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -115,27 +145,61 @@ func LoadAll(dir string) ([]Agent, error) {
 			}
 			return nil, fmt.Errorf("reading %q: %w", path, err)
 		}
+		frontmatter, _, err := splitFrontmatter(raw)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", path, err)
+		}
 		var a Agent
-		if err := yaml.Unmarshal(raw, &a); err != nil {
-			return nil, fmt.Errorf("parsing %q: %w", path, err)
+		if err := yaml.Unmarshal(frontmatter, &a); err != nil {
+			return nil, fmt.Errorf("parsing %q frontmatter: %w", path, err)
 		}
-		if a.Metadata.Name == "" {
-			return nil, fmt.Errorf("%q: metadata.name is required", path)
+		if a.Zuno.Name == "" {
+			return nil, fmt.Errorf("%q: zuno.name is required", path)
 		}
+		tasks, err := loadTasks(agentDir, a.Zuno.TaskNames)
+		if err != nil {
+			return nil, err
+		}
+		a.Tasks = tasks
 		agents = append(agents, a)
 	}
 
 	sort.Slice(agents, func(i, j int) bool {
-		return agents[i].Metadata.Name < agents[j].Metadata.Name
+		return agents[i].Zuno.Name < agents[j].Zuno.Name
 	})
 
 	return agents, nil
 }
 
-// Find returns the agent with the given metadata.name, if loaded.
+func loadTasks(agentDir string, taskNames []string) ([]Task, error) {
+	var tasks []Task
+	for _, name := range taskNames {
+		path := filepath.Join(agentDir, "tasks", name+".md")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("reading task %q: %w", path, err)
+		}
+		frontmatter, _, err := splitFrontmatter(raw)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", path, err)
+		}
+		var tf taskFrontmatter
+		if err := yaml.Unmarshal(frontmatter, &tf); err != nil {
+			return nil, fmt.Errorf("parsing %q frontmatter: %w", path, err)
+		}
+		tasks = append(tasks, Task{
+			Name:         name,
+			Title:        tf.Title,
+			AllowedTools: tf.Zuno.AllowedTools,
+		})
+	}
+	return tasks, nil
+}
+
+// Find returns the agent with the given zuno.name, if loaded.
 func Find(agents []Agent, name string) (Agent, bool) {
 	for _, a := range agents {
-		if a.Metadata.Name == name {
+		if a.Zuno.Name == name {
 			return a, true
 		}
 	}

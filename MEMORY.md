@@ -396,17 +396,39 @@ planning narrative - see README.md's "v0 build status" for a summary:
   `sales_admin` subgroup, reserved for Comage) gate tool/data permissions
   once inside. Each agent's BFF now enforces the entitlement claim
   server-side (`components/agent-bff/main.go`, 403 if missing) rather than
-  relying on frontend tile visibility. `agents/*/agent.okf.yaml`'s
-  `access.groups` was updated from the business group to the matching
+  relying on frontend tile visibility. `agents/*/agent.okf.md`'s
+  `zuno.access.groups` was updated from the business group to the matching
   `agent_<name>` group accordingly.
+- The OKF agent definition format is now real OKF v0.2 Markdown bundles
+  (ADR-0038): `agents/<name>/agent.okf.yaml` (a single Kubernetes-style
+  file) is replaced by `agent.okf.md` (YAML frontmatter + Markdown body)
+  plus one linked Markdown document per task under `tasks/*.md` and, for
+  Tekos, a system prompt under `prompts/*.md`. Agent Runtime now executes
+  this contract instead of hardcoding it (ADR-0039): a new
+  `app/registry.py` `AgentRegistry` resolves classification ceiling, RAG
+  `top_k`, allowed tools and the system prompt from the bundle at startup,
+  replacing what used to be Python constants in `app/graph/nodes.py`
+  (`components/agent-runtime/tests/test_registry.py` is the acceptance
+  test proving a bundle edit changes behavior with no code change). The
+  MCP Gateway now enforces the full ADR-0011 five-factor intersection
+  (ADR-0036): the `agent_declaration` and `task_rights` factors (via a new
+  `app/agent_declarations.py`, reading the same bundles) were previously
+  deferred as "no per-agent OKF tool declarations exist yet" - no longer
+  true once ADR-0038 landed. Agent Runtime now declares
+  `X-Zuno-Agent`/`X-Zuno-Task` on every `/v1/tools/*/invoke` call
+  accordingly. Fixing this also surfaced and fixed a real, unrelated
+  pre-existing bug in `components/mcp-gateway/app/policy.py`:
+  `PolicyStore.reload()` iterated `tool-policy.yaml`'s raw parsed dict
+  instead of its `tools:` list, so every real load of that file raised and
+  every tool call failed closed.
 - Agent surface: OKF definitions for all five agents (Tekos `active`, the
   rest `placeholder`), Tekos's frontend/BFF, and namespace-per-agent
   isolation (`gitops/charts/namespaces`) for all five even though only
   `zuno-agent-tekos` runs workloads. ADR-0031 formalizes this as the
   target shape, not an in-progress gap: Tekos is the only mandatory
   end-to-end business path for v0, and `make check` (`ansible/roles/agents`)
-  structurally validates the four catalog-only agents' `agent.okf.yaml`
-  files rather than leaving them unchecked.
+  structurally validates the four catalog-only agents' `agent.okf.md`
+  bundles rather than leaving them unchecked.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos

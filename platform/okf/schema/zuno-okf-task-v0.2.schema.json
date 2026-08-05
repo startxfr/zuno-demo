@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/startxfr/zuno-demo/platform/okf/schema/zuno-okf-task-v0.2.schema.json",
+  "title": "Zuno Agent Task (OKF v0.2 Markdown bundle frontmatter + Zuno extension)",
+  "description": "Schema for the YAML frontmatter block of agents/<name>/tasks/<task>.md (ADR-0038). Each task referenced by an agent.okf.md's `zuno.tasks` list is its own linked Markdown document: the frontmatter carries the OKF core identity fields plus the Zuno tool-authorization declaration; the Markdown body is the human-readable task description that used to live inline in the Kubernetes-style agent.okf.yaml. Consumed by Agent Runtime's AgentRegistry (ADR-0039, allowed_tools ceiling + description) and MCP Gateway's task-rights check (ADR-0036, allowed_tools).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["okf_version", "type", "title", "zuno"],
+  "properties": {
+    "okf_version": {
+      "description": "[OKF CORE] OKF envelope version this document conforms to.",
+      "type": "string",
+      "const": "v0.2"
+    },
+    "type": {
+      "description": "[OKF CORE] Document kind. Always \"task\" for files under agents/<name>/tasks/.",
+      "type": "string",
+      "const": "task"
+    },
+    "title": {
+      "description": "[OKF CORE] Human-readable task name.",
+      "type": "string",
+      "minLength": 1
+    },
+    "zuno": {
+      "description": "[ZUNO EXT] Tool-authorization declaration for this task.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_tools"],
+      "properties": {
+        "allowed_tools": {
+          "description": "MCP tool names this task may invoke, drawn from the platform tool-policy vocabulary (policies/tools/README.md). Effective authorization is the intersection of this list with the user's group/task/data-classification policy (ADR-0011) - this field is a ceiling, not a grant on its own. Empty for placeholder agents' stub tasks. A task can only ever narrow, never widen, its parent agent's overall declared-tools union (ADR-0036 Security considerations).",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "search_confluence",
+              "list_drive_files",
+              "read_gmail",
+              "get_customer",
+              "list_open_opportunities",
+              "get_quote",
+              "web_search",
+              "send_technical_report_email"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

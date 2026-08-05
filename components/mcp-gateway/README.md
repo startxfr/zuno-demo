@@ -27,6 +27,12 @@ classification, latency, and a precise outcome - `allowed`, `denied`,
   `C1`) - the caller's declared classification ceiling for this request.
   Compared against the tool's `min_classification` from
   `policies/tools/tool-policy.yaml`.
+- **Headers:** `X-Zuno-Agent`, `X-Zuno-Task` (both required, ADR-0036) -
+  which OKF-defined agent and task (`agents/<agent>/agent.okf.md` /
+  `tasks/<task>.md`, ADR-0038) is making this call. Missing, unknown, or a
+  tool absent from that agent/task's declaration all deny the call - the
+  gateway fails closed on any invalid policy input, per this ADR's
+  Security considerations.
 - **Body:** a flat JSON object of tool arguments (tool-specific, e.g.
   `{"query": "..."}` for `search_confluence`).
 - **Response `200`:**
@@ -51,20 +57,21 @@ classification, latency, and a precise outcome - `allowed`, `denied`,
 - **Response `401`:** missing/invalid/expired JWT.
 - **Response `404`:** unknown tool name.
 - **Response `502`:** downstream MCP server unreachable or errored.
-- **Response `503`:** the tool policy file is not yet loaded (Track B's
-  `policies/tools/tool-policy.yaml` missing or unparsable), or the
-  Keycloak JWKS endpoint is unreachable for token validation.
+- **Response `503`:** the tool policy file or the `agents/` OKF bundles are
+  not yet loaded (missing or unparsable), or the Keycloak JWKS endpoint is
+  unreachable for token validation.
 
 ### `GET /healthz` / `GET /readyz`
 
-Liveness always `200`. Readiness returns `503` until `tool-policy.yaml`
-has loaded successfully.
+Liveness always `200`. Readiness returns `503` until both
+`tool-policy.yaml` and every `agents/<name>/agent.okf.md` bundle have
+loaded successfully.
 
 ### `POST /admin/reload-policy`
 
-Re-reads the policy files from disk without a pod restart - use this if
-Track B's policy files land in the image/mount after this pod already
-started.
+Re-reads the policy files and the `agents/` OKF bundles from disk without
+a pod restart - use this if Track B's policy files or an agent definition
+land in the image/mount after this pod already started.
 
 ## Tools routed
 
@@ -90,22 +97,34 @@ If the real server instead exposes MCP-over-stdio via a sidecar, or a
 different HTTP shape, only `app/downstream.py:_invoke_sales_db` needs to
 change - reconcile this once that track's implementation lands.
 
-## ADR-0011 intersection: what this gateway does and does not check
+## ADR-0011 intersection: all five factors (ADR-0036)
 
-This gateway authoritatively enforces:
+This gateway authoritatively enforces the full intersection - any single
+"no" is a "no", evaluated in this order:
 
-1. the tool exists in `policies/tools/tool-policy.yaml`;
-2. the request's declared `X-Zuno-Data-Classification` meets the tool's
+1. **agent_declaration** - the calling agent (`X-Zuno-Agent`)'s
+   `agents/<agent>/agent.okf.md` bundle (ADR-0038) declares this tool
+   under at least one of its tasks (`app/agent_declarations.py`).
+2. **task_rights** - the calling task (`X-Zuno-Task`)'s
+   `agents/<agent>/tasks/<task>.md` `zuno.allowed_tools` includes this
+   tool - a task can only narrow, never widen, its agent's own
+   declaration.
+3. the tool exists in `policies/tools/tool-policy.yaml`;
+4. the request's declared `X-Zuno-Data-Classification` meets the tool's
    `min_classification`;
-3. the caller's JWT `groups` intersect the tool's `allowed_groups`.
+5. **user_group_rights** - the caller's JWT `groups` intersect the tool's
+   `allowed_groups`.
 
-It does **not** independently re-verify the agent's OKF tool declaration or
-the current task's declared rights - those are the Agent Runtime's
-responsibility (it should only ever call a tool its OKF/task actually
-grants). Track E has not authored per-agent OKF tool declarations yet
-(`agents/tekos/tasks`, `agents/tekos/tools` are still stubs); adding a
-second, independent check here once those exist is a tracked v1 hardening
-item, not a v0 regression.
+Before ADR-0036, only factors 3-5 were checked here (1-2 were deferred as
+"Track E has not authored per-agent OKF tool declarations yet" - true at
+the time, no longer true once ADR-0038 landed). Fixing this also surfaced
+and fixed a real, unrelated pre-existing bug: `PolicyStore.reload()` was
+iterating `tool-policy.yaml`'s raw parsed dict directly instead of its
+`tools:` list, so every real load of that file raised `TypeError` and every
+tool call failed closed - this had gone uncaught because no test exercised
+`PolicyStore.reload()` itself (`evaluations/tekos/security_checks.py`'s
+config-consistency check parses the same file independently, which is why
+it never caught the loader bug).
 
 ## Local development
 

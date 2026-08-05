@@ -115,11 +115,12 @@ scenarios:
     persona: consultant-user-01
 
   - id: 18
-    title: Sales-db tool returns a synthetic customer via the MCP Gateway
-    type: sales_db_tool_via_gateway
+    title: MCP Gateway denies a tool no v0 agent declares (ADR-0036 agent_declaration factor)
+    type: mcp_gateway_denied
     persona: board-user-01
     tool: get_customer
     arguments: { customer_id: 1 }
+    expect_status: 403
 
   - id: 19
     title: Placeholder agent namespaces exist but host no workloads

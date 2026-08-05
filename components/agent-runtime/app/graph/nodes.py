@@ -14,14 +14,34 @@ from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
 from app.graph.state import AgentState
+from app.registry import AgentRegistry
 
 logger = logging.getLogger("agent_runtime.graph")
 
-# v0 simplification: Tekos's OKF task/tool declaration doesn't exist yet
-# (agents/tekos/tasks, agents/tekos/tools are still stubs -- owned by
-# Track E). Until that lands, this heuristic decides when a live
-# Confluence lookup is worth the extra round trip, standing in for what
-# should eventually be an OKF-declared task capability check.
+# ADR-0039: this is the "GraphFactory" input for v0 - a single registry
+# lookup replacing the hardcoded classification/RAG-top-k/prompt constants
+# this module used to define directly. There is exactly one graph shape in
+# v0 (see app/graph/build.py), so "selecting" a graph is degenerate today;
+# what ADR-0039 actually buys is that every value below now comes from
+# agents/tekos/{agent.okf.md,tasks/*.md,prompts/*.md} (ADR-0038) rather than
+# Python source - changing the bundle changes runtime behavior with no code
+# change (see components/agent-runtime/tests/test_registry.py).
+_registry = AgentRegistry()
+if _registry.load_errors:
+    raise RuntimeError(f"agent-runtime: failed to load OKF bundles: {_registry.load_errors}")
+_TEKOS = _registry.get("tekos")
+if _TEKOS is None:
+    raise RuntimeError("agent-runtime: no 'tekos' agent bundle found under AGENTS_DIR")
+_ANSWER_TASK = _TEKOS.tasks.get("answer-technical-question")
+if _ANSWER_TASK is None or not _ANSWER_TASK.prompt:
+    raise RuntimeError(
+        "agent-runtime: tekos's 'answer-technical-question' task or its prompt file is missing"
+    )
+
+# The chat endpoint (POST /v1/agents/tekos/chat) always executes this one
+# task in v0 - Tekos's other two declared tasks (find-relevant-docs,
+# check-my-drive-docs) have no dedicated route yet (v1 scope, see
+# agents/tekos/tasks/*.md).
 _TOOL_TRIGGER_PATTERN = re.compile(
     r"\b(confluence|latest|recent|current|up.?to.?date|internal doc(?:ument)?s?)\b",
     re.IGNORECASE,
@@ -32,15 +52,16 @@ _TOOL_TRIGGER_PATTERN = re.compile(
 # here - see that file's comments for the full policy). ADR-0034: the
 # effective classification for a turn is the highest of every contributing
 # source, never a static per-agent constant - retrieve_node seeds it at the
-# baseline technical-docs domain (RAG's only domain today), and
-# tool_call_node escalates it when a higher-classified source (Confluence)
-# is touched. ADR-0035: Confluence is additionally source-restricted to
-# local-only inference regardless of C2's own broader SaaS-eligibility -
-# see policies/tools/tool-policy.yaml's external_model_policy field, echoed
-# back by the MCP Gateway's invoke response rather than duplicated here.
-TEKOS_BASE_CLASSIFICATION = "C1"  # technical-docs
-CONFLUENCE_CLASSIFICATION = "C2"  # confluence
-RAG_TOP_K = 5
+# agent's OKF-declared baseline (technical-docs, RAG's only domain today),
+# and tool_call_node escalates it when a higher-classified source
+# (Confluence) is touched. ADR-0035: Confluence is additionally
+# source-restricted to local-only inference regardless of C2's own broader
+# SaaS-eligibility - see policies/tools/tool-policy.yaml's
+# external_model_policy field, echoed back by the MCP Gateway's invoke
+# response rather than duplicated here.
+TEKOS_BASE_CLASSIFICATION = _TEKOS.preferred_classification  # technical-docs, from agent.okf.md
+CONFLUENCE_CLASSIFICATION = "C2"  # confluence - a data-domain classification, not an OKF field
+RAG_TOP_K = _TEKOS.rag_top_k  # from agent.okf.md's zuno.rag.top_k
 
 _CLASSIFICATION_RANK = {"C1": 1, "C2": 2, "C3": 3}
 
@@ -97,7 +118,21 @@ async def tool_call_node(state: AgentState) -> Dict[str, Any]:
     reason node's model call) and honors the gateway's
     external_model_policy.allow_context verdict by forcing local-only
     inference for the rest of this turn when it's false.
+
+    ADR-0036: the MCP Gateway now enforces the agent_declaration and
+    task_rights factors of the ADR-0011 intersection using the same OKF
+    bundle this runtime resolves (agents/tekos/tasks/answer-technical-question.md
+    declares search_confluence, see _ANSWER_TASK above) - invoke_tool below
+    declares this call as agent=tekos, task=answer-technical-question so the
+    gateway can check it. This node also checks its own copy of that same
+    declaration first: if a future bundle edit ever drops search_confluence
+    from the task, this degrades to "no tool context" locally instead of
+    making a call the gateway would deny anyway.
     """
+    if "search_confluence" not in _ANSWER_TASK.allowed_tools:
+        logger.warning("search_confluence is not in tekos's answer-technical-question.allowed_tools; skipping tool call")
+        return {"tool_results": {}}
+
     escalated = _escalate(
         state.get("effective_classification", TEKOS_BASE_CLASSIFICATION), CONFLUENCE_CLASSIFICATION
     )
@@ -107,6 +142,8 @@ async def tool_call_node(state: AgentState) -> Dict[str, Any]:
             arguments={"query": state["message"]},
             bearer_token=state["bearer_token"],
             data_classification=escalated,
+            agent_name=_TEKOS.name,
+            task_name=_ANSWER_TASK.name,
         )
     except McpClientError as exc:
         logger.warning("MCP Gateway tool call failed, continuing without live tool context: %s", exc)
@@ -145,16 +182,14 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
     than a static constant, and forces local-only inference (ADR-0035) when
     a source-restricted result (e.g. Confluence) was folded into context
     this turn - see tool_call_node.
+
+    ADR-0039: the system prompt comes from
+    agents/tekos/prompts/answer-technical-question.md (_ANSWER_TASK.prompt,
+    resolved by AgentRegistry) rather than a Python string literal - editing
+    that file changes Tekos's persona/instructions with no source change.
     """
     context = _build_context_block(state)
-    system = SystemMessage(
-        content=(
-            "You are Tekos, Zuno's technical consultant assistant for OpenShift, "
-            "Kubernetes and the surrounding Red Hat ecosystem. Answer precisely and "
-            "concisely, grounded strictly in the provided context. If the context does "
-            "not contain the answer, say so explicitly rather than inventing details."
-        )
-    )
+    system = SystemMessage(content=_ANSWER_TASK.prompt)
     human = HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['message']}")
 
     classification = state.get("effective_classification", TEKOS_BASE_CLASSIFICATION)

@@ -5,11 +5,12 @@ things from one binary, per ADR-0008 ("one frontend ... deployment per
 agent", same shared codebase):
 
 1. **The agent portal** (`GET /`) - one tile per agent, read at startup from
-   every `agents/<name>/agent.okf.yaml` baked into the image (see
-   `Dockerfile`). A tile is clickable only if the agent's OKF `status` is
-   `active` **and** the signed-in user's JWT `groups` claim intersects the
-   agent's `spec.access.groups`; otherwise it renders disabled ("coming
-   soon" or "not authorized"). See
+   every `agents/<name>/agent.okf.md` OKF v0.2 Markdown bundle (ADR-0038)
+   baked into the image (see `Dockerfile`). A tile is clickable only if the
+   agent's `zuno.status` is `active` **and** the signed-in user's JWT
+   `groups` claim intersects the agent's `zuno.access.groups` - the
+   `agent_<name>` entitlement group (ADR-0040), not a business role;
+   otherwise it renders disabled ("coming soon" or "not authorized"). See
    `platform/architecture/agent-platform-separation.md`.
 2. **The Tekos chat UI** (`GET /tekos`, `POST /api/chat`) - the one agent
    this v0 deployment actually runs a chat surface for, selected by the
@@ -38,17 +39,17 @@ Two deliberate, documented departures from "use the well-known library":
   later is a drop-in replacement since the class names already match.
 
 The one non-stdlib dependency is `gopkg.in/yaml.v3`, used only to parse
-`agent.okf.yaml` (a single, stable, widely audited API surface) - see
-`go.mod`. **This repository's sandbox has no network access, so `go.sum`
-was not generated here; run `go mod tidy` once real network/toolchain
-access is available before building.**
+`agent.okf.md`'s YAML frontmatter (a single, stable, widely audited API
+surface) - see `go.mod`. **This repository's sandbox has no network
+access, so `go.sum` was not generated here; run `go mod tidy` once real
+network/toolchain access is available before building.**
 
 ## Configuration (environment variables)
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `LISTEN_ADDR` | no (default `:8080`) | HTTP listen address |
-| `AGENTS_DIR` | no (default `/agents`, set to `/app/agents` in the image) | Directory of `<name>/agent.okf.yaml` |
+| `AGENTS_DIR` | no (default `/agents`, set to `/app/agents` in the image) | Directory of `<name>/agent.okf.md` bundles |
 | `ACTIVE_AGENT` | no (default `tekos`) | Which agent this deployment renders a chat UI for |
 | `KEYCLOAK_ISSUER_URL` | **yes** | `https://sso.apps.<cluster-domain>/realms/zuno` - see assumption below |
 | `OIDC_CLIENT_ID` | no (default `tekos-frontend`) | Keycloak client ID, contract: `<agent>-frontend` |
@@ -88,7 +89,7 @@ different hostname or makes the frontend clients public (no secret), update
 ```text
 main.go                    Wiring: config, OKF load, routes
 internal/config/           Environment-variable loading
-internal/okf/               agent.okf.yaml parsing (mirrors platform/okf/schema)
+internal/okf/               agent.okf.md Markdown-frontmatter parsing (mirrors platform/okf/schema)
 internal/oidc/              Hand-rolled OIDC Authorization Code + PKCE + JWKS/RS256 verification
 internal/session/           Signed-cookie session (HMAC, no server-side store)
 internal/portal/            Portal tile page

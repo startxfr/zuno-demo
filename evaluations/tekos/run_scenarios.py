@@ -224,9 +224,19 @@ def rag_retrieval_has_citation(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def _invoke_tool(persona: str, tool: str, arguments: Dict[str, Any], classification: str = "C1") -> httpx.Response:
+    # ADR-0036: X-Zuno-Agent/X-Zuno-Task are required - every scenario here
+    # calls the gateway as if it were Tekos's one real task, since this
+    # harness is evaluations/tekos/. A tool this task doesn't declare (e.g.
+    # scenario 12/18's get_customer) is still correctly denied by the
+    # gateway's agent_declaration factor - no per-scenario override needed.
     return httpx.post(
         f"{MCP_GATEWAY_URL}/v1/tools/{tool}/invoke",
-        headers={**auth_headers(persona), "X-Zuno-Data-Classification": classification},
+        headers={
+            **auth_headers(persona),
+            "X-Zuno-Data-Classification": classification,
+            "X-Zuno-Agent": "tekos",
+            "X-Zuno-Task": "answer-technical-question",
+        },
         json=arguments,
         timeout=15,
     )
@@ -293,15 +303,6 @@ def bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code}")
 
 
-def sales_db_tool_via_gateway(s: Dict[str, Any]) -> ScenarioResult:
-    resp = _invoke_tool(s["persona"], s["tool"], s["arguments"], classification="C2")
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code} body={resp.text[:200]}")
-    body = resp.json()
-    ok = "customer" in body
-    return ScenarioResult(s["id"], s["title"], ok, f"keys={list(body.keys())}")
-
-
 def namespace_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     # Requires `oc`/`kubectl` on PATH and a valid kubeconfig - the one
     # scenario that inspects cluster state directly rather than an HTTP API.
@@ -355,7 +356,6 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "model_router_prefers_local": model_router_prefers_local,
     "bff_rejects_missing_jwt": bff_rejects_missing_jwt,
     "bff_rejects_wrong_audience": bff_rejects_wrong_audience,
-    "sales_db_tool_via_gateway": sales_db_tool_via_gateway,
     "namespace_isolation_placeholder_empty": namespace_isolation_placeholder_empty,
     "health_endpoints_all_ok": health_endpoints_all_ok,
 }

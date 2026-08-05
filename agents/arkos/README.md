@@ -4,13 +4,14 @@
 - **Primary integrations:** Technical RAG, Confluence, Google Drive/Docs, Lucidchart
 - **Initial tasks:** Create DAT; prepare Odyssey workshops
 
-## Planned declarative structure
+## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 
 ```text
 arkos/
 ├── README.md
-├── agent.okf.yaml
+├── agent.okf.md         Agent index bundle (YAML frontmatter + Markdown body)
 ├── tasks/
+│   └── coming-soon.md
 ├── prompts/
 ├── policies/
 ├── rag/

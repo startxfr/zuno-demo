@@ -1,6 +1,6 @@
 // Package portal renders the agent portal: one tile per agent defined in
-// agents/*/agent.okf.yaml, enabled/clickable only when the signed-in user's
-// JWT groups intersect that agent's spec.access.groups AND the agent's
+// agents/*/agent.okf.md (ADR-0038), enabled/clickable only when the signed-in
+// user's JWT groups intersect that agent's zuno.access.groups AND the agent's
 // status is active. Agents that are placeholder-only (four of five in v0,
 // see platform/architecture/agent-platform-separation.md) always render as
 // a disabled "coming soon" tile, regardless of the viewer's groups - an
@@ -94,15 +94,15 @@ func Handler(agents []okf.Agent, sessions *session.Manager) http.HandlerFunc {
 		for _, a := range agents {
 			authorized := sess != nil && a.AllowsAnyGroup(sess.Groups)
 			view.Tiles = append(view.Tiles, tileView{
-				Name:            a.Metadata.Name,
-				DisplayName:     a.Spec.UI.DisplayName,
-				TileDescription: a.Spec.UI.TileDescription,
-				Color:           a.Spec.UI.Color,
-				Icon:            a.Spec.UI.Icon,
-				Status:          a.Metadata.Status,
+				Name:            a.Zuno.Name,
+				DisplayName:     a.Zuno.UI.DisplayName,
+				TileDescription: a.Zuno.UI.TileDescription,
+				Color:           a.Zuno.UI.Color,
+				Icon:            a.Zuno.UI.Icon,
+				Status:          a.Zuno.Status,
 				Authorized:      authorized,
 				Clickable:       a.IsActive() && authorized,
-				Href:            "/" + a.Metadata.Name,
+				Href:            "/" + a.Zuno.Name,
 			})
 		}
 

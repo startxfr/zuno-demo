@@ -16,6 +16,7 @@ prerequisite the way Keycloak/Vault/PostgreSQL do.
 the Tekos frontend's `/healthz` route - the full 20-scenario acceptance
 evaluation (ADR-0027/0028) lives under `evaluations/tekos/` and is a
 separate concern. It also structurally validates the four catalog-only
-agents' `agent.okf.yaml` files (apiVersion/kind/`metadata.status:
-placeholder`) - v0 formalizes Tekos as the only mandatory end-to-end
-business path (ADR-0031), but catalog-only is not the same as unchecked.
+agents' `agent.okf.md` OKF v0.2 Markdown bundles (ADR-0038 -
+`okf_version`/`type`/`zuno.status: placeholder`) - v0 formalizes Tekos as
+the only mandatory end-to-end business path (ADR-0031), but catalog-only is
+not the same as unchecked.

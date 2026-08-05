@@ -1,5 +1,6 @@
-# Build context is this directory (unlike agent-frontend, the BFF needs no
-# repository-root context - it has no agent.okf.yaml files to bake in).
+# Build context is this directory (unlike agent-frontend/agent-runtime/
+# mcp-gateway, the BFF needs no repository-root context - it has no
+# agent.okf.md OKF bundles to bake in).
 #
 #   docker build -t zuno/agent-bff:dev components/agent-bff
 

@@ -1,3 +1,5 @@
 # Comage Tasks
 
-Agent-specific tasks assets will be maintained here.
+`coming-soon.md` (ADR-0038 OKF Markdown bundle format), linked from
+`../agent.okf.md`'s `zuno.tasks`. Real per-task Markdown documents will be
+added here as Comage's v1 tasks are actually implemented.

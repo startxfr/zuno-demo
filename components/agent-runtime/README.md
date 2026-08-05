@@ -81,29 +81,37 @@ START -> retrieve -> [conditional] -> reason -> respond -> END
 - **conditional edge** (`should_call_tools`) - a v0 heuristic (regex over
   the question for words like "confluence", "latest", "internal doc...")
   decides whether the live-data tool step is worth the extra round trip.
-  This stands in for what should eventually be an OKF-declared task
-  capability check once Track E authors `agents/tekos/tasks` /
-  `agents/tekos/tools` (currently stubs) - see the docstring in
-  `app/graph/nodes.py` for the full rationale.
+  This is intent detection, deliberately out of ADR-0039's scope (which
+  covers prompts/tools/RAG/classification config, not NLU) - what the OKF
+  bundle governs is *whether the tool is allowed at all* once triggered
+  (`_ANSWER_TASK.allowed_tools`, below), not *when* to trigger it.
 - **`tool_call`** (`tool_call_node`) - calls the MCP Gateway's
   `POST /v1/tools/search_confluence/invoke`, forwarding the caller's own
-  Bearer JWT (ADR-0013) and a declared `X-Zuno-Data-Classification: C2`
-  (confluence, per `policies/data-classification/classification.yaml` -
-  escalated from whatever the turn's baseline was, ADR-0034; the tool's own
+  Bearer JWT (ADR-0013), a declared `X-Zuno-Agent: tekos` /
+  `X-Zuno-Task: answer-technical-question` (ADR-0036 - the gateway's
+  agent-declaration/task-rights check) and a declared
+  `X-Zuno-Data-Classification: C2` (confluence, per
+  `policies/data-classification/classification.yaml` - escalated from
+  whatever the turn's baseline was, ADR-0034; the tool's own
   `min_classification` requires at least C2). Degrades to no tool context
-  (logged) if the gateway denies or fails the call. On success, escalates
-  `effective_classification` for the rest of the turn and, per the
-  gateway's `external_model_policy.allow_context` verdict (ADR-0035), may
-  set `local_only_required` so the `reason` step below is forced to local
-  inference regardless of classification.
-- **`reason`** (`reason_node`) - builds a grounded prompt from retrieved
-  docs + tool results, then calls `ModelRouter.invoke_with_fallback()`
-  (`app/clients/model_router.py`), a single HTTP call to
-  `components/ai-gateway`'s `POST /v1/chat/completions`, declaring the
-  turn's aggregated `effective_classification` (ADR-0034, not a static
-  per-agent constant) and `X-Zuno-Local-Only` (ADR-0035). The gateway tries
-  the local vLLM model first, then falls through OpenAI -> Gemini ->
-  Anthropic -> Mistral in the order declared by
+  (logged) if the gateway denies or fails the call, or if
+  `agents/tekos/tasks/answer-technical-question.md` no longer declares
+  `search_confluence` (ADR-0039 - checked locally before the call). On
+  success, escalates `effective_classification` for the rest of the turn
+  and, per the gateway's `external_model_policy.allow_context` verdict
+  (ADR-0035), may set `local_only_required` so the `reason` step below is
+  forced to local inference regardless of classification.
+- **`reason`** (`reason_node`) - builds a grounded prompt (system prompt
+  from `agents/tekos/prompts/answer-technical-question.md`, ADR-0039) from
+  retrieved docs + tool results, then calls
+  `ModelRouter.invoke_with_fallback()` (`app/clients/model_router.py`), a
+  single HTTP call to `components/ai-gateway`'s
+  `POST /v1/chat/completions`, declaring the turn's aggregated
+  `effective_classification` (ADR-0034, seeded from
+  `agents/tekos/agent.okf.md`'s `zuno.model.preferred_classification`
+  rather than a Python constant) and `X-Zuno-Local-Only` (ADR-0035). The
+  gateway tries the local vLLM model first, then falls through OpenAI ->
+  Gemini -> Anthropic -> Mistral in the order declared by
   `platform/ai-gateway/provider-routing.yaml`, filtered to providers
   eligible for the request's classification (ADR-0021 - fails closed,
   never silently escalates to an ineligible provider) and further filtered
@@ -117,6 +125,28 @@ Streaming (`app/main.py:_stream_chat`) uses LangGraph's
 `astream_events(..., version="v2")` to surface `on_chat_model_stream`
 events from the chat model call nested inside the `reason` node, without
 needing to restructure that node into a generator itself.
+
+## Agent definition (ADR-0038, ADR-0039)
+
+`app/registry.py`'s `AgentRegistry` loads every `agents/<name>/agent.okf.md`
+OKF v0.2 Markdown bundle under `AGENTS_DIR` at import time (fails fast -
+`app/graph/nodes.py` raises at module load if `tekos`'s bundle or its
+`answer-technical-question` task/prompt is missing or malformed, per
+ADR-0039's "configuration errors must be validated early"). This replaces
+what used to be hardcoded Python constants:
+
+| Was (Python constant) | Now (OKF bundle field) |
+|---|---|
+| `TEKOS_DATA_CLASSIFICATION` / `TEKOS_BASE_CLASSIFICATION = "C1"` | `agents/tekos/agent.okf.md`'s `zuno.model.preferred_classification` |
+| `RAG_TOP_K = 5` | `agents/tekos/agent.okf.md`'s `zuno.rag.top_k` |
+| the `reason` node's hardcoded system-prompt string | `agents/tekos/prompts/answer-technical-question.md` (body text) |
+| the implicit "search_confluence is always available" assumption | `agents/tekos/tasks/answer-technical-question.md`'s `zuno.allowed_tools` (`tool_call_node` checks it before calling) |
+
+`components/agent-runtime/tests/test_registry.py` is the ADR-0039 acceptance
+test proving this: it loads a temporary fixture bundle, edits it, and
+asserts the registry's resolved output changes accordingly - the same
+mechanism the real `agents/tekos/` bundle exercises at every service
+startup.
 
 ## Identity propagation
 
@@ -134,6 +164,7 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 | `RAG_SERVICE_URL` | `http://rag-service.zuno-data.svc:8080` | retrieve node |
 | `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-ai.svc:8080` | tool_call node |
 | `AI_GATEWAY_URL` | `http://ai-gateway.zuno-ai.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
+| `AGENTS_DIR` | `/app/agents` | Directory of `<name>/agent.okf.md` OKF bundles (ADR-0038) `app/registry.py`'s `AgentRegistry` loads at import time (ADR-0039) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-telemetry.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
 
 ## Observability (ADR-0029)
@@ -150,8 +181,8 @@ call, so it's the correct owner of that detail. `rag-service` and
 ## Local development
 
 ```bash
-cd components/agent-runtime
-docker build -t zuno/agent-runtime:local .
+# from the repository root - build context matters (bakes in agents/, see Dockerfile)
+docker build -f components/agent-runtime/Dockerfile -t zuno/agent-runtime:local .
 docker run -p 8080:8080 \
   -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.example.com/realms/zuno \
   -e RAG_SERVICE_URL=http://localhost:8081 \

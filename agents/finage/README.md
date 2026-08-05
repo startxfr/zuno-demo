@@ -4,13 +4,14 @@
 - **Primary integrations:** Sales and invoice data
 - **Initial tasks:** Billable business; monthly invoice reporting
 
-## Planned declarative structure
+## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 
 ```text
 finage/
 ├── README.md
-├── agent.okf.yaml
+├── agent.okf.md         Agent index bundle (YAML frontmatter + Markdown body)
 ├── tasks/
+│   └── coming-soon.md
 ├── prompts/
 ├── policies/
 ├── rag/

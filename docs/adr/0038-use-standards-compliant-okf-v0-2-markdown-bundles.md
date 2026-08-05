@@ -1,6 +1,6 @@
 # ADR-0038: Use standards-compliant OKF v0.2 Markdown bundles
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,45 @@ Create a migration tool or validation step that rejects the legacy pseudo-OKF fo
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05).** Every `agents/<name>/agent.okf.yaml` (a
+single Kubernetes-style `apiVersion/kind/metadata/spec` document) is
+replaced by `agents/<name>/agent.okf.md`: a YAML frontmatter block (OKF
+core fields `okf_version`, `type`, `title`, `description`, `provenance`,
+`verification`, `freshness`, `sources`, plus the Zuno extension entirely
+namespaced under `zuno`) followed by a Markdown body. Tasks are individual
+linked documents under `agents/<name>/tasks/<task>.md`, referenced by name
+from the index's `zuno.tasks` list; Tekos additionally has a
+`agents/tekos/prompts/answer-technical-question.md` prompt document (used
+by ADR-0039). Two new schemas formalize this:
+`platform/okf/schema/zuno-okf-v0.2.schema.json` (rewritten for the
+frontmatter shape) and `platform/okf/schema/zuno-okf-task-v0.2.schema.json`
+(new); a third, `zuno-okf-prompt-v0.2.schema.json`, covers prompt
+documents.
+
+Every consumer of the old format was migrated to parse frontmatter instead
+(the same small "split on `---`, `yaml.safe_load` the middle part" logic,
+independently duplicated per this repo's established convention rather
+than shared across independently deployed services/tools):
+`components/agent-frontend/internal/okf/okf.go` (the portal),
+`components/agent-runtime/app/registry.py` (new, ADR-0039),
+`components/mcp-gateway/app/agent_declarations.py` (new, ADR-0036), and
+`ansible/roles/agents/tasks/check.yml`'s structural validator (Jinja's
+`.split('---')`). All three services now bake `agents/` into their image
+at build time from a repository-root Docker build context (`agent-runtime`
+and `agent-frontend`'s Dockerfiles already did/were changed to this
+pattern; `mcp-gateway`'s already did for `policies/`).
+
+Operational consideration ("reject the legacy pseudo-OKF form once all v0
+agents have migrated"): the old `agent.okf.yaml` files are deleted, not
+merely superseded - there is no fallback path reading the old format, so a
+stray legacy file would simply be invisible to every loader (`LoadAll`/
+`AgentRegistry`/`AgentDeclarationStore` all glob for `agent.okf.md`
+specifically).
+
+No secrets or sensitive runtime values are placed in these bundles
+(Security considerations above) - they carry only descriptive/config
+metadata already public in this repository (task descriptions, tool
+names, classification hints, UI copy).
 
 ## Acceptance criteria
 
