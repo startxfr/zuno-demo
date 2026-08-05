@@ -1,9 +1,0 @@
----
-# Copy/adapt into the demo inventory. Keep secrets in Vault, never in Git.
-# The cluster API endpoint and token are NOT set here - export
-# K8S_AUTH_HOST and K8S_AUTH_API_KEY before running `make`, per `make help`.
-cluster_api_url: https://api.example.com:6443
-# cluster_base_domain is intentionally not set - auto-discovered, see
-# ansible/inventories/demo/group_vars/all/main.yml's comment.
-zuno_environment: example
-zuno_repo_root: "{{ playbook_dir }}/../.."
