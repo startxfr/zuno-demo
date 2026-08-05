@@ -30,6 +30,26 @@
         | from_yaml
       }}
 
+# ADR-0048: lets a role inject values it only knows at run time (e.g. a
+# discovered serving-runtime image) without hand-editing the checked-in
+# application.yaml, whose spec.source.helm.values is otherwise fixed,
+# checked-in configuration (gitops/apps/README.md's convention). Optional -
+# most roles never set gitops_app_extra_helm_values, leaving
+# application.yaml's own helm.values (if any, e.g. gitops/apps/vault)
+# untouched. When set, it *replaces* spec.source.helm.values wholesale
+# (rendered to a YAML string) rather than deep-merging with one already
+# present in application.yaml - no current caller needs both at once, and
+# merging two independently-authored value trees correctly is more
+# complexity than this repo's actual usage justifies.
+- name: "gitops | merge extra Helm values into the Application spec, if provided (ADR-0048)"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{
+        _gitops_app_definition
+        | combine({'spec': {'source': {'helm': {'values': gitops_app_extra_helm_values | to_nice_yaml}}}}, recursive=True)
+      }}
+  when: gitops_app_extra_helm_values is defined
+
 - name: "gitops | apply ArgoCD Application: {{ gitops_app_name }}"
   kubernetes.core.k8s:
     state: present

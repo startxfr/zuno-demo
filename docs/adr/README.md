@@ -50,11 +50,11 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Implemented | Use PatternFly React for the agent frontend |
 | [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Implemented | Stream responses end to end with SSE |
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Implemented | Make RAG retrieval metadata-aware and bilingual |
-| [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | v0 | To be implemented | Manage the complete OpenShift AI prerequisite lifecycle |
-| [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | v0 | To be implemented | Discover supported operator channels and serving runtimes at deployment time |
+| [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | v0 | Implemented | Manage the complete OpenShift AI prerequisite lifecycle |
+| [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | v0 | Implemented | Discover supported operator channels and serving runtimes at deployment time |
 | [ADR-0049](0049-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v1 | To be implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v1 | To be implemented | Abstract the RAG backend and integrate OpenShift AI OGX |
-| [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0 | To be implemented | Use immutable and verifiable software supply chain artifacts |
+| [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0 | Implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | To be implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |

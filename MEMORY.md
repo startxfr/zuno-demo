@@ -497,6 +497,34 @@ planning narrative - see README.md's "v0 build status" for a summary:
   disagree on a field name; `platform/api/lint_openapi.py` validates the
   spec itself against the OpenAPI meta-schema plus two ADR-0054-specific
   conventions.
+- Platform lifecycle and supply chain (ADR-0047/ADR-0048/ADR-0051): a new
+  `ansible/roles/nfd` role closes a real, previously undeclared gap (the
+  NVIDIA GPU Operator's default `ClusterPolicy` relies on NFD node
+  labels, and nothing installed NFD before this). Found and fixed a real
+  latent bug while implementing this: `openshift_ai`'s `DataScienceCluster`
+  requested KServe Serverless mode (`kserve.serving.managementState:
+  Managed` + `name: knative-serving`), which implicitly needs Service
+  Mesh, Serverless and cert-manager - none of which this repository ever
+  installed, so it would never have reached `Ready` on a real cluster.
+  Fixed by switching to `Removed` (RawDeployment) - the correct mode for
+  this demo's one always-on model, not a workaround. `ansible/roles/models`
+  now discovers the vLLM serving-runtime image from OpenShift AI's own
+  published `Template` catalog (`redhat-ods-applications`) instead of
+  trusting the old hardcoded `quay.io/modh/vllm:rhoai-2.16-cuda` guess,
+  and `openshift_ai` discovers its operator channel from the cluster's
+  PackageManifest instead of a hardcoded `eus-3.5`; both fail loudly
+  rather than silently guessing. Cert-manager/Service Mesh/Connectivity
+  Link/LeaderWorkerSet/MaaS are deliberately *not* installed - none of
+  them are applicable to this repository's actual v0 feature set (see
+  `platform/openshift-ai/README.md`). This repository's first CI workflows
+  now exist (`.github/workflows/{build-publish,lint}.yml`): image
+  build/SBOM/scan/keyless-cosign-sign on push, and a lint gate running
+  every static check built across this whole engagement. Neither has
+  actually run (no live Quay credentials/Actions runner in this sandbox);
+  `platform/supply-chain/check_no_latest_tags.py` correctly and honestly
+  still fails (6 charts still say `tag: latest`) until a real release is
+  cut - see `RELEASING.md` for that process, deliberately not fabricated
+  by rewriting `targetRevision: main` to a tag that doesn't exist yet.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos

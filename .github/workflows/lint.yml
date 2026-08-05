@@ -1,0 +1,98 @@
+# Static checks that need no live cluster, registry or credentials - every
+# one of these commands was actually run (and currently passes, except
+# where documented as a known, honest gap) in this repository's own
+# development environment before this workflow was written. See each
+# script's own docstring/README for what it checks and why.
+name: Lint and policy checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  policy-as-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml openapi-spec-validator
+      # ADR-0051 - known-failing today (6 charts still use tag: latest,
+      # pending the build-publish.yml pipeline actually publishing
+      # immutable tags for them to reference) - see
+      # platform/supply-chain/README.md. Not made a hard CI gate yet for
+      # that reason; report only.
+      - name: Reject non-immutable image tags (ADR-0051)
+        run: python3 platform/supply-chain/check_no_latest_tags.py
+        continue-on-error: true
+      - name: Lint OpenAPI contracts (ADR-0054)
+        run: python3 platform/api/lint_openapi.py
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: helm lint every chart
+        run: |
+          set -e
+          for chart in gitops/charts/*/; do
+            helm lint "$chart"
+          done
+      - run: pip install pyyaml
+      - name: Workload hardening baseline (ADR-0052)
+        run: python3 platform/security/check_workload_hardening.py
+
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: agent-frontend (build/vet/fmt)
+        working-directory: components/agent-frontend
+        run: |
+          go build ./...
+          go vet ./...
+          test -z "$(gofmt -l .)"
+      - name: agent-bff (build/vet/fmt/test)
+        working-directory: components/agent-bff
+        run: |
+          go build ./...
+          go vet ./...
+          test -z "$(gofmt -l .)"
+          go test ./...
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: agent-runtime tests
+        working-directory: components/agent-runtime
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_registry.py
+          python3 tests/test_retrieve_metadata.py
+      - name: rag-service tests
+        working-directory: components/rag-service
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_search_filters.py
+
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install ansible && ansible-galaxy collection install kubernetes.core
+      - name: Syntax-check every playbook
+        run: |
+          set -e
+          for playbook in ansible/playbooks/*.yml; do
+            ansible-playbook -i ansible/inventories/demo/hosts.yml "$playbook" --syntax-check
+          done

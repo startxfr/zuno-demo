@@ -1,0 +1,22 @@
+---
+- name: "nfd | verify the Node Feature Discovery Operator is available in the catalog"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: nfd
+  register: _nfd_precheck_pkg
+
+- name: "nfd | fail if the operator is not published in this cluster's catalog"
+  ansible.builtin.fail:
+    msg: >-
+      nfd was not found in openshift-marketplace. Confirm the
+      redhat-operators CatalogSource is enabled (ADR-0047 - Node Feature
+      Discovery is a prerequisite for the nvidia_gpu role's GPU Operator,
+      whose default ClusterPolicy node selector relies on NFD-applied
+      labels such as feature.node.kubernetes.io/pci-10de.present).
+  when: (_nfd_precheck_pkg.resources | default([]) | length) == 0
+
+- name: "nfd | precheck summary"
+  ansible.builtin.debug:
+    msg: "Node Feature Discovery Operator is available in the catalog."

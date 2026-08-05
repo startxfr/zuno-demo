@@ -12,9 +12,13 @@ inferenceServiceName: qwen25-7b-instruct
 modelId: Qwen/Qwen2.5-7B-Instruct
 
 image:
-  # Red Hat OpenShift AI's bundled vLLM runtime image (KServe ServingRuntime).
-  # Override for the exact tag published by the installed RHOAI 3.5 EA2
-  # catalog - not verified against a live cluster (ASSUMPTION, see README.md).
+  # ADR-0048: this default is a `helm template`/standalone-testing
+  # fallback only. The real `ansible/roles/models` configure path
+  # (tasks/discover_vllm_image.yml) always overrides this at apply time
+  # with the vLLM ServingRuntime image actually published by the
+  # installed OpenShift AI catalog (redhat-ods-applications Templates),
+  # never trusting a hardcoded guess for a real deploy - see that task
+  # file and gitops/charts/models/README.md.
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 

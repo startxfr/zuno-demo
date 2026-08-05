@@ -21,7 +21,52 @@
         namespace: redhat-ods-operator
       spec: {}
 
-- name: "openshift_ai | subscribe to the Red Hat OpenShift AI operator (3.5 EA2 channel)"
+- name: "openshift_ai | discover the operator's published channels (ADR-0048)"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhods-operator
+  register: _openshift_ai_pkg
+
+- name: "openshift_ai | fail if the package manifest is unavailable"
+  ansible.builtin.fail:
+    msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make precheck openshift-ai' first."
+  when: (_openshift_ai_pkg.resources | default([]) | length) == 0
+
+# ADR-0048: select the 3.5-family channel this cluster's catalog actually
+# publishes, instead of embedding a hardcoded, previously-unverified
+# "eus-3.5" guess (the exact EA2/GA channel name is not standardized
+# across catalog snapshots). Falls back to the manifest's own
+# defaultChannel only if no 3.5-family channel name is found - fails with
+# a clear diagnostic rather than silently subscribing to an arbitrary
+# channel if even that isn't available.
+- name: "openshift_ai | select the 3.5-family channel actually published by this cluster's catalog"
+  ansible.builtin.set_fact:
+    _openshift_ai_channel: >-
+      {{
+        ((_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | map(attribute='name') | list)[0])
+        if (_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | list | length) > 0
+        else (_openshift_ai_pkg.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "openshift_ai | fail with a clear diagnostic if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      No OpenShift AI 3.5-family channel published in this cluster's
+      catalog, and no defaultChannel to fall back to. Published channels:
+      {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }}.
+      Update ansible/roles/openshift_ai/tasks/prepare.yml's channel
+      selection if this catalog uses a different naming convention.
+  when: _openshift_ai_channel | length == 0
+
+- name: "openshift_ai | discovered channel summary (ADR-0048)"
+  ansible.builtin.debug:
+    msg: >-
+      Selected rhods-operator channel: {{ _openshift_ai_channel }}
+      (all published channels: {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }})
+
+- name: "openshift_ai | subscribe to the Red Hat OpenShift AI operator"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -33,11 +78,7 @@
         labels:
           zuno.io/managed-by: ansible
       spec:
-        # ASSUMPTION: exact EA2 channel name not verified against a live
-        # catalog - confirm with `oc get packagemanifest rhods-operator -o
-        # jsonpath='{.status.channels[*].name}'` before a real run and
-        # adjust if it differs (ADR-0002 accepts EA2 pre-GA constraints).
-        channel: eus-3.5
+        channel: "{{ _openshift_ai_channel }}"
         name: rhods-operator
         source: redhat-operators
         sourceNamespace: openshift-marketplace
@@ -67,9 +108,37 @@
         components:
           kserve:
             managementState: Managed
+            # ADR-0047/ADR-0048 fix: RawDeployment, not Serverless.
+            # serving.managementState: Removed disables KServe's Knative
+            # integration entirely, so InferenceServices default to a
+            # plain Kubernetes Deployment+Service instead of a Knative
+            # Service. The previous value here (Managed +
+            # name: knative-serving) implicitly required the Red Hat
+            # OpenShift Service Mesh Operator, the Red Hat OpenShift
+            # Serverless Operator (which owns the KNativeServing CR that
+            # `name` referenced) and cert-manager - none of which this
+            # repository ever installed, so this DataScienceCluster would
+            # never actually have reached Ready on a real cluster (exactly
+            # the failure mode ADR-0047 calls out: "failures identify the
+            # missing dependency rather than surfacing later during
+            # model/RAG deployment" - found by reading, not by hitting it
+            # live). This demo's one model (gitops/charts/models) runs
+            # minReplicas == maxReplicas == 1, always on - it has no use
+            # for Serverless's scale-to-zero, so RawDeployment isn't a
+            # compromise here, it's the correct mode for this workload.
+            # gitops/charts/models/templates/inferenceservice.yaml now also
+            # sets the serving.kserve.io/deploymentMode: RawDeployment
+            # annotation explicitly (belt and suspenders with this
+            # cluster-wide default). Connectivity Link, LeaderWorkerSet and
+            # MaaS-related dependencies (also named in ADR-0047's
+            # Operational considerations) are likewise deliberately not
+            # installed - nothing in this repository's actual v0 feature
+            # set uses multi-node/multi-GPU serving (LeaderWorkerSet), an
+            # API policy gateway (Connectivity Link) or a Models-as-a-
+            # Service routing layer (MaaS, explicitly deferred to v1 as
+            # ADR-0049) - see platform/openshift-ai/README.md.
             serving:
-              managementState: Managed
-              name: knative-serving
+              managementState: Removed
           workbenches:
             managementState: Removed
           dashboard:

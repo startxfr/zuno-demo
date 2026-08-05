@@ -5,7 +5,7 @@ ANSIBLE_PLAYBOOK ?= ansible-playbook
 INVENTORY ?= ansible/inventories/demo/hosts.yml
 EXTRA_VARS ?=
 
-PREP_COMPONENTS := openshift-ai datascience nvidia-gpu argocd vault external-secrets keycloak postgresql observability smtp
+PREP_COMPONENTS := openshift-ai datascience nfd nvidia-gpu argocd vault external-secrets keycloak postgresql observability smtp
 CONFIG_SCOPES := vault external-secrets argocd datascience keycloak postgresql sql-schema models llm api mlops rag mcp
 DISPATCH_TARGET := $(word 2,$(MAKECMDGOALS))
 

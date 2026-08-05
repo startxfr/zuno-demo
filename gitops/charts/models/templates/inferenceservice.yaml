@@ -10,6 +10,15 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    # ADR-0047/ADR-0048: explicit, belt-and-suspenders with the
+    # DataScienceCluster's cluster-wide kserve.serving.managementState:
+    # Removed (ansible/roles/openshift_ai/tasks/prepare.yml) - this one
+    # always-on model (minReplicas == maxReplicas, no scale-to-zero need)
+    # has no use for Serverless/Knative, which would otherwise require the
+    # Service Mesh and Serverless operators plus cert-manager, none of
+    # which this repository installs.
+    serving.kserve.io/deploymentMode: RawDeployment
 spec:
   predictor:
     minReplicas: {{ .Values.minReplicas }}

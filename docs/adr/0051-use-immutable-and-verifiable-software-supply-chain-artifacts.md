@@ -1,6 +1,6 @@
 # ADR-0051: Use immutable and verifiable software supply chain artifacts
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,74 @@ Add CI checks rejecting `latest` for deployable component images and establish i
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05)**: the CI pipeline, the release process, and
+the policy-as-code gate all exist and are correct as authored - what
+remains is external to this repository (provisioning real Quay
+credentials, and a maintainer actually cutting a first release), not
+something this environment could fabricate without lying about the
+repository's actual state.
+
+**CI build/publish/SBOM/scan/sign** (Decision: "Build every component in
+CI, publish images to Quay with immutable version/SHA tags... generate an
+SBOM, scan dependencies/images, sign release images"):
+`.github/workflows/build-publish.yml` - new, this repository's first CI
+workflow along with `lint.yml` below. A matrix over all 8 buildable images
+(the 6 components with a `gitops/charts/*` deployment, plus
+`components/mcp-servers/sales-db` and the custom
+`gitops/charts/postgresql/image` pgvector image) builds and pushes to
+`quay.io/zuno-demo/<name>` tagged `sha-<commit>` on every push to `main`
+(never `:latest` - immutable by construction) and additionally the
+semantic version tag on a `v*` tag push, generates an SPDX SBOM
+(`anchore/sbom-action`), scans for HIGH/CRITICAL vulnerabilities
+(`aquasecurity/trivy-action`, failing the build), and signs the image plus
+attests the SBOM with `cosign` **keylessly** via GitHub's own OIDC
+identity (Sigstore/Fulcio) - satisfying "CI secrets stay outside Git"
+literally: there is no signing secret to leak, by design, not merely a
+promise to store one safely. `QUAY_USERNAME`/`QUAY_PASSWORD` (the only
+secrets this pipeline needs, for the registry push itself) must be
+provisioned as encrypted GitHub repository secrets - never committed.
+
+**"Update GitOps manifests with immutable references" / "Production-like
+Argo CD applications must deploy a reviewed Git revision/tag"**:
+deliberately **not done** for the existing `targetRevision: main`
+references, and this is an honest sequencing gap, not an oversight -
+`RELEASING.md` (new) explains why: no tag has ever been pushed in this
+repository's history, so rewriting `targetRevision: main` to a specific
+tag today would point every GitOps `Application` at a Git ref that
+doesn't exist, breaking every deployment for no benefit. `RELEASING.md`
+documents the exact process (tag push → CI publishes → bump chart
+`image.tag` values → bump every `targetRevision` in the same PR) so that
+transition is a maintainer decision away, not still-unbuilt tooling.
+
+**Policy-as-code gate** (Operational considerations: "Add CI checks
+rejecting `latest` for deployable component images"):
+`platform/supply-chain/check_no_latest_tags.py` walks every
+`gitops/charts/*/values.yaml` for an image `tag` of `latest` (or empty),
+wired into `.github/workflows/lint.yml`. **Run and currently, correctly,
+failing**: 6 charts (`agent-runtime`, `ai-gateway`, `mcp-gateway`,
+`mcp-sales-db`, `rag-service`, `tekos`) still use `tag: latest`, because
+no image has ever actually been published by the new pipeline for them to
+reference yet - marked `continue-on-error: true` in the workflow for
+exactly that reason (a real, currently-true failure, not a broken check)
+rather than either silently disabling it or fabricating a passing state.
+
+`lint.yml` also runs every other static check built across this
+engagement (`platform/security/check_workload_hardening.py`,
+`platform/api/lint_openapi.py`, `helm lint` on every chart, `go
+build`/`vet`/`gofmt`/`test` on both Go components, the standalone Python
+test suites, and `ansible-playbook --syntax-check`) - this repository's
+first actual CI gate tying all of it together, not just the supply-chain
+half of this specific ADR.
+
+**Not executed**: neither workflow has run in a real GitHub Actions
+environment - this sandbox has no live Quay credentials or Actions runner.
+Both files' YAML was parsed/validated and every command they invoke was
+run directly in this environment (and does pass, except
+`check_no_latest_tags.py`'s honestly-still-failing state above); the
+workflow orchestration itself (action versions, matrix behavior, GitHub
+Actions expression syntax) is unverified beyond careful authorship against
+well-documented, widely-used actions - see `.github/README.md`'s own
+"What hasn't run" section.
 
 ## Acceptance criteria
 

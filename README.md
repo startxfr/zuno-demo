@@ -50,6 +50,7 @@ AIAgent CRD/operator (originally v0) is retargeted to v1 - see ADR-0026.
 - Agent definitions use Open Knowledge Format (OKF) v0.2 plus a Zuno-specific extension profile.
 - Real commercial data and nominative data must never be committed to this public repository.
 - `MEMORY.md` captures the project context so future work can resume consistently.
+- Component images are built, scanned, SBOM'd and signed in CI and published under immutable tags (ADR-0051) - see `.github/README.md` and `RELEASING.md`.
 
 ## Operator workflow
 

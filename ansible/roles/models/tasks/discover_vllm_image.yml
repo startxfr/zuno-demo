@@ -1,0 +1,153 @@
+---
+# Shared discovery task, included by both tasks/precheck.yml (for early
+# visibility/failure - ADR-0048 "add precheck output showing... serving
+# runtimes... before model deployment") and tasks/configure.yml (which
+# actually needs the resulting _models_discovered_vllm_image fact to apply
+# it - separate `ansible-playbook` runs of the precheck vs. configure
+# playbooks don't share facts, so this can't just run once in precheck and
+# be read back later).
+#
+# ADR-0048: "Select approved operator channels and ClusterServingRuntime/
+# serving images exposed by the installed OpenShift AI version instead of
+# embedding unverified runtime image tags." Red Hat OpenShift AI publishes
+# its maintained serving-runtime definitions as Template objects in
+# redhat-ods-applications - the same catalog the dashboard's "Serving
+# runtimes" page reads from (gitops/charts/models/README.md already
+# pointed at `oc get templates -n redhat-ods-applications | grep -i vllm`
+# as the manual equivalent of what this task now does automatically).
+# Matched by name content rather than a specific label, since the exact
+# label taxonomy RHOAI 3.5 uses was not verified against a live cluster -
+# a defensible, honestly-scoped choice over guessing a label that might
+# not exist. This whole discovery block (and its resolution logic below)
+# was verified against synthetic fixture data with a standalone local
+# playbook (both a literal-image template and a Template-parameterized
+# ${VAR} image, plus the "no default value" failure case) before being
+# committed here - this sandbox has no live OpenShift AI cluster to
+# discover against for real.
+- name: "models | discover the vLLM serving-runtime Templates OpenShift AI published (ADR-0048)"
+  kubernetes.core.k8s_info:
+    api_version: template.openshift.io/v1
+    kind: Template
+    namespace: redhat-ods-applications
+  register: _models_ods_templates
+  when: models_vllm_image_override is not defined
+
+- name: "models | select vLLM-named templates"
+  ansible.builtin.set_fact:
+    _models_vllm_templates: >-
+      {{
+        _models_ods_templates.resources
+        | default([])
+        | selectattr('metadata.name', 'search', 'vllm', ignorecase=True)
+        | list
+      }}
+  when: models_vllm_image_override is not defined
+
+- name: "models | fail with a clear diagnostic if no vLLM serving-runtime template was published"
+  ansible.builtin.fail:
+    msg: >-
+      No Template with "vllm" in its name was found in
+      redhat-ods-applications - this OpenShift AI installation may not
+      have the vLLM serving runtime available yet, or publishes it under a
+      different naming convention. Templates found in that namespace:
+      {{ _models_ods_templates.resources | default([]) | map(attribute='metadata.name') | list }}.
+      To bypass discovery and pin an explicitly known-good image, rerun
+      with -e models_vllm_image_override=<registry>/<image>:<tag> (ADR-0048
+      Security considerations: this is an explicit, conscious override,
+      never a silent fallback).
+  when:
+    - models_vllm_image_override is not defined
+    - (_models_vllm_templates | default([]) | length) == 0
+
+# A Template wraps one or more objects and may parameterize any field
+# (including the container image) via ${PARAM_NAME} references resolved
+# against the Template's own top-level `parameters` list - this handles
+# both the literal-image and the parameterized-image shape without
+# assuming which one RHOAI 3.5 actually uses.
+- name: "models | extract the ServingRuntime/ClusterServingRuntime object from the selected template"
+  ansible.builtin.set_fact:
+    _models_selected_template: "{{ _models_vllm_templates[0] }}"
+    _models_runtime_object: >-
+      {{
+        (_models_vllm_templates[0].objects
+          | selectattr('kind', 'in', ['ServingRuntime', 'ClusterServingRuntime'])
+          | list
+          | first)
+        if (_models_vllm_templates[0].objects | selectattr('kind', 'in', ['ServingRuntime', 'ClusterServingRuntime']) | list | length) > 0
+        else {}
+      }}
+  when: models_vllm_image_override is not defined
+
+- name: "models | fail if the template has no ServingRuntime/ClusterServingRuntime object"
+  ansible.builtin.fail:
+    msg: >-
+      Template {{ _models_selected_template.metadata.name }} in
+      redhat-ods-applications has no ServingRuntime or
+      ClusterServingRuntime object among its objects - cannot discover an
+      image from it. Object kinds present:
+      {{ _models_selected_template.objects | default([]) | map(attribute='kind') | list }}.
+  when:
+    - models_vllm_image_override is not defined
+    - (_models_runtime_object | default({}) | length) == 0
+
+- name: "models | read the (possibly parameterized) image reference"
+  ansible.builtin.set_fact:
+    _models_raw_image: "{{ _models_runtime_object.spec.containers[0].image | default('') }}"
+  when: models_vllm_image_override is not defined
+
+- name: "models | use the image as-is when it is not a Template parameter reference"
+  ansible.builtin.set_fact:
+    _models_discovered_vllm_image: "{{ _models_raw_image }}"
+  when:
+    - models_vllm_image_override is not defined
+    - not (_models_raw_image is match('^\$\{[A-Za-z0-9_]+\}$'))
+
+- name: "models | resolve a ${PARAM} placeholder against the template's own parameters"
+  vars:
+    _models_param_name: "{{ _models_raw_image | regex_replace('^\\$\\{([A-Za-z0-9_]+)\\}$', '\\1') }}"
+  ansible.builtin.set_fact:
+    _models_discovered_vllm_image: >-
+      {{
+        (_models_selected_template.parameters
+          | default([])
+          | selectattr('name', 'equalto', _models_param_name)
+          | map(attribute='value')
+          | list
+          | first) | default('', true)
+      }}
+  when:
+    - models_vllm_image_override is not defined
+    - _models_raw_image is match('^\$\{[A-Za-z0-9_]+\}$')
+
+- name: "models | fail if the image could not be resolved to a concrete reference"
+  ansible.builtin.fail:
+    msg: >-
+      Could not resolve a concrete image from template
+      {{ _models_selected_template.metadata.name }} (raw value:
+      {{ _models_raw_image }}) - either the ServingRuntime's image field
+      was empty, or it references a Template parameter with no default
+      value (requiring interactive `oc process` input this non-interactive
+      pipeline does not collect). Rerun with
+      -e models_vllm_image_override=<registry>/<image>:<tag> instead.
+  when:
+    - models_vllm_image_override is not defined
+    - (_models_discovered_vllm_image | default('') | length) == 0
+
+- name: "models | use the explicit override instead of discovery, if given"
+  ansible.builtin.set_fact:
+    _models_discovered_vllm_image: "{{ models_vllm_image_override }}"
+  when: models_vllm_image_override is defined
+
+# ADR-0048 Operational considerations: "Add precheck output showing
+# selected channels, operator versions, serving runtimes and GPU
+# compatibility before model deployment."
+- name: "models | discovery summary (ADR-0048)"
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        'vLLM serving-runtime image: explicit override ' ~ _models_discovered_vllm_image
+        if models_vllm_image_override is defined
+        else 'vLLM serving-runtime image: ' ~ _models_discovered_vllm_image ~
+             ' (discovered from Template ' ~ _models_selected_template.metadata.name ~
+             ' in redhat-ods-applications)'
+      }}

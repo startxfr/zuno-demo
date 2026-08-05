@@ -6,6 +6,7 @@
     prerequisite_components:
       - openshift_ai
       - datascience
+      - nfd
       - nvidia_gpu
       - argocd
       - vault

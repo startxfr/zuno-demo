@@ -1,0 +1,131 @@
+# ADR-0051: build every component in CI, publish to Quay with immutable
+# tags, generate an SBOM, scan for vulnerabilities, and sign with cosign
+# (keyless, via GitHub's OIDC identity - no pre-provisioned signing key,
+# consistent with Security considerations: "CI secrets stay outside Git").
+#
+# Runs on every push to main (continuous immutable-tagged builds, tagged
+# only with the commit SHA - never `:latest`) and on every `v*` tag push
+# (an actual release - same pipeline, plus the semantic version tag).
+# QUAY_USERNAME/QUAY_PASSWORD must be configured as encrypted repository
+# secrets in GitHub - never committed here.
+#
+# NOT executed in this repository's development environment: this sandbox
+# has no live Quay credentials or GitHub Actions runner to actually
+# exercise this against. Written to be genuinely runnable the moment those
+# secrets are provisioned - see docs/adr/0051-*.md's Implementation state
+# and .github/README.md for the honest scope of what "implemented" means
+# here.
+name: Build, publish and sign component images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # cosign keyless signing (Sigstore/Fulcio via OIDC)
+
+env:
+  REGISTRY: quay.io
+  REGISTRY_NAMESPACE: zuno-demo
+
+jobs:
+  build-publish-sign:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # context: "." means the Dockerfile bakes in files outside its
+          # own component directory (e.g. agents/) and needs the
+          # repository root as build context - see each Dockerfile's own
+          # header comment for exactly why.
+          - name: agent-bff
+            dockerfile: components/agent-bff/Dockerfile
+            context: components/agent-bff
+          - name: agent-frontend
+            dockerfile: components/agent-frontend/Dockerfile
+            context: .
+          - name: agent-runtime
+            dockerfile: components/agent-runtime/Dockerfile
+            context: .
+          - name: ai-gateway
+            dockerfile: components/ai-gateway/Dockerfile
+            context: components/ai-gateway
+          - name: mcp-gateway
+            dockerfile: components/mcp-gateway/Dockerfile
+            context: .
+          - name: rag-service
+            dockerfile: components/rag-service/Dockerfile
+            context: components/rag-service
+          - name: mcp-sales-db
+            dockerfile: components/mcp-servers/sales-db/Dockerfile
+            context: components/mcp-servers/sales-db
+          - name: postgresql-pgvector
+            dockerfile: gitops/charts/postgresql/image/Dockerfile
+            context: gitops/charts/postgresql/image
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute immutable tags (ADR-0051 - never :latest)
+        id: tags
+        run: |
+          echo "sha_tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "release_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ steps.tags.outputs.sha_tag }}
+            ${{ steps.tags.outputs.release_tag != '' && format('{0}/{1}/{2}:{3}', env.REGISTRY, env.REGISTRY_NAMESPACE, matrix.name, steps.tags.outputs.release_tag) || '' }}
+
+      - name: Generate SBOM (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.name }}.spdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.name }}
+          path: sbom-${{ matrix.name }}.spdx.json
+
+      - name: Scan for vulnerabilities (Trivy) - fails the build on HIGH/CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign the image (keyless)
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - name: Attest the SBOM to the image (keyless)
+        run: cosign attest --yes --predicate "sbom-${{ matrix.name }}.spdx.json" --type spdxjson "${IMAGE}@${DIGEST}"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}

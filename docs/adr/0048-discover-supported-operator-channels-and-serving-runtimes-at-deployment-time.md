@@ -1,6 +1,6 @@
 # ADR-0048: Discover supported operator channels and serving runtimes at deployment time
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
@@ -32,7 +32,71 @@ Add precheck output showing selected channels, operator versions, serving runtim
 
 ## Implementation state
 
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+**Implemented (2026-08-05)** for the two hardcoded assumptions this ADR's
+own Context names by name.
+
+**Serving-runtime image** (`quay.io/modh/vllm:rhoai-2.16-cuda`):
+`ansible/roles/models/tasks/discover_vllm_image.yml` (a shared task,
+included by both `tasks/precheck.yml` for early visibility and
+`tasks/configure.yml`, since separate `ansible-playbook` runs don't share
+facts) lists the `Template` objects OpenShift AI publishes in
+`redhat-ods-applications` (the same catalog the dashboard's own "Serving
+runtimes" page reads from), selects the one naming "vllm", extracts the
+image from its embedded `ServingRuntime`/`ClusterServingRuntime` object -
+resolving a `${PARAM}`-style Template parameter reference against that
+Template's own `parameters` list if the image field is parameterized
+rather than literal - and fails with a clear diagnostic (listing every
+template actually found) if discovery can't resolve a concrete image at
+any step, rather than silently falling back to the old hardcoded guess.
+`ansible/tasks/apply_gitops_app.yml` gained a generic
+`gitops_app_extra_helm_values` mechanism so the discovered value reaches
+the chart without hand-editing checked-in GitOps config.
+`gitops/charts/models/values.yaml`'s old hardcoded value is kept only as
+a `helm template`/standalone-testing fallback, explicitly documented as
+never trusted for a real deploy. An operator who already knows the
+correct image can bypass discovery with an explicit
+`models_vllm_image_override` variable - a conscious override, never a
+silent one (Security considerations: "must not silently switch to an
+untrusted image").
+
+This whole resolution algorithm (Template selection, object extraction,
+both the literal-image and parameterized-image paths, and the
+no-default-value failure path) was verified against synthetic fixture
+data via a standalone local `ansible-playbook` run (no live cluster
+needed for pure Jinja/fact logic) before being committed - all paths
+behaved correctly. Discovery itself (the `kubernetes.core.k8s_info` calls)
+was not exercised against a real cluster - no live OpenShift AI
+installation exists in this environment, the same constraint as every
+other cluster-dependent role in this repository.
+
+**Operator channel** (`eus-3.5`, previously flagged as an unverified
+guess): `ansible/roles/openshift_ai/tasks/prepare.yml` now reads the
+`rhods-operator` `PackageManifest`'s published channels and selects the
+one matching the `3.5` family, falling back to the manifest's own
+`defaultChannel`, and failing with a clear diagnostic (listing every
+published channel) if neither is available.
+
+Security considerations: "Only approved registries... may be selected" -
+satisfied by construction, since discovery only ever reads Templates the
+already-trusted `rhods-operator` (itself installed only from the
+`redhat-operators` catalog, ADR-0047) published into
+`redhat-ods-applications` - never an arbitrary external source. "...and
+signed images" and "runtime discovery must not silently switch to an
+untrusted image" - the *never silent* half is implemented (every failure
+path above fails loudly rather than guessing); actual image *signature*
+verification at discovery time is **not implemented** - that would need a
+cluster-side policy (e.g. Sigstore Policy Controller or an
+ImageContentSourcePolicy-based check) this ansible role has no mechanism
+to enforce, and connects more naturally to ADR-0051's own signing/
+verification scope than to this ADR's discovery mechanism - flagged here
+as an honest gap, not silently assumed covered.
+
+Operational considerations ("Add precheck output showing selected
+channels, operator versions, serving runtimes... before model
+deployment"): both discovery paths above end in an
+`ansible.builtin.debug` summary naming exactly what was selected and why
+(the matched channel plus every published alternative; the resolved image
+plus the Template it came from, or the explicit override used instead).
 
 ## Acceptance criteria
 

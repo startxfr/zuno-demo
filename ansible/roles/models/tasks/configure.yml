@@ -1,7 +1,18 @@
 ---
+- name: "models | discover the vLLM serving-runtime image (ADR-0048)"
+  ansible.builtin.include_tasks: discover_vllm_image.yml
+
 - name: "models | apply the model serving GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_app_name: models
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
+    # ADR-0048: override the chart's own hardcoded values.yaml default
+    # (kept only as a `helm template`/standalone-testing fallback - see
+    # gitops/charts/models/README.md) with the image this run actually
+    # discovered (or was explicitly told to use via
+    # models_vllm_image_override).
+    gitops_app_extra_helm_values:
+      image:
+        vllm: "{{ _models_discovered_vllm_image }}"
