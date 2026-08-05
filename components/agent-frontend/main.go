@@ -10,8 +10,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/assets"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/chat"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/config"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/oidc"
@@ -19,6 +21,9 @@ import (
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/portal"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/session"
 )
+
+// staticBase must match web/vite.config.ts's build.base.
+const staticBase = "/static/"
 
 const oidcTxnCookie = "zuno_oidc_txn"
 
@@ -41,6 +46,24 @@ func main() {
 	}
 	log.Printf("agent-frontend: loaded %d agent definitions from %q; serving chat UI for %q", len(agents), cfg.AgentsDir, cfg.ActiveAgent)
 
+	// ADR-0044: the Vite build (components/agent-frontend/web) must run
+	// before this server starts - `npm run build` locally, or the
+	// Dockerfile's Node stage in the image. manifest.Entry resolves each
+	// page's content-hashed JS/CSS; see internal/assets.
+	manifestPath := filepath.Join(cfg.WebDistDir, ".vite", "manifest.json")
+	manifest, err := assets.Load(manifestPath, staticBase)
+	if err != nil {
+		log.Fatalf("agent-frontend: %v", err)
+	}
+	portalAsset, err := manifest.Entry("src/portal/main.tsx")
+	if err != nil {
+		log.Fatalf("agent-frontend: %v", err)
+	}
+	chatAsset, err := manifest.Entry("src/chat/main.tsx")
+	if err != nil {
+		log.Fatalf("agent-frontend: %v", err)
+	}
+
 	oidcClient := oidc.NewClient(cfg.KeycloakIssuerURL, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCRedirectURL)
 	sessions := session.NewManager(cfg.SessionHMACSecret, isSecureBaseURL(cfg.SelfBaseURL))
 
@@ -51,15 +74,15 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle(staticBase, http.StripPrefix(staticBase, http.FileServer(http.Dir(cfg.WebDistDir))))
 
-	mux.HandleFunc("/", portal.Handler(agents, sessions))
+	mux.HandleFunc("/", portal.Handler(agents, sessions, portalAsset))
 
 	mux.HandleFunc("/login", loginHandler(oidcClient, sessions))
 	mux.HandleFunc("/callback", callbackHandler(oidcClient, sessions))
 	mux.HandleFunc("/logout", logoutHandler(oidcClient, sessions, cfg.SelfBaseURL))
 
-	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, sessions))
+	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, sessions, chatAsset))
 	mux.HandleFunc("/api/chat", chat.APIHandler(activeAgent, cfg.BFFBaseURL, sessions))
 
 	server := &http.Server{

@@ -29,22 +29,56 @@ forwarding the caller's OIDC access token as a Bearer credential.
    ```text
    POST {AGENT_RUNTIME_BASE_URL}/v1/agents/{AGENT_NAME}/chat
      headers: Authorization: Bearer <end-user token>
+              Accept: text/event-stream (only if the frontend asked to stream)
+              X-Zuno-Request-Id: <uuid> (ADR-0045, see below)
      body:  {"session_id": string, "user_sub": string, "message": string}
      reply: {"reply": string, "citations": [{"source": string, "title": string}]}
+            or an SSE stream (see the frontend's own README for the exact
+            event contract) when Accept: text/event-stream was sent.
    ```
 
    `user_sub` is taken from the validated token's `sub` claim, but is
    informational/correlation only on the Runtime side (ADR-0033) - the
    Runtime derives the authoritative identity from the forwarded token
    itself, never from this field.
-4. Relays the runtime's reply back to the frontend.
+4. Relays the runtime's reply back to the frontend - either the buffered
+   JSON body (default) or, when the frontend sent
+   `Accept: text/event-stream`, the runtime's SSE stream relayed
+   chunk-by-chunk (`main.go:proxySSE`) rather than buffered (ADR-0045 - see
+   "Streaming (ADR-0045)" below).
 
 ## This service's own API surface (what the frontend calls)
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
-| POST | `/api/chat` | `Authorization: Bearer <access_token>` | `{"session_id": string, "message": string}` | `200 {"reply": string, "citations": [{"source","title"}]}` / `401 {"error"}` if the token is missing, invalid or expired / `403 {"error"}` if the token lacks the `agent_<AGENT_NAME>` entitlement group (ADR-0040) / `400 {"error"}` on a bad request body / `502 {"error"}` if the Agent Runtime call fails |
+| POST | `/api/chat` | `Authorization: Bearer <access_token>` | `{"session_id": string, "message": string}` | `200 {"reply": string, "citations": [{"source","title"}]}`, or a relayed SSE stream if the caller sent `Accept: text/event-stream` / `401 {"error"}` if the token is missing, invalid or expired / `403 {"error"}` if the token lacks the `agent_<AGENT_NAME>` entitlement group (ADR-0040) / `400 {"error"}` on a bad request body / `502 {"error"}` if the Agent Runtime call fails |
 | GET | `/healthz` | none | - | `200 ok` |
+
+## Streaming (ADR-0045)
+
+This service is a pure relay for the streaming path, not a re-implementation
+of it: `internal/runtime/client.go`'s `ChatStream` opens the same
+`POST .../chat` call as the synchronous `Chat` method, but with
+`Accept: text/event-stream`, and hands back the raw `*http.Response` for
+`main.go:proxySSE` to copy chunk-by-chunk (flushing after every read) onto
+this service's own `http.ResponseWriter`. Two things follow from that:
+
+- **No fixed request timeout on the streaming path.** `http.Client.Timeout`
+  bounds an entire request including reading the response body, which
+  would kill a slow-but-healthy stream - so `ChatStream` uses a separate
+  `http.Client` with no `Timeout`, and `chatHandler` instead derives a
+  120-second-bounded `context.Context` from the inbound request for the
+  overall call. An early client disconnect (browser closed the tab, or hit
+  "Stop") cancels the inbound `r.Context()` directly, which cancels that
+  derived context, which cancels the outbound call to the Agent Runtime -
+  ADR-0045's "client cancellation" propagates for free through Go's
+  `context` plumbing, no explicit disconnect-polling needed.
+- **`X-Zuno-Request-Id` propagation** (ADR-0045 "preserve request
+  correlation ... across the chain"): `internal/reqid` forwards whatever ID
+  `components/agent-frontend` minted (the normal case) or mints its own if
+  called directly (e.g. `evaluations/tekos/security_checks.py`), so this
+  turn's Agent Runtime log lines and its SSE `start` event carry the same
+  ID as this service's own logs.
 
 ## Configuration (environment variables)
 
@@ -76,11 +110,14 @@ to source from Vault for this component).
 
 ## Why standard library only
 
-Same reasoning as `components/agent-frontend`: no network access in this
-environment to vendor/pin a JWT library, and RS256/JWKS verification is a
+Same reasoning as `components/agent-frontend`: RS256/JWKS verification is a
 small, well-specified surface (RFC 7515/7517) worth keeping fully
-auditable. `internal/jwks` intentionally duplicates
-`components/agent-frontend/internal/oidc`'s verification code rather than
+auditable within this component's own small dependency footprint, rather
+than pulling in a general-purpose JWT library for one narrow use.
+`internal/jwks` intentionally duplicates
+`components/agent-frontend/internal/oidc`'s verification code, and
+`internal/reqid` intentionally duplicates
+`components/agent-frontend/internal/reqid`'s UUIDv4 helper, rather than
 sharing a module across two independently deployed, independently
 versioned services.
 
@@ -90,5 +127,8 @@ versioned services.
 docker build -t zuno/agent-bff:dev components/agent-bff
 ```
 
-Not run in this environment (no toolchain/network access here); the code is
-written to compile against Go 1.22 with `go build ./...`.
+`go build ./...`, `go vet ./...` and `gofmt -l .` were all run successfully
+against Go 1.26 in this phase's development environment (the toolchain
+constraint noted in earlier phases' docs no longer applies here - see
+`components/agent-frontend/README.md`'s PatternFly section for the same
+finding on the npm side).

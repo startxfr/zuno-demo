@@ -27,6 +27,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/startxfr/zuno-demo/components/agent-bff/internal/reqid"
 )
 
 // Citation mirrors one entry of the Agent Runtime's citations array.
@@ -53,6 +55,14 @@ type Client struct {
 	baseURL    string
 	agentName  string
 	httpClient *http.Client
+	// streamClient has no fixed Timeout (unlike httpClient) because
+	// http.Client.Timeout bounds the *entire* request including reading
+	// the response body - fatal for a long SSE stream. Cancellation for a
+	// streaming call is instead purely context-driven (ADR-0045 "client
+	// cancellation"): main.go's chatHandler derives a bounded context from
+	// the inbound request for the overall call, and an early client
+	// disconnect cancels r.Context() directly.
+	streamClient *http.Client
 }
 
 // NewClient builds a Client for the given Agent Runtime base URL and agent.
@@ -63,6 +73,7 @@ func NewClient(baseURL, agentName string) *Client {
 		httpClient: &http.Client{
 			Timeout: 55 * time.Second,
 		},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -105,4 +116,36 @@ func (c *Client) Chat(ctx context.Context, bearerToken string, req ChatRequest) 
 		return nil, fmt.Errorf("decoding agent runtime response: %w", err)
 	}
 	return &out, nil
+}
+
+// ChatStream calls the same endpoint as Chat but with
+// Accept: text/event-stream (ADR-0045), and returns the raw *http.Response
+// for the caller to relay chunk-by-chunk instead of decoding a single JSON
+// body - see main.go:chatHandler's proxySSE. The caller must close
+// resp.Body. requestID, if non-empty, is forwarded as X-Zuno-Request-Id
+// (ADR-0045 request correlation) so this turn's Agent Runtime logs and its
+// SSE "start" event carry the same ID agent-frontend minted.
+func (c *Client) ChatStream(ctx context.Context, bearerToken, requestID string, req ChatRequest) (*http.Response, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("encoding chat request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1/agents/%s/chat", c.baseURL, c.agentName)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("building chat request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+bearerToken)
+	httpReq.Header.Set("Accept", "text/event-stream")
+	if requestID != "" {
+		httpReq.Header.Set(reqid.Header, requestID)
+	}
+
+	resp, err := c.streamClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("calling agent runtime at %q: %w", url, err)
+	}
+	return resp, nil
 }

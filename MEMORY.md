@@ -451,6 +451,21 @@ planning narrative - see README.md's "v0 build status" for a summary:
   check_workload_hardening.py` statically verifies the whole baseline
   against every chart's rendered manifests (70 checks, no live cluster
   needed).
+- The agent frontend is now a real PatternFly React application (ADR-0044)
+  instead of hand-rolled CSS approximating it:
+  `components/agent-frontend/web` (Vite + React + TypeScript, real
+  `@patternfly/react-core`) builds static assets that the unchanged Go
+  server resolves via a Vite manifest reader (`internal/assets`) and mounts
+  into a thin per-request HTML shell, with session/tile state injected as
+  JSON rather than server-templated HTML. Chat streaming now runs the full
+  chain (ADR-0045): Agent Runtime's pre-existing LangGraph SSE stream is
+  relayed byte-for-byte (chunked, flushed per-read, never buffered) through
+  `agent-bff` and `agent-frontend` to a `fetch()`-based browser client,
+  gaining a new `event: tool` status frame and an `X-Zuno-Request-Id`
+  correlation header propagated across all three hops along the way.
+  `evaluations/tekos/scenarios.yaml`'s pre-existing scenario 8
+  (`chat_first_token_latency`, `max_seconds: 6`) already covered ADR-0045's
+  required TTFT performance test.
 - Evaluation: the 20 Tekos acceptance scenarios and 75%-threshold runner
   (`evaluations/tekos/`, ADR-0027/ADR-0028).
 - ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos

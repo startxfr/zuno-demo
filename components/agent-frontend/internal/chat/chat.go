@@ -4,6 +4,12 @@
 // POST /api/chat to the BFF's in-cluster Service, attaching the caller's
 // OIDC access token as a Bearer credential so the BFF can independently
 // revalidate identity (ADR-0013) before calling the Agent Runtime.
+//
+// ADR-0044: the page itself is a thin, per-request HTML shell - the chat
+// UI is a PatternFly React component (web/src/chat/Chat.tsx) mounted into
+// #root. ADR-0045: when the browser sends Accept: text/event-stream,
+// APIHandler streams the BFF's SSE response back byte-for-byte instead of
+// buffering a synchronous JSON reply - see proxySSE.
 package chat
 
 import (
@@ -12,9 +18,12 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/assets"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/okf"
+	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/reqid"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/session"
 )
 
@@ -24,38 +33,44 @@ const pageTemplate = `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.DisplayName}} - Zuno</title>
-  <link rel="stylesheet" href="/static/style.css">
+  {{range .CSS}}<link rel="stylesheet" href="{{.}}">
+  {{end}}
 </head>
-<body class="pf-body">
-  <header class="zuno-header">
-    <div class="zuno-header-title"><a class="zuno-home-link" href="/">Zuno</a> / {{.DisplayName}}</div>
-    <div class="zuno-header-user">
-      <span class="zuno-user-sub">{{.Subject}}</span>
-      <a class="pf-button pf-button-link" href="/logout">Sign out</a>
-    </div>
-  </header>
-  <main class="zuno-chat-shell">
-    <div id="zuno-chat-log" class="zuno-chat-log" aria-live="polite"></div>
-    <form id="zuno-chat-form" class="zuno-chat-form">
-      <input id="zuno-chat-input" class="pf-form-control" type="text"
-             placeholder="Ask a technical question…" autocomplete="off" required>
-      <button class="pf-button pf-button-primary" type="submit">Send</button>
-    </form>
-  </main>
-  <script src="/static/chat.js"></script>
+<body>
+  <div id="root"></div>
+  <script id="zuno-config" type="application/json">{{.ConfigJSON}}</script>
+  <script type="module" src="{{.JS}}"></script>
 </body>
 </html>`
 
 var tmpl = template.Must(template.New("chat").Parse(pageTemplate))
 
+// chatConfig mirrors web/src/shared/types.ts's ChatConfig field-for-field.
+type chatConfig struct {
+	DisplayName string `json:"displayName"`
+	Subject     string `json:"subject"`
+	HomeURL     string `json:"homeURL"`
+	LogoutURL   string `json:"logoutURL"`
+	// ApiURL is this same-origin page's own chat endpoint (ADR-0044:
+	// "keep runtime API endpoint injection from environment into
+	// JavaScript context") - always "/api/chat" today, but the React
+	// client reads it from injected config rather than hardcoding it so a
+	// future deployment split (e.g. serving the API from a different
+	// path/host) doesn't require a frontend code change.
+	ApiURL string `json:"apiURL"`
+}
+
 type pageView struct {
 	DisplayName string
-	Subject     string
+	JS          string
+	CSS         []string
+	ConfigJSON  template.JS
 }
 
 // PageHandler serves the chat UI for one active agent, gated on the caller
 // being signed in and authorized (their groups intersect access.groups).
-func PageHandler(agent okf.Agent, sessions *session.Manager) http.HandlerFunc {
+// asset is web/src/chat/main.tsx's resolved Vite manifest entry.
+func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := sessions.Load(r)
 		if err != nil || sess == nil {
@@ -67,11 +82,27 @@ func PageHandler(agent okf.Agent, sessions *session.Manager) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = tmpl.Execute(w, pageView{
+		cfg := chatConfig{
 			DisplayName: agent.Zuno.UI.DisplayName,
 			Subject:     sess.Subject,
-		})
+			HomeURL:     "/",
+			LogoutURL:   "/logout",
+			ApiURL:      "/api/chat",
+		}
+		configJSON, err := json.Marshal(cfg) // HTML-escaped by default - see portal.go's comment
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		view := pageView{
+			DisplayName: agent.Zuno.UI.DisplayName,
+			JS:          asset.JS,
+			CSS:         asset.CSS,
+			ConfigJSON:  template.JS(configJSON),
+		}
+		_ = tmpl.Execute(w, view)
 	}
 }
 
@@ -89,6 +120,13 @@ type bffChatRequest struct {
 }
 
 // APIHandler proxies a validated, authorized chat turn to the BFF.
+// ADR-0045: if the browser sent Accept: text/event-stream, the same call
+// is made with that header forwarded, and a 200 SSE response is streamed
+// back chunk-by-chunk (proxySSE) instead of read into memory - preserving
+// token-by-token latency through this hop. A non-200 or non-SSE response
+// (auth/authorization failures, which this handler and the BFF both
+// return as plain JSON regardless of the request's Accept header) falls
+// back to the synchronous JSON path unchanged.
 func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) http.HandlerFunc {
 	client := &http.Client{Timeout: 60 * time.Second}
 
@@ -127,6 +165,8 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 			return
 		}
 
+		wantsStream := strings.Contains(r.Header.Get("Accept"), "text/event-stream")
+
 		bffReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost,
 			bffBaseURL+"/api/chat", bytes.NewReader(body))
 		if err != nil {
@@ -135,6 +175,16 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 		}
 		bffReq.Header.Set("Content-Type", "application/json")
 		bffReq.Header.Set("Authorization", "Bearer "+sess.AccessToken)
+		// ADR-0045 "preserve request correlation ... across the chain":
+		// this frontend is the first hop with an HTTP request at all
+		// (browser -> frontend has no ID yet), so it normally mints the ID
+		// that agent-bff and agent-runtime then propagate unchanged in
+		// their own logs and the "start" SSE event.
+		requestID := reqid.FromHeaderOrNew(r.Header)
+		bffReq.Header.Set(reqid.Header, requestID)
+		if wantsStream {
+			bffReq.Header.Set("Accept", "text/event-stream")
+		}
 
 		resp, err := client.Do(bffReq)
 		if err != nil {
@@ -143,8 +193,49 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 		}
 		defer resp.Body.Close()
 
+		if wantsStream && resp.StatusCode == http.StatusOK &&
+			strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+			proxySSE(w, resp)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.StatusCode)
 		_, _ = io.Copy(w, resp.Body)
+	}
+}
+
+// proxySSE relays an already-200-OK SSE response body to w chunk by chunk,
+// flushing after every read so token deltas reach the browser as they
+// arrive rather than being buffered - the same reasoning as
+// agent-bff/main.go's identically-named function for its own hop, and
+// components/agent-runtime/app/main.py:_stream_chat's
+// "X-Accel-Buffering: no" header for the first hop. If the client
+// disconnects (browser closed the tab, or the React client's "Stop"
+// button aborted its fetch), r.Context() -> resp's underlying request
+// context is canceled, resp.Body.Read returns an error, and this function
+// returns - which in turn cancels the BFF's own request to the Agent
+// Runtime (ADR-0045 "client cancellation").
+func proxySSE(w http.ResponseWriter, resp *http.Response) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	flusher, canFlush := w.(http.Flusher)
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return
+			}
+			if canFlush {
+				flusher.Flush()
+			}
+		}
+		if readErr != nil {
+			return
+		}
 	}
 }

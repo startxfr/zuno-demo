@@ -66,6 +66,14 @@ type Config struct {
 	// SessionHMACSecret signs the frontend's session cookie (subject,
 	// groups, access token, expiry). Sourced from Vault via ExternalSecret.
 	SessionHMACSecret []byte
+
+	// WebDistDir is the Vite build output directory (ADR-0044), containing
+	// .vite/manifest.json plus the hashed JS/CSS assets - see
+	// internal/assets. Set to /app/web/dist in the image (Dockerfile builds
+	// it in a Node stage); defaults to web/dist for `go run` from this
+	// component's own directory during local development, after running
+	// `npm run build` in web/ once.
+	WebDistDir string
 }
 
 // Load reads configuration from the environment, applying safe defaults
@@ -81,6 +89,7 @@ func Load() (*Config, error) {
 		OIDCRedirectURL:   getenv("OIDC_REDIRECT_URL", ""),
 		SelfBaseURL:       getenv("SELF_BASE_URL", ""),
 		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080"),
+		WebDistDir:        getenv("WEB_DIST_DIR", "web/dist"),
 	}
 
 	if cfg.KeycloakIssuerURL == "" {

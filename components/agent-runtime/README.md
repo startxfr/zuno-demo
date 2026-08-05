@@ -44,13 +44,34 @@ layer's own GitOps apps, listed in that file).
   }
   ```
 - **Streaming:** send `Accept: text/event-stream` on the same request to
-  receive Server-Sent Events instead:
+  receive Server-Sent Events instead (ADR-0045 - relayed unmodified all the
+  way to the browser by `components/agent-bff` and
+  `components/agent-frontend`, see their own READMEs):
+  - `event: start` - `{"request_id": "..."}`, the first frame, echoing the
+    `X-Zuno-Request-Id` header this request arrived with (or a freshly
+    minted one if it arrived without one - see `app/main.py:_request_id`)
+    so every hop's logs for this turn share one correlatable ID.
+  - `event: tool` - `{"name": "search_confluence", "status": "started"|"finished"}`,
+    emitted around `tool_call_node` actually running (only when the
+    conditional edge routes through it - see "The Tekos workflow" below).
   - `event: token` - `{"delta": "<next text fragment>"}`, one per model
     token/chunk as the `reason` node's chat model streams.
   - `event: done` - `{"citations": [...]}`, emitted once at the end (same
     shape as the synchronous response's `citations` field).
   - `event: error` - `{"message": "..."}`, emitted (instead of `done`) if
     the graph raises mid-stream.
+
+  `evaluations/tekos/scenarios.yaml`'s scenario 8
+  (`chat_first_token_latency`, `max_seconds: 6`) is ADR-0045's mandatory
+  "performance test that measures time-to-first-token and fails when the
+  agreed threshold is exceeded" - it predates this phase (built as part of
+  the original 20-scenario suite, ADR-0027/0028) and already measures
+  exactly this at this service's own `/v1/agents/tekos/chat` endpoint,
+  which dominates end-to-end latency; the `X-Zuno-Request-Id`/`start`/`tool`
+  events and the BFF/frontend SSE relay hops added in this phase are pure
+  byte-relays that flush per-chunk (no added buffering), so they were not
+  judged to need a second, redundant latency scenario under ADR-0027's
+  fixed 20-scenario count.
 - **Response `401`:** missing/invalid/expired JWT.
 - **Response `500`:** unhandled graph failure (see `errors` accumulated in
   graph state via logs - not currently surfaced in the HTTP response body

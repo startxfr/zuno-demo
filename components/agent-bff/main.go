@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/config"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/jwks"
+	"github.com/startxfr/zuno-demo/components/agent-bff/internal/reqid"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/runtime"
 )
 
@@ -65,24 +67,32 @@ type apiErrorResponse struct {
 	Error string `json:"error"`
 }
 
+// chatHandler validates and authorizes the caller, then either proxies a
+// synchronous JSON reply (default) or, when the caller sent
+// Accept: text/event-stream, opens an SSE stream to the Agent Runtime and
+// relays it chunk-by-chunk (ADR-0045) - see proxySSE. Every early-return
+// error path (auth/authorization/body validation) responds with plain
+// JSON regardless of the request's Accept header, since those failures
+// happen before any stream would have started.
 func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
 	entitlementGroup := "agent_" + agentName
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
 		if r.Method != http.MethodPost {
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 
 		token := bearerToken(r)
 		if token == "" {
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusUnauthorized, "missing bearer token")
 			return
 		}
 		claims, err := verifier.Verify(token)
 		if err != nil {
 			log.Printf("agent-bff: token verification failed: %v", err)
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
 		}
@@ -93,39 +103,106 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		// tile visibility is not authorization - this is the actual gate.
 		if !hasGroup(claims.Groups, entitlementGroup) {
 			log.Printf("agent-bff: subject %q lacks entitlement group %q", claims.Subject, entitlementGroup)
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusForbidden, "not entitled to this agent")
 			return
 		}
 
 		var req apiChatRequest
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 		if strings.TrimSpace(req.Message) == "" {
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusBadRequest, "message is required")
+			return
+		}
+
+		requestID := reqid.FromHeaderOrNew(r.Header)
+		runtimeReq := runtime.ChatRequest{
+			SessionID: req.SessionID,
+			UserSub:   claims.Subject, // informational only (ADR-0033); the Runtime derives identity from the forwarded token, not this field
+			Message:   req.Message,
+		}
+
+		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			// A full streamed reply can legitimately take longer than a
+			// single non-streaming call - bounded generously rather than
+			// left unbounded, but well past the synchronous path's 55s.
+			ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+			defer cancel()
+
+			resp, err := runtimeClient.ChatStream(ctx, token, requestID, runtimeReq)
+			if err != nil {
+				log.Printf("agent-bff: agent runtime stream call failed: %v", err)
+				w.Header().Set("Content-Type", "application/json")
+				writeError(w, http.StatusBadGateway, "agent runtime unreachable")
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode == http.StatusOK && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+				proxySSE(w, resp)
+				return
+			}
+			// The Agent Runtime rejected the request before streaming
+			// anything (e.g. 401 if this BFF's own forwarded token somehow
+			// expired mid-flight) - relay its status/body as-is.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(resp.StatusCode)
+			_, _ = io.Copy(w, resp.Body)
 			return
 		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), 55*time.Second)
 		defer cancel()
 
-		resp, err := runtimeClient.Chat(ctx, token, runtime.ChatRequest{
-			SessionID: req.SessionID,
-			UserSub:   claims.Subject, // informational only (ADR-0033); the Runtime derives identity from the forwarded token, not this field
-			Message:   req.Message,
-		})
+		resp, err := runtimeClient.Chat(ctx, token, runtimeReq)
 		if err != nil {
 			log.Printf("agent-bff: agent runtime call failed: %v", err)
+			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusBadGateway, "agent runtime unreachable")
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(apiChatResponse{
 			Reply:     resp.Reply,
 			Citations: resp.Citations,
 		})
+	}
+}
+
+// proxySSE relays an already-200-OK SSE response body to w chunk by chunk,
+// flushing after every read so token deltas reach the caller as they
+// arrive rather than being buffered - see
+// components/agent-frontend/internal/chat/chat.go's identically-named
+// function for the next hop down and the same client-cancellation
+// reasoning.
+func proxySSE(w http.ResponseWriter, resp *http.Response) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	flusher, canFlush := w.(http.Flusher)
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return
+			}
+			if canFlush {
+				flusher.Flush()
+			}
+		}
+		if readErr != nil {
+			return
+		}
 	}
 }
 

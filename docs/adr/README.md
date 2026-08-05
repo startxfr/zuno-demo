@@ -47,8 +47,8 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | v0 | Implemented | Remove nominative demo identities and static passwords from Git |
 | [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v1 | To be implemented | Use opaque browser sessions with server-side token storage |
 | [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md) | v1 | To be implemented | Use standard MCP protocol behind the Zuno MCP Gateway |
-| [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | To be implemented | Use PatternFly React for the agent frontend |
-| [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | To be implemented | Stream responses end to end with SSE |
+| [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Implemented | Use PatternFly React for the agent frontend |
+| [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Implemented | Stream responses end to end with SSE |
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | To be implemented | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | v0 | To be implemented | Manage the complete OpenShift AI prerequisite lifecycle |
 | [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | v0 | To be implemented | Discover supported operator channels and serving runtimes at deployment time |

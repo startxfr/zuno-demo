@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Any, AsyncIterator, Dict
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -42,6 +43,20 @@ async def healthz() -> Dict[str, str]:
 @app.get("/readyz")
 async def readyz() -> Dict[str, str]:
     return {"status": "ready"}
+
+
+REQUEST_ID_HEADER = "x-zuno-request-id"
+
+
+def _request_id(request: Request) -> str:
+    """ADR-0045 "preserve request correlation ... across the chain":
+    agent-frontend normally mints this ID and agent-bff forwards it
+    unchanged (see their own reqid packages); this runtime is usually the
+    last hop, so it just needs to propagate whatever it received into its
+    own logs and (for the streaming path) the "start" SSE event, minting
+    one itself only if called directly (e.g. security_checks.py).
+    """
+    return request.headers.get(REQUEST_ID_HEADER) or str(uuid.uuid4())
 
 
 def _initial_state(payload: ChatRequest, identity: CallerIdentity) -> Dict[str, Any]:
@@ -83,18 +98,23 @@ async def tekos_chat(
     """
     accept = request.headers.get("accept", "")
     initial_state = _initial_state(payload, identity)
+    request_id = _request_id(request)
 
     if "text/event-stream" in accept:
         return StreamingResponse(
-            _stream_chat(initial_state),
+            _stream_chat(initial_state, request_id),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                REQUEST_ID_HEADER: request_id,
+            },
         )
 
     try:
         final_state = await tekos_graph.ainvoke(initial_state)
     except Exception as exc:
-        logger.error("graph execution failed for session=%s: %s", payload.session_id, exc)
+        logger.error("graph execution failed for session=%s request_id=%s: %s", payload.session_id, request_id, exc)
         raise HTTPException(status_code=500, detail=f"agent workflow failed: {exc}") from exc
 
     return ChatResponse(
@@ -107,26 +127,44 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _stream_chat(initial_state: Dict[str, Any]) -> AsyncIterator[str]:
+# Node names that trigger a `tool` SSE event (ADR-0045 "tool status
+# events"), mapped to the human-facing tool name the frontend should show
+# (e.g. "Using search_confluence…"). v0 has exactly one tool-calling node
+# (app/graph/nodes.py:tool_call_node), which itself only ever calls
+# search_confluence - see that function's own docstring. A second
+# tool-calling node would add a second entry here.
+_TOOL_NODES = {"tool_call": "search_confluence"}
+
+
+async def _stream_chat(initial_state: Dict[str, Any], request_id: str) -> AsyncIterator[str]:
     """Streams token deltas from the `reason` node's underlying chat model
     via LangGraph's `astream_events` (v2), which surfaces
     `on_chat_model_stream` events for any model call nested inside a node
-    -- no need to restructure the node itself for streaming to work.
+    -- no need to restructure the node itself for streaming to work. Also
+    surfaces `tool` events (start/end of `_TOOL_NODES` entries) and a
+    `start` event carrying request_id, per ADR-0045.
     """
+    yield _sse("start", {"request_id": request_id})
+
     citations: Any = []
     try:
         async for event in tekos_graph.astream_events(initial_state, version="v2"):
             kind = event.get("event")
+            name = event.get("name")
             if kind == "on_chat_model_stream":
                 chunk = event["data"].get("chunk")
                 token = getattr(chunk, "content", "") if chunk is not None else ""
                 if token:
                     yield _sse("token", {"delta": token})
-            elif kind == "on_chain_end" and event.get("name") == "respond":
+            elif kind == "on_chain_start" and name in _TOOL_NODES:
+                yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
+            elif kind == "on_chain_end" and name in _TOOL_NODES:
+                yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
+            elif kind == "on_chain_end" and name == "respond":
                 output = event["data"].get("output") or {}
                 citations = output.get("citations", [])
     except Exception as exc:
-        logger.error("SSE stream failed: %s", exc)
+        logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
         yield _sse("error", {"message": str(exc)})
         return
 
