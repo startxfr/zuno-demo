@@ -8,7 +8,14 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_app_name: vault
-    gitops_app_wait_retries: 60
+    # The chart's readinessProbe runs `vault status`, which exits non-zero
+    # while sealed - so the StatefulSet (and therefore the Application)
+    # can never report Healthy until Vault is unsealed, which only
+    # happens via this same role's own imperative steps below. Waiting
+    # here for Synced+Healthy would deadlock forever on a fresh install.
+    # The StatefulSet-exists/Pod-Running waits immediately below are this
+    # role's own equivalent, sufficient wait.
+    gitops_app_wait: false
 
 - name: "vault | wait for the Vault StatefulSet to exist"
   kubernetes.core.k8s_info:
