@@ -1,45 +1,18 @@
 ---
-# Re-applies the PriorityClasses (idempotent - same definitions as
-# prepare.yml) and reports on the one ClusterRoleBinding this repository
-# creates outside of this role today (ansible/roles/argocd/tasks/
-# prepare.yml's zuno-argocd-application-controller-admin). This is a
-# consolidation/visibility point, not a new grant - admin_context runs
-# first in the Day 0 sequence (before argocd even installs the operator),
-# so on a fresh cluster this binding legitimately does not exist yet the
-# first time `configure` runs here; that is expected, not an error.
-- name: "admin_context | re-apply the platform-critical PriorityClass"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: scheduling.k8s.io/v1
-      kind: PriorityClass
-      metadata:
-        name: zuno-platform-critical
-        labels:
-          zuno.io/managed-by: ansible
-      value: 1000000
-      globalDefault: false
-      description: >-
-        For operators and shared platform infrastructure (Vault, Keycloak,
-        PostgreSQL, ArgoCD) - must not be preempted by ordinary workload
-        pods under node pressure.
-
-- name: "admin_context | re-apply the workload-default PriorityClass"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: scheduling.k8s.io/v1
-      kind: PriorityClass
-      metadata:
-        name: zuno-workload-default
-        labels:
-          zuno.io/managed-by: ansible
-      value: 100
-      globalDefault: false
-      description: >-
-        For agent/business workloads (Tekos frontend/BFF, Agent Runtime,
-        MCP Gateway/servers, RAG service) - lower priority than platform
-        infrastructure, above unset-priority cluster noise.
+# Re-applies the PriorityClasses (idempotent - same
+# ansible/roles/admin_context/kustomize/priorityclasses/ directory
+# prepare.yml applies, ADR-0310 - not a hand-duplicated copy) and reports
+# on the one ClusterRoleBinding this repository creates outside of this
+# role today (ansible/roles/argocd/tasks/prepare.yml's
+# zuno-argocd-application-controller-admin). This is a consolidation/
+# visibility point, not a new grant - admin_context runs first in the Day
+# 0 sequence (before argocd even installs the operator), so on a fresh
+# cluster this binding legitimately does not exist yet the first time
+# `configure` runs here; that is expected, not an error.
+- name: "admin_context | re-apply the PriorityClasses"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
 
 - name: "admin_context | look up the ArgoCD application-controller ClusterRoleBinding"
   kubernetes.core.k8s_info:

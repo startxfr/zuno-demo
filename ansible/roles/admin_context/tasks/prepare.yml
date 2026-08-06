@@ -26,39 +26,13 @@
       provisioner-specific parameters here, since they vary per cluster).
   when: (_admin_context_storageclasses.resources | default([]) | length) == 0
 
-- name: "admin_context | apply the platform-critical PriorityClass"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: scheduling.k8s.io/v1
-      kind: PriorityClass
-      metadata:
-        name: zuno-platform-critical
-        labels:
-          zuno.io/managed-by: ansible
-      value: 1000000
-      globalDefault: false
-      description: >-
-        For operators and shared platform infrastructure (Vault, Keycloak,
-        PostgreSQL, ArgoCD) - must not be preempted by ordinary workload
-        pods under node pressure.
-
-- name: "admin_context | apply the workload-default PriorityClass"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: scheduling.k8s.io/v1
-      kind: PriorityClass
-      metadata:
-        name: zuno-workload-default
-        labels:
-          zuno.io/managed-by: ansible
-      value: 100
-      globalDefault: false
-      description: >-
-        For agent/business workloads (Tekos frontend/BFF, Agent Runtime,
-        MCP Gateway/servers, RAG service) - lower priority than platform
-        infrastructure, above unset-priority cluster noise.
+# ADR-0310: PriorityClass definitions live once in
+# ansible/roles/admin_context/kustomize/priorityclasses/, referenced from
+# both this file and configure.yml, instead of being duplicated inline.
+- name: "admin_context | apply the PriorityClasses"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
 
 - name: "admin_context | prepare summary"
   ansible.builtin.debug:

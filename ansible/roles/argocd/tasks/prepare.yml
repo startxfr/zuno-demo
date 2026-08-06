@@ -1,33 +1,12 @@
 ---
-- name: "argocd | ensure the openshift-gitops-operator namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: openshift-gitops-operator
-        labels:
-          zuno.io/managed-by: ansible
-
-- name: "argocd | subscribe to the OpenShift GitOps operator"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: Subscription
-      metadata:
-        name: openshift-gitops-operator
-        namespace: openshift-operators
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        channel: latest
-        name: openshift-gitops-operator
-        source: redhat-operators
-        sourceNamespace: openshift-marketplace
-        installPlanApproval: Automatic
-        startingCSV: openshift-gitops-operator.v1.21.1
+# ADR-0310: Namespace + Subscription live in
+# ansible/roles/argocd/kustomize/operator/ as plain manifests (the
+# ClusterRoleBinding below is a separate group, applied only after the
+# CRD/deployment waits confirm the operator installed successfully).
+- name: "argocd | apply the operator Namespace and Subscription"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/argocd/kustomize/operator"
 
 - name: "argocd | wait for the Application CRD to be established"
   kubernetes.core.k8s_info:
@@ -53,18 +32,6 @@
   delay: 10
 
 - name: "argocd | grant the ArgoCD application controller cluster-admin (demo scope)"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: rbac.authorization.k8s.io/v1
-      kind: ClusterRoleBinding
-      metadata:
-        name: zuno-argocd-application-controller-admin
-      subjects:
-        - kind: ServiceAccount
-          name: openshift-gitops-argocd-application-controller
-          namespace: openshift-gitops
-      roleRef:
-        kind: ClusterRole
-        name: cluster-admin
-        apiGroup: rbac.authorization.k8s.io
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/argocd/kustomize/rbac"

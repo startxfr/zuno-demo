@@ -131,12 +131,23 @@ idempotent re-apply (`changed: false` on a second run).
 
 ## Implementation state
 
-**Proposed.** `ansible/tasks/apply_kustomize.yml` and the pilot migration of
-`admin_context` (both PriorityClasses, previously duplicated between
-`prepare.yml` and `configure.yml`) and `argocd` (the static half of
-`prepare.yml`: Namespace, Subscription, ClusterRoleBinding) land alongside
-this ADR as the first example. The remaining Tier 1/Tier 2 roles
-(`external_secrets`, `vault`, `nfd`, `observability`, `nvidia_gpu`,
+**Proposed, pilot implemented (2026-08-06).** `ansible/tasks/apply_kustomize.yml`
+lands alongside this ADR, together with the first two roles migrated as the
+worked example: `admin_context` (both PriorityClasses, now defined once in
+`ansible/roles/admin_context/kustomize/priorityclasses/` and referenced from
+both `prepare.yml` and `configure.yml`, instead of the previous
+copy-pasted-verbatim duplication) and `argocd` (`prepare.yml`'s Namespace +
+Subscription in `ansible/roles/argocd/kustomize/operator/`, applied before
+the CRD/deployment waits; the ClusterRoleBinding in
+`ansible/roles/argocd/kustomize/rbac/`, applied after - two groups because
+the role's existing sequencing needs the operator installed before granting
+the binding). Each migrated directory's `kustomize build` output was diffed
+field-for-field against the inline `definition:` block it replaced before
+the task files were rewritten, and `ansible-playbook --syntax-check` was run
+against `day0_install.yml`/`day0_configure.yml`; no live-cluster apply was
+performed in this environment (same constraint as every other
+cluster-dependent role in this repository). The remaining Tier 1/Tier 2
+roles (`external_secrets`, `vault`, `nfd`, `observability`, `nvidia_gpu`,
 `postgresql`, `sql_schema`, `openshift_ai`, `keycloak`, and the two
 file-backed ConfigMaps in `rag`/`agents`) are not yet migrated.
 

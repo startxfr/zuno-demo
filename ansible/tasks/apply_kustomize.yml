@@ -1,0 +1,43 @@
+---
+# Shared task (ADR-0310): apply every resource in a per-role kustomize/
+# directory. `kubernetes.core` 3.3.1 (ansible/requirements.yml) has no
+# native kustomize support in its own `src:` parameter - it only reads a
+# plain YAML/JSON manifest file - so this shells out to the `kustomize`
+# binary and feeds the parsed multi-document output back through
+# kubernetes.core.k8s per resource, one apply per resource, so check-mode
+# and per-resource changed/unchanged reporting keep working exactly as
+# they do for an inline `definition:` block.
+#
+# Required var: kustomize_dir (absolute path to a directory containing a
+# kustomization.yaml).
+# Optional var: kustomize_replacements (dict of literal-string ->
+# replacement-value substitutions applied to the rendered YAML before
+# parsing - the same convention ansible/tasks/apply_gitops_app.yml already
+# uses for __CLUSTER_BASE_DOMAIN__, for the rare resource whose shape is
+# otherwise static but needs one or two values resolved earlier in the
+# same Ansible run).
+- name: "kustomize | validate kustomize_dir is set"
+  ansible.builtin.assert:
+    that:
+      - kustomize_dir is defined
+      - kustomize_dir | length > 0
+    fail_msg: "apply_kustomize.yml requires 'kustomize_dir' to be set by the including role"
+
+- name: "kustomize | build manifests from {{ kustomize_dir }}"
+  ansible.builtin.set_fact:
+    _kustomize_raw: "{{ lookup('ansible.builtin.pipe', 'kustomize build ' + kustomize_dir) }}"
+
+- name: "kustomize | substitute runtime replacements, if any"
+  ansible.builtin.set_fact:
+    _kustomize_raw: "{{ _kustomize_raw | replace(item.key, item.value) }}"
+  loop: "{{ kustomize_replacements | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "kustomize | apply every resource built from {{ kustomize_dir }}"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ item }}"
+  loop: "{{ _kustomize_raw | from_yaml_all | select('!=', None) | list }}"
+  loop_control:
+    label: "{{ item.kind }}/{{ item.metadata.name }}"

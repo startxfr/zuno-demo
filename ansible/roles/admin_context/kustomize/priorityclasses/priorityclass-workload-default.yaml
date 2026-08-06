@@ -1,0 +1,12 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: zuno-workload-default
+  labels:
+    zuno.io/managed-by: ansible
+value: 100
+globalDefault: false
+description: >-
+  For agent/business workloads (Tekos frontend/BFF, Agent Runtime,
+  MCP Gateway/servers, RAG service) - lower priority than platform
+  infrastructure, above unset-priority cluster noise.
