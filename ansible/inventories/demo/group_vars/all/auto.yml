@@ -17,9 +17,6 @@ zuno_repo_root: "{{ playbook_dir }}/../.."
 # Name of the organisation
 zuno_name: "{{ zuno_org }}-{{ zuno_env }}"
 # Id of the organisation
-zuno_Id: "{{ zuno_orgId }}{{ zuno_envId }}"
+zuno_id: "{{ zuno_orgId }}{{ zuno_envId }}"
 # ID of the organisation
 zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"
-
-# Name of the organisation
-zuno_prefix: "{{ zuno_name }}"

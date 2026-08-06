@@ -80,3 +80,9 @@ platformNamespaces:
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
+  - name: zuno-ai-build
+    allowedFromNamespaces: 
+      - zuno-ai-run
+      - zuno-data
+  - name: zuno-ai-run
+    allowedFromNamespaces: []
