@@ -20,7 +20,7 @@ DAY0_VERBS := check install configure uninstall all
 # would be a functional regression, not just a naming choice).
 # "configure" and "run" are aliases of each other.
 DAY1_RUN_COMPONENTS := llm models sql-schema rag mcp agents mlops
-DAY1_BUILD_COMPONENTS := mcp rag agent
+DAY1_BUILD_COMPONENTS := mcp rag agent ai-gateway
 DAY1_VERBS := check build configure run uninstall all
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
@@ -88,7 +88,7 @@ d0: credentials-check
 	$(DAY0_RECIPE)
 
 # day1/d1 share this exact recipe. "all" is handled specially: build
-# components (mcp, rag, agent) and run components (mcp, models, sql-schema,
+# components (mcp, rag, agent, ai-gateway) and run components (mcp, models, sql-schema,
 # rag, mcp, agents, mlops) are different, overlapping-but-not-identical
 # sets (most visibly: "agent" builds, "agents" runs - singular vs plural,
 # a real name, not a typo), so `make d1 all <component>` runs whichever of
