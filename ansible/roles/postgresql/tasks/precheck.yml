@@ -32,9 +32,11 @@
 # (OLM's ResolutionFailed: no such package in that catalog there). This
 # check is deliberately a fuzzy name match, not an exact package name, so
 # precheck doesn't falsely block a cluster where PGO exists under a
-# different catalog or exact package name - prepare.yml does the same
-# fuzzy discovery (plus an operatorhubio-catalog fallback) before actually
-# subscribing.
+# different catalog or exact package name - install.yml does the same
+# fuzzy discovery (plus an operatorhubio-catalog fallback); the actual
+# Subscription (ADR-0312: now part of gitops/charts/postgresql) is applied
+# by configure.yml, which re-selects the package/channel/catalog install.yml
+# already validated is possible.
 - name: "postgresql | verify some Crunchy-named operator package is available in the catalog"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1

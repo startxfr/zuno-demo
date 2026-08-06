@@ -1,14 +1,85 @@
 ---
-# Applies the PostgreSQL GitOps Application (gitops/apps/postgresql), which
-# renders the PGO PostgresCluster CR and its ExternalSecret via the local
-# chart at gitops/charts/postgresql, then waits for PGO to report the
-# cluster's rollout complete. See gitops/charts/postgresql/image/README.md
-# for how pgvector is made available to this cluster.
+# Re-discovers the package/catalog/channel selection tasks/install.yml
+# already validated is possible (read-only fuzzy match, no catalog
+# registration - that already persists on the cluster from install.yml if
+# it was needed): apply_gitops_app.yml's gitops_app_extra_helm_values
+# *replaces* spec.source.helm.values wholesale (ADR-0048), and a fact set
+# in install.yml does not survive into this separate day0_configure.yml
+# playbook run - same reasoning as
+# ansible/roles/external_secrets/tasks/configure.yml's own re-discovery.
+- name: "postgresql | list every PackageManifest published in this cluster's catalogs"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+  register: _postgresql_all_pkgs
+
+- name: "postgresql | select whichever package looks like the Crunchy Postgres Operator"
+  ansible.builtin.set_fact:
+    _postgresql_pkg_candidates: >-
+      {{
+        _postgresql_all_pkgs.resources | default([])
+        | selectattr('metadata.name', 'search', 'crunchy', ignorecase=True) | list
+      }}
+
+- name: "postgresql | fail if nothing crunchy-named is published (install.yml should have registered a fallback already)"
+  ansible.builtin.fail:
+    msg: "No PackageManifest matching /crunchy/i was found - run 'make d0 install postgresql' first."
+  when: (_postgresql_pkg_candidates | length) == 0
+
+# Prefer an exact "crunchy-postgres-operator" match if multiple
+# crunchy-named packages exist (e.g. published by more than one catalog);
+# otherwise take whichever fuzzy match was found.
+- name: "postgresql | pick the package name/catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _postgresql_pkg: >-
+      {{
+        (_postgresql_pkg_candidates | selectattr('metadata.name', 'equalto', 'crunchy-postgres-operator') | list
+         + _postgresql_pkg_candidates)[0]
+      }}
+
+- name: "postgresql | select the channel to subscribe from"
+  ansible.builtin.set_fact:
+    _postgresql_package_name: "{{ _postgresql_pkg.metadata.name }}"
+    _postgresql_catalog_source: "{{ _postgresql_pkg.status.catalogSource }}"
+    _postgresql_channel: >-
+      {{
+        'stable'
+        if (_postgresql_pkg.status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_postgresql_pkg.status.defaultChannel | default(''))
+      }}
+
+- name: "postgresql | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ _postgresql_package_name }}' (catalog
+      '{{ _postgresql_catalog_source }}') has no "stable" channel and no
+      defaultChannel to fall back to. Published channels:
+      {{ _postgresql_pkg.status.channels | map(attribute='name') | list }}.
+  when: _postgresql_channel | length == 0
+
+- name: "postgresql | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ _postgresql_package_name }}', catalog
+      '{{ _postgresql_catalog_source }}', channel '{{ _postgresql_channel }}'.
+
+# ADR-0312: templates/subscription.yaml (sync-wave -40) and
+# templates/postgrescluster.yaml (sync-wave -30) both live in
+# gitops/charts/postgresql, applied as a single ArgoCD Application here -
+# the PostgresCluster wave is gated on the Subscription reporting Healthy
+# via the custom health check
+# ansible/roles/argocd/tasks/apply_resource_health_checks.yml registers.
 - name: "postgresql | apply the PostgreSQL GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "postgresql"
     gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_extra_helm_values:
+      operator:
+        packageName: "{{ _postgresql_package_name }}"
+        channel: "{{ _postgresql_channel }}"
+        catalogSource: "{{ _postgresql_catalog_source }}"
     gitops_app_wait_retries: 60
 
 # PGO's documented readiness signal (see

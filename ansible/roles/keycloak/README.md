@@ -1,10 +1,9 @@
 # Ansible role: keycloak
 
-Installs the Red Hat build of Keycloak operator (OLM Subscription, same
-operator-then-instance split as `ansible/roles/argocd` and
-`ansible/roles/external_secrets`), then applies the `keycloak` GitOps
-Application (`gitops/apps/keycloak` -> local chart
-`gitops/charts/keycloak`) that renders:
+Applies the `gitops/apps/keycloak` ArgoCD Application (ADR-0312), whose
+chart (`gitops/charts/keycloak`) installs the Red Hat build of Keycloak
+operator (OLM `Subscription` + `OperatorGroup`, sync-wave `"-25"`) and
+renders:
 
 - the `Keycloak` CR (`k8s.keycloak.org/v2alpha1`) - one instance, demo scope;
 - an `ExternalSecret` resolving the bootstrap admin credentials the `vault`
@@ -42,49 +41,62 @@ work (not present in the original per-track build):
   vault-generated secret (`${vault.demo_personas_password}`), never a
   literal in this repo.
 
-Runs after `argocd` and `external_secrets` (which registers the
-`vault-backend` `ClusterSecretStore` the two `ExternalSecret`s above
-resolve against) - enforced by ordering in
-`ansible/playbooks/day0_{check,install,configure}.yml`.
+Applied by `configure.yml`, not `install.yml` (ADR-0312): the two
+`ExternalSecret`s above resolve against the `vault-backend`
+`ClusterSecretStore`, which only becomes Ready once `external_secrets`'
+own `configure.yml` has run. `make day0|d0 all` runs every component's
+`install.yml` before any component's `configure.yml`, and `external_secrets`
+sorts before `keycloak` in `day0_components` - applying the Application in
+`configure.yml` matches that ordering; applying it in `install.yml` would
+risk the chart's first sync racing ahead of it. `install.yml` only
+validates the package/channel is resolvable, so `configure.yml`'s own
+re-selection is guaranteed to succeed.
 
 ## Operator package/channel discovery
 
 The OLM package name `rhbk-operator` is fixed (confirmed real on a live
-cluster), but the Subscription channel and controller Deployment name are
-discovered at runtime rather than hardcoded - found via live-cluster
-testing on api.demo222.startx.fr that a hardcoded `channel: stable` hits
-OLM's `ResolutionFailed`/`ConstraintsNotSatisfiable`, since RHBK's
-channels are version-qualified (`stable-v22`, `stable-v26`, ...) with no
-bare `stable` alias on that cluster. Same lesson as ADR-0048's CNPG
-channel discovery and `ansible/roles/postgresql`'s PGO package discovery.
+cluster), but the Subscription channel is discovered at runtime rather
+than hardcoded - found via live-cluster testing on api.demo222.startx.fr
+that a hardcoded `channel: stable` hits OLM's
+`ResolutionFailed`/`ConstraintsNotSatisfiable`, since RHBK's channels are
+version-qualified (`stable-v22`, `stable-v26`, ...) with no bare `stable`
+alias on that cluster. Same lesson as ADR-0048's CNPG channel discovery
+and `ansible/roles/postgresql`'s PGO package discovery. `tasks/install.yml`
+and `tasks/configure.yml` both run this same discovery (Ansible facts
+don't survive across the separate `day0_install.yml`/`day0_configure.yml`
+playbook runs) - `install.yml`'s copy is read-only validation,
+`configure.yml`'s copy feeds `gitops_app_extra_helm_values`
+(`subscriptionChannel`/`subscriptionCatalogSource`, ADR-0048) into the
+`apply_gitops_app.yml` call that actually applies the Subscription.
 
 ## Installed directly into zuno-auth (RHBK doesn't support AllNamespaces)
 
 Unlike every other Day 0 operator in this repo (which subscribe into the
-shared `openshift-operators` namespace, whose `OperatorGroup` targets all
-namespaces), RHBK's CSV only supports `OwnNamespace`/`SingleNamespace`
-install modes - subscribing it there failed with `AllNamespaces
-InstallModeType not supported, cannot configure to watch all namespaces`
-(found via live-cluster testing on api.demo222.startx.fr). Rather than
-give it a separate operator-only namespace (the shape
-`ansible/roles/nvidia_gpu` uses for the same reason), `tasks/install.yml`
-installs it in `OwnNamespace` mode directly into `zuno-auth`: an
-`OperatorGroup` (`targetNamespaces: [zuno-auth]`) and the `Subscription`
-both live there, alongside the `Keycloak` CR this role's `configure.yml`
-applies (`gitops/apps/keycloak`) - one namespace for both the operator and
-the instance it reconciles, no cross-namespace watch scope to get wrong.
-`zuno-auth` must already exist (`tasks/precheck.yml` verifies this,
-`namespaces` role runs before `keycloak` in Day 0 order).
+shared `openshift-operators` namespace, which ships with OpenShift's own
+default global `OperatorGroup`), RHBK's CSV only supports
+`OwnNamespace`/`SingleNamespace` install modes - subscribing it there
+failed with `AllNamespaces InstallModeType not supported, cannot
+configure to watch all namespaces` (found via live-cluster testing on
+api.demo222.startx.fr). Rather than give it a separate operator-only
+namespace (the shape `ansible/roles/nvidia_gpu` uses for the same
+reason), `gitops/charts/keycloak/templates/{operatorgroup,subscription}.yaml`
+install it in `OwnNamespace` mode directly into `{{ .Values.namespace }}`
+(`zuno-auth`) - an `OperatorGroup` (`targetNamespaces: [zuno-auth]`) and
+the `Subscription` both live there, alongside the `Keycloak` CR this same
+chart applies - one namespace for both the operator and the instance it
+reconciles, no cross-namespace watch scope to get wrong. `zuno-auth`
+already exists by the time this role runs, owned by `gitops/charts/
+namespaces` (`tasks/precheck.yml` verifies this, `namespaces` role runs
+before `keycloak` in Day 0 order) - this chart does not declare it.
 
 | Item | How it's resolved |
 |---|---|
 | OLM package name | Fixed: `rhbk-operator` |
-| Subscription channel | `tasks/install.yml` reads the package's `PackageManifest`; prefers an exact `stable` channel if one exists, else falls back to the package's own `defaultChannel`; fails loudly listing every published channel if neither exists |
-| Operator Deployment name | Discovered by listing every `Deployment` in `openshift-operators` and matching one whose name looks like `rhbk\|keycloak` (same pattern as `ansible/roles/postgresql`'s PGO controller discovery) |
+| Subscription channel | `tasks/{install,configure}.yml` read the package's `PackageManifest`; prefer an exact `stable` channel if one exists, else fall back to the package's own `defaultChannel`; fail loudly listing every published channel if neither exists |
 
 If discovery ever fails on a given cluster (e.g. the package isn't
 published at all), `tasks/install.yml` fails with a diagnostic naming the
-`oc get packagemanifest`/`oc get deployment` commands to run manually.
+`oc get packagemanifest` command to run manually.
 
 ## Google OAuth secret injection into the realm import (ADR-0014)
 

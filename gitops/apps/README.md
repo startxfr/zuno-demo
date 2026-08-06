@@ -57,13 +57,31 @@ duplicated across `openshift_ai`'s and `external_secrets`' own kustomize)
 are owned by `gitops/charts/namespaces` instead, closing that
 double-ownership.
 
+`keycloak` and `postgresql` were never in the exception bucket above -
+their operand (`Keycloak`+`KeycloakRealmImport`, `PostgresCluster`) was
+always declarative here - but their operator `Subscription` (+
+`OperatorGroup` for `keycloak`) was, the same split `postgresql`'s own
+image build docs call out. ADR-0312 folded those in too, as a follow-up
+once the health-check mechanism existed: same chart, same
+`Subscription`-then-operand sync-wave gating, but a different negative
+wave numbering than the four components above, since both charts already
+had their own pre-existing internal wave convention:
+`postgresql`'s new `Subscription` is `"-40"` (before its existing
+`"-35"`/`"-30"`), `keycloak`'s new `Subscription`/`OperatorGroup` is
+`"-25"` (before its existing `"-20"`/`"-15"`/`"-10"`). Their `Application` apply also
+stays in each role's `configure.yml`, not `install.yml` (unlike the four
+above): their `ExternalSecret`s depend on `external_secrets`' own
+`configure.yml` having registered the `vault-backend`
+`ClusterSecretStore` first, and `make day0|d0 all` runs every component's
+`install.yml` before any component's `configure.yml`.
+
 Directories present:
 
 | Component | Source |
 |---|---|
 | `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) |
-| `keycloak` | local chart, `gitops/charts/keycloak` |
-| `postgresql` | local chart, `gitops/charts/postgresql` |
+| `keycloak` | local chart, `gitops/charts/keycloak` (includes the RHBK operator `Subscription`/`OperatorGroup` since ADR-0312 - applied by `configure.yml`, see the `keycloak` role's README) |
+| `postgresql` | local chart, `gitops/charts/postgresql` (includes the PGO operator `Subscription` since ADR-0312 - applied by `configure.yml`, see the `postgresql` role's README) |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` |
 | `rag` | local chart, `gitops/charts/rag-service` |

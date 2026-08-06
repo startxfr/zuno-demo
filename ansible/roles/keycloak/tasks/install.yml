@@ -1,10 +1,11 @@
 ---
-# Installs the Keycloak Operator (Red Hat build of Keycloak) via OLM,
-# following the same operator-then-instance split used by
-# ansible/roles/argocd and ansible/roles/external_secrets: the operator is
-# subscribed imperatively here; the actual Keycloak CR + KeycloakRealmImport
-# instance is applied declaratively by configure.yml via the
-# gitops/apps/keycloak GitOps Application (gitops/charts/keycloak).
+# Validates the Red Hat build of Keycloak operator's package/channel is
+# resolvable in this cluster's catalog. Does not itself apply anything
+# OLM-related any more (ADR-0312: the Subscription now lives in
+# gitops/charts/keycloak) - tasks/configure.yml re-runs this same
+# discovery (facts don't survive across the separate day0_install.yml/
+# day0_configure.yml playbook runs) immediately before applying the
+# GitOps Application.
     # RHBK's CSV only supports OwnNamespace/SingleNamespace install modes
     # (AllNamespaces is explicitly unsupported) - found via live-cluster
     # testing on api.demo222.startx.fr: subscribing it into the shared
@@ -12,9 +13,9 @@
     # namespace, the AllNamespaces pattern every other Day 0 operator in
     # this repo uses) failed the CSV with "AllNamespaces InstallModeType
     # not supported". Installed directly into zuno-auth instead (OwnNamespace
-    # mode: the operator pod and the Keycloak CR it reconciles - applied by
-    # this role's own configure.yml via gitops/apps/keycloak - both live in
-    # the same namespace, so no separate operator-only namespace is needed).
+    # mode: the operator pod and the Keycloak CR it reconciles - both
+    # rendered by gitops/charts/keycloak - both live in the same
+    # namespace, so no separate operator-only namespace is needed).
     # zuno-auth is guaranteed to already exist here: the namespaces role
     # (Day 0, runs before keycloak) creates it.
     # Package name "rhbk-operator" in the redhat-operators catalog is
@@ -46,8 +47,6 @@
 
 - name: "keycloak | select the channel to subscribe from"
   ansible.builtin.set_fact:
-    _keycloak_pkg: "{{ _keycloak_pkg_info.resources[0] }}"
-    _keycloak_catalog_source: "{{ _keycloak_pkg_info.resources[0].status.catalogSource }}"
     _keycloak_channel: >-
       {{
         'stable'
@@ -58,85 +57,16 @@
 - name: "keycloak | fail if no usable channel was found"
   ansible.builtin.fail:
     msg: >-
-      Package 'rhbk-operator' (catalog '{{ _keycloak_catalog_source }}')
-      has no "stable" channel and no defaultChannel to fall back to.
-      Published channels:
-      {{ _keycloak_pkg.status.channels | map(attribute='name') | list }}.
+      Package 'rhbk-operator' (catalog
+      '{{ _keycloak_pkg_info.resources[0].status.catalogSource }}') has no
+      "stable" channel and no defaultChannel to fall back to. Published
+      channels:
+      {{ _keycloak_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
   when: _keycloak_channel | length == 0
 
-- name: "keycloak | discovery summary"
+- name: "keycloak | prepare summary"
   ansible.builtin.debug:
     msg: >-
-      Subscribing to package 'rhbk-operator', catalog
-      '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
-
-# ADR-0310: ansible/roles/keycloak/kustomize/operator/ - the OperatorGroup
-# lives in the same group as the Subscription (order relative to the
-# PackageManifest lookup above doesn't matter, since it isn't read by that
-# lookup).
-- name: "keycloak | apply the operator group and subscribe to the Red Hat build of Keycloak operator"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
-  vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/keycloak/kustomize/operator"
-    kustomize_replacements:
-      __KEYCLOAK_CHANNEL__: "{{ _keycloak_channel }}"
-      __KEYCLOAK_CATALOG_SOURCE__: "{{ _keycloak_catalog_source }}"
-
-- name: "keycloak | wait for the Keycloak CRD to be established"
-  kubernetes.core.k8s_info:
-    api_version: apiextensions.k8s.io/v1
-    kind: CustomResourceDefinition
-    name: keycloaks.k8s.keycloak.org
-  register: _keycloak_crd
-  until: (_keycloak_crd.resources | default([]) | length) > 0
-  retries: 30
-  delay: 10
-
-- name: "keycloak | wait for the KeycloakRealmImport CRD to be established"
-  kubernetes.core.k8s_info:
-    api_version: apiextensions.k8s.io/v1
-    kind: CustomResourceDefinition
-    name: keycloakrealmimports.k8s.keycloak.org
-  register: _keycloak_realmimport_crd
-  until: (_keycloak_realmimport_crd.resources | default([]) | length) > 0
-  retries: 30
-  delay: 10
-
-    # UNVERIFIED against a real cluster until this role's own live test
-    # ran far enough to reach it (channel discovery above was the
-    # blocker first): discover the controller Deployment name rather
-    # than hardcode "rhbk-operator-controller-manager", same reasoning
-    # as ansible/roles/postgresql/tasks/prepare.yml's PGO controller
-    # discovery.
-- name: "keycloak | discover the operator controller Deployment name once OLM creates it"
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    namespace: zuno-auth
-  register: _keycloak_operator_deploys
-  until: >-
-    (_keycloak_operator_deploys.resources | default([])
-     | selectattr('metadata.name', 'search', 'rhbk|keycloak')
-     | list | length) > 0
-  retries: 30
-  delay: 10
-
-- name: "keycloak | select the discovered operator controller Deployment name"
-  ansible.builtin.set_fact:
-    _keycloak_operator_deploy_name: >-
-      {{
-        (_keycloak_operator_deploys.resources
-         | selectattr('metadata.name', 'search', 'rhbk|keycloak')
-         | map(attribute='metadata.name') | list)[0]
-      }}
-
-- name: "keycloak | wait for the operator deployment to be ready"
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    namespace: zuno-auth
-    name: "{{ _keycloak_operator_deploy_name }}"
-  register: _keycloak_operator_deploy
-  until: (_keycloak_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0
-  retries: 60
-  delay: 10
+      rhbk-operator is available in the catalog (channel
+      '{{ _keycloak_channel }}') - tasks/configure.yml will apply the
+      keycloak GitOps Application.

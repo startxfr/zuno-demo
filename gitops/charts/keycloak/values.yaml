@@ -27,3 +27,10 @@ clusterBaseDomain: apps.mycluster.example.com
 # ClusterSecretStore. Never hardcode values here - see ADR-0024.
 adminSecretName: keycloak-admin
 googleOAuthSecretName: google-oauth-client
+
+# ADR-0312/ADR-0048: discovered by ansible/roles/keycloak/tasks/
+# configure.yml (RHBK's channels are version-qualified, e.g. "stable-v26",
+# no bare "stable" alias - see that role's README.md) and always set via
+# gitops_app_extra_helm_values; templates/subscription.yaml requires them.
+subscriptionChannel: ""
+subscriptionCatalogSource: ""

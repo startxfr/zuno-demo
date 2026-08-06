@@ -1,10 +1,17 @@
 # postgresql
 
-Installs the Crunchy Postgres Operator (PGO) via OLM, then applies a
-single-instance PostgreSQL `PostgresCluster` (GitOps-managed, see
-`gitops/apps/postgresql`) that bootstraps the `zuno` database owned by the
-`zunoapp` role. Implements ADR-0015 ("Use PostgreSQL and pgvector as the
-persistent data platform") - that ADR never named a specific operator.
+Applies the `gitops/apps/postgresql` ArgoCD Application (ADR-0312), whose
+chart (`gitops/charts/postgresql`) installs the Crunchy Postgres Operator
+(PGO, OLM `Subscription`, sync-wave `"-40"`) and a single-instance
+PostgreSQL `PostgresCluster` (sync-wave `"-30"`) that bootstraps the
+`zuno` database owned by the `zunoapp` role. Implements ADR-0015 ("Use
+PostgreSQL and pgvector as the persistent data platform") - that ADR
+never named a specific operator. Previously applied the Subscription
+directly via `ansible/tasks/apply_kustomize.yml` (ADR-0310); converted to
+this role-applies-one-Application pattern by ADR-0312, alongside
+`keycloak` (the other role sharing this "operator install stays split
+across day0 install/configure because the operand's `ExternalSecret`s
+depend on `external_secrets`' own configure step" shape).
 
 ## Why PGO, not CloudNativePG
 
@@ -34,25 +41,30 @@ Service names and Secret conventions), not a config tweak.
   somewhere in this cluster's catalogs (fuzzy match, not an exact package
   name - see above), and that ArgoCD is already installed (the
   `PostgresCluster` CR is applied as a GitOps Application).
-- `install.yml` - discovers the actual package name/catalog/channel to
-  subscribe from (fuzzy-matches `/crunchy/i` across every PackageManifest
-  in `openshift-marketplace`; prefers an exact `crunchy-postgres-operator`
-  name and a `stable` channel if present, else whatever fuzzy match/
-  `defaultChannel` was found; registers `operatorhubio-catalog` as a
-  fallback and retries if nothing matched at all; fails with a clear
+- `install.yml` - fuzzy-matches `/crunchy/i` across every PackageManifest
+  in `openshift-marketplace`, registering `operatorhubio-catalog` as a
+  fallback and retrying if nothing matched at all, failing with a clear
   diagnostic - listing every postgres-ish package this cluster's catalogs
-  actually publish - rather than guessing a fourth time), subscribes (OLM
-  `Subscription`, `openshift-operators` namespace, mirrors
-  `ansible/roles/argocd` and `ansible/roles/external_secrets`), and waits
-  for the `postgresclusters.postgres-operator.crunchydata.com` CRD. The
-  controller Deployment's exact name was **not verified against a live
-  cluster** (this environment has no network path to test against - see
-  below) - rather than hardcode a guessed name, it's discovered by listing
-  every Deployment in `openshift-operators` and matching one whose name
-  looks like the PGO controller, polled until OLM actually creates it.
-- `configure.yml` - applies the `postgresql` GitOps Application
-  (`gitops/apps/postgresql/application.yaml`, local chart
-  `gitops/charts/postgresql`), which renders:
+  actually publish - rather than guessing a fourth time. Does not itself
+  apply anything OLM-related any more (ADR-0312): it only validates that
+  *some* crunchy-named package will be resolvable, so `configure.yml`'s
+  own re-selection is guaranteed to succeed.
+- `configure.yml` - re-selects the exact package name/catalog/channel
+  (prefers an exact `crunchy-postgres-operator` name and a `stable`
+  channel if present, else whatever fuzzy match/`defaultChannel` was
+  found - re-run rather than reused from `install.yml`, since Ansible
+  facts don't survive across the separate `day0_install.yml`/
+  `day0_configure.yml` playbook runs), then applies the `postgresql`
+  GitOps Application (`gitops/apps/postgresql/application.yaml`, local
+  chart `gitops/charts/postgresql`) with that selection passed via
+  `gitops_app_extra_helm_values` (ADR-0048). The chart renders:
+  - the OLM `Subscription` itself (sync-wave `"-40"`, `openshift-operators`
+    namespace - mirrors `ansible/roles/argocd` and
+    `ansible/roles/external_secrets`; no `OperatorGroup` needed, that
+    namespace ships with OpenShift's own default global one) - gated
+    ahead of everything below by the custom health check
+    `ansible/roles/argocd/tasks/apply_resource_health_checks.yml`
+    registers (ADR-0312);
   - an `ExternalSecret` syncing the pre-seeded `secret/zuno/postgresql/app`
     Vault path (username `zunoapp`, auto-generated password - see
     `ansible/roles/vault/tasks/configure.yml`) into the
@@ -109,8 +121,6 @@ role targets (confirmed by a direct connection timeout while
 investigating the original CNPG catalog issue), so the following were
 researched from Crunchy's own documentation but not exercised end to end:
 
-- The PGO controller Deployment's exact name/labels (`install.yml`
-  discovers it rather than hardcoding a guess - see above).
 - The exact OLM package name/catalog/channel this cluster actually
   publishes PGO under (`install.yml`'s fuzzy `/crunchy/i` discovery - see
   above - handles whatever it turns out to be, but the specific values

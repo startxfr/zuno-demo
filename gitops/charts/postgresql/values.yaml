@@ -2,6 +2,16 @@
 # for how this is deployed (namespace: zuno-data) and
 # gitops/charts/postgresql/image/README.md for the pgvector image build step.
 
+# ADR-0312/ADR-0048: all three discovered by
+# ansible/roles/postgresql/tasks/configure.yml (fuzzy /crunchy/i match
+# across every catalog, operatorhubio-catalog fallback if nothing is
+# found anywhere - see that role's README.md) and always set via
+# gitops_app_extra_helm_values; templates/subscription.yaml requires them.
+operator:
+  packageName: ""
+  channel: ""
+  catalogSource: ""
+
 postgresVersion: 16
 
 image:

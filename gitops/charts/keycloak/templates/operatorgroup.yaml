@@ -1,0 +1,13 @@
+# Unlike gitops/charts/postgresql (openshift-operators, which ships with
+# OpenShift's own default global OperatorGroup), zuno-auth needs its own -
+# RHBK only supports OwnNamespace/SingleNamespace install modes.
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: rhbk-operator-group
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+spec:
+  targetNamespaces:
+    - {{ .Values.namespace }}

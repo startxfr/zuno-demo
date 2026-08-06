@@ -1,15 +1,70 @@
 ---
-# Applies the keycloak GitOps Application (gitops/apps/keycloak), which
-# renders gitops/charts/keycloak: the Keycloak CR instance, the two
-# ExternalSecrets it depends on (bootstrap admin credentials, Google OAuth
-# client), and the KeycloakRealmImport carrying the `zuno` realm (groups,
-# users, per-agent OIDC clients, Google IdP broker). See ADR-0012, ADR-0013,
-# ADR-0014 and this role's README.md.
+# Re-discovers the channel/catalog selection tasks/install.yml already
+# validated is possible: apply_gitops_app.yml's gitops_app_extra_helm_values
+# *replaces* spec.source.helm.values wholesale (ADR-0048), and a fact set
+# in install.yml does not survive into this separate day0_configure.yml
+# playbook run - same reasoning as
+# ansible/roles/external_secrets/tasks/configure.yml's own re-discovery.
+- name: "keycloak | look up the rhbk-operator PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhbk-operator
+  register: _keycloak_pkg_info
+
+- name: "keycloak | fail if the rhbk-operator package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: "rhbk-operator PackageManifest not found - run 'make d0 install keycloak' first."
+  when: (_keycloak_pkg_info.resources | default([]) | length) == 0
+
+- name: "keycloak | select the channel/catalog to subscribe from"
+  ansible.builtin.set_fact:
+    _keycloak_catalog_source: "{{ _keycloak_pkg_info.resources[0].status.catalogSource }}"
+    _keycloak_channel: >-
+      {{
+        'stable'
+        if (_keycloak_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_keycloak_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "keycloak | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package 'rhbk-operator' (catalog '{{ _keycloak_catalog_source }}')
+      has no "stable" channel and no defaultChannel to fall back to.
+      Published channels:
+      {{ _keycloak_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _keycloak_channel | length == 0
+
+- name: "keycloak | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package 'rhbk-operator', catalog
+      '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
+
+# ADR-0312: templates/{operatorgroup,subscription}.yaml (sync-wave "-25")
+# and the Keycloak CR/ExternalSecrets/RealmImport (sync-waves "-20"
+# through "-10") all live in gitops/charts/keycloak, applied as a single
+# ArgoCD Application here - the later waves are gated on the Subscription
+# reporting Healthy via the custom health check
+# ansible/roles/argocd/tasks/apply_resource_health_checks.yml registers.
+# Applied here (configure.yml), not install.yml: the ExternalSecrets this
+# same Application renders resolve against the vault-backend
+# ClusterSecretStore, which only becomes Ready once
+# ansible/roles/external_secrets/tasks/configure.yml has run - and
+# `make day0|d0 all` runs every component's install.yml before any
+# component's configure.yml, so applying here (after external_secrets,
+# per day0_components ordering) matches that dependency; applying in
+# install.yml would risk a first sync racing ahead of it.
 - name: "keycloak | apply the keycloak GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "keycloak"
     gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_extra_helm_values:
+      subscriptionChannel: "{{ _keycloak_channel }}"
+      subscriptionCatalogSource: "{{ _keycloak_catalog_source }}"
     gitops_app_wait_retries: 60
 
 - name: "keycloak | wait for the Keycloak CR to report Ready"

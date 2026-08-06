@@ -1,21 +1,22 @@
 ---
 # Reverse of install.yml + configure.yml. zuno-auth (shared namespace) is
 # left in place.
-- name: "keycloak | delete the keycloak ArgoCD Application"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
-  vars:
-    gitops_app_name: "zuno-keycloak"
-
-- name: "keycloak | remove the operator (its owned CRDs, then the CSV, then the Subscription)"
+#
+# remove_operator.yml must run *before* delete_gitops_app.yml: it
+# discovers the installed CSV via the Subscription's own
+# status.installedCSV field, which only exists while the Subscription (an
+# Application-managed resource) still exists. Running it first also means
+# its CRD delete (cascading the Keycloak/KeycloakRealmImport CRs first)
+# and CSV/Subscription delete happen before ArgoCD's own cascade prune
+# would otherwise race to remove the same Subscription object - same
+# ordering ADR-0312 established for the other converted roles.
+- name: "keycloak | remove the operator (its owned CRDs - cascading the Keycloak/KeycloakRealmImport CRs - then the CSV, then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
   vars:
     operator_subscription_name: rhbk-operator
     operator_namespace: zuno-auth
 
-- name: "keycloak | delete the operator OperatorGroup"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: operators.coreos.com/v1
-    kind: OperatorGroup
-    name: rhbk-operator-group
-    namespace: zuno-auth
+- name: "keycloak | delete the keycloak GitOps Application (cascades the remaining OperatorGroup)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-keycloak"
