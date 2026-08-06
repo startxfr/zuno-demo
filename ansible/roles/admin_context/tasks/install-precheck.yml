@@ -1,9 +1,12 @@
 ---
 # State detection (never fails - see ansible/tasks/record_install_state.yml):
 # admin_context has no ArgoCD Application (bootstrap role, ADR-0312) - its
-# "installed" objects are the two PriorityClasses and the zuno AppProject
-# (ansible/roles/admin_context/kustomize/{priorityclasses,appproject}/,
-# applied by install.yml).
+# "installed" objects are just the two PriorityClasses
+# (ansible/roles/admin_context/kustomize/priorityclasses/, applied by
+# install.yml). The zuno AppProject is NOT checked here: it can only be
+# applied by configure.yml (its CRD doesn't exist until the argocd role's
+# own install.yml has run - see configure.yml's own comment) - it's
+# configure-precheck.yml's signal instead.
 - name: "admin_context | look up the PriorityClasses"
   kubernetes.core.k8s_info:
     api_version: scheduling.k8s.io/v1
@@ -17,20 +20,11 @@
     loop_var: pc_name
     label: "{{ pc_name }}"
 
-- name: "admin_context | look up the zuno AppProject"
-  kubernetes.core.k8s_info:
-    api_version: argoproj.io/v1alpha1
-    kind: AppProject
-    namespace: openshift-gitops
-    name: zuno
-  register: _admin_context_appproject_lookup
-
 - name: "admin_context | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
         (_admin_context_pc_lookup.results | selectattr('resources', 'defined') | selectattr('resources', 'equalto', []) | list | length) == 0
-        and (_admin_context_appproject_lookup.resources | default([]) | length) > 0
       }}
 
 - name: "admin_context | record install state"
