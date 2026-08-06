@@ -100,15 +100,45 @@
   retries: 30
   delay: 10
 
+    # The controller Deployment lives in openshift-operators (the
+    # Subscription's own namespace, since this is an AllNamespaces-mode
+    # install), not in the external-secrets namespace this role also
+    # creates (that one's only for the operand's own resources, e.g. the
+    # "external-secrets" ServiceAccount the ClusterSecretStore references)
+    # - a hardcoded `namespace: external-secrets, name: external-secrets`
+    # never matched anything and spun through its full retry budget doing
+    # nothing, found via live-cluster testing on api.demo222.startx.fr.
+    # Discovered rather than hardcoded a second time, same reasoning as
+    # ansible/roles/postgresql's/keycloak's controller Deployment discovery.
+- name: "external_secrets | discover the operator controller Deployment name once OLM creates it"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-operators
+  register: _eso_operator_deploys
+  until: >-
+    (_eso_operator_deploys.resources | default([])
+     | selectattr('metadata.name', 'search', 'external-secrets')
+     | list | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "external_secrets | select the discovered operator controller Deployment name"
+  ansible.builtin.set_fact:
+    _eso_operator_deploy_name: >-
+      {{
+        (_eso_operator_deploys.resources
+         | selectattr('metadata.name', 'search', 'external-secrets')
+         | map(attribute='metadata.name') | list)[0]
+      }}
+
 - name: "external_secrets | wait for the operator deployment to be ready"
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
-    namespace: external-secrets
-    name: external-secrets
+    namespace: openshift-operators
+    name: "{{ _eso_operator_deploy_name }}"
   register: _eso_deploy
-  until: >-
-    (_eso_deploy.resources | default([]) | length) > 0 and
-    (_eso_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  until: (_eso_deploy.resources[0].status.readyReplicas | default(0)) > 0
   retries: 60
   delay: 10
