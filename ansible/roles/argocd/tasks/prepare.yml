@@ -6,7 +6,7 @@
       apiVersion: v1
       kind: Namespace
       metadata:
-        name: openshift-operators
+        name: openshift-gitops-operator
         labels:
           zuno.io/managed-by: ansible
 
@@ -27,6 +27,7 @@
         source: redhat-operators
         sourceNamespace: openshift-marketplace
         installPlanApproval: Automatic
+        startingCSV: openshift-gitops-operator.v1.21.1
 
 - name: "argocd | wait for the Application CRD to be established"
   kubernetes.core.k8s_info:
