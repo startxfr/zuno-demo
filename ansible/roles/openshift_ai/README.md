@@ -17,7 +17,7 @@ reflected two genuinely independent concerns.
 
 ## Channel discovery (ADR-0048)
 
-`tasks/prepare.yml` reads the `rhods-operator` `PackageManifest`'s
+`tasks/install.yml` reads the `rhods-operator` `PackageManifest`'s
 published channels and selects the one matching the `3.5` family (falling
 back to the manifest's own `defaultChannel`, and failing with a clear
 diagnostic - listing every published channel - if neither is available)
@@ -38,7 +38,7 @@ have reached `Ready`. This demo's one model
 (`gitops/charts/models`) is always-on (`minReplicas == maxReplicas == 1`)
 with no use for Serverless's scale-to-zero, so `Removed` (RawDeployment
 mode) is the correct choice here, not a workaround - see
-`tasks/prepare.yml`'s inline comment for the full reasoning, and
+`tasks/install.yml`'s inline comment for the full reasoning, and
 `gitops/charts/models/README.md` for the InferenceService-level annotation
 that makes the same choice explicit at that layer too.
 

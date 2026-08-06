@@ -1,6 +1,6 @@
 # rag
 
-A Day 1 component (ADR-0056) with a documented no-op `prepare.yml` - no
+A Day 1 component (ADR-0056) with a documented no-op `install.yml` - no
 operator dependency of its own. Depends on `postgresql` (and
 `sql_schema`, for the `document_embeddings` table itself) having run
 first.

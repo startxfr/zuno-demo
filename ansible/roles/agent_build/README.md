@@ -10,6 +10,6 @@ Day 1 build component) - flagged as an open follow-up in ADR-0056's
 Implementation state, still built via the existing GitHub Actions
 pipeline (ADR-0051) for now.
 
-No `precheck.yml`/`prepare.yml`/`configure.yml` - this is a build-only
+No `precheck.yml`/`install.yml`/`configure.yml` - this is a build-only
 role, distinct from the `agents`/`llm` Day 1 `run` components, which
 deploy the already-built images.

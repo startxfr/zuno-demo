@@ -15,7 +15,7 @@ Required value, spec.dcgmExporter: Required value, spec.gfd: Required
 value, spec.nodeStatusExporter: Required value" - this CRD version
 requires substantially more top-level sections than the field list this
 role used to hardcode. Every OLM-published operator ships its own
-recommended default CR alongside the CSV, so `tasks/prepare.yml` reads
+recommended default CR alongside the CSV, so `tasks/install.yml` reads
 that instead of guessing the current required shape by hand.
 
 **Depends on `ansible/roles/nfd` having run first** (ADR-0047): the

@@ -27,5 +27,5 @@ run (`ansible/playbooks/day1_configure.yml`'s `llm` step, ADR-0056), so
 `make day1|d1 run` with no component brings both up together;
 `make day1|d1 run llm` alone does the same.
 
-A Day 1 component (ADR-0056) with a documented no-op `prepare.yml` - no
+A Day 1 component (ADR-0056) with a documented no-op `install.yml` - no
 operator dependency of its own.

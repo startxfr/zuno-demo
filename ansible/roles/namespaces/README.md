@@ -14,7 +14,7 @@ deploying the Tekos workloads.
   hardcoded list, so it can't drift from what the chart actually creates)
   and fails, naming exactly which are missing, if any expected namespace
   isn't present.
-- `prepare.yml` - applies the GitOps Application.
+- `install.yml` - applies the GitOps Application.
 - `configure.yml` - re-applies the same Application (idempotent - for an
   explicit on-demand re-sync after a `values.yaml` change, since ArgoCD's
   own `selfHeal: true` already reconciles continuously on its own cycle).

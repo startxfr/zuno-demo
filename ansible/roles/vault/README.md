@@ -6,7 +6,7 @@ Kubernetes auth method and the `eso-reader` policy/role that
 `ansible/roles/external_secrets` binds its `ClusterSecretStore` to.
 
 This is the one role that cannot depend on Vault for its own bootstrap
-secret: `prepare.yml` captures the unseal key and root token into a
+secret: `install.yml` captures the unseal key and root token into a
 Kubernetes `Secret` (`vault-bootstrap-credentials`) in a locked-down,
 admin-only namespace (`zuno-data`) rather than requiring any
 external input. See ADR-0024.

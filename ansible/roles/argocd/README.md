@@ -8,4 +8,4 @@ independently reapplies its own child Application (see
 `ansible/tasks/apply_gitops_app.yml`).
 
 Runs first among prerequisite components - see
-`ansible/playbooks/{precheck,prepare}.yml`.
+`ansible/playbooks/{precheck,install}.yml`.

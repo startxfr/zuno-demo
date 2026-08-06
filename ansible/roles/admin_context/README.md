@@ -7,7 +7,7 @@ depends on (ADR-0056). Positioned first in the Day 0 sequence, before
 - `precheck.yml` - verifies the cluster API is reachable (nothing else
   can be checked until this passes, since this is the very first Day 0
   component).
-- `prepare.yml` - verifies at least one `StorageClass` exists (discover-
+- `install.yml` - verifies at least one `StorageClass` exists (discover-
   only, never invents provisioner-specific parameters - fails with a
   clear diagnostic if none does), and applies two `PriorityClass` objects:
   `zuno-platform-critical` (value `1000000`, for operators/shared

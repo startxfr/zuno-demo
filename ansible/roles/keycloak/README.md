@@ -67,7 +67,7 @@ install modes - subscribing it there failed with `AllNamespaces
 InstallModeType not supported, cannot configure to watch all namespaces`
 (found via live-cluster testing on api.demo222.startx.fr). Rather than
 give it a separate operator-only namespace (the shape
-`ansible/roles/nvidia_gpu` uses for the same reason), `tasks/prepare.yml`
+`ansible/roles/nvidia_gpu` uses for the same reason), `tasks/install.yml`
 installs it in `OwnNamespace` mode directly into `zuno-auth`: an
 `OperatorGroup` (`targetNamespaces: [zuno-auth]`) and the `Subscription`
 both live there, alongside the `Keycloak` CR this role's `configure.yml`
@@ -79,11 +79,11 @@ the instance it reconciles, no cross-namespace watch scope to get wrong.
 | Item | How it's resolved |
 |---|---|
 | OLM package name | Fixed: `rhbk-operator` |
-| Subscription channel | `tasks/prepare.yml` reads the package's `PackageManifest`; prefers an exact `stable` channel if one exists, else falls back to the package's own `defaultChannel`; fails loudly listing every published channel if neither exists |
+| Subscription channel | `tasks/install.yml` reads the package's `PackageManifest`; prefers an exact `stable` channel if one exists, else falls back to the package's own `defaultChannel`; fails loudly listing every published channel if neither exists |
 | Operator Deployment name | Discovered by listing every `Deployment` in `openshift-operators` and matching one whose name looks like `rhbk\|keycloak` (same pattern as `ansible/roles/postgresql`'s PGO controller discovery) |
 
 If discovery ever fails on a given cluster (e.g. the package isn't
-published at all), `tasks/prepare.yml` fails with a diagnostic naming the
+published at all), `tasks/install.yml` fails with a diagnostic naming the
 `oc get packagemanifest`/`oc get deployment` commands to run manually.
 
 ## Google OAuth secret injection into the realm import (ADR-0014)

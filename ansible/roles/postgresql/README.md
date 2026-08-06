@@ -22,7 +22,7 @@ no fallback/discovery workaround needed - **also proven wrong** on a real
 cluster (OLM's `Subscription.status` reported `ResolutionFailed`: "no
 operators found in package crunchy-postgres-operator in the catalog
 referenced by subscription"). Three real-world catalog/channel/package-name
-mismatches in a row is a pattern, not a fluke: `precheck.yml`/`prepare.yml`
+mismatches in a row is a pattern, not a fluke: `precheck.yml`/`install.yml`
 now discover the package by fuzzy name match (`/crunchy/i`) across every
 catalog in this cluster's `openshift-marketplace`, not just a hardcoded
 package name in a hardcoded catalog, with the same `operatorhubio-catalog`
@@ -34,7 +34,7 @@ Service names and Secret conventions), not a config tweak.
   somewhere in this cluster's catalogs (fuzzy match, not an exact package
   name - see above), and that ArgoCD is already installed (the
   `PostgresCluster` CR is applied as a GitOps Application).
-- `prepare.yml` - discovers the actual package name/catalog/channel to
+- `install.yml` - discovers the actual package name/catalog/channel to
   subscribe from (fuzzy-matches `/crunchy/i` across every PackageManifest
   in `openshift-marketplace`; prefers an exact `crunchy-postgres-operator`
   name and a `stable` channel if present, else whatever fuzzy match/
@@ -109,10 +109,10 @@ role targets (confirmed by a direct connection timeout while
 investigating the original CNPG catalog issue), so the following were
 researched from Crunchy's own documentation but not exercised end to end:
 
-- The PGO controller Deployment's exact name/labels (`prepare.yml`
+- The PGO controller Deployment's exact name/labels (`install.yml`
   discovers it rather than hardcoding a guess - see above).
 - The exact OLM package name/catalog/channel this cluster actually
-  publishes PGO under (`prepare.yml`'s fuzzy `/crunchy/i` discovery - see
+  publishes PGO under (`install.yml`'s fuzzy `/crunchy/i` discovery - see
   above - handles whatever it turns out to be, but the specific values
   were not confirmed from this environment).
 - The `PostgresCluster.status.conditions` `Progressing` condition's exact
