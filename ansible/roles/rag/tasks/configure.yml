@@ -98,4 +98,4 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "rag"
-    gitops_app_name: "{{ zuno_id }}-{{ gitops_component_name }}"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
