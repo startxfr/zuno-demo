@@ -1,10 +1,14 @@
 # nvidia_gpu
 
-Installs the NVIDIA GPU Operator (OLM `Subscription`, certified-operators
-catalog) and applies the default `ClusterPolicy`, enabling GPU scheduling on
-the two L4 worker nodes. A Day 0 component (ADR-0056) with a documented
-no-op `configure.yml` - nothing to configure beyond the `ClusterPolicy`
-itself.
+Applies the `gitops/apps/nvidia-gpu` ArgoCD Application (ADR-0312), whose
+chart (`gitops/charts/nvidia-gpu`) installs the NVIDIA GPU Operator (OLM
+`Subscription`, certified-operators catalog, sync-wave `"10"`) and its
+default `ClusterPolicy` (sync-wave `"20"`), enabling GPU scheduling on the
+two L4 worker nodes. A Day 0 component (ADR-0056) with a documented no-op
+`configure.yml` - nothing to configure beyond the `ClusterPolicy` itself.
+Previously applied raw manifests directly via `ansible/tasks/
+apply_kustomize.yml` (ADR-0310); converted to this role-applies-one-
+Application pattern by ADR-0312.
 
 The `ClusterPolicy` spec is read from the installed CSV's own
 `alm-examples` annotation at runtime rather than hand-maintained: a
@@ -16,7 +20,11 @@ value, spec.nodeStatusExporter: Required value" - this CRD version
 requires substantially more top-level sections than the field list this
 role used to hardcode. Every OLM-published operator ships its own
 recommended default CR alongside the CSV, so `tasks/install.yml` reads
-that instead of guessing the current required shape by hand.
+that instead of guessing the current required shape by hand - see
+`gitops/charts/nvidia-gpu/README.md` for how this discovery interacts
+with the chart now being applied as an ArgoCD Application (two
+`apply_gitops_app.yml` calls, not a direct `kubernetes.core.k8s` apply of
+the `ClusterPolicy`).
 
 **Depends on `ansible/roles/nfd` having run first** (ADR-0047): the
 default `ClusterPolicy` this role applies relies on Node Feature

@@ -1,0 +1,10 @@
+# ADR-0312: clusterPolicy.spec is deliberately unset by default. The
+# ClusterPolicy CRD version installed by a given GPU Operator release
+# requires a spec shape this repository does not hand-maintain (see this
+# chart's README.md) - ansible/roles/nvidia_gpu/tasks/install.yml reads
+# the installed CSV's own recommended default spec from its alm-examples
+# annotation and injects it via gitops_app_extra_helm_values (ADR-0048)
+# in a *second* apply_gitops_app.yml call, once the operator (this
+# chart's own sync-wave 10) has actually installed a CSV to read. Until
+# then, templates/clusterpolicy.yaml renders nothing.
+clusterPolicy: {}

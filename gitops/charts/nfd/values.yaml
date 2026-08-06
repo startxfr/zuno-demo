@@ -1,0 +1,2 @@
+# Nothing runtime-discovered for this chart - the operator channel
+# ("stable") and the NodeFeatureDiscovery instance spec are both static.

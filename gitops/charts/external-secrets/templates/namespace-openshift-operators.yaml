@@ -1,0 +1,10 @@
+# openshift-operators is a cluster-default namespace (not created by this
+# chart in practice) - applied idempotently, without a zuno.io/managed-by
+# label, so ArgoCD doesn't claim ownership of a namespace it didn't
+# actually create.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-operators
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"

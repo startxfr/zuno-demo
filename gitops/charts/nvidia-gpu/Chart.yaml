@@ -1,0 +1,11 @@
+apiVersion: v2
+name: nvidia-gpu
+description: >-
+  NVIDIA GPU Operator (OLM Subscription, certified-operators catalog) and
+  its default ClusterPolicy, enabling GPU scheduling (ADR-0312). The
+  ClusterPolicy spec is supplied at apply time from the installed CSV's
+  own alm-examples - see this chart's README.md for why it is not
+  rendered on the operator's first sync.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

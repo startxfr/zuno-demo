@@ -1,0 +1,16 @@
+{{- if .Values.clusterPolicy.spec }}
+# See this chart's README.md and values.yaml: .spec below is the
+# installed GPU Operator CSV's own recommended default ClusterPolicy,
+# discovered and injected by ansible/roles/nvidia_gpu/tasks/install.yml's
+# second apply_gitops_app.yml call - not a hand-maintained shape.
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+{{ toYaml .Values.clusterPolicy.spec | indent 4 }}
+{{- end }}

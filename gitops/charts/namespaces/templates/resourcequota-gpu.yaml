@@ -1,0 +1,15 @@
+{{- if .Values.openshiftAi }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: zuno-ai-run-gpu-cap
+  namespace: {{ .Values.openshiftAi.namespace }}
+  labels:
+    zuno.io/tier: platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-70"
+spec:
+  hard:
+    requests.nvidia.com/gpu: {{ .Values.openshiftAi.gpuQuota.requestsGpu | quote }}
+    limits.nvidia.com/gpu: {{ .Values.openshiftAi.gpuQuota.limitsGpu | quote }}
+{{- end }}

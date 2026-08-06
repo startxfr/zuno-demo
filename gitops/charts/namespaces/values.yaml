@@ -81,3 +81,24 @@ platformNamespaces:
       - zuno-data
   - name: zuno-ai-run
     allowedFromNamespaces: []
+    # ADR-0312: the RHOAI dashboard label used to be applied by a second,
+    # independent Namespace object in ansible/roles/openshift_ai's own
+    # kustomize (and re-declared a third time, label-less, by
+    # ansible/roles/external_secrets) - this chart already owns
+    # zuno-ai-run's Namespace via platformNamespaces above, so the label
+    # is folded in here instead of leaving two/three appliers of the same
+    # object.
+    extraLabels:
+      opendatahub.io/dashboard: "true"
+
+# ADR-0312: GPU ResourceQuota for zuno-ai-run, applied here (not by
+# gitops/charts/openshift-ai) for the same "one owner per Namespace-scoped
+# object this chart already manages" reasoning as the dashboard label
+# above. Caps GPU consumption at 1 - this demo has exactly one 24GB L4
+# budgeted for the single local model (gitops/charts/models); without this
+# a future second InferenceService could silently starve it.
+openshiftAi:
+  namespace: zuno-ai-run
+  gpuQuota:
+    requestsGpu: "1"
+    limitsGpu: "1"

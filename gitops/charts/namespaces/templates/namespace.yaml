@@ -19,6 +19,9 @@ metadata:
   labels:
     zuno.io/tier: platform
     zuno.io/managed-by: argocd
+    {{- range $k, $v := .extraLabels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
   annotations:
     argocd.argoproj.io/sync-wave: "-80"
 ---

@@ -1,31 +1,21 @@
 ---
-# Reverse of install.yml + configure.yml. zuno-ai-run (shared) and
-# redhat-ods-operator (Namespaces) are left in place.
-- name: "openshift_ai | delete the GPU-capped ResourceQuota"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: v1
-    kind: ResourceQuota
-    name: zuno-ai-run-gpu-cap
-    namespace: zuno-ai-run
-
-- name: "openshift_ai | delete the DataScienceCluster"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: datasciencecluster.opendatahub.io/v1
-    kind: DataScienceCluster
-    name: zuno-dsc
-
-- name: "openshift_ai | remove the operator (its owned CRDs, then the CSV, then the Subscription)"
+# Reverse of install.yml. zuno-ai-run (owned by gitops/charts/namespaces,
+# ADR-0312) is left in place.
+#
+# remove_operator.yml must run *before* delete_gitops_app.yml: it
+# discovers the installed CSV via the Subscription's own
+# status.installedCSV field, which only exists while the Subscription (an
+# Application-managed resource) still exists. Running it first also means
+# its CRD delete (which cascades to delete the DataScienceCluster CR
+# first) and CSV/Subscription delete happen before ArgoCD's own cascade
+# prune would otherwise race to remove the same Subscription object.
+- name: "openshift_ai | remove the operator (its owned CRDs - cascading the DataScienceCluster - then the CSV, then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
   vars:
     operator_subscription_name: rhods-operator
     operator_namespace: redhat-ods-operator
 
-- name: "openshift_ai | delete the operator OperatorGroup"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: operators.coreos.com/v1
-    kind: OperatorGroup
-    name: rhods-operator-group
-    namespace: redhat-ods-operator
+- name: "openshift_ai | delete the openshift-ai GitOps Application (cascades the remaining OperatorGroup/Namespace)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-openshift-ai"

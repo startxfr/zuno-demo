@@ -1,14 +1,10 @@
 ---
-# Merged in from the former `datascience` role (ADR-0056). Caps GPU
-# consumption in zuno-ai-run at 1 - this demo has exactly one 24GB L4 budgeted
-# for the single local model (gitops/charts/models); without this a future
-# second InferenceService could silently starve it.
-# ADR-0310: ansible/roles/openshift_ai/kustomize/quota/.
-- name: "openshift_ai | apply a GPU-capped ResourceQuota"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
-  vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/openshift_ai/kustomize/quota"
-
-- name: "openshift_ai | configure summary"
+# No configure phase: the GPU ResourceQuota for zuno-ai-run now lives in
+# gitops/charts/namespaces (ADR-0312, folded in alongside the RHOAI
+# dashboard label - see that chart's `openshiftAi` values block), not
+# here. Nothing left for openshift_ai to configure beyond what
+# install.yml already applies (same convention as
+# ansible/roles/nfd/tasks/configure.yml and friends).
+- name: "openshift_ai | nothing to configure - GPU quota moved to gitops/charts/namespaces (ADR-0312)"
   ansible.builtin.debug:
-    msg: "GPU-capped ResourceQuota applied to zuno-ai-run."
+    msg: "openshift_ai has no configure phase - see gitops/charts/namespaces' openshiftAi values block."

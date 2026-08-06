@@ -1,0 +1,25 @@
+# The external-secrets-operator package installs a helm-operator meta-
+# operator (openshift-operators/external-secrets-operator-controller-
+# manager) that only watches OperatorConfig - it does not deploy the
+# actual ESO controller/webhook/cert-controller (and their
+# ServiceAccounts, including the "external-secrets" one
+# templates/clustersecretstore.yaml references) until this CR exists to
+# reconcile.
+apiVersion: operator.external-secrets.io/v1alpha1
+kind: OperatorConfig
+metadata:
+  name: cluster
+  namespace: external-secrets
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  fullnameOverride: external-secrets
+  # The operator's own CSV already installs the CRDs; asking the operand
+  # Helm release to install them a second time is redundant at best.
+  installCRDs: false
+  webhook:
+    create: true
+  certController:
+    create: true

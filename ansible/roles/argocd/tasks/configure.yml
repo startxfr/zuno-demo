@@ -7,7 +7,9 @@
 # ansible/roles/nfd/tasks/configure.yml and friends). The App-of-Apps
 # manifest itself still exists, kept as a documented example of a
 # pure-GitOps bootstrap in docs/platform/installation.md - it is simply
-# never applied by any `make day0|d0`/`day1|d1` target.
+# never applied by any `make day0|d0`/`day1|d1` target. The custom
+# resource health checks ADR-0312 needs are registered in install.yml
+# instead - see that file's comment for why.
 - name: "argocd | nothing to configure - every component applies its own GitOps Application directly (ADR-0311)"
   ansible.builtin.debug:
     msg: "argocd has no configure phase - see gitops/apps/README.md and ADR-0311."

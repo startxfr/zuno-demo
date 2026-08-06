@@ -1,0 +1,15 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: external-secrets-operator
+  namespace: openshift-operators
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  channel: {{ required "subscriptionChannel must be set via gitops_app_extra_helm_values (ADR-0048)" .Values.subscriptionChannel | quote }}
+  name: external-secrets-operator
+  source: {{ required "subscriptionCatalogSource must be set via gitops_app_extra_helm_values (ADR-0048)" .Values.subscriptionCatalogSource | quote }}
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic

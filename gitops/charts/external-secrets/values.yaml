@@ -1,0 +1,16 @@
+# ADR-0048/ADR-0312: subscriptionChannel/subscriptionCatalogSource are
+# discovered by ansible/roles/external_secrets/tasks/install.yml (catalog
+# introspection - doesn't depend on the operator being installed yet) and
+# always set via gitops_app_extra_helm_values; templates/subscription.yaml
+# requires them.
+#
+# vaultServiceName is left unset by that same first call - it's only
+# discovered in tasks/configure.yml, after Vault's own configure step has
+# set up the Kubernetes auth method + eso-reader role the
+# ClusterSecretStore depends on (day0's install-then-configure playbook
+# ordering enforces this, not sync-wave - see that role's README.md).
+# templates/clustersecretstore.yaml and templates/
+# externalsecret-cluster-domain.yaml render nothing until it's set.
+subscriptionChannel: ""
+subscriptionCatalogSource: ""
+vaultServiceName: ""

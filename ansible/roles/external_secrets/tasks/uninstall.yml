@@ -1,23 +1,22 @@
 ---
-# Reverse of install.yml + configure.yml. Namespaces (external-secrets,
-# the shared openshift-operators and zuno-ai-run) are left in place.
-- name: "external_secrets | delete the cluster-domain ExternalSecret"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: external-secrets.io/v1beta1
-    kind: ExternalSecret
-    name: zuno-cluster-domain
-    namespace: zuno-ai-run
-
-- name: "external_secrets | delete the vault-backend ClusterSecretStore"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: external-secrets.io/v1beta1
-    kind: ClusterSecretStore
-    name: vault-backend
-
-- name: "external_secrets | remove the operator (its owned CRDs, then the CSV, then the Subscription)"
+# Reverse of install.yml + configure.yml. zuno-ai-run (owned by
+# gitops/charts/namespaces, ADR-0312) is left in place.
+#
+# remove_operator.yml must run *before* delete_gitops_app.yml: it
+# discovers the installed CSV via the Subscription's own
+# status.installedCSV field, which only exists while the Subscription (an
+# Application-managed resource) still exists. Running it first also means
+# its CRD delete (cascading the OperatorConfig, ClusterSecretStore and
+# ExternalSecret CRs first - the operator's own CSV owns all of these
+# CRDs) and CSV/Subscription delete happen before ArgoCD's own cascade
+# prune would otherwise race to remove the same Subscription object.
+- name: "external_secrets | remove the operator (its owned CRDs - cascading the OperatorConfig/ClusterSecretStore/ExternalSecret - then the CSV, then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
   vars:
     operator_subscription_name: external-secrets-operator
     operator_namespace: openshift-operators
+
+- name: "external_secrets | delete the external-secrets GitOps Application (cascades the remaining Namespaces)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-external-secrets"

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: nfd
+description: >-
+  Node Feature Discovery operator (OLM Subscription) and a minimal
+  NodeFeatureDiscovery instance (ADR-0047/ADR-0312) - labels GPU-bearing
+  nodes for ansible/roles/nvidia_gpu's ClusterPolicy to select on.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,46 @@
+---
+# ADR-0312: makes argocd.argoproj.io/sync-wave gating functional *within* a
+# single Application's own sync (previously only meaningful to the
+# never-applied root App-of-Apps - ADR-0311), so a chart can safely apply an
+# OLM Subscription in one wave and its operand CR in a later one. Without
+# this, ArgoCD's default health evaluation reports a Subscription kind it
+# has no logic for as Healthy immediately after apply, before OLM has
+# actually installed the CSV that registers the operand CR's CRD - the next
+# wave would then fail with "no matches for kind X".
+#
+# Patches the operator-managed ArgoCD CR (openshift-gitops/openshift-gitops,
+# auto-created by the OpenShift GitOps operator itself - this repository
+# never created it) rather than the argocd-cm ConfigMap directly: the
+# operator reconciles argocd-cm *from* this CR's spec, so a raw ConfigMap
+# edit would be silently reverted on the operator's next reconcile.
+- name: "argocd | register the Subscription resource health check (ADR-0312)"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: argoproj.io/v1beta1
+    kind: ArgoCD
+    name: openshift-gitops
+    namespace: openshift-gitops
+    definition:
+      spec:
+        resourceHealthChecks:
+          - group: operators.coreos.com
+            kind: Subscription
+            check: |
+              hs = {}
+              if obj.status ~= nil and obj.status.installedCSV ~= nil and obj.status.installedCSV ~= "" then
+                hs.status = "Healthy"
+                hs.message = "Installed " .. obj.status.installedCSV
+                return hs
+              end
+              if obj.status ~= nil and obj.status.conditions ~= nil then
+                for i, condition in ipairs(obj.status.conditions) do
+                  if condition.type == "CatalogSourcesUnhealthy" and condition.status == "True" then
+                    hs.status = "Degraded"
+                    hs.message = condition.message
+                    return hs
+                  end
+                end
+              end
+              hs.status = "Progressing"
+              hs.message = "Waiting for OLM to install the Subscription's CSV"
+              return hs

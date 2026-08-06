@@ -1,10 +1,17 @@
 # nfd
 
-Installs the Node Feature Discovery Operator (OLM `Subscription`,
-redhat-operators catalog, `stable` channel) and applies a minimal
-`NodeFeatureDiscovery` instance (ADR-0047). A Day 0 component (ADR-0056)
-with a documented no-op `configure.yml` - nothing to configure beyond
-that instance, same convention as `ansible/roles/nvidia_gpu`.
+Applies the `gitops/apps/nfd` ArgoCD Application (ADR-0312), whose chart
+(`gitops/charts/nfd`) installs the Node Feature Discovery Operator (OLM
+`Subscription`, redhat-operators catalog, `stable` channel, sync-wave
+`"10"`) and a minimal `NodeFeatureDiscovery` instance (sync-wave `"20"`,
+ADR-0047) - gated on the Subscription's custom health check
+(`ansible/roles/argocd/tasks/apply_resource_health_checks.yml`, ADR-0312)
+so ArgoCD doesn't attempt the instance before OLM has installed the
+operator. A Day 0 component (ADR-0056) with a documented no-op
+`configure.yml` - nothing to configure beyond that instance, same
+convention as `ansible/roles/nvidia_gpu`. Previously applied raw
+manifests directly via `ansible/tasks/apply_kustomize.yml` (ADR-0310);
+converted to this role-applies-one-Application pattern by ADR-0312.
 
 ## Why this role exists
 

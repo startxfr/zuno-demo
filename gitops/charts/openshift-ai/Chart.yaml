@@ -1,0 +1,11 @@
+apiVersion: v2
+name: openshift-ai
+description: >-
+  Red Hat OpenShift AI operator (OLM Subscription, channel discovered at
+  Ansible run time - ADR-0048) and the DataScienceCluster with kserve
+  (RawDeployment) enabled - ADR-0047/ADR-0312. zuno-ai-run's Namespace,
+  RHOAI dashboard label and GPU ResourceQuota are owned by
+  gitops/charts/namespaces, not this chart.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

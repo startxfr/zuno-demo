@@ -1,0 +1,6 @@
+# ADR-0048: subscriptionChannel is discovered from the cluster's own
+# catalog by ansible/roles/openshift_ai/tasks/install.yml (the 3.5-family
+# channel actually published, not a hardcoded guess) and injected via
+# gitops_app_extra_helm_values. Empty by default so `helm template`/`helm
+# lint` still render something sane without Ansible.
+subscriptionChannel: ""

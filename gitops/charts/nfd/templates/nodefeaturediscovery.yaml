@@ -1,0 +1,14 @@
+# Minimal CR, relying on the operator's own defaults (instance/topology
+# updater disabled - this demo has no need for either).
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: nfd-instance
+  namespace: openshift-nfd
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  instance: ""
+  topologyupdater: false

@@ -1,21 +1,19 @@
 ---
-# ADR-0310: ansible/roles/nvidia_gpu/kustomize/operator/. The ClusterPolicy
-# below stays inline - its spec is read from the installed operator's own
-# CSV alm-examples at run time, not a static shape this repository owns.
-- name: "nvidia_gpu | apply the operator Namespace, OperatorGroup and Subscription"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+# ADR-0312: Namespace/OperatorGroup/Subscription (sync-wave 10) and the
+# ClusterPolicy (sync-wave 20, conditional on clusterPolicy.spec) both
+# live in gitops/charts/nvidia-gpu, applied as a single ArgoCD
+# Application - see gitops/charts/nvidia-gpu/README.md for why this
+# role's install proceeds in two apply_gitops_app.yml calls instead of
+# one: the ClusterPolicy's spec is read from the CSV OLM installs in
+# response to the Subscription below, so it cannot be known before this
+# first call.
+- name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (operator only, first pass)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/nvidia_gpu/kustomize/operator"
-
-- name: "nvidia_gpu | wait for the ClusterPolicy CRD to be established"
-  kubernetes.core.k8s_info:
-    api_version: apiextensions.k8s.io/v1
-    kind: CustomResourceDefinition
-    name: clusterpolicies.nvidia.com
-  register: _nvidia_gpu_crd
-  until: (_nvidia_gpu_crd.resources | default([]) | length) > 0
-  retries: 30
-  delay: 15
+    gitops_component_name: "nvidia-gpu"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
 
     # A hand-maintained minimal spec (operator.defaultRuntime/driver/
     # toolkit/devicePlugin only) rejected outright on a real cluster
@@ -57,17 +55,19 @@
          | selectattr('kind', 'equalto', 'ClusterPolicy') | list)[0].spec
       }}
 
-- name: "nvidia_gpu | apply the default ClusterPolicy"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: nvidia.com/v1
-      kind: ClusterPolicy
-      metadata:
-        name: gpu-cluster-policy
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      spec: "{{ _nvidia_gpu_default_policy_spec }}"
+# ADR-0312: second pass - updates the same Application's Helm values so
+# ArgoCD renders and syncs the wave-20 ClusterPolicy. The role never
+# applies the ClusterPolicy manifest itself.
+- name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (with the discovered ClusterPolicy spec)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "nvidia-gpu"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_extra_helm_values:
+      clusterPolicy:
+        spec: "{{ _nvidia_gpu_default_policy_spec }}"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
 
 - name: "nvidia_gpu | wait for the ClusterPolicy to report ready"
   kubernetes.core.k8s_info:
