@@ -36,7 +36,24 @@
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
+      # agents' check.yml (ADR-0053) is a real acceptance/security gate,
+      # unlike every other *-precheck.yml here - it can genuinely fail. Don't
+      # let that abort the play before the state report below is displayed.
+      ignore_errors: true
+      register: _day1_configure_check_results
 
     - name: Display the state report
       ansible.builtin.debug:
         msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"
+
+    - name: Fail if any Day 1 configure-state check failed
+      ansible.builtin.fail:
+        msg: >-
+          One or more Day 1 configure-state checks failed - see the task
+          output above and the state report for detail: {{
+          _day1_configure_check_results.results
+          | selectattr('failed', 'defined') | selectattr('failed')
+          | map(attribute='item') | list }}
+      when: >-
+        _day1_configure_check_results.results
+        | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0
