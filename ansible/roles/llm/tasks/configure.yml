@@ -14,6 +14,16 @@
 # attempt holding a stale root token from a previous Vault init cycle.
 # Every `vault kv` exec in this file 403'd against the live (correctly
 # re-initialized) Vault using that stale token.
+#
+# Second, compounding bug found in the same pass: kubernetes.core.k8s_exec
+# has no env-passing parameter of its own, and the generic Ansible task
+# `environment:` keyword only sets env vars for the local ansible/python
+# process, not the exec session k8s_exec opens inside the container - see
+# ansible/roles/vault/tasks/configure.yml's own comment for this exact
+# gotcha (already learned there, never applied here). Every exec below
+# was therefore running as an unauthenticated Vault request regardless of
+# which token/namespace it read - fixed the same way vault/configure.yml
+# does, by embedding VAULT_TOKEN inside the `sh -c` command string itself.
 - name: "llm | read Vault bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret
@@ -41,9 +51,9 @@
     namespace: zuno-data
     pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv get -format=json secret/zuno/providers/{{ provider }}"
-  environment:
-    VAULT_TOKEN: "{{ _llm_vault_creds.resources[0].data.root_token | b64decode }}"
+    command: >-
+      sh -c "VAULT_TOKEN={{ _llm_vault_creds.resources[0].data.root_token | b64decode }}
+      vault kv get -format=json secret/zuno/providers/{{ provider }}"
   loop:
     - openai
     - gemini
@@ -62,9 +72,9 @@
     namespace: zuno-data
     pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv put secret/zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
-  environment:
-    VAULT_TOKEN: "{{ _llm_vault_creds.resources[0].data.root_token | b64decode }}"
+    command: >-
+      sh -c "VAULT_TOKEN={{ _llm_vault_creds.resources[0].data.root_token | b64decode }}
+      vault kv put secret/zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
   loop: "{{ _llm_existing_provider_secrets.results }}"
   loop_control:
     loop_var: provider_result
