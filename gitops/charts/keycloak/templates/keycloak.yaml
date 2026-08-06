@@ -18,24 +18,25 @@
 # Operator's KeycloakRealmImport CRD has no native secretKeyRef-style
 # substitution for arbitrary IdentityProviderRepresentation fields (unlike
 # spec.db's username/password, which the CRD does support as secret
-# references). Instead this uses Keycloak's own built-in "vault" SPI in env
-# mode: `${vault.<key>}` placeholders in the realm JSON
+# references). Instead this uses Keycloak's own built-in "vault" SPI:
+# `${vault.<key>}` placeholders in the realm JSON
 # (files/realm-zuno.json's identityProviders[0].config.clientId/
-# clientSecret) resolve at runtime to the environment variable
-# `KC_VAULT_<KEY-UPPERCASED-WITH-NON-ALPHANUMERICS-AS-UNDERSCORE>` - see
-# https://www.keycloak.org/server/vault (env provider). We enable it with
-# KC_VAULT=env below and populate KC_VAULT_GOOGLE_CLIENT_ID /
-# KC_VAULT_GOOGLE_CLIENT_SECRET from the ExternalSecret-backed
-# google-oauth-client Secret. This is the documented, supported Keycloak
-# mechanism for keeping secrets out of a realm import file - ASSUMPTION:
-# the exact env-var-naming transform should be re-verified against the
-# specific RHBK version the cluster installs (documented in this role's
-# README.md), since this could not be validated against a live cluster.
+# clientSecret, and every demo persona's credential.value) resolve at
+# runtime from files under KC_VAULT_DIR - see
+# https://www.keycloak.org/server/vault (files provider).
 #
-# KC_VAULT_DEMO_PERSONAS_PASSWORD (ADR-0041): the same mechanism resolves
-# every fixture user's `${vault.demo_personas_password}` credential in
-# files/realm-zuno.json - one shared, vault-generated password, never
-# hardcoded in Git.
+# CORRECTION (found via live-cluster testing on api.demo222.startx.fr,
+# replacing an unverified assumption this comment used to make): the env
+# provider this used to configure (`KC_VAULT=env`) does not exist on the
+# installed RHBK version - `kc.sh` rejects it outright ("Invalid value for
+# option 'KC_VAULT': env. Expected values are: file, keystore"), crash-
+# looping the server before it ever reaches realm import. Switched to the
+# files provider instead: KC_VAULT=file + KC_VAULT_DIR below, with a
+# projected volume placing each secret's value at
+# <KC_VAULT_DIR>/<realm>_<key> (the files provider's documented default
+# naming, e.g. `zuno_google_client_id` for `${vault.google_client_id}` in
+# the "zuno" realm) - ASSUMPTION still open: this naming convention itself
+# is not yet verified against a real realm import on this RHBK version.
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -72,6 +73,30 @@ spec:
           runAsNonRoot: true
           seccompProfile:
             type: RuntimeDefault
+        volumes:
+          - name: vault-secrets
+            projected:
+              sources:
+                - secret:
+                    name: {{ .Values.googleOAuthSecretName }}
+                    optional: true
+                    items:
+                      - key: client_id
+                        path: zuno_google_client_id
+                      - key: client_secret
+                        path: zuno_google_client_secret
+                - secret:
+                    name: tekos-frontend-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_tekos_frontend_client_secret
+                - secret:
+                    name: demo-personas-password
+                    optional: true
+                    items:
+                      - key: password
+                        path: zuno_demo_personas_password
         containers:
           - name: keycloak
             securityContext:
@@ -80,28 +105,10 @@ spec:
                 drop: ["ALL"]
             env:
               - name: KC_VAULT
-                value: env
-              - name: KC_VAULT_GOOGLE_CLIENT_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: {{ .Values.googleOAuthSecretName }}
-                    key: client_id
-                    optional: true
-              - name: KC_VAULT_GOOGLE_CLIENT_SECRET
-                valueFrom:
-                  secretKeyRef:
-                    name: {{ .Values.googleOAuthSecretName }}
-                    key: client_secret
-                    optional: true
-              - name: KC_VAULT_TEKOS_FRONTEND_CLIENT_SECRET
-                valueFrom:
-                  secretKeyRef:
-                    name: tekos-frontend-client-secret
-                    key: client_secret
-                    optional: true
-              - name: KC_VAULT_DEMO_PERSONAS_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: demo-personas-password
-                    key: password
-                    optional: true
+                value: file
+              - name: KC_VAULT_DIR
+                value: /opt/keycloak/vault
+            volumeMounts:
+              - name: vault-secrets
+                mountPath: /opt/keycloak/vault
+                readOnly: true
