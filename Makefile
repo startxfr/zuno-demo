@@ -42,16 +42,16 @@ help:
 	  '' \
 	  '  make day0|d0 check [component]            Check one/all Day 0 components'"'"' install AND configure state' \
 	  '  make day0|d0 install-check [component]    Check one/all Day 0 components'"'"' install state only' \
-	  '  make day0|d0 configure-check [component]  Check one/all Day 0 components'"'"' configure state only' \
 	  '  make day0|d0 install [component]          Install one/all Day 0 prerequisites' \
+	  '  make day0|d0 configure-check [component]  Check one/all Day 0 components'"'"' configure state only' \
 	  '  make day0|d0 configure [component]        Configure one/all Day 0 prerequisites' \
 	  '  make day0|d0 uninstall [component]        Uninstall one/all Day 0 prerequisites (reverse order)' \
 	  '  make day0|d0 all [component]              check + install + configure, in order' \
 	  '' \
 	  '  make day1|d1 check [component]            Check one/all Day 1 components'"'"' install AND configure state (agents runs the ADR-0053 acceptance gate)' \
 	  '  make day1|d1 install-check [component]    Check one/all Day 1 components'"'"' install state (prerequisites) only' \
-	  '  make day1|d1 configure-check [component]  Check one/all Day 1 components'"'"' configure state only (agents runs the ADR-0053 acceptance gate)' \
 	  '  make day1|d1 build [component]            Build one/all Day 1 component images' \
+	  '  make day1|d1 configure-check [component]  Check one/all Day 1 components'"'"' configure state only (agents runs the ADR-0053 acceptance gate)' \
 	  '  make day1|d1 configure [component]        Configure/deploy one/all Day 1 components (alias: run)' \
 	  '  make day1|d1 run [component]              Same as configure' \
 	  '  make day1|d1 uninstall [component]        Uninstall one/all Day 1 components (reverse order)' \
