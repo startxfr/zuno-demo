@@ -1,0 +1,22 @@
+---
+# State detection (never fails). nvidia_gpu's configure.yml is a no-op -
+# everything happens in install.yml's two-phase apply (ADR-0312). This
+# checks the same final state install-precheck.yml's "installed" can't
+# see: the ClusterPolicy actually reporting ready (the second phase).
+- name: "nvidia_gpu | look up the ClusterPolicy"
+  kubernetes.core.k8s_info:
+    api_version: nvidia.com/v1
+    kind: ClusterPolicy
+    name: gpu-cluster-policy
+  register: _nvidia_gpu_policy_lookup
+
+- name: "nvidia_gpu | compute configure state"
+  ansible.builtin.set_fact:
+    _state_is_configured: >-
+      {{
+        (_nvidia_gpu_policy_lookup.resources | default([]) | length) > 0
+        and (_nvidia_gpu_policy_lookup.resources[0].status.state | default('')) == 'ready'
+      }}
+
+- name: "nvidia_gpu | record configure state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_configure_state.yml"

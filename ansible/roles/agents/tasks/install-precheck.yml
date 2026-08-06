@@ -1,0 +1,27 @@
+---
+# State detection (never fails). Day 1 has no real install phase -
+# "installed" reports whether this role's prerequisites are ready (former
+# precheck.yml content, now informational rather than fail-fast).
+- name: "agents | look up the Application CRD"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: applications.argoproj.io
+  register: _agents_argocd_crd_lookup
+
+- name: "agents | look up the zuno-agent-tekos namespace"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: zuno-agent-tekos
+  register: _agents_ns_lookup
+
+- name: "agents | compute install state (prerequisites ready)"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        (_agents_argocd_crd_lookup.resources | default([]) | length) > 0
+        and (_agents_ns_lookup.resources | default([]) | length) > 0
+      }}
+
+- name: "agents | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_install_state.yml"

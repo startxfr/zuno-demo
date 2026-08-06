@@ -86,8 +86,9 @@ the `Subscription` both live there, alongside the `Keycloak` CR this same
 chart applies - one namespace for both the operator and the instance it
 reconciles, no cross-namespace watch scope to get wrong. `zuno-auth`
 already exists by the time this role runs, owned by `gitops/charts/
-namespaces` (`tasks/precheck.yml` verifies this, `namespaces` role runs
-before `keycloak` in Day 0 order) - this chart does not declare it.
+namespaces` (`tasks/install-precheck.yml` reports on this, `namespaces`
+role runs before `keycloak` in Day 0 order) - this chart does not
+declare it.
 
 | Item | How it's resolved |
 |---|---|

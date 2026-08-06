@@ -4,9 +4,11 @@ Cluster-admin-level objects every other Day 0 component implicitly
 depends on (ADR-0056). Positioned first in the Day 0 sequence, before
 `argocd`.
 
-- `precheck.yml` - verifies the cluster API is reachable (nothing else
-  can be checked until this passes, since this is the very first Day 0
-  component).
+- `install-precheck.yml`/`configure-precheck.yml` - state detection, never
+  fail: report whether the PriorityClasses and the zuno `AppProject`
+  already exist, setting `admin_context_state_installed`/
+  `_state_configured` and a line in the shared `/tmp` state report (see
+  `ansible/playbooks/day0_check.yml`).
 - `install.yml` - verifies at least one `StorageClass` exists (discover-
   only, never invents provisioner-specific parameters - fails with a
   clear diagnostic if none does), and applies two `PriorityClass` objects:

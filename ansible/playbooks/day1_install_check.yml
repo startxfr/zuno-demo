@@ -1,0 +1,41 @@
+---
+# Day 1 (ADR-0056): install-state-only check - `make day1 install-check`/
+# `make d1 install-check`. Same component list/ordering and mlops
+# exclusion as day1_check.yml (see that file's header comment).
+- name: "Day 1: check install state"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day1_components:
+      - llm
+      - models
+      - sql_schema
+      - rag
+      - mcp
+      - agents
+      - mlops
+  tasks:
+    - name: Resolve requested Day 1 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day1_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Exclude mlops from state-checking (no install-precheck.yml yet)
+      ansible.builtin.set_fact:
+        selected_components: "{{ selected_components | reject('equalto', 'mlops') | list }}"
+
+    - name: Generate the state-report file
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
+
+    - name: Run Day 1 component install-state checks
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: install-precheck
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Display the state report
+      ansible.builtin.debug:
+        msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"

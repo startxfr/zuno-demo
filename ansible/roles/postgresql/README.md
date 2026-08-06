@@ -29,7 +29,7 @@ no fallback/discovery workaround needed - **also proven wrong** on a real
 cluster (OLM's `Subscription.status` reported `ResolutionFailed`: "no
 operators found in package crunchy-postgres-operator in the catalog
 referenced by subscription"). Three real-world catalog/channel/package-name
-mismatches in a row is a pattern, not a fluke: `precheck.yml`/`install.yml`
+mismatches in a row is a pattern, not a fluke: `install.yml`/`configure.yml`
 now discover the package by fuzzy name match (`/crunchy/i`) across every
 catalog in this cluster's `openshift-marketplace`, not just a hardcoded
 package name in a hardcoded catalog, with the same `operatorhubio-catalog`
@@ -37,10 +37,13 @@ public fallback CNPG's fix used if nothing crunchy-named is found anywhere.
 This is a genuine rewrite either way (CNPG and PGO use different CRDs,
 Service names and Secret conventions), not a config tweak.
 
-- `precheck.yml` - verifies *some* crunchy-named package is published
-  somewhere in this cluster's catalogs (fuzzy match, not an exact package
-  name - see above), and that ArgoCD is already installed (the
-  `PostgresCluster` CR is applied as a GitOps Application).
+- `install-precheck.yml`/`configure-precheck.yml` - state detection,
+  never fail: report whether prerequisites (Application CRD, a
+  crunchy-named `PackageManifest`) are ready and whether the
+  `zuno-postgresql` Application/`PostgresCluster` are actually
+  Synced+Healthy/rolled out, setting `postgresql_state_installed`/
+  `_state_configured` and a line in the shared `/tmp` state report (see
+  `ansible/playbooks/day0_check.yml`).
 - `install.yml` - fuzzy-matches `/crunchy/i` across every PackageManifest
   in `openshift-marketplace`, registering `operatorhubio-catalog` as a
   fallback and retrying if nothing matched at all, failing with a clear

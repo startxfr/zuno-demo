@@ -1,0 +1,40 @@
+---
+# State detection (never fails). keycloak only applies its Application in
+# configure.yml (ADR-0312 - the ExternalSecrets it renders need
+# external_secrets' own configure step first), so there is no GitOps
+# signal for "installed" here. "Installed" instead reports whether this
+# role's prerequisites are ready (former precheck.yml content, now
+# informational rather than fail-fast) - not "the component is already
+# posed."
+- name: "keycloak | look up the Application CRD"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: applications.argoproj.io
+  register: _keycloak_argocd_crd_lookup
+
+- name: "keycloak | look up the zuno-auth namespace"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: zuno-auth
+  register: _keycloak_ns_lookup
+
+- name: "keycloak | look up the rhbk-operator PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhbk-operator
+  register: _keycloak_pkg_lookup
+
+- name: "keycloak | compute install state (prerequisites ready)"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        (_keycloak_argocd_crd_lookup.resources | default([]) | length) > 0
+        and (_keycloak_ns_lookup.resources | default([]) | length) > 0
+        and (_keycloak_pkg_lookup.resources | default([]) | length) > 0
+      }}
+
+- name: "keycloak | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_install_state.yml"

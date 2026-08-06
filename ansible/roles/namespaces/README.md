@@ -1,19 +1,20 @@
 # namespaces
 
-Applies the namespace-scaffolding GitOps Application (`gitops/apps/agents`
+Applies the namespace-scaffolding GitOps Application (`gitops/apps/namespaces`
 → `gitops/charts/namespaces`, ADR-0023): the 5 agent namespaces + the
 `zuno-auth`/`zuno-data`/`zuno-telemetry`/`zuno-ai-run`/`zuno-ai-build`
 platform namespaces, each with a `ResourceQuota` and a default-deny
 `NetworkPolicy` baseline. A Day 0 component (ADR-0056) - moved out of
 `ansible/roles/agents` so namespace creation is its own explicit,
 checkable step rather than only ever happening as a side effect of
-deploying the Tekos workloads.
+deploying the Tekos workloads. (`gitops/apps/agents` is a stale, orphaned
+directory left over from before this move - nothing applies it any more.)
 
-- `precheck.yml` - reads the expected namespace list directly from
-  `gitops/charts/namespaces/values.yaml` (never duplicated as a separate
-  hardcoded list, so it can't drift from what the chart actually creates)
-  and fails, naming exactly which are missing, if any expected namespace
-  isn't present.
+- `install-precheck.yml`/`configure-precheck.yml` - state detection,
+  never fail: check the `zuno-namespaces` Application's Synced+Healthy
+  status, setting `namespaces_state_installed`/`_state_configured` and a
+  line in the shared `/tmp` state report (see
+  `ansible/playbooks/day0_check.yml`).
 - `install.yml` - applies the GitOps Application.
 - `configure.yml` - re-applies the same Application (idempotent - for an
   explicit on-demand re-sync after a `values.yaml` change, since ArgoCD's

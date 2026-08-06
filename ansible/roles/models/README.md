@@ -7,8 +7,14 @@ documented no-op `install.yml` - no operator dependency of its own.
 Depends on `openshift_ai` (`DataScienceCluster` Ready) and
 `nvidia_gpu` (GPU Operator) having run first.
 
-`tasks/discover_vllm_image.yml` (ADR-0048) - included by both
-`tasks/precheck.yml` and `tasks/configure.yml` - discovers the vLLM
-serving-runtime image Red Hat OpenShift AI actually published for this
-cluster/catalog instead of trusting `gitops/charts/models/values.yaml`'s
-hardcoded fallback; see that chart's own README for the full mechanism.
+`tasks/discover_vllm_image.yml` (ADR-0048) - included by `tasks/
+configure.yml` - discovers the vLLM serving-runtime image Red Hat
+OpenShift AI actually published for this cluster/catalog instead of
+trusting `gitops/charts/models/values.yaml`'s hardcoded fallback; see
+that chart's own README for the full mechanism. `tasks/
+install-precheck.yml`/`configure-precheck.yml` (state detection, never
+fail) do not run this discovery themselves - they only report the
+`DataScienceCluster`'s readiness and the `zuno-models` Application's
+Synced+Healthy status, setting `models_state_installed`/
+`_state_configured` and a line in the shared `/tmp` state report (see
+`ansible/playbooks/day1_check.yml`).

@@ -8,7 +8,7 @@ Vault instance (`ansible/roles/vault`), which must already be
 initialized, unsealed and have the Kubernetes auth method + `eso-reader`
 role configured (see `ansible/roles/vault/tasks/configure.yml`) before
 this role's `configure` step runs - enforced by ordering in
-`ansible/playbooks/{precheck,install,configure,uninstall}.yml`. Previously
+`ansible/playbooks/day0_{check,install,configure,uninstall}.yml`. Previously
 applied raw manifests directly via `ansible/tasks/apply_kustomize.yml`
 (ADR-0310); converted to this role-applies-one-Application pattern by
 ADR-0312. `zuno-ai-run`'s `Namespace` is owned by `gitops/charts/

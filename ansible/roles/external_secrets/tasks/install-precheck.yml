@@ -1,0 +1,26 @@
+---
+# State detection (never fails). external_secrets' Subscription and
+# operand (OperatorConfig) both live in one Application (ADR-0312) that
+# is also reused, with different Helm values, by configure.yml for the
+# ClusterSecretStore - so the Application's own Synced+Healthy status
+# alone can't distinguish "operator+operand installed" from "fully
+# configured". Reuses install.yml's own readiness signal instead: the
+# ESO operand Deployment being ready.
+- name: "external_secrets | look up the ESO operand Deployment"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: external-secrets
+    name: external-secrets
+  register: _eso_operand_deploy_lookup
+
+- name: "external_secrets | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        (_eso_operand_deploy_lookup.resources | default([]) | length) > 0
+        and (_eso_operand_deploy_lookup.resources[0].status.readyReplicas | default(0)) > 0
+      }}
+
+- name: "external_secrets | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_install_state.yml"

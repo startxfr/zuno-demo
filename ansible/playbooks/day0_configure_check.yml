@@ -1,0 +1,43 @@
+---
+# Day 0 (ADR-0056): configure-state-only check - `make day0
+# configure-check`/`make d0 configure-check`. Same component list/
+# ordering as day0_check.yml (see that file's header comment) - runs only
+# the configure-precheck loop, with its own state-report file.
+- name: "Day 0: check configure state"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day0_components:
+      - admin_context
+      - argocd
+      - namespaces
+      - vault
+      - external_secrets
+      - keycloak
+      - postgresql
+      - smtp
+      - nfd
+      - nvidia_gpu
+      - observability
+      - openshift_ai
+  tasks:
+    - name: Resolve requested Day 0 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day0_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Generate the state-report file
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
+
+    - name: Run Day 0 component configure-state checks
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: configure-precheck
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Display the state report
+      ansible.builtin.debug:
+        msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"

@@ -9,7 +9,7 @@ EXTRA_VARS ?=
 # platform) sequencing, replacing the former precheck/prepare/configure/
 # install/check interface outright.
 DAY0_COMPONENTS := admin-context argocd namespaces vault external-secrets keycloak postgresql smtp nfd nvidia-gpu observability openshift-ai
-DAY0_VERBS := check install configure uninstall all
+DAY0_VERBS := check install-check configure-check install configure uninstall all
 
 # Day 1 has two different valid component sets depending on the verb:
 # "build" only knows how to build the 3 named image groups (mcp, rag,
@@ -21,7 +21,7 @@ DAY0_VERBS := check install configure uninstall all
 # "configure" and "run" are aliases of each other.
 DAY1_RUN_COMPONENTS := llm models sql-schema rag mcp agents mlops
 DAY1_BUILD_COMPONENTS := mcp rag agent ai-gateway
-DAY1_VERBS := check build configure run uninstall all
+DAY1_VERBS := check install-check configure-check build configure run uninstall all
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
@@ -40,18 +40,22 @@ help:
 	  '  This is the only manual input for the entire install - everything else' \
 	  '  (Keycloak, Vault, PostgreSQL, OpenShift AI, MLOps...) is automated.' \
 	  '' \
-	  '  make day0|d0 check [component]      Check one/all Day 0 prerequisites' \
-	  '  make day0|d0 install [component]    Install one/all Day 0 prerequisites' \
-	  '  make day0|d0 configure [component]  Configure one/all Day 0 prerequisites' \
-	  '  make day0|d0 uninstall [component]  Uninstall one/all Day 0 prerequisites (reverse order)' \
-	  '  make day0|d0 all [component]        check + install + configure, in order' \
+	  '  make day0|d0 check [component]            Check one/all Day 0 components'"'"' install AND configure state' \
+	  '  make day0|d0 install-check [component]    Check one/all Day 0 components'"'"' install state only' \
+	  '  make day0|d0 configure-check [component]  Check one/all Day 0 components'"'"' configure state only' \
+	  '  make day0|d0 install [component]          Install one/all Day 0 prerequisites' \
+	  '  make day0|d0 configure [component]        Configure one/all Day 0 prerequisites' \
+	  '  make day0|d0 uninstall [component]        Uninstall one/all Day 0 prerequisites (reverse order)' \
+	  '  make day0|d0 all [component]              check + install + configure, in order' \
 	  '' \
-	  '  make day1|d1 check [component]      Check one/all Day 1 components (agents runs the ADR-0053 acceptance gate)' \
-	  '  make day1|d1 build [component]      Build one/all Day 1 component images' \
-	  '  make day1|d1 configure [component]  Configure/deploy one/all Day 1 components (alias: run)' \
-	  '  make day1|d1 run [component]        Same as configure' \
-	  '  make day1|d1 uninstall [component]  Uninstall one/all Day 1 components (reverse order)' \
-	  '  make day1|d1 all [component]        check + build + configure, whichever apply to the component' \
+	  '  make day1|d1 check [component]            Check one/all Day 1 components'"'"' install AND configure state (agents runs the ADR-0053 acceptance gate)' \
+	  '  make day1|d1 install-check [component]    Check one/all Day 1 components'"'"' install state (prerequisites) only' \
+	  '  make day1|d1 configure-check [component]  Check one/all Day 1 components'"'"' configure state only (agents runs the ADR-0053 acceptance gate)' \
+	  '  make day1|d1 build [component]            Build one/all Day 1 component images' \
+	  '  make day1|d1 configure [component]        Configure/deploy one/all Day 1 components (alias: run)' \
+	  '  make day1|d1 run [component]              Same as configure' \
+	  '  make day1|d1 uninstall [component]        Uninstall one/all Day 1 components (reverse order)' \
+	  '  make day1|d1 all [component]              check + build + configure, whichever apply to the component' \
 	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
 	  'Day 1 components (check/configure/run): $(DAY1_RUN_COMPONENTS)' \
@@ -71,9 +75,11 @@ component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY0_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day0 verb: '$$verb' (expected one of: $(DAY0_VERBS))" >&2; exit 2;; esac; \
 case " $(DAY0_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day0 component: '$$component' (expected one of: $(DAY0_COMPONENTS) or all)" >&2; exit 2;; esac; \
-run_one() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) "ansible/playbooks/day0_$$1.yml" -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_one() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) "ansible/playbooks/day0_$${1//-/_}.yml" -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) run_one check ;; \
+  install-check) run_one install-check ;; \
+  configure-check) run_one configure-check ;; \
   install) run_one install ;; \
   configure) run_one configure ;; \
   uninstall) run_one uninstall ;; \
@@ -100,6 +106,8 @@ component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY1_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day1 verb: '$$verb' (expected one of: $(DAY1_VERBS))" >&2; exit 2;; esac; \
 run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_install_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_install_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_configure_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_configure_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_build() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_build.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_configure() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_configure.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
@@ -107,6 +115,12 @@ case "$$verb" in \
   check) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 check component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     run_check ;; \
+  install-check) \
+    case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 install-check component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_install_check ;; \
+  configure-check) \
+    case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 configure-check component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_configure_check ;; \
   build) \
     case " $(DAY1_BUILD_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 build component: '$$component' (expected one of: $(DAY1_BUILD_COMPONENTS) or all)" >&2; exit 2;; esac; \
     run_build ;; \

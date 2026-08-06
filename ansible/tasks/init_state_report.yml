@@ -1,0 +1,26 @@
+---
+# Shared task: generates a unique /tmp state-report file path (Ansible-
+# native - the same lookup('ansible.builtin.password', '/dev/null', ...)
+# idiom ansible/roles/vault/tasks/configure.yml already uses to generate
+# random values, no shell uuidgen/mktemp and no dependency on an extra
+# collection) and creates the empty file. Included once at the top of
+# every check playbook (day0_check.yml, day0_install_check.yml,
+# day0_configure_check.yml, and the day1 equivalents) - `default()` makes
+# this idempotent within a single ansible-playbook run: day0_check.yml
+# includes this once before looping both install-precheck and
+# configure-precheck, so both loops share the same file/fact without
+# regenerating it.
+- name: "state-report | generate a unique report file path"
+  ansible.builtin.set_fact:
+    state_report_file: >-
+      {{
+        state_report_file
+        | default('/tmp/zuno-statereport-' + (lookup('ansible.builtin.password', '/dev/null', length=12, chars=['hexdigits'])))
+      }}
+
+- name: "state-report | create the empty report file"
+  ansible.builtin.copy:
+    dest: "{{ state_report_file }}"
+    content: ""
+    force: false
+    mode: "0644"

@@ -1,0 +1,17 @@
+---
+# State detection (never fails). Kept for consistency with every other
+# role's file layout, but day1_check.yml/day1_configure_check.yml never
+# actually call this for `agents`: their configure loop uses
+# `tasks_from: "{{ 'check' if item == 'agents' else 'configure-precheck' }}"`,
+# so the ADR-0053 acceptance gate (tasks/check.yml) runs instead - a full
+# functional/security gate is a stronger "is this actually configured and
+# working" signal than an Application's Synced+Healthy status alone.
+- name: "agents | check the api Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-api"
+
+- name: "agents | record configure state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_configure_state.yml"
+  vars:
+    _state_is_configured: "{{ _state_check_result }}"

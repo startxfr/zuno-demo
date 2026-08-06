@@ -1,0 +1,33 @@
+---
+# State detection (never fails). postgresql only applies its Application
+# in configure.yml (ADR-0312 - the ExternalSecret it renders needs
+# external_secrets' own configure step first), so there is no GitOps
+# signal for "installed" here. "Installed" instead reports whether this
+# role's prerequisites are ready (former precheck.yml content, now
+# informational rather than fail-fast) - not "the component is already
+# posed."
+- name: "postgresql | look up the Application CRD"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: applications.argoproj.io
+  register: _postgresql_argocd_crd_lookup
+
+- name: "postgresql | list every PackageManifest published in this cluster's catalogs"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+  register: _postgresql_all_pkgs_lookup
+
+- name: "postgresql | compute install state (prerequisites ready)"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        (_postgresql_argocd_crd_lookup.resources | default([]) | length) > 0
+        and (_postgresql_all_pkgs_lookup.resources | default([])
+             | selectattr('metadata.name', 'search', 'crunchy', ignorecase=True) | list | length) > 0
+      }}
+
+- name: "postgresql | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_install_state.yml"

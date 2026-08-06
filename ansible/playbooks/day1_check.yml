@@ -1,26 +1,28 @@
 ---
-# Day 1 (ADR-0056): building the platform's own component images and
-# running the platform itself. `make day1 check`/`make d1 check`.
+# Day 1 (ADR-0056): combined install+configure state check for Day 1
+# components - `make day1 check`/`make d1 check`. Mirrors day0_check.yml's
+# structure (see that file's header comment for why state_report_file is
+# generated once here rather than passed in by the Makefile).
 #
 # Component list note: your original Day 1 spec named `llm, rag, mcp,
-# agents` as the "run" components. `models`, `sql_schema` and `mlops` are
-# included here too, deliberately going beyond that exact list - dropping
-# them would make them permanently unreachable (nothing else in this
+# agents` as the "run" components. `models` and `sql_schema` are included
+# here too, deliberately going beyond that exact list - dropping them
+# would make them permanently unreachable (nothing else in this
 # repository triggers the vLLM InferenceService or the SXA schema/
 # sales-db deployment), a real functional regression, not just a naming
-# choice. Flagged here and in ADR-0056's Implementation state rather than
-# silently done.
+# choice. `mlops` is excluded from the state-check loops below (not from
+# day1_configure.yml/day1_uninstall.yml) - it has no install-precheck.yml/
+# configure-precheck.yml, since tasks/install.yml and tasks/configure.yml
+# are still placeholder scaffolds with nothing real to detect yet.
 #
-# `agents` is a deliberate special case: before this restructuring, `make
-# check` (ADR-0053) ran ansible/roles/agents/tasks/check.yml - the full
-# 20-scenario acceptance/security gate, not a dependency precheck. That
-# capability must not quietly disappear just because "check" now also
-# means "verify this component's prerequisites" for every other Day 1
-# component. So `day1 check agents` runs `tasks_from: check` (the real
-# ADR-0053 gate) while every other component here runs `tasks_from:
-# precheck` (dependency verification) - same verb, intentionally
-# different meaning for the one component that already had a richer one.
-- name: "Day 1: check components"
+# `agents` is a deliberate special case: `make check` (ADR-0053) must
+# still run ansible/roles/agents/tasks/check.yml - the full 20-scenario
+# acceptance/security gate - not just a lightweight configure-state check.
+# So the configure loop below runs `tasks_from: check` for `agents` and
+# `tasks_from: configure-precheck` for everyone else; the install loop is
+# uniform (agents' install-precheck.yml is an ordinary prerequisite check,
+# same as every other Day 1 role).
+- name: "Day 1: check install and configure state"
   hosts: localhost
   gather_facts: false
   vars:
@@ -39,10 +41,29 @@
           {{ day1_components if target_component | default('all') == 'all'
              else [target_component | replace('-', '_')] }}
 
-    - name: Run Day 1 component checks
+    - name: Exclude mlops from state-checking (no install-precheck.yml/configure-precheck.yml yet)
+      ansible.builtin.set_fact:
+        selected_components: "{{ selected_components | reject('equalto', 'mlops') | list }}"
+
+    - name: Generate the shared state-report file
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
+
+    - name: Run Day 1 component install-state checks
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: "{{ 'check' if item == 'agents' else 'precheck' }}"
+        tasks_from: install-precheck
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
+
+    - name: Run Day 1 component configure-state checks
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: "{{ 'check' if item == 'agents' else 'configure-precheck' }}"
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Display the state report
+      ansible.builtin.debug:
+        msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"

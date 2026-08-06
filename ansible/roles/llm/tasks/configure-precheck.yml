@@ -1,0 +1,34 @@
+---
+# State detection (never fails). llm applies three separate Applications
+# in configure.yml (provider routing, ai-gateway, agent-runtime) -
+# "configured" requires all three Synced+Healthy.
+- name: "llm | check the llm Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-llm"
+- name: "llm | remember the llm Application state"
+  ansible.builtin.set_fact:
+    _llm_state_llm: "{{ _state_check_result }}"
+
+- name: "llm | check the ai-gateway Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-ai-gateway"
+- name: "llm | remember the ai-gateway Application state"
+  ansible.builtin.set_fact:
+    _llm_state_ai_gateway: "{{ _state_check_result }}"
+
+- name: "llm | check the agent-runtime Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-agent-runtime"
+- name: "llm | remember the agent-runtime Application state"
+  ansible.builtin.set_fact:
+    _llm_state_agent_runtime: "{{ _state_check_result }}"
+
+- name: "llm | compute configure state"
+  ansible.builtin.set_fact:
+    _state_is_configured: "{{ _llm_state_llm and _llm_state_ai_gateway and _llm_state_agent_runtime }}"
+
+- name: "llm | record configure state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_configure_state.yml"

@@ -2,9 +2,9 @@
 
 Applies the Tekos frontend/BFF workloads GitOps Application
 (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008). This is Day 1's
-`agents` `run` component (ADR-0056) - `precheck.yml` verifies ArgoCD is
-installed and that `zuno-agent-tekos` (created by the Day 0 `namespaces`
-role) already exists.
+`agents` `run` component (ADR-0056) - `install-precheck.yml` reports
+(never fails) whether ArgoCD is installed and `zuno-agent-tekos` (created
+by the Day 0 `namespaces` role) already exists.
 
 Namespace creation used to live in this role's `configure.yml` too (a
 separate `gitops/apps/agents` → `gitops/charts/namespaces` Application
@@ -16,8 +16,14 @@ applying namespaces, it was doing exactly what `api` did (apply the
 Tekos workloads Application, nothing else) - one role for that job is
 enough, and `agents` is the name Day 1's `run` component list uses.
 
-`check.yml` (`make day1|d1 check agents`) is the ADR-0053 layered
-acceptance and security gate. It structurally validates the four catalog-only agents'
+`check.yml` (`make day1|d1 check agents`, and `make day1|d1
+configure-check agents`) is the ADR-0053 layered acceptance and security
+gate - `day1_check.yml`/`day1_configure_check.yml` run it *instead of*
+`configure-precheck.yml` for this role specifically (a full functional/
+security gate is a stronger "is this configured and working" signal than
+a lightweight Application state check). `configure-precheck.yml` still
+exists for file-layout consistency but is never invoked while that
+special case is in place. It structurally validates the four catalog-only agents'
 `agent.okf.md` OKF v0.2 Markdown bundles (ADR-0038 -
 `okf_version`/`type`/`zuno.status: placeholder`) - v0 formalizes Tekos as
 the only mandatory end-to-end business path (ADR-0031), but catalog-only is
