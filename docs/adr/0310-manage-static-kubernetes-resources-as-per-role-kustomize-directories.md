@@ -1,6 +1,6 @@
 # ADR-0310: Manage static Kubernetes resources as per-role kustomize directories
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-06
 - **Decision owners:** Zuno Demo architecture team
@@ -131,25 +131,58 @@ idempotent re-apply (`changed: false` on a second run).
 
 ## Implementation state
 
-**Proposed, pilot implemented (2026-08-06).** `ansible/tasks/apply_kustomize.yml`
-lands alongside this ADR, together with the first two roles migrated as the
-worked example: `admin_context` (both PriorityClasses, now defined once in
-`ansible/roles/admin_context/kustomize/priorityclasses/` and referenced from
-both `prepare.yml` and `configure.yml`, instead of the previous
-copy-pasted-verbatim duplication) and `argocd` (`prepare.yml`'s Namespace +
-Subscription in `ansible/roles/argocd/kustomize/operator/`, applied before
-the CRD/deployment waits; the ClusterRoleBinding in
-`ansible/roles/argocd/kustomize/rbac/`, applied after - two groups because
-the role's existing sequencing needs the operator installed before granting
-the binding). Each migrated directory's `kustomize build` output was diffed
-field-for-field against the inline `definition:` block it replaced before
-the task files were rewritten, and `ansible-playbook --syntax-check` was run
-against `day0_install.yml`/`day0_configure.yml`; no live-cluster apply was
-performed in this environment (same constraint as every other
-cluster-dependent role in this repository). The remaining Tier 1/Tier 2
-roles (`external_secrets`, `vault`, `nfd`, `observability`, `nvidia_gpu`,
-`postgresql`, `sql_schema`, `openshift_ai`, `keycloak`, and the two
-file-backed ConfigMaps in `rag`/`agents`) are not yet migrated.
+**Implemented (2026-08-06).** `ansible/tasks/apply_kustomize.yml` (extended
+with `--load-restrictor LoadRestrictionsNone` so a role's
+`configMapGenerator: files:` can read from this repository's `data/` and
+`evaluations/` trees, which sit outside the role's own `kustomize/`
+directory) and all fourteen roles named in Context are migrated:
+`admin_context`, `argocd`, `external_secrets`, `vault`, `nfd`,
+`observability`, `nvidia_gpu`, `postgresql`, `sql_schema`, `openshift_ai`,
+`keycloak`, `smtp`, `rag`, `agents`.
+
+Each role's static resources moved into one or more `kustomize/<group>/`
+directories, grouped to match the sequencing the role already needed
+(operator install before a CRD-established wait, a CR after; a
+ClusterSecretStore before the Namespace/ExternalSecret that reference it,
+per `external_secrets`; a conditionally-applied `CatalogSource` fallback as
+its own group, per `postgresql`). Tier 2 placeholder substitution
+(`kustomize_replacements`) is used for `external_secrets`, `postgresql`,
+`openshift_ai` and `keycloak`'s Subscription channel/catalogSource/package
+name, each resolved by that role's existing `PackageManifest` discovery
+step before the kustomize apply. The three file-backed ConfigMaps
+(`sql_schema`'s `zuno-sxa-schema`, `rag`'s `zuno-rag-schema`, `agents`'
+`acceptance-gate-scripts`) use `configMapGenerator: files:` reading
+directly from `data/`/`evaluations/tekos/`, each with
+`generatorOptions.disableNameSuffixHash: true` so the inline Job that
+mounts the ConfigMap by its fixed name (outside the kustomization, per
+Tier 3) keeps resolving it. Tier 3 resources stayed inline exactly as
+scoped: `agents`' `acceptance-gate-credentials` Secret and
+`zuno-acceptance-gate` Job, `rag`'s and `sql_schema`'s schema-apply Jobs,
+`vault`'s `vault-bootstrap-credentials` Secret, and `nvidia_gpu`'s
+ClusterPolicy (its `spec` is read from the installed GPU Operator's own
+CSV `alm-examples` at run time, not a static shape this repository owns).
+
+Every migrated directory's `kustomize build` output was diffed
+field-for-field against the inline `definition:` block(s) it replaced
+before each task file was rewritten (26 `kustomize/` directories in total).
+`ansible-playbook --syntax-check` was run against all six playbooks in
+`ansible/playbooks/`. A final sweep confirmed the only `kind:` occurrences
+left inside `state: present` blocks anywhere under `ansible/roles/` are the
+Tier 3 resources named above. No live-cluster apply was performed in this
+environment (same constraint as every other cluster-dependent role in this
+repository).
+
+While migrating, the `zuno.io/managed-by` label value used on every
+Ansible-applied resource in this repository (as distinct from
+`zuno.io/managed-by: argocd`, used throughout `gitops/charts/` for
+GitOps-managed resources - a separate, unrelated classification not
+touched here) was standardized from `ansible` to `zuno-ansible`, including
+in `ansible/tasks/apply_openshift_build.yml` (a shared task outside
+`ansible/roles/`, kept consistent for the same reason even though its
+BuildConfig/ImageStream resources are themselves out of this ADR's scope).
+This is an orthogonal decision to the kustomize migration itself, folded
+in here only because it landed in the same working session and touched
+the same files.
 
 ## Acceptance criteria
 
