@@ -3,4 +3,4 @@ kind: Namespace
 metadata:
   name: openshift-gitops-operator
   labels:
-    zuno.io/managed-by: ansible
+    zuno.io/managed-by: zuno-ansible

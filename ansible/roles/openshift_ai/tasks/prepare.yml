@@ -1,26 +1,4 @@
 ---
-- name: "openshift_ai | ensure the redhat-ods-operator namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: redhat-ods-operator
-        labels:
-          zuno.io/managed-by: ansible
-
-- name: "openshift_ai | ensure the operator group exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1
-      kind: OperatorGroup
-      metadata:
-        name: rhods-operator-group
-        namespace: redhat-ods-operator
-      spec: {}
-
 - name: "openshift_ai | discover the operator's published channels (ADR-0048)"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
@@ -66,23 +44,16 @@
       Selected rhods-operator channel: {{ _openshift_ai_channel }}
       (all published channels: {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }})
 
-- name: "openshift_ai | subscribe to the Red Hat OpenShift AI operator"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: Subscription
-      metadata:
-        name: rhods-operator
-        namespace: redhat-ods-operator
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        channel: "{{ _openshift_ai_channel }}"
-        name: rhods-operator
-        source: redhat-operators
-        sourceNamespace: openshift-marketplace
-        installPlanApproval: Automatic
+# ADR-0310: ansible/roles/openshift_ai/kustomize/operator/ - the Namespace
+# and OperatorGroup live in the same group as the Subscription (order
+# relative to the PackageManifest discovery above doesn't matter, since
+# neither is read by that lookup).
+- name: "openshift_ai | apply the operator Namespace, OperatorGroup and Subscription"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/openshift_ai/kustomize/operator"
+    kustomize_replacements:
+      __OPENSHIFT_AI_CHANNEL__: "{{ _openshift_ai_channel }}"
 
 - name: "openshift_ai | wait for the DataScienceCluster CRD to be established"
   kubernetes.core.k8s_info:
@@ -94,57 +65,11 @@
   retries: 40
   delay: 15
 
+# ADR-0310: ansible/roles/openshift_ai/kustomize/dsc/.
 - name: "openshift_ai | apply the DataScienceCluster with kserve enabled"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: datasciencecluster.opendatahub.io/v1
-      kind: DataScienceCluster
-      metadata:
-        name: zuno-dsc
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        components:
-          kserve:
-            managementState: Managed
-            # ADR-0047/ADR-0048 fix: RawDeployment, not Serverless.
-            # serving.managementState: Removed disables KServe's Knative
-            # integration entirely, so InferenceServices default to a
-            # plain Kubernetes Deployment+Service instead of a Knative
-            # Service. The previous value here (Managed +
-            # name: knative-serving) implicitly required the Red Hat
-            # OpenShift Service Mesh Operator, the Red Hat OpenShift
-            # Serverless Operator (which owns the KNativeServing CR that
-            # `name` referenced) and cert-manager - none of which this
-            # repository ever installed, so this DataScienceCluster would
-            # never actually have reached Ready on a real cluster (exactly
-            # the failure mode ADR-0047 calls out: "failures identify the
-            # missing dependency rather than surfacing later during
-            # model/RAG deployment" - found by reading, not by hitting it
-            # live). This demo's one model (gitops/charts/models) runs
-            # minReplicas == maxReplicas == 1, always on - it has no use
-            # for Serverless's scale-to-zero, so RawDeployment isn't a
-            # compromise here, it's the correct mode for this workload.
-            # gitops/charts/models/templates/inferenceservice.yaml now also
-            # sets the serving.kserve.io/deploymentMode: RawDeployment
-            # annotation explicitly (belt and suspenders with this
-            # cluster-wide default). Connectivity Link, LeaderWorkerSet and
-            # MaaS-related dependencies (also named in ADR-0047's
-            # Operational considerations) are likewise deliberately not
-            # installed - nothing in this repository's actual v0 feature
-            # set uses multi-node/multi-GPU serving (LeaderWorkerSet), an
-            # API policy gateway (Connectivity Link) or a Models-as-a-
-            # Service routing layer (MaaS, explicitly deferred to v1 as
-            # ADR-0049) - see platform/openshift-ai/README.md.
-            serving:
-              managementState: Removed
-          workbenches:
-            managementState: Removed
-          dashboard:
-            managementState: Managed
-          modelmeshserving:
-            managementState: Removed
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/openshift_ai/kustomize/dsc"
 
 - name: "openshift_ai | wait for the DataScienceCluster to report Ready"
   kubernetes.core.k8s_info:
@@ -166,14 +91,8 @@
 # dashboard recognizes as a Data Science Project, so it's visible there too,
 # not just via `oc`, even though this namespace also hosts non-RHOAI
 # workloads.
+# ADR-0310: ansible/roles/openshift_ai/kustomize/ai-run-namespace/.
 - name: "openshift_ai | ensure the zuno-ai-run namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: zuno-ai-run
-        labels:
-          zuno.io/managed-by: ansible
-          opendatahub.io/dashboard: "true"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/openshift_ai/kustomize/ai-run-namespace"

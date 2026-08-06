@@ -3,7 +3,7 @@ kind: PriorityClass
 metadata:
   name: zuno-workload-default
   labels:
-    zuno.io/managed-by: ansible
+    zuno.io/managed-by: zuno-ansible
 value: 100
 globalDefault: false
 description: >-

@@ -4,7 +4,7 @@ metadata:
   name: openshift-gitops-operator
   namespace: openshift-operators
   labels:
-    zuno.io/managed-by: ansible
+    zuno.io/managed-by: zuno-ansible
 spec:
   channel: latest
   name: openshift-gitops-operator

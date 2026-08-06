@@ -5,61 +5,21 @@
 # (see gitops/apps/README.md). The sales-db MCP server that reads this
 # schema *is* a standing workload, so it's applied afterward as a proper
 # GitOps Application.
+# ADR-0310: ansible/roles/sql_schema/kustomize/schema/ (a configMapGenerator
+# reading directly from data/sxa/ - disableNameSuffixHash keeps the name
+# "zuno-sxa-schema" stable so the inline Job below, which is outside this
+# kustomization, can still reference it by that fixed name) and
+# ansible/roles/sql_schema/kustomize/prereqs/ (the static Namespace and
+# ExternalSecret).
 - name: "sql_schema | build the SQL ConfigMap from data/sxa/"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: zuno-sxa-schema
-        namespace: zuno-data
-        labels:
-          zuno.io/managed-by: ansible
-      data:
-        001_init.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/schema/001_init.sql') }}"
-        002_pgvector.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/schema/002_pgvector.sql') }}"
-        seed.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/sxa/fixtures/seed.sql') }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/sql_schema/kustomize/schema"
 
-- name: "sql_schema | ensure the zuno-data namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: zuno-data
-        labels:
-          zuno.io/managed-by: ansible
-
-- name: "sql_schema | register the PostgreSQL credentials ExternalSecret in zuno-data"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: sql-schema-postgresql-credentials
-        namespace: zuno-data
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        refreshInterval: 1h
-        secretStoreRef:
-          name: vault-backend
-          kind: ClusterSecretStore
-        target:
-          name: sql-schema-postgresql-credentials
-          creationPolicy: Owner
-        data:
-          - secretKey: username
-            remoteRef:
-              key: zuno/postgresql/app
-              property: username
-          - secretKey: password
-            remoteRef:
-              key: zuno/postgresql/app
-              property: password
+- name: "sql_schema | ensure the zuno-data namespace and PostgreSQL credentials ExternalSecret exist"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/sql_schema/kustomize/prereqs"
 
 - name: "sql_schema | delete any previous schema-apply Job (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -80,7 +40,7 @@
         name: zuno-sxa-schema-apply
         namespace: zuno-data
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       spec:
         backoffLimit: 2
         template:

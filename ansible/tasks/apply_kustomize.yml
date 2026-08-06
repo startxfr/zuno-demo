@@ -23,9 +23,19 @@
       - kustomize_dir | length > 0
     fail_msg: "apply_kustomize.yml requires 'kustomize_dir' to be set by the including role"
 
+# --load-restrictor LoadRestrictionsNone: every kustomize_dir in this
+# repository is first-party, local content (never a remote base) - some
+# roles' configMapGenerator `files:` sources reach outside their own
+# kustomize/ directory into this repo's data/ or evaluations/ trees
+# (e.g. ansible/roles/sql_schema/kustomize/schema/), which kustomize's
+# default same-directory-or-below restriction otherwise rejects.
 - name: "kustomize | build manifests from {{ kustomize_dir }}"
   ansible.builtin.set_fact:
-    _kustomize_raw: "{{ lookup('ansible.builtin.pipe', 'kustomize build ' + kustomize_dir) }}"
+    _kustomize_raw: >-
+      {{
+        lookup('ansible.builtin.pipe',
+               'kustomize build --load-restrictor LoadRestrictionsNone ' + kustomize_dir)
+      }}
 
 - name: "kustomize | substitute runtime replacements, if any"
   ansible.builtin.set_fact:

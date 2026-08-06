@@ -34,7 +34,7 @@
       metadata:
         name: zuno-ai-build
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
 
 # Build pods pull source from git and push images out - nothing needs to
 # open an inbound connection to anything in this namespace, so a full
@@ -52,7 +52,7 @@
         name: zuno-ai-build-default-deny-ingress
         namespace: zuno-ai-build
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       spec:
         podSelector: {}
         policyTypes:
@@ -80,7 +80,7 @@
         name: "zuno-ai-build-image-puller-{{ item }}"
         namespace: zuno-ai-build
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       subjects:
         - kind: Group
           apiGroup: rbac.authorization.k8s.io
@@ -104,7 +104,7 @@
         name: "{{ build_image_name }}"
         namespace: zuno-ai-build
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
 
 - name: "openshift-build | apply the BuildConfig: {{ build_image_name }}"
   kubernetes.core.k8s:
@@ -116,7 +116,7 @@
         name: "{{ build_image_name }}"
         namespace: zuno-ai-build
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       spec:
         source:
           type: Git

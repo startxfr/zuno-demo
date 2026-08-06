@@ -1,27 +1,12 @@
 ---
+# ADR-0310: ansible/roles/external_secrets/kustomize/store/. A separate
+# group from runtime/ below - the wait for Valid immediately after this
+# must observe the ClusterSecretStore before the Namespace/ExternalSecret
+# that reference it are applied.
 - name: "external_secrets | register the Vault-backed ClusterSecretStore"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: external-secrets.io/v1beta1
-      kind: ClusterSecretStore
-      metadata:
-        name: vault-backend
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        provider:
-          vault:
-            server: "http://vault.zuno-data.svc:8200"
-            path: secret
-            version: v2
-            auth:
-              kubernetes:
-                mountPath: kubernetes
-                role: eso-reader
-                serviceAccountRef:
-                  name: external-secrets
-                  namespace: external-secrets
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/external_secrets/kustomize/store"
 
 - name: "external_secrets | wait for the ClusterSecretStore to report Valid"
   kubernetes.core.k8s_info:
@@ -35,19 +20,9 @@
   retries: 30
   delay: 10
 
-- name: "external_secrets | ensure the zuno-ai-run namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: zuno-ai-run
-        labels:
-          zuno.io/managed-by: ansible
-
-# The cluster's apps domain (secret/zuno/platform/cluster-domain, written
-# by ansible/roles/vault/tasks/configure.yml) baked into K8s manifest spec
+# ADR-0310: ansible/roles/external_secrets/kustomize/runtime/. The cluster's
+# apps domain (secret/zuno/platform/cluster-domain, written by
+# ansible/roles/vault/tasks/configure.yml) baked into K8s manifest spec
 # fields - a Route's spec.host, the Keycloak CR's spec.hostname.hostname,
 # the realm's client redirect URIs - cannot come from a Secret; those are
 # resolved at Ansible/Helm-apply time via
@@ -56,27 +31,7 @@
 # ExternalSecret is for any current-or-future service that wants the same
 # value as a genuine *runtime* env var/file, refreshed on `refreshInterval`
 # without a redeploy - not yet consumed by any service in this build.
-- name: "external_secrets | expose the cluster's apps domain to runtime consumers"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: external-secrets.io/v1beta1
-      kind: ExternalSecret
-      metadata:
-        name: zuno-cluster-domain
-        namespace: zuno-ai-run
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        refreshInterval: 1h
-        secretStoreRef:
-          name: vault-backend
-          kind: ClusterSecretStore
-        target:
-          name: zuno-cluster-domain
-          creationPolicy: Owner
-        data:
-          - secretKey: domain
-            remoteRef:
-              key: zuno/platform/cluster-domain
-              property: domain
+- name: "external_secrets | apply the zuno-ai-run namespace and the cluster-domain ExternalSecret"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/external_secrets/kustomize/runtime"

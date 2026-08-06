@@ -7,20 +7,14 @@
 # apply isn't a standing GitOps Application - reusing that role's
 # `sql-schema-postgresql-credentials` Secret rather than registering a
 # second ExternalSecret for the same Vault-backed credential.
+# ADR-0310: ansible/roles/rag/kustomize/schema/ (a configMapGenerator
+# reading directly from data/rag/ - disableNameSuffixHash keeps the name
+# "zuno-rag-schema" stable so the inline Job below, outside this
+# kustomization, can still reference it by that fixed name).
 - name: "rag | build the RAG metadata schema + fixtures ConfigMap"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: zuno-rag-schema
-        namespace: zuno-data
-        labels:
-          zuno.io/managed-by: ansible
-      data:
-        003_rag_metadata.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/rag/schema/003_rag_metadata.sql') }}"
-        seed.sql: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/data/rag/fixtures/seed.sql') }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/rag/kustomize/schema"
 
 - name: "rag | delete any previous RAG schema-apply Job (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -41,7 +35,7 @@
         name: zuno-rag-schema-apply
         namespace: zuno-data
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       spec:
         backoffLimit: 2
         template:

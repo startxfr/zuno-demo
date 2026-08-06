@@ -4,47 +4,11 @@
 # ansible/playbooks/{precheck,prepare}.yml's prerequisite_components
 # ordering (nfd listed before nvidia_gpu) and that role's own README for
 # why this dependency was previously undeclared.
-- name: "nfd | ensure the openshift-nfd namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: openshift-nfd
-        labels:
-          zuno.io/managed-by: ansible
-
-- name: "nfd | ensure the operator group exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1
-      kind: OperatorGroup
-      metadata:
-        name: openshift-nfd-group
-        namespace: openshift-nfd
-      spec:
-        targetNamespaces:
-          - openshift-nfd
-
-- name: "nfd | subscribe to the Node Feature Discovery Operator"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: Subscription
-      metadata:
-        name: nfd
-        namespace: openshift-nfd
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        channel: stable
-        name: nfd
-        source: redhat-operators
-        sourceNamespace: openshift-marketplace
-        installPlanApproval: Automatic
+# ADR-0310: ansible/roles/nfd/kustomize/operator/.
+- name: "nfd | apply the operator Namespace, OperatorGroup and Subscription"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/nfd/kustomize/operator"
 
 - name: "nfd | wait for the NodeFeatureDiscovery CRD to be established"
   kubernetes.core.k8s_info:
@@ -59,21 +23,12 @@
 # Minimal CR, relying on the operator's own defaults (instance/topology
 # updater disabled - this demo has no need for either) - the same
 # "don't guess unverified fields beyond a documented minimal shape"
-# reasoning as ansible/roles/nvidia_gpu's ClusterPolicy.
+# reasoning as ansible/roles/nvidia_gpu's ClusterPolicy. ADR-0310:
+# ansible/roles/nfd/kustomize/cr/.
 - name: "nfd | apply the NodeFeatureDiscovery instance"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: nfd.openshift.io/v1
-      kind: NodeFeatureDiscovery
-      metadata:
-        name: nfd-instance
-        namespace: openshift-nfd
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        instance: ""
-        topologyupdater: false
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/nfd/kustomize/cr"
 
 - name: "nfd | wait for NFD worker pods to be labeling nodes"
   kubernetes.core.k8s_info:

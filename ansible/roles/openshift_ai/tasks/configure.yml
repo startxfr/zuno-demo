@@ -3,21 +3,11 @@
 # consumption in zuno-ai-run at 1 - this demo has exactly one 24GB L4 budgeted
 # for the single local model (gitops/charts/models); without this a future
 # second InferenceService could silently starve it.
+# ADR-0310: ansible/roles/openshift_ai/kustomize/quota/.
 - name: "openshift_ai | apply a GPU-capped ResourceQuota"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ResourceQuota
-      metadata:
-        name: zuno-ai-run-gpu-cap
-        namespace: zuno-ai-run
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        hard:
-          requests.nvidia.com/gpu: "1"
-          limits.nvidia.com/gpu: "1"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/openshift_ai/kustomize/quota"
 
 - name: "openshift_ai | configure summary"
   ansible.builtin.debug:

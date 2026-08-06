@@ -38,16 +38,11 @@
 - name: "acceptance-gate | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
+# ADR-0310: ansible/roles/agents/kustomize/namespace/.
 - name: "acceptance-gate | ensure the zuno-ai-run namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: zuno-ai-run
-        labels:
-          zuno.io/managed-by: ansible
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/namespace"
 
 - name: "acceptance-gate | read the demo-persona password from zuno-auth (ADR-0041)"
   kubernetes.core.k8s_info:
@@ -85,31 +80,22 @@
         name: acceptance-gate-credentials
         namespace: zuno-ai-run
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       type: Opaque
       data:
         demo-persona-password: "{{ _gate_demo_password_secret.resources[0].data.password }}"
         tekos-frontend-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
   no_log: true
 
+# ADR-0310: ansible/roles/agents/kustomize/acceptance-gate-scripts/ (a
+# configMapGenerator reading directly from evaluations/tekos/ -
+# disableNameSuffixHash keeps the name "acceptance-gate-scripts" stable so
+# the inline Job below, outside this kustomization, can still reference it
+# by that fixed name).
 - name: "acceptance-gate | build the evaluations/tekos ConfigMap"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: acceptance-gate-scripts
-        namespace: zuno-ai-run
-        labels:
-          zuno.io/managed-by: ansible
-      data:
-        requirements.txt: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/requirements.txt') }}"
-        scenarios.yaml: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/scenarios.yaml') }}"
-        run_scenarios.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/run_scenarios.py') }}"
-        security_checks.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/security_checks.py') }}"
-        gate_checks.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/gate_checks.py') }}"
-        run_acceptance_gate.py: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/evaluations/tekos/run_acceptance_gate.py') }}"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/acceptance-gate-scripts"
 
 - name: "acceptance-gate | delete any previous gate Job (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -130,7 +116,7 @@
         name: zuno-acceptance-gate
         namespace: zuno-ai-run
         labels:
-          zuno.io/managed-by: ansible
+          zuno.io/managed-by: zuno-ansible
       spec:
         backoffLimit: 0
         template:

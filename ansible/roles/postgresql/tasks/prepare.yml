@@ -18,16 +18,11 @@
 # on at least one real cluster from the earlier CloudNativePG fallback)
 # if nothing matches anywhere, and failing loudly - listing every
 # postgres-ish package actually found - rather than guessing a fourth time.
+# ADR-0310: ansible/roles/postgresql/kustomize/namespace/.
 - name: "postgresql | ensure the openshift-operators namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: openshift-operators
-        labels:
-          zuno.io/managed-by: ansible
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/postgresql/kustomize/namespace"
 
 - name: "postgresql | list every PackageManifest published in this cluster's catalogs"
   kubernetes.core.k8s_info:
@@ -44,22 +39,11 @@
         | selectattr('metadata.name', 'search', 'crunchy', ignorecase=True) | list
       }}
 
+# ADR-0310: ansible/roles/postgresql/kustomize/catalogsource-fallback/.
 - name: "postgresql | register the operatorhubio-catalog fallback if nothing crunchy-named was found anywhere"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: CatalogSource
-      metadata:
-        name: operatorhubio-catalog
-        namespace: openshift-marketplace
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        sourceType: grpc
-        image: quay.io/operatorhubio/catalog:latest
-        displayName: "Community Operators (OperatorHub.io)"
-        publisher: OperatorHub.io
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/postgresql/kustomize/catalogsource-fallback"
   when: (_postgresql_pkg_candidates | length) == 0
 
 - name: "postgresql | wait for the operatorhubio-catalog fallback to become ready"
@@ -146,23 +130,15 @@
       Subscribing to package '{{ _postgresql_package_name }}', catalog
       '{{ _postgresql_catalog_source }}', channel '{{ _postgresql_channel }}'.
 
+# ADR-0310: ansible/roles/postgresql/kustomize/subscription/.
 - name: "postgresql | subscribe to the Crunchy Postgres Operator"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: Subscription
-      metadata:
-        name: "{{ _postgresql_package_name }}"
-        namespace: openshift-operators
-        labels:
-          zuno.io/managed-by: ansible
-      spec:
-        channel: "{{ _postgresql_channel }}"
-        name: "{{ _postgresql_package_name }}"
-        source: "{{ _postgresql_catalog_source }}"
-        sourceNamespace: openshift-marketplace
-        installPlanApproval: Automatic
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/postgresql/kustomize/subscription"
+    kustomize_replacements:
+      __POSTGRESQL_PACKAGE_NAME__: "{{ _postgresql_package_name }}"
+      __POSTGRESQL_CHANNEL__: "{{ _postgresql_channel }}"
+      __POSTGRESQL_CATALOG_SOURCE__: "{{ _postgresql_catalog_source }}"
 
 - name: "postgresql | wait for the PostgresCluster CRD to be established"
   kubernetes.core.k8s_info:

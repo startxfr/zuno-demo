@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: zuno-data
+configMapGenerator:
+  - name: zuno-rag-schema
+    files:
+      - 003_rag_metadata.sql=../../../../../data/rag/schema/003_rag_metadata.sql
+      - seed.sql=../../../../../data/rag/fixtures/seed.sql
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    zuno.io/managed-by: zuno-ansible

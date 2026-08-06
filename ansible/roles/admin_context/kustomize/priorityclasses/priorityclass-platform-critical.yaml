@@ -3,7 +3,7 @@ kind: PriorityClass
 metadata:
   name: zuno-platform-critical
   labels:
-    zuno.io/managed-by: ansible
+    zuno.io/managed-by: zuno-ansible
 value: 1000000
 globalDefault: false
 description: >-
