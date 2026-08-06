@@ -44,6 +44,13 @@
 # present in application.yaml - no current caller needs both at once, and
 # merging two independently-authored value trees correctly is more
 # complexity than this repo's actual usage justifies.
+- name: "gitops | update application name to {{ gitops_app_name }}"
+  ansible.builtin.set_fact:
+    _gitops_app_definition: >-
+      {{
+        _gitops_app_definition
+        | combine({'metadata': {'name': gitops_app_name }}, recursive=True)
+      }}
 - name: "gitops | merge extra Helm values into the Application spec, if provided (ADR-0048)"
   ansible.builtin.set_fact:
     _gitops_app_definition: >-
