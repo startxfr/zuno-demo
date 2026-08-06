@@ -11,7 +11,19 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "vault"
-    gitops_app_name: "{{ zuno_id }}-{{ gitops_component_name }}"
+    # NOT "{{ zuno_id }}-{{ gitops_component_name }}" (this role's usual
+    # convention, e.g. every other role in this file): gitops/apps/vault/
+    # application.yaml is also auto-synced by the root App-of-Apps
+    # (gitops/root-app-of-apps.yaml), under its own checked-in, static
+    # name "zuno-vault" - not zuno_id-derived. Naming this Application
+    # "{{ zuno_id }}-vault" instead, as every other role here does, was
+    # found live on api.demo222.startx.fr to create a *second*,
+    # independent Vault release/StatefulSet alongside the root App-of-
+    # Apps' own "zuno-vault" one - the exact opposite of
+    # apply_gitops_app.yml's documented "both paths converge on the same
+    # desired state" assumption. Matching the static file's own name here
+    # makes that assumption actually true for this component.
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
     # The chart's readinessProbe runs `vault status`, which exits non-zero
     # while sealed - so the StatefulSet (and therefore the Application)
     # can never report Healthy until Vault is unsealed, which only
@@ -21,12 +33,18 @@
     # role's own equivalent, sufficient wait.
     gitops_app_wait: false
 
+# Label-based, not a hardcoded name: the Helm release name (and therefore
+# every resource's name) isn't a repository-wide constant - see the
+# gitops_app_name comment above. app.kubernetes.io/name=vault is the
+# official HashiCorp chart's own stable label, present regardless of
+# release name.
 - name: "vault | wait for the Vault StatefulSet to exist"
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: StatefulSet
     namespace: zuno-data
-    name: vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
   register: _vault_sts
   until: (_vault_sts.resources | default([]) | length) > 0
   retries: 30
@@ -72,7 +90,7 @@
 - name: "vault | check for an existing bootstrap credentials secret"
   kubernetes.core.k8s_info:
     kind: Secret
-    namespace: zuno-secrets-bootstrap
+    namespace: zuno-data
     name: vault-bootstrap-credentials
   register: _vault_bootstrap_secret
 
@@ -95,7 +113,7 @@
       kind: Secret
       metadata:
         name: vault-bootstrap-credentials
-        namespace: zuno-secrets-bootstrap
+        namespace: zuno-data
       type: Opaque
       stringData:
         unseal_key: "{{ (_vault_init_raw.stdout | from_json).unseal_keys_b64[0] }}"

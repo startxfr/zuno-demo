@@ -14,7 +14,7 @@
 - name: "vault | read bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret
-    namespace: zuno-secrets-bootstrap
+    namespace: zuno-data
     name: vault-bootstrap-credentials
   register: _vault_creds
   no_log: true
@@ -38,8 +38,30 @@
       - "component=server"
   register: _vault_pod
 
+# Discovered, not hardcoded "vault.zuno-data.svc" or "{{ zuno_id }}-vault":
+# the Helm release name isn't a repository-wide constant (see prepare.yml's
+# gitops_app_name comment) and the chart creates three Services sharing
+# app.kubernetes.io/name=vault (client, -internal headless, -ui) - only
+# the plain client one (no vault-internal label) is what VAULT_ADDR needs.
+- name: "vault | discover the Vault client Service"
+  kubernetes.core.k8s_info:
+    kind: Service
+    namespace: zuno-data
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+  register: _vault_services
+
+- name: "vault | select the client Service (excludes the -internal headless and -ui variants)"
+  ansible.builtin.set_fact:
+    _vault_service_name: >-
+      {{
+        (_vault_services.resources
+         | rejectattr('metadata.labels.vault-internal', 'defined')
+         | map(attribute='metadata.name') | list)[0]
+      }}
+
 # The unseal key/root token live in vault-bootstrap-credentials, in the
-# locked-down zuno-secrets-bootstrap namespace (ADR-0024) - a Pod can only
+# locked-down zuno-data namespace (ADR-0024) - a Pod can only
 # mount Secrets from its own namespace, so the vault-unseal-configure Job
 # below (running in zuno-data, alongside Vault itself) needs its own copy.
 # Same pattern as ansible/roles/agents/tasks/run_acceptance_gate.yml's
@@ -103,7 +125,7 @@
                   - /scripts/unseal-and-configure.sh
                 env:
                   - name: VAULT_ADDR
-                    value: http://vault.zuno-data.svc:8200
+                    value: "http://{{ _vault_service_name }}.zuno-data.svc:8200"
                   - name: VAULT_TOKEN
                     valueFrom:
                       secretKeyRef:
@@ -178,6 +200,7 @@
   loop_control:
     loop_var: generated_secret
     label: "{{ generated_secret.key }}"
+  no_log: false
   vars:
     _vault_generated_secrets:
       keycloak/admin:
@@ -194,7 +217,6 @@
         # constraint) to PGO - see ansible/roles/postgresql/README.md.
         username: zunoapp
         password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
-  no_log: true
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:

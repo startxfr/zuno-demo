@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: zuno-secrets-bootstrap
-  labels:
-    zuno.io/managed-by: zuno-ansible

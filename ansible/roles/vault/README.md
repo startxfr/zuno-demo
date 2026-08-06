@@ -8,7 +8,7 @@ Kubernetes auth method and the `eso-reader` policy/role that
 This is the one role that cannot depend on Vault for its own bootstrap
 secret: `prepare.yml` captures the unseal key and root token into a
 Kubernetes `Secret` (`vault-bootstrap-credentials`) in a locked-down,
-admin-only namespace (`zuno-secrets-bootstrap`) rather than requiring any
+admin-only namespace (`zuno-data`) rather than requiring any
 external input. See ADR-0024.
 
 `configure.yml` also generates and seeds the secrets that can be
