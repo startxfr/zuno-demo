@@ -90,3 +90,4 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v3 | Proposed | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v3 | Proposed | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v3 | Proposed | Introduce policy-driven autonomous optimization |
+| [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) | v0 | Proposed | Manage static Kubernetes resources as per-role kustomize directories |
