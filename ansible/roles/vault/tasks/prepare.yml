@@ -7,7 +7,8 @@
 - name: "vault | apply the Vault GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
-    gitops_app_name: "{{ zuno_id }}-vault"
+    gitops_component_name: "vault"
+    gitops_app_name: "{{ zuno_id }}-{{ gitops_component_name }}"
     # The chart's readinessProbe runs `vault status`, which exits non-zero
     # while sealed - so the StatefulSet (and therefore the Application)
     # can never report Healthy until Vault is unsealed, which only

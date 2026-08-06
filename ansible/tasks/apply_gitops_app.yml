@@ -12,13 +12,14 @@
 # `make day0|d0 configure <component>` / `make day1|d1 configure|run
 # <component>` self-sufficient for a single component without requiring a
 # full sync.
-
 - name: "gitops | validate gitops_app_name is set"
   ansible.builtin.assert:
     that:
+      - gitops_component_name is defined
+      - gitops_component_name | length > 0
       - gitops_app_name is defined
       - gitops_app_name | length > 0
-    fail_msg: "apply_gitops_app.yml requires 'gitops_app_name' to be set by the including role"
+    fail_msg: "apply_gitops_app.yml requires 'gitops_component_name' AND 'gitops_app_name' to be set by the including role"
 
 - name: "gitops | resolve the cluster base domain (for Applications whose Helm values need it)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
@@ -27,7 +28,7 @@
   ansible.builtin.set_fact:
     _gitops_app_definition: >-
       {{
-        (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_app_name + '/application.yaml')
+        (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_component_name + '/application.yaml')
           | replace('__CLUSTER_BASE_DOMAIN__', cluster_base_domain))
         | from_yaml
       }}

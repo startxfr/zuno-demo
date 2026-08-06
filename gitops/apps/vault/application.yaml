@@ -5,7 +5,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: vault
+  name: zuno-vault
   namespace: openshift-gitops
 spec:
   project: default
@@ -69,4 +69,4 @@ spec:
       prune: true
       selfHeal: false # Vault's seal state is managed imperatively by the vault role; avoid ArgoCD fighting a sealed pod's restart behavior.
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false

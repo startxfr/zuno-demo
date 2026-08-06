@@ -1,19 +1,18 @@
 ---
-# The sales-db MCP server (ADR-0017) - see gitops/charts/mcp-sales-db and
-# components/mcp-servers/sales-db. Applied by the `sql_schema` role's
-# configure.yml, after the schema/fixtures Job it runs directly (the schema
-# must exist before this server can serve anything from it).
+# Local model serving (ADR-0019) - see gitops/charts/models. Applied by the
+# `models` Ansible role's configure.yml, after `openshift_ai` (DataScienceCluster
+# with kserve enabled) and `nvidia_gpu` (GPU Operator) have prepared the cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zuno-mcp-sales-db
+  name: zuno-namespaces
   namespace: openshift-gitops
 spec:
   project: default
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
-    path: gitops/charts/mcp-sales-db
+    path: gitops/charts/namespaces
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
@@ -22,4 +21,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true

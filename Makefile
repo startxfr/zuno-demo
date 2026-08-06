@@ -35,6 +35,8 @@ help:
 	  '  Required once, before any target below:' \
 	  '    export K8S_AUTH_HOST=https://api.mycluster.com:6443' \
 	  '    export K8S_AUTH_API_KEY=<cluster-admin token>' \
+	  '  Available at any time:' \
+	  '    export K8S_AUTH_VERIFY_SSL=false' \
 	  '  This is the only manual input for the entire install - everything else' \
 	  '  (Keycloak, Vault, PostgreSQL, OpenShift AI, MLOps...) is automated.' \
 	  '' \

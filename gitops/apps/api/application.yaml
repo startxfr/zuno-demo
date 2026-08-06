@@ -9,7 +9,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: api
+  name: zuno-api
   namespace: openshift-gitops
 spec:
   project: default
@@ -31,4 +31,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
