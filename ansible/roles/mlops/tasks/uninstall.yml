@@ -1,0 +1,4 @@
+---
+- name: "mlops | uninstall scaffold"
+  ansible.builtin.debug:
+    msg: "Uninstall contract registered for mlops; implementation tasks are pending."

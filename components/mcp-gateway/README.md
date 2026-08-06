@@ -141,7 +141,7 @@ it never caught the loader bug).
 # from the repository root
 docker build -f components/mcp-gateway/Dockerfile -t zuno/mcp-gateway:local .
 docker run -p 8080:8080 \
-  -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.example.com/realms/zuno \
+  -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.mycluster.example.com/realms/zuno \
   zuno/mcp-gateway:local
 ```
 

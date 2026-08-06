@@ -1,0 +1,5 @@
+---
+- name: "models | delete the models ArgoCD Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "{{ zuno_id }}-models"

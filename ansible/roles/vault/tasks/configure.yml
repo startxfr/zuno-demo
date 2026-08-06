@@ -60,13 +60,12 @@
          | map(attribute='metadata.name') | list)[0]
       }}
 
-# The unseal key/root token live in vault-bootstrap-credentials, in the
-# locked-down zuno-data namespace (ADR-0024) - a Pod can only
-# mount Secrets from its own namespace, so the vault-unseal-configure Job
-# below (running in zuno-data, alongside Vault itself) needs its own copy.
-# Same pattern as ansible/roles/agents/tasks/run_acceptance_gate.yml's
-# acceptance-gate-credentials Secret.
-- name: "vault | copy the unseal key/root token into a zuno-data Secret the Job can mount"
+# A dedicated copy, not a direct reference to vault-bootstrap-credentials:
+# keeps the Job's own dependency self-contained and separately named, same
+# spirit as ansible/roles/agents/tasks/run_acceptance_gate.yml's
+# acceptance-gate-credentials Secret (there, the copy is also cross-
+# namespace; here both Secrets happen to live in zuno-data already).
+- name: "vault | copy the unseal key/root token into a Secret the Job can mount"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -191,16 +190,19 @@
     namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
+    # `environment:` is the generic Ansible task keyword - it sets env vars
+    # for the *ansible controller's own* module invocation, not the remote
+    # exec session kubernetes.core.k8s_exec opens (that module has no
+    # env-passing parameter of its own). VAULT_TOKEN has to be set inside
+    # the shell command that actually runs in the container instead.
     command: >-
-      vault kv put secret/zuno/{{ generated_secret.key }}
-      username={{ generated_secret.value.username }} password={{ generated_secret.value.password }}
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/{{ generated_secret.key }}
+      username={{ generated_secret.value.username }} password={{ generated_secret.value.password }}"
   loop: "{{ _vault_generated_secrets | dict2items }}"
   loop_control:
     loop_var: generated_secret
     label: "{{ generated_secret.key }}"
-  no_log: false
+  no_log: true
   vars:
     _vault_generated_secrets:
       keycloak/admin:
@@ -224,10 +226,8 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      vault kv put secret/zuno/keycloak/tekos-frontend
-      client_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/keycloak/tekos-frontend
+      client_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
 - name: "vault | generate and seed the shared demo-persona password (ADR-0041)"
@@ -236,10 +236,8 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      vault kv put secret/zuno/keycloak/demo-personas
-      password={{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/keycloak/demo-personas
+      password={{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
 - name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037)"
@@ -248,10 +246,8 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      vault kv put secret/zuno/mcp/gateway-workload-token
-      token={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/mcp/gateway-workload-token
+      token={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
 - name: "vault | generate and seed the Tekos frontend session HMAC secret"
@@ -260,10 +256,8 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      vault kv put secret/zuno/tekos/frontend-session
-      hmac_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/tekos/frontend-session
+      hmac_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
 - name: "vault | check whether operator-supplied secrets already exist"
@@ -271,9 +265,8 @@
     namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv get -format=json secret/zuno/{{ secret_path }}"
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json secret/zuno/{{ secret_path }}"
   loop:
     - google-oauth/client
     - smtp/technical
@@ -290,9 +283,8 @@
     namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv put secret/zuno/{{ secret_result.secret_path }} _placeholder=true"
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/{{ secret_result.secret_path }} _placeholder=true"
   loop: "{{ _vault_existing_secrets.results }}"
   loop_control:
     loop_var: secret_result
@@ -324,6 +316,5 @@
     namespace: zuno-data
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    command: "vault kv put secret/zuno/platform/cluster-domain domain={{ cluster_base_domain }}"
-  environment:
-    VAULT_TOKEN: "{{ _vault_root_token }}"
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/platform/cluster-domain domain={{ cluster_base_domain }}"

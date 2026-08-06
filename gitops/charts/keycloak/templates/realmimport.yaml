@@ -6,12 +6,12 @@
 # RealmRepresentation object, there is no ConfigMap/file reference option in
 # this CRD version, so "inline" is the only supported delivery mechanism.
 #
-# __CLUSTER_BASE_DOMAIN__ in the source JSON is a plain string placeholder
+# apps.mycluster.example.com in the source JSON is a plain string placeholder
 # (not Keycloak syntax) substituted here with .Values.clusterBaseDomain
 # before parsing, so every per-agent client's redirectUris/webOrigins/
 # rootUrl resolve to the real cluster's apps domain without hand-editing the
 # JSON per environment.
-{{- $realmRaw := .Files.Get "files/realm-zuno.json" | replace "__CLUSTER_BASE_DOMAIN__" .Values.clusterBaseDomain }}
+{{- $realmRaw := .Files.Get "files/realm-zuno.json" | replace "apps.mycluster.example.com" .Values.clusterBaseDomain }}
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: KeycloakRealmImport
 metadata:

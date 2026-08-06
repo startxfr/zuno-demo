@@ -31,7 +31,7 @@ Directories present:
 
 | Component | Source |
 |---|---|
-| `vault` | Helm chart `hashicorp/vault` |
+| `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) |
 | `keycloak` | local chart, `gitops/charts/keycloak` |
 | `postgresql` | local chart, `gitops/charts/postgresql` |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) |
@@ -44,10 +44,10 @@ Directories present:
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) |
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) |
 
-`keycloak` and `api`'s `Application.spec.source.helm.values` reference
-`clusterBaseDomain: __CLUSTER_BASE_DOMAIN__` - a token, not a literal
-domain. `ansible/tasks/apply_gitops_app.yml` substitutes it with the real
-cluster's apps wildcard domain, auto-discovered from
+`keycloak`, `api` and `vault`'s `Application.spec.source.helm.values`
+reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a
+literal domain. `ansible/tasks/apply_gitops_app.yml` substitutes it with
+the real cluster's apps wildcard domain, auto-discovered from
 `Ingress.config.openshift.io/cluster` and persisted to Vault at
 `secret/zuno/platform/cluster-domain` (see
 `ansible/tasks/resolve_cluster_base_domain.yml` and

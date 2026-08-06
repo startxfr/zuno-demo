@@ -22,7 +22,7 @@ spec:
         global:
           # Substituted by ansible/tasks/apply_gitops_app.yml - see
           # gitops/apps/keycloak/application.yaml's comment for how.
-          clusterBaseDomain: __CLUSTER_BASE_DOMAIN__
+          clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-agent-tekos

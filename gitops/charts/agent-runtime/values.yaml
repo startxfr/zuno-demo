@@ -27,7 +27,7 @@ resources:
     cpu: "1"
     memory: 1Gi
 
-keycloakIssuer: https://keycloak-zuno.apps.example.com/realms/zuno
+keycloakIssuer: https://keycloak-zuno.apps.mycluster.example.com/realms/zuno
 ragServiceUrl: http://rag-service.zuno-data.svc:8080
 mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
 

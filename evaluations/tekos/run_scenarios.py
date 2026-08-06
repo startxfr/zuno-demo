@@ -21,8 +21,8 @@ from typing import Any, Callable, Dict, List, Optional
 import httpx
 import yaml
 
-KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://sso.apps.example.com")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tekos.apps.example.com")
+KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://sso.apps.mycluster.example.com")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tekos.apps.mycluster.example.com")
 BFF_URL = os.getenv("BFF_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080")
 RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080")
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")

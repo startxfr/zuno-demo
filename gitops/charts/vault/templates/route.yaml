@@ -1,0 +1,24 @@
+{{- if .Values.route.enabled }}
+# Fronts the upstream chart's own "-ui" Service (see
+# templates/_helpers.tpl's vault.uiServiceName) with an edge-terminated
+# Route. Off by default - see values.yaml's route.enabled comment
+# (ADR-0024 treats Vault as locked-down/admin-only).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "vault.uiServiceName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: ui
+spec:
+  host: {{ include "vault.routeHost" . }}
+  to:
+    kind: Service
+    name: {{ include "vault.uiServiceName" . }}
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

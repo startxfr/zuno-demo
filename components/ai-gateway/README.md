@@ -137,7 +137,7 @@ here and backed by Vault or a ConfigMap for the limits) is future work.
 
 | Var | Default | Purpose |
 |---|---|---|
-| `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.example.com/realms/zuno` | JWT issuer / JWKS base |
+| `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.mycluster.example.com/realms/zuno` | JWT issuer / JWKS base |
 | `PROVIDER_ROUTING_PATH` | `/app/config/provider-routing.yaml` | routing config (ConfigMap-mounted, not baked into the image) |
 | `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `secret/zuno/providers/<name>` |
@@ -159,7 +159,7 @@ all providers, and guessing would produce a misleading cost figure.
 cd components/ai-gateway
 docker build -t zuno/ai-gateway:local .
 docker run -p 8080:8080 \
-  -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.example.com/realms/zuno \
+  -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.mycluster.example.com/realms/zuno \
   -v $(pwd)/../../platform/ai-gateway/provider-routing.yaml:/app/config/provider-routing.yaml:ro \
   zuno/ai-gateway:local
 ```

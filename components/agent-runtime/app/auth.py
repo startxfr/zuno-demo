@@ -21,7 +21,7 @@ from jwt import PyJWKClient
 logger = logging.getLogger("agent_runtime.auth")
 
 KEYCLOAK_ISSUER = os.getenv(
-    "KEYCLOAK_ISSUER", "https://keycloak-zuno.apps.example.com/realms/zuno"
+    "KEYCLOAK_ISSUER", "https://keycloak-zuno.apps.mycluster.example.com/realms/zuno"
 )
 KEYCLOAK_JWKS_URL = os.getenv(
     "KEYCLOAK_JWKS_URL", f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"

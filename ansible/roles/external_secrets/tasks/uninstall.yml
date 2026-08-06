@@ -1,0 +1,25 @@
+---
+# Reverse of install.yml + configure.yml. Namespaces (external-secrets,
+# the shared openshift-operators and zuno-ai-run) are left in place.
+- name: "external_secrets | delete the cluster-domain ExternalSecret"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    name: zuno-cluster-domain
+    namespace: zuno-ai-run
+
+- name: "external_secrets | delete the vault-backend ClusterSecretStore"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: external-secrets.io/v1beta1
+    kind: ClusterSecretStore
+    name: vault-backend
+
+- name: "external_secrets | delete the operator Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: external-secrets-operator
+    namespace: openshift-operators

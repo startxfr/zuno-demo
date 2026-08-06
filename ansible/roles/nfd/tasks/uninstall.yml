@@ -1,0 +1,25 @@
+---
+# Reverse of install.yml. The openshift-nfd Namespace is left in place.
+- name: "nfd | delete the NodeFeatureDiscovery instance"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: nfd.openshift.io/v1
+    kind: NodeFeatureDiscovery
+    name: nfd-instance
+    namespace: openshift-nfd
+
+- name: "nfd | delete the operator Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: nfd
+    namespace: openshift-nfd
+
+- name: "nfd | delete the operator OperatorGroup"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1
+    kind: OperatorGroup
+    name: openshift-nfd-group
+    namespace: openshift-nfd

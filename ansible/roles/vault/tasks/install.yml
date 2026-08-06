@@ -2,8 +2,8 @@
 # Installs Vault via its GitOps Application (gitops/apps/vault), then
 # imperatively initializes it. This is the one component that cannot
 # depend on Vault for its own bootstrap secret: the unseal key and root
-# token are captured here and stored in a Kubernetes Secret in a
-# locked-down, admin-only namespace. See ADR-0024's "Hardened requirement".
+# token are captured here and stored in vault-bootstrap-credentials, a
+# Kubernetes Secret in zuno-data. See ADR-0024's "Hardened requirement".
 # Unsealing itself happens in configure.yml's vault-unseal-configure Job,
 # not here - that Job re-runs (and re-unseals) every time `configure` is
 # invoked, independent of whether `prepare` ran in the same pass.
@@ -78,15 +78,6 @@
   ansible.builtin.set_fact:
     _vault_status: "{{ _vault_status_raw.stdout | default('{}') | from_json }}"
 
-# ADR-0310: ansible/roles/vault/kustomize/bootstrap-namespace/. The
-# bootstrap credentials Secret below stays inline - its value only exists
-# during this Ansible run (captured from `vault operator init`), so it has
-# no static desired-state manifest to check in.
-- name: "vault | apply the locked-down bootstrap namespace and its admin-only RoleBinding"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
-  vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/vault/kustomize/bootstrap-namespace"
-
 - name: "vault | check for an existing bootstrap credentials secret"
   kubernetes.core.k8s_info:
     kind: Secret
@@ -105,7 +96,7 @@
     - not (_vault_status.initialized | default(false))
     - (_vault_bootstrap_secret.resources | default([]) | length) == 0
 
-- name: "vault | persist the unseal key and root token to the locked-down bootstrap secret"
+- name: "vault | persist the unseal key and root token to the bootstrap secret"
   kubernetes.core.k8s:
     state: present
     definition:

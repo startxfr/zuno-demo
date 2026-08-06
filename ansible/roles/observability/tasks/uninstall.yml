@@ -1,0 +1,26 @@
+---
+# Reverse of install.yml. zuno-telemetry and
+# openshift-opentelemetry-operator (Namespaces) are left in place.
+- name: "observability | delete the OTLP collector"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: opentelemetry.io/v1beta1
+    kind: OpenTelemetryCollector
+    name: zuno-otel-collector
+    namespace: zuno-telemetry
+
+- name: "observability | delete the operator Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: opentelemetry-product
+    namespace: openshift-opentelemetry-operator
+
+- name: "observability | delete the operator OperatorGroup"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1
+    kind: OperatorGroup
+    name: opentelemetry-operator-group
+    namespace: openshift-opentelemetry-operator

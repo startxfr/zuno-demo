@@ -1,0 +1,9 @@
+---
+# Reverse of install.yml. zuno-ai-run (shared namespace) is left in place.
+- name: "smtp | delete the technical mail identity ExternalSecret"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    name: smtp-technical-credentials
+    namespace: zuno-ai-run

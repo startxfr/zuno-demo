@@ -9,7 +9,7 @@ EXTRA_VARS ?=
 # platform) sequencing, replacing the former precheck/prepare/configure/
 # install/check interface outright.
 DAY0_COMPONENTS := admin-context argocd namespaces vault external-secrets keycloak postgresql smtp nfd nvidia-gpu observability openshift-ai
-DAY0_VERBS := check install configure all
+DAY0_VERBS := check install configure uninstall all
 
 # Day 1 has two different valid component sets depending on the verb:
 # "build" only knows how to build the 3 named image groups (mcp, rag,
@@ -21,7 +21,7 @@ DAY0_VERBS := check install configure all
 # "configure" and "run" are aliases of each other.
 DAY1_RUN_COMPONENTS := llm models sql-schema rag mcp agents mlops
 DAY1_BUILD_COMPONENTS := mcp rag agent
-DAY1_VERBS := check build configure run all
+DAY1_VERBS := check build configure run uninstall all
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
@@ -43,12 +43,14 @@ help:
 	  '  make day0|d0 check [component]      Check one/all Day 0 prerequisites' \
 	  '  make day0|d0 install [component]    Install one/all Day 0 prerequisites' \
 	  '  make day0|d0 configure [component]  Configure one/all Day 0 prerequisites' \
+	  '  make day0|d0 uninstall [component]  Uninstall one/all Day 0 prerequisites (reverse order)' \
 	  '  make day0|d0 all [component]        check + install + configure, in order' \
 	  '' \
 	  '  make day1|d1 check [component]      Check one/all Day 1 components (agents runs the ADR-0053 acceptance gate)' \
 	  '  make day1|d1 build [component]      Build one/all Day 1 component images' \
 	  '  make day1|d1 configure [component]  Configure/deploy one/all Day 1 components (alias: run)' \
 	  '  make day1|d1 run [component]        Same as configure' \
+	  '  make day1|d1 uninstall [component]  Uninstall one/all Day 1 components (reverse order)' \
 	  '  make day1|d1 all [component]        check + build + configure, whichever apply to the component' \
 	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
@@ -74,6 +76,7 @@ case "$$verb" in \
   check) run_one check ;; \
   install) run_one install ;; \
   configure) run_one configure ;; \
+  uninstall) run_one uninstall ;; \
   all) run_one check && run_one install && run_one configure ;; \
 esac
 endef
@@ -99,6 +102,7 @@ case " $(DAY1_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day1 verb: '$$ve
 run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_build() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_build.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_configure() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_configure.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 check component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
@@ -109,6 +113,9 @@ case "$$verb" in \
   configure|run) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 $$verb component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     run_configure ;; \
+  uninstall) \
+    case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 uninstall component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_uninstall ;; \
   all) \
     is_run=0; is_build=0; \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) is_run=1;; esac; \

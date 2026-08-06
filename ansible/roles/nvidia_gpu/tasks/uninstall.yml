@@ -1,0 +1,25 @@
+---
+# Reverse of install.yml. The nvidia-gpu-operator Namespace is left in
+# place.
+- name: "nvidia_gpu | delete the ClusterPolicy"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: nvidia.com/v1
+    kind: ClusterPolicy
+    name: gpu-cluster-policy
+
+- name: "nvidia_gpu | delete the operator Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: gpu-operator-certified
+    namespace: nvidia-gpu-operator
+
+- name: "nvidia_gpu | delete the operator OperatorGroup"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1
+    kind: OperatorGroup
+    name: nvidia-gpu-operator-group
+    namespace: nvidia-gpu-operator

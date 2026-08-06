@@ -148,7 +148,7 @@ surface) - see `go.mod`/`go.sum`.
 `ansible/roles/keycloak` was still a scaffold at the time this track was
 built, so there is no published Keycloak route hostname convention yet.
 This component assumes `sso.<cluster_base_domain>` (e.g.
-`sso.apps.example.com`) as `KEYCLOAK_ISSUER_URL`'s host and a confidential
+`sso.apps.mycluster.example.com`) as `KEYCLOAK_ISSUER_URL`'s host and a confidential
 OIDC client per agent (`<agent>-frontend`) that supports the Authorization
 Code + PKCE flow with a client secret. If the identity track lands a
 different hostname or makes the frontend clients public (no secret), update

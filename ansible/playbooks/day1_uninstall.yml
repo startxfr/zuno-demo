@@ -1,0 +1,29 @@
+---
+# Day 1 (ADR-0056): `make day1 uninstall`/`make d1 uninstall`. Reverses
+# day1_configure.yml, in the opposite order.
+- name: "Day 1: uninstall components"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day1_components:
+      - mlops
+      - agents
+      - mcp
+      - rag
+      - sql_schema
+      - models
+      - llm
+  tasks:
+    - name: Resolve requested Day 1 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day1_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Uninstall Day 1 components
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: uninstall
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

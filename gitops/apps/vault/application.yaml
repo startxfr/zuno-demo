@@ -2,6 +2,14 @@
 # Demo-grade Vault: single replica, file storage, no HA/auto-unseal via
 # cloud KMS. Sufficient for a solo demo; production hardening is tracked by
 # ADR-0112 (production-grade backup and recovery, v1).
+#
+# Deploys the local wrapper chart at gitops/charts/vault, which pulls in
+# the upstream hashicorp/vault chart as a Helm dependency (see that
+# chart's Chart.yaml) - the same internal-chart convention as
+# postgresql/keycloak, instead of pointing straight at HashiCorp's Helm
+# repo. All server/ui/injector defaults now live in
+# gitops/charts/vault/values.yaml; only the optional Route feature is
+# toggled here.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -10,57 +18,24 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://helm.releases.hashicorp.com
-    chart: vault
-    targetRevision: "0.28.1"
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/vault
     helm:
       values: |
-        # ADR-0052: the official chart's own documented flag for
-        # OpenShift SCC compatibility (arbitrary/non-root UID, no
-        # privileged context) - this repo does not otherwise control this
-        # third-party chart's PodSpec directly, so hardening beyond this
-        # flag is left to the chart's own restricted-compatible defaults
-        # rather than guessed at via undocumented value overrides.
-        global:
-          openshift: true
-        server:
-          image:
-            # Fully qualified: an unqualified "hashicorp/vault" short name
-            # resolves via this cluster's node-level short-name alias
-            # config to registry.connect.redhat.com/hashicorp/vault, which
-            # needs a paid Red Hat Connect pull secret this cluster
-            # doesn't have (ImagePullBackOff, "Please login to the Red Hat
-            # Registry" - found via live-cluster testing on
-            # api.demo222.startx.fr). docker.io's image is the same
-            # HashiCorp-published build, just reachable without that
-            # credential.
-            repository: docker.io/hashicorp/vault
-            tag: "1.17.2"
-          standalone:
-            enabled: true
-            config: |
-              ui = true
-              listener "tcp" {
-                address = "[::]:8200"
-                tls_disable = true
-              }
-              storage "file" {
-                path = "/vault/data"
-              }
-          dataStorage:
-            enabled: true
-            size: 2Gi
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-        ui:
-          enabled: true
-        injector:
+        # Off by default (ADR-0024: Vault is locked-down/admin-only) -
+        # flip to true to front the vault-ui Service with an OpenShift
+        # Route at vault.<clusterBaseDomain>. clusterBaseDomain itself is
+        # substituted below regardless, so enabling the route later is a
+        # one-line change.
+        route:
           enabled: false
+        # apps.mycluster.example.com is substituted by
+        # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
+        # wildcard domain (see gitops/charts/keycloak's Application for
+        # the same convention) - only consumed if route.enabled is true.
+        global:
+          clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-data

@@ -1,0 +1,11 @@
+---
+# Reverse of install.yml. The StorageClass check has nothing to undo.
+- name: "admin_context | delete the PriorityClasses"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: scheduling.k8s.io/v1
+    kind: PriorityClass
+    name: "{{ item }}"
+  loop:
+    - zuno-platform-critical
+    - zuno-workload-default

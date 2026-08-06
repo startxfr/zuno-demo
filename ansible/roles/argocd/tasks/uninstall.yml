@@ -1,0 +1,32 @@
+---
+# Reverse of install.yml + configure.yml. Removing the root App-of-Apps
+# first lets ArgoCD prune every child Application (and everything they in
+# turn manage) while the operator is still running; the operator's own
+# Subscription is removed last.
+- name: "argocd | delete the root App-of-Apps"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: zuno-app-of-apps
+    namespace: openshift-gitops
+    wait: true
+
+- name: "argocd | delete the application-controller ClusterRoleBinding"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: zuno-argocd-application-controller-admin
+
+- name: "argocd | delete the operator Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: openshift-gitops-operator
+    namespace: openshift-operators
+
+# openshift-gitops-operator (the Namespace) and openshift-operators (shared
+# with other Day 0 operators) are left in place - see
+# ansible/roles/namespaces for the platform's namespace lifecycle.

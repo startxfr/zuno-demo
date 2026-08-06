@@ -1,0 +1,33 @@
+---
+# Reverse of install.yml + configure.yml. zuno-ai-run (shared) and
+# redhat-ods-operator (Namespaces) are left in place.
+- name: "openshift_ai | delete the GPU-capped ResourceQuota"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ResourceQuota
+    name: zuno-ai-run-gpu-cap
+    namespace: zuno-ai-run
+
+- name: "openshift_ai | delete the DataScienceCluster"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: datasciencecluster.opendatahub.io/v1
+    kind: DataScienceCluster
+    name: zuno-dsc
+
+- name: "openshift_ai | delete the operator Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+
+- name: "openshift_ai | delete the operator OperatorGroup"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1
+    kind: OperatorGroup
+    name: rhods-operator-group
+    namespace: redhat-ods-operator

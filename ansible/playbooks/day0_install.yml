@@ -28,7 +28,7 @@
     - name: Install Day 0 components
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: prepare
+        tasks_from: install
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

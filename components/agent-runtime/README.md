@@ -208,7 +208,7 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 
 | Var | Default | Purpose |
 |---|---|---|
-| `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.example.com/realms/zuno` | JWT issuer / JWKS base |
+| `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.mycluster.example.com/realms/zuno` | JWT issuer / JWKS base |
 | `RAG_SERVICE_URL` | `http://rag-service.zuno-data.svc:8080` | retrieve node |
 | `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-ai-run.svc:8080` | tool_call node |
 | `AI_GATEWAY_URL` | `http://ai-gateway.zuno-ai-run.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
@@ -232,7 +232,7 @@ call, so it's the correct owner of that detail. `rag-service` and
 # from the repository root - build context matters (bakes in agents/, see Dockerfile)
 docker build -f components/agent-runtime/Dockerfile -t zuno/agent-runtime:local .
 docker run -p 8080:8080 \
-  -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.example.com/realms/zuno \
+  -e KEYCLOAK_ISSUER=https://keycloak-zuno.apps.mycluster.example.com/realms/zuno \
   -e RAG_SERVICE_URL=http://localhost:8081 \
   -e MCP_GATEWAY_URL=http://localhost:8082 \
   -e AI_GATEWAY_URL=http://localhost:8083 \

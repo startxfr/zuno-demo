@@ -56,7 +56,7 @@ Resources are classified into three tiers, and only the first two move:
    also moves to `kustomize/`, using a placeholder token substituted by
    `apply_kustomize.yml` before parsing, the same string-substitution
    convention `ansible/tasks/apply_gitops_app.yml` already uses for
-   `__CLUSTER_BASE_DOMAIN__`. ConfigMaps built purely from file contents
+   `apps.mycluster.example.com`. ConfigMaps built purely from file contents
    (`lookup('ansible.builtin.file', ...)`) belong here too, via kustomize's
    native `configMapGenerator: files:` - no placeholder needed.
 3. **Genuinely dynamic per-run orchestration** (one-shot Jobs recreated every

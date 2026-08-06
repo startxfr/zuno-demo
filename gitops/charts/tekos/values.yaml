@@ -7,7 +7,7 @@
 # its own header comment: environment values are hand-adapted, checked-in
 # configuration, not injected at apply time.
 global:
-  clusterBaseDomain: apps.example.com
+  clusterBaseDomain: apps.mycluster.example.com
 
 namespace: zuno-agent-tekos
 

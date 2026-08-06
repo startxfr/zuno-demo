@@ -24,7 +24,7 @@ resources:
 
 # Keycloak realm issuer (identity track owns the real route hostname -
 # override this for the target cluster; see ADR-0012).
-keycloakIssuer: https://keycloak-zuno.apps.example.com/realms/zuno
+keycloakIssuer: https://keycloak-zuno.apps.mycluster.example.com/realms/zuno
 
 # ASSUMPTION: sales-db MCP server address - see components/mcp-gateway
 # README "Assumption: sales-db MCP server address" for the reasoning and

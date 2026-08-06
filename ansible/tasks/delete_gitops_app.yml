@@ -1,0 +1,32 @@
+---
+# Shared task: reverse of apply_gitops_app.yml. Deletes one ArgoCD
+# Application by name, patching in the cascade finalizer first so ArgoCD
+# prunes every resource it manages before the Application object itself
+# is removed. Required var: gitops_app_name.
+- name: "gitops | validate gitops_app_name is set"
+  ansible.builtin.assert:
+    that:
+      - gitops_app_name is defined
+      - gitops_app_name | length > 0
+    fail_msg: "delete_gitops_app.yml requires 'gitops_app_name' to be set by the including role"
+
+- name: "gitops | ensure {{ gitops_app_name }} cascades on delete"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: "{{ gitops_app_name }}"
+    namespace: openshift-gitops
+    definition:
+      metadata:
+        finalizers:
+          - resources-finalizer.argocd.argoproj.io
+
+- name: "gitops | delete ArgoCD Application: {{ gitops_app_name }}"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: "{{ gitops_app_name }}"
+    namespace: openshift-gitops
+    wait: true

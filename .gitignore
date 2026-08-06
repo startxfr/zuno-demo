@@ -29,6 +29,12 @@ node_modules/
 dist/
 coverage/
 
+# Helm dependency downloads (ArgoCD/`helm dependency build` fetch these
+# from Chart.yaml's dependencies at render time - see gitops/charts/vault,
+# the one local chart wrapping an upstream chart as a dependency).
+# Chart.lock IS committed, to pin the dependency version.
+gitops/charts/*/charts/
+
 # Editors / OS
 .DS_Store
 .idea/

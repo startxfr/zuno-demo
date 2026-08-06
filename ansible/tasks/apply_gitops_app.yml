@@ -24,12 +24,12 @@
 - name: "gitops | resolve the cluster base domain (for Applications whose Helm values need it)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-- name: "gitops | render the Application manifest with __CLUSTER_BASE_DOMAIN__ substituted"
+- name: "gitops | render the Application manifest with apps.mycluster.example.com substituted"
   ansible.builtin.set_fact:
     _gitops_app_definition: >-
       {{
         (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_component_name + '/application.yaml')
-          | replace('__CLUSTER_BASE_DOMAIN__', cluster_base_domain))
+          | replace('apps.mycluster.example.com', cluster_base_domain))
         | from_yaml
       }}
 
