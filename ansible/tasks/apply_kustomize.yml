@@ -39,15 +39,17 @@
 
 - name: "kustomize | substitute runtime replacements, if any"
   ansible.builtin.set_fact:
-    _kustomize_raw: "{{ _kustomize_raw | replace(item.key, item.value) }}"
+    _kustomize_raw: "{{ _kustomize_raw | replace(_kustomize_replacement.key, _kustomize_replacement.value) }}"
   loop: "{{ kustomize_replacements | default({}) | dict2items }}"
   loop_control:
-    label: "{{ item.key }}"
+    loop_var: _kustomize_replacement
+    label: "{{ _kustomize_replacement.key }}"
 
 - name: "kustomize | apply every resource built from {{ kustomize_dir }}"
   kubernetes.core.k8s:
     state: present
-    definition: "{{ item }}"
+    definition: "{{ _kustomize_resource }}"
   loop: "{{ _kustomize_raw | from_yaml_all | select('!=', None) | list }}"
   loop_control:
-    label: "{{ item.kind }}/{{ item.metadata.name }}"
+    loop_var: _kustomize_resource
+    label: "{{ _kustomize_resource.kind }}/{{ _kustomize_resource.metadata.name }}"

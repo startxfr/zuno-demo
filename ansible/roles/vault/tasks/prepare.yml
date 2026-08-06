@@ -1,9 +1,12 @@
 ---
 # Installs Vault via its GitOps Application (gitops/apps/vault), then
-# imperatively initializes and unseals it. This is the one component that
-# cannot depend on Vault for its own bootstrap secret: the unseal key and
-# root token are captured here and stored in a Kubernetes Secret in a
+# imperatively initializes it. This is the one component that cannot
+# depend on Vault for its own bootstrap secret: the unseal key and root
+# token are captured here and stored in a Kubernetes Secret in a
 # locked-down, admin-only namespace. See ADR-0024's "Hardened requirement".
+# Unsealing itself happens in configure.yml's vault-unseal-configure Job,
+# not here - that Job re-runs (and re-unseals) every time `configure` is
+# invoked, independent of whether `prepare` ran in the same pass.
 - name: "vault | apply the Vault GitOps Application"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -98,22 +101,4 @@
         unseal_key: "{{ (_vault_init_raw.stdout | from_json).unseal_keys_b64[0] }}"
         root_token: "{{ (_vault_init_raw.stdout | from_json).root_token }}"
   when: _vault_init_raw is defined and _vault_init_raw.stdout is defined
-  no_log: true
-
-- name: "vault | re-read the bootstrap secret (covers the already-initialized branch)"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-secrets-bootstrap
-    name: vault-bootstrap-credentials
-  register: _vault_bootstrap_secret_final
-
-- name: "vault | unseal Vault if sealed"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-data
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      vault operator unseal
-      {{ _vault_bootstrap_secret_final.resources[0].data.unseal_key | b64decode }}
-  when: _vault_status.sealed | default(true)
   no_log: true
