@@ -4,7 +4,16 @@
 namespace: zuno-ai-run
 
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-run/ai-gateway
+  # zuno-ai-build, not zuno-ai-run: every other chart's image.repository
+  # points at the internal registry namespace ansible/tasks/
+  # apply_openshift_build.yml actually builds/pushes ImageStreams into
+  # (see gitops/charts/{agent-runtime,mcp-gateway}/values.yaml) - this one
+  # never matched, presumably because ai-gateway had no build component of
+  # its own until ansible/roles/ai_gateway_build was added, so this value
+  # was never exercised end-to-end before. Found via live-cluster testing
+  # on api.demo222.startx.fr (permanent ImagePullBackOff even after a
+  # successful build).
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ai-gateway
   tag: latest
   pullPolicy: IfNotPresent
 
