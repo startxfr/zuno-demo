@@ -5,10 +5,19 @@
 # ansible/roles/vault/tasks/configure.yml's google-oauth/smtp placeholders,
 # scoped to this role since these are llm-specific secrets, not core
 # platform bootstrap secrets.
+#
+# namespace: zuno-data, not zuno-secrets-bootstrap: ansible/roles/vault's
+# own install.yml/configure.yml (the actual owner of this Secret) both
+# read/write it in zuno-data - found via live-cluster testing on
+# api.demo222.startx.fr that this role instead pointed at
+# zuno-secrets-bootstrap, a leftover namespace from an earlier install
+# attempt holding a stale root token from a previous Vault init cycle.
+# Every `vault kv` exec in this file 403'd against the live (correctly
+# re-initialized) Vault using that stale token.
 - name: "llm | read Vault bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret
-    namespace: zuno-secrets-bootstrap
+    namespace: zuno-data
     name: vault-bootstrap-credentials
   register: _llm_vault_creds
   no_log: true
