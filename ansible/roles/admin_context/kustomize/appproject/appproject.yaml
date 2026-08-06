@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: zuno
+  namespace: openshift-gitops
+  labels:
+    zuno.io/managed-by: zuno-ansible
+spec:
+  description: >-
+    Every zuno-* platform Application (gitops/apps/) lives in this project
+    instead of ArgoCD's built-in "default" one, so its RBAC/permissions are
+    scoped and auditable as a named, deliberate grant rather than the
+    catch-all every other in-cluster Application would otherwise share.
+  sourceRepos:
+    - https://github.com/startxfr/zuno-demo.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

@@ -1,0 +1,90 @@
+---
+# Shared task: full OLM operator teardown - reverse of a Subscription-based
+# install (ansible/roles/argocd, keycloak, postgresql, external_secrets,
+# openshift_ai all install this way). Deleting only the Subscription (the
+# old behavior of every one of those roles' uninstall.yml) leaves the
+# operator's ClusterServiceVersion (its Deployment/RBAC) running and, more
+# importantly, leaves every CRD it registered on the cluster - any CR of
+# that type becomes orphaned (no controller left reconciling it), and a
+# later reinstall then adopts pre-existing, possibly stale CRDs/CRs instead
+# of starting clean.
+#
+# Removes cluster state in the safe order: the CRDs the CSV owns (deleting
+# a CRD blocks on and removes every CR instance of that type first, via
+# Kubernetes' own garbage collection/finalizer handling - the ArgoCD
+# Applications that manage those CRs should already be gone by the time an
+# including role reaches this task, per that role's own
+# delete_gitops_app.yml call) -> the CSV -> the Subscription itself.
+#
+# Required vars: operator_subscription_name, operator_namespace (the
+# Subscription's own namespace - OLM always installs the CSV into the same
+# namespace as the Subscription that resolved it).
+- name: "remove_operator | validate required vars are set"
+  ansible.builtin.assert:
+    that:
+      - operator_subscription_name is defined
+      - operator_subscription_name | length > 0
+      - operator_namespace is defined
+      - operator_namespace | length > 0
+    fail_msg: "remove_operator.yml requires 'operator_subscription_name' AND 'operator_namespace' to be set by the including role"
+
+- name: "remove_operator | look up the {{ operator_subscription_name }} Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: "{{ operator_subscription_name }}"
+    namespace: "{{ operator_namespace }}"
+  register: _remove_operator_subscription
+
+- name: "remove_operator | resolve the installed CSV name, if the Subscription still exists"
+  ansible.builtin.set_fact:
+    _remove_operator_csv_name: >-
+      {{
+        (_remove_operator_subscription.resources[0].status.installedCSV | default(''))
+        if (_remove_operator_subscription.resources | default([]) | length) > 0
+        else ''
+      }}
+
+- name: "remove_operator | look up the installed CSV, to read the CRDs it owns"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    name: "{{ _remove_operator_csv_name }}"
+    namespace: "{{ operator_namespace }}"
+  register: _remove_operator_csv
+  when: _remove_operator_csv_name | length > 0
+
+- name: "remove_operator | delete every CRD owned by this operator's CSV (cascades to delete its CRs first)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: "{{ _remove_operator_owned_crd.name }}"
+    wait: true
+    wait_timeout: 180
+  loop: >-
+    {{
+      (_remove_operator_csv.resources[0].spec.customresourcedefinitions.owned | default([]))
+      if (_remove_operator_csv.resources | default([]) | length) > 0
+      else []
+    }}
+  loop_control:
+    loop_var: _remove_operator_owned_crd
+    label: "{{ _remove_operator_owned_crd.name }}"
+
+- name: "remove_operator | delete the installed CSV"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    name: "{{ _remove_operator_csv_name }}"
+    namespace: "{{ operator_namespace }}"
+  when: _remove_operator_csv_name | length > 0
+
+- name: "remove_operator | delete the {{ operator_subscription_name }} Subscription"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: "{{ operator_subscription_name }}"
+    namespace: "{{ operator_namespace }}"

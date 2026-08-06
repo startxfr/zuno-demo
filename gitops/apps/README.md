@@ -9,6 +9,15 @@ the only mechanism `make day0|d0`/`day1|d1` uses to reconcile these
 Applications, so a single component can always be configured without a full
 sync.
 
+Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
+`default` project - a dedicated `AppProject` (`ansible/roles/admin_context/
+kustomize/appproject/appproject.yaml`) applied by the `admin_context` role's
+`configure.yml` during `make day0|d0 configure` (after the `argocd` role's
+`install.yml` has installed the operator that owns the `AppProject` CRD).
+Keeping every zuno-* Application on a named, scoped project - rather than
+whatever else on the cluster shares `default` - makes its RBAC/permissions
+an explicit, auditable grant instead of an implicit one.
+
 The root App-of-Apps (`gitops/root-app-of-apps.yaml`), which recurses over
 this directory and manages every `application.yaml` it finds as a child
 Application, is no longer applied by Ansible (ADR-0311, superseding the

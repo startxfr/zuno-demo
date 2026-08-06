@@ -13,7 +13,7 @@ metadata:
     # only - Ansible applies each Application directly and ignores this.
     argocd.argoproj.io/sync-wave: "-184"
 spec:
-  project: default
+  project: zuno
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

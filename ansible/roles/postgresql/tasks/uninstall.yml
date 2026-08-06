@@ -16,13 +16,11 @@
     namespace: openshift-operators
   register: _postgresql_subscriptions
 
-- name: "postgresql | delete the discovered Subscription, if any"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: operators.coreos.com/v1alpha1
-    kind: Subscription
-    name: "{{ _postgresql_subscription.metadata.name }}"
-    namespace: openshift-operators
+- name: "postgresql | remove the discovered operator(s) (owned CRDs, then CSV, then Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ _postgresql_subscription.metadata.name }}"
+    operator_namespace: openshift-operators
   loop: >-
     {{ _postgresql_subscriptions.resources | default([])
        | selectattr('metadata.name', 'search', 'postgres-operator|^pgo|crunchy') | list }}

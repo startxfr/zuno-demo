@@ -1,5 +1,33 @@
 ---
-# Reverse of install.yml. The StorageClass check has nothing to undo.
+# Reverse of install.yml + configure.yml. The StorageClass check has
+# nothing to undo.
+#
+# The zuno AppProject is only deleted here if its CRD is still present:
+# admin_context is the *last* component `day0_uninstall.yml` tears down
+# (reverse of the install order), so on a full `make d0 uninstall` the
+# argocd role has already removed the AppProject CRD itself (along with
+# every other argoproj.io CRD, per ansible/tasks/remove_operator.yml) by
+# the time this runs - attempting to delete a CR whose CRD no longer
+# exists would fail. Guarding on the CRD's presence keeps this task
+# idempotent for that case while still cleaning up correctly when
+# admin_context is uninstalled on its own (`make d0 uninstall
+# admin_context`), independent of argocd.
+- name: "admin_context | check whether the AppProject CRD is still present"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: appprojects.argoproj.io
+  register: _admin_context_appproject_crd
+
+- name: "admin_context | delete the zuno AppProject"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: argoproj.io/v1alpha1
+    kind: AppProject
+    name: zuno
+    namespace: openshift-gitops
+  when: (_admin_context_appproject_crd.resources | default([]) | length) > 0
+
 - name: "admin_context | delete the PriorityClasses"
   kubernetes.core.k8s:
     state: absent

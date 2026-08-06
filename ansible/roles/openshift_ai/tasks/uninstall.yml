@@ -16,13 +16,11 @@
     kind: DataScienceCluster
     name: zuno-dsc
 
-- name: "openshift_ai | delete the operator Subscription"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: operators.coreos.com/v1alpha1
-    kind: Subscription
-    name: rhods-operator
-    namespace: redhat-ods-operator
+- name: "openshift_ai | remove the operator (its owned CRDs, then the CSV, then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: rhods-operator
+    operator_namespace: redhat-ods-operator
 
 - name: "openshift_ai | delete the operator OperatorGroup"
   kubernetes.core.k8s:
