@@ -33,7 +33,9 @@
     state: absent
     api_version: scheduling.k8s.io/v1
     kind: PriorityClass
-    name: "{{ item }}"
+    name: "{{ pc_name }}"
+  loop_control:
+    loop_var: pc_name
   loop:
     - zuno-platform-critical
     - zuno-workload-default
