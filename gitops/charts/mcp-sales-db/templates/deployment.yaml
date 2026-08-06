@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: sales-db-mcp
     zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
 spec:
   replicas: {{ .Values.replicas }}
   selector:

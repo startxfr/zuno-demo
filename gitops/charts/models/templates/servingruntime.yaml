@@ -9,6 +9,10 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    # Before templates/inferenceservice.yaml, which references this
+    # runtime by name (spec.predictor.model.runtime).
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   supportedModelFormats:
     - name: vLLM

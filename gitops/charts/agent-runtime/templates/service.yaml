@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: agent-runtime
     zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "80"
 spec:
   selector:
     app.kubernetes.io/name: agent-runtime

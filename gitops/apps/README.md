@@ -1,13 +1,21 @@
 # GitOps applications
 
 One subdirectory per platform component, each holding a single ArgoCD
-`Application` manifest at `<component>/application.yaml`. The root
-App-of-Apps (`gitops/root-app-of-apps.yaml`) recurses over this directory and
-manages every `application.yaml` it finds as a child Application; the
-matching Ansible role also applies its own manifest directly during
+`Application` manifest at `<component>/application.yaml`. The matching
+Ansible role applies its own manifest directly during
 `make day0|d0 configure <component>` / `make day1|d1 configure|run
-<component>` (ADR-0056; see `ansible/tasks/apply_gitops_app.yml`) so a
-single component can be configured without a full sync.
+<component>` (ADR-0056; see `ansible/tasks/apply_gitops_app.yml`) - this is
+the only mechanism `make day0|d0`/`day1|d1` uses to reconcile these
+Applications, so a single component can always be configured without a full
+sync.
+
+The root App-of-Apps (`gitops/root-app-of-apps.yaml`), which recurses over
+this directory and manages every `application.yaml` it finds as a child
+Application, is no longer applied by Ansible (ADR-0311, superseding the
+"Bootstrap architecture" addendum in
+docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md).
+It is kept in the repository only as a documented example of a
+pure-GitOps, Ansible-free bootstrap - see `docs/platform/installation.md`.
 
 Each `Application.spec.source` points either at an upstream Helm chart
 (`repoURL` + `chart` + `targetRevision`) for well-known third-party software

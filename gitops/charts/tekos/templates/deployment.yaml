@@ -6,6 +6,8 @@ metadata:
   labels:
     zuno.io/agent: tekos
     app.kubernetes.io/component: frontend
+  annotations:
+    argocd.argoproj.io/sync-wave: "90"
 spec:
   replicas: {{ .Values.frontend.replicas }}
   selector:
@@ -86,6 +88,8 @@ metadata:
   labels:
     zuno.io/agent: tekos
     app.kubernetes.io/component: bff
+  annotations:
+    argocd.argoproj.io/sync-wave: "90"
 spec:
   replicas: {{ .Values.bff.replicas }}
   selector:

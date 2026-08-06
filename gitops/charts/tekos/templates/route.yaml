@@ -10,6 +10,8 @@ metadata:
   labels:
     zuno.io/agent: tekos
     app.kubernetes.io/component: frontend
+  annotations:
+    argocd.argoproj.io/sync-wave: "105"
 spec:
   host: {{ include "tekos.routeHost" . }}
   to:

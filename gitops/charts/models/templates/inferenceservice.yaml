@@ -11,6 +11,7 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
+    argocd.argoproj.io/sync-wave: "0"
     # ADR-0047/ADR-0048: explicit, belt-and-suspenders with the
     # DataScienceCluster's cluster-wide kserve.serving.managementState:
     # Removed (ansible/roles/openshift_ai/tasks/prepare.yml) - this one

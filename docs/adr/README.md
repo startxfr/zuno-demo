@@ -91,3 +91,4 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v3 | Proposed | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v3 | Proposed | Introduce policy-driven autonomous optimization |
 | [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) | v0 | Implemented | Manage static Kubernetes resources as per-role kustomize directories |
+| [ADR-0311](0311-stop-applying-the-root-app-of-apps-from-ansible.md) | v0 | Implemented | Stop applying the root App-of-Apps from Ansible bootstrap tasks |

@@ -1,18 +1,13 @@
 ---
-- name: "argocd | apply the root App-of-Apps"
-  kubernetes.core.k8s:
-    state: present
-    src: "{{ zuno_repo_root }}/gitops/root-app-of-apps.yaml"
-
-- name: "argocd | wait for the App-of-Apps to become Synced and Healthy"
-  kubernetes.core.k8s_info:
-    api_version: argoproj.io/v1alpha1
-    kind: Application
-    namespace: openshift-gitops
-    name: zuno-app-of-apps
-  register: _argocd_root_app
-  until: >-
-    (_argocd_root_app.resources | default([]) | length) > 0 and
-    (_argocd_root_app.resources[0].status.sync.status | default('') == 'Synced')
-  retries: 30
-  delay: 10
+# No configure phase: this role no longer applies the root App-of-Apps
+# (gitops/root-app-of-apps.yaml) - ADR-0311. Every platform component is
+# installed/reconciled exclusively through its own role's direct
+# ansible/tasks/apply_gitops_app.yml call, so there is nothing left for
+# `argocd`'s own configure step to do (same convention as
+# ansible/roles/nfd/tasks/configure.yml and friends). The App-of-Apps
+# manifest itself still exists, kept as a documented example of a
+# pure-GitOps bootstrap in docs/platform/installation.md - it is simply
+# never applied by any `make day0|d0`/`day1|d1` target.
+- name: "argocd | nothing to configure - every component applies its own GitOps Application directly (ADR-0311)"
+  ansible.builtin.debug:
+    msg: "argocd has no configure phase - see gitops/apps/README.md and ADR-0311."

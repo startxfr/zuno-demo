@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: ai-gateway
     zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "60"
 spec:
   replicas: {{ .Values.replicas }}
   selector:

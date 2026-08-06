@@ -6,6 +6,8 @@ metadata:
   labels:
     zuno.io/agent: tekos
     app.kubernetes.io/component: frontend
+  annotations:
+    argocd.argoproj.io/sync-wave: "95"
 spec:
   selector:
     app.kubernetes.io/component: frontend
@@ -25,6 +27,8 @@ metadata:
   labels:
     zuno.io/agent: tekos
     app.kubernetes.io/component: bff
+  annotations:
+    argocd.argoproj.io/sync-wave: "95"
 spec:
   selector:
     app.kubernetes.io/component: bff

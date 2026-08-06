@@ -8,6 +8,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-35"
 data:
   init.sql: |
     CREATE EXTENSION IF NOT EXISTS vector;

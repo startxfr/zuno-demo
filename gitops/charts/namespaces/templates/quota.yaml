@@ -6,6 +6,8 @@ metadata:
   namespace: {{ .name }}
   labels:
     zuno.io/agent: {{ .agent }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-70"
 spec:
   hard:
     requests.cpu: {{ $.Values.quota.requestsCpu | quote }}

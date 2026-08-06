@@ -1,17 +1,11 @@
 ---
-# Reverse of install.yml + configure.yml. Removing the root App-of-Apps
-# first lets ArgoCD prune every child Application (and everything they in
-# turn manage) while the operator is still running; the operator's own
-# Subscription is removed last.
-- name: "argocd | delete the root App-of-Apps"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: argoproj.io/v1alpha1
-    kind: Application
-    name: zuno-app-of-apps
-    namespace: openshift-gitops
-    wait: true
-
+# Reverse of install.yml (configure.yml has nothing to reverse - ADR-0311).
+# There is no root App-of-Apps to delete here: since ADR-0311, nothing
+# under ansible/ ever applies gitops/root-app-of-apps.yaml, so uninstall
+# only has to remove the operator's own resources. An operator who applied
+# the App-of-Apps by hand, following its documented example in
+# docs/platform/installation.md, is responsible for removing it the same
+# way (`oc -n openshift-gitops delete application zuno-app-of-apps`).
 - name: "argocd | delete the application-controller ClusterRoleBinding"
   kubernetes.core.k8s:
     state: absent

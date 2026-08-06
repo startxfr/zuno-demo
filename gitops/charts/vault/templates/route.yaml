@@ -11,6 +11,8 @@ metadata:
   labels:
     app.kubernetes.io/name: vault
     app.kubernetes.io/component: ui
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
 spec:
   host: {{ include "vault.routeHost" . }}
   to:

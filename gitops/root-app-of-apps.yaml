@@ -1,10 +1,16 @@
 ---
-# Root App-of-Apps. Applied once by the `argocd` role's configure task
-# (ansible/roles/argocd/tasks/configure.yml). ArgoCD recurses over
-# gitops/apps/ and turns every application.yaml it finds into a managed
-# child Application - this is the mechanism that lets `make configure`
-# (with no scope) bring the whole platform to its declared state from a
-# single command. See docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md.
+# Root App-of-Apps. NOT applied by any Ansible task (ADR-0311 retired
+# ansible/roles/argocd/tasks/configure.yml's use of this manifest - every
+# component's Application is applied directly by its own role instead, via
+# ansible/tasks/apply_gitops_app.yml). Kept here only as a documented
+# example of a pure-GitOps, Ansible-free bootstrap: apply this manifest by
+# hand (`oc apply -f gitops/root-app-of-apps.yaml`) and ArgoCD recurses over
+# gitops/apps/, turning every application.yaml it finds into a managed
+# child Application, bringing the whole platform to its declared state from
+# a single command with no Ansible involved. See
+# docs/platform/installation.md and
+# docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md /
+# docs/adr/0311-stop-applying-the-root-app-of-apps-from-ansible.md.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

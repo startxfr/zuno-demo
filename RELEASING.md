@@ -27,11 +27,14 @@ tag for from here.
    commit/PR. `platform/supply-chain/check_no_latest_tags.py` (wired into
    `.github/workflows/lint.yml`) will start passing once every chart's
    `tag: latest` is replaced this way.
-5. Bump `gitops/apps/*/application.yaml` and
-   `gitops/root-app-of-apps.yaml`'s `targetRevision: main` to
+5. Bump `gitops/apps/*/application.yaml`'s `targetRevision: main` to
    `targetRevision: v0.1.0` in the same PR - this is the point ADR-0051's
    "production-like Argo CD applications must deploy a reviewed Git
-   revision/tag" actually takes effect, and not before.
+   revision/tag" actually takes effect, and not before. Also bump
+   `gitops/root-app-of-apps.yaml`'s own `targetRevision` the same way even
+   though Ansible no longer applies it (ADR-0311): it stays a working,
+   up-to-date example for the documented pure-GitOps bootstrap path
+   (`docs/platform/installation.md`).
 6. Merge, then `make day0|d0 configure` / `make day1|d1 configure|run`
    (or let ArgoCD's automated sync pick it up) to roll the cluster onto
    the pinned revision.

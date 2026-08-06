@@ -16,6 +16,8 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   podSelector:
     matchLabels:

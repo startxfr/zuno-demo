@@ -14,6 +14,8 @@ metadata:
   namespace: {{ .name }}
   labels:
     zuno.io/agent: {{ .agent }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
 spec:
   podSelector: {}
   policyTypes:

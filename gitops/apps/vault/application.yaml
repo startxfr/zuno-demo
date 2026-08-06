@@ -15,6 +15,10 @@ kind: Application
 metadata:
   name: zuno-vault
   namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this.
+    argocd.argoproj.io/sync-wave: "-192"
 spec:
   project: default
   source:

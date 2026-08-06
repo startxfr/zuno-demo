@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: mcp-gateway
     zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
 spec:
   selector:
     app.kubernetes.io/name: mcp-gateway
