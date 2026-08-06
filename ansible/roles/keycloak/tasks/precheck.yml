@@ -27,6 +27,24 @@
       installed as a GitOps Application (gitops/apps/keycloak).
   when: (_keycloak_precheck_argocd_crd.resources | default([]) | length) == 0
 
+    # The operator is installed directly into zuno-auth (OwnNamespace mode
+    # - RHBK's CSV doesn't support AllNamespaces, found via live-cluster
+    # testing on api.demo222.startx.fr), so this role's own prepare.yml
+    # needs the namespace to already exist.
+- name: "keycloak | verify the zuno-auth namespace already exists"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: zuno-auth
+  register: _keycloak_precheck_ns
+
+- name: "keycloak | fail if the zuno-auth namespace is missing"
+  ansible.builtin.fail:
+    msg: >-
+      Namespace zuno-auth not found. Run `make d0 install namespaces`
+      before preparing keycloak - the RHBK operator is installed directly
+      into zuno-auth (OwnNamespace mode).
+  when: (_keycloak_precheck_ns.resources | default([]) | length) == 0
+
     # ASSUMPTION (see README.md): the redhat-operators catalog publishes Red
     # Hat build of Keycloak under the package name "rhbk-operator". Verify
     # against `oc get packagemanifest -n openshift-marketplace | grep -i

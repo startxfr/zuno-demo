@@ -11,30 +11,12 @@
     # `openshift-operators` namespace (whose OperatorGroup targets every
     # namespace, the AllNamespaces pattern every other Day 0 operator in
     # this repo uses) failed the CSV with "AllNamespaces InstallModeType
-    # not supported". Needs its own dedicated namespace + scoped
-    # OperatorGroup instead - same pattern ansible/roles/nvidia_gpu
-    # already uses for the same reason (gpu-operator-certified is also
-    # OwnNamespace-only).
-- name: "keycloak | ensure the rhbk-operator namespace exists"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: rhbk-operator
-        labels:
-          zuno.io/managed-by: ansible
-
-    # targetNamespaces is zuno-auth, not rhbk-operator: OLM's SingleNamespace
-    # mode runs the operator pod in the OperatorGroup's own namespace but
-    # only *watches* the namespace(s) listed here - and configure.yml
-    # applies the actual Keycloak CR into zuno-auth (gitops/apps/keycloak),
-    # not into rhbk-operator. Pointing this at rhbk-operator itself would
-    # install the operator successfully but leave it blind to the CR it's
-    # actually supposed to reconcile. zuno-auth is guaranteed to already
-    # exist here: the namespaces role (Day 0, runs before keycloak) creates
-    # it.
+    # not supported". Installed directly into zuno-auth instead (OwnNamespace
+    # mode: the operator pod and the Keycloak CR it reconciles - applied by
+    # this role's own configure.yml via gitops/apps/keycloak - both live in
+    # the same namespace, so no separate operator-only namespace is needed).
+    # zuno-auth is guaranteed to already exist here: the namespaces role
+    # (Day 0, runs before keycloak) creates it.
 - name: "keycloak | ensure the operator group exists"
   kubernetes.core.k8s:
     state: present
@@ -43,7 +25,7 @@
       kind: OperatorGroup
       metadata:
         name: rhbk-operator-group
-        namespace: rhbk-operator
+        namespace: zuno-auth
       spec:
         targetNamespaces:
           - zuno-auth
@@ -109,7 +91,7 @@
       kind: Subscription
       metadata:
         name: rhbk-operator
-        namespace: rhbk-operator
+        namespace: zuno-auth
         labels:
           zuno.io/managed-by: ansible
       spec:
@@ -149,7 +131,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
-    namespace: rhbk-operator
+    namespace: zuno-auth
   register: _keycloak_operator_deploys
   until: >-
     (_keycloak_operator_deploys.resources | default([])
@@ -171,7 +153,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
-    namespace: rhbk-operator
+    namespace: zuno-auth
     name: "{{ _keycloak_operator_deploy_name }}"
   register: _keycloak_operator_deploy
   until: (_keycloak_operator_deploy.resources[0].status.readyReplicas | default(0)) > 0

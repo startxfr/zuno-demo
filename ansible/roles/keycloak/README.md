@@ -58,24 +58,23 @@ channels are version-qualified (`stable-v22`, `stable-v26`, ...) with no
 bare `stable` alias on that cluster. Same lesson as ADR-0048's CNPG
 channel discovery and `ansible/roles/postgresql`'s PGO package discovery.
 
-## Dedicated OperatorGroup (RHBK doesn't support AllNamespaces)
+## Installed directly into zuno-auth (RHBK doesn't support AllNamespaces)
 
 Unlike every other Day 0 operator in this repo (which subscribe into the
 shared `openshift-operators` namespace, whose `OperatorGroup` targets all
 namespaces), RHBK's CSV only supports `OwnNamespace`/`SingleNamespace`
 install modes - subscribing it there failed with `AllNamespaces
 InstallModeType not supported, cannot configure to watch all namespaces`
-(found via the same live-cluster test). `tasks/prepare.yml` instead
-creates a dedicated `rhbk-operator` namespace with its own `OperatorGroup`
-(same pattern `ansible/roles/nvidia_gpu` already uses for
-`gpu-operator-certified`, which has the same restriction) - but with
-`spec.targetNamespaces: [zuno-auth]`, not `[rhbk-operator]`: the operator
-pod runs in its own `rhbk-operator` namespace, but OLM's `SingleNamespace`
-mode only lets it *watch* the namespace(s) listed in `targetNamespaces`,
-and the actual `Keycloak` CR this role's `configure.yml` applies lives in
-`zuno-auth` (`gitops/apps/keycloak`). Pointing `targetNamespaces` at
-`rhbk-operator` itself would have installed the operator successfully
-while leaving it blind to the CR it's supposed to reconcile.
+(found via live-cluster testing on api.demo222.startx.fr). Rather than
+give it a separate operator-only namespace (the shape
+`ansible/roles/nvidia_gpu` uses for the same reason), `tasks/prepare.yml`
+installs it in `OwnNamespace` mode directly into `zuno-auth`: an
+`OperatorGroup` (`targetNamespaces: [zuno-auth]`) and the `Subscription`
+both live there, alongside the `Keycloak` CR this role's `configure.yml`
+applies (`gitops/apps/keycloak`) - one namespace for both the operator and
+the instance it reconciles, no cross-namespace watch scope to get wrong.
+`zuno-auth` must already exist (`tasks/precheck.yml` verifies this,
+`namespaces` role runs before `keycloak` in Day 0 order).
 
 | Item | How it's resolved |
 |---|---|
