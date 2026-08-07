@@ -2,7 +2,12 @@
 # Pre-created here rather than left entirely to the operator (which also
 # creates it once it processes the CertManager CR below) - same
 # "harmless, idempotent, ArgoCD-owned" reasoning as gitops/charts/
-# external-secrets/templates/namespace-external-secrets.yaml.
+# external-secrets/templates/namespace-external-secrets.yaml. Created as
+# an ArgoCD PreSync hook (own phase, entirely before the normal Sync
+# phase) rather than a sync-wave'd resource - this namespace is not this
+# Application's own destination.namespace (that's cert-manager-operator),
+# so nothing else guarantees its existence before the CertManager CR
+# needs it.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -10,5 +15,5 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/hook: PreSync
 {{- end }}

@@ -1,4 +1,11 @@
 {{- if .Values.operator.enabled }}
+# Created as an ArgoCD PreSync hook - runs in its own phase, entirely
+# before the normal Sync phase (OperatorGroup/Subscription below), so its
+# existence is guaranteed without relying on sync-wave ordering within
+# the same batch. Also backed by this Application's own
+# syncOptions.CreateNamespace=true (gitops/apps/nfd/application-d0.yaml)
+# as a redundant safeguard, since this namespace is also this
+# Application's own destination.namespace.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -6,5 +13,5 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/hook: PreSync
 {{- end }}

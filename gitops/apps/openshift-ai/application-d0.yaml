@@ -38,4 +38,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      # redhat-ods-operator (this Application's destination.namespace) is
+      # created nowhere else - also backed by the chart's own
+      # namespace.yaml PreSync hook as a redundant safeguard.
+      - CreateNamespace=true

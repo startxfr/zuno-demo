@@ -32,4 +32,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      # cert-manager-operator (this Application's destination.namespace)
+      # is created nowhere else - also backed by the chart's own
+      # namespace-operator.yaml PreSync hook as a redundant safeguard.
+      - CreateNamespace=true

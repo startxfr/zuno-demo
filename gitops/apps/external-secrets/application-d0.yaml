@@ -37,4 +37,8 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false
+      # external-secrets (this Application's destination.namespace) is
+      # created nowhere else - also backed by the chart's own
+      # namespace-external-secrets.yaml PreSync hook as a redundant
+      # safeguard.
+      - CreateNamespace=true

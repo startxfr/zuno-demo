@@ -2,7 +2,11 @@
 # zuno-ai-run is also created by gitops/charts/namespaces (the platform
 # scaffolding chart, applied earlier in day0_components) - re-applying it
 # here idempotently means this chart never depends on that role having run
-# first, at the cost of a harmless duplicate creation.
+# first, at the cost of a harmless duplicate creation. Created as an
+# ArgoCD PreSync hook, same as every other chart-declared Namespace in
+# this repo - syncOptions.CreateNamespace stays false on this Application
+# (gitops/apps/smtp/application-d0.yaml) since zuno-ai-run already exists
+# by the time smtp runs regardless of this hook.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -10,5 +14,5 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/hook: PreSync
 {{- end }}

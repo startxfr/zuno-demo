@@ -87,6 +87,32 @@ backed by a `pki/` secrets engine `ansible/roles/vault` prepares (see that
 role's README). Infrastructure only for now - no existing Route/service
 consumes this issuer yet.
 
+**`Namespace` resources on the `-d0` side**: every chart that declares its
+own `Namespace` (the operator's dedicated namespace, or - for
+`cert-manager`/`external-secrets` - a second namespace beyond it, or -
+for `namespaces` - the whole set of platform/agent namespaces) renders it
+as an ArgoCD `PreSync` hook (`argocd.argoproj.io/hook: PreSync`), not a
+`sync-wave`'d resource. A hook runs in its own phase, entirely before the
+normal Sync phase, so its existence relative to everything else in the
+same chart (`OperatorGroup`/`Subscription`/`ResourceQuota`/...) is
+guaranteed - `sync-wave` only orders resources *within* the same Sync
+phase, not against a separate namespace-creation concern. No
+`hook-delete-policy` is set, so the `Namespace` persists across
+re-syncs and is only removed when the Application itself is deleted.
+
+Independently, every `-d0` Application's `syncOptions.CreateNamespace` is
+`true` whenever its own `spec.destination.namespace` isn't already
+guaranteed to exist some other way (a dedicated operator namespace no
+earlier `day0_components` role creates - `cert-manager`, `external-secrets`,
+`nfd`, `nvidia-gpu`, `openshift-ai`, `observability`, and `namespaces`
+itself for `zuno-ai-run`) - `false` (the default) everywhere else,
+including every `-d0` whose destination is created by `gitops/charts/
+namespaces` ahead of it in `day0_components` (`keycloak`, `postgresql`,
+`smtp`) and every no-op `-d0` (`destination.namespace: openshift-gitops`,
+which always exists). Where both apply to the same namespace (e.g.
+`cert-manager-operator`), they're deliberately redundant safeguards, not
+alternatives.
+
 `keycloak` and `postgresql` were never in the exception bucket above -
 their operand (`Keycloak`+`KeycloakRealmImport`, `PostgresCluster`) was
 always declarative here - but their operator `Subscription` (+
