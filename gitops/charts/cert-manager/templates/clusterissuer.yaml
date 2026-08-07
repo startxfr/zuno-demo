@@ -19,6 +19,7 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: vault-issuer
+  namespace: zuno-certmanager
   labels:
     zuno.io/managed-by: argocd
   annotations:

@@ -20,6 +20,8 @@ spec:
     path: gitops/charts/external-secrets
     helm:
       values: |
+        certmanager:
+          enabled: true
         clusterSecretStore:
           enabled: true
   destination:

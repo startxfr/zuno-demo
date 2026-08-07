@@ -63,13 +63,25 @@ platformNamespaces:
     allowedFromNamespaces:
       - zuno-agent-tekos
       - zuno-ai-run
+  - name: zuno-certmanager
+    allowedFromNamespaces:
+      - zuno-agent-tekos
+      - zuno-ai-run
+      - zuno-auth
+      - zuno-vault
+  - name: zuno-vault
+    allowedFromNamespaces:
+      - zuno-certmanager
+      - zuno-ai-run
+      - zuno-auth
+      - zuno-data
   - name: zuno-data
     # postgresql: rag-service (same-ns, already covered) + sales-db-mcp
     # (zuno-ai-run, cross-ns). vault: External Secrets Operator's
     # ClusterSecretStore controller.
     allowedFromNamespaces:
       - zuno-ai-run
-      - external-secrets
+      - zuno-vault
   - name: zuno-telemetry
     # OTel Collector: every OTel-instrumented service.
     allowedFromNamespaces:

@@ -1,6 +1,6 @@
 # Default values for the vault wrapper chart. See
 # gitops/apps/vault/application-d1.yaml for how this is deployed
-# (namespace: zuno-data, Application/release name fixed to "zuno-vault" -
+# (namespace: zuno-vault, Application/release name fixed to "zuno-vault" -
 # see ansible/roles/vault/tasks/prepare.yml's gitops_app_name comment).
 
 # Cluster-specific values (clusterBaseDomain) must be overridden per

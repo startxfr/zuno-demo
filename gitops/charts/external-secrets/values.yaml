@@ -6,9 +6,11 @@
 # default to false so `helm template`/`helm lint` render nothing by
 # default; each Application sets exactly one to true via
 # spec.source.helm.values.
-operator:
+externalsecret:
   enabled: false
 clusterSecretStore:
+  enabled: false
+operator:
   enabled: false
 
 # ADR-0048/ADR-0312: subscriptionChannel/subscriptionCatalogSource are

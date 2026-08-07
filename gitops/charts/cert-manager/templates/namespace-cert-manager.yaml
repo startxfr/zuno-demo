@@ -1,4 +1,4 @@
-{{- if .Values.operator.enabled }}
+{{- if .Values.certmanager.enabled }}
 # Pre-created here rather than left entirely to the operator (which also
 # creates it once it processes the CertManager CR below) - same
 # "harmless, idempotent, ArgoCD-owned" reasoning as gitops/charts/
@@ -11,7 +11,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: cert-manager
+  name: zuno-certmanager
   labels:
     zuno.io/managed-by: argocd
   annotations:
