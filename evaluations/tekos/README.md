@@ -20,8 +20,8 @@ cd evaluations/tekos
 pip install -r requirements.txt
 export KEYCLOAK_URL=https://sso.apps.<cluster-domain>
 export FRONTEND_URL=https://tekos.apps.<cluster-domain>
-export TEKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret secret/zuno/keycloak/tekos-frontend)
-export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password secret/zuno/keycloak/demo-personas)
+export TEKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/tekos-frontend)
+export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
 # BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL /
 # AI_GATEWAY_URL default to their in-cluster Service DNS names - override if
 # running this from outside the cluster via a port-forward instead. Reaching

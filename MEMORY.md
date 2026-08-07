@@ -357,7 +357,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   + a self-bootstrapping Vault (ADR-0022, ADR-0024, ADR-0056).
 - Identity: the `zuno` Keycloak realm with 13 anonymized synthetic personas
   (ADR-0041 - no nominative demo identity or hardcoded password in Git; the
-  shared password is vault-generated at `secret/zuno/keycloak/demo-personas`)
+  shared password is vault-generated at `zuno/keycloak/demo-personas`)
   across all five agents' groups (section 9's agent catalog), real Google
   IdP broker federation (section 8, ADR-0014), and the policy-intersection
   data files (`policies/tools/tool-policy.yaml`,
@@ -447,7 +447,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   reject even same-namespace neighbors like `agent-runtime` - a namespace
   baseline would have silently defeated that. `sales-db-mcp` additionally
   validates a shared `X-Zuno-Gateway-Token` workload-identity secret
-  (vault-generated, `secret/zuno/mcp/gateway-workload-token`) on every
+  (vault-generated, `zuno/mcp/gateway-workload-token`) on every
   call, independent of the network boundary. `platform/security/
   check_workload_hardening.py` statically verifies the whole baseline
   against every chart's rendered manifests (70 checks, no live cluster
@@ -594,7 +594,7 @@ per-provider model-call spans/token/cost metrics that used to live in
 `agent-runtime`, moved there as part of implementing ADR-0009.
 The cluster's real apps domain is auto-discovered from
 `Ingress.config.openshift.io/cluster`, persisted to Vault
-(`secret/zuno/platform/cluster-domain`), and substituted into every GitOps
+(`zuno/platform/cluster-domain`), and substituted into every GitOps
 `Application` that needs it - no manual edit required (see
 `ansible/tasks/resolve_cluster_base_domain.yml`, `gitops/apps/README.md`).
 Everything here was built and validated (Helm lint/template, YAML/JSON/Python

@@ -31,7 +31,7 @@ db:
   database: zuno
 
 credentials:
-  vaultPath: zuno/postgresql/app
+  vaultPath: postgresql/app
   secretName: sales-db-postgresql-credentials
   secretStoreName: vault-backend
   refreshInterval: 1h

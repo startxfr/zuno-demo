@@ -176,7 +176,7 @@ deployed.
 
 Sourced from individual `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`
 env vars, populated from the same `zunoapp` Vault-backed Secret the
-`vault` role already generates at `secret/zuno/postgresql/app` (see
+`vault` role already generates at `zuno/postgresql/app` (see
 `ansible/roles/vault/tasks/install.yml`), delivered via an
 `ExternalSecret` registered by this service's chart
 (`gitops/charts/rag-service/templates/externalsecret-db.yaml`). No

@@ -175,7 +175,7 @@ reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a
 literal domain. `ansible/tasks/apply_gitops_app.yml` substitutes it with
 the real cluster's apps wildcard domain, auto-discovered from
 `Ingress.config.openshift.io/cluster` and persisted to Vault at
-`secret/zuno/platform/cluster-domain` (see
+`zuno/platform/cluster-domain` (see
 `ansible/tasks/resolve_cluster_base_domain.yml` and
 `ansible/roles/vault/tasks/install.yml`) - no manual edit needed before a
 real deployment. Because `gitops_app_extra_helm_values` (ADR-0048) replaces

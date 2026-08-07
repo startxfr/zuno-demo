@@ -64,7 +64,7 @@ names and Secret conventions), not a config tweak.
     custom health check
     `ansible/roles/argocd/tasks/apply_resource_health_checks.yml`
     registers (ADR-0312);
-  - an `ExternalSecret` syncing the pre-seeded `secret/zuno/postgresql/app`
+  - an `ExternalSecret` syncing the pre-seeded `zuno/postgresql/app`
     Vault path (username `zunoapp`, auto-generated password - see
     `ansible/roles/vault/tasks/install.yml`) into the
     `zuno-postgresql-pguser-zunoapp` Kubernetes `Secret` - PGO's own

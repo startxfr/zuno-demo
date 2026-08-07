@@ -1,12 +1,15 @@
 ---
 # smtp is a Day 0 component (ADR-0056, reachable via `make d0 install
 # smtp`) - there is no SMTP server to install, only the technical mail
-# identity's credential to expose via ExternalSecret, seeded as an empty
-# placeholder at secret/zuno/smtp/technical by
-# ansible/roles/vault/tasks/install.yml. An operator must populate it
-# (`vault kv put secret/zuno/smtp/technical host=... username=... password=...`)
-# before whichever service sends the Comage weekly report (out of scope
-# here) can actually send mail.
+# identity's credential to expose via ExternalSecret, seeded at
+# zuno/smtp/technical by ansible/roles/vault/tasks/install.yml from
+# ansible/confidential.yml (zuno_smtp_host/username/password). If that
+# file still has the "xxxxxx" placeholder for those fields, it falls back
+# to an empty Vault placeholder instead - fill in confidential.yml and
+# re-run `make d0 install vault`, or `vault kv put zuno/smtp/technical
+# host=... username=... password=...` directly, before whichever service
+# sends the Comage weekly report (out of scope here) can actually send
+# mail.
 #
 # No OLM operator involved - gitops/charts/smtp (namespace.enabled/
 # credentials.enabled) is applied via two Applications for the same

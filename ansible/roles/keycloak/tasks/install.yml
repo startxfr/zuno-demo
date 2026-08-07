@@ -145,10 +145,12 @@
   ansible.builtin.debug:
     msg: >-
       The realm's "google" identity provider will only complete login flows
-      once secret/zuno/google-oauth/client has real values (see
-      ansible/roles/vault/tasks/install.yml's placeholder-seeding step).
-      Populate it with
-      `vault kv put secret/zuno/google-oauth/client client_id=... client_secret=...`
+      once zuno/google-oauth/client has real values - normally seeded from
+      ansible/confidential.yml (zuno_google_oauth_client_id/_secret) by
+      ansible/roles/vault/tasks/install.yml. If confidential.yml still has
+      the "xxxxxx" placeholder for those fields, fill it in and re-run
+      `make d0 install vault`, or populate it directly with
+      `vault kv put zuno/google-oauth/client client_id=... client_secret=...`,
       then let the google-oauth-client ExternalSecret resync (or delete the
       Keycloak pod to pick up the refreshed KC_VAULT_GOOGLE_CLIENT_* env
       vars) - no keycloak role step depends on this to complete.

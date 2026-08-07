@@ -7,6 +7,33 @@
 # Unsealing itself happens further down, via the vault-unseal-configure
 # Job - that Job re-runs (and re-unseals) every time this file is
 # invoked, e.g. after a Vault pod restart reseals it.
+#
+# Operator-supplied secrets (Google OAuth, SMTP technical credentials,
+# Confluence token) come from ansible/confidential.yml, gitignored and
+# never written to a Git-tracked file (see ansible/README.md). Checked for
+# up front so a missing file fails fast, before spending time applying the
+# Application below, instead of surfacing later as silent empty
+# placeholders.
+- name: "vault | verify ansible/confidential.yml is present"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _vault_confidential_file
+
+- name: "vault | fail if ansible/confidential.yml is missing"
+  ansible.builtin.fail:
+    msg: >-
+      ansible/confidential.yml is missing. Copy
+      ansible/confidential.example.yml to ansible/confidential.yml and fill
+      in the values (Google OAuth client, SMTP technical credentials,
+      Atlassian Confluence token) before running `make d0 install vault`.
+      This role reads it on every run, so the file can be deleted again
+      afterwards - unless Vault needs to be reinstalled later.
+  when: not _vault_confidential_file.stat.exists
+
+- name: "vault | load ansible/confidential.yml"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+
 - name: "vault | apply the Vault GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -319,7 +346,7 @@
     # env-passing parameter of its own). VAULT_TOKEN has to be set inside
     # the shell command that actually runs in the container instead.
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/{{ generated_secret.key }}
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ generated_secret.key }}
       username={{ generated_secret.value.username }} password={{ generated_secret.value.password }}"
   loop: "{{ _vault_generated_secrets | dict2items }}"
   loop_control:
@@ -349,7 +376,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/keycloak/tekos-frontend
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/tekos-frontend
       client_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
@@ -359,7 +386,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/keycloak/demo-personas
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/demo-personas
       password={{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
@@ -369,7 +396,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/mcp/gateway-workload-token
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mcp/gateway-workload-token
       token={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
@@ -379,8 +406,52 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/tekos/frontend-session
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/tekos/frontend-session
       hmac_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+  no_log: true
+
+# The three secrets below can't be self-generated - they're credentials for
+# real external services, supplied via ansible/confidential.yml (loaded
+# above). Each is (re-)written from confidential.yml on every run once
+# filled in (idempotent, confidential.yml is the source of truth - safe to
+# re-apply); until then it falls through to the check-then-placeholder
+# idiom below, same as always.
+- name: "vault | seed the Google OAuth client from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/google-oauth/client
+      client_id={{ zuno_google_oauth_client_id }} client_secret={{ zuno_google_oauth_client_secret }}"
+  when: >-
+    zuno_google_oauth_client_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_google_oauth_client_secret | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+- name: "vault | seed the SMTP technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/smtp/technical
+      host={{ zuno_smtp_host }} username={{ zuno_smtp_username }} password={{ zuno_smtp_password }}"
+  when: >-
+    zuno_smtp_host | default('xxxxxx') != 'xxxxxx'
+    and zuno_smtp_username | default('xxxxxx') != 'xxxxxx'
+    and zuno_smtp_password | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+- name: "vault | seed the Confluence technical token from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/confluence/technical
+      token={{ zuno_atlassian_confluence_token }}"
+  when: zuno_atlassian_confluence_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 - name: "vault | check whether operator-supplied secrets already exist"
@@ -389,10 +460,11 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json secret/zuno/{{ secret_path }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/{{ secret_path }}"
   loop:
     - google-oauth/client
     - smtp/technical
+    - confluence/technical
   loop_control:
     loop_var: secret_path
     label: "{{ secret_path }}"
@@ -407,7 +479,7 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/{{ secret_result.secret_path }} _placeholder=true"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ secret_result.secret_path }} _placeholder=true"
   loop: "{{ _vault_existing_secrets.results }}"
   loop_control:
     loop_var: secret_result
@@ -418,11 +490,14 @@
 - name: "vault | operator action required"
   ansible.builtin.debug:
     msg: >-
-      secret/zuno/google-oauth/client and secret/zuno/smtp/technical are
-      placeholders until an operator populates them, e.g.
-      `vault kv put secret/zuno/google-oauth/client client_id=... client_secret=...`.
-      This is the only remaining manual step (ADR-0014's real Google OAuth
-      delegation depends on it) - everything else in this file is unattended.
+      zuno/google-oauth/client, zuno/smtp/technical and/or
+      zuno/confluence/technical are still placeholders - the corresponding
+      value(s) in ansible/confidential.yml are still the "xxxxxx" sentinel
+      from confidential.example.yml. Fill them in and re-run
+      `make d0 install vault` (this role re-seeds from confidential.yml on
+      every run, without overwriting anything already populated another
+      way). ADR-0014's real Google OAuth delegation depends on the first
+      one - everything else in this file is unattended.
 
 # Not a secret, but Vault is this platform's single source of truth for
 # runtime configuration too (ADR-0024) - storing it here means any
@@ -440,4 +515,4 @@
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put secret/zuno/platform/cluster-domain domain={{ cluster_base_domain }}"
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/platform/cluster-domain domain={{ cluster_base_domain }}"

@@ -4,7 +4,7 @@
 #      provider-routing.yaml in this directory (single source of truth,
 #      no hand-copied duplicate);
 #   2. one ExternalSecret per external provider, resolving
-#      secret/zuno/providers/<name> from the vault-backend
+#      zuno/providers/<name> from the vault-backend
 #      ClusterSecretStore (ADR-0024) into a same-named Kubernetes Secret
 #      consumed by components/agent-runtime's Deployment env (see
 #      gitops/charts/agent-runtime).

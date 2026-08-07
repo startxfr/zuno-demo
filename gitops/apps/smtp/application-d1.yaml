@@ -2,7 +2,7 @@
 # The technical mail identity's credential (ADR-0056), exposed via
 # ExternalSecret - see gitops/charts/smtp (credentials.enabled). There is
 # no SMTP server to install, only this ExternalSecret reading the
-# pre-seeded placeholder at secret/zuno/smtp/technical (seeded empty by
+# pre-seeded placeholder at zuno/smtp/technical (seeded empty by
 # ansible/roles/vault/tasks/install.yml - an operator must populate it,
 # see ansible/roles/smtp/README.md, before whichever service sends the
 # Comage weekly report can actually send mail).

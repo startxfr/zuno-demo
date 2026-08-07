@@ -19,7 +19,19 @@ admin-only namespace (`zuno-vault`) rather than requiring any
 external input. See ADR-0024.
 
 `install.yml` also generates and seeds the secrets that can be
-self-generated (Keycloak admin, PostgreSQL app credentials) and reserves
-empty placeholders - never overwriting a real value - for the two secrets
-that genuinely require an operator to supply external input: the Google
-Workspace OAuth client (ADR-0014) and the SMTP technical-mail credentials.
+self-generated (Keycloak admin, PostgreSQL app credentials). Three more
+secrets genuinely require external input and can't be generated: the
+Google Workspace OAuth client (ADR-0014), the SMTP technical-mail
+credentials, and the Atlassian Confluence technical token. Those come from
+`ansible/confidential.yml` - copied from the checked-in
+`ansible/confidential.example.yml` and filled in by an operator before the
+first `make d0 install vault`, gitignored so no secret is ever written to a
+Git-tracked file. `install.yml` re-reads it on every run and (re-)seeds
+Vault from it, so the file can be deleted again afterwards unless Vault
+needs to be reinstalled. Any of the three left as the example file's
+`"xxxxxx"` sentinel instead falls back to an empty Vault placeholder -
+never overwriting a real value however it got there.
+
+Vault's KV v2 secrets engine is mounted at `zuno/` (not the HashiCorp
+default `secret/`) - every platform secret lives under `zuno/<component>/
+<item>`, matching the `eso-reader` policy scope below.

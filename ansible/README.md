@@ -39,6 +39,14 @@ No secret is ever written to a Git-tracked file. Anything a role needs at
 run time comes from Vault via the `community.hashi_vault` lookup plugin;
 anything a workload needs comes from an `ExternalSecret`.
 
+Before the first `make day0|d0 install` (specifically before installing
+`vault`), copy `ansible/confidential.example.yml` to `ansible/confidential.yml`
+and fill in the values (Google OAuth client, SMTP technical credentials,
+Atlassian Confluence token) - the `vault` role fails fast if this file is
+missing, and reads it on every run to (re-)seed Vault, so it can be deleted
+again afterwards unless Vault needs to be reinstalled. `ansible/confidential.yml`
+is gitignored; never commit it.
+
 Install the required collections once: `ansible-galaxy collection install -r requirements.yml`.
 
 Every role keeps the same `precheck` / `install` / `uninstall` task file

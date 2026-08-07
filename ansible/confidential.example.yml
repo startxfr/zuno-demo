@@ -1,0 +1,9 @@
+---
+zuno_google_oauth_client_id: "xxxxxx"
+zuno_google_oauth_client_secret: "xxxxxx"
+
+zuno_smtp_host: "xxxxxx"
+zuno_smtp_username: "xxxxxx"
+zuno_smtp_password: "xxxxxx"
+
+zuno_atlassian_confluence_token: "xxxxxx"

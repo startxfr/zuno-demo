@@ -94,11 +94,11 @@ backups:
   storageSize: 5Gi
 
 credentials:
-  # Path under the vault-backend ClusterSecretStore's "secret" KV v2 mount
-  # (i.e. resolves to Vault path secret/zuno/postgresql/app, already seeded
+  # Path under the vault-backend ClusterSecretStore's "zuno" KV v2 mount
+  # (i.e. resolves to Vault path zuno/postgresql/app, already seeded
   # by ansible/roles/vault/tasks/install.yml - this chart only consumes
   # it, never regenerates or hardcodes it, per ADR-0024).
-  vaultPath: zuno/postgresql/app
+  vaultPath: postgresql/app
   # PGO's own fixed naming convention for a user's auto-managed Secret is
   # "<cluster>-pguser-<user>" - not a freely-chosen name like CNPG's
   # bootstrap.initdb.secret.name was, so this is templated from

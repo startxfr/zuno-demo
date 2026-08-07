@@ -29,7 +29,7 @@ spec:
         # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
         # wildcard domain, auto-discovered from
         # Ingress.config.openshift.io/cluster and persisted to Vault at
-        # secret/zuno/platform/cluster-domain (see
+        # zuno/platform/cluster-domain (see
         # ansible/tasks/resolve_cluster_base_domain.yml and
         # ansible/roles/vault/tasks/install.yml) - no manual edit needed.
         # Every per-agent client redirect URI in the imported realm is

@@ -61,15 +61,15 @@ bff:
 
 # Vault paths (ADR-0024) this chart's ExternalSecrets resolve. ASSUMPTION:
 # the identity track has not yet published where it seeds the Keycloak
-# tekos-frontend client secret; secret/zuno/keycloak/tekos-frontend with
+# tekos-frontend client secret; zuno/keycloak/tekos-frontend with
 # keys client_id/client_secret follows this repo's existing
-# secret/zuno/<component>/<item> convention (see
+# zuno/<component>/<item> convention (see
 # ansible/roles/vault/tasks/configure.yml). The session HMAC secret is this
 # track's own and is self-generated the same way vault's role generates
 # keycloak/admin and postgresql/app (see this chart's README.md).
 vault:
-  oidcClientSecretPath: secret/zuno/keycloak/tekos-frontend
-  sessionSecretPath: secret/zuno/tekos/frontend-session
+  oidcClientSecretPath: zuno/keycloak/tekos-frontend
+  sessionSecretPath: zuno/tekos/frontend-session
 
 keycloak:
   # ASSUMPTION: no Keycloak route hostname convention was published by the

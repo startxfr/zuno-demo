@@ -53,7 +53,7 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _llm_vault_creds.resources[0].data.root_token | b64decode }}
-      vault kv get -format=json secret/zuno/providers/{{ provider }}"
+      vault kv get -format=json zuno/providers/{{ provider }}"
   loop:
     - openai
     - gemini
@@ -74,7 +74,7 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _llm_vault_creds.resources[0].data.root_token | b64decode }}
-      vault kv put secret/zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
+      vault kv put zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
   loop: "{{ _llm_existing_provider_secrets.results }}"
   loop_control:
     loop_var: provider_result
@@ -85,9 +85,9 @@
 - name: "llm | operator action required"
   ansible.builtin.debug:
     msg: >-
-      secret/zuno/providers/{openai,gemini,anthropic,mistral} are
+      zuno/providers/{openai,gemini,anthropic,mistral} are
       placeholders until an operator populates them, e.g.
-      `vault kv put secret/zuno/providers/openai api_key=...`. Until then
+      `vault kv put zuno/providers/openai api_key=...`. Until then
       components/agent-runtime's ModelRouter simply fails over past that
       provider (ADR-0020) - the local model always stays eligible.
 

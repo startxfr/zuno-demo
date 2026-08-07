@@ -31,12 +31,12 @@ data:
       fi
     }
 
-    enable_if_new "KV v2 secrets engine at secret/" vault secrets enable -path=secret -version=2 kv
+    enable_if_new "KV v2 secrets engine at zuno/" vault secrets enable -path=zuno -version=2 kv
     enable_if_new "Kubernetes auth method" vault auth enable kubernetes
 
     vault write auth/kubernetes/config kubernetes_host=https://kubernetes.default.svc:443
 
-    printf 'path "secret/data/zuno/*" {\n  capabilities = ["read"]\n}\n' | vault policy write eso-reader -
+    printf 'path "zuno/data/*" {\n  capabilities = ["read"]\n}\n' | vault policy write eso-reader -
 
     vault write auth/kubernetes/role/eso-reader \
       bound_service_account_names=external-secrets \

@@ -4,7 +4,7 @@ description: >-
   The technical mail identity's credential (ADR-0056), exposed via
   ExternalSecret - there is no SMTP server to install, only the zuno-ai-run
   Namespace (namespace.enabled) and the ExternalSecret reading the
-  pre-seeded placeholder at secret/zuno/smtp/technical (credentials.enabled -
+  pre-seeded placeholder at zuno/smtp/technical (credentials.enabled -
   see ansible/roles/vault/tasks/install.yml and
   ansible/roles/smtp/README.md).
 type: application

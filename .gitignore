@@ -9,6 +9,7 @@
 *.kubeconfig
 kubeconfig
 vault-password*
+ansible/confidential.yml
 
 # Real / unapproved business data
 *.dump

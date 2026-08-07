@@ -1,5 +1,12 @@
 # Installation Workflow
 
+Before the first `make day0|d0 install`, copy `ansible/confidential.example.yml`
+to `ansible/confidential.yml` and fill in the values (Google OAuth client,
+SMTP technical credentials, Atlassian Confluence token) - the `vault` role
+(the first Day 0 component that needs them) fails fast if this file is
+missing. It is gitignored and re-read on every `vault` install, so it can
+be deleted again afterwards unless Vault needs to be reinstalled later.
+
 The public operator interface is intentionally small, structured as Day 0
 (cluster prerequisites) / Day 1 (build + run the platform) - ADR-0056:
 
