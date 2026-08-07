@@ -19,6 +19,8 @@ spec:
     path: gitops/charts/cert-manager
     helm:
       values: |
+        certmanager:
+          enabled: true
         issuer:
           enabled: true
   destination:

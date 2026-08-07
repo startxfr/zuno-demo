@@ -10,7 +10,7 @@
 # startx equivalent covers our two-stage vaultServiceName discovery). All
 # default to false so `helm template`/`helm lint` render nothing by
 # default.
-operator:
+certmanager:
   enabled: false
 issuer:
   enabled: false

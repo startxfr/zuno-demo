@@ -1,4 +1,4 @@
-{{- if .Values.operator.enabled }}
+{{- if .Values.certmanager.enabled }}
 # Singleton config CR the operator watches to actually deploy the
 # cert-manager controller/webhook/cainjector pods into the cert-manager
 # namespace - same "meta-operator needs a CR to do anything" shape as
