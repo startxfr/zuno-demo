@@ -10,6 +10,7 @@
       - admin_context
       - namespaces
       - vault
+      - cert_manager
       - external_secrets
       - keycloak
       - postgresql

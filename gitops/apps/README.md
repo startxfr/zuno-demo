@@ -78,6 +78,15 @@ duplicated across `openshift_ai`'s and `external_secrets`' own kustomize)
 are owned by `gitops/charts/namespaces` instead, closing that
 double-ownership.
 
+`cert-manager` is a brand-new Day 0 component (not a conversion of an
+existing kustomize path) following the exact same `-d0`/`-d1` shape: `-d0`
+installs the operator (plus its own singleton `CertManager` config CR,
+the same "meta-operator needs a CR to actually deploy pods" pattern as
+`external_secrets`' `OperatorConfig`); `-d1` applies a `ClusterIssuer`
+backed by a `pki/` secrets engine `ansible/roles/vault` prepares (see that
+role's README). Infrastructure only for now - no existing Route/service
+consumes this issuer yet.
+
 `keycloak` and `postgresql` were never in the exception bucket above -
 their operand (`Keycloak`+`KeycloakRealmImport`, `PostgresCluster`) was
 always declarative here - but their operator `Subscription` (+
@@ -91,6 +100,7 @@ Directories present:
 | Component | Source |
 |---|---|
 | `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) - no operator, `-d0` is a no-op |
+| `cert-manager` | local chart, `gitops/charts/cert-manager` (`-d0`: cert-manager operator + its `CertManager` config CR; `-d1`: Vault-backed `ClusterIssuer` - see the `cert_manager` role's README) |
 | `keycloak` | local chart, `gitops/charts/keycloak` (`-d0`: RHBK operator `Subscription`/`OperatorGroup`; `-d1`: Keycloak CR/RealmImport/ExternalSecrets - ADR-0312, see the `keycloak` role's README) |
 | `postgresql` | local chart, `gitops/charts/postgresql` (`-d0`: PGO operator `Subscription`; `-d1`: PostgresCluster/ExternalSecret/ConfigMap - ADR-0312, see the `postgresql` role's README) |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) - no operator, `-d0` is a no-op |

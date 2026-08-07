@@ -1,0 +1,35 @@
+---
+# cert-manager operator install. See gitops/charts/cert-manager
+# (operator.enabled - Namespaces/OperatorGroup/Subscription/CertManager
+# singleton CR). Applied by the `cert_manager` Ansible role's install.yml.
+# The Vault-backed ClusterIssuer operand is a separate Application
+# (zuno-cert-manager-d1, applied after this one is Synced+Healthy) - see
+# application-d1.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-cert-manager-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this.
+    argocd.argoproj.io/sync-wave: "-195"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/cert-manager
+    helm:
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -45,3 +45,40 @@ data:
       ttl=1h
 
     echo "KV store and default policies configured."
+
+    # ansible/roles/cert_manager: the pki/ engine + cert-manager-issuer
+    # role/policy this prepares are consumed by that role's ClusterIssuer
+    # (gitops/charts/cert-manager/templates/clusterissuer.yaml) - cert_manager
+    # itself never writes to Vault, it only points a declarative
+    # ClusterIssuer at this already-configured backend, same as
+    # external-secrets' ClusterSecretStore above.
+    enable_if_new "PKI secrets engine at pki/" vault secrets enable -path=pki pki
+    vault secrets tune -max-lease-ttl=87600h pki
+
+    if ! vault read pki/cert/ca >/dev/null 2>&1; then
+      vault write -field=certificate pki/root/generate/internal \
+        common_name="zuno-demo.internal" ttl=87600h >/dev/null
+      echo "PKI root CA: generated"
+    else
+      echo "PKI root CA: already generated"
+    fi
+
+    vault write pki/config/urls \
+      issuing_certificates="$VAULT_ADDR/v1/pki/ca" \
+      crl_distribution_points="$VAULT_ADDR/v1/pki/crl"
+
+    vault write pki/roles/cert-manager \
+      allowed_domains="zuno-demo.internal,svc.cluster.local" \
+      allow_subdomains=true \
+      allow_bare_domains=true \
+      max_ttl=720h
+
+    printf 'path "pki/sign/cert-manager" {\n  capabilities = ["create","update"]\n}\n' | vault policy write cert-manager-issuer -
+
+    vault write auth/kubernetes/role/cert-manager-issuer \
+      bound_service_account_names=cert-manager \
+      bound_service_account_namespaces=cert-manager \
+      policies=cert-manager-issuer \
+      ttl=1h
+
+    echo "PKI engine and cert-manager-issuer role configured."

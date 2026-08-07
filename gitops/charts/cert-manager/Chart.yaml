@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cert-manager
+description: >-
+  cert-manager (Red Hat build, "openshift-cert-manager-operator") plus a
+  Vault-backed ClusterIssuer, split across the zuno-cert-manager-d0/-d1
+  ArgoCD Applications - see gitops/apps/README.md. operator.enabled
+  (Namespace/OperatorGroup/Subscription + the operator's own CertManager
+  singleton CR, which actually deploys the controller/webhook/cainjector
+  pods - same meta-operator pattern as gitops/charts/external-secrets'
+  OperatorConfig) is -d0; issuer.enabled (the ClusterIssuer referencing
+  Vault's pki/ secrets engine, prepared by ansible/roles/vault) is -d1.
+  Infrastructure only for now - no existing Route/service consumes this
+  issuer yet, see ansible/roles/cert_manager/README.md.
+type: application
+version: 0.1.0

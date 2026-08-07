@@ -1,0 +1,30 @@
+---
+# Reverse of install.yml. Delete -d1 (the ClusterIssuer operand) first,
+# via ArgoCD prune, before remove_operator.yml deletes the CRDs cert-manager
+# owns - avoids ArgoCD fighting a resource deletion its own Application
+# still desires. remove_operator.yml then runs *before* deleting -d0: it
+# discovers the installed CSV via the Subscription's own
+# status.installedCSV field, which only exists while the Subscription (a
+# -d0-managed resource) still exists - running it before -d0's own delete
+# also means its CRD delete (cascading any remaining ClusterIssuer/
+# Certificate CRs) and CSV/Subscription delete happen before ArgoCD's own
+# cascade prune would otherwise race to remove the same Subscription
+# object - same ordering ADR-0312 established for the other converted
+# roles. The Vault pki/ engine and cert-manager-issuer role/policy
+# (owned by ansible/roles/vault) are not cleaned up here - demo scope,
+# same as vault's own uninstall.yml.
+- name: "cert_manager | delete the cert-manager GitOps Application (d1: ClusterIssuer)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-cert-manager-d1"
+
+- name: "cert_manager | remove the operator (its owned CRDs - cascading any remaining ClusterIssuer/Certificate CRs - then the CSV, then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: openshift-cert-manager-operator
+    operator_namespace: cert-manager-operator
+
+- name: "cert_manager | delete the cert-manager GitOps Application (d0: cascades the remaining OperatorGroup/Namespaces)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-cert-manager-d0"

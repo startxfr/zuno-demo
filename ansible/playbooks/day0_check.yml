@@ -12,7 +12,10 @@
 # vault-backend ClusterSecretStore external_secrets creates, which itself
 # needs the eso-reader Vault auth role sets up - found as a real deadlock
 # via live-cluster testing on api.demo222.startx.fr, where the original
-# ordering left both stuck waiting on a Secret that could never sync).
+# ordering left both stuck waiting on a Secret that could never sync;
+# cert_manager right after vault for the same reason - its ClusterIssuer
+# depends on the pki/ engine and cert-manager-issuer Vault auth role
+# vault's own install.yml sets up).
 - name: "Day 0: check install state"
   hosts: localhost
   gather_facts: false
@@ -22,6 +25,7 @@
       - admin_context
       - namespaces
       - vault
+      - cert_manager
       - external_secrets
       - keycloak
       - postgresql

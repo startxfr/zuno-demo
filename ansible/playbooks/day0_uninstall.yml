@@ -16,6 +16,7 @@
       - postgresql
       - keycloak
       - external_secrets
+      - cert_manager
       - vault
       - namespaces
       - admin_context

@@ -1,0 +1,33 @@
+# This chart is shared by two ArgoCD Applications (see
+# gitops/apps/README.md): operator.enabled (zuno-cert-manager-d0) renders
+# the Namespaces/OperatorGroup/Subscription/CertManager singleton CR,
+# issuer.enabled (zuno-cert-manager-d1) renders the ClusterIssuer. Both
+# default to false so `helm template`/`helm lint` render nothing by
+# default.
+operator:
+  enabled: false
+issuer:
+  enabled: false
+
+# ASSUMPTION (not yet verified against a live cluster in this
+# environment - same posture this repo already documents for RHBK's/PGO's
+# channel before dynamic discovery was added, and for the NVIDIA
+# ClusterPolicy shape): the Red Hat build of cert-manager
+# ("openshift-cert-manager-operator") publishes a "stable-v1" channel via
+# the "redhat-operators" catalog, and its own operator namespace is
+# "cert-manager-operator" (the operand controller/webhook/cainjector pods
+# it deploys, via the CertManager singleton CR below, live in "cert-manager"
+# instead). If `make d0 check cert-manager` shows this is wrong on a real
+# cluster, fix it the same way ansible/roles/{keycloak,postgresql,
+# openshift_ai}/tasks/install.yml do: discover the real package/channel/
+# catalog from the cluster's own PackageManifest at run time instead of
+# trusting this hardcoded value.
+subscriptionChannel: stable-v1
+subscriptionCatalogSource: redhat-operators
+
+# Discovered by ansible/roles/cert_manager/tasks/install.yml (same
+# app.kubernetes.io/name=vault label-selector lookup already used by
+# ansible/roles/{vault,external_secrets}/tasks/install.yml) and always set
+# via gitops_app_extra_helm_values on the -d1 apply; templates/
+# clusterissuer.yaml renders nothing until it's set.
+vaultServiceName: ""

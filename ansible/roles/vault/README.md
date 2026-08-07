@@ -3,7 +3,14 @@
 Installs Vault (via the `vault` GitOps Application, demo-grade single
 replica with file storage), initializes and unseals it, then configures the
 Kubernetes auth method and the `eso-reader` policy/role that
-`ansible/roles/external_secrets` binds its `ClusterSecretStore` to.
+`ansible/roles/external_secrets` binds its `ClusterSecretStore` to, plus
+the `pki/` secrets engine (a self-signed root CA, `common_name:
+zuno-demo.internal`) and the `cert-manager-issuer` policy/role that
+`ansible/roles/cert_manager` binds its `ClusterIssuer` to (see that role's
+README). Both follow the same shape - a role/policy each consumer's
+role only ever *references* declaratively, never configures itself - all
+prepared by the same idempotent script,
+`ansible/roles/vault/kustomize/unseal-configure/configmap.yaml`.
 
 This is the one role that cannot depend on Vault for its own bootstrap
 secret: `install.yml` captures the unseal key and root token into a

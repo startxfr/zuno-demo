@@ -8,8 +8,8 @@ run the platform):
 
 1. `make day0 check` / `install` / `uninstall` (or the `d0` alias) walk
    `DAY0_COMPONENTS` in order (`admin-context`, `argocd`,
-   `namespaces`, `vault`, `external-secrets`, `keycloak`, `postgresql`,
-   `smtp`, `nfd`, `nvidia-gpu`, `observability`,
+   `namespaces`, `vault`, `cert-manager`, `external-secrets`, `keycloak`,
+   `postgresql`, `smtp`, `nfd`, `nvidia-gpu`, `observability`,
    `openshift-ai`) - `uninstall` walks it in reverse. `admin_context`
    checks the cluster API and applies PriorityClasses/verifies a
    StorageClass exists; `argocd` installs the OpenShift GitOps operator
@@ -17,8 +17,10 @@ run the platform):
    NetworkPolicy baseline (needs `argocd`'s `Application` CRD); `vault`
    installs itself as a GitOps Application, then imperatively
    initializes/unseals it (the one component that can't depend on Vault
-   for its own bootstrap secret); `external-secrets` installs the
-   operator and the Vault-backed `ClusterSecretStore`. `make day0 all
+   for its own bootstrap secret); `cert_manager` installs cert-manager and
+   a Vault-backed `ClusterIssuer` (infrastructure only for now - no
+   existing Route/service consumes it yet); `external-secrets` installs
+   the operator and the Vault-backed `ClusterSecretStore`. `make day0 all
    [component]` runs check → install in sequence.
 2. `make day1 check` / `build` / `install` / `uninstall` (or the `d1`
    alias) walk `DAY1_COMPONENTS` (`llm`, `models`, `sql_schema`, `rag`,

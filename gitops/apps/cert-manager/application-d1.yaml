@@ -1,0 +1,32 @@
+---
+# Vault-backed ClusterIssuer. See gitops/charts/cert-manager
+# (issuer.enabled) - NOT the operator itself (see
+# gitops/apps/cert-manager/application-d0.yaml, applied first by
+# ansible/roles/cert_manager/tasks/install.yml). Infrastructure only for
+# now - no existing Route/service consumes this issuer yet.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-cert-manager-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-194"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/cert-manager
+    helm:
+      values: |
+        issuer:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
