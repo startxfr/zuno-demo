@@ -14,8 +14,8 @@ metadata:
     zuno.io/agent: {{ .agent }}
     zuno.io/status: {{ .status }}
     zuno.io/managed-by: argocd
-  annotations:
-    argocd.argoproj.io/hook: PreSync
+  # annotations:
+  #   argocd.argoproj.io/hook: PreSync
 ---
 {{- end }}
 {{- range .Values.platformNamespaces }}
@@ -29,7 +29,7 @@ metadata:
     {{- range $k, $v := .extraLabels }}
     {{ $k }}: {{ $v | quote }}
     {{- end }}
-  annotations:
-    argocd.argoproj.io/hook: PreSync
+  # annotations:
+  #   argocd.argoproj.io/hook: PreSync
 ---
 {{- end }}
