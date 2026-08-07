@@ -2,8 +2,11 @@
 # Shared task (ADR-0056): builds one component image via native OpenShift
 # BuildConfig/ImageStream in zuno-ai-build, in the same spirit as
 # ansible/tasks/apply_gitops_app.yml. Called once per image by the Day 1
-# build roles (ansible/roles/{mcp,rag,agent}_build), each with its own
-# build_image_name/build_dockerfile_path/build_context_dir.
+# build roles (ansible/roles/{mcp,rag,agent,ai_gateway}_build) and by the
+# Day 0 postgresql role (the one image whose Dockerfile pulls from an
+# authenticated base registry), each with its own
+# build_image_name/build_dockerfile_path/build_context_dir, plus the
+# optional build_pull_secret_registry/_username/_password (see below).
 #
 # Idempotent, not "always rebuild": the BuildConfig's own `ConfigChange`
 # trigger (OpenShift's standard, idiomatic mechanism for git-source
@@ -106,6 +109,48 @@
         labels:
           zuno.io/managed-by: zuno-ansible
 
+# Optional: some Dockerfiles' FROM pulls from a registry that requires
+# auth even to pull (e.g. registry.developers.crunchydata.com -
+# postgresql's build, the first caller to need this). When
+# build_pull_secret_username/_password are supplied, this creates a
+# dockerconfigjson Secret and the BuildConfig below references it as
+# strategy.dockerStrategy.pullSecret - OpenShift's documented mechanism
+# for authenticating a build's base-image pull (the build-time
+# equivalent of `oc secrets link default <secret> --for=pull`). Skipped
+# cleanly when not supplied - every existing caller (mcp/rag/agent/
+# ai_gateway _build, none of which need this) is unaffected.
+- name: "openshift-build | create the base-image pull Secret (only when credentials are supplied), for registry {{ build_pull_secret_registry | default('') }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ build_image_name }}-pull-secret"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: kubernetes.io/dockerconfigjson
+      stringData:
+        .dockerconfigjson: >-
+          {{ {"auths": {build_pull_secret_registry: {
+                "username": build_pull_secret_username,
+                "password": build_pull_secret_password,
+                "auth": (build_pull_secret_username ~ ':' ~ build_pull_secret_password) | b64encode
+              }}} | to_json }}
+  when: (build_pull_secret_username | default('') | length > 0) and (build_pull_secret_password | default('') | length > 0)
+  no_log: true
+
+- name: "openshift-build | compute the Docker strategy (with the pull Secret above when supplied)"
+  ansible.builtin.set_fact:
+    _openshift_build_docker_strategy: >-
+      {{
+        {'dockerfilePath': build_dockerfile_path}
+        | combine({'pullSecret': {'name': build_image_name ~ '-pull-secret'}}
+                  if ((build_pull_secret_username | default('') | length > 0) and (build_pull_secret_password | default('') | length > 0))
+                  else {})
+      }}
+
 - name: "openshift-build | apply the BuildConfig: {{ build_image_name }}"
   kubernetes.core.k8s:
     state: present
@@ -126,8 +171,7 @@
           contextDir: "{{ build_context_dir if build_context_dir != '.' else '' }}"
         strategy:
           type: Docker
-          dockerStrategy:
-            dockerfilePath: "{{ build_dockerfile_path }}"
+          dockerStrategy: "{{ _openshift_build_docker_strategy }}"
         output:
           to:
             kind: ImageStreamTag

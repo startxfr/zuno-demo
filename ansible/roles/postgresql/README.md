@@ -94,14 +94,21 @@ PGO does not bundle pgvector out of the box either (open, unresolved
 upstream issue `CrunchyData/postgres-operator#3706`) - same situation
 this demo already had with CloudNativePG. `gitops/charts/postgresql/
 image/Dockerfile` layers pgvector onto Crunchy's own UBI-based operand
-image via a PGDG RPM. That image must be built and pushed once by an
-operator before `make d0 install postgresql` can succeed - see
-`image/README.md` for the exact commands, the new Crunchy Data registry
-signup step (unlike CNPG's public `ghcr.io` image), and three details
-flagged there as unverified against a real build (base image tag, package
-manager, exact pgvector RPM package name). This is the one manual
-prerequisite for this role, in the same spirit as the Vault
-`google-oauth`/`smtp` placeholder secrets requiring operator input.
+image via a PGDG RPM. `install.yml` now builds and imports this image
+itself, on-cluster, the same `zuno-ai-build` BuildConfig/ImageStream
+mechanism every other component's image uses
+(`ansible/tasks/apply_openshift_build.yml`, ADR-0056) - the one
+difference being the Dockerfile's `FROM` pulls from
+`registry.developers.crunchydata.com`, which needs a free Crunchy Data
+developer account even just to pull, so this build also needs
+`zuno_crunchydata_registry_username`/`_password` in
+`ansible/confidential.yml` (same operator-supplied-credential pattern as
+the Vault `google-oauth`/`smtp`/`confluence` fields). Without those two
+fields set, `install.yml` skips the build with a clear warning and the
+`PostgresCluster` sits `ImagePullBackOff` until they're added and `make
+d0 install postgresql` is re-run - see `image/README.md` for the account
+signup step and three details flagged there as unverified against a real
+build (base image tag, package manager, exact pgvector RPM package name).
 
 ## Connecting to this cluster
 
@@ -131,10 +138,14 @@ researched from Crunchy's own documentation but not exercised end to end:
   `templates/postgrescluster.yaml`'s own comment for the manual fallback
   if not).
 - The three pgvector image-build details flagged in `image/README.md`.
+- The `strategy.dockerStrategy.pullSecret` mechanism `ansible/tasks/
+  apply_openshift_build.yml` relies on to authenticate the Crunchy Data
+  base-image pull - not exercised against a real `BuildConfig` from this
+  environment.
 
-Run `make d0 check postgresql` → build/push the image → `make d0 install
-postgresql` against the real cluster and adjust any of the above that
-turns out to be wrong.
+Run `make d0 check postgresql` → fill in `ansible/confidential.yml`'s
+Crunchy Data credentials → `make d0 install postgresql` against the real
+cluster and adjust any of the above that turns out to be wrong.
 
 ## Consumed by
 

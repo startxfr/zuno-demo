@@ -8,3 +8,6 @@ zuno_smtp_username: "xxxxxx"
 zuno_smtp_password: "xxxxxx"
 
 zuno_atlassian_confluence_token: "xxxxxx"
+
+zuno_crunchydata_registry_username: "xxxxxx"
+zuno_crunchydata_registry_password: "xxxxxx"

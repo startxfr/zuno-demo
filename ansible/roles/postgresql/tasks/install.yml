@@ -149,6 +149,62 @@
               name: "{{ _postgresql_catalog_source }}"
     gitops_app_wait_retries: 60
 
+# Crunchy's own operand images don't bundle pgvector (open upstream issue
+# CrunchyData/postgres-operator#3706) - gitops/charts/postgresql/image/
+# Dockerfile layers it on via RPM. Built on-cluster the same way every
+# other component's image is (ansible/tasks/apply_openshift_build.yml,
+# ADR-0056), the one difference being the Dockerfile's FROM pulls from
+# registry.developers.crunchydata.com, which requires a free Crunchy Data
+# developer account even just to pull - so this build additionally needs
+# a base-image pull Secret, sourced from ansible/confidential.yml
+# (zuno_crunchydata_registry_username/_password) the same way
+# google-oauth/smtp/confluence credentials are. Soft-read, keycloak-role
+# style (ansible/roles/keycloak/tasks/install.yml) - not vault's hard
+# fail: postgresql stays independently runnable per ansible/README.md's
+# design principle even without this credential set up yet; the
+# PostgresCluster applied below just sits ImagePullBackOff either way
+# until an image exists, same as it does today - failing this role
+# outright over a missing image credential would only block the
+# (unrelated) OLM Subscription work above, for no benefit.
+- name: "postgresql | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _postgresql_confidential_file
+
+- name: "postgresql | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _postgresql_confidential_file.stat.exists
+
+- name: "postgresql | build the pgvector-enabled image (skipped if Crunchy Data credentials aren't set)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: postgresql-pgvector
+    build_dockerfile_path: Dockerfile
+    build_context_dir: gitops/charts/postgresql/image
+    build_pull_secret_registry: registry.developers.crunchydata.com
+    build_pull_secret_username: "{{ zuno_crunchydata_registry_username | default('') }}"
+    build_pull_secret_password: "{{ zuno_crunchydata_registry_password | default('') }}"
+  when: >-
+    (zuno_crunchydata_registry_username | default('') | length > 0)
+    and (zuno_crunchydata_registry_password | default('') | length > 0)
+
+- name: "postgresql | warn if Crunchy Data credentials are missing"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_crunchydata_registry_username/zuno_crunchydata_registry_password
+      are not set in ansible/confidential.yml - skipping the on-cluster
+      build of the pgvector-enabled image. The zuno-postgresql
+      PostgresCluster applied below will sit in ImagePullBackOff until
+      image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgresql-pgvector:latest
+      exists - register a free account at
+      https://www.crunchydata.com/developers/download-postgres/containers,
+      add those two fields to ansible/confidential.yml, and re-run
+      `make d0 install postgresql`.
+  when: >-
+    not ((zuno_crunchydata_registry_username | default('') | length > 0)
+         and (zuno_crunchydata_registry_password | default('') | length > 0))
+
 # templates/postgrescluster.yaml (postgresCluster.enabled) lives in the
 # same chart, applied via the separate zuno-postgresql-d1 Application,
 # after -d0 (above) is Synced+Healthy.

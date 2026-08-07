@@ -64,12 +64,15 @@ postgresVersion: 16
 image:
   # Built from gitops/charts/postgresql/image/Dockerfile (Crunchy's own
   # UBI-based operand image + pgvector, since PGO does not bundle pgvector
-  # out of the box either - see image/README.md). This is a placeholder
-  # internal-registry reference - an operator must build and push this
-  # image once (see image/README.md) before the PostgresCluster below can
-  # start; point this at wherever your cluster's image registry actually is.
-  repository: image-registry.zuno-demo.internal/zuno/postgresql-pgvector
-  tag: "16-crunchy"
+  # out of the box either - see image/README.md) on-cluster by
+  # ansible/roles/postgresql/tasks/install.yml via
+  # ansible/tasks/apply_openshift_build.yml - the same zuno-ai-build
+  # BuildConfig/ImageStream mechanism every other component's image uses
+  # (ADR-0056), not a placeholder anymore. Needs Crunchy Data developer
+  # credentials in ansible/confidential.yml (the Dockerfile's FROM pulls
+  # from an authenticated registry) - see image/README.md.
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgresql-pgvector
+  tag: latest
 
 cluster:
   name: zuno-postgresql
