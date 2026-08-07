@@ -1,7 +1,9 @@
 ---
 # Red Hat OpenShift AI operator install (ADR-0047/ADR-0048, ADR-0312). See
-# gitops/charts/openshift-ai (operator.enabled - Namespace/OperatorGroup/
-# Subscription). Applied by the `openshift_ai` Ansible role's install.yml,
+# gitops/charts/openshift-ai (cluster-ods.project.enabled +
+# cluster-ods.operator.enabled - Namespace/OperatorGroup/Subscription,
+# rendered by the vendored startx cluster-ods chart). Applied by the
+# `openshift_ai` Ansible role's install.yml,
 # with the operator's catalog-published channel injected via
 # gitops_app_extra_helm_values (ADR-0048) - see that role's README.md. The
 # DataScienceCluster operand is a separate Application
@@ -28,8 +30,11 @@ spec:
     path: gitops/charts/openshift-ai
     helm:
       values: |
-        operator:
-          enabled: true
+        cluster-ods:
+          project:
+            enabled: true
+          operator:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator
@@ -39,6 +44,6 @@ spec:
       selfHeal: true
     syncOptions:
       # redhat-ods-operator (this Application's destination.namespace) is
-      # created nowhere else - also backed by the chart's own
-      # namespace.yaml PreSync hook as a redundant safeguard.
+      # created nowhere else - also backed by the vendored cluster-ods
+      # chart's own project.hooked PreSync hook as a redundant safeguard.
       - CreateNamespace=true

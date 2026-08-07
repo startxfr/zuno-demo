@@ -1,11 +1,12 @@
 ---
 # Node Feature Discovery operator install (ADR-0047, ADR-0312). See
-# gitops/charts/nfd (operator.enabled - Namespace/OperatorGroup/
-# Subscription). Applied by the `nfd` Ansible role's install.yml - see
-# that role's README.md for why NFD must sync before nvidia_gpu. The
-# NodeFeatureDiscovery CR operand is a separate Application
-# (zuno-nfd-d1, applied after this one is Synced+Healthy) - see
-# application-d1.yaml.
+# gitops/charts/nfd (cluster-nfd.project.enabled + cluster-nfd.operator.
+# enabled - Namespace/OperatorGroup/Subscription, rendered by the vendored
+# startx cluster-nfd chart). Applied by the `nfd` Ansible role's
+# install.yml - see that role's README.md for why NFD must sync before
+# nvidia_gpu. The NodeFeatureDiscovery CR operand is a separate
+# Application (zuno-nfd-d1, applied after this one is Synced+Healthy) -
+# see application-d1.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,8 +26,11 @@ spec:
     path: gitops/charts/nfd
     helm:
       values: |
-        operator:
-          enabled: true
+        cluster-nfd:
+          project:
+            enabled: true
+          operator:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-nfd
@@ -36,6 +40,6 @@ spec:
       selfHeal: true
     syncOptions:
       # openshift-nfd (this Application's destination.namespace) is
-      # created nowhere else - also backed by the chart's own
-      # namespace.yaml PreSync hook as a redundant safeguard.
+      # created nowhere else - also backed by the vendored cluster-nfd
+      # chart's own project.hooked PreSync hook as a redundant safeguard.
       - CreateNamespace=true

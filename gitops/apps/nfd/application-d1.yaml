@@ -1,7 +1,7 @@
 ---
 # Node Feature Discovery instance CR (ADR-0047, ADR-0312). See
-# gitops/charts/nfd (nodeFeatureDiscovery.enabled) - NOT the operator
-# itself (see gitops/apps/nfd/application-d0.yaml, applied first by
+# gitops/charts/nfd (cluster-nfd.nfd.enabled) - NOT the operator itself
+# (see gitops/apps/nfd/application-d0.yaml, applied first by
 # ansible/roles/nfd/tasks/install.yml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -18,8 +18,9 @@ spec:
     path: gitops/charts/nfd
     helm:
       values: |
-        nodeFeatureDiscovery:
-          enabled: true
+        cluster-nfd:
+          nfd:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-nfd

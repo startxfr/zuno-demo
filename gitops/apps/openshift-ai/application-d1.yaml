@@ -1,8 +1,9 @@
 ---
 # Red Hat OpenShift AI DataScienceCluster operand (ADR-0047/ADR-0048,
-# ADR-0312). See gitops/charts/openshift-ai (dataScienceCluster.enabled) -
-# NOT the operator itself (see gitops/apps/openshift-ai/application-d0.yaml,
-# applied first by ansible/roles/openshift_ai/tasks/install.yml).
+# ADR-0312). See gitops/charts/openshift-ai
+# (cluster-ods.DataScienceCluster.enabled) - NOT the operator itself (see
+# gitops/apps/openshift-ai/application-d0.yaml, applied first by
+# ansible/roles/openshift_ai/tasks/install.yml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,8 +19,9 @@ spec:
     path: gitops/charts/openshift-ai
     helm:
       values: |
-        dataScienceCluster:
-          enabled: true
+        cluster-ods:
+          DataScienceCluster:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator

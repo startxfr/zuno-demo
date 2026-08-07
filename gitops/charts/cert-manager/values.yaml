@@ -1,13 +1,26 @@
 # This chart is shared by two ArgoCD Applications (see
-# gitops/apps/README.md): operator.enabled (zuno-cert-manager-d0) renders
-# the Namespaces/OperatorGroup/Subscription/CertManager singleton CR,
-# issuer.enabled (zuno-cert-manager-d1) renders the ClusterIssuer. Both
+# gitops/apps/README.md): operator.enabled (zuno-cert-manager-d0) gates
+# the CertManager singleton CR (templates/certmanager.yaml, local - no
+# startx equivalent) and the operand namespace (templates/
+# namespace-cert-manager.yaml, local); cluster-certmanager.project.enabled
+# + cluster-certmanager.operator.enabled (also zuno-cert-manager-d0) render
+# the operator Namespace/OperatorGroup/Subscription via the vendored
+# dependency (see Chart.yaml). issuer.enabled (zuno-cert-manager-d1) gates
+# the Vault-backed ClusterIssuer (templates/clusterissuer.yaml, local - no
+# startx equivalent covers our two-stage vaultServiceName discovery). All
 # default to false so `helm template`/`helm lint` render nothing by
 # default.
 operator:
   enabled: false
 issuer:
   enabled: false
+
+# Discovered by ansible/roles/cert_manager/tasks/install.yml (same
+# app.kubernetes.io/name=vault label-selector lookup already used by
+# ansible/roles/{vault,external_secrets}/tasks/install.yml) and always set
+# via gitops_app_extra_helm_values on the -d1 apply; templates/
+# clusterissuer.yaml renders nothing until it's set.
+vaultServiceName: ""
 
 # ASSUMPTION (not yet verified against a live cluster in this
 # environment - same posture this repo already documents for RHBK's/PGO's
@@ -16,18 +29,62 @@ issuer:
 # ("openshift-cert-manager-operator") publishes a "stable-v1" channel via
 # the "redhat-operators" catalog, and its own operator namespace is
 # "cert-manager-operator" (the operand controller/webhook/cainjector pods
-# it deploys, via the CertManager singleton CR below, live in "cert-manager"
-# instead). If `make d0 check cert-manager` shows this is wrong on a real
-# cluster, fix it the same way ansible/roles/{keycloak,postgresql,
-# openshift_ai}/tasks/install.yml do: discover the real package/channel/
-# catalog from the cluster's own PackageManifest at run time instead of
-# trusting this hardcoded value.
-subscriptionChannel: stable-v1
-subscriptionCatalogSource: redhat-operators
+# it deploys, via the CertManager singleton CR, live in "cert-manager"
+# instead - templates/namespace-cert-manager.yaml). If `make d0 check
+# cert-manager` shows this is wrong on a real cluster, fix it the same way
+# ansible/roles/{keycloak,postgresql,openshift_ai}/tasks/install.yml do:
+# discover the real package/channel/catalog from the cluster's own
+# PackageManifest at run time instead of trusting this hardcoded value.
+# Kept "stable-v1" rather than switching to startx's own cluster-certmanager
+# default ("stable-v1.19", tied to their pinned appVersion) - both are
+# unverified guesses, and this migration shouldn't also change which one
+# this repo has documented and relied on so far.
+cluster-certmanager:
+  context: &context
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: cert-manager
+    app: cert-manager
 
-# Discovered by ansible/roles/cert_manager/tasks/install.yml (same
-# app.kubernetes.io/name=vault label-selector lookup already used by
-# ansible/roles/{vault,external_secrets}/tasks/install.yml) and always set
-# via gitops_app_extra_helm_values on the -d1 apply; templates/
-# clusterissuer.yaml renders nothing until it's set.
-vaultServiceName: ""
+  project:
+    enabled: false
+    context:
+      <<: *context
+    project:
+      enabled: true
+      # PreSync ArgoCD hook (see gitops/apps/README.md's Namespace
+      # convention), same mechanism this repo's own charts use.
+      hooked: true
+      type: namespace
+      name: cert-manager-operator
+      display_name: Operator CertManager
+      description: cert-manager operator, configured by Zuno
+
+  operator:
+    enabled: false
+    context:
+      <<: *context
+    subscription:
+      enabled: true
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      operator:
+        channel: stable-v1
+        name: openshift-cert-manager-operator
+        # Matches this repo's previous local template (automatic
+        # upgrades) - the startx chart defaults to Manual.
+        installPlanApproval: Automatic
+        source:
+          name: redhat-operators
+          namespace: openshift-marketplace
+    operatorGroup:
+      # startx's own cluster-certmanager default is operatorGroup.enabled:
+      # false (AllNamespaces, no dedicated OperatorGroup - this operator
+      # commonly supports that mode). Kept enabled/namespace-scoped here
+      # instead, to preserve this chart's previous, already-existing
+      # (if likewise unverified) behavior rather than changing two
+      # unverified assumptions in the same migration.
+      enabled: true
+      name: cert-manager-operator-group
+      namespace: cert-manager-operator

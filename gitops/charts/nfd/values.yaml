@@ -1,12 +1,62 @@
-# Nothing runtime-discovered for this chart - the operator channel
-# ("stable") and the NodeFeatureDiscovery instance spec are both static.
-
-# This chart is shared by two ArgoCD Applications (see
-# gitops/apps/README.md): operator.enabled (zuno-nfd-d0) renders the
-# Namespace/OperatorGroup/Subscription, nodeFeatureDiscovery.enabled
-# (zuno-nfd-d1) renders the NodeFeatureDiscovery CR. Both default to false
-# so `helm template`/`helm lint` render nothing by default.
-operator:
-  enabled: false
-nodeFeatureDiscovery:
-  enabled: false
+# This chart is a thin wrapper around the startx `cluster-nfd` chart
+# (https://helm-repository.readthedocs.io/en/latest/charts/cluster-nfd,
+# vendored as a Helm dependency - see Chart.yaml), which itself renders the
+# Namespace/OperatorGroup/Subscription (its own `project`/`operator`
+# dependencies) and the NodeFeatureDiscovery CR. Shared by two ArgoCD
+# Applications (see gitops/apps/README.md): cluster-nfd.project.enabled +
+# cluster-nfd.operator.enabled (zuno-nfd-d0, Namespace/OperatorGroup/
+# Subscription) and cluster-nfd.nfd.enabled (zuno-nfd-d1, the
+# NodeFeatureDiscovery CR). All default to false so `helm template`/`helm
+# lint` render nothing by default.
+cluster-nfd:
+  context: &context
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: nfd
+    app: nfd
+  project:
+    enabled: false
+    context:
+      <<: *context
+    project:
+      enabled: true
+      # PreSync ArgoCD hook (see gitops/apps/README.md's Namespace
+      # convention), same mechanism this repo's own charts use.
+      hooked: true
+      type: namespace
+      name: openshift-nfd
+      display_name: Operator NFD
+      description: Node Feature Discovery, configured by Zuno
+  operator:
+    enabled: false
+    context:
+      <<: *context
+    subscription:
+      enabled: true
+      name: nfd
+      namespace: openshift-nfd
+      operator:
+        channel: stable
+        name: nfd
+        # Matches this repo's previous local template (automatic
+        # upgrades) - the startx chart defaults to Manual.
+        installPlanApproval: Automatic
+        source:
+          name: redhat-operators
+          namespace: openshift-marketplace
+    operatorGroup:
+      enabled: true
+      name: openshift-nfd-group
+      namespace: openshift-nfd
+  nfd:
+    enabled: false
+    list:
+      - name: nfd-instance
+        namespace: openshift-nfd
+        # Minimal spec, relying on the operator's own defaults (instance/
+        # topology updater disabled - this demo has no need for either) -
+        # matches this chart's previous local NodeFeatureDiscovery CR.
+        spec: |-
+          instance: ""
+          topologyupdater: false

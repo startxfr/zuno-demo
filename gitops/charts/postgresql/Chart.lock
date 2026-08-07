@@ -1,0 +1,6 @@
+dependencies:
+- name: operator
+  repository: https://helm-repository.readthedocs.io/en/latest/repos/stable
+  version: 21.3.207
+digest: sha256:9219fc1c57a3c445520229e5fe637c0531a1089353456b6073437dba0c0871b5
+generated: "2026-08-07T17:35:03.715864932+02:00"

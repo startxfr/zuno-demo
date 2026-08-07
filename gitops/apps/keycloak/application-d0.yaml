@@ -1,7 +1,9 @@
 ---
 # RHBK (Red Hat build of Keycloak) operator install (ADR-0312). See
-# gitops/charts/keycloak (operator.enabled - Subscription/OperatorGroup).
-# Applied by the `keycloak` Ansible role's install.yml, with the operator's
+# gitops/charts/keycloak (operator.enabled - Subscription/OperatorGroup,
+# rendered by the vendored startx `operator` chart - see that chart's
+# Chart.yaml for why not `cluster-sso`). Applied by the `keycloak` Ansible
+# role's install.yml, with the operator's
 # catalog-discovered channel injected via gitops_app_extra_helm_values
 # (ADR-0048) - see that role's README.md. The Keycloak CR/RealmImport/
 # ExternalSecrets operand is a separate Application

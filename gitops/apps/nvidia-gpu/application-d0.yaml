@@ -1,7 +1,9 @@
 ---
 # NVIDIA GPU Operator install (ADR-0312). See gitops/charts/nvidia-gpu
-# (operator.enabled - Namespace/OperatorGroup/Subscription). Applied by the
-# `nvidia_gpu` Ansible role's install.yml. The ClusterPolicy operand is a
+# (cluster-gpu.project.enabled + cluster-gpu.operator.enabled - Namespace/
+# OperatorGroup/Subscription, rendered by the vendored startx cluster-gpu
+# chart). Applied by the `nvidia_gpu` Ansible role's install.yml. The
+# ClusterPolicy operand is a
 # separate Application (zuno-nvidia-gpu-d1, application-d1.yaml) - its
 # spec is read from this operator's installed CSV's own alm-examples at
 # run time, so that role calls apply_gitops_app.yml against -d1 *twice*
@@ -27,8 +29,11 @@ spec:
     path: gitops/charts/nvidia-gpu
     helm:
       values: |
-        operator:
-          enabled: true
+        cluster-gpu:
+          project:
+            enabled: true
+          operator:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: nvidia-gpu-operator
@@ -38,6 +43,6 @@ spec:
       selfHeal: true
     syncOptions:
       # nvidia-gpu-operator (this Application's destination.namespace) is
-      # created nowhere else - also backed by the chart's own
-      # namespace.yaml PreSync hook as a redundant safeguard.
+      # created nowhere else - also backed by the vendored cluster-gpu
+      # chart's own project.hooked PreSync hook as a redundant safeguard.
       - CreateNamespace=true

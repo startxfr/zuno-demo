@@ -1,8 +1,11 @@
 ---
 # cert-manager operator install. See gitops/charts/cert-manager
-# (operator.enabled - Namespaces/OperatorGroup/Subscription/CertManager
-# singleton CR). Applied by the `cert_manager` Ansible role's install.yml.
-# The Vault-backed ClusterIssuer operand is a separate Application
+# (operator.enabled - operand Namespace + CertManager singleton CR, local
+# templates; cluster-certmanager.project.enabled +
+# cluster-certmanager.operator.enabled - operator Namespace/OperatorGroup/
+# Subscription, rendered by the vendored startx cluster-certmanager
+# chart). Applied by the `cert_manager` Ansible role's install.yml. The
+# Vault-backed ClusterIssuer operand is a separate Application
 # (zuno-cert-manager-d1, applied after this one is Synced+Healthy) - see
 # application-d1.yaml.
 apiVersion: argoproj.io/v1alpha1
@@ -24,6 +27,11 @@ spec:
       values: |
         operator:
           enabled: true
+        cluster-certmanager:
+          project:
+            enabled: true
+          operator:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager-operator
@@ -33,6 +41,7 @@ spec:
       selfHeal: true
     syncOptions:
       # cert-manager-operator (this Application's destination.namespace)
-      # is created nowhere else - also backed by the chart's own
-      # namespace-operator.yaml PreSync hook as a redundant safeguard.
+      # is created nowhere else - also backed by the vendored
+      # cluster-certmanager chart's own project.hooked PreSync hook as a
+      # redundant safeguard.
       - CreateNamespace=true

@@ -1,0 +1,6 @@
+dependencies:
+- name: cluster-ods
+  repository: https://helm-repository.readthedocs.io/en/latest/repos/stable
+  version: 21.3.205
+digest: sha256:1fc7faef647a7ff15fef95c1ab11dccc727c93e14952f7b6adf064c648b02791
+generated: "2026-08-07T17:18:24.318063982+02:00"

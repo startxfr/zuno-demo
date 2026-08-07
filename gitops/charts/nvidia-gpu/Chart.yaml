@@ -5,7 +5,15 @@ description: >-
   its default ClusterPolicy, enabling GPU scheduling (ADR-0312). The
   ClusterPolicy spec is supplied at apply time from the installed CSV's
   own alm-examples - see this chart's README.md for why it is not
-  rendered on the operator's first sync.
+  rendered on the operator's first sync. Wraps the startx cluster-gpu
+  chart (github.com/startxfr/helm-repository) as a dependency, same
+  pattern as gitops/charts/vault wrapping hashicorp/vault - cluster-gpu
+  itself renders the Namespace/OperatorGroup/Subscription (via its own
+  project/operator dependencies) and the ClusterPolicy CR.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: "0.2.0"
+dependencies:
+  - name: cluster-gpu
+    version: "21.3.205"
+    repository: "https://helm-repository.readthedocs.io/en/latest/repos/stable"

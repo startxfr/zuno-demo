@@ -87,6 +87,31 @@ backed by a `pki/` secrets engine `ansible/roles/vault` prepares (see that
 role's README). Infrastructure only for now - no existing Route/service
 consumes this issuer yet.
 
+**Vendored startx charts**: `nfd`, `nvidia-gpu`, `openshift-ai`,
+`cert-manager`, `keycloak` and `postgresql` vendor a chart from the
+[startx `helm-repository`](https://helm-repository.readthedocs.io) as a
+Helm `dependencies:` entry (same pattern `gitops/charts/vault` already used
+for `hashicorp/vault`), instead of hand-authoring their own Namespace/
+OperatorGroup/Subscription boilerplate - `helm dependency update` vendors
+the chart's `.tgz` (gitignored, resolved at render time) and pins its
+version in a committed `Chart.lock`. Only the genuinely Zuno-specific
+content (the `CertManager`/`ClusterIssuer` CRs, the Keycloak CR/RealmImport/
+ExternalSecrets, the PostgresCluster/pgvector wiring, the discovered
+`ClusterPolicy`/`DataScienceCluster` specs) stays as local templates in
+these charts. `nfd`/`nvidia-gpu`/`openshift-ai`/`cert-manager` use that
+component's matching `cluster-xxx` chart (`cluster-nfd`/`cluster-gpu`/
+`cluster-ods`/`cluster-certmanager`), which already bundles startx's own
+`project`+`operator` dependencies; `keycloak`/`postgresql` instead depend
+directly on the generic `operator` chart (skipping `cluster-sso`/
+`cluster-crunchy`) since this repo's install targets a different operator
+package/namespace topology than those charts' own opinionated defaults -
+see each chart's `Chart.yaml` for the specific reasoning. `vault` was
+evaluated against `cluster-vault` and deliberately NOT migrated: its own
+`project` dependency isn't needed (`zuno-data` is already created by
+`gitops/charts/namespaces`), and adopting it would force an unrelated,
+unreviewed `hashicorp/vault` chart version jump (0.28.1 → 1.21.2) for no
+offsetting benefit.
+
 **`Namespace` resources on the `-d0` side**: every chart that declares its
 own `Namespace` (the operator's dedicated namespace, or - for
 `cert-manager`/`external-secrets` - a second namespace beyond it, or -
@@ -126,9 +151,9 @@ Directories present:
 | Component | Source |
 |---|---|
 | `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) - no operator, `-d0` is a no-op |
-| `cert-manager` | local chart, `gitops/charts/cert-manager` (`-d0`: cert-manager operator + its `CertManager` config CR; `-d1`: Vault-backed `ClusterIssuer` - see the `cert_manager` role's README) |
-| `keycloak` | local chart, `gitops/charts/keycloak` (`-d0`: RHBK operator `Subscription`/`OperatorGroup`; `-d1`: Keycloak CR/RealmImport/ExternalSecrets - ADR-0312, see the `keycloak` role's README) |
-| `postgresql` | local chart, `gitops/charts/postgresql` (`-d0`: PGO operator `Subscription`; `-d1`: PostgresCluster/ExternalSecret/ConfigMap - ADR-0312, see the `postgresql` role's README) |
+| `cert-manager` | local chart, `gitops/charts/cert-manager` (`-d0`: startx `cluster-certmanager` dependency for Namespace/OperatorGroup/Subscription + local `CertManager` config CR; `-d1`: Vault-backed `ClusterIssuer` - see the `cert_manager` role's README) |
+| `keycloak` | local chart, `gitops/charts/keycloak` (`-d0`: startx `operator` dependency for the RHBK `Subscription`/`OperatorGroup` - not `cluster-sso`, see that chart's Chart.yaml; `-d1`: Keycloak CR/RealmImport/ExternalSecrets - ADR-0312, see the `keycloak` role's README) |
+| `postgresql` | local chart, `gitops/charts/postgresql` (`-d0`: startx `operator` dependency for the PGO `Subscription` - not `cluster-crunchy`, see that chart's Chart.yaml; `-d1`: PostgresCluster/ExternalSecret/ConfigMap - ADR-0312, see the `postgresql` role's README) |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) - no operator, `-d0` is a no-op |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` - no operator, `-d0` is a no-op |
 | `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |
@@ -138,9 +163,9 @@ Directories present:
 | `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) - no operator, `-d0` is a no-op |
-| `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: operator; `-d1`: NodeFeatureDiscovery CR) |
-| `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: operator; `-d1`: ClusterPolicy, spec injected once discovered - see that chart's README) |
-| `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: operator; `-d1`: DataScienceCluster) |
+| `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: startx `cluster-nfd` dependency, entirely - Namespace/OperatorGroup/Subscription; `-d1`: `cluster-nfd`'s own NodeFeatureDiscovery CR) |
+| `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: startx `cluster-gpu` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-gpu`'s own ClusterPolicy CR, spec injected once discovered - see that chart's README) |
+| `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: startx `cluster-ods` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-ods`'s own DataScienceCluster CR, spec overridden in full - RawDeployment, not startx's Serverless-dependent default) |
 | `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: operator + OperatorConfig; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
 | `smtp` | local chart, `gitops/charts/smtp` (`-d0`: zuno-ai-run Namespace; `-d1`: technical mail identity ExternalSecret) - no operator |
 | `observability` | local chart, `gitops/charts/observability` (`-d0`: OpenTelemetry operator; `-d1`: zuno-telemetry Namespace + shared OTLP Collector) |

@@ -58,8 +58,10 @@ version-qualified (`stable-v22`, `stable-v26`, ...) with no bare `stable`
 alias on that cluster. Same lesson as ADR-0048's CNPG channel discovery
 and `ansible/roles/postgresql`'s PGO package discovery. `tasks/install.yml`
 runs this discovery once and feeds it into `gitops_app_extra_helm_values`
-(`subscriptionChannel`/`subscriptionCatalogSource`, ADR-0048) for the
-`apply_gitops_app.yml` call that actually applies the Subscription.
+(`operator.subscription.operator.channel`/`operator.subscription.operator.
+source.name`, ADR-0048) for the `apply_gitops_app.yml` call that actually
+applies the Subscription (rendered by the vendored startx `operator`
+chart - see `gitops/charts/keycloak/Chart.yaml`).
 
 ## Installed directly into zuno-auth (RHBK doesn't support AllNamespaces)
 

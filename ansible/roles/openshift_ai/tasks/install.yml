@@ -45,12 +45,13 @@
       (all published channels: {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }})
 
 # ADR-0312: the operator Namespace/OperatorGroup/Subscription
-# (operator.enabled) and the DataScienceCluster (dataScienceCluster.
-# enabled) both live in gitops/charts/openshift-ai, applied via two
-# separate Applications (zuno-openshift-ai-d0/-d1) - -d1 is only applied
-# once -d0 is Synced+Healthy, whose custom Subscription health check
-# (ansible/roles/argocd/tasks/apply_resource_health_checks.yml) already
-# confirms the CSV is installed.
+# (cluster-ods.project.enabled/cluster-ods.operator.enabled) and the
+# DataScienceCluster (cluster-ods.DataScienceCluster.enabled) both live in
+# gitops/charts/openshift-ai (wrapping the vendored startx cluster-ods
+# chart), applied via two separate Applications (zuno-openshift-ai-d0/-d1)
+# - -d1 is only applied once -d0 is Synced+Healthy, whose custom
+# Subscription health check (ansible/roles/argocd/tasks/
+# apply_resource_health_checks.yml) already confirms the CSV is installed.
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -58,9 +59,14 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
-      operator:
-        enabled: true
-      subscriptionChannel: "{{ _openshift_ai_channel }}"
+      cluster-ods:
+        project:
+          enabled: true
+        operator:
+          enabled: true
+          subscription:
+            operator:
+              channel: "{{ _openshift_ai_channel }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
@@ -71,8 +77,9 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_extra_helm_values:
-      dataScienceCluster:
-        enabled: true
+      cluster-ods:
+        DataScienceCluster:
+          enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 

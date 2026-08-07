@@ -1,0 +1,6 @@
+dependencies:
+- name: cluster-certmanager
+  repository: https://helm-repository.readthedocs.io/en/latest/repos/stable
+  version: 21.3.205
+digest: sha256:95ab57a71d2102543bf5c0375a17ef11728a15b8ea693dfbc5f97d358b4a290c
+generated: "2026-08-07T17:27:46.895510897+02:00"

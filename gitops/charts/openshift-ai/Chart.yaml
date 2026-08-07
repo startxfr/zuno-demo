@@ -5,7 +5,15 @@ description: >-
   Ansible run time - ADR-0048) and the DataScienceCluster with kserve
   (RawDeployment) enabled - ADR-0047/ADR-0312. zuno-ai-run's Namespace,
   RHOAI dashboard label and GPU ResourceQuota are owned by
-  gitops/charts/namespaces, not this chart.
+  gitops/charts/namespaces, not this chart. Wraps the startx cluster-ods
+  chart (github.com/startxfr/helm-repository) as a dependency, same
+  pattern as gitops/charts/vault wrapping hashicorp/vault - cluster-ods
+  itself renders the Namespace/OperatorGroup/Subscription (via its own
+  project/operator dependencies) and the DataScienceCluster CR.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: "0.2.0"
+dependencies:
+  - name: cluster-ods
+    version: "21.3.205"
+    repository: "https://helm-repository.readthedocs.io/en/latest/repos/stable"

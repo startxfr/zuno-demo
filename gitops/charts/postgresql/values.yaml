@@ -5,23 +5,59 @@
 
 # This chart is shared by two ArgoCD Applications (see
 # gitops/apps/README.md): operator.enabled (zuno-postgresql-d0) renders
-# the PGO Subscription, postgresCluster.enabled (zuno-postgresql-d1)
-# renders the PostgresCluster/ConfigMap/ExternalSecret. Both default to
-# false so `helm template`/`helm lint` render nothing by default.
+# the PGO Subscription via the vendored startx `operator` chart (see
+# Chart.yaml for why not `cluster-crunchy`), postgresCluster.enabled
+# (zuno-postgresql-d1) renders the PostgresCluster/ConfigMap/ExternalSecret
+# (local templates, no startx equivalent covers this chart's pgvector
+# image/backups/Vault-credentials wiring). Both default to false so `helm
+# template`/`helm lint` render nothing by default.
 postgresCluster:
   enabled: false
 
-# ADR-0312/ADR-0048: all three discovered by
+# ADR-0312/ADR-0048: subscription.name (the package name itself, unlike
+# every other converted chart) / subscription.operator.channel /
+# subscription.operator.source.name are all discovered by
 # ansible/roles/postgresql/tasks/install.yml (fuzzy /crunchy/i match
 # across every catalog, operatorhubio-catalog fallback if nothing is
 # found anywhere - see that role's README.md) and always set via
-# gitops_app_extra_helm_values on the -d0 apply; templates/subscription.yaml
-# requires them.
+# gitops_app_extra_helm_values on the -d0 apply. templates/checks.yaml
+# fails the render if any is still empty once operator.enabled is true -
+# same fail-fast guard this chart's previous local Subscription template
+# enforced with Helm's `required` function (the vendored `operator`
+# chart's own Subscription template has no such guard). No OperatorGroup
+# here: openshift-operators ships with OpenShift's own default global
+# OperatorGroup (AllNamespaces), unlike gitops/charts/{nfd,nvidia-gpu,
+# openshift-ai,cert-manager}'s dedicated per-operator namespaces - so
+# operatorGroup.enabled is left at the `operator` chart's own default
+# (false).
 operator:
   enabled: false
-  packageName: ""
-  channel: ""
-  catalogSource: ""
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: postgresql
+    app: postgresql
+  subscription:
+    enabled: true
+    namespace: openshift-operators
+    name: ""
+    operator:
+      # Must be set to the same discovered package name as subscription.name
+      # above (both metadata.name and spec.name need it) - NOT left unset to
+      # fall back to subscription.name via the vendored `operator` chart's
+      # own `.name | default $name` logic, because that chart's own
+      # values.yaml already gives operator.name a non-empty base default
+      # ("codeready-workspaces", its own CRW example) which wins the merge
+      # and suppresses that fallback entirely.
+      name: ""
+      channel: ""
+      # Matches this repo's previous local template (automatic
+      # upgrades) - the startx chart defaults to Manual.
+      installPlanApproval: Automatic
+      source:
+        name: ""
+        namespace: openshift-marketplace
 
 postgresVersion: 16
 
