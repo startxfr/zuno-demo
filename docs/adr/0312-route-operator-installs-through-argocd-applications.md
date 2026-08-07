@@ -32,9 +32,11 @@ Subscription+operand-CR shape, so all four are converted together rather
 than repeating this exercise four times.
 
 `argocd` and `admin_context` are **not** converted - `argocd` installs
-ArgoCD itself, and `admin_context` creates the `AppProject` (`zuno`) every
-`Application.spec.project` in this repository references. Both are a
-bootstrap chicken-and-egg no `Application` can resolve. `sql_schema` and
+ArgoCD itself (and, once its own CRDs are Established, the `AppProject`
+(`zuno`) every `Application.spec.project` in this repository references -
+moved here from `admin_context`, which runs before `argocd` in the Day 0
+sequence and so can't wait on a CRD that role hasn't installed yet).
+Both are a bootstrap chicken-and-egg no `Application` can resolve. `sql_schema` and
 `rag`'s one-shot SQL `Job`s, `vault`'s imperative unseal, and the
 `*_build` roles' `BuildConfig`s are likewise out of scope - they are
 one-shot actions, not standing installed components, and none of them

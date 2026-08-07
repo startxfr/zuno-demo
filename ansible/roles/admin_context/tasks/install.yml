@@ -34,10 +34,11 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
 
-# The zuno AppProject is applied by configure.yml, not here: its CRD
-# (appprojects.argoproj.io) doesn't exist until the argocd role's own
-# install.yml has subscribed the GitOps operator and it has reconciled -
-# see configure.yml's own comment for why that's safe to rely on.
+# The zuno AppProject is applied by the argocd role's own install.yml, not
+# here or in this role's configure.yml: its CRD (appprojects.argoproj.io)
+# doesn't exist until that role's install.yml has subscribed the GitOps
+# operator and it has reconciled, and admin_context runs before argocd in
+# the Day 0 sequence.
 - name: "admin_context | prepare summary"
   ansible.builtin.debug:
     msg: >-

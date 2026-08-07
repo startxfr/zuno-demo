@@ -10,10 +10,10 @@ Applications, so a single component can always be configured without a full
 sync.
 
 Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
-`default` project - a dedicated `AppProject` (`ansible/roles/admin_context/
-kustomize/appproject/appproject.yaml`) applied by the `admin_context` role's
-`configure.yml` during `make day0|d0 configure` (after the `argocd` role's
-`install.yml` has installed the operator that owns the `AppProject` CRD).
+`default` project - a dedicated `AppProject` (`ansible/roles/argocd/
+kustomize/appproject/appproject.yaml`) applied by the `argocd` role's own
+`install.yml`, once it has installed the operator that owns the
+`AppProject` CRD and waited for that CRD to be Established.
 Keeping every zuno-* Application on a named, scoped project - rather than
 whatever else on the cluster shares `default` - makes its RBAC/permissions
 an explicit, auditable grant instead of an implicit one.
@@ -34,11 +34,11 @@ Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).
 
 Not every component has an Application here. `argocd` is the one remaining
-exception - it installs ArgoCD itself, and `admin_context` creates the
-`AppProject` (`zuno`) every `Application.spec.project` here references;
-both are a bootstrap chicken-and-egg no `Application` can resolve, so they
-still apply raw manifests directly via `ansible/tasks/apply_kustomize.yml`
-(ADR-0310). `sql_schema` and `rag`'s one-shot SQL `Job`s, `vault`'s
+exception - it installs ArgoCD itself and creates the `AppProject` (`zuno`)
+every `Application.spec.project` here references; both are a bootstrap
+chicken-and-egg no `Application` can resolve, so they still apply raw
+manifests directly via `ansible/tasks/apply_kustomize.yml` (ADR-0310).
+`sql_schema` and `rag`'s one-shot SQL `Job`s, `vault`'s
 imperative unseal, `smtp`'s static `ExternalSecret`, and the `*_build`
 roles' `BuildConfig`s are likewise one-shot/imperative actions rather than
 standing installed components, and stay outside this directory for the

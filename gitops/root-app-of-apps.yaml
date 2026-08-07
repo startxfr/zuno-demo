@@ -12,13 +12,13 @@
 # docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md /
 # docs/adr/0311-stop-applying-the-root-app-of-apps-from-ansible.md.
 #
-# spec.project references the "zuno" AppProject (ansible/roles/admin_context/
-# kustomize/appproject/appproject.yaml, applied by that role's configure.yml
+# spec.project references the "zuno" AppProject (ansible/roles/argocd/
+# kustomize/appproject/appproject.yaml, applied by that role's install.yml
 # - see gitops/apps/README.md), same as every child Application it recurses
 # over. Anyone following this manifest's own pure-GitOps path by hand must
 # create that AppProject first (`oc apply -f
-# ansible/roles/admin_context/kustomize/appproject/appproject.yaml`) - it
-# does not exist until admin_context's Ansible role has run.
+# ansible/roles/argocd/kustomize/appproject/appproject.yaml`) - it does not
+# exist until the argocd Ansible role has run.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

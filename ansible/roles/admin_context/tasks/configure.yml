@@ -14,30 +14,6 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
 
-# The zuno AppProject (ansible/roles/admin_context/kustomize/appproject/)
-# every gitops/apps/*/application.yaml targets instead of ArgoCD's built-in
-# "default" AppProject. It can't be applied from this role's install.yml:
-# the AppProject CRD doesn't exist until the argocd role's own install.yml
-# has subscribed the GitOps operator and it has reconciled - same ordering
-# constraint as the ClusterRoleBinding check just below. Since `make d0
-# install` always runs every component's install.yml (argocd included)
-# before `make d0 configure` runs any component's configure.yml, the CRD is
-# guaranteed to exist by the time this task runs.
-- name: "admin_context | wait for the AppProject CRD to be established (created by the argocd role's install.yml)"
-  kubernetes.core.k8s_info:
-    api_version: apiextensions.k8s.io/v1
-    kind: CustomResourceDefinition
-    name: appprojects.argoproj.io
-  register: _admin_context_appproject_crd
-  until: (_admin_context_appproject_crd.resources | default([]) | length) > 0
-  retries: 30
-  delay: 10
-
-- name: "admin_context | apply the zuno AppProject"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
-  vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/appproject"
-
 - name: "admin_context | look up the ArgoCD application-controller ClusterRoleBinding"
   kubernetes.core.k8s_info:
     api_version: rbac.authorization.k8s.io/v1
@@ -48,7 +24,7 @@
 - name: "admin_context | configure summary"
   ansible.builtin.debug:
     msg: >-
-      PriorityClasses re-applied. zuno AppProject applied.
+      PriorityClasses re-applied.
       zuno-argocd-application-controller-admin ClusterRoleBinding:
       {{ 'present (created by the argocd role)' if (_admin_context_argocd_crb.resources | default([]) | length) > 0
          else 'not present yet - expected before `make d0 install argocd` has run once' }}.

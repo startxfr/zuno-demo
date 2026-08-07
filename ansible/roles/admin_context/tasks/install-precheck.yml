@@ -1,12 +1,10 @@
 ---
 # State detection (never fails - see ansible/tasks/record_install_state.yml):
 # admin_context has no ArgoCD Application (bootstrap role, ADR-0312) - its
-# "installed" objects are just the two PriorityClasses
+# only "installed" objects are the two PriorityClasses
 # (ansible/roles/admin_context/kustomize/priorityclasses/, applied by
-# install.yml). The zuno AppProject is NOT checked here: it can only be
-# applied by configure.yml (its CRD doesn't exist until the argocd role's
-# own install.yml has run - see configure.yml's own comment) - it's
-# configure-precheck.yml's signal instead.
+# install.yml). The zuno AppProject moved to the argocd role (its own
+# install.yml) - see that role's install-precheck.yml for its signal.
 - name: "admin_context | look up the PriorityClasses"
   kubernetes.core.k8s_info:
     api_version: scheduling.k8s.io/v1

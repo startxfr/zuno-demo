@@ -2,8 +2,8 @@
 # State detection (never fails). argocd bootstraps ArgoCD itself - no
 # Application to check (ADR-0312). "Installed" = the Application CRD is
 # established, the default server Deployment is ready, the RBAC grant
-# exists, and the custom Subscription health check
-# (ansible/roles/argocd/tasks/apply_resource_health_checks.yml) is
+# exists, the zuno AppProject exists, and the custom Subscription health
+# check (ansible/roles/argocd/tasks/apply_resource_health_checks.yml) is
 # registered on the ArgoCD CR.
 - name: "argocd | look up the Application CRD"
   kubernetes.core.k8s_info:
@@ -27,6 +27,14 @@
     name: zuno-argocd-application-controller-admin
   register: _argocd_crb_lookup
 
+- name: "argocd | look up the zuno AppProject"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: AppProject
+    namespace: openshift-gitops
+    name: zuno
+  register: _argocd_appproject_lookup
+
 - name: "argocd | look up the ArgoCD CR's resourceHealthChecks (ADR-0312)"
   kubernetes.core.k8s_info:
     api_version: argoproj.io/v1beta1
@@ -43,6 +51,7 @@
         and (_argocd_server_lookup.resources | default([]) | length) > 0
         and (_argocd_server_lookup.resources[0].status.readyReplicas | default(0)) > 0
         and (_argocd_crb_lookup.resources | default([]) | length) > 0
+        and (_argocd_appproject_lookup.resources | default([]) | length) > 0
         and (_argocd_cr_lookup.resources | default([]) | length) > 0
         and (_argocd_cr_lookup.resources[0].spec.resourceHealthChecks | default([])
              | selectattr('kind', 'equalto', 'Subscription') | list | length) > 0
