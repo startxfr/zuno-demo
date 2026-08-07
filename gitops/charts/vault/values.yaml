@@ -19,7 +19,7 @@ global:
 # templates/_helpers.tpl), same predictable-hostname convention as the
 # tekos and keycloak charts.
 route:
-  enabled: false
+  enabled: true
   host: ""
 
 # Values for the upstream hashicorp/vault chart dependency declared in
