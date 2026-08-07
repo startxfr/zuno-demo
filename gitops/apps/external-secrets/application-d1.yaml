@@ -20,13 +20,11 @@ spec:
     path: gitops/charts/external-secrets
     helm:
       values: |
-        certmanager:
-          enabled: true
         clusterSecretStore:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: external-secrets
+    namespace: zuno-vault
   syncPolicy:
     automated:
       prune: true

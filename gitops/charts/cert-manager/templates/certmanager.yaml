@@ -10,7 +10,6 @@ apiVersion: operator.openshift.io/v1alpha1
 kind: CertManager
 metadata:
   name: cluster
-  namespace: zuno-certmanager
   labels:
     zuno.io/managed-by: argocd
   annotations:

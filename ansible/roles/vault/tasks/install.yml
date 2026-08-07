@@ -3,7 +3,7 @@
 # imperatively initializes it. This is the one component that cannot
 # depend on Vault for its own bootstrap secret: the unseal key and root
 # token are captured here and stored in vault-bootstrap-credentials, a
-# Kubernetes Secret in zuno-data. See ADR-0024's "Hardened requirement".
+# Kubernetes Secret in zuno-vault. See ADR-0024's "Hardened requirement".
 # Unsealing itself happens further down, via the vault-unseal-configure
 # Job - that Job re-runs (and re-unseals) every time this file is
 # invoked, e.g. after a Vault pod restart reseals it.
@@ -59,7 +59,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: StatefulSet
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
   register: _vault_sts
@@ -70,7 +70,7 @@
 - name: "vault | wait for the Vault server pod to be Running (sealed is expected at this point)"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
       - "component=server"
@@ -83,7 +83,7 @@
 
 - name: "vault | read current seal/init status"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: vault status -format=json
@@ -98,13 +98,13 @@
 - name: "vault | check for an existing bootstrap credentials secret"
   kubernetes.core.k8s_info:
     kind: Secret
-    namespace: zuno-data
+    namespace: zuno-vault
     name: vault-bootstrap-credentials
   register: _vault_bootstrap_secret
 
 - name: "vault | initialize Vault with a single key share (demo scope; ADR-0112 tracks HA/production hardening for v1)"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: vault operator init -key-shares=1 -key-threshold=1 -format=json
@@ -121,7 +121,7 @@
       kind: Secret
       metadata:
         name: vault-bootstrap-credentials
-        namespace: zuno-data
+        namespace: zuno-vault
       type: Opaque
       stringData:
         unseal_key: "{{ (_vault_init_raw.stdout | from_json).unseal_keys_b64[0] }}"
@@ -144,7 +144,7 @@
 - name: "vault | read bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret
-    namespace: zuno-data
+    namespace: zuno-vault
     name: vault-bootstrap-credentials
   register: _vault_creds
   no_log: true
@@ -169,7 +169,7 @@
 - name: "vault | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
   register: _vault_services
@@ -187,7 +187,7 @@
 # keeps the Job's own dependency self-contained and separately named, same
 # spirit as ansible/roles/agents/tasks/run_acceptance_gate.yml's
 # acceptance-gate-credentials Secret (there, the copy is also cross-
-# namespace; here both Secrets happen to live in zuno-data already).
+# namespace; here both Secrets happen to live in zuno-vault already).
 - name: "vault | copy the unseal key/root token into a Secret the Job can mount"
   kubernetes.core.k8s:
     state: present
@@ -196,7 +196,7 @@
       kind: Secret
       metadata:
         name: vault-unseal-configure-credentials
-        namespace: zuno-data
+        namespace: zuno-vault
         labels:
           zuno.io/managed-by: zuno-ansible
       type: Opaque
@@ -220,7 +220,7 @@
     api_version: batch/v1
     kind: Job
     name: vault-unseal-configure
-    namespace: zuno-data
+    namespace: zuno-vault
     wait: true
 
 - name: "vault | run the unseal/configure Job"
@@ -231,7 +231,7 @@
       kind: Job
       metadata:
         name: vault-unseal-configure
-        namespace: zuno-data
+        namespace: zuno-vault
         labels:
           zuno.io/managed-by: zuno-ansible
       spec:
@@ -247,7 +247,7 @@
                   - /scripts/unseal-and-configure.sh
                 env:
                   - name: VAULT_ADDR
-                    value: "http://{{ _vault_service_name }}.zuno-data.svc:8200"
+                    value: "http://{{ _vault_service_name }}.zuno-vault.svc:8200"
                   - name: VAULT_TOKEN
                     valueFrom:
                       secretKeyRef:
@@ -271,7 +271,7 @@
   kubernetes.core.k8s_info:
     api_version: batch/v1
     kind: Job
-    namespace: zuno-data
+    namespace: zuno-vault
     name: vault-unseal-configure
   register: _vault_unseal_configure_job
   until: >-
@@ -283,14 +283,14 @@
 - name: "vault | fetch the unseal/configure Job's pod"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "job-name=vault-unseal-configure"
   register: _vault_unseal_configure_pod
 
 - name: "vault | print the unseal/configure Job's output"
   kubernetes.core.k8s_log:
-    namespace: zuno-data
+    namespace: zuno-vault
     name: "{{ _vault_unseal_configure_pod.resources[0].metadata.name }}"
   register: _vault_unseal_configure_log
   when: (_vault_unseal_configure_pod.resources | default([]) | length) > 0
@@ -310,7 +310,7 @@
 
 - name: "vault | generate and seed self-generatable application secrets"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     # `environment:` is the generic Ansible task keyword - it sets env vars
@@ -345,7 +345,7 @@
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -355,7 +355,7 @@
 
 - name: "vault | generate and seed the shared demo-persona password (ADR-0041)"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -365,7 +365,7 @@
 
 - name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037)"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -375,7 +375,7 @@
 
 - name: "vault | generate and seed the Tekos frontend session HMAC secret"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -385,7 +385,7 @@
 
 - name: "vault | check whether operator-supplied secrets already exist"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -403,7 +403,7 @@
 
 - name: "vault | seed an empty placeholder only where no secret exists yet (never overwrite operator-supplied values)"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
@@ -436,7 +436,7 @@
 
 - name: "vault | store the cluster's apps domain"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-

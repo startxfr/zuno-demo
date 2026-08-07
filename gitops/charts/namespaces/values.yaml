@@ -63,15 +63,14 @@ platformNamespaces:
     allowedFromNamespaces:
       - zuno-agent-tekos
       - zuno-ai-run
-  - name: zuno-certmanager
-    allowedFromNamespaces:
-      - zuno-agent-tekos
-      - zuno-ai-run
-      - zuno-auth
-      - zuno-vault
   - name: zuno-vault
+    # cert-manager's ClusterIssuer talks to Vault's pki/ engine, but the
+    # Red Hat cert-manager operator hardcodes its operand controller pods
+    # into the fixed "cert-manager" namespace (not chart-managed - see
+    # gitops/charts/cert-manager/values.yaml's ASSUMPTION comment), so
+    # that's the real namespace to allow here, not a zuno-* one.
     allowedFromNamespaces:
-      - zuno-certmanager
+      - cert-manager
       - zuno-ai-run
       - zuno-auth
       - zuno-data

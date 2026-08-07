@@ -12,7 +12,7 @@
 - name: "vault | look up the bootstrap credentials Secret"
   kubernetes.core.k8s_info:
     kind: Secret
-    namespace: zuno-data
+    namespace: zuno-vault
     name: vault-bootstrap-credentials
   register: _vault_bootstrap_secret_lookup
 
@@ -20,7 +20,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: StatefulSet
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
   register: _vault_sts_lookup
@@ -28,7 +28,7 @@
 - name: "vault | look up the Vault server Pod"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
       - "component=server"
@@ -36,7 +36,7 @@
 
 - name: "vault | read current seal status"
   kubernetes.core.k8s_exec:
-    namespace: zuno-data
+    namespace: zuno-vault
     pod: "{{ _vault_pod_lookup.resources[0].metadata.name }}"
     container: vault
     command: vault status -format=json

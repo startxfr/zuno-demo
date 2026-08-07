@@ -29,16 +29,18 @@ spec:
       values: |
         operator:
           enabled: true
+        externalsecret:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: external-secrets
+    namespace: zuno-vault
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      # external-secrets (this Application's destination.namespace) is
-      # created nowhere else - also backed by the chart's own
-      # namespace-external-secrets.yaml PreSync hook as a redundant
-      # safeguard.
+      # zuno-vault (this Application's destination.namespace) is created
+      # nowhere else - also backed by the chart's own
+      # namespace-external-secrets.yaml PreSync hook (externalsecret.
+      # enabled, set above) as a redundant safeguard.
       - CreateNamespace=true

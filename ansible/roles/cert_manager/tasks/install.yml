@@ -42,7 +42,7 @@
 - name: "cert_manager | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
   register: _cert_manager_vault_services

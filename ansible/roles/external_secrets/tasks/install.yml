@@ -70,6 +70,8 @@
     gitops_app_extra_helm_values:
       operator:
         enabled: true
+      externalsecret:
+        enabled: true
       subscriptionChannel: "{{ _eso_channel }}"
       subscriptionCatalogSource: "{{ _eso_catalog_source }}"
     gitops_app_wait_retries: 60
@@ -86,7 +88,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
-    namespace: external-secrets
+    namespace: zuno-vault
     name: external-secrets
   register: _eso_operand_deploy
   until: >-
@@ -106,7 +108,7 @@
 - name: "external_secrets | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service
-    namespace: zuno-data
+    namespace: zuno-vault
     label_selectors:
       - "app.kubernetes.io/name=vault"
   register: _eso_vault_services

@@ -15,7 +15,7 @@ prepared by the same idempotent script,
 This is the one role that cannot depend on Vault for its own bootstrap
 secret: `install.yml` captures the unseal key and root token into a
 Kubernetes `Secret` (`vault-bootstrap-credentials`) in a locked-down,
-admin-only namespace (`zuno-data`) rather than requiring any
+admin-only namespace (`zuno-vault`) rather than requiring any
 external input. See ADR-0024.
 
 `install.yml` also generates and seeds the secrets that can be
