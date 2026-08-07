@@ -26,10 +26,9 @@ spec:
     targetRevision: main
     path: gitops/charts/external-secrets
     helm:
+      releaseName: zuno-external-secrets-d0
       values: |
         operator:
-          enabled: true
-        externalsecret:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
@@ -39,8 +38,10 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # zuno-vault (this Application's destination.namespace) is created
-      # nowhere else - also backed by the chart's own
-      # namespace-external-secrets.yaml PreSync hook (externalsecret.
-      # enabled, set above) as a redundant safeguard.
-      - CreateNamespace=true
+      # zuno-vault (this Application's destination.namespace) is owned by
+      # gitops/charts/namespaces (platformNamespaces), applied earlier in
+      # Day 0 ordering (ansible/playbooks/day0_install.yml: namespaces ->
+      # vault -> cert_manager -> external_secrets) - this chart must not
+      # also create/track it (was the zuno-external-secrets-d0/
+      # zuno-namespaces-d0 SharedResourceWarning).
+      - CreateNamespace=false

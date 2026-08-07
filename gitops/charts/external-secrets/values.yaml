@@ -1,13 +1,12 @@
 # This chart is shared by two ArgoCD Applications (gitops/apps/
 # external-secrets/application-d0.yaml and application-d1.yaml -
 # see gitops/apps/README.md): operator.enabled renders the operator
-# install (Namespaces/Subscription/OperatorConfig), clusterSecretStore.
+# install (Subscription/OperatorConfig - the Namespace it runs in is
+# owned by gitops/charts/namespaces, not this chart), clusterSecretStore.
 # enabled renders the operand (ClusterSecretStore/ExternalSecret). Both
 # default to false so `helm template`/`helm lint` render nothing by
 # default; each Application sets exactly one to true via
 # spec.source.helm.values.
-externalsecret:
-  enabled: false
 clusterSecretStore:
   enabled: false
 operator:
