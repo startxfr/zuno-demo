@@ -74,6 +74,13 @@ platformNamespaces:
       - zuno-ai-run
       - zuno-auth
       - zuno-data
+    # External Secrets Operator's secretstore-validate
+    # ValidatingWebhookConfiguration (failurePolicy: Fail) lives in this
+    # namespace and is called synchronously by the kube-apiserver on
+    # every SecretStore/ClusterSecretStore write - without this, those
+    # calls time out against the default-deny policy (see
+    # templates/networkpolicy-platform.yaml).
+    allowApiServerWebhooks: true
   - name: zuno-data
     # postgresql: rag-service (same-ns, already covered) + sales-db-mcp
     # (zuno-ai-run, cross-ns). vault: External Secrets Operator's

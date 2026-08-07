@@ -31,6 +31,18 @@ spec:
               # default-deny policies can still admit router traffic to
               # Routed Services (e.g. Keycloak's login UI).
               policy-group.network.openshift.io/ingress: ""
+        {{- if .allowApiServerWebhooks }}
+        - namespaceSelector:
+            matchLabels:
+              # OVN-Kubernetes labels this real namespace so
+              # default-deny policies can still admit kube-apiserver
+              # traffic - the apiserver runs hostNetwork: true, so it
+              # doesn't match any normal pod/namespaceSelector. Needed
+              # wherever a ValidatingWebhookConfiguration/
+              # MutatingWebhookConfiguration's service lives, since the
+              # apiserver calls those synchronously.
+              policy-group.network.openshift.io/host-network: ""
+        {{- end }}
         {{- range .allowedFromNamespaces }}
         - namespaceSelector:
             matchLabels:
