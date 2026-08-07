@@ -24,8 +24,8 @@
   gather_facts: false
   vars:
     day0_components:
-      - admin_context
       - argocd
+      - admin_context
       - namespaces
       - vault
       - external_secrets

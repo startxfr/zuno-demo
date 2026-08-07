@@ -18,8 +18,8 @@
       - external_secrets
       - vault
       - namespaces
-      - argocd
       - admin_context
+      - argocd
   tasks:
     - name: Resolve requested Day 0 component name(s)
       ansible.builtin.set_fact:
