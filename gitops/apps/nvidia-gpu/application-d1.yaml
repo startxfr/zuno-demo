@@ -1,0 +1,34 @@
+---
+# NVIDIA GPU Operator ClusterPolicy operand (ADR-0312). See
+# gitops/charts/nvidia-gpu (clusterPolicy.enabled) - NOT the operator
+# itself (see gitops/apps/nvidia-gpu/application-d0.yaml, applied first).
+# clusterPolicy.spec starts empty (renders nothing) until
+# ansible/roles/nvidia_gpu/tasks/install.yml's second apply against this
+# Application injects the installed CSV's own recommended spec via
+# gitops_app_extra_helm_values (ADR-0048).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-nvidia-gpu-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-202"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/nvidia-gpu
+    helm:
+      values: |
+        clusterPolicy:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nvidia-gpu-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

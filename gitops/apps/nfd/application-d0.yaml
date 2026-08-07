@@ -1,0 +1,38 @@
+---
+# Node Feature Discovery operator install (ADR-0047, ADR-0312). See
+# gitops/charts/nfd (operator.enabled - Namespace/OperatorGroup/
+# Subscription). Applied by the `nfd` Ansible role's install.yml - see
+# that role's README.md for why NFD must sync before nvidia_gpu. The
+# NodeFeatureDiscovery CR operand is a separate Application
+# (zuno-nfd-d1, applied after this one is Synced+Healthy) - see
+# application-d1.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-nfd-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this;
+    # real Day 0 ordering comes from ansible/playbooks/day0_install.yml's
+    # day0_components list (nfd before nvidia_gpu).
+    argocd.argoproj.io/sync-wave: "-204"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/nfd
+    helm:
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-nfd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

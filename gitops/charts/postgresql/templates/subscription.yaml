@@ -1,12 +1,17 @@
-# ADR-0312: PGO's Subscription now lives in this chart, alongside the
+{{- if .Values.operator.enabled }}
+# ADR-0312: PGO's Subscription lives in this chart, alongside the
 # PostgresCluster it makes available - same operator-in-chart pattern as
-# gitops/charts/{openshift-ai,nfd,nvidia-gpu,external-secrets}. No
+# gitops/charts/{openshift-ai,nfd,nvidia-gpu,external-secrets,keycloak}.
+# Rendered by the zuno-postgresql-d0 Application (operator.enabled); the
+# PostgresCluster/ConfigMap/ExternalSecret below render on the separate
+# zuno-postgresql-d1 Application (postgresCluster.enabled), applied
+# afterwards by ansible/roles/postgresql/tasks/install.yml. No
 # OperatorGroup here: openshift-operators ships with OpenShift's own
 # default global OperatorGroup, unlike gitops/charts/{nfd,nvidia-gpu,
 # openshift-ai}'s dedicated per-operator namespaces.
 #
 # packageName/channel/catalogSource are all runtime-discovered by
-# ansible/roles/postgresql/tasks/configure.yml (fuzzy /crunchy/i match
+# ansible/roles/postgresql/tasks/install.yml (fuzzy /crunchy/i match
 # across every catalog, with an operatorhubio-catalog fallback - see that
 # role's README.md) and injected via gitops_app_extra_helm_values
 # (ADR-0048) - unlike the other converted charts, even the package name
@@ -26,3 +31,4 @@ spec:
   source: {{ required "operator.catalogSource must be set via gitops_app_extra_helm_values (ADR-0048)" .Values.operator.catalogSource | quote }}
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
+{{- end }}

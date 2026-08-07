@@ -1,8 +1,14 @@
 ---
-# Reverse of install.yml: removes the Vault GitOps Application. Demo scope
-# (mirrors ADR-0112) - the unseal key/root token in vault-bootstrap-
-# credentials and the PVC-backed Vault data are not cleaned up here.
-- name: "vault | delete the vault ArgoCD Application"
+# Reverse of install.yml: removes the Vault GitOps Applications (-d1, the
+# real content, then -d0, the no-op). Demo scope (mirrors ADR-0112) - the
+# unseal key/root token in vault-bootstrap-credentials and the PVC-backed
+# Vault data are not cleaned up here.
+- name: "vault | delete the vault ArgoCD Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
-    gitops_app_name: "zuno-vault"
+    gitops_app_name: "zuno-vault-d1"
+
+- name: "vault | delete the vault ArgoCD Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-vault-d0"

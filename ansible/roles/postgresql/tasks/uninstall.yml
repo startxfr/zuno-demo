@@ -4,12 +4,21 @@
 # constant, so it's rediscovered here by listing. openshift-operators
 # (shared) is left in place.
 #
-# remove_operator.yml must run *before* delete_gitops_app.yml: it needs
-# the Subscription to still exist to discover the installed CSV. Running
-# it first also means its CRD delete (cascading the PostgresCluster CR
-# first) and CSV/Subscription delete happen before ArgoCD's own cascade
-# prune would otherwise race to remove the same Subscription object -
-# same ordering ADR-0312 established for the other converted roles.
+# Delete -d1 (the PostgresCluster operand) first, via ArgoCD prune, before
+# remove_operator.yml deletes the CRD it's an instance of - avoids ArgoCD
+# fighting a CR deletion its own Application still desires.
+# remove_operator.yml then runs *before* deleting -d0: it needs the
+# Subscription (a -d0-managed resource) to still exist to discover the
+# installed CSV. Running it before -d0's own delete also means its CRD
+# delete (cascading any remaining PostgresCluster CR) and CSV/Subscription
+# delete happen before ArgoCD's own cascade prune would otherwise race to
+# remove the same Subscription object - same ordering ADR-0312 established
+# for the other converted roles.
+- name: "postgresql | delete the postgresql ArgoCD Application (d1: PostgresCluster)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-postgresql-d1"
+
 - name: "postgresql | find the Crunchy Postgres Operator Subscription"
   kubernetes.core.k8s_info:
     api_version: operators.coreos.com/v1alpha1
@@ -29,10 +38,10 @@
     loop_var: _postgresql_subscription
     label: "{{ _postgresql_subscription.metadata.name }}"
 
-- name: "postgresql | delete the postgresql ArgoCD Application"
+- name: "postgresql | delete the postgresql ArgoCD Application (d0: cascades the remaining operator install)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
-    gitops_app_name: "zuno-postgresql"
+    gitops_app_name: "zuno-postgresql-d0"
 
 - name: "postgresql | delete the operatorhubio-catalog fallback CatalogSource"
   kubernetes.core.k8s:

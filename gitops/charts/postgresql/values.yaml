@@ -1,13 +1,24 @@
-# Default values for the postgresql chart. See gitops/apps/postgresql/application.yaml
-# for how this is deployed (namespace: zuno-data) and
-# gitops/charts/postgresql/image/README.md for the pgvector image build step.
+# Default values for the postgresql chart. See gitops/apps/postgresql/
+# application-d0.yaml/application-d1.yaml for how this is deployed
+# (namespace: zuno-data) and gitops/charts/postgresql/image/README.md for
+# the pgvector image build step.
+
+# This chart is shared by two ArgoCD Applications (see
+# gitops/apps/README.md): operator.enabled (zuno-postgresql-d0) renders
+# the PGO Subscription, postgresCluster.enabled (zuno-postgresql-d1)
+# renders the PostgresCluster/ConfigMap/ExternalSecret. Both default to
+# false so `helm template`/`helm lint` render nothing by default.
+postgresCluster:
+  enabled: false
 
 # ADR-0312/ADR-0048: all three discovered by
-# ansible/roles/postgresql/tasks/configure.yml (fuzzy /crunchy/i match
+# ansible/roles/postgresql/tasks/install.yml (fuzzy /crunchy/i match
 # across every catalog, operatorhubio-catalog fallback if nothing is
 # found anywhere - see that role's README.md) and always set via
-# gitops_app_extra_helm_values; templates/subscription.yaml requires them.
+# gitops_app_extra_helm_values on the -d0 apply; templates/subscription.yaml
+# requires them.
 operator:
+  enabled: false
   packageName: ""
   channel: ""
   catalogSource: ""
@@ -49,7 +60,7 @@ backups:
 credentials:
   # Path under the vault-backend ClusterSecretStore's "secret" KV v2 mount
   # (i.e. resolves to Vault path secret/zuno/postgresql/app, already seeded
-  # by ansible/roles/vault/tasks/configure.yml - this chart only consumes
+  # by ansible/roles/vault/tasks/install.yml - this chart only consumes
   # it, never regenerates or hardcodes it, per ADR-0024).
   vaultPath: zuno/postgresql/app
   # PGO's own fixed naming convention for a user's auto-managed Secret is

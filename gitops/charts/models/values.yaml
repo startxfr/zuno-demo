@@ -1,5 +1,5 @@
 # Default values for the models chart. Overridden per-environment through
-# gitops/apps/models/application.yaml's spec.source.helm.values.
+# gitops/apps/models/application-d1.yaml's spec.source.helm.values.
 
 namespace: zuno-ai-run
 

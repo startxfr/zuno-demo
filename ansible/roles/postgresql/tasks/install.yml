@@ -128,22 +128,35 @@
       Subscribing to package '{{ _postgresql_package_name }}', catalog
       '{{ _postgresql_catalog_source }}', channel '{{ _postgresql_channel }}'.
 
-# ADR-0312: templates/subscription.yaml (sync-wave -40) and
-# templates/postgrescluster.yaml (sync-wave -30) both live in
-# gitops/charts/postgresql, applied as a single ArgoCD Application here -
-# the PostgresCluster wave is gated on the Subscription reporting Healthy
-# via the custom health check
-# ansible/roles/argocd/tasks/apply_resource_health_checks.yml registers.
-- name: "postgresql | apply the PostgreSQL GitOps Application"
+# ADR-0312: templates/subscription.yaml (operator.enabled) lives in
+# gitops/charts/postgresql, applied via the separate zuno-postgresql-d0
+# Application.
+- name: "postgresql | apply the PostgreSQL GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "postgresql"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
       operator:
+        enabled: true
         packageName: "{{ _postgresql_package_name }}"
         channel: "{{ _postgresql_channel }}"
         catalogSource: "{{ _postgresql_catalog_source }}"
+    gitops_app_wait_retries: 60
+
+# templates/postgrescluster.yaml (postgresCluster.enabled) lives in the
+# same chart, applied via the separate zuno-postgresql-d1 Application,
+# after -d0 (above) is Synced+Healthy.
+- name: "postgresql | apply the PostgreSQL GitOps Application (d1: PostgresCluster)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "postgresql"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_extra_helm_values:
+      postgresCluster:
+        enabled: true
     gitops_app_wait_retries: 60
 
 # PGO's documented readiness signal (see

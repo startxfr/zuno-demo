@@ -1,0 +1,41 @@
+---
+# Red Hat OpenShift AI operator install (ADR-0047/ADR-0048, ADR-0312). See
+# gitops/charts/openshift-ai (operator.enabled - Namespace/OperatorGroup/
+# Subscription). Applied by the `openshift_ai` Ansible role's install.yml,
+# with the operator's catalog-published channel injected via
+# gitops_app_extra_helm_values (ADR-0048) - see that role's README.md. The
+# DataScienceCluster operand is a separate Application
+# (zuno-openshift-ai-d1, applied after this one is Synced+Healthy) - see
+# application-d1.yaml. zuno-ai-run's own Namespace, RHOAI dashboard label
+# and GPU ResourceQuota are owned by gitops/charts/namespaces instead
+# (ADR-0312), not by this chart.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-ai-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this;
+    # real Day 0 ordering (after `namespaces`) comes from ansible/
+    # playbooks/day0_install.yml's day0_components list.
+    argocd.argoproj.io/sync-wave: "-199"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-ai
+    helm:
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redhat-ods-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

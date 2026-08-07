@@ -1,0 +1,34 @@
+---
+# The technical mail identity's credential (ADR-0056), exposed via
+# ExternalSecret - see gitops/charts/smtp (credentials.enabled). There is
+# no SMTP server to install, only this ExternalSecret reading the
+# pre-seeded placeholder at secret/zuno/smtp/technical (seeded empty by
+# ansible/roles/vault/tasks/install.yml - an operator must populate it,
+# see ansible/roles/smtp/README.md, before whichever service sends the
+# Comage weekly report can actually send mail).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-smtp-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-179"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/smtp
+    helm:
+      values: |
+        credentials:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

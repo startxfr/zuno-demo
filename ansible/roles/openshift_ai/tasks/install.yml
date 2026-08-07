@@ -44,23 +44,35 @@
       Selected rhods-operator channel: {{ _openshift_ai_channel }}
       (all published channels: {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }})
 
-# ADR-0312: the operator Namespace/OperatorGroup/Subscription and the
-# DataScienceCluster now both live in gitops/charts/openshift-ai, applied
-# as a single ArgoCD Application - see
-# gitops/apps/openshift-ai/application.yaml. The chart's sync-wave 10
-# (Namespace/OperatorGroup/Subscription) is gated ahead of wave 20
-# (DataScienceCluster) by the custom Subscription health check
-# ansible/roles/argocd/tasks/apply_resource_health_checks.yml registers,
-# so this single apply_gitops_app.yml call covers both the operator
-# install and the operand CR - no separate CRD-established wait needed
-# here any more, ArgoCD's own sync-wave retry handles it.
-- name: "openshift_ai | apply the openshift-ai GitOps Application"
+# ADR-0312: the operator Namespace/OperatorGroup/Subscription
+# (operator.enabled) and the DataScienceCluster (dataScienceCluster.
+# enabled) both live in gitops/charts/openshift-ai, applied via two
+# separate Applications (zuno-openshift-ai-d0/-d1) - -d1 is only applied
+# once -d0 is Synced+Healthy, whose custom Subscription health check
+# (ansible/roles/argocd/tasks/apply_resource_health_checks.yml) already
+# confirms the CSV is installed.
+- name: "openshift_ai | apply the openshift-ai GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "openshift-ai"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
+      operator:
+        enabled: true
       subscriptionChannel: "{{ _openshift_ai_channel }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 20
+
+- name: "openshift_ai | apply the openshift-ai GitOps Application (d1: DataScienceCluster)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-ai"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_extra_helm_values:
+      dataScienceCluster:
+        enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 

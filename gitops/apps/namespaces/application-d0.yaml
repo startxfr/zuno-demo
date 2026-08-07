@@ -1,0 +1,30 @@
+---
+# Platform namespace/quota scaffolding (ADR-0023) - see
+# gitops/charts/namespaces. Namespace objects are cluster-scoped, so this
+# component's content is entirely -d0 (see
+# gitops/apps/namespaces/application-d1.yaml, a no-op). Applied by the
+# `namespaces` Ansible role's install.yml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-namespaces-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this.
+    argocd.argoproj.io/sync-wave: "-200"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/namespaces
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

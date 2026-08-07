@@ -5,7 +5,7 @@ description: >-
   dependency so this repo's own Application source follows the internal
   gitops/charts/* convention every other component uses (see
   gitops/apps/README.md), instead of pointing straight at the third-party
-  Helm repo from gitops/apps/vault/application.yaml. Also adds an optional
+  Helm repo from gitops/apps/vault/application-d1.yaml. Also adds an optional
   OpenShift Route in front of the vault-ui Service (route.enabled, off by
   default - Vault access is otherwise locked down per ADR-0024's "Hardened
   requirement").

@@ -1,16 +1,29 @@
+# This chart is shared by two ArgoCD Applications (gitops/apps/
+# external-secrets/application-d0.yaml and application-d1.yaml -
+# see gitops/apps/README.md): operator.enabled renders the operator
+# install (Namespaces/Subscription/OperatorConfig), clusterSecretStore.
+# enabled renders the operand (ClusterSecretStore/ExternalSecret). Both
+# default to false so `helm template`/`helm lint` render nothing by
+# default; each Application sets exactly one to true via
+# spec.source.helm.values.
+operator:
+  enabled: false
+clusterSecretStore:
+  enabled: false
+
 # ADR-0048/ADR-0312: subscriptionChannel/subscriptionCatalogSource are
 # discovered by ansible/roles/external_secrets/tasks/install.yml (catalog
 # introspection - doesn't depend on the operator being installed yet) and
-# always set via gitops_app_extra_helm_values; templates/subscription.yaml
-# requires them.
+# always set via gitops_app_extra_helm_values on the -d0 apply;
+# templates/subscription.yaml requires them.
 #
-# vaultServiceName is left unset by that same first call - it's only
-# discovered in tasks/configure.yml, after Vault's own configure step has
+# vaultServiceName is left unset on that -d0 call - it's only
+# discovered/injected on the -d1 apply, after Vault's own install step has
 # set up the Kubernetes auth method + eso-reader role the
-# ClusterSecretStore depends on (day0's install-then-configure playbook
-# ordering enforces this, not sync-wave - see that role's README.md).
-# templates/clustersecretstore.yaml and templates/
-# externalsecret-cluster-domain.yaml render nothing until it's set.
+# ClusterSecretStore depends on (day0_components' sequence enforces this,
+# not sync-wave - see that role's README.md). templates/clustersecretstore.
+# yaml and templates/externalsecret-cluster-domain.yaml render nothing
+# until it's set, even with clusterSecretStore.enabled: true.
 subscriptionChannel: ""
 subscriptionCatalogSource: ""
 vaultServiceName: ""

@@ -12,6 +12,8 @@ OpenShift AI actually published for this cluster/catalog instead of
 trusting `gitops/charts/models/values.yaml`'s hardcoded fallback; see
 that chart's own README for the full mechanism. `tasks/precheck.yml`
 (state detection, never fails) does not run this discovery itself - it
-only reports the `zuno-models` Application's Synced+Healthy status,
-setting `models_state_installed` and a line in the shared `/tmp` state
-report (see `ansible/playbooks/day1_check.yml`).
+only reports the `zuno-models-d0`/`zuno-models-d1` Applications'
+Synced+Healthy status, setting `models_state_installed` and a line in the
+shared `/tmp` state report (see `ansible/playbooks/day1_check.yml`). No
+operator involved, so all of this component's content is `-d1` -
+`zuno-models-d0` is a no-op (see `gitops/apps/README.md`).

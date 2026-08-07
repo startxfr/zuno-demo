@@ -1,0 +1,28 @@
+---
+# No Day1 (live-service) content for namespaces - it only creates
+# Namespaces/Quotas/NetworkPolicies (cluster-scoped/envelope provisioning,
+# classified entirely as -d0 - see application-d0.yaml). See
+# gitops/charts/noop/README.md and gitops/apps/README.md's -d0/-d1
+# convention.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-namespaces-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-199"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -1,3 +1,4 @@
+{{- if .Values.postgresCluster.enabled }}
 # Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL -
 # PGO runs this once at cluster bootstrap, per Crunchy's own Extension
 # Management guide's documented pattern for adding pgvector this way.
@@ -13,3 +14,4 @@ metadata:
 data:
   init.sql: |
     CREATE EXTENSION IF NOT EXISTS vector;
+{{- end }}

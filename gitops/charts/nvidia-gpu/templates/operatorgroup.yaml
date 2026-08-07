@@ -1,3 +1,4 @@
+{{- if .Values.operator.enabled }}
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -8,3 +9,4 @@ metadata:
 spec:
   targetNamespaces:
     - nvidia-gpu-operator
+{{- end }}

@@ -1,0 +1,34 @@
+---
+# Demo-grade PostgreSQL: single Crunchy Postgres Operator (PGO) instance,
+# no HA/replica topology (ADR-0101 tracks HA for shared platform services
+# in v1). This Application manages the PostgresCluster CR and its
+# credentials ExternalSecret/init-SQL ConfigMap, rendered from the local
+# chart at gitops/charts/postgresql (postgresCluster.enabled) - NOT the
+# operator itself (see gitops/apps/postgresql/application-d0.yaml, applied
+# first by ansible/roles/postgresql/tasks/install.yml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-postgresql-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-175"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/postgresql
+    helm:
+      values: |
+        postgresCluster:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

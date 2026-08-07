@@ -1,11 +1,11 @@
 # Default values for the vault wrapper chart. See
-# gitops/apps/vault/application.yaml for how this is deployed
+# gitops/apps/vault/application-d1.yaml for how this is deployed
 # (namespace: zuno-data, Application/release name fixed to "zuno-vault" -
 # see ansible/roles/vault/tasks/prepare.yml's gitops_app_name comment).
 
 # Cluster-specific values (clusterBaseDomain) must be overridden per
 # environment when route.enabled=true - see
-# gitops/apps/vault/application.yaml's spec.source.helm.values block, same
+# gitops/apps/vault/application-d1.yaml's spec.source.helm.values block, same
 # apps.mycluster.example.com substitution the keycloak and tekos Applications
 # use (ansible/tasks/apply_gitops_app.yml).
 global:
@@ -13,7 +13,7 @@ global:
 
 # Off by default: ADR-0024 treats Vault as locked-down/admin-only, and this
 # demo's UI access is otherwise via port-forward. Flip route.enabled to
-# true (in gitops/apps/vault/application.yaml) to front the chart's own
+# true (in gitops/apps/vault/application-d1.yaml) to front the chart's own
 # vault-ui Service with an OpenShift Route - see templates/route.yaml.
 # route.host empty means "vault.<global.clusterBaseDomain>" (computed in
 # templates/_helpers.tpl), same predictable-hostname convention as the
@@ -26,7 +26,7 @@ route:
 # Chart.yaml, nested under this "vault:" key per Helm subchart convention
 # (matches the dependency's own `name`). Same values previously inlined
 # directly under spec.source.helm.values in
-# gitops/apps/vault/application.yaml before this chart existed.
+# gitops/apps/vault/application-d1.yaml before this chart existed.
 vault:
   # ADR-0052: the official chart's own documented flag for OpenShift SCC
   # compatibility (arbitrary/non-root UID, no privileged context) - this

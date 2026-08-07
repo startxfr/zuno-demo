@@ -1,0 +1,11 @@
+apiVersion: v2
+name: observability
+description: >-
+  OTLP trace/metric collection path (ADR-0029): the Red Hat build of
+  OpenTelemetry operator (operator.enabled - Namespace/OperatorGroup/
+  Subscription) and the shared OpenTelemetryCollector instance every
+  service in components/ sends OTLP to (collector.enabled - Namespace +
+  OpenTelemetryCollector CR), split across the zuno-observability-d0/-d1
+  ArgoCD Applications - see gitops/apps/README.md.
+type: application
+version: 0.1.0

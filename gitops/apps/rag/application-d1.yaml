@@ -1,0 +1,27 @@
+---
+# RAG service (pgvector + hybrid search) - see gitops/charts/rag-service and
+# components/rag-service. Applied by the `rag` Ansible role's install.yml.
+# No operator involved, so all of this component's content is -d1 (see
+# gitops/apps/rag/application-d0.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rag-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-135"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/rag-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

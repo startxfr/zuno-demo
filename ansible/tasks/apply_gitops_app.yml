@@ -1,8 +1,11 @@
 ---
 # Shared task: apply a single ArgoCD Application manifest for one platform
-# component. Every role's `install.yml` includes this file with
-# `gitops_app_name` set to its own component directory under gitops/apps/.
-# See gitops/apps/README.md for the manifest convention
+# component. Every role's `install.yml` includes this file twice per
+# component - once with `gitops_app_phase: d0` (operator/cluster-scoped
+# install) and once with `gitops_app_phase: d1` (CRD instances, pods,
+# secrets - the live service), with `gitops_app_name` set to the matching
+# `<component>-d0`/`<component>-d1` Application name. See
+# gitops/apps/README.md for the manifest convention
 # and docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md
 # for the architecture this implements.
 #
@@ -11,18 +14,20 @@
 # (gitops/root-app-of-apps.yaml) that used to also recurse over gitops/apps/
 # in parallel is no longer applied by Ansible (ADR-0311); it is kept only as
 # a documented example of a pure-GitOps bootstrap (docs/platform/
-# installation.md). This keeps `make day0|d0 configure <component>` /
-# `make day1|d1 configure|run <component>` self-sufficient for a single
+# installation.md). This keeps `make day0|d0 install <component>` /
+# `make day1|d1 install <component>` self-sufficient for a single
 # component without requiring a full sync, and without a second, redundant
 # reconciliation path that could disagree with this one.
-- name: "gitops | validate gitops_app_name is set"
+- name: "gitops | validate gitops_app_name/gitops_app_phase are set"
   ansible.builtin.assert:
     that:
       - gitops_component_name is defined
       - gitops_component_name | length > 0
       - gitops_app_name is defined
       - gitops_app_name | length > 0
-    fail_msg: "apply_gitops_app.yml requires 'gitops_component_name' AND 'gitops_app_name' to be set by the including role"
+      - gitops_app_phase is defined
+      - gitops_app_phase in ['d0', 'd1']
+    fail_msg: "apply_gitops_app.yml requires 'gitops_component_name', 'gitops_app_name' AND 'gitops_app_phase' ('d0' or 'd1') to be set by the including role"
 
 - name: "gitops | resolve the cluster base domain (for Applications whose Helm values need it)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
@@ -31,21 +36,22 @@
   ansible.builtin.set_fact:
     _gitops_app_definition: >-
       {{
-        (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_component_name + '/application.yaml')
+        (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_component_name + '/application-' + gitops_app_phase + '.yaml')
           | replace('apps.mycluster.example.com', cluster_base_domain))
         | from_yaml
       }}
 
 # ADR-0048: lets a role inject values it only knows at run time (e.g. a
 # discovered serving-runtime image) without hand-editing the checked-in
-# application.yaml, whose spec.source.helm.values is otherwise fixed,
-# checked-in configuration (gitops/apps/README.md's convention). Optional -
-# most roles never set gitops_app_extra_helm_values, leaving
-# application.yaml's own helm.values (if any, e.g. gitops/apps/vault)
-# untouched. When set, it *replaces* spec.source.helm.values wholesale
-# (rendered to a YAML string) rather than deep-merging with one already
-# present in application.yaml - no current caller needs both at once, and
-# merging two independently-authored value trees correctly is more
+# application-d0.yaml/application-d1.yaml, whose spec.source.helm.values is
+# otherwise fixed, checked-in configuration (gitops/apps/README.md's
+# convention). Optional - most roles never set gitops_app_extra_helm_values,
+# leaving the manifest's own helm.values (if any, e.g.
+# gitops/apps/vault/application-d1.yaml) untouched. When set, it *replaces*
+# spec.source.helm.values wholesale (rendered to a YAML string) rather than
+# deep-merging with one already present in the manifest - no current caller
+# needs both at once, and merging two independently-authored value trees is
+# more
 # complexity than this repo's actual usage justifies.
 - name: "gitops | merge extra Helm values into the Application spec, if provided (ADR-0048)"
   ansible.builtin.set_fact:

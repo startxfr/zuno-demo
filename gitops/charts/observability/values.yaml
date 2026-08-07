@@ -1,0 +1,10 @@
+# This chart is shared by two ArgoCD Applications (see
+# gitops/apps/README.md): operator.enabled (zuno-observability-d0) renders
+# the openshift-opentelemetry-operator Namespace/OperatorGroup/
+# Subscription, collector.enabled (zuno-observability-d1) renders the
+# zuno-telemetry Namespace + OpenTelemetryCollector CR. Both default to
+# false so `helm template`/`helm lint` render nothing by default.
+operator:
+  enabled: false
+collector:
+  enabled: false

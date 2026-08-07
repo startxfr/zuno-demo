@@ -5,7 +5,7 @@ in the platform passes through. Authorizes each call using the ADR-0011
 policy intersection, then proxies to the right downstream MCP server.
 
 Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
-`ansible/roles/mcp` via `gitops/apps/mcp/application.yaml` ->
+`ansible/roles/mcp` via `gitops/apps/mcp/application-d1.yaml` ->
 `gitops/charts/mcp-gateway` into the shared `zuno-ai-run` namespace.
 
 ## Observability (ADR-0029)

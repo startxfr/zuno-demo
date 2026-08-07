@@ -1,0 +1,33 @@
+---
+# External Secrets ClusterSecretStore/ExternalSecret operand (ADR-0024,
+# ADR-0312). See gitops/charts/external-secrets (clusterSecretStore.
+# enabled). Applied by the `external_secrets` Ansible role's install.yml,
+# after zuno-external-secrets-d0 (the operator install, application-d0.yaml)
+# is Synced+Healthy, with the discovered Vault client Service name injected
+# via gitops_app_extra_helm_values (ADR-0048) - see that role's README.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-external-secrets-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-200"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/external-secrets
+    helm:
+      values: |
+        clusterSecretStore:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

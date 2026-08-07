@@ -1,9 +1,22 @@
 ---
-# State detection (never fails). observability has not been converted to
-# the Application/chart pattern yet (still applies raw manifests via
-# ansible/tasks/apply_kustomize.yml - a good ADR-0312-style follow-up
-# candidate) - "installed" checks the concrete objects install.yml
-# applies/waits on directly.
+# State detection (never fails). observability applies its chart via two
+# Applications (operator + shared OTLP collector, ADR-0312) - "installed"
+# checks both Applications plus the collector CR/Deployment's own
+# readiness signal install.yml already waits on.
+- name: "observability | check the observability Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-observability-d0"
+
+- name: "observability | save the d0 check result"
+  ansible.builtin.set_fact:
+    _observability_d0_installed: "{{ _state_check_result }}"
+
+- name: "observability | check the observability Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-observability-d1"
+
 - name: "observability | look up the OpenTelemetryCollector"
   kubernetes.core.k8s_info:
     api_version: opentelemetry.io/v1beta1
@@ -24,7 +37,8 @@
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
-        (_observability_collector_cr_lookup.resources | default([]) | length) > 0
+        _observability_d0_installed and _state_check_result
+        and (_observability_collector_cr_lookup.resources | default([]) | length) > 0
         and (_observability_collector_deploy_lookup.resources | default([]) | length) > 0
         and (_observability_collector_deploy_lookup.resources[0].status.readyReplicas | default(0)) > 0
       }}

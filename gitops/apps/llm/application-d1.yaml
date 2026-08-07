@@ -1,0 +1,31 @@
+---
+# Provider routing config (ADR-0020, ADR-0021): a native Kustomize app
+# (ArgoCD auto-detects platform/ai-gateway/kustomization.yaml) generating
+# the zuno-provider-routing ConfigMap directly from provider-routing.yaml
+# (single source of truth) plus one ExternalSecret per external provider.
+# Applied by the `llm` Ansible role's install.yml, which also applies
+# gitops/apps/agent-runtime (see that role's README for why both live here).
+# No operator involved, so all of this component's content is -d1 (see
+# gitops/apps/llm/application-d0.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-llm-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-127"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: platform/ai-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

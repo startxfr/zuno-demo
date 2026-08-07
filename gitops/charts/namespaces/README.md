@@ -13,9 +13,13 @@ cross-namespace callers. `zuno-ai-run` is deliberately excluded - see
 `values.yaml`'s comment on why ADR-0037 needs per-workload NetworkPolicies
 there instead of a namespace-wide baseline.
 
-Referenced by exactly one Application: `gitops/apps/agents/application.yaml`
-(applied by `ansible/roles/namespaces`, a Day 0 component - ADR-0056 -
-reachable via `make d0 install namespaces` / `make d0 configure namespaces`).
+Referenced by `gitops/apps/namespaces/application-d0.yaml` (all of this
+chart's content is cluster-scoped, so it's entirely `-d0`;
+`application-d1.yaml` is a no-op - see `gitops/apps/README.md`), applied
+by `ansible/roles/namespaces`, a Day 0 component (ADR-0056 - reachable via
+`make d0 install namespaces`). The formerly separate
+`gitops/apps/agents/application.yaml` (a stale, orphaned duplicate
+pointing at this same chart) has been removed.
 
 ## Why all five exist, not just zuno-agent-tekos
 

@@ -1,0 +1,31 @@
+---
+# Red Hat OpenShift AI DataScienceCluster operand (ADR-0047/ADR-0048,
+# ADR-0312). See gitops/charts/openshift-ai (dataScienceCluster.enabled) -
+# NOT the operator itself (see gitops/apps/openshift-ai/application-d0.yaml,
+# applied first by ansible/roles/openshift_ai/tasks/install.yml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-ai-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-198"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-ai
+    helm:
+      values: |
+        dataScienceCluster:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redhat-ods-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

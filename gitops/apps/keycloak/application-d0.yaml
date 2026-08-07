@@ -1,0 +1,38 @@
+---
+# RHBK (Red Hat build of Keycloak) operator install (ADR-0312). See
+# gitops/charts/keycloak (operator.enabled - Subscription/OperatorGroup).
+# Applied by the `keycloak` Ansible role's install.yml, with the operator's
+# catalog-discovered channel injected via gitops_app_extra_helm_values
+# (ADR-0048) - see that role's README.md. The Keycloak CR/RealmImport/
+# ExternalSecrets operand is a separate Application
+# (zuno-keycloak-d1, applied after this one is Synced+Healthy) - see
+# application-d1.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-keycloak-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this.
+    argocd.argoproj.io/sync-wave: "-168"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/keycloak
+    helm:
+      values: |
+        namespace: zuno-auth
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-auth
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

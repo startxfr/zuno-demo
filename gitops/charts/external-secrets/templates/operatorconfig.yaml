@@ -1,10 +1,13 @@
+{{- if .Values.operator.enabled }}
 # The external-secrets-operator package installs a helm-operator meta-
 # operator (openshift-operators/external-secrets-operator-controller-
 # manager) that only watches OperatorConfig - it does not deploy the
 # actual ESO controller/webhook/cert-controller (and their
 # ServiceAccounts, including the "external-secrets" one
 # templates/clustersecretstore.yaml references) until this CR exists to
-# reconcile.
+# reconcile. Classified as operator.enabled (not clusterSecretStore.enabled,
+# -d0 not -d1) since it configures the operator's own controller/webhook
+# rather than anything zuno-specific.
 apiVersion: operator.external-secrets.io/v1alpha1
 kind: OperatorConfig
 metadata:
@@ -23,3 +26,4 @@ spec:
     create: true
   certController:
     create: true
+{{- end }}

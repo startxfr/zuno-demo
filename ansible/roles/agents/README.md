@@ -1,9 +1,11 @@
 # agents
 
-Applies the Tekos frontend/BFF workloads GitOps Application
+Applies the Tekos frontend/BFF workloads GitOps Applications
 (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008). This is Day 1's
 `agents` component (ADR-0056) - `precheck.yml` reports (never fails)
-whether the `zuno-api` Application is Synced+Healthy.
+whether the `zuno-api-d0`/`zuno-api-d1` Applications are Synced+Healthy.
+No operator involved, so all of this component's content is `-d1` -
+`zuno-api-d0` is a no-op (see `gitops/apps/README.md`).
 
 Namespace creation used to live in this role too (a separate
 `gitops/apps/agents` → `gitops/charts/namespaces` Application apply); it

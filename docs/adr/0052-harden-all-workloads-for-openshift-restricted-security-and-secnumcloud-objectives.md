@@ -69,7 +69,7 @@ JVM-writes-its-own-caches reason). Crunchy Postgres Operator (PGO,
 `gitops/charts/postgresql`) is documented as already restricted-PSA
 -compliant by the operator's own design with no user-facing override
 field; the upstream HashiCorp Vault chart
-(`gitops/apps/vault/application.yaml`) gets `global.openshift: true`, that
+(`gitops/apps/vault/application-d1.yaml`) gets `global.openshift: true`, that
 chart's own documented flag, rather than a guessed-at value path.
 
 NetworkPolicies (Decision: "Add NetworkPolicies... by default"):

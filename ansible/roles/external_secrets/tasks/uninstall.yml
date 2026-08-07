@@ -2,21 +2,28 @@
 # Reverse of install.yml. zuno-ai-run (owned by gitops/charts/namespaces,
 # ADR-0312) is left in place.
 #
-# remove_operator.yml must run *before* delete_gitops_app.yml: it
-# discovers the installed CSV via the Subscription's own
-# status.installedCSV field, which only exists while the Subscription (an
-# Application-managed resource) still exists. Running it first also means
-# its CRD delete (cascading the OperatorConfig, ClusterSecretStore and
-# ExternalSecret CRs first - the operator's own CSV owns all of these
-# CRDs) and CSV/Subscription delete happen before ArgoCD's own cascade
-# prune would otherwise race to remove the same Subscription object.
+# Delete -d1 (the ClusterSecretStore/ExternalSecret operand) first, via
+# ArgoCD prune, before remove_operator.yml deletes the CRDs those objects
+# are instances of - avoids ArgoCD fighting a CR deletion its own
+# Application still desires. remove_operator.yml then runs *before*
+# deleting -d0: it discovers the installed CSV via the Subscription's own
+# status.installedCSV field, which only exists while the Subscription (a
+# -d0-managed resource) still exists. Running it before -d0's own delete
+# also means its CRD delete (cascading any remaining OperatorConfig CR)
+# and CSV/Subscription delete happen before ArgoCD's own cascade prune
+# would otherwise race to remove the same Subscription object.
+- name: "external_secrets | delete the external-secrets GitOps Application (d1: ClusterSecretStore/ExternalSecret)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-external-secrets-d1"
+
 - name: "external_secrets | remove the operator (its owned CRDs - cascading the OperatorConfig/ClusterSecretStore/ExternalSecret - then the CSV, then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
   vars:
     operator_subscription_name: external-secrets-operator
     operator_namespace: openshift-operators
 
-- name: "external_secrets | delete the external-secrets GitOps Application (cascades the remaining Namespaces)"
+- name: "external_secrets | delete the external-secrets GitOps Application (d0: cascades the remaining Namespaces)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
-    gitops_app_name: "zuno-external-secrets"
+    gitops_app_name: "zuno-external-secrets-d0"

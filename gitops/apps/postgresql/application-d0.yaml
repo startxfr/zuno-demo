@@ -1,0 +1,37 @@
+---
+# Crunchy Postgres Operator (PGO) install (ADR-0312). See
+# gitops/charts/postgresql (operator.enabled - Subscription). Applied by
+# the `postgresql` Ansible role's install.yml, with the operator's
+# fuzzy-discovered packageName/channel/catalogSource injected via
+# gitops_app_extra_helm_values (ADR-0048) - see that role's README.md. The
+# PostgresCluster CR/ExternalSecret/ConfigMap operand is a separate
+# Application (zuno-postgresql-d1, applied after this one is
+# Synced+Healthy) - see application-d1.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-postgresql-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this.
+    argocd.argoproj.io/sync-wave: "-176"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/postgresql
+    helm:
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

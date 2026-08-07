@@ -7,7 +7,7 @@ logic lives, kept separate from `components/agent-runtime`'s orchestration
 (state, LangGraph workflow, tool/RAG invocation), per ADR-0009's decision.
 
 Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
-`ansible/roles/llm` via `gitops/apps/ai-gateway/application.yaml` ->
+`ansible/roles/llm` via `gitops/apps/ai-gateway/application-d1.yaml` ->
 `gitops/charts/ai-gateway` into the shared `zuno-ai-run` namespace.
 
 ## Why this exists as a separate service

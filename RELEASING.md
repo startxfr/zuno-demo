@@ -39,7 +39,7 @@ tag for from here.
    (or let ArgoCD's automated sync pick it up) to roll the cluster onto
    the pinned revision.
 
-Subsequent releases repeat steps 1-6 with the next tag. `gitops/apps/vault/application.yaml`
+Subsequent releases repeat steps 1-6 with the next tag. `gitops/apps/vault/application-d1.yaml`
 already tracks a pinned upstream chart version (`targetRevision: "0.28.1"`,
 a third-party chart release, not this repository's own) - the same
 pattern this process brings to every other Application.

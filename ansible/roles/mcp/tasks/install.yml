@@ -1,6 +1,16 @@
 ---
-- name: "mcp | apply the MCP Gateway GitOps Application"
+# No OLM operator involved - all of this component's content is -d1 (see
+# gitops/apps/mcp/application-d0.yaml, a no-op).
+- name: "mcp | apply the MCP Gateway GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "mcp"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "mcp | apply the MCP Gateway GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"

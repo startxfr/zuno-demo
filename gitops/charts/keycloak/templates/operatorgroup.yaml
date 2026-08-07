@@ -1,3 +1,4 @@
+{{- if .Values.operator.enabled }}
 # Unlike gitops/charts/postgresql (openshift-operators, which ships with
 # OpenShift's own default global OperatorGroup), zuno-auth needs its own -
 # RHBK only supports OwnNamespace/SingleNamespace install modes.
@@ -11,3 +12,4 @@ metadata:
 spec:
   targetNamespaces:
     - {{ .Values.namespace }}
+{{- end }}

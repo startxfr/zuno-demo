@@ -1,10 +1,19 @@
 ---
-# State detection (never fails). The zuno-postgresql Application plus
-# PGO's own rollout-complete signal install.yml already waits on.
-- name: "postgresql | check the postgresql Application"
+# State detection (never fails). The zuno-postgresql-d0/-d1 Applications
+# plus PGO's own rollout-complete signal install.yml already waits on.
+- name: "postgresql | check the postgresql Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:
-    gitops_app_name: "zuno-postgresql"
+    gitops_app_name: "zuno-postgresql-d0"
+
+- name: "postgresql | save the d0 check result"
+  ansible.builtin.set_fact:
+    _postgresql_d0_installed: "{{ _state_check_result }}"
+
+- name: "postgresql | check the postgresql Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-postgresql-d1"
 
 - name: "postgresql | look up the PostgresCluster"
   kubernetes.core.k8s_info:
@@ -18,7 +27,8 @@
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
-        _state_check_result
+        _postgresql_d0_installed
+        and _state_check_result
         and (_postgresql_cluster_lookup.resources | default([]) | length) > 0
         and (_postgresql_cluster_lookup.resources[0].status.conditions | default([])
              | selectattr('type', 'equalto', 'Progressing') | map(attribute='status') | list

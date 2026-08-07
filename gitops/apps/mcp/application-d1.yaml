@@ -1,0 +1,27 @@
+---
+# Central MCP Gateway (ADR-0010) - see gitops/charts/mcp-gateway and
+# components/mcp-gateway. Applied by the `mcp` Ansible role's install.yml.
+# No operator involved, so all of this component's content is -d1 (see
+# gitops/apps/mcp/application-d0.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mcp-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-151"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mcp-gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

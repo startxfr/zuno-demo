@@ -5,18 +5,25 @@
 # ordering (nfd listed before nvidia_gpu) and that role's own README for
 # why this dependency was previously undeclared.
 #
-# ADR-0312: Namespace/OperatorGroup/Subscription (sync-wave 10) and the
-# NodeFeatureDiscovery instance (sync-wave 20) both live in
-# gitops/charts/nfd, applied as a single ArgoCD Application - wave 20 is
-# gated on wave 10's Subscription reporting Healthy via the custom health
-# check ansible/roles/argocd/tasks/apply_resource_health_checks.yml
-# registers, so this one apply_gitops_app.yml call covers the whole
-# install.
-- name: "nfd | apply the nfd GitOps Application"
+# ADR-0312: Namespace/OperatorGroup/Subscription (operator.enabled) and
+# the NodeFeatureDiscovery instance (nodeFeatureDiscovery.enabled) both
+# live in gitops/charts/nfd, applied via two separate Applications
+# (zuno-nfd-d0/-d1) - -d1 is applied only once -d0 is Synced+Healthy.
+- name: "nfd | apply the nfd GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "nfd"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+- name: "nfd | apply the nfd GitOps Application (d1: NodeFeatureDiscovery instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "nfd"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

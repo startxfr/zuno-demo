@@ -2,9 +2,12 @@
 
 Installs the Red Hat build of the OpenTelemetry Operator and a shared OTLP
 `OpenTelemetryCollector` (`zuno-otel-collector`, `zuno-telemetry` namespace)
-every service sends traces/metrics to (ADR-0029). A Day 0 component
-(ADR-0056) - application-level instrumentation lives in each service's
-own code, not here.
+every service sends traces/metrics to (ADR-0029), via
+`gitops/apps/observability/application-d0.yaml` (operator) and
+`application-d1.yaml` (Collector) - see `gitops/apps/README.md` and
+`gitops/charts/observability/README.md`. A Day 0 component (ADR-0056) -
+application-level instrumentation lives in each service's own code, not
+here.
 
 The Collector's exporter is `debug` (logs spans/metrics to its own pod) -
 enough to prove the pipeline end-to-end for a demo

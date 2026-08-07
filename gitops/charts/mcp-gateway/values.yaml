@@ -1,5 +1,5 @@
 # Default values for the mcp-gateway chart. Overridden per-environment
-# through gitops/apps/mcp/application.yaml's spec.source.helm.values.
+# through gitops/apps/mcp/application-d1.yaml's spec.source.helm.values.
 
 namespace: zuno-ai-run
 

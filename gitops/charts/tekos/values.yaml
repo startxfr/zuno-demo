@@ -1,5 +1,5 @@
 # Cluster-specific values (clusterBaseDomain in particular) must be
-# overridden per environment - see gitops/apps/api/application.yaml's
+# overridden per environment - see gitops/apps/api/application-d1.yaml's
 # spec.source.helm.values block, and keep it in sync with the
 # cluster_base_domain Ansible inventory variable
 # (ansible/inventories/<env>/group_vars/all/main.yml). This mirrors how

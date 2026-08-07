@@ -1,12 +1,22 @@
 # Default values for the keycloak chart. Overridden per-environment through
-# gitops/apps/keycloak/application.yaml's spec.source.helm.values (ArgoCD
-# reads this repo's charts, so overriding here means editing that file for
-# the demo environment - see the comment there for what must change per
-# cluster).
+# gitops/apps/keycloak/application-d0.yaml/application-d1.yaml's
+# spec.source.helm.values (ArgoCD reads this repo's charts, so overriding
+# here means editing those files for the demo environment - see the
+# comments there for what must change per cluster).
+
+# This chart is shared by two ArgoCD Applications (see
+# gitops/apps/README.md): operator.enabled (zuno-keycloak-d0) renders the
+# RHBK Subscription/OperatorGroup, keycloak.enabled (zuno-keycloak-d1)
+# renders the Keycloak CR/RealmImport/ExternalSecrets. Both default to
+# false so `helm template`/`helm lint` render nothing by default.
+operator:
+  enabled: false
+keycloak:
+  enabled: false
 
 # Namespace the Keycloak CR, KeycloakRealmImport and their ExternalSecrets
 # are deployed into. Must stay in sync with the destination namespace on
-# gitops/apps/keycloak/application.yaml.
+# gitops/apps/keycloak/application-d0.yaml/application-d1.yaml.
 namespace: zuno-auth
 
 # Name of the Keycloak CR (k8s.keycloak.org/v2alpha1, kind: Keycloak).
@@ -29,8 +39,9 @@ adminSecretName: keycloak-admin
 googleOAuthSecretName: google-oauth-client
 
 # ADR-0312/ADR-0048: discovered by ansible/roles/keycloak/tasks/
-# configure.yml (RHBK's channels are version-qualified, e.g. "stable-v26",
+# install.yml (RHBK's channels are version-qualified, e.g. "stable-v26",
 # no bare "stable" alias - see that role's README.md) and always set via
-# gitops_app_extra_helm_values; templates/subscription.yaml requires them.
+# gitops_app_extra_helm_values on the -d0 apply; templates/subscription.yaml
+# requires them.
 subscriptionChannel: ""
 subscriptionCatalogSource: ""

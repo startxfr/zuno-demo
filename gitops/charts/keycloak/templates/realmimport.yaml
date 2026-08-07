@@ -1,3 +1,4 @@
+{{- if .Values.keycloak.enabled }}
 # Imports the `zuno` realm (groups, users, per-agent OIDC clients, Google
 # IdP broker) via the Keycloak Operator's KeycloakRealmImport CRD
 # (k8s.keycloak.org/v2alpha1). The realm is authored as plain JSON in
@@ -27,3 +28,4 @@ spec:
   keycloakCRName: {{ .Values.keycloakCRName }}
   realm:
 {{ $realmRaw | fromJson | toYaml | indent 4 }}
+{{- end }}

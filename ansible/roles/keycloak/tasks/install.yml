@@ -67,23 +67,48 @@
       Subscribing to package 'rhbk-operator', catalog
       '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
 
-# ADR-0312: templates/{operatorgroup,subscription}.yaml (sync-wave "-25")
-# and the Keycloak CR/ExternalSecrets/RealmImport (sync-waves "-20"
-# through "-10") all live in gitops/charts/keycloak, applied as a single
-# ArgoCD Application here - the later waves are gated on the Subscription
-# reporting Healthy via the custom health check
-# ansible/roles/argocd/tasks/apply_resource_health_checks.yml registers.
-# The ExternalSecrets this Application renders resolve against the
-# vault-backend ClusterSecretStore, which `external_secrets` (earlier in
-# day0_components) has already made Ready by this point.
-- name: "keycloak | apply the keycloak GitOps Application"
+# ADR-0312: templates/{operatorgroup,subscription}.yaml (operator.enabled)
+# live in gitops/charts/keycloak, applied via the separate
+# zuno-keycloak-d0 Application.
+- name: "keycloak | apply the keycloak GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "keycloak"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
+      operator:
+        enabled: true
       subscriptionChannel: "{{ _keycloak_channel }}"
       subscriptionCatalogSource: "{{ _keycloak_catalog_source }}"
+    gitops_app_wait_retries: 60
+
+# The Keycloak CR/ExternalSecrets/RealmImport (keycloak.enabled) live in
+# the same chart, applied via the separate zuno-keycloak-d1 Application,
+# after -d0 (above) is Synced+Healthy. The ExternalSecrets this
+# Application renders resolve against the vault-backend ClusterSecretStore,
+# which `external_secrets` (earlier in day0_components) has already made
+# Ready by this point.
+#
+# apply_gitops_app.yml's gitops_app_extra_helm_values *replaces*
+# spec.source.helm.values wholesale (ADR-0048) rather than merging with
+# gitops/apps/keycloak/application-d1.yaml's own checked-in values - so
+# clusterBaseDomain must be re-supplied here too (already resolved as a
+# fact by the -d0 call above, via apply_gitops_app.yml's own
+# resolve_cluster_base_domain.yml include), or the chart would fall back
+# to its values.yaml default (the literal, unsubstituted
+# "apps.mycluster.example.com" placeholder) instead of this cluster's real
+# apps domain.
+- name: "keycloak | apply the keycloak GitOps Application (d1: Keycloak CR/RealmImport/ExternalSecrets)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "keycloak"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_extra_helm_values:
+      keycloak:
+        enabled: true
+      clusterBaseDomain: "{{ cluster_base_domain }}"
     gitops_app_wait_retries: 60
 
 - name: "keycloak | wait for the Keycloak CR to report Ready"

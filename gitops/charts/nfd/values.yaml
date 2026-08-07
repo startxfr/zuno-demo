@@ -1,2 +1,12 @@
 # Nothing runtime-discovered for this chart - the operator channel
 # ("stable") and the NodeFeatureDiscovery instance spec are both static.
+
+# This chart is shared by two ArgoCD Applications (see
+# gitops/apps/README.md): operator.enabled (zuno-nfd-d0) renders the
+# Namespace/OperatorGroup/Subscription, nodeFeatureDiscovery.enabled
+# (zuno-nfd-d1) renders the NodeFeatureDiscovery CR. Both default to false
+# so `helm template`/`helm lint` render nothing by default.
+operator:
+  enabled: false
+nodeFeatureDiscovery:
+  enabled: false

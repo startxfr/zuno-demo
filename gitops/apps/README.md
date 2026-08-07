@@ -1,13 +1,24 @@
 # GitOps applications
 
-One subdirectory per platform component, each holding a single ArgoCD
-`Application` manifest at `<component>/application.yaml`. The matching
-Ansible role applies its own manifest directly during
-`make day0|d0 configure <component>` / `make day1|d1 configure|run
+One subdirectory per platform component, each holding two ArgoCD
+`Application` manifests: `<component>/application-d0.yaml` (operator
+install and other cluster-scoped resources - `<app>-d0`) and
+`<component>/application-d1.yaml` (CRD instances, pods, secrets - the live
+service itself - `<app>-d1`). The matching Ansible role applies both
+manifests directly (`-d0` first, then `-d1` once `-d0` is Synced+Healthy)
+during `make day0|d0 install <component>` / `make day1|d1 install
 <component>` (ADR-0056; see `ansible/tasks/apply_gitops_app.yml`) - this is
 the only mechanism `make day0|d0`/`day1|d1` uses to reconcile these
-Applications, so a single component can always be configured without a full
+Applications, so a single component can always be installed without a full
 sync.
+
+Most components have real content on only one side - a component with no
+OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
+`mcp-sales-db`, `models`, `rag`) has an empty `-d0`; `namespaces` (pure
+cluster-scoped Namespace/Quota scaffolding, no live service) has an empty
+`-d1`. The empty side points at `gitops/charts/noop` (see that chart's
+README) rather than being omitted, so the `-d0`/`-d1` naming convention is
+uniform and visible across every component directory.
 
 Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
 `default` project - a dedicated `AppProject` (`ansible/roles/argocd/
@@ -19,12 +30,19 @@ whatever else on the cluster shares `default` - makes its RBAC/permissions
 an explicit, auditable grant instead of an implicit one.
 
 The root App-of-Apps (`gitops/root-app-of-apps.yaml`), which recurses over
-this directory and manages every `application.yaml` it finds as a child
-Application, is no longer applied by Ansible (ADR-0311, superseding the
-"Bootstrap architecture" addendum in
+this directory and manages every `application-d0.yaml`/`application-d1.yaml`
+it finds as a child Application, is no longer applied by Ansible (ADR-0311,
+superseding the "Bootstrap architecture" addendum in
 docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md).
 It is kept in the repository only as a documented example of a
 pure-GitOps, Ansible-free bootstrap - see `docs/platform/installation.md`.
+That path loses the `-d0`-before-`-d1` ordering guarantee Ansible provides
+by applying the two Applications sequentially: ArgoCD has no native
+dependency between two separate `Application` objects, only `sync-wave`
+ordering *within* one Application's own resource graph. The `sync-wave`
+annotations each `-d0`/`-d1` pair still carries are therefore cosmetic
+documentation of intent on that path, consistent with ADR-0311's existing
+"non-operational" framing of the root App-of-Apps.
 
 Each `Application.spec.source` points either at an upstream Helm chart
 (`repoURL` + `chart` + `targetRevision`) for well-known third-party software
@@ -33,25 +51,28 @@ Operator config), or at `gitops/charts/<component>` in this repository for
 Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).
 
-Not every component has an Application here. `argocd` is the one remaining
-exception - it installs ArgoCD itself and creates the `AppProject` (`zuno`)
-every `Application.spec.project` here references; both are a bootstrap
-chicken-and-egg no `Application` can resolve, so they still apply raw
-manifests directly via `ansible/tasks/apply_kustomize.yml` (ADR-0310).
-`sql_schema` and `rag`'s one-shot SQL `Job`s, `vault`'s
-imperative unseal, `smtp`'s static `ExternalSecret`, and the `*_build`
-roles' `BuildConfig`s are likewise one-shot/imperative actions rather than
+Not every component has an Application here. `argocd` and `admin_context`
+are the remaining exceptions - `argocd` installs itself and creates the
+`AppProject` (`zuno`) every `Application.spec.project` here references;
+both are a bootstrap chicken-and-egg no `Application` can resolve, so they
+still apply raw manifests directly via `ansible/tasks/apply_kustomize.yml`
+(ADR-0310). `sql_schema` and `rag`'s one-shot SQL `Job`s and `vault`'s
+imperative unseal are likewise one-shot/imperative actions rather than
 standing installed components, and stay outside this directory for the
 same reason. `mlops` is out of scope for v0 (ADR-0301/0302 are v3).
 
-`nfd`, `nvidia_gpu`, `openshift_ai` and `external_secrets` used to be in
-this same exception bucket - an OLM `Subscription` + operator-managed CR
-was judged to have no meaningful "chart" to template. ADR-0312 reversed
-that: each now has its own `Application`/chart, with the `Subscription`
-itself inside the chart (sync-wave `"10"`, gated ahead of the operand CR's
-sync-wave `"20"` by a custom ArgoCD health check for
-`operators.coreos.com/Subscription` -
-`ansible/roles/argocd/tasks/apply_resource_health_checks.yml`). `zuno-ai-run`'s
+`nfd`, `nvidia_gpu`, `openshift_ai`, `external_secrets`, `smtp` and
+`observability` used to be in an exception bucket like `argocd`'s above -
+either an OLM `Subscription` + operator-managed CR, or (for `smtp`) a
+static kustomize manifest, was judged to have no meaningful "chart" to
+template through ArgoCD. ADR-0312 (and its later `-d0`/`-d1` extension)
+reversed that: each now has its own `-d0`/`-d1` Application pair backed by
+one chart with `operator.enabled`/`<operand>.enabled`-style Helm value
+toggles (see `gitops/charts/README` per-chart docs) controlling which half
+renders. The Subscription's health is gated by a custom ArgoCD health
+check for `operators.coreos.com/Subscription` -
+`ansible/roles/argocd/tasks/apply_resource_health_checks.yml` - which the
+including role's `install.yml` waits on before applying `-d1`. `zuno-ai-run`'s
 `Namespace`, its RHOAI dashboard label and its GPU `ResourceQuota` (formerly
 duplicated across `openshift_ai`'s and `external_secrets`' own kustomize)
 are owned by `gitops/charts/namespaces` instead, closing that
@@ -62,38 +83,31 @@ their operand (`Keycloak`+`KeycloakRealmImport`, `PostgresCluster`) was
 always declarative here - but their operator `Subscription` (+
 `OperatorGroup` for `keycloak`) was, the same split `postgresql`'s own
 image build docs call out. ADR-0312 folded those in too, as a follow-up
-once the health-check mechanism existed: same chart, same
-`Subscription`-then-operand sync-wave gating, but a different negative
-wave numbering than the four components above, since both charts already
-had their own pre-existing internal wave convention:
-`postgresql`'s new `Subscription` is `"-40"` (before its existing
-`"-35"`/`"-30"`), `keycloak`'s new `Subscription`/`OperatorGroup` is
-`"-25"` (before its existing `"-20"`/`"-15"`/`"-10"`). Their `Application`
-apply happens later in each role's `install.yml` than the four above:
-their `ExternalSecret`s depend on `external_secrets` (earlier in
-`day0_components`) having registered the `vault-backend`
-`ClusterSecretStore` first.
+once the health-check mechanism existed, later split into their own
+`-d0`/`-d1` pairs the same way as the six components above.
 
 Directories present:
 
 | Component | Source |
 |---|---|
-| `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) |
-| `keycloak` | local chart, `gitops/charts/keycloak` (includes the RHBK operator `Subscription`/`OperatorGroup` since ADR-0312 - applied by `install.yml`, see the `keycloak` role's README) |
-| `postgresql` | local chart, `gitops/charts/postgresql` (includes the PGO operator `Subscription` since ADR-0312 - applied by `install.yml`, see the `postgresql` role's README) |
-| `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) |
-| `mcp` | local chart, `gitops/charts/mcp-gateway` |
-| `rag` | local chart, `gitops/charts/rag-service` |
-| `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) |
-| `agent-runtime` | local chart, `gitops/charts/agent-runtime` (applied by the `llm` role, see its README) |
-| `agents` | local chart, `gitops/charts/namespaces` |
-| `api` | local chart, `gitops/charts/tekos` |
-| `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) |
-| `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) |
-| `nfd` | local chart, `gitops/charts/nfd` (ADR-0312) |
-| `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312; `ClusterPolicy` spec injected in a second apply once discovered - see that chart's README) |
-| `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312) |
-| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312; `ClusterSecretStore`/cluster-domain `ExternalSecret` rendered only once `install.yml`'s second apply supplies the discovered Vault Service name - see the `external_secrets` role's README) |
+| `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) - no operator, `-d0` is a no-op |
+| `keycloak` | local chart, `gitops/charts/keycloak` (`-d0`: RHBK operator `Subscription`/`OperatorGroup`; `-d1`: Keycloak CR/RealmImport/ExternalSecrets - ADR-0312, see the `keycloak` role's README) |
+| `postgresql` | local chart, `gitops/charts/postgresql` (`-d0`: PGO operator `Subscription`; `-d1`: PostgresCluster/ExternalSecret/ConfigMap - ADR-0312, see the `postgresql` role's README) |
+| `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) - no operator, `-d0` is a no-op |
+| `mcp` | local chart, `gitops/charts/mcp-gateway` - no operator, `-d0` is a no-op |
+| `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |
+| `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) - no operator, `-d0` is a no-op |
+| `agent-runtime` | local chart, `gitops/charts/agent-runtime` (applied by the `llm` role, see its README) - no operator, `-d0` is a no-op |
+| `namespaces` | local chart, `gitops/charts/namespaces` (Namespace/Quota/NetworkPolicy scaffolding, cluster-scoped - entirely `-d0`, `-d1` is a no-op) |
+| `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
+| `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
+| `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) - no operator, `-d0` is a no-op |
+| `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: operator; `-d1`: NodeFeatureDiscovery CR) |
+| `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: operator; `-d1`: ClusterPolicy, spec injected once discovered - see that chart's README) |
+| `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: operator; `-d1`: DataScienceCluster) |
+| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: operator + OperatorConfig; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
+| `smtp` | local chart, `gitops/charts/smtp` (`-d0`: zuno-ai-run Namespace; `-d1`: technical mail identity ExternalSecret) - no operator |
+| `observability` | local chart, `gitops/charts/observability` (`-d0`: OpenTelemetry operator; `-d1`: zuno-telemetry Namespace + shared OTLP Collector) |
 
 `keycloak`, `api` and `vault`'s `Application.spec.source.helm.values`
 reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a
@@ -103,10 +117,15 @@ the real cluster's apps wildcard domain, auto-discovered from
 `secret/zuno/platform/cluster-domain` (see
 `ansible/tasks/resolve_cluster_base_domain.yml` and
 `ansible/roles/vault/tasks/install.yml`) - no manual edit needed before a
-real deployment. `ansible/roles/external_secrets` also exposes that Vault
-value as a `zuno-cluster-domain` Secret in `zuno-ai-run` for any service
-that wants it as a live runtime value rather than a Helm-render-time one
-(not yet consumed by any service - the value only reaches K8s manifest
-spec fields like a Route's `spec.host` or the Keycloak CR's
-`spec.hostname.hostname` through the Ansible/Helm path, since those fields
-have no `secretKeyRef`-style mechanism to source from a Secret).
+real deployment. Because `gitops_app_extra_helm_values` (ADR-0048) replaces
+`spec.source.helm.values` wholesale rather than merging with it, any role
+that both needs this substitution *and* sets extra Helm values (currently
+`keycloak`'s `-d1` apply) must re-supply `clusterBaseDomain` itself from the
+already-resolved `cluster_base_domain` fact - see that role's
+`tasks/install.yml`. `ansible/roles/external_secrets` also exposes that
+Vault value as a `zuno-cluster-domain` Secret in `zuno-ai-run` for any
+service that wants it as a live runtime value rather than a
+Helm-render-time one (not yet consumed by any service - the value only
+reaches K8s manifest spec fields like a Route's `spec.host` or the Keycloak
+CR's `spec.hostname.hostname` through the Ansible/Helm path, since those
+fields have no `secretKeyRef`-style mechanism to source from a Secret).

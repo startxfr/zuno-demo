@@ -309,3 +309,61 @@ keycloak}/` (confirming the operand was already declarative and only the
 `Subscription` was not), and their `kustomize/` manifests - then an
 explicit operator decision to proceed, given as a separate approval after
 this reasoning was presented.
+
+## Addendum (2026-08-07): operator/operand split into separate `-d0`/`-d1` Applications
+
+A later, separate operator decision made the operator/operand split this
+ADR introduced (Decision 2's two-wave chart convention, gated by Decision
+1's custom Subscription health check) explicit at the `Application` level
+instead of implicit at the `sync-wave` level. Every component now has two
+ArgoCD Applications instead of one: `<app>-d0` (operator install and other
+cluster-scoped resources - the former wave-`"10"`/negative-wave content)
+and `<app>-d1` (CRD instances, pods, secrets - the former wave-`"20"`/
+less-negative-wave content). This affects several of this ADR's mechanisms
+without changing the underlying reasoning:
+
+- **Decision 1**'s custom Subscription health check is unchanged and still
+  necessary - it now gates the health of the `-d0` Application specifically
+  (whose only long-pole resource is the Subscription itself), which the
+  including role's `install.yml` waits on (via `apply_gitops_app.yml`'s
+  Synced+Healthy poll) before applying `-d1`.
+- **Decision 2**'s two-wave chart convention (`"10"` before `"20"`, or the
+  keycloak/postgresql negative-number equivalent) is preserved verbatim
+  inside each chart - the wave-`"10"` templates are now gated by
+  `operator.enabled`, the wave-`"20"`+ templates by an operand-specific
+  `<name>.enabled` flag (e.g. `nodeFeatureDiscovery.enabled`,
+  `clusterPolicy.enabled`), so the same two chart "halves" now render via
+  two separate Applications instead of via sync-wave ordering inside one.
+- **Decision 4**'s `nvidia_gpu` two-phase pattern (bare apply, then a
+  second apply with the CSV-discovered `ClusterPolicy` spec) collapses
+  from two calls against one Application to one call against `-d0`
+  (operator) followed by one call against `-d1` (`ClusterPolicy`, already
+  with the discovered spec on its first-ever apply - no preliminary empty
+  render needed, since `-d1` didn't exist before).
+- **Ordering guarantee**: within a single Application, ArgoCD's own
+  sync-wave retry enforced operator-before-operand. Two separate
+  Applications have no such native dependency - the guarantee is now
+  provided entirely by Ansible (`install.yml` applies `-d0` and waits
+  Synced+Healthy before applying `-d1`, the same two-call pattern already
+  used for `nvidia_gpu`/`external_secrets`'s discovery-dependent second
+  apply before this addendum). The root App-of-Apps
+  (`gitops/root-app-of-apps.yaml`), already non-operational per ADR-0311,
+  loses this ordering entirely on that path - accepted, since it was
+  already documentation-only.
+- **Uninstall order** is unchanged in spirit (operand torn down before the
+  operator's Subscription/CSV, `remove_operator.yml` before the
+  Subscription's own Application is deleted) but now spans two
+  `delete_gitops_app.yml` calls: `-d1` first (ArgoCD-pruned), then
+  `remove_operator.yml`, then `-d0`.
+
+Components with no OLM operator at all (`vault`, `agent-runtime`,
+`ai-gateway`, `api`, `llm`, `mcp`, `mcp-sales-db`, `models`, `rag`) gained
+an empty `-d0` Application pointing at a new `gitops/charts/noop` chart,
+and `namespaces` (cluster-scoped Namespace/Quota scaffolding, no live
+service) gained an empty `-d1` the same way - purely for the uniform
+`-d0`/`-d1` naming convention (see `gitops/apps/README.md`), not because
+either has new content. `smtp` and `observability` (previously raw
+kustomize, `ansible/tasks/apply_kustomize.yml`, no `Application` at all)
+were converted to this same chart+toggle+`-d0`/`-d1` pattern in the same
+change, `observability` adopting Decision 1's health-check mechanism for
+the first time.

@@ -1,5 +1,5 @@
 # Default values for the rag-service chart. Overridden per-environment
-# through gitops/apps/rag/application.yaml's spec.source.helm.values.
+# through gitops/apps/rag/application-d1.yaml's spec.source.helm.values.
 
 namespace: zuno-data
 

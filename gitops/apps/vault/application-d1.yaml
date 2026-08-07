@@ -1,0 +1,45 @@
+---
+# Demo-grade Vault: single replica, file storage, no HA/auto-unseal via
+# cloud KMS. Sufficient for a solo demo; production hardening is tracked by
+# ADR-0112 (production-grade backup and recovery, v1).
+#
+# Deploys the local wrapper chart at gitops/charts/vault, which pulls in
+# the upstream hashicorp/vault chart as a Helm dependency (see that
+# chart's Chart.yaml) - the same internal-chart convention as
+# postgresql/keycloak, instead of pointing straight at HashiCorp's Helm
+# repo. All server/ui/injector defaults now live in
+# gitops/charts/vault/values.yaml; only the optional Route feature is
+# toggled here. No OLM operator involved, so all of this component's
+# content is -d1 (see gitops/apps/vault/application-d0.yaml) - this
+# Application's name intentionally stays a static "zuno-vault-d1" (not
+# derived from any per-run discovery), to avoid ever creating a second,
+# divergent Vault release if the root App-of-Apps bootstrap path is ever
+# used on the same cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-vault-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-191"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/vault
+    helm:
+      values: |
+        route:
+          enabled: true
+        global:
+          clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false # Vault's seal state is managed imperatively by the vault role; avoid ArgoCD fighting a sealed pod's restart behavior.
+    syncOptions:
+      - CreateNamespace=false

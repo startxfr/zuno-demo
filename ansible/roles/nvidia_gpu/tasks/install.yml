@@ -1,17 +1,20 @@
 ---
-# ADR-0312: Namespace/OperatorGroup/Subscription (sync-wave 10) and the
-# ClusterPolicy (sync-wave 20, conditional on clusterPolicy.spec) both
-# live in gitops/charts/nvidia-gpu, applied as a single ArgoCD
-# Application - see gitops/charts/nvidia-gpu/README.md for why this
-# role's install proceeds in two apply_gitops_app.yml calls instead of
-# one: the ClusterPolicy's spec is read from the CSV OLM installs in
-# response to the Subscription below, so it cannot be known before this
-# first call.
-- name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (operator only, first pass)"
+# ADR-0312: Namespace/OperatorGroup/Subscription (operator.enabled) and the
+# ClusterPolicy (clusterPolicy.enabled, conditional on clusterPolicy.spec)
+# both live in gitops/charts/nvidia-gpu, applied via two separate
+# Applications (zuno-nvidia-gpu-d0/-d1) - the ClusterPolicy's spec is read
+# from the CSV OLM installs in response to -d0's Subscription, so it
+# cannot be known before -d0 is Synced+Healthy, and -d1 is only applied
+# once that discovery is done.
+- name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "nvidia-gpu"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15
 
@@ -55,16 +58,18 @@
          | selectattr('kind', 'equalto', 'ClusterPolicy') | list)[0].spec
       }}
 
-# ADR-0312: second pass - updates the same Application's Helm values so
-# ArgoCD renders and syncs the wave-20 ClusterPolicy. The role never
-# applies the ClusterPolicy manifest itself.
-- name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (with the discovered ClusterPolicy spec)"
+# ADR-0312: applies the separate zuno-nvidia-gpu-d1 Application (the
+# ClusterPolicy operand) for the first time, already with the discovered
+# spec - the role never applies the ClusterPolicy manifest itself.
+- name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (d1: ClusterPolicy, with the discovered spec)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "nvidia-gpu"
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_extra_helm_values:
       clusterPolicy:
+        enabled: true
         spec: "{{ _nvidia_gpu_default_policy_spec }}"
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15

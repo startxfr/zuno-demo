@@ -1,0 +1,47 @@
+---
+# Zuno identity platform. This deploys the local chart (gitops/charts/keycloak)
+# holding the Keycloak CR instance, the Google IdP broker configuration and
+# the `zuno` realm (KeycloakRealmImport) - NOT the operator itself (see
+# gitops/apps/keycloak/application-d0.yaml, applied first by
+# ansible/roles/keycloak/tasks/install.yml). See gitops/apps/README.md and
+# ansible/roles/keycloak/README.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-keycloak-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-167"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/keycloak
+    helm:
+      values: |
+        namespace: zuno-auth
+        keycloak:
+          enabled: true
+        keycloakCRName: zuno
+        # apps.mycluster.example.com is substituted by
+        # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
+        # wildcard domain, auto-discovered from
+        # Ingress.config.openshift.io/cluster and persisted to Vault at
+        # secret/zuno/platform/cluster-domain (see
+        # ansible/tasks/resolve_cluster_base_domain.yml and
+        # ansible/roles/vault/tasks/install.yml) - no manual edit needed.
+        # Every per-agent client redirect URI in the imported realm is
+        # templated against this same value.
+        clusterBaseDomain: apps.mycluster.example.com
+        adminSecretName: keycloak-admin
+        googleOAuthSecretName: google-oauth-client
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-auth
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

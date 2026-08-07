@@ -7,24 +7,40 @@
 # Unsealing itself happens further down, via the vault-unseal-configure
 # Job - that Job re-runs (and re-unseals) every time this file is
 # invoked, e.g. after a Vault pod restart reseals it.
-- name: "vault | apply the Vault GitOps Application"
+- name: "vault | apply the Vault GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "vault"
-    # NOT "{{ zuno_id }}-{{ gitops_component_name }}" (this role's usual
-    # convention, e.g. every other role in this file): gitops/apps/vault/
-    # application.yaml's own checked-in name is the static "zuno-vault" -
-    # not zuno_id-derived. Naming this Application "{{ zuno_id }}-vault"
-    # instead, as every other role here does, was found live on
-    # api.demo222.startx.fr to create a *second*, independent Vault
-    # release/StatefulSet alongside the one an operator-applied root
-    # App-of-Apps (gitops/root-app-of-apps.yaml, kept only as a documented
-    # bootstrap example since ADR-0311, no longer applied by Ansible)
-    # would create under its own "zuno-vault" name. Matching the static
-    # file's own name here keeps this role's Application and that
-    # documented example converging on the same desired state, for anyone
-    # who follows both paths on the same cluster.
-    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_phase: "d0"
+    # NOT "{{ zuno_id }}-{{ gitops_component_name }}-d0" (this role's
+    # usual convention, e.g. every other role in this file): gitops/apps/
+    # vault/application-d0.yaml/application-d1.yaml's own checked-in names
+    # are the static "zuno-vault-d0"/"zuno-vault-d1" - not zuno_id-derived.
+    # See the application-d1.yaml call below for why.
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+# Vault has no OLM operator at all (a plain Helm deployment) - all of its
+# content is -d1, see gitops/apps/vault/application-d1.yaml.
+- name: "vault | apply the Vault GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "vault"
+    gitops_app_phase: "d1"
+    # NOT "{{ zuno_id }}-{{ gitops_component_name }}-d1" (this role's
+    # usual convention): gitops/apps/vault/application-d1.yaml's own
+    # checked-in name is the static "zuno-vault-d1" - not zuno_id-derived.
+    # Naming this Application "{{ zuno_id }}-vault-d1" instead, as every
+    # other role here does, was found live on api.demo222.startx.fr
+    # (before the -d0/-d1 split, on the single former "zuno-vault") to
+    # create a *second*, independent Vault release/StatefulSet alongside
+    # the one an operator-applied root App-of-Apps
+    # (gitops/root-app-of-apps.yaml, kept only as a documented bootstrap
+    # example since ADR-0311, no longer applied by Ansible) would create
+    # under its own static name. Matching the static file's own name here
+    # keeps this role's Applications and that documented example
+    # converging on the same desired state, for anyone who follows both
+    # paths on the same cluster.
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     # The chart's readinessProbe runs `vault status`, which exits non-zero
     # while sealed - so the StatefulSet (and therefore the Application)
     # can never report Healthy until Vault is unsealed, which only

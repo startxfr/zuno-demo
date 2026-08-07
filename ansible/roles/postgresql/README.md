@@ -38,9 +38,9 @@ is a genuine rewrite either way (CNPG and PGO use different CRDs, Service
 names and Secret conventions), not a config tweak.
 
 - `precheck.yml` - state detection, never fails: reports whether the
-  `zuno-postgresql` Application/`PostgresCluster` are actually
-  Synced+Healthy/rolled out, setting `postgresql_state_installed` and a
-  line in the shared `/tmp` state report (see
+  `zuno-postgresql-d0`/`zuno-postgresql-d1` Applications/`PostgresCluster`
+  are actually Synced+Healthy/rolled out, setting `postgresql_state_installed`
+  and a line in the shared `/tmp` state report (see
   `ansible/playbooks/day0_check.yml`).
 - `install.yml` - fuzzy-matches `/crunchy/i` across every PackageManifest
   in `openshift-marketplace`, registering `operatorhubio-catalog` as a
@@ -50,14 +50,18 @@ names and Secret conventions), not a config tweak.
   exact package name/catalog/channel (prefers an exact
   `crunchy-postgres-operator` name and a `stable` channel if present,
   else whatever fuzzy match/`defaultChannel` was found) and applies the
-  `postgresql` GitOps Application (`gitops/apps/postgresql/application.yaml`,
-  local chart `gitops/charts/postgresql`) with that selection passed via
-  `gitops_app_extra_helm_values` (ADR-0048). The chart renders:
-  - the OLM `Subscription` itself (sync-wave `"-40"`, `openshift-operators`
+  `postgresql` GitOps Applications (`gitops/apps/postgresql/application-d0.yaml`
+  then `application-d1.yaml`, both against local chart
+  `gitops/charts/postgresql`) with that selection passed via
+  `gitops_app_extra_helm_values` (ADR-0048) on the `-d0` call. The chart
+  renders, split across the two Applications (`operator.enabled` for `-d0`,
+  `postgresCluster.enabled` for `-d1` - ADR-0312's addendum):
+  - the OLM `Subscription` itself (`-d0`, `openshift-operators`
     namespace - mirrors `ansible/roles/argocd` and
     `ansible/roles/external_secrets`; no `OperatorGroup` needed, that
     namespace ships with OpenShift's own default global one) - gated
-    ahead of everything below by the custom health check
+    ahead of `-d1` (applied only once `-d0` is Synced+Healthy) by the
+    custom health check
     `ansible/roles/argocd/tasks/apply_resource_health_checks.yml`
     registers (ADR-0312);
   - an `ExternalSecret` syncing the pre-seeded `secret/zuno/postgresql/app`

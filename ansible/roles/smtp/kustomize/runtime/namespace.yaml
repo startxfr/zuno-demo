@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: zuno-ai-run
-  labels:
-    zuno.io/managed-by: zuno-ansible

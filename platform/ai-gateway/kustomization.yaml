@@ -1,5 +1,5 @@
 # Rendered by ArgoCD (Kustomize is auto-detected via this file) as the
-# `llm` GitOps Application - see gitops/apps/llm/application.yaml. Deploys:
+# `llm` GitOps Application - see gitops/apps/llm/application-d1.yaml. Deploys:
 #   1. the `zuno-provider-routing` ConfigMap, generated directly from
 #      provider-routing.yaml in this directory (single source of truth,
 #      no hand-copied duplicate);

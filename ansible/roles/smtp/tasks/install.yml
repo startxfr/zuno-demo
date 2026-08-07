@@ -7,8 +7,20 @@
 # (`vault kv put secret/zuno/smtp/technical host=... username=... password=...`)
 # before whichever service sends the Comage weekly report (out of scope
 # here) can actually send mail.
-# ADR-0310: ansible/roles/smtp/kustomize/runtime/.
-- name: "smtp | apply the zuno-ai-run namespace and the technical mail identity ExternalSecret"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+#
+# No OLM operator involved - gitops/charts/smtp (namespace.enabled/
+# credentials.enabled) is applied via two Applications for the same
+# uniform -d0/-d1 pattern every Day 0 component here follows.
+- name: "smtp | apply the smtp GitOps Application (d0: zuno-ai-run namespace)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/smtp/kustomize/runtime"
+    gitops_component_name: "smtp"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "smtp | apply the smtp GitOps Application (d1: technical mail identity ExternalSecret)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "smtp"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"

@@ -6,7 +6,7 @@ description: >-
   zuno-agent-tekos namespace (ADR-0008, ADR-0023). Deliberately a plain
   Deployment rather than the AIAgent CRD - see ADR-0026 (retargeted to v1)
   and platform/architecture/agent-platform-separation.md. Referenced by
-  exactly one Application, gitops/apps/api/application.yaml.
+  exactly one Application, gitops/apps/api/application-d1.yaml.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

@@ -27,7 +27,7 @@ workload outright rather than hardening it - see the comments in
 container: needs a writable HuggingFace/compilation cache, so
 `readOnlyRootFilesystem` is intentionally not set). Crunchy Postgres
 Operator (PGO, `gitops/charts/postgresql`) and the upstream HashiCorp
-Vault chart (`gitops/apps/vault/application.yaml`) are not checked at all
+Vault chart (`gitops/apps/vault/application-d1.yaml`) are not checked at all
 here: PGO's operand pods are restricted-PSA-compliant by the operator's
 own design with no user-facing override field, and Vault gets `global.openshift: true`
 (that chart's own documented OpenShift-compatibility flag) rather than a

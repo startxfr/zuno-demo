@@ -1,0 +1,35 @@
+---
+# Red Hat build of OpenTelemetry operator install (ADR-0029). See
+# gitops/charts/observability (operator.enabled - Namespace/OperatorGroup/
+# Subscription). Applied by the `observability` Ansible role's install.yml.
+# The shared OpenTelemetryCollector operand is a separate Application
+# (zuno-observability-d1, applied after this one is Synced+Healthy) - see
+# application-d1.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-observability-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this.
+    argocd.argoproj.io/sync-wave: "-206"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/observability
+    helm:
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-opentelemetry-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

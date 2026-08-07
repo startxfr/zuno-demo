@@ -1,7 +1,7 @@
 # argocd
 
 Installs the OpenShift GitOps (ArgoCD) operator, then (once its CRDs are
-Established) the zuno `AppProject` every `gitops/apps/*/application.yaml`
+Established) the zuno `AppProject` every `gitops/apps/*/application-{d0,d1}.yaml`
 targets instead of ArgoCD's built-in "default" AppProject
 (`ansible/roles/argocd/kustomize/appproject/`) - both in `install.yml`.
 This lives here rather than in `admin_context` (which runs first in the

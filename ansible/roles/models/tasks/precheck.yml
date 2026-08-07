@@ -1,11 +1,20 @@
 ---
 # State detection (never fails).
-- name: "models | check the models Application"
+- name: "models | check the models Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:
-    gitops_app_name: "zuno-models"
+    gitops_app_name: "zuno-models-d0"
+
+- name: "models | save the d0 check result"
+  ansible.builtin.set_fact:
+    _models_d0_installed: "{{ _state_check_result }}"
+
+- name: "models | check the models Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-models-d1"
 
 - name: "models | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:
-    _state_is_installed: "{{ _state_check_result }}"
+    _state_is_installed: "{{ _models_d0_installed and _state_check_result }}"

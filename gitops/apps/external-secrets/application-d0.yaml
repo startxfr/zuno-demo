@@ -1,0 +1,40 @@
+---
+# External Secrets Operator install (ADR-0024, ADR-0312). See
+# gitops/charts/external-secrets (operator.enabled). Applied by the
+# `external_secrets` Ansible role's install.yml, with the operator's
+# catalog/channel injected via gitops_app_extra_helm_values (ADR-0048) -
+# see that role's README.md. The ClusterSecretStore/ExternalSecret operand
+# is a separate Application (zuno-external-secrets-d1, applied after this
+# one is Synced+Healthy) - see application-d1.yaml. zuno-ai-run's own
+# Namespace is owned by gitops/charts/namespaces instead (ADR-0312), not
+# by this chart.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-external-secrets-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
+    # only - Ansible applies each Application directly and ignores this;
+    # real Day 0 ordering (after `vault` is initialized/unsealed) comes
+    # from ansible/playbooks/day0_install.yml's day0_components list.
+    argocd.argoproj.io/sync-wave: "-201"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/external-secrets
+    helm:
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

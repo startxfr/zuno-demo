@@ -1,10 +1,19 @@
 ---
-# State detection (never fails). The zuno-keycloak Application plus the
-# CR-level readiness signals install.yml itself already waits on.
-- name: "keycloak | check the keycloak Application"
+# State detection (never fails). The zuno-keycloak-d0/-d1 Applications plus
+# the CR-level readiness signals install.yml itself already waits on.
+- name: "keycloak | check the keycloak Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:
-    gitops_app_name: "zuno-keycloak"
+    gitops_app_name: "zuno-keycloak-d0"
+
+- name: "keycloak | save the d0 check result"
+  ansible.builtin.set_fact:
+    _keycloak_d0_installed: "{{ _state_check_result }}"
+
+- name: "keycloak | check the keycloak Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-keycloak-d1"
 
 - name: "keycloak | look up the Keycloak CR"
   kubernetes.core.k8s_info:
@@ -26,7 +35,8 @@
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
-        _state_check_result
+        _keycloak_d0_installed
+        and _state_check_result
         and (_keycloak_cr_lookup.resources | default([]) | length) > 0
         and (_keycloak_cr_lookup.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
         and (_keycloak_realmimport_lookup.resources | default([]) | length) > 0

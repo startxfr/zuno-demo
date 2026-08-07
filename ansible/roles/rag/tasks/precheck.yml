@@ -10,10 +10,19 @@
     name: zuno-rag-schema-apply
   register: _rag_job_lookup
 
-- name: "rag | check the rag Application"
+- name: "rag | check the rag Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:
-    gitops_app_name: "zuno-rag"
+    gitops_app_name: "zuno-rag-d0"
+
+- name: "rag | save the d0 check result"
+  ansible.builtin.set_fact:
+    _rag_d0_installed: "{{ _state_check_result }}"
+
+- name: "rag | check the rag Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-rag-d1"
 
 - name: "rag | compute install state"
   ansible.builtin.set_fact:
@@ -21,6 +30,7 @@
       {{
         (_rag_job_lookup.resources | default([]) | length) > 0
         and (_rag_job_lookup.resources[0].status.succeeded | default(0)) > 0
+        and _rag_d0_installed
         and _state_check_result
       }}
 

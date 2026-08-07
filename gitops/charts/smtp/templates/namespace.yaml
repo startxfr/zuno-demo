@@ -1,0 +1,14 @@
+{{- if .Values.namespace.enabled }}
+# zuno-ai-run is also created by gitops/charts/namespaces (the platform
+# scaffolding chart, applied earlier in day0_components) - re-applying it
+# here idempotently means this chart never depends on that role having run
+# first, at the cost of a harmless duplicate creation.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zuno-ai-run
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+{{- end }}

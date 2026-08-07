@@ -5,7 +5,7 @@ Shared RAG capabilities backed by PostgreSQL pgvector and hybrid
 (ADR-0018) - currently used by Tekos.
 
 Implementation: FastAPI (Python 3.11), `asyncpg`. Deployed by
-`ansible/roles/rag` via `gitops/apps/rag/application.yaml` ->
+`ansible/roles/rag` via `gitops/apps/rag/application-d1.yaml` ->
 `gitops/charts/rag-service` into the shared `zuno-data` namespace.
 
 ## Observability (ADR-0029)

@@ -1,6 +1,9 @@
+{{- if .Values.postgresCluster.enabled }}
 # Crunchy Postgres Operator (PGO) PostgresCluster CR. Requires PGO,
-# installed separately by ansible/roles/postgresql/tasks/prepare.yml (OLM
-# Subscription) - not managed by this chart.
+# installed by this same chart's templates/subscription.yaml, rendered by
+# the separate zuno-postgresql-d0 Application (operator.enabled) applied
+# before this one (zuno-postgresql-d1, postgresCluster.enabled) - see
+# ansible/roles/postgresql/tasks/install.yml.
 #
 # ADR-0052: PGO's operator-managed operand pods run non-root with a
 # restricted-compatible security profile by the operator's own design
@@ -77,3 +80,4 @@ spec:
   databaseInitSQL:
     name: {{ .Values.cluster.name }}-init-sql
     key: init.sql
+{{- end }}

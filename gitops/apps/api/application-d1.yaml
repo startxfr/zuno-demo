@@ -1,0 +1,38 @@
+---
+# Tekos's frontend + BFF (ADR-0008): a plain Deployment/Service/Route pair,
+# not the AIAgent CRD (ADR-0026, retargeted to v1) - see
+# gitops/charts/tekos/Chart.yaml and platform/architecture/agent-platform-separation.md.
+# Depends on gitops/apps/agents (creates the zuno-agent-tekos namespace this
+# deploys into) and gitops/apps/keycloak (the tekos-frontend OIDC client) -
+# ArgoCD's own reconciliation is eventually consistent, so exact apply order
+# isn't required, but ansible/roles/agents applies `agents` before `api`.
+# No operator involved, so all of this component's content is -d1 (see
+# gitops/apps/api/application-d0.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-api-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-103"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/tekos
+    helm:
+      values: |
+        global:
+          # Substituted by ansible/tasks/apply_gitops_app.yml - see
+          # gitops/apps/keycloak/application-d1.yaml's comment for how.
+          clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-agent-tekos
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

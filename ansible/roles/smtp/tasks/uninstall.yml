@@ -1,9 +1,13 @@
 ---
-# Reverse of install.yml. zuno-ai-run (shared namespace) is left in place.
-- name: "smtp | delete the technical mail identity ExternalSecret"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: external-secrets.io/v1beta1
-    kind: ExternalSecret
-    name: smtp-technical-credentials
-    namespace: zuno-ai-run
+# Reverse of install.yml. zuno-ai-run (shared namespace) is also owned by
+# gitops/charts/namespaces, so -d0's own Namespace delete here is harmless
+# even if that role's Application is still present.
+- name: "smtp | delete the smtp GitOps Application (d1: technical mail identity ExternalSecret)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-smtp-d1"
+
+- name: "smtp | delete the smtp GitOps Application (d0: zuno-ai-run namespace)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-smtp-d0"

@@ -1,0 +1,29 @@
+---
+# The sales-db MCP server (ADR-0017) - see gitops/charts/mcp-sales-db and
+# components/mcp-servers/sales-db. Applied by the `sql_schema` role's
+# install.yml, after the schema/fixtures Job it runs directly (the schema
+# must exist before this server can serve anything from it). No operator
+# involved, so all of this component's content is -d1 (see
+# gitops/apps/mcp-sales-db/application-d0.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mcp-sales-db-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-143"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mcp-sales-db
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

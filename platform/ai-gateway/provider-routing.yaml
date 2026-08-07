@@ -4,7 +4,7 @@
 # (app/clients/model_router.py) to decide, per request classification,
 # which provider to call and in what fallback order. Deployed as the
 # `zuno-provider-routing` ConfigMap by ansible/roles/llm via
-# gitops/apps/llm/application.yaml (see kustomization.yaml in this
+# gitops/apps/llm/application-d1.yaml (see kustomization.yaml in this
 # directory - the ConfigMap is generated from this exact file, so this is
 # the single source of truth; do not hand-copy its contents elsewhere).
 #
