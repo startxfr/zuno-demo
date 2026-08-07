@@ -436,22 +436,35 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/smtp/technical
-      host={{ zuno_smtp_host }} username={{ zuno_smtp_username }} password={{ zuno_smtp_password }}"
+      host={{ zuno_smtp_host }} port={{ zuno_smtp_port | default('587') }}
+      username={{ zuno_smtp_username }} password={{ zuno_smtp_password }}"
   when: >-
     zuno_smtp_host | default('xxxxxx') != 'xxxxxx'
     and zuno_smtp_username | default('xxxxxx') != 'xxxxxx'
     and zuno_smtp_password | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-- name: "vault | seed the Confluence technical token from ansible/confidential.yml"
+# url/email are required alongside token: Atlassian Cloud's REST API
+# authenticates with email+API-token Basic Auth, not a bearer token
+# alone, and the base site URL is needed to know which Confluence
+# instance to call - a token by itself was never enough to actually use
+# this credential. enabled is written as plain metadata, not part of the
+# when: gate below (redundant with checking real values are present) -
+# for the future MCP confluence server to read once it exists.
+- name: "vault | seed the Confluence technical credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/confluence/technical
-      token={{ zuno_atlassian_confluence_token }}"
-  when: zuno_atlassian_confluence_token | default('xxxxxx') != 'xxxxxx'
+      url={{ zuno_atlassian_confluence_url }} email={{ zuno_atlassian_confluence_email }}
+      token={{ zuno_atlassian_confluence_token }}
+      enabled={{ zuno_atlassian_confluence_enabled | default(false) }}"
+  when: >-
+    zuno_atlassian_confluence_url | default('xxxxxx') != 'xxxxxx'
+    and zuno_atlassian_confluence_email | default('xxxxxx') != 'xxxxxx'
+    and zuno_atlassian_confluence_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 - name: "vault | check whether operator-supplied secrets already exist"

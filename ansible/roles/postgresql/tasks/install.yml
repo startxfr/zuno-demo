@@ -154,7 +154,8 @@
 # Dockerfile layers it on via RPM. Built on-cluster the same way every
 # other component's image is (ansible/tasks/apply_openshift_build.yml,
 # ADR-0056), the one difference being the Dockerfile's FROM pulls from
-# registry.developers.crunchydata.com, which requires a free Crunchy Data
+# registry.developers.crunchydata.com (zuno_crunchydata_registry_uri
+# below, defaulting to that host), which requires a free Crunchy Data
 # developer account even just to pull - so this build additionally needs
 # a base-image pull Secret, sourced from ansible/confidential.yml
 # (zuno_crunchydata_registry_username/_password) the same way
@@ -182,7 +183,7 @@
     build_image_name: postgresql-pgvector
     build_dockerfile_path: Dockerfile
     build_context_dir: gitops/charts/postgresql/image
-    build_pull_secret_registry: registry.developers.crunchydata.com
+    build_pull_secret_registry: "{{ zuno_crunchydata_registry_uri | default('registry.developers.crunchydata.com') }}"
     build_pull_secret_username: "{{ zuno_crunchydata_registry_username | default('') }}"
     build_pull_secret_password: "{{ zuno_crunchydata_registry_password | default('') }}"
   when: >-

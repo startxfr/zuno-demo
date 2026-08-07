@@ -4,10 +4,16 @@ zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 
 zuno_smtp_host: "xxxxxx"
+zuno_smtp_port: "587"
 zuno_smtp_username: "xxxxxx"
 zuno_smtp_password: "xxxxxx"
+zuno_smtp_enabled: false
 
+zuno_atlassian_confluence_url: "xxxxxx"
+zuno_atlassian_confluence_email: "xxxxxx"
 zuno_atlassian_confluence_token: "xxxxxx"
+zuno_atlassian_confluence_enabled: false
 
+zuno_crunchydata_registry_uri: "registry.developers.crunchydata.com"
 zuno_crunchydata_registry_username: "xxxxxx"
 zuno_crunchydata_registry_password: "xxxxxx"

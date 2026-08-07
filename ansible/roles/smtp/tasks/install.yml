@@ -3,23 +3,45 @@
 # smtp`) - there is no SMTP server to install, only the technical mail
 # identity's credential to expose via ExternalSecret, seeded at
 # zuno/smtp/technical by ansible/roles/vault/tasks/install.yml from
-# ansible/confidential.yml (zuno_smtp_host/username/password). If that
-# file still has the "xxxxxx" placeholder for those fields, it falls back
-# to an empty Vault placeholder instead - fill in confidential.yml and
-# re-run `make d0 install vault`, or `vault kv put zuno/smtp/technical
-# host=... username=... password=...` directly, before whichever service
-# sends the Comage weekly report (out of scope here) can actually send
-# mail.
+# ansible/confidential.yml (zuno_smtp_host/port/username/password). If
+# that file still has the "xxxxxx" placeholder for host/username/
+# password, it falls back to an empty Vault placeholder instead - fill in
+# confidential.yml and re-run `make d0 install vault`, or `vault kv put
+# zuno/smtp/technical host=... port=... username=... password=...`
+# directly, before whichever service sends the Comage weekly report (out
+# of scope here) can actually send mail.
 #
 # No OLM operator involved - gitops/charts/smtp (namespace.enabled/
 # credentials.enabled) is applied via two Applications for the same
 # uniform -d0/-d1 pattern every Day 0 component here follows.
+#
+# zuno_smtp_enabled (ansible/confidential.yml, soft-read below like
+# ansible/roles/keycloak/tasks/install.yml - no fail if the file is
+# missing) gates both Applications: defaults to true (preserve today's
+# always-on behavior when unset), but confidential.example.yml sets it
+# to false as the demo-friendly default, same as
+# zuno_keycloak_google_oauth_enabled. Safe to skip -d0 too when disabled:
+# zuno-ai-run is already created by gitops/charts/namespaces (Day 0,
+# earlier) - this role's own -d0 only ever re-applied it idempotently as
+# a belt-and-braces fallback, nothing else depends on smtp's -d0
+# specifically.
+- name: "smtp | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _smtp_confidential_file
+
+- name: "smtp | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _smtp_confidential_file.stat.exists
+
 - name: "smtp | apply the smtp GitOps Application (d0: zuno-ai-run namespace)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "smtp"
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+  when: zuno_smtp_enabled | default(true) | bool
 
 - name: "smtp | apply the smtp GitOps Application (d1: technical mail identity ExternalSecret)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -27,3 +49,12 @@
     gitops_component_name: "smtp"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+  when: zuno_smtp_enabled | default(true) | bool
+
+- name: "smtp | note that smtp is disabled"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_smtp_enabled is false in ansible/confidential.yml - skipping
+      both smtp GitOps Applications. Set it to true (or remove it) and
+      re-run `make d0 install smtp` to enable the technical mail identity.
+  when: not (zuno_smtp_enabled | default(true) | bool)
