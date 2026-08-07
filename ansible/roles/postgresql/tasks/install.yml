@@ -186,8 +186,8 @@
     build_pull_secret_username: "{{ zuno_crunchydata_registry_username | default('') }}"
     build_pull_secret_password: "{{ zuno_crunchydata_registry_password | default('') }}"
   when: >-
-    (zuno_crunchydata_registry_username | default('') | length > 0)
-    and (zuno_crunchydata_registry_password | default('') | length > 0)
+    (zuno_crunchydata_registry_username | default('xxxxxx') != 'xxxxxx')
+    and (zuno_crunchydata_registry_password | default('xxxxxx') != 'xxxxxx')
 
 - name: "postgresql | warn if Crunchy Data credentials are missing"
   ansible.builtin.debug:
@@ -202,8 +202,8 @@
       add those two fields to ansible/confidential.yml, and re-run
       `make d0 install postgresql`.
   when: >-
-    not ((zuno_crunchydata_registry_username | default('') | length > 0)
-         and (zuno_crunchydata_registry_password | default('') | length > 0))
+    not ((zuno_crunchydata_registry_username | default('xxxxxx') != 'xxxxxx')
+         and (zuno_crunchydata_registry_password | default('xxxxxx') != 'xxxxxx'))
 
 # templates/postgrescluster.yaml (postgresCluster.enabled) lives in the
 # same chart, applied via the separate zuno-postgresql-d1 Application,
