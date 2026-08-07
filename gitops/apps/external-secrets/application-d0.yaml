@@ -45,3 +45,13 @@ spec:
       # also create/track it (was the zuno-external-secrets-d0/
       # zuno-namespaces-d0 SharedResourceWarning).
       - CreateNamespace=false
+      # ADR-0312's two-wave pattern (Subscription wave 10, OperatorConfig
+      # wave 20) assumes ArgoCD gets far enough to start wave 10. On a
+      # cold cluster operator.external-secrets.io/OperatorConfig's
+      # GroupVersion is entirely undiscoverable (its CRD is only
+      # installed by the Subscription's CSV), which makes ArgoCD abort
+      # the *whole* sync operation as invalid before applying anything -
+      # including the Subscription that would eventually produce the
+      # CRD. This skips dry-run/discovery validation for resources whose
+      # CRD isn't installed yet, breaking that deadlock.
+      - SkipDryRunOnMissingResource=true
