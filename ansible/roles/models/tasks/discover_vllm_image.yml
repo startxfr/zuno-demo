@@ -1,11 +1,8 @@
 ---
-# Shared discovery task, included by both tasks/precheck.yml (for early
-# visibility/failure - ADR-0048 "add precheck output showing... serving
-# runtimes... before model deployment") and tasks/configure.yml (which
-# actually needs the resulting _models_discovered_vllm_image fact to apply
-# it - separate `ansible-playbook` runs of the precheck vs. configure
-# playbooks don't share facts, so this can't just run once in precheck and
-# be read back later).
+# Included by tasks/install.yml, which needs the resulting
+# _models_discovered_vllm_image fact to apply it. tasks/precheck.yml
+# (state detection, never fails) does not run this discovery itself - see
+# that file's own comment.
 #
 # ADR-0048: "Select approved operator channels and ClusterServingRuntime/
 # serving images exposed by the installed OpenShift AI version instead of

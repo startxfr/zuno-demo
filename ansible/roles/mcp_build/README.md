@@ -6,6 +6,6 @@ Day 1 `build` component (ADR-0056, `make day1|d1 build mcp`). Builds
 for the shared mechanism (git-source Docker-strategy build, `ConfigChange`
 trigger, waits for `status.phase: Complete`, fails loudly otherwise).
 
-No `precheck.yml`/`install.yml`/`configure.yml` - this is a build-only
+No `precheck.yml`/`install.yml` - this is a build-only
 role, distinct from the `mcp` Day 1 `run` component (`ansible/roles/mcp`),
 which deploys the already-built image.

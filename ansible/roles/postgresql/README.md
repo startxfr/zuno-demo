@@ -9,9 +9,9 @@ PostgreSQL and pgvector as the persistent data platform") - that ADR
 never named a specific operator. Previously applied the Subscription
 directly via `ansible/tasks/apply_kustomize.yml` (ADR-0310); converted to
 this role-applies-one-Application pattern by ADR-0312, alongside
-`keycloak` (the other role sharing this "operator install stays split
-across day0 install/configure because the operand's `ExternalSecret`s
-depend on `external_secrets`' own configure step" shape).
+`keycloak` (the other role sharing this "operand's `ExternalSecret`s
+depend on `external_secrets` having run first" shape - both sort after
+`external_secrets` in `day0_components`).
 
 ## Why PGO, not CloudNativePG
 
@@ -29,37 +29,29 @@ no fallback/discovery workaround needed - **also proven wrong** on a real
 cluster (OLM's `Subscription.status` reported `ResolutionFailed`: "no
 operators found in package crunchy-postgres-operator in the catalog
 referenced by subscription"). Three real-world catalog/channel/package-name
-mismatches in a row is a pattern, not a fluke: `install.yml`/`configure.yml`
-now discover the package by fuzzy name match (`/crunchy/i`) across every
-catalog in this cluster's `openshift-marketplace`, not just a hardcoded
-package name in a hardcoded catalog, with the same `operatorhubio-catalog`
-public fallback CNPG's fix used if nothing crunchy-named is found anywhere.
-This is a genuine rewrite either way (CNPG and PGO use different CRDs,
-Service names and Secret conventions), not a config tweak.
+mismatches in a row is a pattern, not a fluke: `install.yml` discovers
+the package by fuzzy name match (`/crunchy/i`) across every catalog in
+this cluster's `openshift-marketplace`, not just a hardcoded package name
+in a hardcoded catalog, with the same `operatorhubio-catalog` public
+fallback CNPG's fix used if nothing crunchy-named is found anywhere. This
+is a genuine rewrite either way (CNPG and PGO use different CRDs, Service
+names and Secret conventions), not a config tweak.
 
-- `install-precheck.yml`/`configure-precheck.yml` - state detection,
-  never fail: report whether prerequisites (Application CRD, a
-  crunchy-named `PackageManifest`) are ready and whether the
+- `precheck.yml` - state detection, never fails: reports whether the
   `zuno-postgresql` Application/`PostgresCluster` are actually
-  Synced+Healthy/rolled out, setting `postgresql_state_installed`/
-  `_state_configured` and a line in the shared `/tmp` state report (see
+  Synced+Healthy/rolled out, setting `postgresql_state_installed` and a
+  line in the shared `/tmp` state report (see
   `ansible/playbooks/day0_check.yml`).
 - `install.yml` - fuzzy-matches `/crunchy/i` across every PackageManifest
   in `openshift-marketplace`, registering `operatorhubio-catalog` as a
   fallback and retrying if nothing matched at all, failing with a clear
   diagnostic - listing every postgres-ish package this cluster's catalogs
-  actually publish - rather than guessing a fourth time. Does not itself
-  apply anything OLM-related any more (ADR-0312): it only validates that
-  *some* crunchy-named package will be resolvable, so `configure.yml`'s
-  own re-selection is guaranteed to succeed.
-- `configure.yml` - re-selects the exact package name/catalog/channel
-  (prefers an exact `crunchy-postgres-operator` name and a `stable`
-  channel if present, else whatever fuzzy match/`defaultChannel` was
-  found - re-run rather than reused from `install.yml`, since Ansible
-  facts don't survive across the separate `day0_install.yml`/
-  `day0_configure.yml` playbook runs), then applies the `postgresql`
-  GitOps Application (`gitops/apps/postgresql/application.yaml`, local
-  chart `gitops/charts/postgresql`) with that selection passed via
+  actually publish - rather than guessing a fourth time. Then selects the
+  exact package name/catalog/channel (prefers an exact
+  `crunchy-postgres-operator` name and a `stable` channel if present,
+  else whatever fuzzy match/`defaultChannel` was found) and applies the
+  `postgresql` GitOps Application (`gitops/apps/postgresql/application.yaml`,
+  local chart `gitops/charts/postgresql`) with that selection passed via
   `gitops_app_extra_helm_values` (ADR-0048). The chart renders:
   - the OLM `Subscription` itself (sync-wave `"-40"`, `openshift-operators`
     namespace - mirrors `ansible/roles/argocd` and
@@ -70,7 +62,7 @@ Service names and Secret conventions), not a config tweak.
     registers (ADR-0312);
   - an `ExternalSecret` syncing the pre-seeded `secret/zuno/postgresql/app`
     Vault path (username `zunoapp`, auto-generated password - see
-    `ansible/roles/vault/tasks/configure.yml`) into the
+    `ansible/roles/vault/tasks/install.yml`) into the
     `zuno-postgresql-pguser-zunoapp` Kubernetes `Secret` - PGO's own
     fixed naming convention (`<cluster>-pguser-<user>`), pre-created with
     PGO's two required labels so PGO's "bring your own password"
@@ -99,7 +91,7 @@ upstream issue `CrunchyData/postgres-operator#3706`) - same situation
 this demo already had with CloudNativePG. `gitops/charts/postgresql/
 image/Dockerfile` layers pgvector onto Crunchy's own UBI-based operand
 image via a PGDG RPM. That image must be built and pushed once by an
-operator before `make d0 configure postgresql` can succeed - see
+operator before `make d0 install postgresql` can succeed - see
 `image/README.md` for the exact commands, the new Crunchy Data registry
 signup step (unlike CNPG's public `ghcr.io` image), and three details
 flagged there as unverified against a real build (base image tag, package
@@ -129,16 +121,16 @@ researched from Crunchy's own documentation but not exercised end to end:
   above - handles whatever it turns out to be, but the specific values
   were not confirmed from this environment).
 - The `PostgresCluster.status.conditions` `Progressing` condition's exact
-  semantics on the installed PGO version (`configure.yml`'s `until`).
+  semantics on the installed PGO version (`install.yml`'s `until`).
 - Whether `spec.databaseInitSQL` runs against the `zuno` database as
   intended, or a different default database (see
   `templates/postgrescluster.yaml`'s own comment for the manual fallback
   if not).
 - The three pgvector image-build details flagged in `image/README.md`.
 
-Run `make d0 check postgresql` → `make d0 install postgresql` → build/push
-the image → `make d0 configure postgresql` against the real cluster and
-adjust any of the above that turns out to be wrong.
+Run `make d0 check postgresql` → build/push the image → `make d0 install
+postgresql` against the real cluster and adjust any of the above that
+turns out to be wrong.
 
 ## Consumed by
 

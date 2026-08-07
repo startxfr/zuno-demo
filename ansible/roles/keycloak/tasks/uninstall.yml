@@ -1,6 +1,5 @@
 ---
-# Reverse of install.yml + configure.yml. zuno-auth (shared namespace) is
-# left in place.
+# Reverse of install.yml. zuno-auth (shared namespace) is left in place.
 #
 # remove_operator.yml must run *before* delete_gitops_app.yml: it
 # discovers the installed CSV via the Subscription's own

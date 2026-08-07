@@ -1,4 +1,110 @@
 ---
-- name: "llm | no prerequisites to prepare"
+# Seeds empty placeholders (never overwriting a real value) for the four
+# external provider API keys platform/ai-gateway/externalsecret-*.yaml
+# resolve - same check-then-placeholder idiom as
+# ansible/roles/vault/tasks/install.yml's google-oauth/smtp placeholders,
+# scoped to this role since these are llm-specific secrets, not core
+# platform bootstrap secrets.
+#
+# namespace: zuno-data, not zuno-secrets-bootstrap: ansible/roles/vault's
+# own install.yml (the actual owner of this Secret) reads/writes it in
+# zuno-data - found via live-cluster testing on api.demo222.startx.fr
+# that this role instead pointed at zuno-secrets-bootstrap, a leftover
+# namespace from an earlier install attempt holding a stale root token
+# from a previous Vault init cycle. Every `vault kv` exec in this file
+# 403'd against the live (correctly re-initialized) Vault using that
+# stale token.
+#
+# Second, compounding bug found in the same pass: kubernetes.core.k8s_exec
+# has no env-passing parameter of its own, and the generic Ansible task
+# `environment:` keyword only sets env vars for the local ansible/python
+# process, not the exec session k8s_exec opens inside the container - see
+# ansible/roles/vault/tasks/install.yml's own comment for this exact
+# gotcha (already learned there, never applied here). Every exec below
+# was therefore running as an unauthenticated Vault request regardless of
+# which token/namespace it read - fixed the same way vault/install.yml
+# does, by embedding VAULT_TOKEN inside the `sh -c` command string itself.
+- name: "llm | read Vault bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-data
+    name: vault-bootstrap-credentials
+  register: _llm_vault_creds
+  no_log: true
+
+- name: "llm | fail if Vault bootstrap credentials are missing"
+  ansible.builtin.fail:
+    msg: "vault-bootstrap-credentials not found - run `make d0 install vault` and `make d0 configure vault` first."
+  when: (_llm_vault_creds.resources | default([]) | length) == 0
+
+- name: "llm | find the running Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-data
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _llm_vault_pod
+
+- name: "llm | check whether provider API keys already exist"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _llm_vault_creds.resources[0].data.root_token | b64decode }}
+      vault kv get -format=json secret/zuno/providers/{{ provider }}"
+  loop:
+    - openai
+    - gemini
+    - anthropic
+    - mistral
+  loop_control:
+    loop_var: provider
+    label: "{{ provider }}"
+  register: _llm_existing_provider_secrets
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "llm | seed an empty placeholder only where no key exists yet"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _llm_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _llm_vault_creds.resources[0].data.root_token | b64decode }}
+      vault kv put secret/zuno/providers/{{ provider_result.provider }} api_key=__placeholder__"
+  loop: "{{ _llm_existing_provider_secrets.results }}"
+  loop_control:
+    loop_var: provider_result
+    label: "{{ provider_result.provider }}"
+  when: provider_result.rc != 0
+  no_log: true
+
+- name: "llm | operator action required"
   ansible.builtin.debug:
-    msg: "llm is applied entirely by tasks/configure.yml - provider routing and the Agent Runtime have no operator dependency of their own."
+    msg: >-
+      secret/zuno/providers/{openai,gemini,anthropic,mistral} are
+      placeholders until an operator populates them, e.g.
+      `vault kv put secret/zuno/providers/openai api_key=...`. Until then
+      components/agent-runtime's ModelRouter simply fails over past that
+      provider (ADR-0020) - the local model always stays eligible.
+
+- name: "llm | apply the provider routing GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "llm"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
+
+- name: "llm | apply the AI Inference Gateway GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "ai-gateway"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
+
+- name: "llm | apply the Agent Runtime GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "agent-runtime"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"

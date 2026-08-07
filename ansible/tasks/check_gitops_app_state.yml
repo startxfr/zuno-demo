@@ -2,9 +2,9 @@
 # Shared task: point-in-time read of one ArgoCD Application's Synced+
 # Healthy state - the same fields ansible/tasks/apply_gitops_app.yml
 # waits on, but as a single non-failing, non-blocking lookup (no `until`/
-# `retries`) suitable for install-precheck.yml/configure-precheck.yml
-# state detection, where "not there yet" is a normal, reportable outcome,
-# not an error. Required var: gitops_app_name. Sets _state_check_result
+# `retries`) suitable for precheck.yml state detection, where "not there
+# yet" is a normal, reportable outcome, not an error. Required var:
+# gitops_app_name. Sets _state_check_result
 # (bool, false if the Application doesn't exist).
 - name: "state-check | look up {{ gitops_app_name }}"
   kubernetes.core.k8s_info:

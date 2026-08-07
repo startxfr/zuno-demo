@@ -14,7 +14,7 @@ api.demo222.startx.fr. This role closes that gap using the same in-cluster
 build mechanism as the other three, rather than requiring the GitHub
 Actions pipeline as a hard prerequisite for a working demo install.
 
-No `precheck.yml`/`install.yml`/`configure.yml` - this is a build-only
+No `precheck.yml`/`install.yml` - this is a build-only
 role, distinct from the `ai-gateway` Day 1 `run` component
 (`ansible/roles/ai_gateway`... if/when one exists), which deploys the
 already-built image via `gitops/apps/ai-gateway`.

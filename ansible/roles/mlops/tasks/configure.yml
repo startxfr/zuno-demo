@@ -1,4 +1,0 @@
----
-- name: "mlops | configure scaffold"
-  ansible.builtin.debug:
-    msg: "Configuration contract registered for mlops; implementation tasks are pending."

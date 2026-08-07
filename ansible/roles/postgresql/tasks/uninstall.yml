@@ -1,8 +1,8 @@
 ---
-# Reverse of install.yml + configure.yml. The Subscription name is
-# runtime-discovered (catalog-dependent, e.g. "crunchy-postgres-operator"),
-# not a fixed constant, so it's rediscovered here by listing. openshift-
-# operators (shared) is left in place.
+# Reverse of install.yml. The Subscription name is runtime-discovered
+# (catalog-dependent, e.g. "crunchy-postgres-operator"), not a fixed
+# constant, so it's rediscovered here by listing. openshift-operators
+# (shared) is left in place.
 #
 # remove_operator.yml must run *before* delete_gitops_app.yml: it needs
 # the Subscription to still exist to discover the installed CSV. Running

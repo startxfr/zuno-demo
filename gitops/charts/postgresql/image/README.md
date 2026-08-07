@@ -41,7 +41,7 @@ choice.)
 (`image-registry.zuno-demo.internal/zuno/postgresql-pgvector:16-crunchy`)
 that does not correspond to a real registry - it exists only so `helm
 template`/`helm lint` have something concrete to render.
-`ansible/roles/postgresql/tasks/configure.yml` applies this chart with no
+`ansible/roles/postgresql/tasks/install.yml` applies this chart with no
 Helm value overrides today (unlike e.g. `ansible/roles/models`, which does
 inject a discovered image via `apply_gitops_app.yml`'s
 `gitops_app_extra_helm_values`), so the only way to point this chart at

@@ -1,0 +1,28 @@
+---
+# State detection (never fails). openshift_ai applies its whole chart
+# (operator + DataScienceCluster) in a single install.yml call (ADR-0312)
+# - "installed" checks the Application plus the DataScienceCluster's own
+# Ready signal install.yml already waits on.
+- name: "openshift_ai | check the openshift-ai Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-openshift-ai"
+
+- name: "openshift_ai | look up the DataScienceCluster"
+  kubernetes.core.k8s_info:
+    api_version: datasciencecluster.opendatahub.io/v1
+    kind: DataScienceCluster
+    name: zuno-dsc
+  register: _openshift_ai_dsc_lookup
+
+- name: "openshift_ai | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _state_check_result
+        and (_openshift_ai_dsc_lookup.resources | default([]) | length) > 0
+        and (_openshift_ai_dsc_lookup.resources[0].status.phase | default('')) == 'Ready'
+      }}
+
+- name: "openshift_ai | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

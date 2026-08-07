@@ -10,7 +10,7 @@ renders:
   role auto-generates at `secret/zuno/keycloak/admin`;
 - an `ExternalSecret` resolving the Google OAuth client at
   `secret/zuno/google-oauth/client` (placeholder until an operator
-  populates it - see `ansible/roles/vault/tasks/configure.yml`);
+  populates it - see `ansible/roles/vault/tasks/install.yml`);
 - an `ExternalSecret` resolving the shared demo-persona password the
   `vault` role auto-generates at `secret/zuno/keycloak/demo-personas`
   (ADR-0041 - no password is ever hardcoded in Git);
@@ -41,16 +41,11 @@ work (not present in the original per-track build):
   vault-generated secret (`${vault.demo_personas_password}`), never a
   literal in this repo.
 
-Applied by `configure.yml`, not `install.yml` (ADR-0312): the two
-`ExternalSecret`s above resolve against the `vault-backend`
-`ClusterSecretStore`, which only becomes Ready once `external_secrets`'
-own `configure.yml` has run. `make day0|d0 all` runs every component's
-`install.yml` before any component's `configure.yml`, and `external_secrets`
-sorts before `keycloak` in `day0_components` - applying the Application in
-`configure.yml` matches that ordering; applying it in `install.yml` would
-risk the chart's first sync racing ahead of it. `install.yml` only
-validates the package/channel is resolvable, so `configure.yml`'s own
-re-selection is guaranteed to succeed.
+Applied by `install.yml`, once `external_secrets` (earlier in
+`day0_components`) has made the `vault-backend` `ClusterSecretStore`
+Ready - the two `ExternalSecret`s above resolve against it, so this
+role's own ordering in the component list is what keeps that dependency
+satisfied.
 
 ## Operator package/channel discovery
 
@@ -62,11 +57,8 @@ that a hardcoded `channel: stable` hits OLM's
 version-qualified (`stable-v22`, `stable-v26`, ...) with no bare `stable`
 alias on that cluster. Same lesson as ADR-0048's CNPG channel discovery
 and `ansible/roles/postgresql`'s PGO package discovery. `tasks/install.yml`
-and `tasks/configure.yml` both run this same discovery (Ansible facts
-don't survive across the separate `day0_install.yml`/`day0_configure.yml`
-playbook runs) - `install.yml`'s copy is read-only validation,
-`configure.yml`'s copy feeds `gitops_app_extra_helm_values`
-(`subscriptionChannel`/`subscriptionCatalogSource`, ADR-0048) into the
+runs this discovery once and feeds it into `gitops_app_extra_helm_values`
+(`subscriptionChannel`/`subscriptionCatalogSource`, ADR-0048) for the
 `apply_gitops_app.yml` call that actually applies the Subscription.
 
 ## Installed directly into zuno-auth (RHBK doesn't support AllNamespaces)
@@ -86,14 +78,13 @@ the `Subscription` both live there, alongside the `Keycloak` CR this same
 chart applies - one namespace for both the operator and the instance it
 reconciles, no cross-namespace watch scope to get wrong. `zuno-auth`
 already exists by the time this role runs, owned by `gitops/charts/
-namespaces` (`tasks/install-precheck.yml` reports on this, `namespaces`
-role runs before `keycloak` in Day 0 order) - this chart does not
-declare it.
+namespaces` (`namespaces` role runs before `keycloak` in Day 0 order) -
+this chart does not declare it.
 
 | Item | How it's resolved |
 |---|---|
 | OLM package name | Fixed: `rhbk-operator` |
-| Subscription channel | `tasks/{install,configure}.yml` read the package's `PackageManifest`; prefer an exact `stable` channel if one exists, else fall back to the package's own `defaultChannel`; fail loudly listing every published channel if neither exists |
+| Subscription channel | `tasks/install.yml` reads the package's `PackageManifest`; prefers an exact `stable` channel if one exists, else falls back to the package's own `defaultChannel`; fails loudly listing every published channel if neither exists |
 
 If discovery ever fails on a given cluster (e.g. the package isn't
 published at all), `tasks/install.yml` fails with a diagnostic naming the
@@ -177,7 +168,7 @@ track) must match the client's `redirectUris`/`webOrigins` host and the
 If a namespace or Route hostname changes on the other track's side, update
 `clusterBaseDomain`/the per-client `redirectUris` in
 `gitops/charts/keycloak/files/realm-zuno.json` (and re-run
-`make d0 configure keycloak`) to keep the two in sync.
+`make d0 install keycloak`) to keep the two in sync.
 
 ## Group model: two orthogonal dimensions (ADR-0040)
 

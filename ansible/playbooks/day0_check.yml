@@ -1,13 +1,8 @@
 ---
-# Day 0 (ADR-0056): combined install+configure state check - `make day0
-# check`/`make d0 check`. Runs ansible/tasks/init_state_report.yml once
-# and both install-precheck/configure-precheck loops in the same
-# ansible-playbook process, so state_report_file (an Ansible-generated
-# fact, not something the Makefile passes in) is naturally shared across
-# both loops - a single report at the end covers every component's
-# install AND configure state. `make d0 install-check`/`configure-check`
-# (day0_install_check.yml/day0_configure_check.yml) run either loop
-# standalone, each with its own report file.
+# Day 0 (ADR-0056): state check - `make day0 check`/`make d0 check`. Runs
+# ansible/tasks/init_state_report.yml once, then every selected
+# component's tasks/precheck.yml (state detection, never fails), and
+# displays the resulting report at the end.
 #
 # Order matters (admin_context first: nothing else can be checked until
 # the cluster API itself is reachable; namespaces after argocd: namespace
@@ -15,11 +10,10 @@
 # argocd installs; external_secrets right after vault: keycloak's and
 # postgresql's charts each apply an ExternalSecret CR against the
 # vault-backend ClusterSecretStore external_secrets creates, which itself
-# needs the eso-reader Vault auth role vault's own configure step sets up
-# - found as a real deadlock via live-cluster testing on
-# api.demo222.startx.fr, where the original ordering left both stuck
-# waiting on a Secret that could never sync).
-- name: "Day 0: check install and configure state"
+# needs the eso-reader Vault auth role sets up - found as a real deadlock
+# via live-cluster testing on api.demo222.startx.fr, where the original
+# ordering left both stuck waiting on a Secret that could never sync).
+- name: "Day 0: check install state"
   hosts: localhost
   gather_facts: false
   vars:
@@ -43,21 +37,13 @@
           {{ day0_components if target_component | default('all') == 'all'
              else [target_component | replace('-', '_')] }}
 
-    - name: Generate the shared state-report file
+    - name: Generate the state-report file
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
 
-    - name: Run Day 0 component install-state checks
+    - name: Run Day 0 component state checks
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: install-precheck
-      loop: "{{ selected_components }}"
-      loop_control:
-        label: "{{ item }}"
-
-    - name: Run Day 0 component configure-state checks
-      ansible.builtin.include_role:
-        name: "{{ item }}"
-        tasks_from: configure-precheck
+        tasks_from: precheck
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

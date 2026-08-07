@@ -4,8 +4,8 @@ Applies the `gitops/apps/nvidia-gpu` ArgoCD Application (ADR-0312), whose
 chart (`gitops/charts/nvidia-gpu`) installs the NVIDIA GPU Operator (OLM
 `Subscription`, certified-operators catalog, sync-wave `"10"`) and its
 default `ClusterPolicy` (sync-wave `"20"`), enabling GPU scheduling on the
-two L4 worker nodes. A Day 0 component (ADR-0056) with a documented no-op
-`configure.yml` - nothing to configure beyond the `ClusterPolicy` itself.
+two L4 worker nodes. A Day 0 component (ADR-0056) - `install.yml` applies
+the whole chart, in two `apply_gitops_app.yml` calls (see below).
 Previously applied raw manifests directly via `ansible/tasks/
 apply_kustomize.yml` (ADR-0310); converted to this role-applies-one-
 Application pattern by ADR-0312.

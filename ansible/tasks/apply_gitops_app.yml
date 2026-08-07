@@ -1,8 +1,8 @@
 ---
 # Shared task: apply a single ArgoCD Application manifest for one platform
-# component. Every role's `configure.yml` (and, where relevant, `prepare.yml`)
-# includes this file with `gitops_app_name` set to its own component directory
-# under gitops/apps/. See gitops/apps/README.md for the manifest convention
+# component. Every role's `install.yml` includes this file with
+# `gitops_app_name` set to its own component directory under gitops/apps/.
+# See gitops/apps/README.md for the manifest convention
 # and docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md
 # for the architecture this implements.
 #

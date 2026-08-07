@@ -1,4 +1,0 @@
----
-- name: "smtp | nothing to configure"
-  ansible.builtin.debug:
-    msg: "smtp has no configure phase - see tasks/prepare.yml."

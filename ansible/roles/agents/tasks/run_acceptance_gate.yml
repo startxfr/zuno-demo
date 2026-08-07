@@ -6,7 +6,7 @@
 # (agent-runtime, mcp-gateway, ai-gateway, rag-service) has no OpenShift
 # Route and is only reachable over in-cluster Service DNS (see
 # evaluations/tekos/README.md). Same "Job, not a GitOps Application"
-# reasoning as ansible/roles/sql_schema/tasks/configure.yml: there is
+# reasoning as ansible/roles/sql_schema/tasks/install.yml: there is
 # nothing declaratively running about a test run once it has finished.
 #
 # The Job runs in zuno-ai-run, labeled app.kubernetes.io/name: acceptance-gate

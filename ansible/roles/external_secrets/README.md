@@ -6,9 +6,9 @@ Secrets Operator and registers the `ClusterSecretStore` every
 `ExternalSecret` in the platform resolves against. Backed by the demo
 Vault instance (`ansible/roles/vault`), which must already be
 initialized, unsealed and have the Kubernetes auth method + `eso-reader`
-role configured (see `ansible/roles/vault/tasks/configure.yml`) before
-this role's `configure` step runs - enforced by ordering in
-`ansible/playbooks/day0_{check,install,configure,uninstall}.yml`. Previously
+role configured (see `ansible/roles/vault/tasks/install.yml`) before this
+role's second apply below runs - enforced by ordering in
+`ansible/playbooks/day0_{check,install,uninstall}.yml`. Previously
 applied raw manifests directly via `ansible/tasks/apply_kustomize.yml`
 (ADR-0310); converted to this role-applies-one-Application pattern by
 ADR-0312. `zuno-ai-run`'s `Namespace` is owned by `gitops/charts/
@@ -22,16 +22,16 @@ or an Ansible variable file; every workload consumes credentials through an
 
 The chart's `Namespace`s/`Subscription` (sync-wave `"10"`) and
 `OperatorConfig` operand (sync-wave `"20"`) are applied by `tasks/
-install.yml`'s single `apply_gitops_app.yml` call. The `ClusterSecretStore`
+install.yml`'s first `apply_gitops_app.yml` call. The `ClusterSecretStore`
 (sync-wave `"30"`) and cluster-domain `ExternalSecret` (sync-wave `"40"`)
 are deliberately left unrendered by that call (`gitops/charts/
 external-secrets/values.yaml`'s `vaultServiceName` stays unset) and only
-applied by `tasks/configure.yml`'s own `apply_gitops_app.yml` call, once
-Vault's own `configure` step has prepared the Kubernetes auth method +
-`eso-reader` role they depend on - this two-phase split enforces the
-Vault-readiness ordering the paragraph above describes; sync-wave alone
-cannot (ArgoCD has no way to know about a *different* Application's
-readiness). `configure.yml` re-discovers the operator's catalog/channel
-(cheap, idempotent) alongside the newly-discovered Vault client `Service`
-name, since `gitops_app_extra_helm_values` replaces the Application's
-Helm values wholesale (ADR-0048) rather than merging.
+applied by a second `apply_gitops_app.yml` call further down the same
+file, once `vault` (earlier in `day0_components`) has prepared the
+Kubernetes auth method + `eso-reader` role they depend on - this
+two-phase split enforces the Vault-readiness ordering the paragraph above
+describes; sync-wave alone cannot (ArgoCD has no way to know about a
+*different* Application's readiness). The second call re-supplies the
+operator's catalog/channel alongside the newly-discovered Vault client
+`Service` name, since `gitops_app_extra_helm_values` replaces the
+Application's Helm values wholesale (ADR-0048) rather than merging.

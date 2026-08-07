@@ -1,7 +1,0 @@
----
-# No configure phase: the NodeFeatureDiscovery instance applied in
-# prepare.yml is the whole of what "configuring" NFD means for this demo
-# (same convention as ansible/roles/nvidia_gpu/tasks/configure.yml).
-- name: "nfd | nothing to configure beyond the NodeFeatureDiscovery instance"
-  ansible.builtin.debug:
-    msg: "nfd has no configure phase - see tasks/prepare.yml."

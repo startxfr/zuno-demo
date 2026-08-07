@@ -1,12 +1,13 @@
 ---
-# No separate prepare phase: unlike Day 0's components (operators/instances
-# that must exist before anything can be configured, ADR-0056), the Tekos
-# workloads this role applies are a plain GitOps Application with no
-# operator dependency of its own - see tasks/configure.yml. `agents` is a
-# Day 1 component, not listed in day0_install.yml's component list, so
-# this file is not reachable via `make d0 install` today; kept for
-# structural consistency with every other role and as a placeholder
-# should a future prerequisite appear.
-- name: "agents | no prerequisites to prepare"
-  ansible.builtin.debug:
-    msg: "agents has no separate prepare phase - see tasks/configure.yml."
+# Applies the Tekos frontend/BFF workloads GitOps Application. Namespace
+# creation used to happen here too, but moved to the new `namespaces` Day 0
+# role (ADR-0056) - this role is now Day 1's "agents" run component, and
+# assumes namespaces already exist (see precheck.yml). The formerly
+# separate "api" role/CONFIG_SCOPE was retired as part of the same change:
+# once namespace-apply moved out, it was doing exactly this and nothing
+# else - one role for "apply the Tekos workloads Application" is enough.
+- name: "agents | apply the Tekos workloads GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "api"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"

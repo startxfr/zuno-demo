@@ -248,6 +248,45 @@ ADR-0312` when applicable.
 - ADR-0048 (`gitops_app_extra_helm_values` mechanism reused here)
 - ADR-0047 (NFD→GPU Operator node-label ordering, unaffected)
 
+## Addendum (2026-08-07): `configure.yml` merged into `install.yml`
+
+A later, separate operator decision collapsed the `install`/`configure`
+two-phase Day 0/Day 1 lifecycle back into a single `install`/`uninstall`/
+`check` interface (`configure` and `run` removed from the Makefile
+entirely) - every role's `configure.yml` content moved into `install.yml`
+and the file itself was deleted, repo-wide. This directly affects two of
+this ADR's decision points, superseding their specific mechanism (not
+their reasoning):
+
+- **Decision 1** registered the custom Subscription health check in
+  `install.yml` specifically *to run before configure.yml*, reasoning
+  from the old two-pass `make day0|d0 all` (`run_one install && run_one
+  configure`, each a separate full pass over `day0_components`). That
+  two-pass structure no longer exists - `make d0 all` is now `run_one
+  check && run_one install`, a single pass. The health check still must
+  be registered in `argocd`'s `install.yml`, for the same reason
+  (`nfd`/`nvidia_gpu`/`openshift_ai`/`external_secrets` sort after
+  `argocd` in `day0_components` and depend on it existing), just without
+  the now-removed second-pass framing.
+- **Decision 7** kept `postgresql`/`keycloak`'s `Application` apply in
+  `configure.yml`, relying on "`install.yml` (all components) fully
+  precedes `configure.yml` (all components)" for the
+  `external_secrets`-before-`keycloak`/`postgresql` ordering their
+  `ExternalSecret`s depend on. With a single pass, that same ordering is
+  preserved by `day0_components`' existing sequence alone (`vault` →
+  `external_secrets` → `keycloak` → `postgresql`): each role's `install.yml`
+  now runs to full completion, including the `Application` apply, before
+  the next role's `install.yml` starts - no two-phase split needed within
+  the file. The re-discovery `install.yml`/`configure.yml` each used to
+  do independently (because separate `ansible-playbook` processes don't
+  share facts) also collapsed: package/channel selection now happens once
+  per role, reused directly by the apply further down the same file.
+
+Every role's `tasks/install-precheck.yml` and `tasks/configure-precheck.yml`
+(introduced by a still-later, unrelated change than either of the above)
+were likewise merged into a single `tasks/precheck.yml` at the same time,
+for the same reason: there is only one lifecycle state to detect now.
+
 ## Review evidence
 
 Grounded in a direct read of `gitops/apps/README.md`'s exception list,

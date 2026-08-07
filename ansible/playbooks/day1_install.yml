@@ -1,0 +1,31 @@
+---
+# Day 1 (ADR-0056): `make day1 install`/`make d1 install`. See
+# day1_check.yml's header comment for why `models`/`sql_schema`/`mlops`
+# are included alongside the `llm, rag, mcp, agents` your Day 1 spec
+# named.
+- name: "Day 1: install components"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    day1_components:
+      - llm
+      - models
+      - sql_schema
+      - rag
+      - mcp
+      - agents
+      - mlops
+  tasks:
+    - name: Resolve requested Day 1 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day1_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Install Day 1 components
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: install
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

@@ -1,0 +1,61 @@
+---
+# State detection (never fails). argocd bootstraps ArgoCD itself - no
+# Application to check (ADR-0312). "Installed" = the Application CRD is
+# established, the default server Deployment is ready, the RBAC grant
+# exists, the zuno AppProject exists, and the custom Subscription health
+# check (ansible/roles/argocd/tasks/apply_resource_health_checks.yml) is
+# registered on the ArgoCD CR.
+- name: "argocd | look up the Application CRD"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: applications.argoproj.io
+  register: _argocd_crd_lookup
+
+- name: "argocd | look up the default ArgoCD server Deployment"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-gitops
+    name: openshift-gitops-server
+  register: _argocd_server_lookup
+
+- name: "argocd | look up the application-controller ClusterRoleBinding"
+  kubernetes.core.k8s_info:
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: zuno-argocd-application-controller-admin
+  register: _argocd_crb_lookup
+
+- name: "argocd | look up the zuno AppProject"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: AppProject
+    namespace: openshift-gitops
+    name: zuno
+  register: _argocd_appproject_lookup
+
+- name: "argocd | look up the ArgoCD CR's resourceHealthChecks (ADR-0312)"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1beta1
+    kind: ArgoCD
+    namespace: openshift-gitops
+    name: openshift-gitops
+  register: _argocd_cr_lookup
+
+- name: "argocd | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        (_argocd_crd_lookup.resources | default([]) | length) > 0
+        and (_argocd_server_lookup.resources | default([]) | length) > 0
+        and (_argocd_server_lookup.resources[0].status.readyReplicas | default(0)) > 0
+        and (_argocd_crb_lookup.resources | default([]) | length) > 0
+        and (_argocd_appproject_lookup.resources | default([]) | length) > 0
+        and (_argocd_cr_lookup.resources | default([]) | length) > 0
+        and (_argocd_cr_lookup.resources[0].spec.resourceHealthChecks | default([])
+             | selectattr('kind', 'equalto', 'Subscription') | list | length) > 0
+      }}
+
+- name: "argocd | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

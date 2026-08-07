@@ -68,20 +68,19 @@ wave numbering than the four components above, since both charts already
 had their own pre-existing internal wave convention:
 `postgresql`'s new `Subscription` is `"-40"` (before its existing
 `"-35"`/`"-30"`), `keycloak`'s new `Subscription`/`OperatorGroup` is
-`"-25"` (before its existing `"-20"`/`"-15"`/`"-10"`). Their `Application` apply also
-stays in each role's `configure.yml`, not `install.yml` (unlike the four
-above): their `ExternalSecret`s depend on `external_secrets`' own
-`configure.yml` having registered the `vault-backend`
-`ClusterSecretStore` first, and `make day0|d0 all` runs every component's
-`install.yml` before any component's `configure.yml`.
+`"-25"` (before its existing `"-20"`/`"-15"`/`"-10"`). Their `Application`
+apply happens later in each role's `install.yml` than the four above:
+their `ExternalSecret`s depend on `external_secrets` (earlier in
+`day0_components`) having registered the `vault-backend`
+`ClusterSecretStore` first.
 
 Directories present:
 
 | Component | Source |
 |---|---|
 | `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) |
-| `keycloak` | local chart, `gitops/charts/keycloak` (includes the RHBK operator `Subscription`/`OperatorGroup` since ADR-0312 - applied by `configure.yml`, see the `keycloak` role's README) |
-| `postgresql` | local chart, `gitops/charts/postgresql` (includes the PGO operator `Subscription` since ADR-0312 - applied by `configure.yml`, see the `postgresql` role's README) |
+| `keycloak` | local chart, `gitops/charts/keycloak` (includes the RHBK operator `Subscription`/`OperatorGroup` since ADR-0312 - applied by `install.yml`, see the `keycloak` role's README) |
+| `postgresql` | local chart, `gitops/charts/postgresql` (includes the PGO operator `Subscription` since ADR-0312 - applied by `install.yml`, see the `postgresql` role's README) |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` |
 | `rag` | local chart, `gitops/charts/rag-service` |
@@ -94,7 +93,7 @@ Directories present:
 | `nfd` | local chart, `gitops/charts/nfd` (ADR-0312) |
 | `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312; `ClusterPolicy` spec injected in a second apply once discovered - see that chart's README) |
 | `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312) |
-| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312; `ClusterSecretStore`/cluster-domain `ExternalSecret` rendered only once `configure.yml` supplies the discovered Vault Service name - see the `external_secrets` role's README) |
+| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312; `ClusterSecretStore`/cluster-domain `ExternalSecret` rendered only once `install.yml`'s second apply supplies the discovered Vault Service name - see the `external_secrets` role's README) |
 
 `keycloak`, `api` and `vault`'s `Application.spec.source.helm.values`
 reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a
@@ -103,7 +102,7 @@ the real cluster's apps wildcard domain, auto-discovered from
 `Ingress.config.openshift.io/cluster` and persisted to Vault at
 `secret/zuno/platform/cluster-domain` (see
 `ansible/tasks/resolve_cluster_base_domain.yml` and
-`ansible/roles/vault/tasks/configure.yml`) - no manual edit needed before a
+`ansible/roles/vault/tasks/install.yml`) - no manual edit needed before a
 real deployment. `ansible/roles/external_secrets` also exposes that Vault
 value as a `zuno-cluster-domain` Secret in `zuno-ai-run` for any service
 that wants it as a live runtime value rather than a Helm-render-time one

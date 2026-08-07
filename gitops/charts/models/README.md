@@ -13,7 +13,7 @@ what `components/agent-runtime`'s model router expects at
 `values.yaml`'s `image.vllm` is a `helm template`/standalone-testing
 fallback only - it is never trusted for a real deploy. `ansible/roles/models`'s
 `tasks/discover_vllm_image.yml` (included by both `tasks/precheck.yml` and
-`tasks/configure.yml`) discovers the actual vLLM serving-runtime image
+`tasks/install.yml`) discovers the actual vLLM serving-runtime image
 Red Hat OpenShift AI published for the installed cluster/catalog, by
 reading the `Template` objects in `redhat-ods-applications` (the same
 catalog the dashboard's "Serving runtimes" page reads from - `oc get

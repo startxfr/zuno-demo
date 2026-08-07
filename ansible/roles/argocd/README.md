@@ -11,11 +11,11 @@ AppProject before tearing down the operator's own CRDs (per
 `ansible/tasks/remove_operator.yml`), so the explicit delete always runs
 while the CRD is still present.
 
-This role has no `configure` phase (ADR-0311): every other component's
-`configure` step applies its own child Application directly (see
-`ansible/tasks/apply_gitops_app.yml`), which is what turns a bare
-cluster-admin token into a fully configured platform, one component at a
-time.
+This role owns no downstream Application of its own (ADR-0311): every
+other component's `install.yml` applies its own child Application
+directly (see `ansible/tasks/apply_gitops_app.yml`), which is what turns
+a bare cluster-admin token into a fully configured platform, one
+component at a time.
 
 The root App-of-Apps (`gitops/root-app-of-apps.yaml`) still exists in the
 repository as a documented example of a pure-GitOps, Ansible-free bootstrap
@@ -23,4 +23,4 @@ repository as a documented example of a pure-GitOps, Ansible-free bootstrap
 target ever applies it.
 
 Runs first among prerequisite components - see
-`ansible/playbooks/day0_{check,install,configure}.yml`.
+`ansible/playbooks/day0_{check,install}.yml`.

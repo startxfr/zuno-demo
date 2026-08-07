@@ -11,7 +11,7 @@ Kubernetes `Secret` (`vault-bootstrap-credentials`) in a locked-down,
 admin-only namespace (`zuno-data`) rather than requiring any
 external input. See ADR-0024.
 
-`configure.yml` also generates and seeds the secrets that can be
+`install.yml` also generates and seeds the secrets that can be
 self-generated (Keycloak admin, PostgreSQL app credentials) and reserves
 empty placeholders - never overwriting a real value - for the two secrets
 that genuinely require an operator to supply external input: the Google

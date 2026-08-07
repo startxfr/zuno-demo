@@ -59,9 +59,10 @@
 # health check ansible/roles/argocd/tasks/apply_resource_health_checks.yml
 # registers. The Vault-backed ClusterSecretStore and cluster-domain
 # ExternalSecret (waves 30/40) are deliberately left unrendered by this
-# call (vaultServiceName unset - see gitops/charts/external-secrets/
-# values.yaml) and only applied in tasks/configure.yml, once Vault's own
-# configure step has prepared what they depend on.
+# first call (vaultServiceName unset - see gitops/charts/external-secrets/
+# values.yaml) and only applied further below, once the Vault client
+# Service has been discovered - `vault` runs before `external_secrets` in
+# day0_components, so it's already installed and unsealed by this point.
 - name: "external_secrets | apply the external-secrets GitOps Application (operator + operand only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -78,7 +79,7 @@
 # as soon as synced, not once the operand Deployment it triggers is
 # actually ready. Kept as a supplementary explicit wait (same convention
 # ansible/roles/{postgresql,keycloak} use for their own CR-specific
-# readiness): tasks/configure.yml's ClusterSecretStore references the
+# readiness): the ClusterSecretStore applied below references the
 # "external-secrets" ServiceAccount this Deployment's rollout creates.
 - name: "external_secrets | wait for the ESO operand Deployment to be ready"
   kubernetes.core.k8s_info:
@@ -91,4 +92,59 @@
     (_eso_operand_deploy.resources | default([]) | length) > 0 and
     (_eso_operand_deploy.resources[0].status.readyReplicas | default(0)) > 0
   retries: 60
+  delay: 10
+
+    # Discovered, not hardcoded "vault.zuno-data.svc" - the Helm release
+    # name isn't a repository-wide constant, and the chart creates three
+    # Services sharing app.kubernetes.io/name=vault (client, -internal
+    # headless, -ui). Found and fixed a real bug via live-cluster testing
+    # on api.demo222.startx.fr, where a static "vault.zuno-data.svc"
+    # hostname this used to hardcode doesn't exist (the actual Service is
+    # "zuno-vault"), so vault-backend's ClusterSecretStore never became
+    # Ready ("dial tcp: lookup vault.zuno-data.svc ...: no such host").
+- name: "external_secrets | discover the Vault client Service"
+  kubernetes.core.k8s_info:
+    kind: Service
+    namespace: zuno-data
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+  register: _eso_vault_services
+
+- name: "external_secrets | select the client Service (excludes the -internal headless and -ui variants)"
+  ansible.builtin.set_fact:
+    _eso_vault_service_name: >-
+      {{
+        (_eso_vault_services.resources
+         | rejectattr('metadata.labels.vault-internal', 'defined')
+         | map(attribute='metadata.name') | list)[0]
+      }}
+
+# ADR-0312: templates/clustersecretstore.yaml. Reuses the catalog/channel
+# selection already made above - apply_gitops_app.yml's
+# gitops_app_extra_helm_values *replaces* spec.source.helm.values wholesale
+# (ADR-0048), so this second call must re-supply subscriptionChannel/
+# subscriptionCatalogSource alongside the newly discovered
+# vaultServiceName, or the chart would stop rendering its own Subscription.
+- name: "external_secrets | apply the external-secrets GitOps Application (with the Vault-backed ClusterSecretStore)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "external-secrets"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_extra_helm_values:
+      subscriptionChannel: "{{ _eso_channel }}"
+      subscriptionCatalogSource: "{{ _eso_catalog_source }}"
+      vaultServiceName: "{{ _eso_vault_service_name }}"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10
+
+- name: "external_secrets | wait for the ClusterSecretStore to report Valid"
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1beta1
+    kind: ClusterSecretStore
+    name: vault-backend
+  register: _eso_store
+  until: >-
+    (_eso_store.resources | default([]) | length) > 0 and
+    (_eso_store.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+  retries: 30
   delay: 10

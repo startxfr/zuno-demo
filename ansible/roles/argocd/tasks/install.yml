@@ -58,14 +58,10 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/argocd/kustomize/appproject"
 
-# ADR-0312: registered here, in install.yml, rather than configure.yml -
-# `make day0|d0 all` runs every component's install.yml before any
-# component's configure.yml (Makefile's DAY0_RECIPE: `run_one install &&
-# run_one configure`, each a separate full pass over day0_components).
-# nfd/nvidia_gpu/openshift_ai/external_secrets's own install.yml already
-# depends on this health check existing (their first
+# ADR-0312: nfd/nvidia_gpu/openshift_ai/external_secrets's own install.yml
+# already depends on this health check existing (their first
 # apply_gitops_app.yml call waits on a Subscription reporting Healthy),
-# and all four sort after `argocd` in day0_components - registering it in
-# configure.yml would run too late for any of them.
+# and all four sort after `argocd` in day0_components - registering it
+# here, before any of them run, is required.
 - name: "argocd | register the custom resource health checks this repository's charts rely on (ADR-0312)"
   ansible.builtin.include_tasks: apply_resource_health_checks.yml

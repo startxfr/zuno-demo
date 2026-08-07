@@ -1,11 +1,8 @@
 ---
-# Validates the Red Hat build of Keycloak operator's package/channel is
-# resolvable in this cluster's catalog. Does not itself apply anything
-# OLM-related any more (ADR-0312: the Subscription now lives in
-# gitops/charts/keycloak) - tasks/configure.yml re-runs this same
-# discovery (facts don't survive across the separate day0_install.yml/
-# day0_configure.yml playbook runs) immediately before applying the
-# GitOps Application.
+# Discovers the Red Hat build of Keycloak operator's package/channel in
+# this cluster's catalog, then applies the keycloak GitOps Application
+# (ADR-0312: the Subscription lives in gitops/charts/keycloak, not applied
+# directly here).
     # RHBK's CSV only supports OwnNamespace/SingleNamespace install modes
     # (AllNamespaces is explicitly unsupported) - found via live-cluster
     # testing on api.demo222.startx.fr: subscribing it into the shared
@@ -45,8 +42,9 @@
       name on this cluster and update this role's selection.
   when: (_keycloak_pkg_info.resources | default([]) | length) == 0
 
-- name: "keycloak | select the channel to subscribe from"
+- name: "keycloak | select the channel/catalog to subscribe from"
   ansible.builtin.set_fact:
+    _keycloak_catalog_source: "{{ _keycloak_pkg_info.resources[0].status.catalogSource }}"
     _keycloak_channel: >-
       {{
         'stable'
@@ -57,16 +55,71 @@
 - name: "keycloak | fail if no usable channel was found"
   ansible.builtin.fail:
     msg: >-
-      Package 'rhbk-operator' (catalog
-      '{{ _keycloak_pkg_info.resources[0].status.catalogSource }}') has no
-      "stable" channel and no defaultChannel to fall back to. Published
-      channels:
+      Package 'rhbk-operator' (catalog '{{ _keycloak_catalog_source }}')
+      has no "stable" channel and no defaultChannel to fall back to.
+      Published channels:
       {{ _keycloak_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
   when: _keycloak_channel | length == 0
 
-- name: "keycloak | prepare summary"
+- name: "keycloak | discovery summary"
   ansible.builtin.debug:
     msg: >-
-      rhbk-operator is available in the catalog (channel
-      '{{ _keycloak_channel }}') - tasks/configure.yml will apply the
-      keycloak GitOps Application.
+      Subscribing to package 'rhbk-operator', catalog
+      '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
+
+# ADR-0312: templates/{operatorgroup,subscription}.yaml (sync-wave "-25")
+# and the Keycloak CR/ExternalSecrets/RealmImport (sync-waves "-20"
+# through "-10") all live in gitops/charts/keycloak, applied as a single
+# ArgoCD Application here - the later waves are gated on the Subscription
+# reporting Healthy via the custom health check
+# ansible/roles/argocd/tasks/apply_resource_health_checks.yml registers.
+# The ExternalSecrets this Application renders resolve against the
+# vault-backend ClusterSecretStore, which `external_secrets` (earlier in
+# day0_components) has already made Ready by this point.
+- name: "keycloak | apply the keycloak GitOps Application"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "keycloak"
+    gitops_app_name: "zuno-{{ gitops_component_name }}"
+    gitops_app_extra_helm_values:
+      subscriptionChannel: "{{ _keycloak_channel }}"
+      subscriptionCatalogSource: "{{ _keycloak_catalog_source }}"
+    gitops_app_wait_retries: 60
+
+- name: "keycloak | wait for the Keycloak CR to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: k8s.keycloak.org/v2alpha1
+    kind: Keycloak
+    namespace: zuno-auth
+    name: zuno
+  register: _keycloak_cr_status
+  until: >-
+    (_keycloak_cr_status.resources | default([]) | length) > 0 and
+    (_keycloak_cr_status.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+  retries: 60
+  delay: 10
+
+- name: "keycloak | wait for the zuno realm import to report Done"
+  kubernetes.core.k8s_info:
+    api_version: k8s.keycloak.org/v2alpha1
+    kind: KeycloakRealmImport
+    namespace: zuno-auth
+    name: zuno-realm
+  register: _keycloak_realmimport_status
+  until: >-
+    (_keycloak_realmimport_status.resources | default([]) | length) > 0 and
+    (_keycloak_realmimport_status.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Done') | map(attribute='status') | list | first | default('False')) == 'True'
+  retries: 60
+  delay: 10
+
+- name: "keycloak | operator action required if Google federation is still pending"
+  ansible.builtin.debug:
+    msg: >-
+      The realm's "google" identity provider will only complete login flows
+      once secret/zuno/google-oauth/client has real values (see
+      ansible/roles/vault/tasks/install.yml's placeholder-seeding step).
+      Populate it with
+      `vault kv put secret/zuno/google-oauth/client client_id=... client_secret=...`
+      then let the google-oauth-client ExternalSecret resync (or delete the
+      Keycloak pod to pick up the refreshed KC_VAULT_GOOGLE_CLIENT_* env
+      vars) - no keycloak role step depends on this to complete.

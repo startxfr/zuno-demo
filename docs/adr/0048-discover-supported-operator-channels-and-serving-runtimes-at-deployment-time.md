@@ -38,7 +38,7 @@ own Context names by name.
 **Serving-runtime image** (`quay.io/modh/vllm:rhoai-2.16-cuda`):
 `ansible/roles/models/tasks/discover_vllm_image.yml` (a shared task,
 included by both `tasks/precheck.yml` for early visibility and
-`tasks/configure.yml`, since separate `ansible-playbook` runs don't share
+`tasks/install.yml`, since separate `ansible-playbook` runs don't share
 facts) lists the `Template` objects OpenShift AI publishes in
 `redhat-ods-applications` (the same catalog the dashboard's own "Serving
 runtimes" page reads from), selects the one naming "vllm", extracts the

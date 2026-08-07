@@ -26,21 +26,36 @@
       provisioner-specific parameters here, since they vary per cluster).
   when: (_admin_context_storageclasses.resources | default([]) | length) == 0
 
-# ADR-0310: PriorityClass definitions live once in
-# ansible/roles/admin_context/kustomize/priorityclasses/, referenced from
-# both this file and configure.yml, instead of being duplicated inline.
+# ADR-0310: PriorityClass definitions live in
+# ansible/roles/admin_context/kustomize/priorityclasses/ rather than being
+# hand-inlined here.
 - name: "admin_context | apply the PriorityClasses"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
 
 # The zuno AppProject is applied by the argocd role's own install.yml, not
-# here or in this role's configure.yml: its CRD (appprojects.argoproj.io)
-# doesn't exist until that role's install.yml has subscribed the GitOps
-# operator and it has reconciled, and admin_context runs before argocd in
-# the Day 0 sequence.
+# here: its CRD (appprojects.argoproj.io) doesn't exist until that role's
+# install.yml has subscribed the GitOps operator and it has reconciled,
+# and admin_context runs before argocd in the Day 0 sequence.
+#
+# The zuno-argocd-application-controller-admin ClusterRoleBinding lookup
+# below is a consolidation/visibility point, not a new grant - admin_context
+# runs first in the Day 0 sequence (before argocd even installs the
+# operator), so on a fresh cluster this binding legitimately does not
+# exist yet the first time this role runs; that is expected, not an error.
+- name: "admin_context | look up the ArgoCD application-controller ClusterRoleBinding"
+  kubernetes.core.k8s_info:
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: zuno-argocd-application-controller-admin
+  register: _admin_context_argocd_crb
+
 - name: "admin_context | prepare summary"
   ansible.builtin.debug:
     msg: >-
       {{ _admin_context_storageclasses.resources | length }} StorageClass(es)
-      found; zuno-platform-critical/zuno-workload-default PriorityClasses applied.
+      found; zuno-platform-critical/zuno-workload-default PriorityClasses
+      applied. zuno-argocd-application-controller-admin ClusterRoleBinding:
+      {{ 'present (created by the argocd role)' if (_admin_context_argocd_crb.resources | default([]) | length) > 0
+         else 'not present yet - expected before `make d0 install argocd` has run once' }}.

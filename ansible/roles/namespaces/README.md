@@ -10,15 +10,14 @@ checkable step rather than only ever happening as a side effect of
 deploying the Tekos workloads. (`gitops/apps/agents` is a stale, orphaned
 directory left over from before this move - nothing applies it any more.)
 
-- `install-precheck.yml`/`configure-precheck.yml` - state detection,
-  never fail: check the `zuno-namespaces` Application's Synced+Healthy
-  status, setting `namespaces_state_installed`/`_state_configured` and a
-  line in the shared `/tmp` state report (see
-  `ansible/playbooks/day0_check.yml`).
-- `install.yml` - applies the GitOps Application.
-- `configure.yml` - re-applies the same Application (idempotent - for an
-  explicit on-demand re-sync after a `values.yaml` change, since ArgoCD's
-  own `selfHeal: true` already reconciles continuously on its own cycle).
+- `precheck.yml` - state detection, never fails: checks the
+  `zuno-namespaces` Application's Synced+Healthy status, setting
+  `namespaces_state_installed` and a line in the shared `/tmp` state
+  report (see `ansible/playbooks/day0_check.yml`).
+- `install.yml` - applies the GitOps Application (idempotent - ArgoCD's
+  own `selfHeal: true` also reconciles continuously on its own cycle, but
+  re-running this role gives an explicit on-demand re-sync after a
+  `values.yaml` change).
 
 `ansible/roles/agents` still exists and still applies the `api` (Tekos
 workloads) Application - it no longer applies this one.

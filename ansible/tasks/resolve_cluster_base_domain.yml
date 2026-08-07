@@ -6,11 +6,11 @@
 # a single playbook run via the `is not defined` guard, so every include
 # site (apply_gitops_app.yml, the vault role, the agents role's smoke
 # check) can safely call this without worrying about duplicate API calls or
-# about which scope happened to run first in a given `make configure`
+# about which scope happened to run first in a given `make install`
 # invocation.
 #
 # The discovered value is also persisted to Vault (see
-# ansible/roles/vault/tasks/configure.yml) so that anything without direct
+# ansible/roles/vault/tasks/install.yml) so that anything without direct
 # cluster API access - a pod consuming it via an ExternalSecret, a future
 # out-of-band script - has one durable place to read it from instead of a
 # second, potentially stale, hardcoded copy. This task only ever discovers
