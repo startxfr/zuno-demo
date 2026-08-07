@@ -1,4 +1,5 @@
 ---
+zuno_keycloak_google_oauth_enabled: false
 zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 

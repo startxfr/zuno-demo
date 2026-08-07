@@ -94,6 +94,22 @@
 # which `external_secrets` (earlier in day0_components) has already made
 # Ready by this point.
 #
+# Optional read, unlike ansible/roles/vault/tasks/install.yml's hard
+# `fail` on a missing confidential.yml: this role stays independently
+# runnable without it (ansible/README.md's "single component remains
+# independently runnable" convention) - a missing file just means
+# zuno_keycloak_google_oauth_enabled stays undefined, defaulting to true
+# (today's existing behavior) below.
+- name: "keycloak | check for ansible/confidential.yml (optional, only for the googleOAuth.enabled flag)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _keycloak_confidential_file
+
+- name: "keycloak | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _keycloak_confidential_file.stat.exists
+
 # apply_gitops_app.yml's gitops_app_extra_helm_values *replaces*
 # spec.source.helm.values wholesale (ADR-0048) rather than merging with
 # gitops/apps/keycloak/application-d1.yaml's own checked-in values - so
@@ -113,6 +129,8 @@
       keycloak:
         enabled: true
       clusterBaseDomain: "{{ cluster_base_domain }}"
+      googleOAuth:
+        enabled: "{{ zuno_keycloak_google_oauth_enabled | default(true) | bool }}"
     gitops_app_wait_retries: 60
 
 - name: "keycloak | wait for the Keycloak CR to report Ready"
@@ -154,3 +172,4 @@
       then let the google-oauth-client ExternalSecret resync (or delete the
       Keycloak pod to pick up the refreshed KC_VAULT_GOOGLE_CLIENT_* env
       vars) - no keycloak role step depends on this to complete.
+  when: zuno_keycloak_google_oauth_enabled | default(true) | bool

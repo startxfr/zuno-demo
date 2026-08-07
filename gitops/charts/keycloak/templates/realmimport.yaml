@@ -13,6 +13,20 @@
 # rootUrl resolve to the real cluster's apps domain without hand-editing the
 # JSON per environment.
 {{- $realmRaw := .Files.Get "files/realm-zuno.json" | replace "apps.mycluster.example.com" .Values.clusterBaseDomain }}
+{{- $realm := $realmRaw | fromJson }}
+{{- /* .Values.googleOAuth.enabled (default true - see values.yaml) lets an
+   environment without real Google OAuth credentials disable the realm's
+   "google" identity provider instead of leaving google-oauth-client's
+   ExternalSecret in permanent error - flips the IdP's own enabled field
+   rather than removing the entry, so re-enabling later is a one-value
+   change. */}}
+{{- if not .Values.googleOAuth.enabled }}
+{{- range $idp := $realm.identityProviders }}
+{{- if eq $idp.alias "google" }}
+{{- $_ := set $idp "enabled" false }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: KeycloakRealmImport
 metadata:
@@ -27,5 +41,5 @@ metadata:
 spec:
   keycloakCRName: {{ .Values.keycloakCRName }}
   realm:
-{{ $realmRaw | fromJson | toYaml | indent 4 }}
+{{ $realm | toYaml | indent 4 }}
 {{- end }}
