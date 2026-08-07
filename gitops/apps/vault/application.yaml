@@ -27,17 +27,8 @@ spec:
     path: gitops/charts/vault
     helm:
       values: |
-        # Off by default (ADR-0024: Vault is locked-down/admin-only) -
-        # flip to true to front the vault-ui Service with an OpenShift
-        # Route at vault.<clusterBaseDomain>. clusterBaseDomain itself is
-        # substituted below regardless, so enabling the route later is a
-        # one-line change.
         route:
-          enabled: false
-        # apps.mycluster.example.com is substituted by
-        # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
-        # wildcard domain (see gitops/charts/keycloak's Application for
-        # the same convention) - only consumed if route.enabled is true.
+          enabled: true
         global:
           clusterBaseDomain: apps.mycluster.example.com
   destination:
