@@ -18,6 +18,7 @@ spec:
     targetRevision: main
     path: gitops/charts/cert-manager
     helm:
+      releaseName: zuno-cert-manager-d1
       values: |
         certmanager:
           enabled: true

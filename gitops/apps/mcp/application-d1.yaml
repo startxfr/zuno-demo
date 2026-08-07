@@ -16,6 +16,8 @@ spec:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
     path: gitops/charts/mcp-gateway
+    helm:
+      releaseName: zuno-mcp-d1
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

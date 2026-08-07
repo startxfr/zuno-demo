@@ -19,6 +19,7 @@ spec:
     targetRevision: main
     path: gitops/charts/external-secrets
     helm:
+      releaseName: zuno-external-secrets-d1
       values: |
         clusterSecretStore:
           enabled: true

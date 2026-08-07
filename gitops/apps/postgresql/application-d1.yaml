@@ -20,6 +20,7 @@ spec:
     targetRevision: main
     path: gitops/charts/postgresql
     helm:
+      releaseName: zuno-postgresql-d1
       values: |
         postgresCluster:
           enabled: true

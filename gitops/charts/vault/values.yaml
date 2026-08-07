@@ -1,7 +1,8 @@
 # Default values for the vault wrapper chart. See
 # gitops/apps/vault/application-d1.yaml for how this is deployed
-# (namespace: zuno-vault, Application/release name fixed to "zuno-vault" -
-# see ansible/roles/vault/tasks/prepare.yml's gitops_app_name comment).
+# (namespace: zuno-vault, release name fixed to "zuno-vault" via that
+# Application's spec.source.helm.releaseName - the Application's own name
+# is the static "zuno-vault-d1" instead, see that file's own comment).
 
 # Cluster-specific values (clusterBaseDomain) must be overridden per
 # environment when route.enabled=true - see

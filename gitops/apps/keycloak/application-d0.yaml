@@ -25,6 +25,7 @@ spec:
     targetRevision: main
     path: gitops/charts/keycloak
     helm:
+      releaseName: zuno-keycloak-d0
       values: |
         namespace: zuno-auth
         operator:

@@ -25,6 +25,7 @@ spec:
     targetRevision: main
     path: gitops/charts/postgresql
     helm:
+      releaseName: zuno-postgresql-d0
       values: |
         operator:
           enabled: true

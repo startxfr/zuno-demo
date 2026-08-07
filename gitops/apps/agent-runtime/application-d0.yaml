@@ -17,6 +17,8 @@ spec:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
     path: gitops/charts/noop
+    helm:
+      releaseName: zuno-agent-runtime-d0
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-gitops

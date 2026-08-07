@@ -17,6 +17,7 @@ spec:
     targetRevision: main
     path: gitops/charts/nfd
     helm:
+      releaseName: zuno-nfd-d1
       values: |
         cluster-nfd:
           nfd:

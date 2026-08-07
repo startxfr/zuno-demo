@@ -19,6 +19,8 @@ spec:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
     path: gitops/charts/namespaces
+    helm:
+      releaseName: zuno-namespaces-d0
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

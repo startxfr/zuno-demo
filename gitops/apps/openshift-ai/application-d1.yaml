@@ -18,6 +18,7 @@ spec:
     targetRevision: main
     path: gitops/charts/openshift-ai
     helm:
+      releaseName: zuno-openshift-ai-d1
       values: |
         cluster-ods:
           DataScienceCluster:

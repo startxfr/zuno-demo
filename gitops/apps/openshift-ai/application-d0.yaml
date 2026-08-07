@@ -29,6 +29,7 @@ spec:
     targetRevision: main
     path: gitops/charts/openshift-ai
     helm:
+      releaseName: zuno-openshift-ai-d0
       values: |
         cluster-ods:
           project:

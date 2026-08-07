@@ -23,6 +23,7 @@ spec:
     targetRevision: main
     path: gitops/charts/nvidia-gpu
     helm:
+      releaseName: zuno-nvidia-gpu-d1
       values: |
         cluster-gpu:
           gpu:

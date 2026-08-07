@@ -22,6 +22,7 @@ spec:
     targetRevision: main
     path: gitops/charts/tekos
     helm:
+      releaseName: zuno-api-d1
       values: |
         global:
           # Substituted by ansible/tasks/apply_gitops_app.yml - see

@@ -18,6 +18,8 @@ spec:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
     path: gitops/charts/mcp-sales-db
+    helm:
+      releaseName: zuno-mcp-sales-db-d1
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

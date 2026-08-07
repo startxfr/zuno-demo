@@ -24,6 +24,7 @@ spec:
     targetRevision: main
     path: gitops/charts/cert-manager
     helm:
+      releaseName: zuno-cert-manager-d0
       values: |
         cluster-certmanager:
           project:

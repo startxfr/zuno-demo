@@ -20,6 +20,7 @@ spec:
     targetRevision: main
     path: gitops/charts/smtp
     helm:
+      releaseName: zuno-smtp-d1
       values: |
         credentials:
           enabled: true
