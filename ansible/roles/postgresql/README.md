@@ -86,9 +86,13 @@ names and Secret conventions), not a config tweak.
     `CREATE EXTENSION IF NOT EXISTS timescaledb;` via
     `spec.databaseInitSQL` referencing a `ConfigMap`.
 
-Then waits for the `PostgresCluster`'s `Progressing` condition to report
-`False` (PGO's documented rollout-complete signal - not CNPG's single
-`status.phase` string).
+Then waits for `status.instances[].readyReplicas` to match `.replicas`
+(summed across every instance set) plus the `ProxyAvailable` condition -
+PGO 5.8.8 does not set a `Progressing` condition at all once a cluster is
+stable, confirmed live on `api.demo222.startx.fr`, unlike CNPG's single
+`status.phase` string or what Crunchy's own admin-tasks tutorial
+documents (`kubectl wait --for=condition=Progressing=False`, which never
+matches on this version).
 
 ## pgvector and TimescaleDB
 
@@ -128,8 +132,6 @@ researched from Crunchy's own documentation but not exercised end to end:
   publishes PGO under (`install.yml`'s fuzzy `/crunchy/i` discovery - see
   above - handles whatever it turns out to be, but the specific values
   were not confirmed from this environment).
-- The `PostgresCluster.status.conditions` `Progressing` condition's exact
-  semantics on the installed PGO version (`install.yml`'s `until`).
 - Whether `spec.databaseInitSQL` runs against the `zuno` database as
   intended, or a different default database (see
   `templates/postgrescluster.yaml`'s own comment for the manual fallback

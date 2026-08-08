@@ -215,13 +215,18 @@
           region: "{{ zuno_postgresql_backup_s3_region | default('') }}"
     gitops_app_wait_retries: 60
 
-# PGO's documented readiness signal (see
-# https://access.crunchydata.com/documentation/postgres-operator/latest/tutorials/cluster-management/administrative-tasks,
-# "kubectl wait postgrescluster prod --for=condition=Progressing=False"):
-# unlike CNPG's single status.phase string, PGO reports a "Progressing"
-# condition that goes False once the rollout is complete. Not verified
-# against a live cluster in this environment - if the condition type/
-# semantics differ on the installed PGO version, adjust this `until`.
+# PGO 5.8.8 does NOT set a "Progressing" condition once a PostgresCluster
+# is stable - confirmed live on api.demo222.startx.fr (2026-08-08): a
+# fully healthy, fully-rolled-out cluster's status.conditions only ever
+# contained PGBackRestRepoHostReady/PGBackRestReplicaRepoReady/
+# PGBackRestReplicaCreate/ProxyAvailable, no "Progressing" entry at all -
+# the documented `kubectl wait --for=condition=Progressing=False` approach
+# (Crunchy's own admin-tasks tutorial) never matches on this version, so
+# the original `until` here span its full retry budget on an already-
+# healthy cluster. Compare status.instances[].readyReplicas against
+# .replicas instead (summed across every instance set, for multi-instance
+# HA) plus ProxyAvailable, both directly observed to reflect real rollout
+# state on this PGO version.
 - name: "postgresql | wait for the zuno-postgresql PostgresCluster to finish rolling out"
   kubernetes.core.k8s_info:
     api_version: postgres-operator.crunchydata.com/v1beta1
@@ -231,12 +236,19 @@
   register: _postgresql_cluster
   until: >-
     (_postgresql_cluster.resources | default([]) | length) > 0 and
+    (_postgresql_cluster.resources[0].status.instances | default([]) | length) > 0 and
+    (_postgresql_cluster.resources[0].status.instances | map(attribute='readyReplicas', default=0) | sum) ==
+    (_postgresql_cluster.resources[0].status.instances | map(attribute='replicas', default=0) | sum) and
     (_postgresql_cluster.resources[0].status.conditions | default([])
-     | selectattr('type', 'equalto', 'Progressing') | map(attribute='status') | list
-     | first | default('True')) == 'False'
+     | selectattr('type', 'equalto', 'ProxyAvailable') | map(attribute='status') | list
+     | first | default('False')) == 'True'
   retries: 60
   delay: 10
 
 - name: "postgresql | configure summary"
   ansible.builtin.debug:
-    msg: "zuno-postgresql PostgresCluster has finished rolling out in the zuno-data namespace (1 instance, demo scope - see ADR-0101 for v1 HA)."
+    msg: >-
+      zuno-postgresql PostgresCluster has finished rolling out in the
+      zuno-data namespace
+      ({{ _postgresql_cluster.resources[0].status.instances | map(attribute='replicas', default=0) | sum }}
+      instance(s), PgBouncer in front).
