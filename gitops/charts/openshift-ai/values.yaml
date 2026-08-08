@@ -94,10 +94,10 @@ cluster-ods:
         kserve:
           managementState: Managed
           serving:
-            managementState: Removed
+            managementState: Managed
         workbenches:
           managementState: Removed
         dashboard:
           managementState: Managed
         modelmeshserving:
-          managementState: Removed
+          managementState: Managed
