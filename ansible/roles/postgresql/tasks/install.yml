@@ -149,24 +149,17 @@
               name: "{{ _postgresql_catalog_source }}"
     gitops_app_wait_retries: 60
 
-# Crunchy's own operand images don't bundle pgvector (open upstream issue
-# CrunchyData/postgres-operator#3706) - gitops/charts/postgresql/image/
-# Dockerfile layers it on via RPM. Built on-cluster the same way every
-# other component's image is (ansible/tasks/apply_openshift_build.yml,
-# ADR-0056), the one difference being the Dockerfile's FROM pulls from
-# registry.developers.crunchydata.com (zuno_crunchydata_registry_uri
-# below, defaulting to that host), which requires a free Crunchy Data
-# developer account even just to pull - so this build additionally needs
-# a base-image pull Secret, sourced from ansible/confidential.yml
-# (zuno_crunchydata_registry_username/_password) the same way
-# google-oauth/smtp/confluence credentials are. Soft-read, keycloak-role
-# style (ansible/roles/keycloak/tasks/install.yml) - not vault's hard
-# fail: postgresql stays independently runnable per ansible/README.md's
-# design principle even without this credential set up yet; the
-# PostgresCluster applied below just sits ImagePullBackOff either way
-# until an image exists, same as it does today - failing this role
-# outright over a missing image credential would only block the
-# (unrelated) OLM Subscription work above, for no benefit.
+# PGO 5.8.8's own operand image bundles pgvector 0.8.2 and TimescaleDB -
+# no custom image/build needed (UNVERIFIED - confirm once the cluster is
+# reachable: `SELECT extname, extversion FROM pg_extension;` once
+# connected). templates/postgrescluster.yaml omits spec.image entirely so
+# PGO picks its own default operand image for the installed version, no
+# separate registry credentials required.
+#
+# Soft-read of ansible/confidential.yml (keycloak-role style, not vault's
+# hard fail - postgresql stays independently runnable per
+# ansible/README.md's design principle) - needed below for the optional
+# S3 pgBackRest backup repo credentials.
 - name: "postgresql | check for ansible/confidential.yml"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
@@ -177,34 +170,30 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _postgresql_confidential_file.stat.exists
 
-- name: "postgresql | build the pgvector-enabled image (skipped if Crunchy Data credentials aren't set)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
-  vars:
-    build_image_name: postgresql-pgvector
-    build_dockerfile_path: Dockerfile
-    build_context_dir: gitops/charts/postgresql/image
-    build_pull_secret_registry: "{{ zuno_crunchydata_registry_uri | default('registry.developers.crunchydata.com') }}"
-    build_pull_secret_username: "{{ zuno_crunchydata_registry_username | default('') }}"
-    build_pull_secret_password: "{{ zuno_crunchydata_registry_password | default('') }}"
-  when: >-
-    (zuno_crunchydata_registry_username | default('xxxxxx') != 'xxxxxx')
-    and (zuno_crunchydata_registry_password | default('xxxxxx') != 'xxxxxx')
+# Only add the S3 pgBackRest repo when real credentials exist - never
+# rendered half-configured (same guard pattern as keycloak's
+# googleOAuth.enabled). ansible/roles/vault/tasks/install.yml seeds the
+# same five fields into Vault under the same condition.
+- name: "postgresql | determine whether S3 backup credentials are configured"
+  ansible.builtin.set_fact:
+    _postgresql_backup_s3_enabled: >-
+      {{
+        (zuno_postgresql_backup_s3_bucket | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_region | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_access_key | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx')
+      }}
 
-- name: "postgresql | warn if Crunchy Data credentials are missing"
+- name: "postgresql | note that the S3 backup repo is not configured"
   ansible.builtin.debug:
     msg: >-
-      zuno_crunchydata_registry_username/zuno_crunchydata_registry_password
-      are not set in ansible/confidential.yml - skipping the on-cluster
-      build of the pgvector-enabled image. The zuno-postgresql
-      PostgresCluster applied below will sit in ImagePullBackOff until
-      image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgresql-pgvector:latest
-      exists - register a free account at
-      https://www.crunchydata.com/developers/download-postgres/containers,
-      add those two fields to ansible/confidential.yml, and re-run
-      `make d0 install postgresql`.
-  when: >-
-    not ((zuno_crunchydata_registry_username | default('xxxxxx') != 'xxxxxx')
-         and (zuno_crunchydata_registry_password | default('xxxxxx') != 'xxxxxx'))
+      zuno_postgresql_backup_s3_* fields are not all set in
+      ansible/confidential.yml - the zuno-postgresql PostgresCluster will
+      only get the local PVC backup repo (repo1). Fill in the bucket/
+      endpoint/region/access_key/secret_key fields and re-run
+      `make d0 install postgresql` to add the off-cluster S3 repo (repo2).
+  when: not (_postgresql_backup_s3_enabled | bool)
 
 # templates/postgrescluster.yaml (postgresCluster.enabled) lives in the
 # same chart, applied via the separate zuno-postgresql-d1 Application,
@@ -218,6 +207,12 @@
     gitops_app_extra_helm_values:
       postgresCluster:
         enabled: true
+      backups:
+        s3:
+          enabled: "{{ _postgresql_backup_s3_enabled | bool }}"
+          bucket: "{{ zuno_postgresql_backup_s3_bucket | default('') }}"
+          endpoint: "{{ zuno_postgresql_backup_s3_endpoint | default('') }}"
+          region: "{{ zuno_postgresql_backup_s3_region | default('') }}"
     gitops_app_wait_retries: 60
 
 # PGO's documented readiness signal (see

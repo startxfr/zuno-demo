@@ -28,36 +28,106 @@ metadata:
 spec:
   postgresVersion: {{ .Values.postgresVersion }}
 
-  # Crunchy's own UBI-based operand image + pgvector, built by
-  # gitops/charts/postgresql/image/Dockerfile - PGO does not bundle
-  # pgvector out of the box either (see image/README.md).
-  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  # Tells PGO to apply OpenShift-SCC-friendly pod/container security
+  # context conventions to the instances it manages.
+  openshift: true
+
+  # TimescaleDB needs shared_preload_libraries (pgvector doesn't) - paired
+  # with the CREATE EXTENSION statements in templates/configmap-init-sql.yaml
+  # (spec.databaseInitSQL below).
+  config:
+    parameters:
+      shared_preload_libraries: "timescaledb"
+      max_connections: "{{ .Values.config.maxConnections }}"
+      log_min_duration_statement: "{{ .Values.config.logMinDurationStatement }}"
 
   instances:
     - name: instance1
       replicas: {{ .Values.cluster.instances }}
+      resources:
+        requests:
+          cpu: {{ .Values.cluster.resources.requests.cpu | quote }}
+          memory: {{ .Values.cluster.resources.requests.memory | quote }}
+        limits:
+          cpu: {{ .Values.cluster.resources.limits.cpu | quote }}
+          memory: {{ .Values.cluster.resources.limits.memory | quote }}
       dataVolumeClaimSpec:
+        storageClassName: {{ .Values.cluster.storageClassName }}
         accessModes:
           - "ReadWriteOnce"
         resources:
           requests:
             storage: {{ .Values.cluster.storageSize }}
+      # Separate volume for WAL - particularly useful under TimescaleDB's
+      # typically high ingestion rate, which is sensitive to WAL write
+      # latency.
+      walVolumeClaimSpec:
+        storageClassName: {{ .Values.cluster.storageClassName }}
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.cluster.walStorageSize }}
+
+  # PGO-managed PgBouncer (transaction pooling) in front of the instances
+  # above - see ansible/roles/postgresql/README.md's "Connecting to this
+  # cluster" for the resulting Service name consumers should use.
+  proxy:
+    pgBouncer:
+      replicas: {{ .Values.pgBouncer.replicas }}
+      resources:
+        requests:
+          cpu: {{ .Values.pgBouncer.resources.requests.cpu | quote }}
+          memory: {{ .Values.pgBouncer.resources.requests.memory | quote }}
+        limits:
+          cpu: {{ .Values.pgBouncer.resources.limits.cpu | quote }}
+          memory: {{ .Values.pgBouncer.resources.limits.memory | quote }}
+      config:
+        global:
+          pool_mode: {{ .Values.pgBouncer.poolMode | quote }}
+          max_client_conn: {{ .Values.pgBouncer.maxClientConn | quote }}
+          default_pool_size: {{ .Values.pgBouncer.defaultPoolSize | quote }}
 
   # PGO requires at least one pgBackRest repo - unlike CNPG there is no
-  # way to omit backups entirely. A single local PVC-backed repo is the
-  # minimal equivalent of this demo's "HA/backup hardening deferred to
-  # v1" scope (ADR-0101), not a real off-cluster backup destination.
+  # way to omit backups entirely. repo1 (local PVC) always exists; repo2
+  # (S3-compatible, off-cluster) is added only once real credentials are
+  # configured (values.yaml's backups.s3.enabled) - see
+  # templates/externalsecret-backup-s3.yaml for where its Secret comes
+  # from. UNVERIFIED: the repos[].s3/configuration shape below is
+  # reconstructed from Crunchy's general pgBackRest S3 documentation, not
+  # confirmed against the PGO 5.8.8 CRD installed on a live cluster -
+  # confirm with `oc explain postgrescluster.spec.backups.pgbackrest
+  # --recursive` and adjust if it differs.
   backups:
     pgbackrest:
+      global:
+        repo1-retention-full: "4"
+        repo1-retention-full-type: count
       repos:
         - name: repo1
+          schedules:
+            full: "0 2 * * 0"
+            differential: "0 2 * * 1-6"
           volume:
             volumeClaimSpec:
+              storageClassName: {{ .Values.cluster.storageClassName }}
               accessModes:
                 - "ReadWriteOnce"
               resources:
                 requests:
                   storage: {{ .Values.backups.storageSize }}
+{{- if .Values.backups.s3.enabled }}
+        - name: repo2
+          schedules:
+            full: "0 3 * * 0"
+          s3:
+            bucket: {{ .Values.backups.s3.bucket | quote }}
+            endpoint: {{ .Values.backups.s3.endpoint | quote }}
+            region: {{ .Values.backups.s3.region | quote }}
+      configuration:
+        - secret:
+            name: {{ .Values.backups.s3.secretName }}
+{{- end }}
 
   # Creates the zuno database owned by {{ .Values.cluster.owner }}, and (via the
   # "bring your own password" mechanism - PGO >= 5.6) adopts the password

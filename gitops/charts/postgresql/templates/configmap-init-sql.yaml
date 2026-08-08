@@ -1,7 +1,10 @@
 {{- if .Values.postgresCluster.enabled }}
 # Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL -
 # PGO runs this once at cluster bootstrap, per Crunchy's own Extension
-# Management guide's documented pattern for adding pgvector this way.
+# Management guide's documented pattern for adding extensions this way.
+# TimescaleDB additionally needs shared_preload_libraries=timescaledb
+# (spec.config.parameters in postgrescluster.yaml) - CREATE EXTENSION
+# alone isn't enough for it, unlike pgvector.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,4 +17,5 @@ metadata:
 data:
   init.sql: |
     CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
 {{- end }}

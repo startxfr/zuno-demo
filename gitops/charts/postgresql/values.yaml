@@ -1,7 +1,6 @@
 # Default values for the postgresql chart. See gitops/apps/postgresql/
 # application-d0.yaml/application-d1.yaml for how this is deployed
-# (namespace: zuno-data) and gitops/charts/postgresql/image/README.md for
-# the pgvector image build step.
+# (namespace: zuno-data).
 
 # This chart is shared by two ArgoCD Applications (see
 # gitops/apps/README.md): operator.enabled (zuno-postgresql-d0) renders
@@ -59,27 +58,35 @@ operator:
         name: ""
         namespace: openshift-marketplace
 
-postgresVersion: 16
+postgresVersion: 18
 
-image:
-  # Built from gitops/charts/postgresql/image/Dockerfile (Crunchy's own
-  # UBI-based operand image + pgvector, since PGO does not bundle pgvector
-  # out of the box either - see image/README.md) on-cluster by
-  # ansible/roles/postgresql/tasks/install.yml via
-  # ansible/tasks/apply_openshift_build.yml - the same zuno-ai-build
-  # BuildConfig/ImageStream mechanism every other component's image uses
-  # (ADR-0056), not a placeholder anymore. Needs Crunchy Data developer
-  # credentials in ansible/confidential.yml (the Dockerfile's FROM pulls
-  # from an authenticated registry) - see image/README.md.
-  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgresql-pgvector
-  tag: latest
+# No image: override - PGO 5.8.8's own default operand image for the
+# postgresVersion above already bundles pgvector 0.8.2 and supports
+# TimescaleDB (UNVERIFIED - confirm once the cluster is reachable, see
+# ansible/roles/postgresql/README.md's "What's unverified" section).
+# Letting PGO pick its own certified image (accessible via the cluster's
+# existing global pull secret) avoids needing any separate registry
+# credentials - templates/postgrescluster.yaml omits spec.image entirely.
 
 cluster:
   name: zuno-postgresql
-  # Demo scope: single instance, no automatic failover. ADR-0101 (v1,
-  # Proposed) tracks HA for shared agent-platform services.
-  instances: 1
-  storageSize: 5Gi
+  # HA: 3 Patroni replicas (1 primary + 2 async replicas), PGO/Patroni
+  # handle automatic failover.
+  instances: 3
+  # UNVERIFIED - confirm this StorageClass exists on the target cluster
+  # (`oc get storageclass`) and adjust if not.
+  storageClassName: ocs-storagecluster-ceph-rbd
+  storageSize: 200Gi
+  # Separate volume for WAL - write latency matters more for WAL than for
+  # DATA, particularly under TimescaleDB's typically high ingestion rate.
+  walStorageSize: 50Gi
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      cpu: "4"
+      memory: 16Gi
   database: zuno
   # No underscore/hyphen: PGO derives a Kubernetes Secret name directly
   # from this value ("<cluster>-pguser-<owner>", RFC 1123 label rules),
@@ -88,13 +95,48 @@ cluster:
   # ansible/roles/postgresql/README.md).
   owner: zunoapp
 
+# TimescaleDB must be preloaded (unlike pgvector, which needs no
+# shared_preload_libraries entry) - see templates/configmap-init-sql.yaml
+# for the CREATE EXTENSION statements this pairs with.
+config:
+  maxConnections: "200"
+  logMinDurationStatement: "1000"
+
+# PgBouncer in front of the 3 instances (transaction pooling) - PGO
+# manages it natively (spec.proxy.pgBouncer). Consumers connect to the
+# <cluster>-pgbouncer Service rather than -primary directly, see
+# ansible/roles/postgresql/README.md's "Connecting to this cluster".
+pgBouncer:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  poolMode: transaction
+  maxClientConn: "500"
+  defaultPoolSize: "50"
+
 # PGO requires at least one pgBackRest repository configured - unlike
-# CNPG, there is no way to omit backups entirely. A single local
-# PVC-backed repo is the minimal equivalent of this demo's "HA/backup
-# hardening deferred to v1" scope (ADR-0101) rather than a real off-cluster
-# backup destination.
+# CNPG, there is no way to omit backups entirely. repo1 is always a local
+# PVC; repo2 (S3-compatible, off-cluster) is added only once real
+# credentials exist in ansible/confidential.yml (backups.s3.enabled,
+# set via gitops_app_extra_helm_values by ansible/roles/postgresql/tasks/
+# install.yml - never rendered half-configured, same guard pattern as
+# keycloak's googleOAuth.enabled).
 backups:
-  storageSize: 5Gi
+  storageSize: 500Gi
+  s3:
+    enabled: false
+    bucket: ""
+    endpoint: ""
+    region: ""
+    # Secret (pgBackRest "s3.conf" style) synced from Vault by
+    # templates/externalsecret-backup-s3.yaml - only rendered/referenced
+    # when s3.enabled is true.
+    secretName: zuno-postgresql-backup-s3
 
 credentials:
   # Path under the vault-backend ClusterSecretStore's "zuno" KV v2 mount

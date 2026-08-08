@@ -2,9 +2,9 @@
 
 Applies the `gitops/apps/postgresql` ArgoCD Application (ADR-0312), whose
 chart (`gitops/charts/postgresql`) installs the Crunchy Postgres Operator
-(PGO, OLM `Subscription`, sync-wave `"-40"`) and a single-instance
-PostgreSQL `PostgresCluster` (sync-wave `"-30"`) that bootstraps the
-`zuno` database owned by the `zunoapp` role. Implements ADR-0015 ("Use
+(PGO, OLM `Subscription`, sync-wave `"-40"`) and a 3-instance, PgBouncer-
+fronted PostgreSQL `PostgresCluster` (sync-wave `"-30"`) that bootstraps
+the `zuno` database owned by the `zunoapp` role. Implements ADR-0015 ("Use
 PostgreSQL and pgvector as the persistent data platform") - that ADR
 never named a specific operator. Previously applied the Subscription
 directly via `ansible/tasks/apply_kustomize.yml` (ADR-0310); converted to
@@ -77,45 +77,42 @@ names and Secret conventions), not a config tweak.
     underscores, and unquoted PostgreSQL identifiers can't contain
     hyphens either, so a name valid in both had to drop the separator
     entirely);
-  - a `PostgresCluster` (1 instance - demo scope; ADR-0101 tracks HA for
-    v1) with 5Gi storage, one local PVC-backed pgBackRest repo (PGO
-    requires at least one - there's no way to omit backups entirely,
-    unlike CNPG), creating the `zuno` database owned by `zunoapp`, and
-    running `CREATE EXTENSION IF NOT EXISTS vector;` via
+  - a `PostgresCluster` (3 Patroni instances for HA, PgBouncer x2 in
+    front, separate data/WAL volumes, one local PVC-backed pgBackRest
+    repo always plus a second S3-compatible one once real credentials
+    exist - PGO requires at least one repo, there's no way to omit
+    backups entirely unlike CNPG), creating the `zuno` database owned by
+    `zunoapp`, and running `CREATE EXTENSION IF NOT EXISTS vector;`/
+    `CREATE EXTENSION IF NOT EXISTS timescaledb;` via
     `spec.databaseInitSQL` referencing a `ConfigMap`.
 
 Then waits for the `PostgresCluster`'s `Progressing` condition to report
 `False` (PGO's documented rollout-complete signal - not CNPG's single
 `status.phase` string).
 
-## pgvector
+## pgvector and TimescaleDB
 
-PGO does not bundle pgvector out of the box either (open, unresolved
-upstream issue `CrunchyData/postgres-operator#3706`) - same situation
-this demo already had with CloudNativePG. `gitops/charts/postgresql/
-image/Dockerfile` layers pgvector onto Crunchy's own UBI-based operand
-image via a PGDG RPM. `install.yml` now builds and imports this image
-itself, on-cluster, the same `zuno-ai-build` BuildConfig/ImageStream
-mechanism every other component's image uses
-(`ansible/tasks/apply_openshift_build.yml`, ADR-0056) - the one
-difference being the Dockerfile's `FROM` pulls from
-`registry.developers.crunchydata.com`, which needs a free Crunchy Data
-developer account even just to pull, so this build also needs
-`zuno_crunchydata_registry_username`/`_password` in
-`ansible/confidential.yml` (same operator-supplied-credential pattern as
-the Vault `google-oauth`/`smtp`/`confluence` fields). Without those two
-fields set, `install.yml` skips the build with a clear warning and the
-`PostgresCluster` sits `ImagePullBackOff` until they're added and `make
-d0 install postgresql` is re-run - see `image/README.md` for the account
-signup step and three details flagged there as unverified against a real
-build (base image tag, package manager, exact pgvector RPM package name).
+No custom image or on-cluster build - PGO 5.8.8's own default operand
+image for `postgresVersion: 18` already bundles pgvector 0.8.2, and
+TimescaleDB 2.27.1 ships alongside it (UNVERIFIED - not exercised
+against a real pull from this environment, confirm with `SELECT extname,
+extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb');`
+once connected). `templates/postgrescluster.yaml` omits `spec.image`
+entirely so PGO resolves its own certified image, already reachable
+through the cluster's existing global pull secret - no separate registry
+account needed. TimescaleDB additionally needs
+`shared_preload_libraries=timescaledb` (`spec.config.parameters`); both
+extensions are created via `CREATE EXTENSION IF NOT EXISTS ...` in
+`spec.databaseInitSQL`'s `ConfigMap` (pgvector needs no preload entry).
 
 ## Connecting to this cluster
 
 PGO auto-creates several Services for a `PostgresCluster` named
-`zuno-postgresql`: `zuno-postgresql-primary` (the one every consumer
-below uses), `-replicas`, `-pods`, `-ha`, `-ha-config`. Every consumer
-connects to `zuno-postgresql-primary.zuno-data.svc.cluster.local:5432`.
+`zuno-postgresql`: `zuno-postgresql-primary` (direct, bypasses pooling),
+`-replicas`, `-pods`, `-ha`, `-ha-config`, and - since `spec.proxy.
+pgBouncer` is configured - `zuno-postgresql-pgbouncer`. **Every consumer
+connects through PgBouncer**, `zuno-postgresql-pgbouncer.zuno-data.svc.
+cluster.local:5432` (transaction pooling), not `-primary` directly.
 There is no plain `postgresql` Service, and no `-rw`-suffixed Service
 either (that was CNPG's convention, not PGO's) - nothing in this
 repository creates one.
@@ -137,20 +134,31 @@ researched from Crunchy's own documentation but not exercised end to end:
   intended, or a different default database (see
   `templates/postgrescluster.yaml`'s own comment for the manual fallback
   if not).
-- The three pgvector image-build details flagged in `image/README.md`.
-- The `strategy.dockerStrategy.pullSecret` mechanism `ansible/tasks/
-  apply_openshift_build.yml` relies on to authenticate the Crunchy Data
-  base-image pull - not exercised against a real `BuildConfig` from this
-  environment.
+- Whether PGO 5.8.8's default operand image for `postgresVersion: 18`
+  really does bundle pgvector 0.8.2 and TimescaleDB 2.27.1 as expected -
+  see "pgvector and TimescaleDB" above.
+- `cluster.storageClassName` (`ocs-storagecluster-ceph-rbd`,
+  `gitops/charts/postgresql/values.yaml`) - confirm this StorageClass
+  exists on the target cluster (`oc get storageclass`).
+- The `spec.backups.pgbackrest.repos[].s3`/`.configuration` shape in
+  `templates/postgrescluster.yaml` and the `s3.conf` file format in
+  `templates/externalsecret-backup-s3.yaml` - reconstructed from
+  Crunchy's general pgBackRest S3 documentation, not confirmed against
+  the installed CRD (`oc explain postgrescluster.spec.backups.pgbackrest
+  --recursive`).
+- `spec.proxy.pgBouncer` and `spec.openshift`/`spec.config.parameters`
+  field names/shapes - not exercised against a real `PostgresCluster`
+  from this environment.
 
-Run `make d0 check postgresql` → fill in `ansible/confidential.yml`'s
-Crunchy Data credentials → `make d0 install postgresql` against the real
-cluster and adjust any of the above that turns out to be wrong.
+Run `make d0 check postgresql` → `make d0 install postgresql` against
+the real cluster and adjust any of the above that turns out to be wrong.
 
 ## Consumed by
 
 - `ansible/roles/sql_schema` (applies `data/sxa/schema/*.sql` and
-  `data/sxa/fixtures/seed.sql` against this cluster).
+  `data/sxa/fixtures/seed.sql` against this cluster) and `ansible/roles/
+  rag` (applies the RAG schema/fixtures the same way) - both one-shot
+  Jobs, connecting through PgBouncer.
 - `components/mcp-servers/sales-db` (reads the same `zunoapp` credentials
   via its own `ExternalSecret`).
 - Track D's RAG service (queries `document_embeddings`, see

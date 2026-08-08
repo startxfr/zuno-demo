@@ -467,6 +467,30 @@
     and zuno_atlassian_confluence_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# Only seeded when all five fields are real - unlike google-oauth/smtp/
+# confluence above, this one has no placeholder fallback: the ExternalSecret
+# that reads it (gitops/charts/postgresql/templates/externalsecret-backup-s3.yaml)
+# is itself only rendered when ansible/roles/postgresql/tasks/install.yml
+# detects the same five real values and sets backups.s3.enabled - so there's
+# never a case where that ExternalSecret exists but this Vault path doesn't.
+- name: "vault | seed the PostgreSQL backup S3 credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/postgresql/backup-s3
+      bucket={{ zuno_postgresql_backup_s3_bucket | quote }} endpoint={{ zuno_postgresql_backup_s3_endpoint | quote }}
+      region={{ zuno_postgresql_backup_s3_region | quote }} access_key={{ zuno_postgresql_backup_s3_access_key | quote }}
+      secret_key={{ zuno_postgresql_backup_s3_secret_key | quote }}"
+  when: >-
+    zuno_postgresql_backup_s3_bucket | default('xxxxxx') != 'xxxxxx'
+    and zuno_postgresql_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx'
+    and zuno_postgresql_backup_s3_region | default('xxxxxx') != 'xxxxxx'
+    and zuno_postgresql_backup_s3_access_key | default('xxxxxx') != 'xxxxxx'
+    and zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 - name: "vault | check whether operator-supplied secrets already exist"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

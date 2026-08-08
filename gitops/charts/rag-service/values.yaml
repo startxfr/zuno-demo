@@ -24,12 +24,12 @@ resources:
 
 # PostgreSQL connection target - owned by the data track (ansible/roles/postgresql).
 # Database credentials come from the ExternalSecret below, not from values.
-# zuno-postgresql-primary is PGO's own auto-created Service for the
-# zuno-postgresql PostgresCluster - there is no plain "postgresql"
-# Service, and no "-rw"-suffixed one either (that was CloudNativePG's
-# convention - see ansible/roles/postgresql/README.md).
+# zuno-postgresql-pgbouncer is PGO's own auto-created PgBouncer Service in
+# front of the zuno-postgresql PostgresCluster - there is no plain
+# "postgresql" Service, and no "-rw"-suffixed one either (that was
+# CloudNativePG's convention - see ansible/roles/postgresql/README.md).
 pg:
-  host: zuno-postgresql-primary.zuno-data.svc
+  host: zuno-postgresql-pgbouncer.zuno-data.svc
   port: 5432
   database: zuno
 
