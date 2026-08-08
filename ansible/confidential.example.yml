@@ -1,19 +1,108 @@
 ---
+# ==============================================================================
+# ansible/confidential.yml (gitignored, NEVER commit) - operator-supplied
+# secrets for external services this platform integrates with. Copy this file
+# to ansible/confidential.yml and fill in real values before the first
+# `make d0 install` - see ansible/README.md. Any field left at its "xxxxxx"
+# placeholder is treated as "not configured" and the corresponding
+# integration is skipped (or seeded as an empty Vault placeholder) rather
+# than failing the install.
+# ==============================================================================
+
+# --- Google OAuth (Keycloak "google" identity provider, ADR-0014) ----------
+# Set to false to skip the Google identity provider entirely (no
+# ExternalSecret rendered, no broken login button) - useful if you don't
+# have real Google OAuth credentials yet. Ansible defaults this to true if
+# unset, so this line only matters while it's explicitly false.
 zuno_keycloak_google_oauth_enabled: false
+
+# Create at https://console.cloud.google.com/apis/credentials (a GCP project
+# tied to your Google Workspace org):
+#   1. APIs & Services -> OAuth consent screen -> User type "Internal".
+#   2. APIs & Services -> Library -> enable "Gmail API" and "Google Drive
+#      API" (the realm requests gmail.readonly/drive.readonly scopes).
+#   3. APIs & Services -> Credentials -> Create Credentials -> OAuth client
+#      ID -> Application type "Web application".
+#   4. Authorized redirect URI (exact match required):
+#      https://keycloak.<cluster-base-domain>/realms/zuno/broker/google/endpoint
+#      (cluster-base-domain: see zuno/platform/cluster-domain in Vault, or
+#      `oc get route -n zuno-auth`).
+#   5. Create -> copy the Client ID and Client Secret (secret is shown once).
 zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 
-zuno_smtp_host: "xxxxxx"
-zuno_smtp_port: "587"
-zuno_smtp_username: "xxxxxx"
-zuno_smtp_password: "xxxxxx"
+# --- SMTP technical mail identity ------------------------------------------
+# Set to false to skip deploying the smtp component entirely (no namespace/
+# ExternalSecret applied). Defaults to true if unset.
 zuno_smtp_enabled: false
 
-zuno_atlassian_confluence_url: "xxxxxx"
-zuno_atlassian_confluence_email: "xxxxxx"
-zuno_atlassian_confluence_token: "xxxxxx"
+# Example below uses AWS SES (Simple Email Service) - any SMTP provider
+# works the same way (host/port/username/password), SES is just a common
+# choice with a generous free tier.
+#   1. https://console.aws.amazon.com/ses/ -> Verified identities -> verify
+#      the domain or email address you'll send from (SES won't send
+#      otherwise). New accounts start in the "sandbox" (can only send to
+#      verified recipients) - request production access from the SES
+#      dashboard to send to arbitrary recipients.
+#   2. Left nav -> SMTP settings -> note the SMTP endpoint for your region
+#      (e.g. email-smtp.eu-west-1.amazonaws.com for eu-west-1) - this is
+#      zuno_smtp_host below. SMTP credentials are region-specific: generate
+#      a new set per region if you use more than one.
+#   3. Click "Create SMTP Credentials" (opens the IAM console, creates an
+#      IAM user scoped to SES sending) -> copy the generated SMTP username
+#      and password (shown once - these are NOT your regular AWS access
+#      key/secret, SES derives distinct SMTP credentials).
+zuno_smtp_host: "xxxxxx"            # e.g. email-smtp.eu-west-1.amazonaws.com
+zuno_smtp_port: "587"               # 587 (STARTTLS, recommended), 465 (TLS) or 25
+zuno_smtp_username: "xxxxxx"        # SES-generated SMTP username, not your AWS access key
+zuno_smtp_password: "xxxxxx"        # SES-generated SMTP password, not your AWS secret key
+
+# --- Atlassian Confluence Cloud (technical identity for MCP ingestion) -----
+# Set to false / leave as "xxxxxx" for now - no ExternalSecret/MCP server
+# consumes this yet (components/mcp-servers/confluence is a stub). Stored
+# ahead of time so it's ready once that integration is built.
 zuno_atlassian_confluence_enabled: false
 
+# Create at https://id.atlassian.com/manage-profile/security/api-tokens,
+# logged in as whichever Atlassian account should act as the technical
+# identity (a dedicated service account is cleaner than a personal one, if
+# your org has one):
+#   1. Create API token -> give it a clear label (e.g.
+#      "zuno-demo-confluence-mcp") -> prefer a *scoped* token (Confluence
+#      read-only scopes) over a "classic" token, which inherits every
+#      permission the account has.
+#   2. Copy the token immediately - Atlassian shows it once and never
+#      stores it, so it can't be recovered later (only regenerated).
+# The Confluence Cloud REST API authenticates with email+token as HTTP
+# Basic Auth - the token alone is not sufficient, zuno_atlassian_confluence_
+# email must be the same account the token was created for.
+zuno_atlassian_confluence_url: "xxxxxx"     # e.g. https://your-company.atlassian.net/wiki
+zuno_atlassian_confluence_email: "xxxxxx"   # account the token below belongs to
+zuno_atlassian_confluence_token: "xxxxxx"
+
+# --- Crunchy Data registry (postgresql-pgvector image build) ---------------
+# gitops/charts/postgresql/image/Dockerfile's FROM pulls Crunchy Postgres
+# Operator's own PostgreSQL 16 operand image, which requires a free Crunchy
+# Data developer account even just to pull (not only to build) - see
+# gitops/charts/postgresql/image/README.md.
+#   1. Create a free account at https://www.crunchydata.com/developers
+#      ("Crunchy Data Developer Program" - accept the terms; this tier is
+#      for internal/personal use, production use needs a paid subscription).
+#   2. https://www.crunchydata.com/developers/download-postgres/containers
+#      lists the available PostgreSQL/PGO containers once logged in.
+#   3. `podman login registry.developers.crunchydata.com` with that
+#      account's credentials confirms what to put below (usually the
+#      account's own email/password, like registry.redhat.io - some vendor
+#      registries issue a separate registry token instead, confirm at
+#      signup).
+# zuno_crunchydata_registry_uri is a fixed, non-secret value (not
+# per-operator) - only change it if Crunchy Data redirects you elsewhere.
+# NOTE: Crunchy periodically retires old image tags ("no longer available
+# from the Crunchy Data Developer Program" - see CrunchyData/postgres-
+# operator#3859 on GitHub). The tag hardcoded in the Dockerfile's FROM line
+# is UNVERIFIED - confirm it still pulls once you have an account
+# (`podman pull registry.developers.crunchydata.com/crunchydata/crunchy-postgres:<tag>`)
+# and update the Dockerfile if it's been retired.
 zuno_crunchydata_registry_uri: "registry.developers.crunchydata.com"
 zuno_crunchydata_registry_username: "xxxxxx"
 zuno_crunchydata_registry_password: "xxxxxx"
