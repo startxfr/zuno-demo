@@ -1,0 +1,27 @@
+---
+# Registers the startx Helm chart repository with ArgoCD's repo-server so
+# `helm dependency build` can resolve the vendored subchart dependencies
+# declared in gitops/charts/{cert-manager,keycloak,nfd,nvidia-gpu,
+# openshift-ai,postgresql}/Chart.yaml (cluster-certmanager, operator,
+# cluster-nfd, cluster-gpu, cluster-ods). Being listed in AppProject
+# sourceRepos (appproject.yaml) is NOT enough on its own - that only
+# allow-lists which repoURLs an Application's own spec.source.repoURL may
+# point to, it does not make the repo-server aware of a Helm repo for
+# subchart dependency resolution. Without this Secret, sync fails with
+# "no repository definition for ... Please add the missing repos via
+# 'helm repo add'" the first time a repo-server pod has never fetched this
+# URL's index before (its Helm client cache/config is otherwise empty per
+# pod, not seeded from anywhere declarative) - this is the standard
+# ArgoCD mechanism (same shape `argocd repo add --type helm` generates).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: startx-helm-repo
+  namespace: openshift-gitops
+  labels:
+    argocd.argoproj.io/secret-type: repository
+    zuno.io/managed-by: zuno-ansible
+stringData:
+  type: helm
+  name: startx
+  url: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
