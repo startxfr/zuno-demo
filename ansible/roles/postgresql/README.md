@@ -137,9 +137,10 @@ researched from Crunchy's own documentation but not exercised end to end:
 - Whether PGO 5.8.8's default operand image for `postgresVersion: 18`
   really does bundle pgvector 0.8.2 and TimescaleDB 2.27.1 as expected -
   see "pgvector and TimescaleDB" above.
-- `cluster.storageClassName` (`ocs-storagecluster-ceph-rbd`,
-  `gitops/charts/postgresql/values.yaml`) - confirm this StorageClass
-  exists on the target cluster (`oc get storageclass`).
+- `cluster.storageClassName` (`gitops/charts/postgresql/values.yaml`) -
+  confirmed live on `api.demo222.startx.fr` (2026-08-08): AWS/EBS-backed,
+  `gp3-csi` (cluster default). Re-check with `oc get storageclass` on any
+  other target cluster.
 - The `spec.backups.pgbackrest.repos[].s3`/`.configuration` shape in
   `templates/postgrescluster.yaml` and the `s3.conf` file format in
   `templates/externalsecret-backup-s3.yaml` - reconstructed from

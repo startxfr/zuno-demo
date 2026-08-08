@@ -73,9 +73,9 @@ cluster:
   # HA: 3 Patroni replicas (1 primary + 2 async replicas), PGO/Patroni
   # handle automatic failover.
   instances: 3
-  # UNVERIFIED - confirm this StorageClass exists on the target cluster
-  # (`oc get storageclass`) and adjust if not.
-  storageClassName: ocs-storagecluster-ceph-rbd
+  # api.demo222.startx.fr is AWS/EBS-backed (`oc get storageclass`: gp2-csi,
+  # gp3-csi) - no ODF/Ceph here, gp3-csi is the cluster's own default.
+  storageClassName: gp3-csi
   storageSize: 200Gi
   # Separate volume for WAL - write latency matters more for WAL than for
   # DATA, particularly under TimescaleDB's typically high ingestion rate.
