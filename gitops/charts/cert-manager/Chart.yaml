@@ -22,4 +22,4 @@ version: 0.2.0
 dependencies:
   - name: cluster-certmanager
     version: "21.3.277"
-    repository: "https://helm-repository.readthedocs.io/en/latest/repos/stable"
+    repository: "http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable"

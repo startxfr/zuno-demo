@@ -1,6 +1,6 @@
 dependencies:
 - name: cluster-nfd
-  repository: https://helm-repository.readthedocs.io/en/latest/repos/stable
-  version: 21.3.205
-digest: sha256:528aee28a675b1b21d1647dd8c01671ca5867a6c1c677c2d0d7724a75fb4865c
-generated: "2026-08-07T16:28:01.370213833+02:00"
+  repository: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  version: 21.3.277
+digest: sha256:c941bbe15327afb38c101cde6878f697b77a8accb8912016b48b3343ab8335a4
+generated: "2026-08-09T01:12:07.543508606+02:00"
