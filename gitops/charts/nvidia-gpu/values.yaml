@@ -50,6 +50,7 @@ cluster-gpu:
       enabled: true
       name: nvidia-gpu-operator-group
       namespace: nvidia-gpu-operator
+      target: nvidia-gpu-operator
       # No `target: all-ns` override (startx's own recommended default for
       # this operator, per their ArgoCD deployment conventions) - kept
       # scoped to this single namespace to preserve this chart's previous,
