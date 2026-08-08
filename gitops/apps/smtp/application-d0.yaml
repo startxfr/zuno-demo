@@ -1,9 +1,13 @@
 ---
-# The technical mail identity's Namespace (ADR-0056) - see
-# gitops/charts/smtp (namespace.enabled). Applied by the `smtp` Ansible
-# role's install.yml. The credentials ExternalSecret is a separate
-# Application (zuno-smtp-d1, applied after this one is Synced+Healthy) -
-# see application-d1.yaml.
+# Applied by the `smtp` Ansible role's install.yml. namespace.enabled
+# stays false (the chart's own default) - zuno-ai-run is owned solely by
+# gitops/charts/namespaces (zuno-namespaces-d0), which already runs
+# earlier in day0_components; this Application no longer duplicates that
+# Namespace (it previously did, idempotently, per gitops/charts/smtp/
+# templates/namespace.yaml's own comment - dropped so the resource has a
+# single owning Application instead of two). The credentials ExternalSecret
+# is a separate Application (zuno-smtp-d1, applied after this one is
+# Synced+Healthy) - see application-d1.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -23,7 +27,7 @@ spec:
       releaseName: zuno-smtp-d0
       values: |
         namespace:
-          enabled: true
+          enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
