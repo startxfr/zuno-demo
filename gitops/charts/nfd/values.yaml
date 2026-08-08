@@ -59,4 +59,4 @@ cluster-nfd:
         # matches this chart's previous local NodeFeatureDiscovery CR.
         spec: |-
           instance: ""
-          topologyupdater: false
+          topologyUpdater: false
