@@ -21,5 +21,5 @@ type: application
 version: 0.2.0
 dependencies:
   - name: cluster-certmanager
-    version: "21.3.205"
+    version: "21.3.277"
     repository: "https://helm-repository.readthedocs.io/en/latest/repos/stable"

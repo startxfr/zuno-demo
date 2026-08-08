@@ -22,5 +22,5 @@ version: 0.2.0
 appVersion: "n/a"
 dependencies:
   - name: operator
-    version: "21.3.207"
+    version: "21.3.277"
     repository: "https://helm-repository.readthedocs.io/en/latest/repos/stable"
