@@ -5,6 +5,13 @@
 # TimescaleDB additionally needs shared_preload_libraries=timescaledb
 # (spec.config.parameters in postgrescluster.yaml) - CREATE EXTENSION
 # alone isn't enough for it, unlike pgvector.
+#
+# \connect {{ .Values.cluster.database }} is required: confirmed live on
+# api.demo222.startx.fr (2026-08-08, PGO 5.8.8) that databaseInitSQL runs
+# against the "postgres" database regardless of spec.users[].databases,
+# not against the app database created alongside the user - without this,
+# both extensions get created in "postgres" and the actual "{{ .Values.cluster.database }}"
+# database never gets them at all.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -16,6 +23,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "-35"
 data:
   init.sql: |
+    \set ON_ERROR_STOP on
+    \connect {{ .Values.cluster.database }}
     CREATE EXTENSION IF NOT EXISTS vector;
     CREATE EXTENSION IF NOT EXISTS timescaledb;
 {{- end }}

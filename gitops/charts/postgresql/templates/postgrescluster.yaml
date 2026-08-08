@@ -140,13 +140,12 @@ spec:
       databases:
         - {{ .Values.cluster.database }}
 
-  # Runs once at bootstrap, against the {{ .Values.cluster.owner }}-owned database created
-  # above (per Crunchy's own Extension Management guide's documented
-  # pattern for adding an extension this way) - NOT verified against a
-  # live cluster from this environment; if it lands in the wrong database
-  # instead, create the extension manually once
-  # (`psql -d {{ .Values.cluster.database }} -c "CREATE EXTENSION IF NOT EXISTS vector;"`)
-  # and adjust this block.
+  # Runs once at bootstrap (per Crunchy's own Extension Management guide's
+  # documented pattern for adding extensions this way) - PGO 5.8.8 runs it
+  # against the "postgres" database, not the app database created above,
+  # regardless of spec.users[].databases (confirmed live), so
+  # templates/configmap-init-sql.yaml's init.sql explicitly `\connect`s to
+  # {{ .Values.cluster.database }} first.
   databaseInitSQL:
     name: {{ .Values.cluster.name }}-init-sql
     key: init.sql

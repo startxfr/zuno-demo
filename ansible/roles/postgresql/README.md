@@ -97,17 +97,19 @@ matches on this version).
 ## pgvector and TimescaleDB
 
 No custom image or on-cluster build - PGO 5.8.8's own default operand
-image for `postgresVersion: 18` already bundles pgvector 0.8.2, and
-TimescaleDB 2.27.1 ships alongside it (UNVERIFIED - not exercised
-against a real pull from this environment, confirm with `SELECT extname,
-extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb');`
-once connected). `templates/postgrescluster.yaml` omits `spec.image`
+image for `postgresVersion: 18` already bundles pgvector 0.8.2 and
+TimescaleDB 2.27.1, confirmed live on `api.demo222.startx.fr`
+(2026-08-08): `SELECT extname, extversion FROM pg_extension;` reports
+both once created. `templates/postgrescluster.yaml` omits `spec.image`
 entirely so PGO resolves its own certified image, already reachable
 through the cluster's existing global pull secret - no separate registry
 account needed. TimescaleDB additionally needs
-`shared_preload_libraries=timescaledb` (`spec.config.parameters`); both
-extensions are created via `CREATE EXTENSION IF NOT EXISTS ...` in
-`spec.databaseInitSQL`'s `ConfigMap` (pgvector needs no preload entry).
+`shared_preload_libraries=timescaledb` (`spec.config.parameters`,
+confirmed via `SHOW shared_preload_libraries;`); both extensions are
+created via `CREATE EXTENSION IF NOT EXISTS ...` in `spec.databaseInitSQL`'s
+`ConfigMap` (pgvector needs no preload entry) - that script must
+`\connect` to the app database first, PGO runs it against `postgres`
+otherwise (see that file's own comment).
 
 ## Connecting to this cluster
 
@@ -132,10 +134,6 @@ researched from Crunchy's own documentation but not exercised end to end:
   publishes PGO under (`install.yml`'s fuzzy `/crunchy/i` discovery - see
   above - handles whatever it turns out to be, but the specific values
   were not confirmed from this environment).
-- Whether `spec.databaseInitSQL` runs against the `zuno` database as
-  intended, or a different default database (see
-  `templates/postgrescluster.yaml`'s own comment for the manual fallback
-  if not).
 - Whether PGO 5.8.8's default operand image for `postgresVersion: 18`
   really does bundle pgvector 0.8.2 and TimescaleDB 2.27.1 as expected -
   see "pgvector and TimescaleDB" above.
