@@ -423,7 +423,7 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/google-oauth/client
-      client_id={{ zuno_google_oauth_client_id }} client_secret={{ zuno_google_oauth_client_secret }}"
+      client_id={{ zuno_google_oauth_client_id | quote }} client_secret={{ zuno_google_oauth_client_secret | quote }}"
   when: >-
     zuno_google_oauth_client_id | default('xxxxxx') != 'xxxxxx'
     and zuno_google_oauth_client_secret | default('xxxxxx') != 'xxxxxx'
@@ -436,8 +436,8 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/smtp/technical
-      host={{ zuno_smtp_host }} port={{ zuno_smtp_port | default('587') }}
-      username={{ zuno_smtp_username }} password={{ zuno_smtp_password }}"
+      host={{ zuno_smtp_host | quote }} port={{ (zuno_smtp_port | default('587')) | quote }}
+      username={{ zuno_smtp_username | quote }} password={{ zuno_smtp_password | quote }}"
   when: >-
     zuno_smtp_host | default('xxxxxx') != 'xxxxxx'
     and zuno_smtp_username | default('xxxxxx') != 'xxxxxx'
@@ -458,9 +458,9 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/confluence/technical
-      url={{ zuno_atlassian_confluence_url }} email={{ zuno_atlassian_confluence_email }}
-      token={{ zuno_atlassian_confluence_token }}
-      enabled={{ zuno_atlassian_confluence_enabled | default(false) }}"
+      url={{ zuno_atlassian_confluence_url | quote }} email={{ zuno_atlassian_confluence_email | quote }}
+      token={{ zuno_atlassian_confluence_token | quote }}
+      enabled={{ (zuno_atlassian_confluence_enabled | default(false)) | quote }}"
   when: >-
     zuno_atlassian_confluence_url | default('xxxxxx') != 'xxxxxx'
     and zuno_atlassian_confluence_email | default('xxxxxx') != 'xxxxxx'
