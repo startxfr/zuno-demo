@@ -10,6 +10,7 @@ spec:
     Every zuno-* platform Application (gitops/apps/) lives in this project
   sourceRepos:
     - https://github.com/startxfr/zuno-demo.git
+    - http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "*"
