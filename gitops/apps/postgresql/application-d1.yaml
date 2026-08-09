@@ -1,6 +1,7 @@
 ---
-# Demo-grade PostgreSQL: single instance, no HA/replica topology.
-# Manages the PostgresCluster CR and credentials (not the operator, see application-d0.yaml).
+# Demo-grade PostgreSQL: single instance, no HA/replica topology. Manages the
+# PostgresCluster CR and credentials (not the operator, see
+# application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

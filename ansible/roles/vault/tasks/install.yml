@@ -119,8 +119,8 @@
   when: _vault_init_raw is defined and _vault_init_raw.stdout is defined
   no_log: true
 
-# Runs the vault-unseal-configure Job (unseal + KV/auth/policy setup) as a
-# Job, not k8s_exec, so it can be re-run in-cluster after a pod restart reseals it.
+# Runs the vault-unseal-configure Job (unseal + KV/auth/policy setup) as a Job,
+# not k8s_exec, so it can be re-run in-cluster after a pod restart reseals it.
 - name: "vault | read bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret

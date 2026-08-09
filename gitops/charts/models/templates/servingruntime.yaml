@@ -8,7 +8,8 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    # Must sync before inferenceservice.yaml, which references this runtime by name.
+    # Must sync before inferenceservice.yaml, which references this runtime by
+    # name.
     argocd.argoproj.io/sync-wave: "-5"
 spec:
   supportedModelFormats:
@@ -26,9 +27,9 @@ spec:
         - containerPort: 8080
           protocol: TCP
       # No readOnlyRootFilesystem: vLLM writes a HuggingFace/compilation cache
-      # under its container filesystem at startup, and the exact writable
-      # paths aren't verified. Pod-level runAsNonRoot/seccompProfile aren't
-      # set either: the `model:` shorthand doesn't reliably expose that override.
+      # under its container filesystem at startup, and the exact writable paths
+      # aren't verified. Pod-level runAsNonRoot/seccompProfile aren't set
+      # either: the `model:` shorthand doesn't reliably expose that override.
       securityContext:
         allowPrivilegeEscalation: false
         capabilities:

@@ -1,6 +1,7 @@
 ---
 # No Day1 content for namespaces; it only creates cluster-scoped
-# Namespaces/Quotas/NetworkPolicies, classified entirely as -d0 (see application-d0.yaml).
+# Namespaces/Quotas/NetworkPolicies, classified entirely as -d0 (see
+# application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

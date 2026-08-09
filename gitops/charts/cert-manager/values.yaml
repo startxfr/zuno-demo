@@ -1,5 +1,6 @@
 # operator.enabled gates the CertManager CR + operand namespace; issuer.enabled
-# gates the Vault-backed ClusterIssuer. Both default false so templates render nothing.
+# gates the Vault-backed ClusterIssuer. Both default false so templates render
+# nothing.
 certmanager:
   enabled: false
 issuer:
@@ -10,7 +11,8 @@ issuer:
 vaultServiceName: ""
 
 # ASSUMPTION: not yet verified against a live cluster. If this is wrong,
-# discover the real package/channel/catalog from the cluster's PackageManifest at runtime.
+# discover the real package/channel/catalog from the cluster's PackageManifest
+# at runtime.
 cluster-certmanager:
   context: &context
     scope: zuno

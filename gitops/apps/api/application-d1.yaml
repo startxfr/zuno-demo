@@ -1,6 +1,6 @@
 ---
-# Tekos's frontend + BFF. Depends on the agents namespace and the
-# tekos-frontend OIDC client from keycloak; Ansible applies `agents` before `api`.
+# Tekos's frontend + BFF. Depends on the agents namespace and the tekos-frontend
+# OIDC client from keycloak; Ansible applies `agents` before `api`.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,7 +18,8 @@ spec:
       releaseName: zuno-api-d1
       values: |
         global:
-          # Substituted with the real cluster domain by ansible/tasks/apply_gitops_app.yml.
+          # Substituted with the real cluster domain by
+          # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc

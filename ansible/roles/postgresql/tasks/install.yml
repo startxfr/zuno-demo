@@ -1,6 +1,7 @@
 ---
 # Discovers the Crunchy Postgres Operator package/catalog/channel actually
-# published (neither is fixed across clusters); falls back to operatorhubio-catalog.
+# published (neither is fixed across clusters); falls back to
+# operatorhubio-catalog.
 - name: "postgresql | list every PackageManifest published in this cluster's catalogs"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1

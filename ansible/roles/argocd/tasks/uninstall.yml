@@ -1,6 +1,7 @@
 ---
-# No root App-of-Apps to delete: ansible never applies gitops/root-app-of-apps.yaml,
-# so uninstall only removes the operator's own resources.
+# No root App-of-Apps to delete: ansible never applies
+# gitops/root-app-of-apps.yaml, so uninstall only removes the operator's own
+# resources.
 - name: "argocd | delete the application-controller ClusterRoleBinding"
   kubernetes.core.k8s:
     state: absent

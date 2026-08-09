@@ -38,7 +38,8 @@
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
-      # agents' check.yml can genuinely fail; don't abort before the report below is shown.
+      # agents' check.yml can genuinely fail; don't abort before the report
+      # below is shown.
       ignore_errors: true
       register: _day1_check_results
 

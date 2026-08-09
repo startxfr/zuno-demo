@@ -1,7 +1,8 @@
 # sales-db-mcp must accept traffic ONLY from the MCP Gateway, not other
 # same-namespace pods (e.g. agent-runtime) - this is why zuno-ai-run has no
 # namespace-wide baseline NetworkPolicy, which would defeat this restriction.
-# The app also validates the X-Zuno-Gateway-Token shared secret as defense in depth.
+# The app also validates the X-Zuno-Gateway-Token shared secret as defense in
+# depth.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

@@ -2,7 +2,8 @@
 global:
   clusterBaseDomain: apps.mycluster.example.com
 
-# route.host empty means "vault.<global.clusterBaseDomain>" (see templates/_helpers.tpl).
+# route.host empty means "vault.<global.clusterBaseDomain>" (see
+# templates/_helpers.tpl).
 route:
   enabled: true
   host: ""

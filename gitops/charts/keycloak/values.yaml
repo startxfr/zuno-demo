@@ -8,12 +8,14 @@ keycloak:
 # No Namespace template here - zuno-auth is created by gitops/charts/namespaces.
 namespace: zuno-auth
 
-# Name of the Keycloak CR; spec.keycloakCRName on the KeycloakRealmImport must match.
+# Name of the Keycloak CR; spec.keycloakCRName on the KeycloakRealmImport must
+# match.
 keycloakCRName: zuno
 
 # OpenShift apps wildcard domain. Every per-agent client redirect URI in
 # files/realm-zuno.json is templated against this - override for the real
-# cluster before go-live; the checked-in default only works for the example domain.
+# cluster before go-live; the checked-in default only works for the example
+# domain.
 clusterBaseDomain: apps.mycluster.example.com
 
 # Kubernetes Secret names populated by ExternalSecrets resolving against the

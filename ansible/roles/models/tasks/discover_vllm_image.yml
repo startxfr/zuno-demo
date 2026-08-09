@@ -1,6 +1,7 @@
 ---
 # Selects the vLLM image OpenShift AI actually publishes (a Template in
-# redhat-ods-applications), matched by name since RHOAI's label taxonomy isn't verified.
+# redhat-ods-applications), matched by name since RHOAI's label taxonomy isn't
+# verified.
 - name: "models | discover the vLLM serving-runtime Templates OpenShift AI published (ADR-0048)"
   kubernetes.core.k8s_info:
     api_version: template.openshift.io/v1

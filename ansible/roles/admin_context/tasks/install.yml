@@ -1,7 +1,7 @@
 ---
-# Cluster-admin objects other Day 0 components depend on; runs first, before argocd.
-# StorageClass is discover-only: provisioner details vary per cluster, so we
-# only verify one exists rather than guessing parameters.
+# Cluster-admin objects other Day 0 components depend on; runs first, before
+# argocd. StorageClass is discover-only: provisioner details vary per cluster,
+# so we only verify one exists rather than guessing parameters.
 - name: "admin_context | discover existing StorageClasses"
   kubernetes.core.k8s_info:
     api_version: storage.k8s.io/v1

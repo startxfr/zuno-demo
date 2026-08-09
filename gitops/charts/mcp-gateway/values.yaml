@@ -1,8 +1,8 @@
 namespace: zuno-ai-run
 
 image:
-  # Built by the "mcp" build component into zuno-ai-build's ImageStream,
-  # pulled cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
+  # Built by the "mcp" build component into zuno-ai-build's ImageStream, pulled
+  # cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-gateway
   tag: latest
   pullPolicy: IfNotPresent

@@ -1,12 +1,14 @@
 ---
-# No Day0 content for agent-runtime; see gitops/apps/README.md's -d0/-d1 convention.
+# No Day0 content for agent-runtime; see gitops/apps/README.md's -d0/-d1
+# convention.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-agent-runtime-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
     argocd.argoproj.io/sync-wave: "-112"
 spec:
   project: zuno

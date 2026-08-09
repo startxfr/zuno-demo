@@ -1,13 +1,15 @@
 ---
 # RHBK (Red Hat build of Keycloak) operator install; the Keycloak
-# CR/RealmImport/ExternalSecrets operand is a separate Application (application-d1.yaml).
+# CR/RealmImport/ExternalSecrets operand is a separate Application
+# (application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-keycloak-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
     argocd.argoproj.io/sync-wave: "-168"
 spec:
   project: zuno
@@ -25,7 +27,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: zuno-auth
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

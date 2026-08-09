@@ -1,6 +1,7 @@
 ---
-# Deletes one ArgoCD Application by name; patches in the cascade finalizer
-# first so ArgoCD prunes managed resources before removing it. Requires gitops_app_name.
+# Deletes one ArgoCD Application by name; patches in the cascade finalizer first
+# so ArgoCD prunes managed resources before removing it. Requires
+# gitops_app_name.
 - name: "gitops | validate gitops_app_name is set"
   ansible.builtin.assert:
     that:

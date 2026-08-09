@@ -45,7 +45,8 @@ cluster-nfd:
     list:
       - name: nfd-instance
         namespace: openshift-nfd
-        # Minimal spec: instance/topology updater disabled, not needed for this demo.
+        # Minimal spec: instance/topology updater disabled, not needed for this
+        # demo.
         spec: |-
           instance: ""
           topologyUpdater: false

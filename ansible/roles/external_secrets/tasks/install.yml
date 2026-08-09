@@ -78,8 +78,8 @@
   retries: 60
   delay: 10
 
-    # Discovered rather than hardcoded: the Helm release name isn't a
-    # repo-wide constant, and the chart creates three Services sharing this label.
+    # Discovered rather than hardcoded: the Helm release name isn't a repo-wide
+    # constant, and the chart creates three Services sharing this label.
 - name: "external_secrets | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service

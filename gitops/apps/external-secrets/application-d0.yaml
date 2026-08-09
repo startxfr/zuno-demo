@@ -1,6 +1,7 @@
 ---
 # External Secrets Operator install; the ClusterSecretStore/ExternalSecret
-# operand is a separate Application (application-d1.yaml) applied after this one is healthy.
+# operand is a separate Application (application-d1.yaml) applied after this one
+# is healthy.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -29,8 +30,10 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # zuno-vault namespace is owned by gitops/charts/namespaces; don't also track it here (avoids a SharedResourceWarning).
+      # zuno-vault namespace is owned by gitops/charts/namespaces; don't also
+      # track it here (avoids a SharedResourceWarning).
       - CreateNamespace=false
       # On a cold cluster the OperatorConfig CRD doesn't exist yet, which makes
-      # ArgoCD abort the whole sync as invalid; this skips discovery validation to break that deadlock.
+      # ArgoCD abort the whole sync as invalid; this skips discovery validation
+      # to break that deadlock.
       - SkipDryRunOnMissingResource=true

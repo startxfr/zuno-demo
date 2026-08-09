@@ -1,6 +1,7 @@
 ---
 # NVIDIA GPU Operator install. The ClusterPolicy operand (application-d1.yaml)
-# is applied twice: once after this is healthy, once more with the spec discovered from the installed CSV.
+# is applied twice: once after this is healthy, once more with the spec
+# discovered from the installed CSV.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,7 +29,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: nvidia-gpu-operator
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

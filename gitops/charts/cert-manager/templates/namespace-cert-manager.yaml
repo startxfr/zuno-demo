@@ -1,6 +1,7 @@
 {{- if .Values.certmanager.enabled }}
 # Pre-created as a PreSync hook since this chart's destination.namespace is
-# cert-manager-operator, not cert-manager; the operator would otherwise create it later.
+# cert-manager-operator, not cert-manager; the operator would otherwise create
+# it later.
 apiVersion: v1
 kind: Namespace
 metadata:

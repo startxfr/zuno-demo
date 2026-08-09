@@ -1,6 +1,7 @@
 ---
 # ClusterPolicy operand (not the operator, see application-d0.yaml). gpu.enabled
-# stays false until Ansible's second apply flips it true with the CSV's spec; the chart renders an invalid empty spec otherwise.
+# stays false until Ansible's second apply flips it true with the CSV's spec;
+# the chart renders an invalid empty spec otherwise.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

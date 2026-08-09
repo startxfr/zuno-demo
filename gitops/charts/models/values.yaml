@@ -11,7 +11,8 @@ modelId: Qwen/Qwen2.5-7B-Instruct
 
 image:
   # Fallback for `helm template`/standalone testing only; ansible always
-  # overrides this at apply time with the image published by the installed OpenShift AI catalog.
+  # overrides this at apply time with the image published by the installed
+  # OpenShift AI catalog.
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 

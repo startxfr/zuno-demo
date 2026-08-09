@@ -1,6 +1,7 @@
 ---
-# ClusterSecretStore/ExternalSecret operand, applied after the operator
-# install (application-d0.yaml) is healthy, with the Vault client Service name injected at apply time.
+# ClusterSecretStore/ExternalSecret operand, applied after the operator install
+# (application-d0.yaml) is healthy, with the Vault client Service name injected
+# at apply time.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

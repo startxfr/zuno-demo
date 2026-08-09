@@ -81,7 +81,8 @@ platformNamespaces:
     description: >-
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
-    # postgresql: sales-db-mcp (cross-ns). vault: ESO's ClusterSecretStore controller.
+    # postgresql: sales-db-mcp (cross-ns). vault: ESO's ClusterSecretStore
+    # controller.
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-vault
@@ -111,8 +112,9 @@ platformNamespaces:
     extraLabels:
       opendatahub.io/dashboard: "true"
 
-# Caps GPU consumption at 1 - this demo has exactly one 24GB L4 budgeted for
-# the single local model; without this a second InferenceService could silently starve it.
+# Caps GPU consumption at 1 - this demo has exactly one 24GB L4 budgeted for the
+# single local model; without this a second InferenceService could silently
+# starve it.
 openshiftAi:
   namespace: zuno-ai-run
   gpuQuota:

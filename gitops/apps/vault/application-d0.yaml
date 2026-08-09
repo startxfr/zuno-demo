@@ -1,5 +1,6 @@
 ---
-# No Day0 content for vault: no OLM operator, plain Helm deployment (see application-d1.yaml).
+# No Day0 content for vault: no OLM operator, plain Helm deployment (see
+# application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

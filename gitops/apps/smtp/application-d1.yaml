@@ -1,6 +1,7 @@
 ---
-# Technical mail identity's credential, exposed via ExternalSecret. Vault
-# seeds the placeholder empty; an operator must populate it before mail can actually send.
+# Technical mail identity's credential, exposed via ExternalSecret. Vault seeds
+# the placeholder empty; an operator must populate it before mail can actually
+# send.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

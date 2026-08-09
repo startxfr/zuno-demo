@@ -29,7 +29,8 @@ spec:
         - namespaceSelector:
             matchLabels:
               # Admits kube-apiserver traffic (hostNetwork, matches no normal
-              # selector) - needed wherever an admission webhook's service lives.
+              # selector) - needed wherever an admission webhook's service
+              # lives.
               policy-group.network.openshift.io/host-network: ""
         {{- end }}
         {{- range .allowedFromNamespaces }}

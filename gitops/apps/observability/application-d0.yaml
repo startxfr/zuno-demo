@@ -7,7 +7,8 @@ metadata:
   name: zuno-observability-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
     argocd.argoproj.io/sync-wave: "-206"
 spec:
   project: zuno
@@ -24,7 +25,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-opentelemetry-operator
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

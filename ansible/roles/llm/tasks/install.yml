@@ -1,7 +1,29 @@
 ---
 # Provider API key placeholders are seeded by the vault role, not this one;
-# this role only registers the GitOps Applications below.
+# this role only builds the images its Applications need, then registers
+# those GitOps Applications below.
 #
+# ai-gateway and agent-runtime are images built by separate Day 1 "build"
+# components (make day1 build ai-gateway/agent) - their names don't match
+# this run-component's own name ("llm"), so `make day1 all llm` (or plain
+# `install`) would otherwise never trigger them, leaving the Deployments
+# below in permanent ImagePullBackOff/"authentication required" on a
+# fresh cluster. Ensuring them here keeps `make day1 install llm`
+# self-sufficient, same principle as ansible/tasks/apply_gitops_app.yml's
+# single-component installs. apply_openshift_build.yml (which both roles
+# call) is idempotent - a ConfigChange trigger only rebuilds on a real
+# BuildConfig diff, so this costs a status check, not a rebuild, once the
+# image already exists.
+- name: "llm | ensure the ai-gateway image is built"
+  ansible.builtin.include_role:
+    name: ai_gateway_build
+    tasks_from: build
+
+- name: "llm | ensure the agent-runtime image is built"
+  ansible.builtin.include_role:
+    name: agent_build
+    tasks_from: build
+
 # No OLM operator involved in any of these three - all content is -d1
 # (the -d0 Applications are no-ops).
 - name: "llm | apply the provider-routing/AI Inference Gateway/Agent Runtime GitOps Applications (d0, no-op)"

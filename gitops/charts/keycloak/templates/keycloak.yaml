@@ -3,11 +3,10 @@
 # than a dedicated serving certificate. spec.db is intentionally omitted -
 # Keycloak falls back to its bundled dev database (not durable across pod
 # loss); wiring the shared PostgreSQL instance is a follow-up.
-#
-# Google OAuth / demo-persona secrets are injected via Keycloak's "vault"
-# SPI: `${vault.<key>}` placeholders in the realm JSON resolve at runtime
-# from files under KC_VAULT_DIR. Must be KC_VAULT=file, not env - the env
-# provider doesn't exist on the installed RHBK version and crash-loops the server.
+# Google OAuth / demo-persona secrets are injected via Keycloak's "vault" SPI:
+# `${vault.<key>}` placeholders in the realm JSON resolve at runtime from files
+# under KC_VAULT_DIR. Must be KC_VAULT=file, not env - the env provider doesn't
+# exist on the installed RHBK version and crash-loops the server.
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -32,7 +31,8 @@ spec:
     podTemplate:
       spec:
         # No readOnlyRootFilesystem: Keycloak/the JVM write caches and logs
-        # under its own filesystem at runtime, and the exact writable paths aren't verified.
+        # under its own filesystem at runtime, and the exact writable paths
+        # aren't verified.
         automountServiceAccountToken: false
         securityContext:
           runAsNonRoot: true

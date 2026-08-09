@@ -1,13 +1,15 @@
 ---
 # Crunchy Postgres Operator (PGO) install; the PostgresCluster
-# CR/ExternalSecret/ConfigMap operand is a separate Application (application-d1.yaml).
+# CR/ExternalSecret/ConfigMap operand is a separate Application
+# (application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-postgresql-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
     argocd.argoproj.io/sync-wave: "-176"
 spec:
   project: zuno

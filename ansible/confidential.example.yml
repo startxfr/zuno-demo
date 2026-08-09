@@ -1,17 +1,20 @@
 ---
 # ansible/confidential.yml (gitignored, NEVER commit) - copy this file, fill in
-# real values before `make d0 install`. Fields left as "xxxxxx" are treated as not configured.
+# real values before `make d0 install`. Fields left as "xxxxxx" are treated as
+# not configured.
 
 # --- Google OAuth (Keycloak "google" identity provider) ---------------------
-# Set false to skip the Google identity provider (no broken login button). Defaults to true.
+# Set false to skip the Google identity provider (no broken login button).
+# Defaults to true.
 zuno_keycloak_google_oauth_enabled: false
 
-# Create at https://console.cloud.google.com/apis/credentials:
-#   1. OAuth consent screen -> User type "Internal".
-#   2. Enable "Gmail API" and "Google Drive API" (realm needs gmail.readonly/drive.readonly).
-#   3. Credentials -> Create Credentials -> OAuth client ID -> "Web application".
-#   4. Authorized redirect URI: https://keycloak.<cluster-base-domain>/realms/zuno/broker/google/endpoint
-#   5. Copy the Client ID and Client Secret (secret shown once).
+# Create at https://console.cloud.google.com/apis/credentials:   1. OAuth
+# consent screen -> User type "Internal".   2. Enable "Gmail API" and "Google
+# Drive API" (realm needs gmail.readonly/drive.readonly).   3. Credentials ->
+# Create Credentials -> OAuth client ID -> "Web application".   4. Authorized
+# redirect URI:
+# https://keycloak.<cluster-base-domain>/realms/zuno/broker/google/endpoint   5.
+# Copy the Client ID and Client Secret (secret shown once).
 zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 
@@ -19,11 +22,11 @@ zuno_google_oauth_client_secret: "xxxxxx"
 # Set false to skip deploying the smtp component. Defaults to true.
 zuno_smtp_enabled: false
 
-# Example uses AWS SES; any SMTP provider works the same way.
-#   1. Verify the sending domain/address in SES (required before sending;
-#      new accounts start sandboxed to verified recipients only).
-#   2. Note the SMTP endpoint for your region - this is zuno_smtp_host below.
-#   3. Create SMTP Credentials -> copy the generated username/password (shown once).
+# Example uses AWS SES; any SMTP provider works the same way.   1. Verify the
+# sending domain/address in SES (required before sending;      new accounts
+# start sandboxed to verified recipients only).   2. Note the SMTP endpoint for
+# your region - this is zuno_smtp_host below.   3. Create SMTP Credentials ->
+# copy the generated username/password (shown once).
 zuno_smtp_host: "xxxxxx"            # e.g. email-smtp.eu-west-1.amazonaws.com
 zuno_smtp_port: "587"               # 587 (STARTTLS), 465 (TLS) or 25
 zuno_smtp_username: "xxxxxx"

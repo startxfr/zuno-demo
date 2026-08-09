@@ -1,6 +1,7 @@
 ---
-# Shared OTLP Collector every service sends traces/metrics to (not the
-# operator, see application-d0.yaml). No long-term storage backend; debug/log exporter only.
+# Shared OTLP Collector every service sends traces/metrics to (not the operator,
+# see application-d0.yaml). No long-term storage backend; debug/log exporter
+# only.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

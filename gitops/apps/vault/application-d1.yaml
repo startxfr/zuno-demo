@@ -1,6 +1,7 @@
 ---
-# Demo-grade Vault: single replica, file storage, no HA/auto-unseal.
-# Application name stays static ("zuno-vault-d1") to avoid ever creating a second, divergent release.
+# Demo-grade Vault: single replica, file storage, no HA/auto-unseal. Application
+# name stays static ("zuno-vault-d1") to avoid ever creating a second, divergent
+# release.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,7 +16,9 @@ spec:
     targetRevision: main
     path: gitops/charts/vault
     helm:
-      # Forces the release name to "zuno-vault"; without it, resources would inherit "zuno-vault-d1" and break the chart's fixed-release-name assumption.
+      # Forces the release name to "zuno-vault"; without it, resources would
+      # inherit "zuno-vault-d1" and break the chart's fixed-release-name
+      # assumption.
       releaseName: zuno-vault
       values: |
         route:

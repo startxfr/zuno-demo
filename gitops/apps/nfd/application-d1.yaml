@@ -1,5 +1,6 @@
 ---
-# Node Feature Discovery instance CR (not the operator itself, see application-d0.yaml).
+# Node Feature Discovery instance CR (not the operator itself, see
+# application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

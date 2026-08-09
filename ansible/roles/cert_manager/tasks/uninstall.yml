@@ -1,8 +1,8 @@
 ---
-# Order matters: delete d1 (ClusterIssuer) first to avoid ArgoCD fighting
-# the CRD deletion, then remove the operator while the Subscription (a
-# d0-managed resource) still exists to read its installedCSV, then delete d0.
-# Vault's pki/ engine and issuer role/policy are not cleaned up here (demo scope).
+# Order matters: delete d1 (ClusterIssuer) first to avoid ArgoCD fighting the
+# CRD deletion, then remove the operator while the Subscription (a d0-managed
+# resource) still exists to read its installedCSV, then delete d0. Vault's pki/
+# engine and issuer role/policy are not cleaned up here (demo scope).
 - name: "cert_manager | delete the cert-manager GitOps Application (d1: ClusterIssuer)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

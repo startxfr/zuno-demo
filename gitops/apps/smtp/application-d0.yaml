@@ -1,13 +1,15 @@
 ---
 # namespace.enabled stays false; zuno-ai-run is owned solely by
-# gitops/charts/namespaces, to avoid two Applications tracking the same Namespace.
+# gitops/charts/namespaces, to avoid two Applications tracking the same
+# Namespace.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-smtp-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
     argocd.argoproj.io/sync-wave: "-180"
 spec:
   project: zuno

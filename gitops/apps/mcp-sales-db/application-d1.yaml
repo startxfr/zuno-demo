@@ -1,6 +1,7 @@
 ---
-# The sales-db MCP server. Applied after -d0's PreSync hook Job has
-# populated the schema this server reads from; ArgoCD blocks -d0 Synced until that hook succeeds.
+# The sales-db MCP server. Applied after -d0's PreSync hook Job has populated
+# the schema this server reads from; ArgoCD blocks -d0 Synced until that hook
+# succeeds.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
