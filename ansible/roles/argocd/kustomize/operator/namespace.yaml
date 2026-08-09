@@ -4,3 +4,10 @@ metadata:
   name: openshift-gitops-operator
   labels:
     zuno.io/managed-by: zuno-ansible
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-gitops
+  labels:
+    zuno.io/managed-by: zuno-ansible
