@@ -9,33 +9,33 @@ namespaces:
   - name: zuno-agent-comage
     agent: comage
     status: placeholder
-    displayName: Zuno Comage Agent
+    displayName: Zuno Agent Comage
     description: >-
       Sales assistant - placeholder namespace reserved for the
       follow-up/PO-tracking agent (ADR-0023).
   - name: zuno-agent-tekos
     agent: tekos
     status: active
-    displayName: Zuno Tekos Agent
+    displayName: Zuno Agent Tekos
     description: Technical consultant assistant - the only active v0 agent instance.
   - name: zuno-agent-advantage
     agent: advantage
     status: placeholder
-    displayName: Zuno Advantage Agent
+    displayName: Zuno Agent Advantage
     description: >-
       Sales administration assistant - placeholder namespace reserved for
       new-business/PO reporting.
   - name: zuno-agent-finage
     agent: finage
     status: placeholder
-    displayName: Zuno Finage Agent
+    displayName: Zuno Agent Finage
     description: >-
       Finance assistant - placeholder namespace reserved for
       invoicing-readiness reporting.
   - name: zuno-agent-arkos
     agent: arkos
     status: placeholder
-    displayName: Zuno Arkos Agent
+    displayName: Zuno Agent Arkos
     description: >-
       Architecture assistant - placeholder namespace reserved for
       DAT/Odyssey-workshop support.
