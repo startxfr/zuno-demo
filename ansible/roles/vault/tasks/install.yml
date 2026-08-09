@@ -536,17 +536,41 @@
       way). ADR-0014's real Google OAuth delegation depends on the first
       one - everything else in this file is unattended.
 
-# LLM provider API keys (ADR-0020's ModelRouter fail-over). Same
-# check-then-placeholder idiom as the google-oauth/smtp/confluence block
-# above, kept separate because the field name differs: those seed an opaque
-# `_placeholder=true` marker, while platform/ai-gateway/externalsecret-
-# {openai,gemini,anthropic,mistral}.yaml each resolve a specific `api_key`
-# property, so the placeholder has to carry that same key. Formerly seeded
-# by ansible/roles/llm/tasks/install.yml itself via a direct
+# LLM provider API keys (ADR-0020's ModelRouter fail-over), supplied via
+# ansible/confidential.yml same as google-oauth/smtp/confluence above -
+# written unconditionally when real (idempotent, confidential.yml is the
+# source of truth), then the check-then-placeholder idiom below fills in
+# whichever ones are still unset. Kept separate from that block because the
+# field name differs: those seed an opaque `_placeholder=true` marker,
+# while platform/ai-gateway/externalsecret-{openai,gemini,anthropic,
+# mistral}.yaml each resolve a specific `api_key` property, so both the
+# real seed and the placeholder have to carry that same key. Formerly
+# seeded by ansible/roles/llm/tasks/install.yml itself via a direct
 # vault-bootstrap-credentials read + k8s_exec - moved here so llm's own
 # install.yml only ever registers GitOps Applications, consistent with
 # every other day1 role (ADR-0024: this role is the platform's one
 # legitimate direct Vault writer).
+- name: "vault | seed real LLM provider API keys from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/providers/{{ provider_key.key }}
+      api_key={{ provider_key.value | quote }}"
+  loop: "{{ _llm_provider_real_keys | dict2items }}"
+  loop_control:
+    loop_var: provider_key
+    label: "{{ provider_key.key }}"
+  when: provider_key.value | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+  vars:
+    _llm_provider_real_keys:
+      openai: "{{ zuno_llm_provider_openai_api_key | default('xxxxxx') }}"
+      gemini: "{{ zuno_llm_provider_gemini_api_key | default('xxxxxx') }}"
+      anthropic: "{{ zuno_llm_provider_anthropic_api_key | default('xxxxxx') }}"
+      mistral: "{{ zuno_llm_provider_mistral_api_key | default('xxxxxx') }}"
+
 - name: "vault | check whether LLM provider API keys already exist"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -584,11 +608,15 @@
 - name: "vault | LLM provider operator action required"
   ansible.builtin.debug:
     msg: >-
-      zuno/providers/{openai,gemini,anthropic,mistral} are placeholders
-      until an operator populates them, e.g.
-      `vault kv put zuno/providers/openai api_key=...`. Until then
-      components/agent-runtime's ModelRouter simply fails over past that
-      provider (ADR-0020) - the local model always stays eligible.
+      zuno/providers/{openai,gemini,anthropic,mistral} are still
+      placeholders - the corresponding zuno_llm_provider_<name>_api_key
+      value(s) in ansible/confidential.yml are still the "xxxxxx" sentinel
+      from confidential.example.yml. Fill them in and re-run
+      `make d0 install vault` (this role re-seeds from confidential.yml on
+      every run, without overwriting anything already populated another
+      way). Until filled in, components/agent-runtime's ModelRouter simply
+      fails over past that provider (ADR-0020) - the local model always
+      stays eligible.
 
 # Not a secret, but Vault is this platform's single source of truth for
 # runtime configuration too (ADR-0024) - storing it here means any

@@ -99,3 +99,20 @@ zuno_postgresql_backup_s3_endpoint: "xxxxxx"
 zuno_postgresql_backup_s3_region: "xxxxxx"
 zuno_postgresql_backup_s3_access_key: "xxxxxx"
 zuno_postgresql_backup_s3_secret_key: "xxxxxx"
+
+# --- LLM external provider API keys (ADR-0020 ModelRouter fail-over) -------
+# Each is independently optional: leave any at "xxxxxx" and the ModelRouter
+# simply fails over past that provider to the next eligible one (the local
+# model is always eligible, so the platform stays usable with none of these
+# filled in). Seeded into Vault by ansible/roles/vault/tasks/install.yml at
+# zuno/providers/<name>, resolved by platform/ai-gateway/externalsecret-
+# <name>.yaml into the llm-provider-<name> Secret components/agent-runtime
+# reads from.
+#   OpenAI:    https://platform.openai.com/api-keys
+#   Gemini:    https://aistudio.google.com/apikey
+#   Anthropic: https://console.anthropic.com/settings/keys
+#   Mistral:   https://console.mistral.ai/api-keys
+zuno_llm_provider_openai_api_key: "xxxxxx"
+zuno_llm_provider_gemini_api_key: "xxxxxx"
+zuno_llm_provider_anthropic_api_key: "xxxxxx"
+zuno_llm_provider_mistral_api_key: "xxxxxx"
