@@ -1,22 +1,13 @@
 ---
-# RHBK (Red Hat build of Keycloak) operator install (ADR-0312). See
-# gitops/charts/keycloak (operator.enabled - Subscription/OperatorGroup,
-# rendered by the vendored startx `operator` chart - see that chart's
-# Chart.yaml for why not `cluster-sso`). Applied by the `keycloak` Ansible
-# role's install.yml, with the operator's
-# catalog-discovered channel injected via gitops_app_extra_helm_values
-# (ADR-0048) - see that role's README.md. The Keycloak CR/RealmImport/
-# ExternalSecrets operand is a separate Application
-# (zuno-keycloak-d1, applied after this one is Synced+Healthy) - see
-# application-d1.yaml.
+# RHBK (Red Hat build of Keycloak) operator install; the Keycloak
+# CR/RealmImport/ExternalSecrets operand is a separate Application (application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-keycloak-d0
   namespace: openshift-gitops
   annotations:
-    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
-    # only - Ansible applies each Application directly and ignores this.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-168"
 spec:
   project: zuno
@@ -34,11 +25,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: zuno-auth
   ignoreDifferences:
-    # OLM's OperatorGroup controller rewrites this annotation at runtime
-    # with the APIs the installed CSV(s) actually provide - the chart
-    # only ever renders it empty/absent, so without this ArgoCD sees
-    # permanent drift and (selfHeal: true) fights OLM's own value on
-    # every sync.
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees permanent drift and fights it.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

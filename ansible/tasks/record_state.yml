@@ -1,15 +1,6 @@
 ---
-# Shared task: called at the end of every role's tasks/precheck.yml with a
-# single input var, _state_is_installed (bool). Uses the ansible_role_name
-# magic var (the currently-executing role's directory name, provided
-# automatically by Ansible) so no role has to spell out its own name - and
-# so the fact name/report line can never drift from the role's actual
-# directory name.
-#
-# Never fails - "not installed yet" is a normal, reportable outcome, not
-# an error (the fail-fast behavior stays in install.yml itself, which
-# still fails if a component it needs isn't there when it actually tries
-# to act).
+# Called at the end of every role's precheck.yml with _state_is_installed
+# (bool). Never fails - "not installed yet" is a normal, reportable outcome.
 - name: "state-report | validate required vars are set"
   ansible.builtin.assert:
     that:

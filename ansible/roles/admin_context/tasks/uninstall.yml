@@ -1,7 +1,6 @@
 ---
-# Reverse of install.yml. The StorageClass check has nothing to undo. The
-# zuno AppProject is deleted by the argocd role's own uninstall.yml now
-# (it applies it, in argocd's install.yml) - see that file's comment.
+# The StorageClass check has nothing to undo; the zuno AppProject is
+# deleted by argocd's own uninstall.yml since it's applied there too.
 - name: "admin_context | delete the PriorityClasses"
   kubernetes.core.k8s:
     state: absent

@@ -1,8 +1,6 @@
 ---
-# Day 0 (ADR-0056): `make day0 uninstall`/`make d0 uninstall`. Reverses
-# `install`, in the opposite order (last-installed, first-removed) so
-# e.g. vault is torn down before external_secrets, whose ClusterSecretStore
-# depends on the Vault auth role vault's own configure step created.
+# Day 0 uninstall (`make day0 uninstall`). Reverses install order so
+# dependents are removed before what they depend on.
 - name: "Day 0: uninstall prerequisites"
   hosts: localhost
   gather_facts: false

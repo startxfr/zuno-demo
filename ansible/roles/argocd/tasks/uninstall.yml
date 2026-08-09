@@ -1,11 +1,6 @@
 ---
-# Reverse of install.yml. There is no root App-of-Apps to delete here: since
-# ADR-0311, nothing
-# under ansible/ ever applies gitops/root-app-of-apps.yaml, so uninstall
-# only has to remove the operator's own resources. An operator who applied
-# the App-of-Apps by hand, following its documented example in
-# docs/platform/installation.md, is responsible for removing it the same
-# way (`oc -n openshift-gitops delete application zuno-app-of-apps`).
+# No root App-of-Apps to delete: ansible never applies gitops/root-app-of-apps.yaml,
+# so uninstall only removes the operator's own resources.
 - name: "argocd | delete the application-controller ClusterRoleBinding"
   kubernetes.core.k8s:
     state: absent
@@ -21,12 +16,4 @@
     name: zuno
     namespace: openshift-gitops
 
-# - name: "argocd | remove the operator (its owned CRDs, then the CSV, then the Subscription)"
-#   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
-#   vars:
-#     operator_subscription_name: openshift-gitops-operator
-#     operator_namespace: openshift-operators
-
-# openshift-gitops-operator (the Namespace) and openshift-operators (shared
-# with other Day 0 operators) are left in place - see
-# ansible/roles/namespaces for the platform's namespace lifecycle.
+# Operator removal is intentionally skipped here.

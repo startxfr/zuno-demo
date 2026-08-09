@@ -1,10 +1,6 @@
 ---
-# The sales-db MCP server (ADR-0017) - see gitops/charts/mcp-sales-db and
-# components/mcp-servers/sales-db. Applied by the `sql_schema` role's
-# install.yml, after -d0 (gitops/charts/sql-schema)'s PreSync hook Job has
-# populated the schema this server reads from - ArgoCD blocks -d0 Synced
-# until that hook succeeds. No operator involved, so all of this
-# component's content is -d1.
+# The sales-db MCP server. Applied after -d0's PreSync hook Job has
+# populated the schema this server reads from; ArgoCD blocks -d0 Synced until that hook succeeds.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

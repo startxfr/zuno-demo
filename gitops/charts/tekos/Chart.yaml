@@ -1,12 +1,9 @@
 apiVersion: v2
 name: tekos
 description: >-
-  Tekos frontend (portal + chat UI) and BFF: one plain Kubernetes
+  Tekos frontend (portal + chat UI) and BFF: plain Kubernetes
   Deployment/Service/Route (frontend) and Deployment/Service (BFF) in the
-  zuno-agent-tekos namespace (ADR-0008, ADR-0023). Deliberately a plain
-  Deployment rather than the AIAgent CRD - see ADR-0026 (retargeted to v1)
-  and platform/architecture/agent-platform-separation.md. Referenced by
-  exactly one Application, gitops/apps/api/application-d1.yaml.
+  zuno-agent-tekos namespace.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

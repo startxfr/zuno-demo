@@ -1,8 +1,6 @@
-# This chart is shared by two ArgoCD Applications (see
-# gitops/apps/README.md): zuno-smtp-d0 (namespace.enabled, left false -
-# see templates/namespace.yaml) and credentials.enabled (zuno-smtp-d1)
-# rendering the smtp-technical-credentials ExternalSecret. Both default
-# to false so `helm template`/`helm lint` render nothing by default.
+# Shared by two ArgoCD Applications: namespace (zuno-smtp-d0) and
+# credentials (zuno-smtp-d1). Both default false so `helm template`/`helm
+# lint` render nothing.
 namespace:
   enabled: false
 credentials:

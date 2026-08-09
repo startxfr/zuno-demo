@@ -1,20 +1,7 @@
 ---
-# ADR-0029: instrument model usage, cost and distributed traces. This role
-# installs the collection path only - a Collector every service in
-# components/ can send OTLP traces/metrics to. It does not install a
-# long-term backend (Tempo/Prometheus storage): the Collector's debug/log
-# exporter is enough to prove the pipeline for a demo; wiring a real backend
-# is future work (ADR-0029 doesn't mandate one for v0, only instrumentation).
-#
-# Namespace/OperatorGroup/Subscription (operator.enabled) and the
-# zuno-telemetry Namespace + OpenTelemetryCollector CR (collector.enabled)
-# both live in gitops/charts/observability, applied via two separate
-# Applications (zuno-observability-d0/-d1, same ADR-0312 pattern as
-# nfd/nvidia_gpu/openshift_ai) - -d1 is only applied once -d0 is
-# Synced+Healthy, whose custom Subscription health check
-# (ansible/roles/argocd/tasks/apply_resource_health_checks.yml) already
-# confirms the CSV (and therefore the OpenTelemetryCollector CRD it
-# registers) is installed, so no separate CRD-established wait is needed.
+# Installs the collection path only - a Collector every service can send
+# OTLP traces/metrics to. No long-term backend (Tempo/Prometheus storage);
+# the debug/log exporter is enough to prove the pipeline for a demo.
 - name: "observability | apply the observability GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -33,12 +20,8 @@
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 
-# ArgoCD's default health evaluation has no logic for
-# opentelemetry.io/OpenTelemetryCollector - it reports the CR Healthy as
-# soon as synced, not once the Deployment it triggers is actually ready.
-# Kept as a supplementary explicit wait, same convention
-# ansible/roles/{postgresql,keycloak,openshift_ai} use for their own
-# CR-specific readiness beyond the generic Application wait.
+# ArgoCD has no health logic for OpenTelemetryCollector - it reports the
+# CR Healthy as soon as synced, not once the Deployment is actually ready.
 - name: "observability | wait for the collector Deployment to be ready"
   kubernetes.core.k8s_info:
     api_version: apps/v1

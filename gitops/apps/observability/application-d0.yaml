@@ -1,18 +1,13 @@
 ---
-# Red Hat build of OpenTelemetry operator install (ADR-0029). See
-# gitops/charts/observability (operator.enabled - Namespace/OperatorGroup/
-# Subscription). Applied by the `observability` Ansible role's install.yml.
-# The shared OpenTelemetryCollector operand is a separate Application
-# (zuno-observability-d1, applied after this one is Synced+Healthy) - see
-# application-d1.yaml.
+# OpenTelemetry operator install; the shared Collector operand is a
+# separate Application (application-d1.yaml) applied after this one is healthy.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-observability-d0
   namespace: openshift-gitops
   annotations:
-    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
-    # only - Ansible applies each Application directly and ignores this.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-206"
 spec:
   project: zuno
@@ -29,11 +24,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-opentelemetry-operator
   ignoreDifferences:
-    # OLM's OperatorGroup controller rewrites this annotation at runtime
-    # with the APIs the installed CSV(s) actually provide - the chart
-    # only ever renders it empty/absent, so without this ArgoCD sees
-    # permanent drift and (selfHeal: true) fights OLM's own value on
-    # every sync.
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees permanent drift and fights it.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:
@@ -43,8 +34,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # openshift-opentelemetry-operator (this Application's
-      # destination.namespace) is created nowhere else - also backed by
-      # the chart's own namespace-operator.yaml PreSync hook as a
-      # redundant safeguard.
+      # Namespace isn't created elsewhere, so CreateNamespace is required here.
       - CreateNamespace=true

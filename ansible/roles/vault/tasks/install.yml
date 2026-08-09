@@ -1,19 +1,7 @@
 ---
-# Installs Vault via its GitOps Application (gitops/apps/vault), then
-# imperatively initializes it. This is the one component that cannot
-# depend on Vault for its own bootstrap secret: the unseal key and root
-# token are captured here and stored in vault-bootstrap-credentials, a
-# Kubernetes Secret in zuno-vault. See ADR-0024's "Hardened requirement".
-# Unsealing itself happens further down, via the vault-unseal-configure
-# Job - that Job re-runs (and re-unseals) every time this file is
-# invoked, e.g. after a Vault pod restart reseals it.
-#
-# Operator-supplied secrets (Google OAuth, SMTP technical credentials,
-# Confluence token) come from ansible/confidential.yml, gitignored and
-# never written to a Git-tracked file (see ansible/README.md). Checked for
-# up front so a missing file fails fast, before spending time applying the
-# Application below, instead of surfacing later as silent empty
-# placeholders.
+# Installs Vault via GitOps, then imperatively initializes and unseals it -
+# the one component that can't depend on Vault for its own bootstrap secret.
+# Operator-supplied secrets come from ansible/confidential.yml (gitignored).
 - name: "vault | verify ansible/confidential.yml is present"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
@@ -39,49 +27,24 @@
   vars:
     gitops_component_name: "vault"
     gitops_app_phase: "d0"
-    # NOT "{{ zuno_id }}-{{ gitops_component_name }}-d0" (this role's
-    # usual convention, e.g. every other role in this file): gitops/apps/
-    # vault/application-d0.yaml/application-d1.yaml's own checked-in names
-    # are the static "zuno-vault-d0"/"zuno-vault-d1" - not zuno_id-derived.
-    # See the application-d1.yaml call below for why.
+    # Static name, not zuno_id-derived: matches application-d0.yaml.
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
 
-# Vault has no OLM operator at all (a plain Helm deployment) - all of its
-# content is -d1, see gitops/apps/vault/application-d1.yaml.
+# Vault has no OLM operator (plain Helm deployment) - all content is -d1.
 - name: "vault | apply the Vault GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "vault"
     gitops_app_phase: "d1"
-    # NOT "{{ zuno_id }}-{{ gitops_component_name }}-d1" (this role's
-    # usual convention): gitops/apps/vault/application-d1.yaml's own
-    # checked-in name is the static "zuno-vault-d1" - not zuno_id-derived.
-    # Naming this Application "{{ zuno_id }}-vault-d1" instead, as every
-    # other role here does, was found live on api.demo222.startx.fr
-    # (before the -d0/-d1 split, on the single former "zuno-vault") to
-    # create a *second*, independent Vault release/StatefulSet alongside
-    # the one an operator-applied root App-of-Apps
-    # (gitops/root-app-of-apps.yaml, kept only as a documented bootstrap
-    # example since ADR-0311, no longer applied by Ansible) would create
-    # under its own static name. Matching the static file's own name here
-    # keeps this role's Applications and that documented example
-    # converging on the same desired state, for anyone who follows both
-    # paths on the same cluster.
+    # Static name matching application-d1.yaml - a zuno_id-derived name
+    # would create a second, independent Vault release.
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
-    # The chart's readinessProbe runs `vault status`, which exits non-zero
-    # while sealed - so the StatefulSet (and therefore the Application)
-    # can never report Healthy until Vault is unsealed, which only
-    # happens via this same role's own imperative steps below. Waiting
-    # here for Synced+Healthy would deadlock forever on a fresh install.
-    # The StatefulSet-exists/Pod-Running waits immediately below are this
-    # role's own equivalent, sufficient wait.
+    # readinessProbe runs `vault status`, which fails while sealed, so
+    # waiting for Healthy here would deadlock a fresh install.
     gitops_app_wait: false
 
-# Label-based, not a hardcoded name: the Helm release name (and therefore
-# every resource's name) isn't a repository-wide constant - see the
-# gitops_app_name comment above. app.kubernetes.io/name=vault is the
-# official HashiCorp chart's own stable label, present regardless of
-# release name.
+# Label-based, not a hardcoded release name: app.kubernetes.io/name=vault
+# is the chart's stable label regardless of release name.
 - name: "vault | wait for the Vault StatefulSet to exist"
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -156,18 +119,8 @@
   when: _vault_init_raw is defined and _vault_init_raw.stdout is defined
   no_log: true
 
-# Runs the vault-unseal-configure Job (unseals Vault, then enables the KV
-# v2 secrets engine, the Kubernetes auth method, and the eso-reader
-# role/policy every ExternalSecret in the platform resolves through - see
-# ansible/roles/vault/kustomize/unseal-configure/configmap.yaml for the
-# actual script). A Job, not ansible k8s_exec, so it can be re-run inside
-# the cluster at any time - e.g. after a Vault pod restart reseals it -
-# without needing a full ansible run; same "Job, not exec" reasoning as
-# ansible/roles/sql_schema and ansible/roles/rag's schema-apply Jobs.
-# Also seeds self-generatable application secrets and reserves empty
-# placeholders for the handful that require an operator to supply real
-# input (the Google OAuth client secret, SMTP credentials) - see ADR-0014
-# and ADR-0024.
+# Runs the vault-unseal-configure Job (unseal + KV/auth/policy setup) as a
+# Job, not k8s_exec, so it can be re-run in-cluster after a pod restart reseals it.
 - name: "vault | read bootstrap credentials"
   kubernetes.core.k8s_info:
     kind: Secret
@@ -186,13 +139,9 @@
     _vault_root_token: "{{ _vault_creds.resources[0].data.root_token | b64decode }}"
   no_log: true
 
-# Discovered, not hardcoded "vault.zuno-data.svc" or "{{ zuno_id }}-vault":
-# the Helm release name isn't a repository-wide constant (see the
-# gitops_app_name comment above) and the chart creates three Services
-# sharing app.kubernetes.io/name=vault (client, -internal headless, -ui) -
-# only the plain client one (no vault-internal label) is what VAULT_ADDR
-# needs. _vault_pod is already available from the wait above (same pod,
-# already confirmed Running) - no need to re-look it up.
+# Discovered by label, not hardcoded: the chart creates 3 Services sharing
+# app.kubernetes.io/name=vault (client, -internal, -ui) - only the plain
+# client one is the right VAULT_ADDR target.
 - name: "vault | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service
@@ -211,10 +160,7 @@
       }}
 
 # A dedicated copy, not a direct reference to vault-bootstrap-credentials:
-# keeps the Job's own dependency self-contained and separately named, same
-# spirit as ansible/roles/agents/tasks/run_acceptance_gate.yml's
-# acceptance-gate-credentials Secret (there, the copy is also cross-
-# namespace; here both Secrets happen to live in zuno-vault already).
+# keeps the Job's dependency self-contained and separately named.
 - name: "vault | copy the unseal key/root token into a Secret the Job can mount"
   kubernetes.core.k8s:
     state: present
@@ -232,10 +178,8 @@
         root_token: "{{ _vault_creds.resources[0].data.root_token }}"
   no_log: true
 
-# ADR-0310: the script itself is static (ansible/roles/vault/kustomize/
-# unseal-configure/) - only the Job that runs it stays inline, below,
-# since (like ansible/roles/sql_schema and ansible/roles/rag's schema-
-# apply Jobs) it's deleted and recreated every run.
+# The script is static (kustomize/unseal-configure/); only the Job that
+# runs it stays inline, since it's deleted and recreated every run.
 - name: "vault | apply the unseal/configure script ConfigMap"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
@@ -340,11 +284,8 @@
     namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
     container: vault
-    # `environment:` is the generic Ansible task keyword - it sets env vars
-    # for the *ansible controller's own* module invocation, not the remote
-    # exec session kubernetes.core.k8s_exec opens (that module has no
-    # env-passing parameter of its own). VAULT_TOKEN has to be set inside
-    # the shell command that actually runs in the container instead.
+    # k8s_exec has no env-passing parameter, so VAULT_TOKEN is set inside
+    # the shell command itself rather than via Ansible's `environment:`.
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ generated_secret.key }}
       username={{ generated_secret.value.username }} password={{ generated_secret.value.password }}"
@@ -359,14 +300,8 @@
         username: admin
         password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
       postgresql/app:
-        # No underscore/hyphen (zunoapp, not zuno_app/zuno-app): PGO's
-        # PostgresCluster derives a Kubernetes Secret name directly from
-        # spec.users[].name ("<cluster>-pguser-<user>", RFC 1123 label
-        # rules - no underscores), and unquoted PostgreSQL identifiers
-        # can't contain hyphens either - lowercase-letters-and-digits-only
-        # is the one charset valid in both. Discovered via `helm lint`
-        # while migrating this role from CloudNativePG (which had no such
-        # constraint) to PGO - see ansible/roles/postgresql/README.md.
+        # Lowercase letters/digits only: PGO derives an RFC 1123 Secret name
+        # from this, and unquoted PostgreSQL identifiers reject hyphens.
         username: zunoapp
         password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
 
@@ -410,12 +345,8 @@
       hmac_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
   no_log: true
 
-# The three secrets below can't be self-generated - they're credentials for
-# real external services, supplied via ansible/confidential.yml (loaded
-# above). Each is (re-)written from confidential.yml on every run once
-# filled in (idempotent, confidential.yml is the source of truth - safe to
-# re-apply); until then it falls through to the check-then-placeholder
-# idiom below, same as always.
+# These can't be self-generated - real external service credentials,
+# supplied via ansible/confidential.yml and re-applied idempotently.
 - name: "vault | seed the Google OAuth client from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -444,13 +375,8 @@
     and zuno_smtp_password | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# url/email are required alongside token: Atlassian Cloud's REST API
-# authenticates with email+API-token Basic Auth, not a bearer token
-# alone, and the base site URL is needed to know which Confluence
-# instance to call - a token by itself was never enough to actually use
-# this credential. enabled is written as plain metadata, not part of the
-# when: gate below (redundant with checking real values are present) -
-# for the future MCP confluence server to read once it exists.
+# url/email are required alongside token: Atlassian Cloud's REST API uses
+# email+API-token Basic Auth, not a bearer token alone.
 - name: "vault | seed the Confluence technical credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -467,12 +393,9 @@
     and zuno_atlassian_confluence_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# Only seeded when all five fields are real - unlike google-oauth/smtp/
-# confluence above, this one has no placeholder fallback: the ExternalSecret
-# that reads it (gitops/charts/postgresql/templates/externalsecret-backup-s3.yaml)
-# is itself only rendered when ansible/roles/postgresql/tasks/install.yml
-# detects the same five real values and sets backups.s3.enabled - so there's
-# never a case where that ExternalSecret exists but this Vault path doesn't.
+# Only seeded when all five fields are real - no placeholder fallback,
+# since the ExternalSecret that reads it only renders under the same
+# condition (postgresql role's backups.s3.enabled).
 - name: "vault | seed the PostgreSQL backup S3 credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -536,20 +459,10 @@
       way). ADR-0014's real Google OAuth delegation depends on the first
       one - everything else in this file is unattended.
 
-# LLM provider API keys (ADR-0020's ModelRouter fail-over), supplied via
-# ansible/confidential.yml same as google-oauth/smtp/confluence above -
-# written unconditionally when real (idempotent, confidential.yml is the
-# source of truth), then the check-then-placeholder idiom below fills in
-# whichever ones are still unset. Kept separate from that block because the
-# field name differs: those seed an opaque `_placeholder=true` marker,
-# while platform/ai-gateway/externalsecret-{openai,gemini,anthropic,
-# mistral}.yaml each resolve a specific `api_key` property, so both the
-# real seed and the placeholder have to carry that same key. Formerly
-# seeded by ansible/roles/llm/tasks/install.yml itself via a direct
-# vault-bootstrap-credentials read + k8s_exec - moved here so llm's own
-# install.yml only ever registers GitOps Applications, consistent with
-# every other day1 role (ADR-0024: this role is the platform's one
-# legitimate direct Vault writer).
+# LLM provider API keys, supplied via ansible/confidential.yml. Kept
+# separate from the block above because the placeholder key name differs:
+# externalsecret-{openai,gemini,anthropic,mistral}.yaml each resolve
+# `api_key`, so both real seed and placeholder must use that same key.
 - name: "vault | seed real LLM provider API keys from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -618,13 +531,8 @@
       fails over past that provider (ADR-0020) - the local model always
       stays eligible.
 
-# Not a secret, but Vault is this platform's single source of truth for
-# runtime configuration too (ADR-0024) - storing it here means any
-# consumer without direct cluster API access (a pod via ExternalSecret,
-# ansible/tasks/apply_gitops_app.yml on a run where this task hasn't fired
-# yet) has exactly one place to read it from instead of a second,
-# potentially stale, hand-maintained copy. See
-# ansible/tasks/resolve_cluster_base_domain.yml for how it's discovered.
+# Not a secret, but Vault is the single source of truth for runtime config
+# too, so consumers without cluster API access can read it via ExternalSecret.
 - name: "vault | resolve the cluster's real apps domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 

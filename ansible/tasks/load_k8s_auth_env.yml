@@ -1,14 +1,7 @@
 ---
-# Common: every role/task that talks to the OpenShift cluster does so via
-# kubernetes.core, authenticated from the operator's own kubeconfig (`oc
-# login <cluster-api-url>`, done once before any `make`/playbook - see
-# ansible/README.md) rather than any credential exported by hand or stored
-# in this repo. This task resolves that kubeconfig path once and exposes it
-# as K8S_AUTH_KUBECONFIG, which every playbook's play-level `environment:`
-# then makes visible to each module call in the play (include_role/
-# include_tasks included) - so no individual role has its own copy of this
-# logic. Idempotent within a single playbook run via the `is not defined`
-# guard, same pattern as resolve_cluster_base_domain.yml.
+# Resolves the operator's kubeconfig (`oc login` beforehand) and exposes it
+# as K8S_AUTH_KUBECONFIG via each playbook's environment:, so no role
+# duplicates this logic.
 - name: "k8s-auth | resolve the operator's kubeconfig path"
   ansible.builtin.set_fact:
     k8s_auth_kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') | default(lookup('env', 'HOME') + '/.kube/config', true) }}"

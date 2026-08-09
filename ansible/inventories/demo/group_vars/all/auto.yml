@@ -1,22 +1,13 @@
 ---
-# ID of the organisation en upperCase
 zuno_orgID: "{{ zuno_orgId | upper  }}"
 
-# Name of the environment
 zuno_env: demo
-# Name of the environment
 zuno_environment: "{{ zuno_env | default('dev') }}"
-# Name of the environment
 zuno_envID: "{{ zuno_envId | default(zuno_environment) | upper }}"
 
-# Repo root, resolved relative to a playbook running from ansible/playbooks/.
-# Used by ansible/tasks/apply_gitops_app.yml and the vault role to locate
-# gitops/ manifests without hardcoding an absolute path.
+# Repo root, resolved relative to playbooks in ansible/playbooks/.
 zuno_repo_root: "{{ playbook_dir }}/../.."
 
-# Name of the organisation
 zuno_name: "{{ zuno_org }}-{{ zuno_env }}"
-# Id of the organisation
 zuno_id: "{{ zuno_orgId }}{{ zuno_envId }}"
-# ID of the organisation
 zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"

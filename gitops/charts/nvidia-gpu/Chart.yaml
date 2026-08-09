@@ -2,14 +2,8 @@ apiVersion: v2
 name: nvidia-gpu
 description: >-
   NVIDIA GPU Operator (OLM Subscription, certified-operators catalog) and
-  its default ClusterPolicy, enabling GPU scheduling (ADR-0312). The
-  ClusterPolicy spec is supplied at apply time from the installed CSV's
-  own alm-examples - see this chart's README.md for why it is not
-  rendered on the operator's first sync. Wraps the startx cluster-gpu
-  chart (github.com/startxfr/helm-repository) as a dependency, same
-  pattern as gitops/charts/vault wrapping hashicorp/vault - cluster-gpu
-  itself renders the Namespace/OperatorGroup/Subscription (via its own
-  project/operator dependencies) and the ClusterPolicy CR.
+  its ClusterPolicy, enabling GPU scheduling. Wraps the startx cluster-gpu
+  chart as a dependency.
 type: application
 version: 0.2.0
 appVersion: "0.2.0"

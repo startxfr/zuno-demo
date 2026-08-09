@@ -1,11 +1,5 @@
 {{- /*
-Fails the render if the operator is enabled without a discovered channel/
-catalog source - same fail-fast guard this chart's previous local
-Subscription template enforced with Helm's `required` function (ADR-0048).
-The vendored `operator` chart's own Subscription template has no such
-guard, so it is preserved here instead. Renders no resource - only a
-whitespace-only string when the checks pass, which Helm strips from the
-manifest set.
+Fails the render if the operator is enabled without a discovered channel/catalog source.
 */ -}}
 {{- if .Values.operator.enabled -}}
 {{- if not .Values.operator.subscription.operator.channel -}}

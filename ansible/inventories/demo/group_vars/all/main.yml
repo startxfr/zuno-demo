@@ -1,10 +1,6 @@
 ---
-# Name of the organisation
 zuno_org: zuno
-# ID of the organisation
 zuno_orgId: zn
 
-# Name of the environment
 zuno_env: demo
-# ID of the environment
 zuno_envId: demo

@@ -1,52 +1,24 @@
-# Default values for the vault wrapper chart. See
-# gitops/apps/vault/application-d1.yaml for how this is deployed
-# (namespace: zuno-vault, release name fixed to "zuno-vault" via that
-# Application's spec.source.helm.releaseName - the Application's own name
-# is the static "zuno-vault-d1" instead, see that file's own comment).
-
-# Cluster-specific values (clusterBaseDomain) must be overridden per
-# environment when route.enabled=true - see
-# gitops/apps/vault/application-d1.yaml's spec.source.helm.values block, same
-# apps.mycluster.example.com substitution the keycloak and tekos Applications
-# use (ansible/tasks/apply_gitops_app.yml).
+# Cluster-specific; must be overridden per environment when route.enabled=true.
 global:
   clusterBaseDomain: apps.mycluster.example.com
 
-# Off by default: ADR-0024 treats Vault as locked-down/admin-only, and this
-# demo's UI access is otherwise via port-forward. Flip route.enabled to
-# true (in gitops/apps/vault/application-d1.yaml) to front the chart's own
-# vault-ui Service with an OpenShift Route - see templates/route.yaml.
-# route.host empty means "vault.<global.clusterBaseDomain>" (computed in
-# templates/_helpers.tpl), same predictable-hostname convention as the
-# tekos and keycloak charts.
+# route.host empty means "vault.<global.clusterBaseDomain>" (see templates/_helpers.tpl).
 route:
   enabled: true
   host: ""
 
-# Values for the upstream hashicorp/vault chart dependency declared in
-# Chart.yaml, nested under this "vault:" key per Helm subchart convention
-# (matches the dependency's own `name`). Same values previously inlined
-# directly under spec.source.helm.values in
-# gitops/apps/vault/application-d1.yaml before this chart existed.
+# Values for the upstream hashicorp/vault chart dependency, nested under
+# "vault:" per Helm subchart convention.
 vault:
-  # ADR-0052: the official chart's own documented flag for OpenShift SCC
-  # compatibility (arbitrary/non-root UID, no privileged context) - this
-  # repo does not otherwise control this third-party chart's PodSpec
-  # directly, so hardening beyond this flag is left to the chart's own
-  # restricted-compatible defaults rather than guessed at via undocumented
-  # value overrides.
+  # Official chart's documented flag for OpenShift SCC compatibility
+  # (arbitrary/non-root UID, no privileged context).
   global:
     openshift: true
   server:
     image:
-      # Fully qualified: an unqualified "hashicorp/vault" short name
-      # resolves via this cluster's node-level short-name alias config to
-      # registry.connect.redhat.com/hashicorp/vault, which needs a paid
-      # Red Hat Connect pull secret this cluster doesn't have
-      # (ImagePullBackOff, "Please login to the Red Hat Registry" - found
-      # via live-cluster testing on api.demo222.startx.fr). docker.io's
-      # image is the same HashiCorp-published build, just reachable
-      # without that credential.
+      # Fully qualified: the unqualified "hashicorp/vault" short name resolves
+      # to a Red Hat Connect registry requiring a paid pull secret this
+      # cluster doesn't have. docker.io serves the same image without it.
       repository: docker.io/hashicorp/vault
       tag: "1.17.2"
     standalone:

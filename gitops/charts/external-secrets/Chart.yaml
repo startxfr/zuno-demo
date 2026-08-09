@@ -1,11 +1,6 @@
 apiVersion: v2
 name: external-secrets
-description: >-
-  External Secrets Operator (OLM Subscription, catalog/channel discovered
-  at Ansible run time - ADR-0048), its OperatorConfig operand, and the
-  Vault-backed ClusterSecretStore every ExternalSecret in this platform
-  resolves against (ADR-0024/ADR-0312). zuno-ai-run's Namespace is owned
-  by gitops/charts/namespaces, not this chart.
+description: Deploys the External Secrets Operator and the Vault-backed ClusterSecretStore used platform-wide.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

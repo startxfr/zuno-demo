@@ -6,19 +6,12 @@ namespace: zuno-ai-run
 servingRuntimeName: vllm-runtime
 inferenceServiceName: qwen25-7b-instruct
 
-# Matches agent-runtime's localModelName/localModelEndpoint expectation
-# (gitops/charts/agent-runtime/values.yaml) - KServe names the predictor
-# Service "<inferenceServiceName>-predictor".
+# Must match agent-runtime's localModelName/localModelEndpoint.
 modelId: Qwen/Qwen2.5-7B-Instruct
 
 image:
-  # ADR-0048: this default is a `helm template`/standalone-testing
-  # fallback only. The real `ansible/roles/models` configure path
-  # (tasks/discover_vllm_image.yml) always overrides this at apply time
-  # with the vLLM ServingRuntime image actually published by the
-  # installed OpenShift AI catalog (redhat-ods-applications Templates),
-  # never trusting a hardcoded guess for a real deploy - see that task
-  # file and gitops/charts/models/README.md.
+  # Fallback for `helm template`/standalone testing only; ansible always
+  # overrides this at apply time with the image published by the installed OpenShift AI catalog.
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 

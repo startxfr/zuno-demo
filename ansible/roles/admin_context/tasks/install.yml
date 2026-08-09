@@ -1,15 +1,7 @@
 ---
-# AdminContext (ADR-0056): cluster-admin-level objects every other Day 0
-# component implicitly depends on (a default StorageClass for PVC-backed
-# workloads like Vault/PostgreSQL, PriorityClasses so platform/operator
-# pods aren't preempted under node pressure) - positioned first in the
-# Day 0 sequence, before argocd.
-#
-# StorageClass is discover-only, never invented: this repository has no
-# way to know a given cluster's actual storage provisioner (AWS EBS/gp3,
-# ODF, etc.), so rather than guess parameters that would be wrong on most
-# clusters, this only verifies at least one exists and fails with a clear
-# diagnostic naming what to do next if none does.
+# Cluster-admin objects other Day 0 components depend on; runs first, before argocd.
+# StorageClass is discover-only: provisioner details vary per cluster, so we
+# only verify one exists rather than guessing parameters.
 - name: "admin_context | discover existing StorageClasses"
   kubernetes.core.k8s_info:
     api_version: storage.k8s.io/v1
@@ -26,24 +18,15 @@
       provisioner-specific parameters here, since they vary per cluster).
   when: (_admin_context_storageclasses.resources | default([]) | length) == 0
 
-# ADR-0310: PriorityClass definitions live in
-# ansible/roles/admin_context/kustomize/priorityclasses/ rather than being
-# hand-inlined here.
 - name: "admin_context | apply the PriorityClasses"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
 
-# The zuno AppProject is applied by the argocd role's own install.yml, not
-# here: its CRD (appprojects.argoproj.io) doesn't exist until that role's
-# install.yml has subscribed the GitOps operator and it has reconciled,
-# and admin_context runs before argocd in the Day 0 sequence.
-#
-# The zuno-argocd-application-controller-admin ClusterRoleBinding lookup
-# below is a consolidation/visibility point, not a new grant - admin_context
-# runs first in the Day 0 sequence (before argocd even installs the
-# operator), so on a fresh cluster this binding legitimately does not
-# exist yet the first time this role runs; that is expected, not an error.
+# The zuno AppProject is applied by argocd's own install.yml, since its CRD
+# doesn't exist until that role has subscribed and reconciled the operator.
+# This binding won't exist yet on a fresh cluster (admin_context runs
+# before argocd) - that's expected, not an error.
 - name: "admin_context | look up the ArgoCD application-controller ClusterRoleBinding"
   kubernetes.core.k8s_info:
     api_version: rbac.authorization.k8s.io/v1

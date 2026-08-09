@@ -1,113 +1,61 @@
 ---
-# ==============================================================================
-# ansible/confidential.yml (gitignored, NEVER commit) - operator-supplied
-# secrets for external services this platform integrates with. Copy this file
-# to ansible/confidential.yml and fill in real values before the first
-# `make d0 install` - see ansible/README.md. Any field left at its "xxxxxx"
-# placeholder is treated as "not configured" and the corresponding
-# integration is skipped (or seeded as an empty Vault placeholder) rather
-# than failing the install.
-# ==============================================================================
+# ansible/confidential.yml (gitignored, NEVER commit) - copy this file, fill in
+# real values before `make d0 install`. Fields left as "xxxxxx" are treated as not configured.
 
-# --- Google OAuth (Keycloak "google" identity provider, ADR-0014) ----------
-# Set to false to skip the Google identity provider entirely (no
-# ExternalSecret rendered, no broken login button) - useful if you don't
-# have real Google OAuth credentials yet. Ansible defaults this to true if
-# unset, so this line only matters while it's explicitly false.
+# --- Google OAuth (Keycloak "google" identity provider) ---------------------
+# Set false to skip the Google identity provider (no broken login button). Defaults to true.
 zuno_keycloak_google_oauth_enabled: false
 
-# Create at https://console.cloud.google.com/apis/credentials (a GCP project
-# tied to your Google Workspace org):
-#   1. APIs & Services -> OAuth consent screen -> User type "Internal".
-#   2. APIs & Services -> Library -> enable "Gmail API" and "Google Drive
-#      API" (the realm requests gmail.readonly/drive.readonly scopes).
-#   3. APIs & Services -> Credentials -> Create Credentials -> OAuth client
-#      ID -> Application type "Web application".
-#   4. Authorized redirect URI (exact match required):
-#      https://keycloak.<cluster-base-domain>/realms/zuno/broker/google/endpoint
-#      (cluster-base-domain: see zuno/platform/cluster-domain in Vault, or
-#      `oc get route -n zuno-auth`).
-#   5. Create -> copy the Client ID and Client Secret (secret is shown once).
+# Create at https://console.cloud.google.com/apis/credentials:
+#   1. OAuth consent screen -> User type "Internal".
+#   2. Enable "Gmail API" and "Google Drive API" (realm needs gmail.readonly/drive.readonly).
+#   3. Credentials -> Create Credentials -> OAuth client ID -> "Web application".
+#   4. Authorized redirect URI: https://keycloak.<cluster-base-domain>/realms/zuno/broker/google/endpoint
+#   5. Copy the Client ID and Client Secret (secret shown once).
 zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 
 # --- SMTP technical mail identity ------------------------------------------
-# Set to false to skip deploying the smtp component entirely (no namespace/
-# ExternalSecret applied). Defaults to true if unset.
+# Set false to skip deploying the smtp component. Defaults to true.
 zuno_smtp_enabled: false
 
-# Example below uses AWS SES (Simple Email Service) - any SMTP provider
-# works the same way (host/port/username/password), SES is just a common
-# choice with a generous free tier.
-#   1. https://console.aws.amazon.com/ses/ -> Verified identities -> verify
-#      the domain or email address you'll send from (SES won't send
-#      otherwise). New accounts start in the "sandbox" (can only send to
-#      verified recipients) - request production access from the SES
-#      dashboard to send to arbitrary recipients.
-#   2. Left nav -> SMTP settings -> note the SMTP endpoint for your region
-#      (e.g. email-smtp.eu-west-1.amazonaws.com for eu-west-1) - this is
-#      zuno_smtp_host below. SMTP credentials are region-specific: generate
-#      a new set per region if you use more than one.
-#   3. Click "Create SMTP Credentials" (opens the IAM console, creates an
-#      IAM user scoped to SES sending) -> copy the generated SMTP username
-#      and password (shown once - these are NOT your regular AWS access
-#      key/secret, SES derives distinct SMTP credentials).
+# Example uses AWS SES; any SMTP provider works the same way.
+#   1. Verify the sending domain/address in SES (required before sending;
+#      new accounts start sandboxed to verified recipients only).
+#   2. Note the SMTP endpoint for your region - this is zuno_smtp_host below.
+#   3. Create SMTP Credentials -> copy the generated username/password (shown once).
 zuno_smtp_host: "xxxxxx"            # e.g. email-smtp.eu-west-1.amazonaws.com
-zuno_smtp_port: "587"               # 587 (STARTTLS, recommended), 465 (TLS) or 25
-zuno_smtp_username: "xxxxxx"        # SES-generated SMTP username, not your AWS access key
-zuno_smtp_password: "xxxxxx"        # SES-generated SMTP password, not your AWS secret key
+zuno_smtp_port: "587"               # 587 (STARTTLS), 465 (TLS) or 25
+zuno_smtp_username: "xxxxxx"
+zuno_smtp_password: "xxxxxx"
 
 # --- Atlassian Confluence Cloud (technical identity for MCP ingestion) -----
-# Set to false / leave as "xxxxxx" for now - no ExternalSecret/MCP server
-# consumes this yet (components/mcp-servers/confluence is a stub). Stored
-# ahead of time so it's ready once that integration is built.
+# Not consumed yet (confluence MCP server is a stub); stored ahead of time.
 zuno_atlassian_confluence_enabled: false
 
-# Create at https://id.atlassian.com/manage-profile/security/api-tokens,
-# logged in as whichever Atlassian account should act as the technical
-# identity (a dedicated service account is cleaner than a personal one, if
-# your org has one):
-#   1. Create API token -> give it a clear label (e.g.
-#      "zuno-demo-confluence-mcp") -> prefer a *scoped* token (Confluence
-#      read-only scopes) over a "classic" token, which inherits every
-#      permission the account has.
-#   2. Copy the token immediately - Atlassian shows it once and never
-#      stores it, so it can't be recovered later (only regenerated).
-# The Confluence Cloud REST API authenticates with email+token as HTTP
-# Basic Auth - the token alone is not sufficient, zuno_atlassian_confluence_
-# email must be the same account the token was created for.
+# Create at https://id.atlassian.com/manage-profile/security/api-tokens:
+#   1. Create API token, preferring a scoped (Confluence read-only) token.
+#   2. Copy it immediately - shown once, cannot be recovered later.
+# Auth is email+token (HTTP Basic); email must match the token's account.
 zuno_atlassian_confluence_url: "xxxxxx"     # e.g. https://your-company.atlassian.net/wiki
-zuno_atlassian_confluence_email: "xxxxxx"   # account the token below belongs to
+zuno_atlassian_confluence_email: "xxxxxx"
 zuno_atlassian_confluence_token: "xxxxxx"
 
 # --- PostgreSQL pgBackRest backup, second repo (S3-compatible) -------------
-# Optional: the zuno-postgresql PostgresCluster always has a local PVC
-# backup repo (repo1); leave these as "xxxxxx" to stay on that alone. Fill
-# them in to add a second, off-cluster repo (repo2) on any S3-compatible
-# object store (AWS S3, MinIO, etc.) - gitops/charts/postgresql/values.yaml's
-# backups.s3.enabled is turned on automatically once all five fields below
-# are real.
-#   1. Create (or reuse) a bucket on your S3-compatible provider.
-#   2. Create an access key/secret key pair scoped to that bucket (AWS: IAM
-#      user or role with s3:PutObject/GetObject/ListBucket/DeleteObject on
-#      the bucket; MinIO: an access key from its console/mc admin).
-#   3. zuno_postgresql_backup_s3_endpoint is the S3 API endpoint host (AWS:
-#      e.g. s3.eu-west-1.amazonaws.com; MinIO/other S3-compatible: your
-#      server's own hostname).
+# Optional: local PVC repo1 always exists; fill these in for an off-cluster
+# repo2 (AWS S3, MinIO, etc.) - enabled automatically once all five are real.
+#   1. Create/reuse a bucket on your S3-compatible provider.
+#   2. Create an access key/secret key pair scoped to that bucket.
+#   3. zuno_postgresql_backup_s3_endpoint is the S3 API endpoint host.
 zuno_postgresql_backup_s3_bucket: "xxxxxx"
 zuno_postgresql_backup_s3_endpoint: "xxxxxx"
 zuno_postgresql_backup_s3_region: "xxxxxx"
 zuno_postgresql_backup_s3_access_key: "xxxxxx"
 zuno_postgresql_backup_s3_secret_key: "xxxxxx"
 
-# --- LLM external provider API keys (ADR-0020 ModelRouter fail-over) -------
-# Each is independently optional: leave any at "xxxxxx" and the ModelRouter
-# simply fails over past that provider to the next eligible one (the local
-# model is always eligible, so the platform stays usable with none of these
-# filled in). Seeded into Vault by ansible/roles/vault/tasks/install.yml at
-# zuno/providers/<name>, resolved by platform/ai-gateway/externalsecret-
-# <name>.yaml into the llm-provider-<name> Secret components/agent-runtime
-# reads from.
+# --- LLM external provider API keys -----------------------------------------
+# Each optional: leave "xxxxxx" and the ModelRouter fails over to the next
+# eligible provider (the local model always works with none filled in).
 #   OpenAI:    https://platform.openai.com/api-keys
 #   Gemini:    https://aistudio.google.com/apikey
 #   Anthropic: https://console.anthropic.com/settings/keys

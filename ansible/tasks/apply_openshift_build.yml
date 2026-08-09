@@ -1,21 +1,7 @@
 ---
-# Shared task (ADR-0056): builds one component image via native OpenShift
-# BuildConfig/ImageStream in zuno-ai-build, in the same spirit as
-# ansible/tasks/apply_gitops_app.yml. Called once per image by the Day 1
-# build roles (ansible/roles/{mcp,rag,agent,ai_gateway}_build), each with
-# its own build_image_name/build_dockerfile_path/build_context_dir.
-#
-# Idempotent, not "always rebuild": the BuildConfig's own `ConfigChange`
-# trigger (OpenShift's standard, idiomatic mechanism for git-source
-# BuildConfigs) only starts a new build when the applied BuildConfig
-# content actually differs from what's already there (source ref,
-# Dockerfile path, etc. - the same "state: present, changed only on real
-# diff" idempotency every other `kubernetes.core.k8s` task in this repo
-# already has). Re-running `make d1 build <component>` against unchanged
-# source is a no-op, matching this repo's idempotent verb semantics
-# elsewhere. To force a rebuild against the same source ref, delete the
-# BuildConfig first or run `oc start-build` directly - a documented manual
-# escape hatch, same pattern as `models_vllm_image_override`.
+# Builds one component image via OpenShift BuildConfig/ImageStream in
+# zuno-ai-build. Idempotent (ConfigChange trigger only rebuilds on a real
+# diff); delete the BuildConfig or run `oc start-build` to force a rebuild.
 
 - name: "openshift-build | validate required vars are set"
   ansible.builtin.assert:
@@ -40,12 +26,8 @@
           openshift.io/display-name: "Zuno AI Build"
           openshift.io/requester: zuno
 
-# Build pods pull source from git and push images out - nothing needs to
-# open an inbound connection to anything in this namespace, so a full
-# default-deny-all-ingress baseline (no exceptions, not even the
-# router-ingress/same-namespace allowances the Day 0 namespaces chart's
-# baseline grants other namespaces) is both safe and correct here, same
-# ADR-0052 hardening spirit as every other namespace in this repo.
+# Build pods only pull source and push images out; nothing needs inbound
+# access, so a full default-deny-all-ingress baseline is safe here.
 - name: "openshift-build | apply a default-deny-all-ingress NetworkPolicy baseline"
   kubernetes.core.k8s:
     state: present
@@ -62,18 +44,9 @@
         policyTypes:
           - Ingress
 
-# Grants the three namespaces that actually run a build-produced image
-# (zuno-ai-run: agent-runtime/mcp-gateway/mcp-sales-db; zuno-data:
-# rag-service; zuno-agent-tekos: agent-frontend/agent-bff) cross-namespace
-# pull access to zuno-ai-build's ImageStreams, via OpenShift's standard
-# system:image-puller ClusterRole bound per-namespace (not per-ServiceAccount
-# name, since each workload uses its own dedicated least-privilege
-# ServiceAccount per ADR-0052, not a shared "default" one). Applied here
-# (Day 1 build time), not by the Day 0 namespaces role: zuno-ai-build
-# doesn't exist until a build first runs, so granting on it any earlier
-# would make Day 0 depend on Day 1 having partially run first - see
-# gitops/charts/namespaces/values.yaml's comment for the same reasoning
-# applied to why zuno-ai-build isn't in that chart's platformNamespaces.
+# Grants cross-namespace image-pull access to the namespaces that run these
+# images. Applied here, not by the Day 0 namespaces role, since zuno-ai-build
+# doesn't exist until a build first runs.
 - name: "openshift-build | grant image-pull access to the namespaces that run these images"
   kubernetes.core.k8s:
     state: present

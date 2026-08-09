@@ -1,7 +1,5 @@
-# Namespace-scoped ServingRuntime (KServe), not ClusterServingRuntime, so it
-# stays inside this chart's namespace-per-agent-adjacent isolation model
-# (the model-serving layer is shared platform, per ADR-0007, but scoped to
-# zuno-ai-run rather than the default ClusterServingRuntime catalog).
+# Namespace-scoped ServingRuntime, not ClusterServingRuntime, to keep this
+# scoped to zuno-ai-run rather than the cluster-wide catalog.
 apiVersion: serving.kserve.io/v1alpha1
 kind: ServingRuntime
 metadata:
@@ -10,8 +8,7 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    # Before templates/inferenceservice.yaml, which references this
-    # runtime by name (spec.predictor.model.runtime).
+    # Must sync before inferenceservice.yaml, which references this runtime by name.
     argocd.argoproj.io/sync-wave: "-5"
 spec:
   supportedModelFormats:
@@ -28,19 +25,10 @@ spec:
       ports:
         - containerPort: 8080
           protocol: TCP
-      # ADR-0052, partial: allowPrivilegeEscalation/capabilities are safe
-      # to set unconditionally (spec.containers here is a raw
-      # corev1.Container list, a verified-safe injection point). No
-      # readOnlyRootFilesystem: vLLM writes a HuggingFace/compilation cache
-      # under its container filesystem at startup - setting it here without
-      # verifying the exact writable paths against a live cluster risks
-      # breaking model serving outright, so this is left as a documented
-      # gap rather than guessed at. Pod-level runAsNonRoot/seccompProfile
-      # are not set here either: KServe's InferenceService predictor
-      # (templates/inferenceservice.yaml) uses the `model:` shorthand,
-      # which does not reliably expose a verified pod-level securityContext
-      # override in this KServe/RHOAI 3.5 profile - same honest-gap
-      # reasoning, not fabricated.
+      # No readOnlyRootFilesystem: vLLM writes a HuggingFace/compilation cache
+      # under its container filesystem at startup, and the exact writable
+      # paths aren't verified. Pod-level runAsNonRoot/seccompProfile aren't
+      # set either: the `model:` shorthand doesn't reliably expose that override.
       securityContext:
         allowPrivilegeEscalation: false
         capabilities:

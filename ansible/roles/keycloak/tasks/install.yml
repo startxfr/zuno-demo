@@ -1,30 +1,10 @@
 ---
-# Discovers the Red Hat build of Keycloak operator's package/channel in
-# this cluster's catalog, then applies the keycloak GitOps Application
-# (ADR-0312: the Subscription lives in gitops/charts/keycloak, not applied
-# directly here).
-    # RHBK's CSV only supports OwnNamespace/SingleNamespace install modes
-    # (AllNamespaces is explicitly unsupported) - found via live-cluster
-    # testing on api.demo222.startx.fr: subscribing it into the shared
-    # `openshift-operators` namespace (whose OperatorGroup targets every
-    # namespace, the AllNamespaces pattern every other Day 0 operator in
-    # this repo uses) failed the CSV with "AllNamespaces InstallModeType
-    # not supported". Installed directly into zuno-auth instead (OwnNamespace
-    # mode: the operator pod and the Keycloak CR it reconciles - both
-    # rendered by gitops/charts/keycloak - both live in the same
-    # namespace, so no separate operator-only namespace is needed).
-    # zuno-auth is guaranteed to already exist here: the namespaces role
-    # (Day 0, runs before keycloak) creates it.
-    # Package name "rhbk-operator" in the redhat-operators catalog is
-    # confirmed real (unlike CNPG/PGO's package-name assumptions - see
-    # ansible/roles/postgresql/README.md for that history), but the
-    # channel is not: RHBK's channels are version-qualified
-    # (stable-v22/v24/v26...) with no bare "stable" alias, so a hardcoded
-    # `channel: stable` hits OLM's ResolutionFailed/ConstraintsNotSatisfiable
-    # - found via live-cluster testing on api.demo222.startx.fr, same
-    # lesson as ADR-0048's CNPG channel discovery. Prefer an exact
-    # "stable" match if one ever exists, else fall back to the package's
-    # own defaultChannel rather than guessing a version.
+# RHBK's CSV only supports OwnNamespace/SingleNamespace install modes, not
+# AllNamespaces, so it's subscribed directly into zuno-auth rather than the
+# shared openshift-operators namespace other operators use.
+    # No bare "stable" channel exists for this operator (channels are
+    # version-qualified, e.g. stable-v22/v24/v26); prefer an exact "stable"
+    # match if one ever exists, else fall back to defaultChannel.
 - name: "keycloak | look up the rhbk-operator PackageManifest"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
@@ -67,9 +47,6 @@
       Subscribing to package 'rhbk-operator', catalog
       '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
 
-# ADR-0312: the Subscription/OperatorGroup (operator.enabled, rendered by
-# the vendored startx `operator` chart) live in gitops/charts/keycloak,
-# applied via the separate zuno-keycloak-d0 Application.
 - name: "keycloak | apply the keycloak GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -87,19 +64,9 @@
               name: "{{ _keycloak_catalog_source }}"
     gitops_app_wait_retries: 60
 
-# The Keycloak CR/ExternalSecrets/RealmImport (keycloak.enabled) live in
-# the same chart, applied via the separate zuno-keycloak-d1 Application,
-# after -d0 (above) is Synced+Healthy. The ExternalSecrets this
-# Application renders resolve against the vault-backend ClusterSecretStore,
-# which `external_secrets` (earlier in day0_components) has already made
-# Ready by this point.
-#
-# Optional read, unlike ansible/roles/vault/tasks/install.yml's hard
-# `fail` on a missing confidential.yml: this role stays independently
-# runnable without it (ansible/README.md's "single component remains
-# independently runnable" convention) - a missing file just means
-# zuno_keycloak_google_oauth_enabled stays undefined, defaulting to true
-# (today's existing behavior) below.
+# Optional read (unlike vault's hard fail on a missing confidential.yml):
+# this role stays runnable without it - a missing file just leaves
+# zuno_keycloak_google_oauth_enabled undefined, defaulting to true below.
 - name: "keycloak | check for ansible/confidential.yml (optional, only for the googleOAuth.enabled flag)"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
@@ -110,15 +77,9 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _keycloak_confidential_file.stat.exists
 
-# apply_gitops_app.yml's gitops_app_extra_helm_values *replaces*
-# spec.source.helm.values wholesale (ADR-0048) rather than merging with
-# gitops/apps/keycloak/application-d1.yaml's own checked-in values - so
-# clusterBaseDomain must be re-supplied here too (already resolved as a
-# fact by the -d0 call above, via apply_gitops_app.yml's own
-# resolve_cluster_base_domain.yml include), or the chart would fall back
-# to its values.yaml default (the literal, unsubstituted
-# "apps.mycluster.example.com" placeholder) instead of this cluster's real
-# apps domain.
+# gitops_app_extra_helm_values replaces spec.source.helm.values wholesale
+# rather than merging, so clusterBaseDomain must be re-supplied here or the
+# chart falls back to its placeholder default.
 - name: "keycloak | apply the keycloak GitOps Application (d1: Keycloak CR/RealmImport/ExternalSecrets)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

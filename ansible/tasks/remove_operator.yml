@@ -1,24 +1,8 @@
 ---
-# Shared task: full OLM operator teardown - reverse of a Subscription-based
-# install (ansible/roles/argocd, keycloak, postgresql, external_secrets,
-# openshift_ai all install this way). Deleting only the Subscription (the
-# old behavior of every one of those roles' uninstall.yml) leaves the
-# operator's ClusterServiceVersion (its Deployment/RBAC) running and, more
-# importantly, leaves every CRD it registered on the cluster - any CR of
-# that type becomes orphaned (no controller left reconciling it), and a
-# later reinstall then adopts pre-existing, possibly stale CRDs/CRs instead
-# of starting clean.
-#
-# Removes cluster state in the safe order: the CRDs the CSV owns (deleting
-# a CRD blocks on and removes every CR instance of that type first, via
-# Kubernetes' own garbage collection/finalizer handling - the ArgoCD
-# Applications that manage those CRs should already be gone by the time an
-# including role reaches this task, per that role's own
-# delete_gitops_app.yml call) -> the CSV -> the Subscription itself.
-#
-# Required vars: operator_subscription_name, operator_namespace (the
-# Subscription's own namespace - OLM always installs the CSV into the same
-# namespace as the Subscription that resolved it).
+# Full OLM operator teardown: deletes CRDs owned by the CSV (cascades to
+# their CRs), then the CSV, then the Subscription - deleting only the
+# Subscription would orphan CRDs/CRs and let a reinstall adopt stale state.
+# Requires operator_subscription_name, operator_namespace.
 - name: "remove_operator | validate required vars are set"
   ansible.builtin.assert:
     that:

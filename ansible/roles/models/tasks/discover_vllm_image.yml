@@ -1,26 +1,6 @@
 ---
-# Included by tasks/install.yml, which needs the resulting
-# _models_discovered_vllm_image fact to apply it. tasks/precheck.yml
-# (state detection, never fails) does not run this discovery itself - see
-# that file's own comment.
-#
-# ADR-0048: "Select approved operator channels and ClusterServingRuntime/
-# serving images exposed by the installed OpenShift AI version instead of
-# embedding unverified runtime image tags." Red Hat OpenShift AI publishes
-# its maintained serving-runtime definitions as Template objects in
-# redhat-ods-applications - the same catalog the dashboard's "Serving
-# runtimes" page reads from (gitops/charts/models/README.md already
-# pointed at `oc get templates -n redhat-ods-applications | grep -i vllm`
-# as the manual equivalent of what this task now does automatically).
-# Matched by name content rather than a specific label, since the exact
-# label taxonomy RHOAI 3.5 uses was not verified against a live cluster -
-# a defensible, honestly-scoped choice over guessing a label that might
-# not exist. This whole discovery block (and its resolution logic below)
-# was verified against synthetic fixture data with a standalone local
-# playbook (both a literal-image template and a Template-parameterized
-# ${VAR} image, plus the "no default value" failure case) before being
-# committed here - this sandbox has no live OpenShift AI cluster to
-# discover against for real.
+# Selects the vLLM image OpenShift AI actually publishes (a Template in
+# redhat-ods-applications), matched by name since RHOAI's label taxonomy isn't verified.
 - name: "models | discover the vLLM serving-runtime Templates OpenShift AI published (ADR-0048)"
   kubernetes.core.k8s_info:
     api_version: template.openshift.io/v1
@@ -56,11 +36,8 @@
     - models_vllm_image_override is not defined
     - (_models_vllm_templates | default([]) | length) == 0
 
-# A Template wraps one or more objects and may parameterize any field
-# (including the container image) via ${PARAM_NAME} references resolved
-# against the Template's own top-level `parameters` list - this handles
-# both the literal-image and the parameterized-image shape without
-# assuming which one RHOAI 3.5 actually uses.
+# Handles both a literal image and a ${PARAM_NAME} reference resolved
+# against the Template's own top-level `parameters` list.
 - name: "models | extract the ServingRuntime/ClusterServingRuntime object from the selected template"
   ansible.builtin.set_fact:
     _models_selected_template: "{{ _models_vllm_templates[0] }}"
@@ -135,9 +112,6 @@
     _models_discovered_vllm_image: "{{ models_vllm_image_override }}"
   when: models_vllm_image_override is defined
 
-# ADR-0048 Operational considerations: "Add precheck output showing
-# selected channels, operator versions, serving runtimes and GPU
-# compatibility before model deployment."
 - name: "models | discovery summary (ADR-0048)"
   ansible.builtin.debug:
     msg: >-

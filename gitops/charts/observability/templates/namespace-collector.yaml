@@ -1,12 +1,6 @@
 {{- if .Values.collector.enabled }}
-# Created as an ArgoCD PreSync hook - runs in its own phase, entirely
-# before the normal Sync phase (OpenTelemetryCollector CR below), so its
-# existence is guaranteed without relying on sync-wave ordering within
-# the same batch. Also backed by this Application's own
-# destination.namespace being zuno-telemetry, though CreateNamespace is
-# false here (gitops/apps/observability/application-d1.yaml), so this
-# hook is the only thing guaranteeing it before the Collector CR needs
-# it.
+# PreSync hook: guarantees the namespace exists before the Collector CR
+# needs it (CreateNamespace is false for this Application).
 apiVersion: v1
 kind: Namespace
 metadata:

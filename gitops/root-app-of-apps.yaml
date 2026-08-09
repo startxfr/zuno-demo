@@ -1,26 +1,8 @@
 ---
-# Root App-of-Apps. NOT applied by any Ansible task (ADR-0311 retired
-# ansible/roles/argocd/tasks/configure.yml's use of this manifest - every
-# component's Application is applied directly by its own role instead, via
-# ansible/tasks/apply_gitops_app.yml). Kept here only as a documented
-# example of a pure-GitOps, Ansible-free bootstrap: apply this manifest by
-# hand (`oc apply -f gitops/root-app-of-apps.yaml`) and ArgoCD recurses over
-# gitops/apps/, turning every application-d0.yaml/application-d1.yaml it
-# finds into a managed child Application, bringing the whole platform to
-# its declared state from a single command with no Ansible involved (this
-# path has no native ordering between a component's -d0 and -d1 - see
-# gitops/apps/README.md and docs/adr/0312-route-operator-installs-through-
-# argocd-applications.md's addendum). See docs/platform/installation.md and
-# docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md /
-# docs/adr/0311-stop-applying-the-root-app-of-apps-from-ansible.md.
-#
-# spec.project references the "zuno" AppProject (ansible/roles/argocd/
-# kustomize/appproject/appproject.yaml, applied by that role's install.yml
-# - see gitops/apps/README.md), same as every child Application it recurses
-# over. Anyone following this manifest's own pure-GitOps path by hand must
-# create that AppProject first (`oc apply -f
-# ansible/roles/argocd/kustomize/appproject/appproject.yaml`) - it does not
-# exist until the argocd Ansible role has run.
+# Root App-of-Apps, for manual pure-GitOps bootstrap only — not applied by
+# any Ansible task. Each component's Application is applied by its own role.
+# Requires the "zuno" AppProject to already exist (apply
+# ansible/roles/argocd/kustomize/appproject/appproject.yaml by hand first).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

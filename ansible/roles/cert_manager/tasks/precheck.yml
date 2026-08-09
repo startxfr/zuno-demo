@@ -1,8 +1,6 @@
 ---
-# State detection (never fails). cert-manager applies its chart via two
-# Applications (operator + Vault-backed ClusterIssuer) - "installed"
-# checks both Applications plus the ClusterIssuer's own Ready signal
-# install.yml already waits on.
+# "Installed" checks both Applications plus the ClusterIssuer's own Ready
+# signal.
 - name: "cert_manager | check the cert-manager Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:

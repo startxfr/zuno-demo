@@ -1,10 +1,6 @@
 ---
-# Zuno identity platform. This deploys the local chart (gitops/charts/keycloak)
-# holding the Keycloak CR instance, the Google IdP broker configuration and
-# the `zuno` realm (KeycloakRealmImport) - NOT the operator itself (see
-# gitops/apps/keycloak/application-d0.yaml, applied first by
-# ansible/roles/keycloak/tasks/install.yml). See gitops/apps/README.md and
-# ansible/roles/keycloak/README.md.
+# Keycloak CR instance, Google IdP broker config, and the `zuno` realm
+# import (not the operator itself, see application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,15 +21,8 @@ spec:
         keycloak:
           enabled: true
         keycloakCRName: zuno
-        # apps.mycluster.example.com is substituted by
-        # ansible/tasks/apply_gitops_app.yml with the real cluster's apps
-        # wildcard domain, auto-discovered from
-        # Ingress.config.openshift.io/cluster and persisted to Vault at
-        # zuno/platform/cluster-domain (see
-        # ansible/tasks/resolve_cluster_base_domain.yml and
-        # ansible/roles/vault/tasks/install.yml) - no manual edit needed.
-        # Every per-agent client redirect URI in the imported realm is
-        # templated against this same value.
+        # Placeholder auto-substituted with the real cluster domain by
+        # ansible/tasks/apply_gitops_app.yml; also used by every per-agent redirect URI in the realm.
         clusterBaseDomain: apps.mycluster.example.com
         adminSecretName: keycloak-admin
         googleOAuthSecretName: google-oauth-client

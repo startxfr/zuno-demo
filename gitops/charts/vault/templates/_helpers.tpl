@@ -1,7 +1,5 @@
 {{/*
-Route host: fixed to "vault.<clusterBaseDomain>" unless explicitly
-overridden via route.host - same predictable-hostname convention as the
-tekos and keycloak charts' own route/hostname helpers.
+Route host: "vault.<clusterBaseDomain>" unless overridden via route.host.
 */}}
 {{- define "vault.routeHost" -}}
 {{- if .Values.route.host -}}
@@ -12,12 +10,8 @@ vault.{{ .Values.global.clusterBaseDomain }}
 {{- end -}}
 
 {{/*
-Name of the upstream hashicorp/vault chart's "-ui" Service. Replicates
-that chart's own vault.fullname helper (fullnameOverride unset, and the
-release name is always "zuno-vault" - see gitops/apps/vault/application-d1.
-yaml's spec.source.helm.releaseName - which already contains "vault", so
-fullname == .Release.Name) rather than vendoring or re-templating the
-dependency chart just for this.
+Name of the upstream hashicorp/vault chart's "-ui" Service, replicating
+that chart's own vault.fullname helper.
 */}}
 {{- define "vault.uiServiceName" -}}
 {{- if contains "vault" .Release.Name -}}

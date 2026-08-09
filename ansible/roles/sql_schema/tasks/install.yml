@@ -1,16 +1,6 @@
 ---
-# Applies the SXA-derived schema + synthetic fixtures (ADR-0016, ADR-0025).
-# ADR-0313: the actual apply is an ArgoCD PreSync hook Job owned by
-# gitops/charts/sql-schema (templates/job-schema-apply.yaml), registered
-# below as the sales-db MCP server's `-d0` ("prerequisites") Application -
-# only the static SQL/fixtures ConfigMap generation and the Namespace stay
-# here.
-# ADR-0310: ansible/roles/sql_schema/kustomize/schema/ (a configMapGenerator
-# reading directly from data/sxa/ - disableNameSuffixHash keeps the name
-# "zuno-sxa-schema" stable so the chart's PreSync hook Job can reference it
-# by that fixed name) and ansible/roles/sql_schema/kustomize/prereqs/ (the
-# static Namespace only now - the ExternalSecret moved into
-# gitops/charts/sql-schema itself).
+# Generates the SQL/fixtures ConfigMap and Namespace only; the actual apply
+# is an ArgoCD PreSync hook Job owned by gitops/charts/sql-schema.
 - name: "sql_schema | build the SQL ConfigMap from data/sxa/"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
@@ -21,10 +11,8 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/sql_schema/kustomize/prereqs"
 
-# The schema-apply Job (gitops/charts/sql-schema, a PreSync hook) and the
-# ExternalSecret it depends on both live in this Application's chart, so
-# gitops_app_wait: true (the default) already blocks here until the Job has
-# succeeded - no separate Ansible-side wait needed.
+# The schema-apply Job and its ExternalSecret live in this Application's
+# chart, so the default gitops_app_wait already blocks until it succeeds.
 - name: "sql_schema | apply the sales-db MCP server GitOps Application (d0, schema prerequisites)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

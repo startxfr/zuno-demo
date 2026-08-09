@@ -1,18 +1,5 @@
-# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai-run namespace
-# baseline (see gitops/charts/namespaces/values.yaml's platformNamespaces
-# comment for why zuno-ai-run doesn't get one). Agent Runtime is called by
-# Tekos's BFF today (cross-namespace, zuno-agent-tekos) - the equivalent
-# rule for any other agent's BFF, once active, is a documented addition
-# here, not an automatic grant.
-#
-# ADR-0053: also allows the same-namespace "acceptance-gate" identity the
-# `make check` Job runs as (ansible/roles/agents/tasks/run_acceptance_gate.yml)
-# - a real, narrowly-scoped synthetic-test caller, added the same
-# deliberate way as every other entry here, never a namespace-wide
-# baseline. sales-db-mcp's NetworkPolicy deliberately does NOT get the same
-# addition - see evaluations/tekos/security_checks.py's
-# direct_call_to_sales_db_mcp_denied_without_gateway_token for why that
-# absence is itself part of what ADR-0053's gate proves.
+# Precise ingress allow-list, not a namespace-wide baseline: only Tekos's
+# BFF and the acceptance-gate test Job may call this service.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

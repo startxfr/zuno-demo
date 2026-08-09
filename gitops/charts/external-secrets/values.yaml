@@ -1,30 +1,13 @@
-# This chart is shared by two ArgoCD Applications (gitops/apps/
-# external-secrets/application-d0.yaml and application-d1.yaml -
-# see gitops/apps/README.md): operator.enabled renders the operator
-# install (Subscription/OperatorConfig - the Namespace it runs in is
-# owned by gitops/charts/namespaces, not this chart), clusterSecretStore.
-# enabled renders the operand (ClusterSecretStore/ExternalSecret). Both
-# default to false so `helm template`/`helm lint` render nothing by
-# default; each Application sets exactly one to true via
-# spec.source.helm.values.
+# operator.enabled renders the operator install; clusterSecretStore.enabled
+# renders the operand. Both default false; each ArgoCD Application sets one.
 clusterSecretStore:
   enabled: false
 operator:
   enabled: false
 
-# ADR-0048/ADR-0312: subscriptionChannel/subscriptionCatalogSource are
-# discovered by ansible/roles/external_secrets/tasks/install.yml (catalog
-# introspection - doesn't depend on the operator being installed yet) and
-# always set via gitops_app_extra_helm_values on the -d0 apply;
-# templates/subscription.yaml requires them.
-#
-# vaultServiceName is left unset on that -d0 call - it's only
-# discovered/injected on the -d1 apply, after Vault's own install step has
-# set up the Kubernetes auth method + eso-reader role the
-# ClusterSecretStore depends on (day0_components' sequence enforces this,
-# not sync-wave - see that role's README.md). templates/clustersecretstore.
-# yaml and templates/externalsecret-cluster-domain.yaml render nothing
-# until it's set, even with clusterSecretStore.enabled: true.
+# subscriptionChannel/subscriptionCatalogSource are discovered by ansible and
+# set on the -d0 apply. vaultServiceName is only set on the -d1 apply, after
+# Vault sets up the Kubernetes auth method + eso-reader role it depends on.
 subscriptionChannel: ""
 subscriptionCatalogSource: ""
 vaultServiceName: ""

@@ -1,20 +1,7 @@
 {{- if and .Values.issuer.enabled .Values.vaultServiceName }}
-# Rendered by the zuno-cert-manager-d1 Application (issuer.enabled),
-# applied by ansible/roles/cert_manager/tasks/install.yml after
-# zuno-cert-manager-d0 (operator.enabled) is Synced+Healthy.
-# vaultServiceName is only discovered/injected on that -d1 call, after
-# Vault's own install step has enabled the pki/ secrets engine and the
-# cert-manager-issuer Kubernetes-auth role/policy this ClusterIssuer
-# depends on - see ansible/roles/vault/kustomize/unseal-configure/
-# configmap.yaml. Until then this renders nothing even with
-# issuer.enabled set.
-#
-# serviceAccountRef uses cert-manager's own TokenRequest-based auth (no
-# static Secret) - the bound Kubernetes-auth role/policy in Vault
-# (cert-manager-issuer) grants exactly this ServiceAccount access to
-# pki/sign/cert-manager. See values.yaml's ASSUMPTION comment - the
-# ServiceAccount name below (the operator's own controller SA) is not yet
-# verified against a live cluster in this environment.
+# Renders only once vaultServiceName is set, after Vault's pki/ engine and
+# the cert-manager-issuer role/policy are provisioned.
+# serviceAccountRef uses cert-manager's TokenRequest-based auth (no static Secret).
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:

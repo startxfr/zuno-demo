@@ -1,19 +1,13 @@
 ---
-# Shared Agent Runtime (ADR-0009, ADR-0018 LangGraph orchestration) - see
-# gitops/charts/agent-runtime and components/agent-runtime. Applied by the
-# `llm` Ansible role's install.yml alongside the provider-routing config
-# (platform/ai-gateway/), since both belong to the AI/model layer track;
-# see ansible/roles/llm/README.md for that judgment call. No operator
-# involved, so all of this component's content is -d1 (see
-# gitops/apps/agent-runtime/application-d0.yaml).
+# Shared Agent Runtime (LangGraph orchestration), applied by the `llm` role
+# alongside provider-routing config since both belong to the AI/model layer.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-agent-runtime-d1
   namespace: openshift-gitops
   annotations:
-    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
-    # only - Ansible applies each Application directly and ignores this.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-111"
 spec:
   project: zuno

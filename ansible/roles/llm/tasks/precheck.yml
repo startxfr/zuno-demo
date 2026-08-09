@@ -1,7 +1,6 @@
 ---
-# State detection (never fails). llm applies six separate Applications in
-# install.yml (provider routing, ai-gateway, agent-runtime - each as a
-# -d0/-d1 pair) - "installed" requires all six Synced+Healthy.
+# "Installed" requires all six Applications (three components x d0/d1)
+# Synced+Healthy.
 - name: "llm | check the llm Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:

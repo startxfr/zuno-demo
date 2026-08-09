@@ -1,10 +1,6 @@
 ---
-# Day0 (prerequisites) content for mcp-sales-db: the SXA-derived schema +
-# fixtures PreSync hook Job and the PostgreSQL credentials ExternalSecret
-# it depends on (gitops/charts/sql-schema), applied before the sales-db MCP
-# server itself (application-d1.yaml). ADR-0313 - previously an
-# ansible-managed Job + kustomize-applied ExternalSecret
-# (ansible/roles/sql_schema), not a GitOps Application at all.
+# Schema fixtures PreSync hook Job + PostgreSQL credentials ExternalSecret,
+# applied before the sales-db MCP server itself (application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -1,21 +1,13 @@
 ---
-# Applied by the `smtp` Ansible role's install.yml. namespace.enabled
-# stays false (the chart's own default) - zuno-ai-run is owned solely by
-# gitops/charts/namespaces (zuno-namespaces-d0), which already runs
-# earlier in day0_components; this Application no longer duplicates that
-# Namespace (it previously did, idempotently, per gitops/charts/smtp/
-# templates/namespace.yaml's own comment - dropped so the resource has a
-# single owning Application instead of two). The credentials ExternalSecret
-# is a separate Application (zuno-smtp-d1, applied after this one is
-# Synced+Healthy) - see application-d1.yaml.
+# namespace.enabled stays false; zuno-ai-run is owned solely by
+# gitops/charts/namespaces, to avoid two Applications tracking the same Namespace.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-smtp-d0
   namespace: openshift-gitops
   annotations:
-    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
-    # only - Ansible applies each Application directly and ignores this.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-180"
 spec:
   project: zuno

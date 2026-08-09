@@ -12,13 +12,8 @@
     msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d0 check openshift-ai' first."
   when: (_openshift_ai_pkg.resources | default([]) | length) == 0
 
-# ADR-0048: select the 3.5-family channel this cluster's catalog actually
-# publishes, instead of embedding a hardcoded, previously-unverified
-# "eus-3.5" guess (the exact EA2/GA channel name is not standardized
-# across catalog snapshots). Falls back to the manifest's own
-# defaultChannel only if no 3.5-family channel name is found - fails with
-# a clear diagnostic rather than silently subscribing to an arbitrary
-# channel if even that isn't available.
+# Selects the 3.5-family channel actually published, rather than a
+# hardcoded guess (exact channel naming isn't standardized across catalogs).
 - name: "openshift_ai | select the 3.5-family channel actually published by this cluster's catalog"
   ansible.builtin.set_fact:
     _openshift_ai_channel: >-
@@ -44,14 +39,6 @@
       Selected rhods-operator channel: {{ _openshift_ai_channel }}
       (all published channels: {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }})
 
-# ADR-0312: the operator Namespace/OperatorGroup/Subscription
-# (cluster-ods.project.enabled/cluster-ods.operator.enabled) and the
-# DataScienceCluster (cluster-ods.DataScienceCluster.enabled) both live in
-# gitops/charts/openshift-ai (wrapping the vendored startx cluster-ods
-# chart), applied via two separate Applications (zuno-openshift-ai-d0/-d1)
-# - -d1 is only applied once -d0 is Synced+Healthy, whose custom
-# Subscription health check (ansible/roles/argocd/tasks/
-# apply_resource_health_checks.yml) already confirms the CSV is installed.
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -83,11 +70,8 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
-# ArgoCD's default health evaluation has no logic for
-# datasciencecluster.opendatahub.io - it reports the CR Healthy as soon as
-# synced, not once status.phase is actually Ready. Kept as a supplementary
-# explicit wait, same convention ansible/roles/{postgresql,keycloak} use
-# for their own CR-specific readiness beyond the generic Application wait.
+# ArgoCD has no health logic for DataScienceCluster - it reports Healthy
+# as soon as synced, not once status.phase is actually Ready.
 - name: "openshift_ai | wait for the DataScienceCluster to report Ready"
   kubernetes.core.k8s_info:
     api_version: datasciencecluster.opendatahub.io/v1

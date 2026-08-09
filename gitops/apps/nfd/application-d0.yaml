@@ -1,22 +1,14 @@
 ---
-# Node Feature Discovery operator install (ADR-0047, ADR-0312). See
-# gitops/charts/nfd (cluster-nfd.project.enabled + cluster-nfd.operator.
-# enabled - Namespace/OperatorGroup/Subscription, rendered by the vendored
-# startx cluster-nfd chart). Applied by the `nfd` Ansible role's
-# install.yml - see that role's README.md for why NFD must sync before
-# nvidia_gpu. The NodeFeatureDiscovery CR operand is a separate
-# Application (zuno-nfd-d1, applied after this one is Synced+Healthy) -
-# see application-d1.yaml.
+# Node Feature Discovery operator install; must sync before nvidia_gpu.
+# The NodeFeatureDiscovery CR operand is a separate Application (application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-nfd-d0
   namespace: openshift-gitops
   annotations:
-    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
-    # only - Ansible applies each Application directly and ignores this;
-    # real Day 0 ordering comes from ansible/playbooks/day0_install.yml's
-    # day0_components list (nfd before nvidia_gpu).
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # orders `nfd` before `nvidia_gpu` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-204"
 spec:
   project: zuno
@@ -36,11 +28,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-nfd
   ignoreDifferences:
-    # OLM's OperatorGroup controller rewrites this annotation at runtime
-    # with the APIs the installed CSV(s) actually provide - the chart
-    # only ever renders it empty/absent, so without this ArgoCD sees
-    # permanent drift and (selfHeal: true) fights OLM's own value on
-    # every sync.
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees permanent drift and fights it.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:
@@ -50,7 +38,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # openshift-nfd (this Application's destination.namespace) is
-      # created nowhere else - also backed by the vendored cluster-nfd
-      # chart's own project.hooked PreSync hook as a redundant safeguard.
+      # Namespace isn't created elsewhere, so CreateNamespace is required here.
       - CreateNamespace=true

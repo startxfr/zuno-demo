@@ -1,10 +1,5 @@
-# One entry per agent instance (ADR-0007). `status: active` namespaces host
-# real workloads (only zuno-agent-tekos in v0); `status: placeholder`
-# namespaces are created and labeled but stay empty/reserved - see
-# platform/architecture/agent-platform-separation.md and this chart's
-# README.md. Namespace names follow the zuno-agent-<agent> convention
-# (ADR-0023) so they read as a family alongside zuno-auth/zuno-ai-run/
-# zuno-ai-build/zuno-data/zuno-telemetry.
+# `status: active` namespaces host real workloads (only zuno-agent-tekos in
+# v0); `status: placeholder` namespaces are created and labeled but stay empty.
 namespaces:
   - name: zuno-agent-comage
     agent: comage
@@ -40,9 +35,7 @@ namespaces:
       Architecture assistant - placeholder namespace reserved for
       DAT/Odyssey-workshop support.
 
-# Default ResourceQuota applied to every agent namespace regardless of
-# status, so the isolation model (ADR-0023) is real even for namespaces
-# with nothing scheduled in them yet.
+# Default ResourceQuota applied to every agent namespace regardless of status.
 quota:
   requestsCpu: "4"
   requestsMemory: 8Gi
@@ -50,31 +43,16 @@ quota:
   limitsMemory: 16Gi
   pods: "20"
 
-# ADR-0052: the same default-deny-other-namespaces baseline as the agent
-# namespaces above, applied to the platform namespaces (zuno-auth,
-# zuno-data, zuno-telemetry - created by this chart's own templates/
-# namespace.yaml, same as the agent namespaces above; a prior revision
-# assumed namespaces would be created by the Day 0 `namespaces` role.
-# it hosts mcp-sales-db, which ADR-0037 requires NOT trust arbitrary
-# same-namespace pods (agent-runtime/ai-gateway specifically must not reach
-# it directly) - a namespace-wide "allow same namespace" baseline would
-# silently defeat that per-workload restriction (Kubernetes NetworkPolicy
-# selecting the same pod are additive/OR'd, so the broader baseline would
-# win). Every zuno-ai-run workload instead gets its own precise
-# NetworkPolicy in its own chart (gitops/charts/{agent-runtime,ai-gateway,
-# mcp-gateway,mcp-sales-db,models}). zuno-ai-build is also NOT here, for a
-# different reason: it's created and given its own self-contained baseline
-# directly by the Day 1 build mechanism (ansible/tasks/
-# apply_openshift_build.yml), not by this Day 0 chart - listing it here
-# would make the Day 0 `namespaces` role's precheck (which reads this
-# file's namespaces/platformNamespaces lists to know what must already
-# exist) depend on Day 1 having partially run first.
+# Default-deny-other-namespaces baseline platform namespaces, same as the
+# agent namespaces above. zuno-ai-run is deliberately excluded: it hosts
+# mcp-sales-db, which must not trust arbitrary same-namespace pods, so a
+# namespace-wide baseline would silently defeat its per-workload
+# NetworkPolicy (see gitops/charts/mcp-sales-db). zuno-ai-build is also
+# excluded - it's created and given its own baseline by the Day 1 build
+# mechanism, not this Day 0 chart.
 #
-# allowedFromNamespaces are known, real cross-namespace callers granted at
-# the namespace level rather than precisely per-workload (proportionate for
-# a demo-scale project - tightening to per-workload policies matching
-# zuno-ai-run's is a documented v1 follow-up, not done here to keep this
-# pass bounded).
+# allowedFromNamespaces are granted at the namespace level rather than
+# per-workload (proportionate for demo scale; tightening is a v1 follow-up).
 platformNamespaces:
   - name: zuno-auth
     displayName: Zuno Authentication
@@ -88,31 +66,22 @@ platformNamespaces:
     description: >-
       HashiCorp Vault and External Secrets Operator, the platform's secret
       storage.
-    # cert-manager's ClusterIssuer talks to Vault's pki/ engine, but the
-    # Red Hat cert-manager operator hardcodes its operand controller pods
-    # into the fixed "cert-manager" namespace (not chart-managed - see
-    # gitops/charts/cert-manager/values.yaml's ASSUMPTION comment), so
-    # that's the real namespace to allow here, not a zuno-* one.
+    # cert-manager's operand pods run in the fixed "cert-manager" namespace
+    # (Red Hat operator hardcoded), not a zuno-* one.
     allowedFromNamespaces:
       - cert-manager
       - zuno-ai-run
       - zuno-auth
       - zuno-data
-    # External Secrets Operator's secretstore-validate
-    # ValidatingWebhookConfiguration (failurePolicy: Fail) lives in this
-    # namespace and is called synchronously by the kube-apiserver on
-    # every SecretStore/ClusterSecretStore write - without this, those
-    # calls time out against the default-deny policy (see
-    # templates/networkpolicy-platform.yaml).
+    # ESO's secretstore-validate webhook (failurePolicy: Fail) lives here and
+    # is called synchronously by the API server on every SecretStore write.
     allowApiServerWebhooks: true
   - name: zuno-data
     displayName: Zuno Data
     description: >-
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
-    # postgresql: rag-service (same-ns, already covered) + sales-db-mcp
-    # (zuno-ai-run, cross-ns). vault: External Secrets Operator's
-    # ClusterSecretStore controller.
+    # postgresql: sales-db-mcp (cross-ns). vault: ESO's ClusterSecretStore controller.
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-vault
@@ -137,22 +106,13 @@ platformNamespaces:
       Agent Runtime, AI Gateway and MCP Gateway - shared runtime hosting
       every active agent.
     allowedFromNamespaces: []
-    # ADR-0312: the RHOAI dashboard label used to be applied by a second,
-    # independent Namespace object in ansible/roles/openshift_ai's own
-    # kustomize (and re-declared a third time, label-less, by
-    # ansible/roles/external_secrets) - this chart already owns
-    # zuno-ai-run's Namespace via platformNamespaces above, so the label
-    # is folded in here instead of leaving two/three appliers of the same
-    # object.
+    # RHOAI dashboard label, folded in here since this chart already owns
+    # zuno-ai-run's Namespace object.
     extraLabels:
       opendatahub.io/dashboard: "true"
 
-# ADR-0312: GPU ResourceQuota for zuno-ai-run, applied here (not by
-# gitops/charts/openshift-ai) for the same "one owner per Namespace-scoped
-# object this chart already manages" reasoning as the dashboard label
-# above. Caps GPU consumption at 1 - this demo has exactly one 24GB L4
-# budgeted for the single local model (gitops/charts/models); without this
-# a future second InferenceService could silently starve it.
+# Caps GPU consumption at 1 - this demo has exactly one 24GB L4 budgeted for
+# the single local model; without this a second InferenceService could silently starve it.
 openshiftAi:
   namespace: zuno-ai-run
   gpuQuota:

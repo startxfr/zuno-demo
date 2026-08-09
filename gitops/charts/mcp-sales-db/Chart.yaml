@@ -1,11 +1,6 @@
 apiVersion: v2
 name: mcp-sales-db
-description: >-
-  The sales-db MCP server (ADR-0017): three deterministic, read-only tools
-  over the SXA-derived sales schema. Image built from
-  components/mcp-servers/sales-db. Applied by the `sql_schema` Ansible
-  role's install.yml, after gitops/charts/sql-schema's PreSync hook Job has
-  populated the schema.
+description: Three deterministic, read-only MCP tools over the sales schema.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

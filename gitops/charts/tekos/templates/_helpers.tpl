@@ -1,7 +1,6 @@
 {{/*
-Route host: fixed to "tekos.<clusterBaseDomain>" unless explicitly
-overridden, since the OIDC redirect URI contract
-(https://<agent>.apps.<cluster-domain>/*) needs a predictable hostname.
+Route host: "tekos.<clusterBaseDomain>" unless overridden; must stay
+predictable since the OIDC redirect URI depends on it.
 */}}
 {{- define "tekos.routeHost" -}}
 {{- if .Values.frontend.route.host -}}
@@ -12,8 +11,7 @@ tekos.{{ .Values.global.clusterBaseDomain }}
 {{- end -}}
 
 {{/*
-Keycloak issuer URL, defaulting to the sso.<clusterBaseDomain> convention
-documented in values.yaml and components/agent-frontend/README.md.
+Keycloak issuer URL, defaulting to the sso.<clusterBaseDomain> convention.
 */}}
 {{- define "tekos.keycloakIssuerUrl" -}}
 {{- if .Values.keycloak.issuerUrl -}}

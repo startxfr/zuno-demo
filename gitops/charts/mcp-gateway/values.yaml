@@ -1,13 +1,8 @@
-# Default values for the mcp-gateway chart. Overridden per-environment
-# through gitops/apps/mcp/application-d1.yaml's spec.source.helm.values.
-
 namespace: zuno-ai-run
 
 image:
-  # Built by the Day 1 "mcp" build component (ADR-0056,
-  # ansible/roles/mcp_build) into zuno-ai-build's ImageStream, pulled
-  # cross-namespace into zuno-ai-run via the system:image-puller
-  # RoleBinding ansible/tasks/apply_openshift_build.yml grants.
+  # Built by the "mcp" build component into zuno-ai-build's ImageStream,
+  # pulled cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-gateway
   tag: latest
   pullPolicy: IfNotPresent
@@ -22,13 +17,9 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# Keycloak realm issuer (identity track owns the real route hostname -
-# override this for the target cluster; see ADR-0012).
+# Override for the target cluster's real route hostname.
 keycloakIssuer: https://keycloak-zuno.apps.mycluster.example.com/realms/zuno
 
-# ASSUMPTION: sales-db MCP server address - see components/mcp-gateway
-# README "Assumption: sales-db MCP server address" for the reasoning and
-# what to change if this is wrong once that track's server lands.
 salesDbMcpUrl: http://sales-db-mcp.zuno-ai-run.svc:8000
 
 # Domains treated as "internal" by the send_technical_report_email demo

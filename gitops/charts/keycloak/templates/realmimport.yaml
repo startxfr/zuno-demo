@@ -1,25 +1,12 @@
 {{- if .Values.keycloak.enabled }}
-# Imports the `zuno` realm (groups, users, per-agent OIDC clients, Google
-# IdP broker) via the Keycloak Operator's KeycloakRealmImport CRD
-# (k8s.keycloak.org/v2alpha1). The realm is authored as plain JSON in
-# files/realm-zuno.json (a real Keycloak realm export shape) and embedded
-# inline below - the CRD's spec.realm field takes a full
-# RealmRepresentation object, there is no ConfigMap/file reference option in
-# this CRD version, so "inline" is the only supported delivery mechanism.
+# Imports the `zuno` realm from files/realm-zuno.json, embedded inline since
+# the CRD's spec.realm field has no ConfigMap/file reference option.
 #
-# apps.mycluster.example.com in the source JSON is a plain string placeholder
-# (not Keycloak syntax) substituted here with .Values.clusterBaseDomain
-# before parsing, so every per-agent client's redirectUris/webOrigins/
-# rootUrl resolve to the real cluster's apps domain without hand-editing the
-# JSON per environment.
+# apps.mycluster.example.com is a plain string placeholder substituted with
+# .Values.clusterBaseDomain before parsing.
 {{- $realmRaw := .Files.Get "files/realm-zuno.json" | replace "apps.mycluster.example.com" .Values.clusterBaseDomain }}
 {{- $realm := $realmRaw | fromJson }}
-{{- /* .Values.googleOAuth.enabled (default true - see values.yaml) lets an
-   environment without real Google OAuth credentials disable the realm's
-   "google" identity provider instead of leaving google-oauth-client's
-   ExternalSecret in permanent error - flips the IdP's own enabled field
-   rather than removing the entry, so re-enabling later is a one-value
-   change. */}}
+{{- /* Disables the "google" IdP instead of removing it, so re-enabling is a one-value change. */}}
 {{- if not .Values.googleOAuth.enabled }}
 {{- range $idp := $realm.identityProviders }}
 {{- if eq $idp.alias "google" }}
@@ -35,8 +22,7 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    # After templates/keycloak.yaml's Keycloak CR (spec.keycloakCRName
-    # references it) - not merely the shared "main workload" wave.
+    # Must sync after the Keycloak CR (templates/keycloak.yaml).
     argocd.argoproj.io/sync-wave: "-10"
 spec:
   keycloakCRName: {{ .Values.keycloakCRName }}

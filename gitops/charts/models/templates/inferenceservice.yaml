@@ -1,8 +1,5 @@
-# KServe pulls the model weights from Hugging Face at pod start via the
-# storageUri's `hf://` scheme (RHOAI's supported storage initializer) -
-# demo scope, no offline/mirrored model cache. First pull is slow (~15GB);
-# this is the dominant contributor to first-token latency on a cold start,
-# separate from the steady-state <6s objective (README.md).
+# Model weights are pulled from Hugging Face at pod start (hf://), no
+# offline/mirrored cache; first pull (~15GB) dominates cold-start latency.
 apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
@@ -12,13 +9,7 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    # ADR-0047/ADR-0048: explicit, belt-and-suspenders with the
-    # DataScienceCluster's cluster-wide kserve.serving.managementState:
-    # Removed (ansible/roles/openshift_ai/tasks/prepare.yml) - this one
-    # always-on model (minReplicas == maxReplicas, no scale-to-zero need)
-    # has no use for Serverless/Knative, which would otherwise require the
-    # Service Mesh and Serverless operators plus cert-manager, none of
-    # which this repository installs.
+    # RawDeployment: this always-on model has no need for Serverless/Knative.
     serving.kserve.io/deploymentMode: RawDeployment
 spec:
   predictor:

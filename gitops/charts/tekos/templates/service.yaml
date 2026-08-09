@@ -17,8 +17,8 @@ spec:
       port: 8080
       targetPort: http
 ---
-# No OpenShift Route for the BFF (ADR-0023 isolation): the frontend proxies
-# chat calls to it server-side over the in-cluster ClusterIP Service only.
+# No OpenShift Route for the BFF: the frontend proxies chat calls to it
+# server-side over the in-cluster ClusterIP Service only.
 apiVersion: v1
 kind: Service
 metadata:

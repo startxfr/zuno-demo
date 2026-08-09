@@ -1,6 +1,5 @@
 ---
-# Day 0 (ADR-0056): `make day0 install`/`make d0 install`. Same component
-# list and ordering as day0_check.yml - see that file's header comment.
+# Day 0 install (`make day0 install`). Same component order as day0_check.yml.
 - name: "Day 0: install prerequisites"
   hosts: localhost
   gather_facts: false

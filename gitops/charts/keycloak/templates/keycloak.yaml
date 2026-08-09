@@ -1,43 +1,13 @@
 {{- if .Values.keycloak.enabled }}
-# The Keycloak CR (Keycloak Operator / Red Hat build of Keycloak,
-# k8s.keycloak.org/v2alpha1). Demo-grade: single instance, HTTP behind an
-# OpenShift edge-terminated Route (mirrors the vault chart's
-# tls_disable-at-the-pod / TLS-at-the-edge pattern) rather than a dedicated
-# serving certificate. ADR-0112 tracks production HA/backup hardening for
-# v1; this instance is sufficient for the v0 demo's ~50-user scale (see
-# MEMORY.md section 2).
+# Demo-grade: single instance, HTTP behind an edge-terminated Route rather
+# than a dedicated serving certificate. spec.db is intentionally omitted -
+# Keycloak falls back to its bundled dev database (not durable across pod
+# loss); wiring the shared PostgreSQL instance is a follow-up.
 #
-# Database: spec.db is intentionally omitted. The Keycloak Operator falls
-# back to its bundled dev database when no external db is configured, which
-# is acceptable for this demo (single Keycloak instance, no HA requirement)
-# but is NOT durable across a database pod loss. Wiring this to the shared
-# PostgreSQL instance (ADR-0015, owned by another track's `postgresql` role)
-# is a documented follow-up once that service name/credentials contract
-# exists - track this alongside ADR-0112.
-#
-# Secret injection for the Google OAuth client (ADR-0014): the Keycloak
-# Operator's KeycloakRealmImport CRD has no native secretKeyRef-style
-# substitution for arbitrary IdentityProviderRepresentation fields (unlike
-# spec.db's username/password, which the CRD does support as secret
-# references). Instead this uses Keycloak's own built-in "vault" SPI:
-# `${vault.<key>}` placeholders in the realm JSON
-# (files/realm-zuno.json's identityProviders[0].config.clientId/
-# clientSecret, and every demo persona's credential.value) resolve at
-# runtime from files under KC_VAULT_DIR - see
-# https://www.keycloak.org/server/vault (files provider).
-#
-# CORRECTION (found via live-cluster testing on api.demo222.startx.fr,
-# replacing an unverified assumption this comment used to make): the env
-# provider this used to configure (`KC_VAULT=env`) does not exist on the
-# installed RHBK version - `kc.sh` rejects it outright ("Invalid value for
-# option 'KC_VAULT': env. Expected values are: file, keystore"), crash-
-# looping the server before it ever reaches realm import. Switched to the
-# files provider instead: KC_VAULT=file + KC_VAULT_DIR below, with a
-# projected volume placing each secret's value at
-# <KC_VAULT_DIR>/<realm>_<key> (the files provider's documented default
-# naming, e.g. `zuno_google_client_id` for `${vault.google_client_id}` in
-# the "zuno" realm) - ASSUMPTION still open: this naming convention itself
-# is not yet verified against a real realm import on this RHBK version.
+# Google OAuth / demo-persona secrets are injected via Keycloak's "vault"
+# SPI: `${vault.<key>}` placeholders in the realm JSON resolve at runtime
+# from files under KC_VAULT_DIR. Must be KC_VAULT=file, not env - the env
+# provider doesn't exist on the installed RHBK version and crash-loops the server.
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -61,16 +31,8 @@ spec:
   unsupported:
     podTemplate:
       spec:
-        # ADR-0052: automountServiceAccountToken/runAsNonRoot/seccompProfile
-        # are set here since spec.unsupported.podTemplate is a full
-        # corev1.PodTemplateSpec overlay - the same already-established
-        # mechanism this file uses for env injection. No
-        # readOnlyRootFilesystem on the container below: Keycloak/the JVM
-        # write caches/logs under its own filesystem at runtime, and
-        # guessing at the exact writable paths without a live cluster risks
-        # breaking the instance outright - left as a documented gap rather
-        # than a fabricated fix, same reasoning as gitops/charts/models'
-        # vLLM container.
+        # No readOnlyRootFilesystem: Keycloak/the JVM write caches and logs
+        # under its own filesystem at runtime, and the exact writable paths aren't verified.
         automountServiceAccountToken: false
         securityContext:
           runAsNonRoot: true

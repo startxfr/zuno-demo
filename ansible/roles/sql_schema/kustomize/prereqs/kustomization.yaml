@@ -1,5 +1,5 @@
-# ExternalSecret moved to gitops/charts/sql-schema/templates/
-# externalsecret.yaml (ADR-0313) - ArgoCD-managed, not ansible-applied.
+# ExternalSecret lives in gitops/charts/sql-schema instead - ArgoCD-managed,
+# not ansible-applied.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

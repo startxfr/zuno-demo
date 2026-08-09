@@ -1,11 +1,6 @@
 ---
-# Shared task: generates a unique /tmp state-report file path (Ansible-
-# native - the same lookup('ansible.builtin.password', '/dev/null', ...)
-# idiom ansible/roles/vault/tasks/install.yml already uses to generate
-# random values, no shell uuidgen/mktemp and no dependency on an extra
-# collection) and creates the empty file. Included once at the top of
-# every check playbook (day0_check.yml, day1_check.yml) - `default()`
-# makes this idempotent within a single ansible-playbook run.
+# Generates a unique /tmp state-report file path and creates the empty file.
+# Included once per check playbook; `default()` keeps it idempotent per run.
 - name: "state-report | generate a unique report file path"
   ansible.builtin.set_fact:
     state_report_file: >-

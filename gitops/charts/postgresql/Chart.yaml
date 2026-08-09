@@ -3,23 +3,9 @@ name: postgresql
 description: >-
   Zuno Demo PostgreSQL PostgresCluster (Crunchy Postgres Operator / PGO
   custom resource) and its Vault-backed application credentials
-  ExternalSecret. Implements ADR-0015. Requires the Crunchy Postgres
-  Operator, installed separately by ansible/roles/postgresql (OLM
-  Subscription, rendered by the vendored startx `operator` chart - see
-  below for why not `cluster-crunchy`).
-  NOTE: this deliberately depends on startx's generic `operator` chart, not
-  `cluster-crunchy` - cluster-crunchy's own defaults target a dedicated
-  "default-crunchy" namespace (OwnNamespace, its own OperatorGroup) with a
-  fixed package name ("crunchy-postgres-operator", certified-operators
-  catalog). This repo's own install (ansible/roles/postgresql/tasks/
-  install.yml) instead subscribes into openshift-operators (AllNamespaces,
-  using OpenShift's own existing global OperatorGroup - no dedicated
-  namespace/OperatorGroup needed) with the package name/channel/catalog all
-  fuzzy-discovered at run time (a fixed "crunchy-postgres-operator" guess
-  proved wrong on at least one real catalog - see that role's README.md).
-  Using cluster-crunchy would mean overriding every one of these values
-  anyway, so plain `operator` avoids the misleading implication that a
-  fixed package/namespace is actually being used.
+  ExternalSecret. Depends on startx's generic `operator` chart rather than
+  `cluster-crunchy`, since the operator's package/channel/catalog are
+  fuzzy-discovered at run time rather than fixed.
 type: application
 version: 0.2.0
 appVersion: "16"

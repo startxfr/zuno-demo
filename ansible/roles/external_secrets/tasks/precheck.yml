@@ -1,10 +1,6 @@
 ---
-# State detection (never fails). Reuses install.yml's own final readiness
-# signal: the vault-backend ClusterSecretStore reporting Ready - only
-# rendered once the Application's second apply_gitops_app.yml call has
-# supplied vaultServiceName (see gitops/charts/external-secrets/
-# values.yaml), so this also implicitly proves the operator/operand are
-# installed too.
+# Reuses install.yml's readiness signal: vault-backend ClusterSecretStore
+# Ready implies the operator/operand are installed too.
 - name: "external_secrets | look up the vault-backend ClusterSecretStore"
   kubernetes.core.k8s_info:
     api_version: external-secrets.io/v1beta1

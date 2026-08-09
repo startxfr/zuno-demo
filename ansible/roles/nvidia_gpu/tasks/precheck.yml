@@ -1,10 +1,6 @@
 ---
-# State detection (never fails). nvidia_gpu's Subscription (-d0) and
-# ClusterPolicy (-d1) are two separate Applications (ADR-0312 - the
-# ClusterPolicy spec is only known once the CSV installs, so -d1 is only
-# ever applied with it already set). "Installed" checks both phases: the
-# operator (Subscription CSV succeeded) and the ClusterPolicy actually
-# reporting ready.
+# State detection (never fails). Checks both phases: the operator
+# (Subscription CSV succeeded) and the ClusterPolicy reporting ready.
 - name: "nvidia_gpu | look up the GPU Operator Subscription"
   kubernetes.core.k8s_info:
     api_version: operators.coreos.com/v1alpha1

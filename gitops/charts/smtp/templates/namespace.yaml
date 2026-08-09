@@ -1,12 +1,6 @@
 {{- if .Values.namespace.enabled }}
-# Not enabled by gitops/apps/smtp/application-d0.yaml (namespace.enabled:
-# false there) - zuno-ai-run is owned solely by gitops/charts/namespaces
-# (the platform scaffolding chart, applied earlier in day0_components),
-# not duplicated here anymore, so a resource has exactly one owning
-# Application. Kept as an opt-in template (not deleted) in case a future
-# caller ever needs this chart runnable standalone, without depending on
-# that role having run first - if enabled, this renders as an ArgoCD
-# PreSync hook, same as every other chart-declared Namespace in this repo.
+# Disabled by default: zuno-ai-run is owned by gitops/charts/namespaces.
+# Kept as an opt-in template in case this chart is ever run standalone.
 apiVersion: v1
 kind: Namespace
 metadata:

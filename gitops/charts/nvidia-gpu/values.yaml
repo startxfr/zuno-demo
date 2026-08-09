@@ -1,12 +1,7 @@
-# This chart is a thin wrapper around the startx `cluster-gpu` chart
-# (https://helm-repository.readthedocs.io/en/latest/charts/cluster-gpu,
-# vendored as a Helm dependency - see Chart.yaml), which itself renders the
-# Namespace/OperatorGroup/Subscription (its own `project`/`operator`
-# dependencies) and the ClusterPolicy CR. Shared by two ArgoCD Applications
-# (see gitops/apps/README.md): cluster-gpu.project.enabled +
-# cluster-gpu.operator.enabled (zuno-nvidia-gpu-d0) render the Namespace/
-# OperatorGroup/Subscription, cluster-gpu.gpu.enabled (zuno-nvidia-gpu-d1)
-# gates the ClusterPolicy CR.
+# Thin wrapper around the startx `cluster-gpu` chart (vendored as a Helm
+# dependency). Shared by two ArgoCD Applications: project + operator
+# (zuno-nvidia-gpu-d0) render the Namespace/OperatorGroup/Subscription,
+# gpu.enabled (zuno-nvidia-gpu-d1) gates the ClusterPolicy CR.
 cluster-gpu:
   context: &context
     scope: zuno
@@ -21,9 +16,7 @@ cluster-gpu:
       <<: *context
     project:
       enabled: true
-      # PreSync ArgoCD hook (see gitops/apps/README.md's Namespace
-      # convention), same mechanism this repo's own charts use.
-      hooked: true
+      hooked: true  # PreSync ArgoCD hook
       type: namespace
       name: nvidia-gpu-operator
       display_name: Zuno NVIDIA GPU Operator
@@ -41,9 +34,7 @@ cluster-gpu:
       operator:
         channel: stable
         name: gpu-operator-certified
-        # Matches this repo's previous local template (automatic
-        # upgrades) - the startx chart defaults to Manual.
-        installPlanApproval: Automatic
+        installPlanApproval: Automatic  # startx chart defaults to Manual
         source:
           name: certified-operators
           namespace: openshift-marketplace
@@ -52,33 +43,11 @@ cluster-gpu:
       name: nvidia-gpu-operator-group
       namespace: nvidia-gpu-operator
       target: nvidia-gpu-operator
-      # No `target: all-ns` override (startx's own recommended default for
-      # this operator, per their ArgoCD deployment conventions) - kept
-      # scoped to this single namespace to preserve this chart's previous,
-      # already-tested targetNamespaces behavior. Revisit if the GPU
-      # Operator ever needs cluster-wide (AllNamespaces) install mode.
+      # Scoped to this single namespace, not all-ns (startx's own default).
 
-  # ADR-0312: gpu.enabled MUST stay false (gitops/apps/nvidia-gpu/
-  # application-d1.yaml's static default) until the real spec is known.
-  # Unlike this repo's former local template (which gated rendering on
-  # `.Values.clusterPolicy.spec` being non-empty, so `enabled: true` +
-  # empty spec rendered nothing), cluster-gpu's own ClusterPolicy.yaml
-  # gates ONLY on gpu.enabled - `.Values.gpu.spec` defaults to the literal
-  # string "{}" via its own `| default "{}"`, so it always renders
-  # *something* the moment gpu.enabled is true, even with no spec
-  # supplied. An empty `spec: {}` is rejected outright by the ClusterPolicy
-  # CRD (see install.yml's comment) - ansible/roles/nvidia_gpu/tasks/
-  # install.yml reads the installed CSV's own recommended default spec
-  # from its alm-examples annotation and flips gpu.enabled to true
-  # together with that real spec, via gitops_app_extra_helm_values
-  # (ADR-0048), in a *second* apply against the zuno-nvidia-gpu-d1
-  # Application, once the operator (the separate zuno-nvidia-gpu-d0
-  # Application) has actually installed a CSV to read. Note: unlike this
-  # repo's own former local template (which used `toYaml` on a native
-  # map), cluster-gpu's template inserts `.Values.gpu.spec` as a raw
-  # string via `nindent` - the injected value must be pre-serialized YAML
-  # text (see the `to_nice_yaml` filter added in install.yml), not a
-  # nested mapping.
+  # Must stay false until a real ClusterPolicy spec is discovered from the
+  # installed operator's CSV — an empty spec is rejected by the CRD.
+  # gpu.spec must be pre-serialized YAML text (a string), not a native map.
   gpu:
     enabled: false
     name: gpu-cluster-policy

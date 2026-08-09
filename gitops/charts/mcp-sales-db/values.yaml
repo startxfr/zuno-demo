@@ -1,11 +1,8 @@
-# Namespace matches components/mcp-gateway's salesDbMcpUrl assumption:
-# http://sales-db-mcp.zuno-ai-run.svc:8000 (gitops/charts/mcp-gateway/values.yaml).
+# Must match mcp-gateway's salesDbMcpUrl (http://sales-db-mcp.zuno-ai-run.svc:8000).
 namespace: zuno-ai-run
 
-# Built by the Day 1 "mcp" build component (ADR-0056,
-# ansible/roles/mcp_build) into zuno-ai-build's ImageStream, pulled
-# cross-namespace into zuno-ai-run via the system:image-puller RoleBinding
-# ansible/tasks/apply_openshift_build.yml grants.
+# Built by the "mcp" build component into zuno-ai-build's ImageStream,
+# pulled cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
 image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-sales-db
   tag: latest
@@ -22,10 +19,7 @@ resources:
     memory: 256Mi
 
 db:
-  # zuno-postgresql-pgbouncer is PGO's own auto-created PgBouncer Service
-  # in front of the zuno-postgresql PostgresCluster - there is no plain
-  # "postgresql" Service, and no "-rw"-suffixed one either (that was
-  # CloudNativePG's convention - see ansible/roles/postgresql/README.md).
+  # PGO's auto-created PgBouncer Service in front of the PostgresCluster.
   host: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
   port: "5432"
   database: zuno

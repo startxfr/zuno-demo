@@ -2,9 +2,7 @@
 - name: "models | discover the vLLM serving-runtime image (ADR-0048)"
   ansible.builtin.include_tasks: discover_vllm_image.yml
 
-# No OLM operator involved (relies on openshift_ai/nvidia_gpu having
-# already prepared the cluster) - all of this component's content is -d1
-# (see gitops/apps/models/application-d0.yaml, a no-op).
+# No OLM operator involved - all content is -d1 (d0 is a no-op).
 - name: "models | apply the model serving GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -20,11 +18,8 @@
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
-    # ADR-0048: override the chart's own hardcoded values.yaml default
-    # (kept only as a `helm template`/standalone-testing fallback - see
-    # gitops/charts/models/README.md) with the image this run actually
-    # discovered (or was explicitly told to use via
-    # models_vllm_image_override).
+    # Overrides the chart's hardcoded values.yaml default with the image
+    # discovered above (or an explicit models_vllm_image_override).
     gitops_app_extra_helm_values:
       image:
         vllm: "{{ _models_discovered_vllm_image }}"

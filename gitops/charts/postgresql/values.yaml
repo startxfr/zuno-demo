@@ -1,34 +1,16 @@
-# Default values for the postgresql chart. See gitops/apps/postgresql/
-# application-d0.yaml/application-d1.yaml for how this is deployed
-# (namespace: zuno-data).
-
-# This chart is shared by two ArgoCD Applications (see
-# gitops/apps/README.md): operator.enabled (zuno-postgresql-d0) renders
-# the PGO Subscription via the vendored startx `operator` chart (see
-# Chart.yaml for why not `cluster-crunchy`), postgresCluster.enabled
-# (zuno-postgresql-d1) renders the PostgresCluster/ConfigMap/ExternalSecret
-# (local templates, no startx equivalent covers this chart's pgvector
-# image/backups/Vault-credentials wiring). Both default to false so `helm
-# template`/`helm lint` render nothing by default.
+# Shared by two ArgoCD Applications: operator (zuno-postgresql-d0) renders
+# the PGO Subscription, postgresCluster (zuno-postgresql-d1) renders the
+# PostgresCluster/ConfigMap/ExternalSecret. Both default false so `helm
+# template`/`helm lint` render nothing.
 postgresCluster:
   enabled: false
 
-# ADR-0312/ADR-0048: subscription.name (the package name itself, unlike
-# every other converted chart) / subscription.operator.channel /
-# subscription.operator.source.name are all discovered by
-# ansible/roles/postgresql/tasks/install.yml (fuzzy /crunchy/i match
-# across every catalog, operatorhubio-catalog fallback if nothing is
-# found anywhere - see that role's README.md) and always set via
-# gitops_app_extra_helm_values on the -d0 apply. templates/checks.yaml
-# fails the render if any is still empty once operator.enabled is true -
-# same fail-fast guard this chart's previous local Subscription template
-# enforced with Helm's `required` function (the vendored `operator`
-# chart's own Subscription template has no such guard). No OperatorGroup
-# here: openshift-operators ships with OpenShift's own default global
-# OperatorGroup (AllNamespaces), unlike gitops/charts/{nfd,nvidia-gpu,
-# openshift-ai,cert-manager}'s dedicated per-operator namespaces - so
-# operatorGroup.enabled is left at the `operator` chart's own default
-# (false).
+# subscription.name/operator.channel/operator.source.name are all
+# discovered at run time by ansible/roles/postgresql/tasks/install.yml and
+# set via gitops_app_extra_helm_values. templates/checks.yaml fails the
+# render if any is still empty once operator.enabled is true. No
+# OperatorGroup: openshift-operators uses OpenShift's own default global
+# one (AllNamespaces).
 operator:
   enabled: false
   context:
@@ -42,44 +24,29 @@ operator:
     namespace: openshift-operators
     name: ""
     operator:
-      # Must be set to the same discovered package name as subscription.name
-      # above (both metadata.name and spec.name need it) - NOT left unset to
-      # fall back to subscription.name via the vendored `operator` chart's
-      # own `.name | default $name` logic, because that chart's own
-      # values.yaml already gives operator.name a non-empty base default
-      # ("codeready-workspaces", its own CRW example) which wins the merge
-      # and suppresses that fallback entirely.
+      # Must be set explicitly: the vendored `operator` chart's own
+      # values.yaml gives this a non-empty default ("codeready-workspaces")
+      # that wins the merge and silently suppresses the fallback to
+      # subscription.name.
       name: ""
       channel: ""
-      # Matches this repo's previous local template (automatic
-      # upgrades) - the startx chart defaults to Manual.
-      installPlanApproval: Automatic
+      installPlanApproval: Automatic  # startx chart defaults to Manual
       source:
         name: ""
         namespace: openshift-marketplace
 
 postgresVersion: 18
 
-# No image: override - PGO 5.8.8's own default operand image for the
-# postgresVersion above already bundles pgvector 0.8.2 and supports
-# TimescaleDB (UNVERIFIED - confirm once the cluster is reachable, see
-# ansible/roles/postgresql/README.md's "What's unverified" section).
-# Letting PGO pick its own certified image (accessible via the cluster's
-# existing global pull secret) avoids needing any separate registry
-# credentials - templates/postgrescluster.yaml omits spec.image entirely.
+# No image: override - PGO's default operand image for this version already
+# bundles pgvector and supports TimescaleDB; templates/postgrescluster.yaml
+# omits spec.image entirely.
 
 cluster:
   name: zuno-postgresql
-  # HA: 3 Patroni replicas (1 primary + 2 async replicas), PGO/Patroni
-  # handle automatic failover.
-  instances: 3
-  # api.demo222.startx.fr is AWS/EBS-backed (`oc get storageclass`: gp2-csi,
-  # gp3-csi) - no ODF/Ceph here, gp3-csi is the cluster's own default.
+  instances: 3  # HA: 1 primary + 2 async replicas, PGO/Patroni auto-failover
   storageClassName: gp3-csi
   storageSize: 200Gi
-  # Separate volume for WAL - write latency matters more for WAL than for
-  # DATA, particularly under TimescaleDB's typically high ingestion rate.
-  walStorageSize: 50Gi
+  walStorageSize: 50Gi  # separate volume: WAL write latency matters more than DATA's
   resources:
     requests:
       cpu: "2"
@@ -88,24 +55,19 @@ cluster:
       cpu: "4"
       memory: 16Gi
   database: zuno
-  # No underscore/hyphen: PGO derives a Kubernetes Secret name directly
-  # from this value ("<cluster>-pguser-<owner>", RFC 1123 label rules),
-  # and unquoted PostgreSQL identifiers can't contain hyphens either -
-  # lowercase-letters-and-digits-only is valid in both (see
-  # ansible/roles/postgresql/README.md).
+  # No underscore/hyphen: PGO derives the pguser Secret name directly from
+  # this ("<cluster>-pguser-<owner>"), and it must also be a valid unquoted
+  # PostgreSQL identifier.
   owner: zunoapp
 
-# TimescaleDB must be preloaded (unlike pgvector, which needs no
-# shared_preload_libraries entry) - see templates/configmap-init-sql.yaml
-# for the CREATE EXTENSION statements this pairs with.
+# TimescaleDB must be preloaded (unlike pgvector) - see
+# templates/configmap-init-sql.yaml for the CREATE EXTENSION statements.
 config:
   maxConnections: "200"
   logMinDurationStatement: "1000"
 
-# PgBouncer in front of the 3 instances (transaction pooling) - PGO
-# manages it natively (spec.proxy.pgBouncer). Consumers connect to the
-# <cluster>-pgbouncer Service rather than -primary directly, see
-# ansible/roles/postgresql/README.md's "Connecting to this cluster".
+# PgBouncer in front of the 3 instances (transaction pooling), managed
+# natively by PGO. Consumers connect to <cluster>-pgbouncer, not -primary.
 pgBouncer:
   replicas: 2
   resources:
@@ -119,13 +81,8 @@ pgBouncer:
   maxClientConn: "500"
   defaultPoolSize: "50"
 
-# PGO requires at least one pgBackRest repository configured - unlike
-# CNPG, there is no way to omit backups entirely. repo1 is always a local
-# PVC; repo2 (S3-compatible, off-cluster) is added only once real
-# credentials exist in ansible/confidential.yml (backups.s3.enabled,
-# set via gitops_app_extra_helm_values by ansible/roles/postgresql/tasks/
-# install.yml - never rendered half-configured, same guard pattern as
-# keycloak's googleOAuth.enabled).
+# PGO requires at least one pgBackRest repository; repo1 is always a local
+# PVC. repo2 (S3, off-cluster) is added only once real credentials exist.
 backups:
   storageSize: 500Gi
   s3:
@@ -133,21 +90,14 @@ backups:
     bucket: ""
     endpoint: ""
     region: ""
-    # Secret (pgBackRest "s3.conf" style) synced from Vault by
-    # templates/externalsecret-backup-s3.yaml - only rendered/referenced
-    # when s3.enabled is true.
-    secretName: zuno-postgresql-backup-s3
+    secretName: zuno-postgresql-backup-s3  # synced from Vault, only used when s3.enabled
 
 credentials:
-  # Path under the vault-backend ClusterSecretStore's "zuno" KV v2 mount
-  # (i.e. resolves to Vault path zuno/postgresql/app, already seeded
-  # by ansible/roles/vault/tasks/install.yml - this chart only consumes
-  # it, never regenerates or hardcodes it, per ADR-0024).
+  # Resolves to Vault path zuno/postgresql/app; this chart only consumes
+  # the credential, never generates it.
   vaultPath: postgresql/app
-  # PGO's own fixed naming convention for a user's auto-managed Secret is
-  # "<cluster>-pguser-<user>" - not a freely-chosen name like CNPG's
-  # bootstrap.initdb.secret.name was, so this is templated from
-  # cluster.name/cluster.owner in templates/externalsecret.yaml rather than
-  # set here, to avoid two places needing to agree on the same string.
+  # PGO's fixed naming convention ("<cluster>-pguser-<user>") is templated
+  # in templates/externalsecret.yaml from cluster.name/cluster.owner
+  # instead of set here, so the two don't need to agree independently.
   secretStoreName: vault-backend
   refreshInterval: 1h

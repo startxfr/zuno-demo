@@ -1,6 +1,5 @@
 ---
-# State detection (never fails). The zuno-postgresql-d0/-d1 Applications
-# plus PGO's own rollout-complete signal install.yml already waits on.
+# State detection (never fails).
 - name: "postgresql | check the postgresql Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:

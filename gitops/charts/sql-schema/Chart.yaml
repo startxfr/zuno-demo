@@ -1,12 +1,8 @@
 apiVersion: v2
 name: sql-schema
 description: >-
-  Applies the SXA-derived PostgreSQL schema + synthetic fixtures (ADR-0016,
-  ADR-0025) the sales-db MCP server (gitops/charts/mcp-sales-db) reads from,
-  as an ArgoCD PreSync hook Job (ADR-0313). Applied by the `sql_schema`
-  Ansible role's install.yml, on the `zuno-mcp-sales-db-d0` Application -
-  the "prerequisites" phase, ahead of the sales-db MCP server itself
-  (`zuno-mcp-sales-db-d1`).
+  Applies the SXA-derived PostgreSQL schema and synthetic fixtures the
+  sales-db MCP server reads from, as an ArgoCD PreSync hook Job.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

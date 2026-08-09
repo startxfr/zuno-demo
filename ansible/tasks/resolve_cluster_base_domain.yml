@@ -1,21 +1,7 @@
 ---
-# Discovers the cluster's real apps wildcard domain directly from the
-# OpenShift API (authoritative, and Ansible already has direct API access
-# via the operator's kubeconfig - K8S_AUTH_KUBECONFIG, see
-# ansible/tasks/load_k8s_auth_env.yml - no need to round-trip through Vault
-# just to read a value this same run can query directly). Idempotent within
-# a single playbook run via the `is not defined` guard, so every include
-# site (apply_gitops_app.yml, the vault role, the agents role's smoke
-# check) can safely call this without worrying about duplicate API calls or
-# about which scope happened to run first in a given `make install`
-# invocation.
-#
-# The discovered value is also persisted to Vault (see
-# ansible/roles/vault/tasks/install.yml) so that anything without direct
-# cluster API access - a pod consuming it via an ExternalSecret, a future
-# out-of-band script - has one durable place to read it from instead of a
-# second, potentially stale, hardcoded copy. This task only ever discovers
-# and sets the in-memory fact; it does not itself talk to Vault.
+# Discovers the cluster's apps wildcard domain from the OpenShift API
+# directly (idempotent via the `is not defined` guard). Also persisted to
+# Vault by the vault role for consumers without direct cluster API access.
 - name: "cluster-domain | discover the real apps domain from Ingress.config.openshift.io/cluster"
   kubernetes.core.k8s_info:
     api_version: config.openshift.io/v1

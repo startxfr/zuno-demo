@@ -1,10 +1,6 @@
 ---
-# State detection (never fails - see ansible/tasks/record_state.yml):
-# admin_context has no ArgoCD Application (bootstrap role, ADR-0312) - its
-# only "installed" objects are the two PriorityClasses
-# (ansible/roles/admin_context/kustomize/priorityclasses/, applied by
-# install.yml). The zuno AppProject moved to the argocd role (its own
-# install.yml) - see that role's precheck.yml for its signal.
+# admin_context is a bootstrap role with no ArgoCD Application; installed
+# state is detected from the two PriorityClasses it applies directly.
 - name: "admin_context | look up the PriorityClasses"
   kubernetes.core.k8s_info:
     api_version: scheduling.k8s.io/v1

@@ -1,11 +1,7 @@
 apiVersion: v2
 name: noop
 description: >-
-  Renders nothing. Used as the spec.source chart for whichever half of a
-  component's -d0/-d1 ArgoCD Application pair (see gitops/apps/README.md)
-  has no content - keeps the <app>-d0/<app>-d1 naming convention uniform
-  across every component even when one side is empty (e.g. zuno-vault-d0,
-  zuno-namespaces-d1: vault has no operator, namespaces has no live-service
-  content).
+  Renders nothing; used as the source chart for the empty half of a
+  component's -d0/-d1 ArgoCD Application pair.
 type: application
 version: 0.1.0

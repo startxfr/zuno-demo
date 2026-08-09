@@ -1,9 +1,5 @@
-# ADR-0052: rag-service lives in zuno-data, which does get a namespace-wide
-# baseline (gitops/charts/namespaces/values.yaml's platformNamespaces,
-# allowing zuno-ai-run in) - that baseline alone would already let
-# agent-runtime reach this service. This precise policy is added anyway so
-# rag-service's actual caller is documented and enforced at the workload
-# level too, not only inferred from the namespace-wide rule.
+# Documents and enforces rag-service's actual caller at the workload level,
+# on top of the namespace-wide baseline that already permits it.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

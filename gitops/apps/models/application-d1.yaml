@@ -1,9 +1,6 @@
 ---
-# Local model serving (ADR-0019) - see gitops/charts/models. Applied by the
-# `models` Ansible role's install.yml, after `openshift_ai` (DataScienceCluster
-# with kserve enabled) and `nvidia_gpu` (GPU Operator) have prepared the cluster.
-# No operator involved in this chart itself, so all of this component's
-# content is -d1 (see gitops/apps/models/application-d0.yaml).
+# Local model serving. Applied after `openshift_ai` (kserve) and
+# `nvidia_gpu` have prepared the cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

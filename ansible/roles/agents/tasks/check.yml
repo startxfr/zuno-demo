@@ -1,24 +1,15 @@
 ---
-# `make day1|d1 check agents`'s full ADR-0053 layered gate for the one functional agent
-# (Tekos): a basic reachability smoke check (this file, Layer 0) followed
-# by the full acceptance/security gate (run_acceptance_gate.yml, Layers
-# 1-3 - the 20-scenario evaluation, ADR-0027/0028, plus every mandatory
-# security-negative check, run as an in-cluster Job since it needs to
-# reach services with no OpenShift Route).
+# Layered gate for the one functional agent (Tekos): a reachability smoke
+# check here (Layer 0), then the full acceptance/security gate
+# (run_acceptance_gate.yml, Layers 1-3) as an in-cluster Job.
 #
-# The catalog-only agents (comage/advantage/finage/arkos) get a structural
-# check instead of a health check (ADR-0031): v0 formalizes Tekos as the
-# only mandatory end-to-end business path, but "catalog-only" must never
-# mean "unchecked" - their agent.okf.md bundle (ADR-0038: OKF v0.2 Markdown
-# bundle, YAML frontmatter + Markdown body) must still parse and declare
-# zuno.status: placeholder, so a future status: active flip (v1) has a
-# known-good starting point rather than a silently-rotted definition.
+# Catalog-only agents (comage/advantage/finage/arkos) get a structural check
+# instead: their agent.okf.md bundle must still parse and declare
+# zuno.status: placeholder, so a future status: active flip isn't starting
+# from a silently-rotted definition.
 #
-# agent.okf.md has no built-in Ansible lookup/filter for "parse frontmatter",
-# so this splits the raw file on the "---" delimiter (Jinja's str.split, the
-# same approach components/agent-frontend/internal/okf/okf.go and
-# components/agent-runtime/app/registry.py use) and hands the middle part
-# (index [1]) to from_yaml.
+# No built-in lookup/filter parses OKF frontmatter, so this splits the raw
+# file on "---" and hands the middle part to from_yaml.
 - name: "agents | load each catalog-only agent's OKF Markdown bundle frontmatter"
   ansible.builtin.set_fact:
     _agents_catalog_okf: "{{ _agents_catalog_okf | default({}) | combine({catalog_agent: (lookup('ansible.builtin.file', zuno_repo_root + '/agents/' + catalog_agent + '/agent.okf.md').split('---'))[1] | from_yaml}) }}"
@@ -80,13 +71,7 @@
   ansible.builtin.debug:
     msg: "Tekos frontend healthy at https://{{ _agents_tekos_host }}/healthz."
 
-# ADR-0053: the layered acceptance and security gate. Everything above this
-# point is infrastructure readiness (Layer 0 - OKF structural validity,
-# frontend reachability); this is Layers 1-3 (Keycloak login/claims, BFF/
-# Runtime auth, RAG retrieval, MCP allow/deny, model routing/classification,
-# SSE, citations, the 20 Tekos scenarios at a 75% threshold, and every
-# security-negative check at 100% mandatory) - see
-# evaluations/tekos/run_acceptance_gate.py, which this task runs as an
-# in-cluster Job.
+# Layers 1-3: auth, RAG, MCP allow/deny, routing, the 20 Tekos scenarios
+# (75% threshold), and every security-negative check (100% mandatory).
 - name: "agents | run the ADR-0053 acceptance gate"
   ansible.builtin.include_tasks: run_acceptance_gate.yml

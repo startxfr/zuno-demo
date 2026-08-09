@@ -1,8 +1,6 @@
 ---
-# Shared task: reverse of apply_gitops_app.yml. Deletes one ArgoCD
-# Application by name, patching in the cascade finalizer first so ArgoCD
-# prunes every resource it manages before the Application object itself
-# is removed. Required var: gitops_app_name.
+# Deletes one ArgoCD Application by name; patches in the cascade finalizer
+# first so ArgoCD prunes managed resources before removing it. Requires gitops_app_name.
 - name: "gitops | validate gitops_app_name is set"
   ansible.builtin.assert:
     that:

@@ -1,18 +1,11 @@
 ---
-# ADR-0312: makes argocd.argoproj.io/sync-wave gating functional *within* a
-# single Application's own sync (previously only meaningful to the
-# never-applied root App-of-Apps - ADR-0311), so a chart can safely apply an
-# OLM Subscription in one wave and its operand CR in a later one. Without
-# this, ArgoCD's default health evaluation reports a Subscription kind it
-# has no logic for as Healthy immediately after apply, before OLM has
-# actually installed the CSV that registers the operand CR's CRD - the next
-# wave would then fail with "no matches for kind X".
+# ArgoCD has no built-in health logic for Subscription, so without this it
+# reports Healthy immediately on apply, before OLM installs the CSV -
+# breaking sync-wave gating for charts that apply an operand CR in a later wave.
 #
-# Patches the operator-managed ArgoCD CR (openshift-gitops/openshift-gitops,
-# auto-created by the OpenShift GitOps operator itself - this repository
-# never created it) rather than the argocd-cm ConfigMap directly: the
-# operator reconciles argocd-cm *from* this CR's spec, so a raw ConfigMap
-# edit would be silently reverted on the operator's next reconcile.
+# Patches the operator-managed ArgoCD CR rather than argocd-cm directly:
+# the operator reconciles argocd-cm from this CR's spec, so a raw ConfigMap
+# edit would be reverted on the next reconcile.
 - name: "argocd | register the Subscription resource health check (ADR-0312)"
   kubernetes.core.k8s:
     state: patched

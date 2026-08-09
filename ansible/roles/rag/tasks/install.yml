@@ -1,22 +1,14 @@
 ---
-# ADR-0046: extends the document_embeddings table (created by
-# ansible/roles/sql_schema, which this role's own README already declares
-# as a dependency) with retrieval metadata support and seeds the demo
-# fixture corpus. ADR-0313: the actual apply is an ArgoCD PreSync hook Job
-# owned by gitops/charts/rag-service (templates/job-schema-apply.yaml),
-# not an ansible-managed Job - only the static SQL/fixtures ConfigMap
-# generation stays here.
-# ADR-0310: ansible/roles/rag/kustomize/schema/ (a configMapGenerator
-# reading directly from data/rag/ - disableNameSuffixHash keeps the name
-# "zuno-rag-schema" stable so the chart's PreSync hook Job can reference it
-# by that fixed name).
+# Generates the SQL/fixtures ConfigMap only; the actual apply is an ArgoCD
+# PreSync hook Job owned by gitops/charts/rag-service, not an ansible-managed
+# Job. disableNameSuffixHash keeps the ConfigMap name stable so the chart's
+# Job can reference it by a fixed name.
 - name: "rag | build the RAG metadata schema + fixtures ConfigMap"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/rag/kustomize/schema"
 
-# No OLM operator involved - all of this component's content is -d1 (see
-# gitops/apps/rag/application-d0.yaml, a no-op).
+# No OLM operator involved - all content is -d1 (d0 is a no-op).
 - name: "rag | apply the RAG service GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

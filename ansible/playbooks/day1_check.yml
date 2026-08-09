@@ -1,23 +1,6 @@
 ---
-# Day 1 (ADR-0056): state check for Day 1 components - `make day1 check`/
-# `make d1 check`. Mirrors day0_check.yml's structure.
-#
-# Component list note: your original Day 1 spec named `llm, rag, mcp,
-# agents` as the "run" components. `models` and `sql_schema` are included
-# here too, deliberately going beyond that exact list - dropping them
-# would make them permanently unreachable (nothing else in this
-# repository triggers the vLLM InferenceService or the SXA schema/
-# sales-db deployment), a real functional regression, not just a naming
-# choice. `mlops` is excluded from the state-check loop below (not from
-# day1_install.yml/day1_uninstall.yml) - it has no tasks/precheck.yml,
-# since tasks/install.yml is still a placeholder scaffold with nothing
-# real to detect yet.
-#
-# `agents` is a deliberate special case: `make check` (ADR-0053) must
-# still run ansible/roles/agents/tasks/check.yml - the full 20-scenario
-# acceptance/security gate - not just a lightweight state check. So the
-# loop below runs `tasks_from: check` for `agents` and
-# `tasks_from: precheck` for everyone else.
+# Day 1 state check (`make day1 check`). Includes `models`/`sql_schema`
+# beyond llm/rag/mcp/agents so they stay reachable (nothing else triggers them).
 - name: "Day 1: check install state"
   hosts: localhost
   gather_facts: false
@@ -55,9 +38,7 @@
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
-      # agents' check.yml (ADR-0053) is a real acceptance/security gate,
-      # unlike every other precheck.yml here - it can genuinely fail. Don't
-      # let that abort the play before the state report below is displayed.
+      # agents' check.yml can genuinely fail; don't abort before the report below is shown.
       ignore_errors: true
       register: _day1_check_results
 

@@ -1,8 +1,6 @@
 ---
-# Day 1 "agent" build component (ADR-0056): builds every image the Tekos
-# agent surface needs - the shared Agent Runtime, and Tekos's own
-# frontend/BFF (ADR-0008: one frontend/BFF pair per agent; only Tekos is
-# active in v0, so this is the one frontend/BFF pair that exists today).
+# Builds every image the Tekos agent surface needs: shared Agent Runtime
+# plus Tekos's own frontend/BFF (only active agent in v0).
 - name: "agent_build | build agent-runtime"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:

@@ -1,11 +1,6 @@
 {{- if .Values.certmanager.enabled }}
-# Singleton config CR the operator watches to actually deploy the
-# cert-manager controller/webhook/cainjector pods into the cert-manager
-# namespace - same "meta-operator needs a CR to do anything" shape as
-# gitops/charts/external-secrets/templates/operatorconfig.yaml. Cluster-
-# scoped (no namespace), name fixed to "cluster" per the operator's own
-# convention. See values.yaml's ASSUMPTION comment - not yet verified
-# against a live cluster in this environment.
+# Singleton CR the operator watches to deploy the controller/webhook/cainjector
+# pods. Cluster-scoped; name fixed to "cluster" per the operator's convention.
 apiVersion: operator.openshift.io/v1alpha1
 kind: CertManager
 metadata:

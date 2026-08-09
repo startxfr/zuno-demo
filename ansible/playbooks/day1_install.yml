@@ -1,8 +1,6 @@
 ---
-# Day 1 (ADR-0056): `make day1 install`/`make d1 install`. See
-# day1_check.yml's header comment for why `models`/`sql_schema`/`mlops`
-# are included alongside the `llm, rag, mcp, agents` your Day 1 spec
-# named.
+# Day 1 install (`make day1 install`). See day1_check.yml for why
+# models/sql_schema/mlops are included alongside llm/rag/mcp/agents.
 - name: "Day 1: install components"
   hosts: localhost
   gather_facts: false

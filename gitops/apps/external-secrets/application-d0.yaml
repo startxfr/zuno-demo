@@ -1,23 +1,14 @@
 ---
-# External Secrets Operator install (ADR-0024, ADR-0312). See
-# gitops/charts/external-secrets (operator.enabled). Applied by the
-# `external_secrets` Ansible role's install.yml, with the operator's
-# catalog/channel injected via gitops_app_extra_helm_values (ADR-0048) -
-# see that role's README.md. The ClusterSecretStore/ExternalSecret operand
-# is a separate Application (zuno-external-secrets-d1, applied after this
-# one is Synced+Healthy) - see application-d1.yaml. zuno-ai-run's own
-# Namespace is owned by gitops/charts/namespaces instead (ADR-0312), not
-# by this chart.
+# External Secrets Operator install; the ClusterSecretStore/ExternalSecret
+# operand is a separate Application (application-d1.yaml) applied after this one is healthy.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-external-secrets-d0
   namespace: openshift-gitops
   annotations:
-    # Sync order within the root App-of-Apps (gitops/root-app-of-apps.yaml)
-    # only - Ansible applies each Application directly and ignores this;
-    # real Day 0 ordering (after `vault` is initialized/unsealed) comes
-    # from ansible/playbooks/day0_install.yml's day0_components list.
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # applies this after `vault` is initialized/unsealed instead.
     argocd.argoproj.io/sync-wave: "-201"
 spec:
   project: zuno
@@ -38,20 +29,8 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # zuno-vault (this Application's destination.namespace) is owned by
-      # gitops/charts/namespaces (platformNamespaces), applied earlier in
-      # Day 0 ordering (ansible/playbooks/day0_install.yml: namespaces ->
-      # vault -> cert_manager -> external_secrets) - this chart must not
-      # also create/track it (was the zuno-external-secrets-d0/
-      # zuno-namespaces-d0 SharedResourceWarning).
+      # zuno-vault namespace is owned by gitops/charts/namespaces; don't also track it here (avoids a SharedResourceWarning).
       - CreateNamespace=false
-      # ADR-0312's two-wave pattern (Subscription wave 10, OperatorConfig
-      # wave 20) assumes ArgoCD gets far enough to start wave 10. On a
-      # cold cluster operator.external-secrets.io/OperatorConfig's
-      # GroupVersion is entirely undiscoverable (its CRD is only
-      # installed by the Subscription's CSV), which makes ArgoCD abort
-      # the *whole* sync operation as invalid before applying anything -
-      # including the Subscription that would eventually produce the
-      # CRD. This skips dry-run/discovery validation for resources whose
-      # CRD isn't installed yet, breaking that deadlock.
+      # On a cold cluster the OperatorConfig CRD doesn't exist yet, which makes
+      # ArgoCD abort the whole sync as invalid; this skips discovery validation to break that deadlock.
       - SkipDryRunOnMissingResource=true

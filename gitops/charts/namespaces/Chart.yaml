@@ -1,11 +1,6 @@
 apiVersion: v2
 name: namespaces
-description: >-
-  The five agent namespaces (ADR-0023 namespace-per-agent isolation model),
-  one per agent instance regardless of whether that agent's FE/BFF is
-  actually deployed (ADR-0007). Referenced by
-  gitops/apps/namespaces/application-d0.yaml (its application-d1.yaml
-  counterpart is a no-op - see gitops/apps/README.md).
+description: Creates the five agent namespaces, one per agent instance regardless of whether it's actively deployed.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

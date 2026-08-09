@@ -1,9 +1,6 @@
 ---
-# No Day1 (live-service) content for namespaces - it only creates
-# Namespaces/Quotas/NetworkPolicies (cluster-scoped/envelope provisioning,
-# classified entirely as -d0 - see application-d0.yaml). See
-# gitops/charts/noop/README.md and gitops/apps/README.md's -d0/-d1
-# convention.
+# No Day1 content for namespaces; it only creates cluster-scoped
+# Namespaces/Quotas/NetworkPolicies, classified entirely as -d0 (see application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

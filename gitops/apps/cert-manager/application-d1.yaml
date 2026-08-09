@@ -1,9 +1,6 @@
 ---
-# Vault-backed ClusterIssuer. See gitops/charts/cert-manager
-# (issuer.enabled) - NOT the operator itself (see
-# gitops/apps/cert-manager/application-d0.yaml, applied first by
-# ansible/roles/cert_manager/tasks/install.yml). Infrastructure only for
-# now - no existing Route/service consumes this issuer yet.
+# Vault-backed ClusterIssuer (not the operator itself, see application-d0.yaml).
+# Infrastructure only for now; no Route/service consumes it yet.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

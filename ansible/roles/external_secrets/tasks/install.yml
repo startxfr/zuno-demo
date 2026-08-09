@@ -1,15 +1,7 @@
 ---
-    # A hardcoded `source: redhat-operators` was wrong on a real cluster
-    # (api.demo222.startx.fr): the package name "external-secrets-operator"
-    # is real, but it's only published there via the community-operators
-    # catalog, not redhat-operators - OLM's ResolutionFailed/
-    # ConstraintsNotSatisfiable ("no operators found in package
-    # external-secrets-operator in the catalog referenced by subscription")
-    # gave no hint which catalog actually had it, since the catalog name is
-    # only visible on the PackageManifest itself. Same lesson as
-    # ansible/roles/postgresql's PGO catalog discovery and
-    # ansible/roles/keycloak's RHBK channel discovery: don't assume which
-    # catalog publishes a package, discover it.
+    # Catalog source varies per cluster (e.g. community-operators, not always
+    # redhat-operators); discover it from the PackageManifest rather than
+    # hardcoding, or the Subscription fails to resolve.
 - name: "external_secrets | look up the external-secrets-operator PackageManifest"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
@@ -52,15 +44,8 @@
       Subscribing to package 'external-secrets-operator', catalog
       '{{ _eso_catalog_source }}', channel '{{ _eso_channel }}'.
 
-# ADR-0312: Namespace(s)/Subscription/OperatorConfig live in
-# gitops/charts/external-secrets (operator.enabled), applied via the
-# separate zuno-external-secrets-d0 Application. The Vault-backed
-# ClusterSecretStore and cluster-domain ExternalSecret (clusterSecretStore.
-# enabled) live in the same chart but are applied via the separate
-# zuno-external-secrets-d1 Application, further below, once the Vault
-# client Service has been discovered - `vault` runs before
-# `external_secrets` in day0_components, so it's already installed and
-# unsealed by this point.
+# Operator (d0) is separate from the Vault-backed ClusterSecretStore (d1,
+# applied below once the Vault client Service is discovered).
 - name: "external_secrets | apply the external-secrets GitOps Application (d0: operator + OperatorConfig)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -77,13 +62,9 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 10
 
-# ArgoCD's default health evaluation has no logic for
-# operator.external-secrets.io/OperatorConfig - it reports the CR Healthy
-# as soon as synced, not once the operand Deployment it triggers is
-# actually ready. Kept as a supplementary explicit wait (same convention
-# ansible/roles/{postgresql,keycloak} use for their own CR-specific
-# readiness): the ClusterSecretStore applied below references the
-# "external-secrets" ServiceAccount this Deployment's rollout creates.
+# ArgoCD reports the OperatorConfig CR Healthy as soon as synced, not once
+# the operand Deployment is ready - the ClusterSecretStore below needs the
+# ServiceAccount that Deployment's rollout creates.
 - name: "external_secrets | wait for the ESO operand Deployment to be ready"
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -97,14 +78,8 @@
   retries: 60
   delay: 10
 
-    # Discovered, not hardcoded "vault.zuno-data.svc" - the Helm release
-    # name isn't a repository-wide constant, and the chart creates three
-    # Services sharing app.kubernetes.io/name=vault (client, -internal
-    # headless, -ui). Found and fixed a real bug via live-cluster testing
-    # on api.demo222.startx.fr, where a static "vault.zuno-data.svc"
-    # hostname this used to hardcode doesn't exist (the actual Service is
-    # "zuno-vault"), so vault-backend's ClusterSecretStore never became
-    # Ready ("dial tcp: lookup vault.zuno-data.svc ...: no such host").
+    # Discovered rather than hardcoded: the Helm release name isn't a
+    # repo-wide constant, and the chart creates three Services sharing this label.
 - name: "external_secrets | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service
@@ -122,7 +97,6 @@
          | map(attribute='metadata.name') | list)[0]
       }}
 
-# ADR-0312: templates/clustersecretstore.yaml (clusterSecretStore.enabled).
 - name: "external_secrets | apply the external-secrets GitOps Application (d1: Vault-backed ClusterSecretStore)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

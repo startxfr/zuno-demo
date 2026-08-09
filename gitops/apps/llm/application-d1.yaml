@@ -1,12 +1,6 @@
 ---
-# Provider routing config (ADR-0020, ADR-0021): a native Kustomize app
-# (ArgoCD auto-detects platform/ai-gateway/kustomization.yaml) generating
-# the zuno-provider-routing ConfigMap directly from provider-routing.yaml
-# (single source of truth) plus one ExternalSecret per external provider.
-# Applied by the `llm` Ansible role's install.yml, which also applies
-# gitops/apps/agent-runtime (see that role's README for why both live here).
-# No operator involved, so all of this component's content is -d1 (see
-# gitops/apps/llm/application-d0.yaml).
+# Provider routing config: a native Kustomize app generating the
+# zuno-provider-routing ConfigMap plus one ExternalSecret per external provider.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -1,10 +1,6 @@
 ---
-# ADR-0312-style split: Namespaces/OperatorGroup/Subscription/CertManager
-# CR (operator.enabled) and the Vault-backed ClusterIssuer (issuer.enabled)
-# both live in gitops/charts/cert-manager, applied via two separate
-# Applications (zuno-cert-manager-d0/-d1) - -d1 is only applied once -d0
-# is Synced+Healthy. Infrastructure only for now - see this role's
-# README.md.
+# Operator (d0) and Vault-backed ClusterIssuer (d1) are separate Applications;
+# d1 only applies once d0 is Synced+Healthy.
 - name: "cert_manager | apply the cert-manager GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -14,13 +10,9 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
-# ArgoCD's default health evaluation has no logic for
-# operator.openshift.io/CertManager - it reports the CR Healthy as soon as
-# synced, not once the operand controller/webhook it triggers is actually
-# ready. Kept as a supplementary explicit wait (same convention
-# ansible/roles/external_secrets uses for its own OperatorConfig-triggered
-# Deployment): the ClusterIssuer applied below needs the webhook pod
-# running to pass admission.
+# ArgoCD reports the CertManager CR Healthy as soon as synced, not once the
+# webhook is actually ready - the ClusterIssuer below needs that webhook up
+# to pass admission.
 - name: "cert_manager | wait for the cert-manager controller Deployment to be ready"
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -34,11 +26,8 @@
   retries: 60
   delay: 15
 
-# Discovered, not hardcoded "vault.zuno-data.svc" - same reasoning as
-# ansible/roles/{vault,external_secrets}/tasks/install.yml: the Helm
-# release name isn't a repository-wide constant, and the chart creates
-# three Services sharing app.kubernetes.io/name=vault (client, -internal
-# headless, -ui).
+# Discovered rather than hardcoded: the Helm release name isn't a repo-wide
+# constant, and the chart creates three Services sharing this label.
 - name: "cert_manager | discover the Vault client Service"
   kubernetes.core.k8s_info:
     kind: Service
@@ -56,12 +45,9 @@
          | map(attribute='metadata.name') | list)[0]
       }}
 
-# The pki/ secrets engine and the cert-manager-issuer Kubernetes-auth
-# role/policy this ClusterIssuer depends on are prepared by
-# ansible/roles/vault/kustomize/unseal-configure/configmap.yaml (`vault`
-# runs before `cert_manager` in day0_components) - this role never writes
-# to Vault directly, it only points a declarative ClusterIssuer at an
-# already-configured backend, same as external_secrets' ClusterSecretStore.
+# The pki/ engine and auth role/policy this ClusterIssuer depends on are
+# prepared by the vault role; this role only points at that backend, never
+# writes to Vault directly.
 - name: "cert_manager | apply the cert-manager GitOps Application (d1: Vault-backed ClusterIssuer)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

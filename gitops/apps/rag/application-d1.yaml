@@ -1,8 +1,5 @@
 ---
-# RAG service (pgvector + hybrid search) - see gitops/charts/rag-service and
-# components/rag-service. Applied by the `rag` Ansible role's install.yml.
-# No operator involved, so all of this component's content is -d1 (see
-# gitops/apps/rag/application-d0.yaml).
+# RAG service (pgvector + hybrid search).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

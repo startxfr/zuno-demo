@@ -1,13 +1,9 @@
 ---
-# Provider API key placeholders (zuno/providers/{openai,gemini,anthropic,
-# mistral}) are seeded by ansible/roles/vault/tasks/install.yml, alongside
-# every other platform secret - this role never talks to Vault directly,
-# it only registers the GitOps Applications below. See
-# platform/ai-gateway/externalsecret-*.yaml for how those placeholders
-# reach the cluster (vault-backend ClusterSecretStore).
-
-# No OLM operator involved in any of these three - all of their content is
-# -d1 (see each gitops/apps/<component>/application-d0.yaml, a no-op).
+# Provider API key placeholders are seeded by the vault role, not this one;
+# this role only registers the GitOps Applications below.
+#
+# No OLM operator involved in any of these three - all content is -d1
+# (the -d0 Applications are no-ops).
 - name: "llm | apply the provider-routing/AI Inference Gateway/Agent Runtime GitOps Applications (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

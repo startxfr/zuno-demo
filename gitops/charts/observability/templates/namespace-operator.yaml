@@ -1,11 +1,6 @@
 {{- if .Values.operator.enabled }}
-# Created as an ArgoCD PreSync hook - runs in its own phase, entirely
-# before the normal Sync phase (OperatorGroup/Subscription below), so its
-# existence is guaranteed without relying on sync-wave ordering within
-# the same batch. Also backed by this Application's own
-# syncOptions.CreateNamespace=true (gitops/apps/observability/
-# application-d0.yaml) as a redundant safeguard, since this namespace is
-# also this Application's own destination.namespace.
+# PreSync hook: guarantees the namespace exists before the
+# OperatorGroup/Subscription below.
 apiVersion: v1
 kind: Namespace
 metadata:

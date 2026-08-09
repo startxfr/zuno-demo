@@ -1,12 +1,7 @@
-# This chart is a thin wrapper around the startx `cluster-ods` chart
-# (https://helm-repository.readthedocs.io/en/latest/charts/cluster-ods,
-# vendored as a Helm dependency - see Chart.yaml), which itself renders the
-# Namespace/OperatorGroup/Subscription (its own `project`/`operator`
-# dependencies) and the DataScienceCluster CR. Shared by two ArgoCD
-# Applications (see gitops/apps/README.md): cluster-ods.project.enabled +
-# cluster-ods.operator.enabled (zuno-openshift-ai-d0) render the Namespace/
-# OperatorGroup/Subscription, cluster-ods.DataScienceCluster.enabled
-# (zuno-openshift-ai-d1) renders the DataScienceCluster CR.
+# Thin wrapper around the startx `cluster-ods` chart (vendored as a Helm
+# dependency). Shared by two ArgoCD Applications: project + operator
+# (zuno-openshift-ai-d0) render the Namespace/OperatorGroup/Subscription,
+# DataScienceCluster.enabled (zuno-openshift-ai-d1) renders the CR.
 cluster-ods:
   context: &context
     scope: zuno
@@ -21,19 +16,14 @@ cluster-ods:
       <<: *context
     project:
       enabled: true
-      # PreSync ArgoCD hook (see gitops/apps/README.md's Namespace
-      # convention), same mechanism this repo's own charts use.
-      hooked: true
+      hooked: true  # PreSync ArgoCD hook
       type: namespace
       name: redhat-ods-operator
       display_name: Zuno OpenShift AI Operator
       description: Red Hat OpenShift AI, configured by Zuno
-      # Overrides startx's own cluster-ods default (requester: startx).
-      requester: zuno
-    # startx's own cluster-ods default also enables rbac.groups
-    # (devops-view/ops-admin) - not part of this repo's previous local
-    # template, left disabled to avoid granting group RBAC this demo
-    # never asked for.
+      requester: zuno  # overrides startx's own default (requester: startx)
+    # Disabled to avoid granting group RBAC (devops-view/ops-admin) this
+    # demo doesn't need; startx's default enables it.
     rbac:
       enabled: false
 
@@ -46,45 +36,24 @@ cluster-ods:
       name: rhods-operator
       namespace: redhat-ods-operator
       operator:
-        # ADR-0048: left empty by default, same as this chart's previous
-        # local template's `required(...)` guard - see templates/
-        # _require-subscription-channel.yaml, which fails the render if
-        # this is still empty once cluster-ods.operator.enabled is true.
-        # ansible/roles/openshift_ai/tasks/install.yml discovers and
-        # injects the real 3.5-family channel via
-        # gitops_app_extra_helm_values (ADR-0048).
+        # Left empty; discovered and injected by
+        # ansible/roles/openshift_ai/tasks/install.yml at apply time. See
+        # templates/checks.yaml, which fails the render if still empty.
         channel: ""
         name: rhods-operator
-        # Matches this repo's previous local template (automatic
-        # upgrades) - the startx chart defaults to Manual.
-        installPlanApproval: Automatic
+        installPlanApproval: Automatic  # startx chart defaults to Manual
         source:
           name: redhat-operators
           namespace: openshift-marketplace
     operatorGroup:
       enabled: true
-      # AllNamespaces (empty spec) - matches this chart's previous local
-      # template, and startx's own recommended default for this operator.
-      target: all-ns
+      target: all-ns  # AllNamespaces
       name: rhods-operator-group
       namespace: redhat-ods-operator
 
-  # ADR-0047/ADR-0048: spec deliberately overridden in full, NOT startx's
-  # own default (which enables workbenches/modelmeshserving/ray/kueue and
-  # sets kserve's serving.managementState: Managed with name:
-  # knative-serving - the Serverless-dependent path this repo explicitly
-  # avoids, see the comment this chart's previous local template carried).
-  # RawDeployment, not Serverless: Managed + name: knative-serving would
-  # implicitly require the Service Mesh, Serverless and cert-manager
-  # operators, none of which this repository installs. This demo's one
-  # model (gitops/charts/models) runs minReplicas == maxReplicas == 1,
-  # always on, with no use for Serverless's scale-to-zero -
-  # gitops/charts/models/templates/inferenceservice.yaml also sets the
-  # serving.kserve.io/deploymentMode: RawDeployment annotation explicitly
-  # (belt and suspenders with this cluster-wide default). Note:
-  # cluster-ods's own template always sets a metadata.namespace on this
-  # CR even though DataScienceCluster is cluster-scoped (harmless - the
-  # API server ignores it for a cluster-scoped CRD).
+  # Spec deliberately overridden in full, not startx's default: uses kserve
+  # RawDeployment rather than Serverless, which would require the Service
+  # Mesh, Serverless and cert-manager operators this repo doesn't install.
   DataScienceCluster:
     enabled: false
     name: zuno-dsc

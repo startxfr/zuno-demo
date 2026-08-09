@@ -1,9 +1,5 @@
 ---
-# Red Hat OpenShift AI DataScienceCluster operand (ADR-0047/ADR-0048,
-# ADR-0312). See gitops/charts/openshift-ai
-# (cluster-ods.DataScienceCluster.enabled) - NOT the operator itself (see
-# gitops/apps/openshift-ai/application-d0.yaml, applied first by
-# ansible/roles/openshift_ai/tasks/install.yml).
+# DataScienceCluster operand (not the operator itself, see application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

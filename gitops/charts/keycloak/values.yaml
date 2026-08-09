@@ -1,70 +1,37 @@
-# Default values for the keycloak chart. Overridden per-environment through
-# gitops/apps/keycloak/application-d0.yaml/application-d1.yaml's
-# spec.source.helm.values (ArgoCD reads this repo's charts, so overriding
-# here means editing those files for the demo environment - see the
-# comments there for what must change per cluster).
-
-# This chart is shared by two ArgoCD Applications (see
-# gitops/apps/README.md): operator.enabled (zuno-keycloak-d0) renders the
-# RHBK Subscription/OperatorGroup via the vendored startx `operator` chart
-# (see Chart.yaml for why not `cluster-sso`), keycloak.enabled
-# (zuno-keycloak-d1) renders the Keycloak CR/RealmImport/ExternalSecrets
-# (local templates, no startx equivalent - RHBK-specific and Zuno-specific
-# realm/secret content). Both default to false so `helm template`/`helm
-# lint` render nothing by default.
+# operator.enabled renders the RHBK Subscription/OperatorGroup;
+# keycloak.enabled renders the Keycloak CR/RealmImport/ExternalSecrets.
+# Both default false so templates render nothing by default.
 keycloak:
   enabled: false
 
-# Namespace the Keycloak CR, KeycloakRealmImport and their ExternalSecrets
-# are deployed into. Must stay in sync with the destination namespace on
-# gitops/apps/keycloak/application-d0.yaml/application-d1.yaml. No Namespace
-# template in this chart - zuno-auth is already created by
-# gitops/charts/namespaces, which runs earlier in day0_components.
+# Namespace for the Keycloak CR, KeycloakRealmImport and ExternalSecrets.
+# No Namespace template here - zuno-auth is created by gitops/charts/namespaces.
 namespace: zuno-auth
 
-# Name of the Keycloak CR (k8s.keycloak.org/v2alpha1, kind: Keycloak).
-# spec.keycloakCRName on the KeycloakRealmImport must reference this.
+# Name of the Keycloak CR; spec.keycloakCRName on the KeycloakRealmImport must match.
 keycloakCRName: zuno
 
-# OpenShift apps wildcard domain, e.g. "apps.<cluster>.<base-domain>".
-# Matches the `cluster_base_domain` convention already established in
-# ansible/inventories/example/group_vars/all/main.yml. Every per-agent
-# client redirect URI in files/realm-zuno.json is templated against this
-# value (placeholder token apps.mycluster.example.com, substituted in
-# templates/realmimport.yaml) - override this for the real cluster before
-# go-live; the checked-in default only works for the example domain.
+# OpenShift apps wildcard domain. Every per-agent client redirect URI in
+# files/realm-zuno.json is templated against this - override for the real
+# cluster before go-live; the checked-in default only works for the example domain.
 clusterBaseDomain: apps.mycluster.example.com
 
-# Kubernetes Secret names populated by ExternalSecret resources (see
-# templates/externalsecret-*.yaml) resolving against the vault-backend
-# ClusterSecretStore. Never hardcode values here - see ADR-0024.
+# Kubernetes Secret names populated by ExternalSecrets resolving against the
+# vault-backend ClusterSecretStore. Never hardcode values here.
 adminSecretName: keycloak-admin
 googleOAuthSecretName: google-oauth-client
 
-# Set to false to disable the realm's "google" identity provider and skip
-# the google-oauth-client ExternalSecret - for environments without real
-# Google OAuth credentials (ansible/confidential.yml's
-# zuno_keycloak_google_oauth_enabled controls this at install time, see
-# ansible/roles/keycloak/tasks/install.yml). Defaults to true (ADR-0014's
-# intended behavior).
+# Disables the realm's "google" identity provider and skips the
+# google-oauth-client ExternalSecret when false.
 googleOAuth:
   enabled: true
 
-# Unlike gitops/charts/postgresql (openshift-operators, which ships with
-# OpenShift's own default global OperatorGroup), zuno-auth needs its own -
-# RHBK only supports OwnNamespace/SingleNamespace install modes. No
-# `target` override below (defaults to targeting just subscription.namespace
-# = zuno-auth), matching this chart's previous local operatorgroup.yaml.
+# zuno-auth needs its own OperatorGroup - RHBK only supports
+# OwnNamespace/SingleNamespace install modes.
 #
-# ADR-0312/ADR-0048: subscription.operator.channel/source.name are left
-# empty by default - discovered by ansible/roles/keycloak/tasks/install.yml
-# (RHBK's channels are version-qualified, e.g. "stable-v26", no bare
-# "stable" alias - see that role's README.md) and always set via
-# gitops_app_extra_helm_values on the -d0 apply. templates/checks.yaml
-# fails the render if either is still empty once operator.enabled is true -
-# same fail-fast guard this chart's previous local Subscription template
-# enforced with Helm's `required` function (the vendored `operator` chart's
-# own Subscription template has no such guard).
+# subscription.operator.channel/source.name are left empty by default,
+# discovered by ansible and set via gitops_app_extra_helm_values on the -d0
+# apply. templates/checks.yaml fails the render if either is still empty.
 operator:
   enabled: false
   context:

@@ -1,21 +1,6 @@
 ---
-# Day 0 (ADR-0056): state check - `make day0 check`/`make d0 check`. Runs
-# ansible/tasks/init_state_report.yml once, then every selected
-# component's tasks/precheck.yml (state detection, never fails), and
-# displays the resulting report at the end.
-#
-# Order matters (admin_context first: nothing else can be checked until
-# the cluster API itself is reachable; namespaces after argocd: namespace
-# creation is a GitOps Application, which needs the Application CRD
-# argocd installs; external_secrets right after vault: keycloak's and
-# postgresql's charts each apply an ExternalSecret CR against the
-# vault-backend ClusterSecretStore external_secrets creates, which itself
-# needs the eso-reader Vault auth role sets up - found as a real deadlock
-# via live-cluster testing on api.demo222.startx.fr, where the original
-# ordering left both stuck waiting on a Secret that could never sync;
-# cert_manager right after vault for the same reason - its ClusterIssuer
-# depends on the pki/ engine and cert-manager-issuer Vault auth role
-# vault's own install.yml sets up).
+# Day 0 state check (`make day0 check`). Component order matters: e.g.
+# vault must precede cert_manager/external_secrets, argocd before namespaces.
 - name: "Day 0: check install state"
   hosts: localhost
   gather_facts: false

@@ -1,16 +1,6 @@
-# ADR-0053: the BFF has had no dedicated NetworkPolicy of its own so far -
-# it only ever needed the zuno-agent-tekos namespace's own default-deny
-# baseline (gitops/charts/namespaces/templates/networkpolicy.yaml: same
-# namespace + router ingress), since its one real caller (the frontend) is
-# a same-namespace pod. `make check`'s "acceptance-gate" Job
-# (ansible/roles/agents/tasks/run_acceptance_gate.yml) runs in zuno-ai-run
-# instead (it also needs to reach agent-runtime/mcp-gateway/ai-gateway/
-# rag-service directly - see gitops/charts/agent-runtime/templates/
-# networkpolicy.yaml's comment), so this precise, additive policy grants
-# it ingress to the BFF too, the same deliberate way as every other entry
-# in this repository's NetworkPolicies. The frontend and router paths
-# already work via the namespace baseline and are unaffected - Kubernetes
-# unions every NetworkPolicy selecting a given pod.
+# Grants the acceptance-gate Job (runs in zuno-ai-run) ingress to the BFF,
+# additive to the namespace-wide default-deny baseline the frontend already
+# relies on.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

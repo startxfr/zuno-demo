@@ -1,22 +1,8 @@
 apiVersion: v2
 name: keycloak
 description: >-
-  Zuno identity platform: the Keycloak CR instance (Red Hat build of
-  Keycloak / Keycloak Operator), Google Workspace IdP broker federation, and
-  the `zuno` realm (groups, users, per-agent OIDC clients) delivered via a
-  KeycloakRealmImport. The operator itself is installed separately by
-  ansible/roles/keycloak (OLM Subscription/OperatorGroup, rendered by the
-  vendored startx `operator` chart - see that role's README for the
-  prerequisite/GitOps split. See docs/adr/0012, 0013, 0014.
-  NOTE: this deliberately depends on startx's generic `operator` chart, not
-  `cluster-sso` - cluster-sso's own operator defaults target the legacy
-  "rhsso-operator" (RH-SSO 7.6, keycloak.org/v1alpha1 CRDs), a different
-  product from the "rhbk-operator" (Red Hat build of Keycloak,
-  k8s.keycloak.org/v2alpha1 CRDs) this chart's own Keycloak CR/
-  KeycloakRealmImport templates require - using cluster-sso would mean
-  overriding every one of its values anyway, with none of its domain
-  defaults actually applying, so plain `operator` avoids the misleading
-  implication that this installs Red Hat SSO.
+  Deploys the Keycloak CR (Red Hat build of Keycloak), Google Workspace IdP
+  federation, and the `zuno` realm via a KeycloakRealmImport.
 type: application
 version: 0.2.0
 appVersion: "n/a"

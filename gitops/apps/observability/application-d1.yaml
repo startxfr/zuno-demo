@@ -1,12 +1,6 @@
 ---
-# OTLP trace/metric collection path (ADR-0029): the shared Collector every
-# service in components/ sends OTLP to - see gitops/charts/observability
-# (collector.enabled - zuno-telemetry Namespace + OpenTelemetryCollector
-# CR). NOT the operator itself (see
-# gitops/apps/observability/application-d0.yaml, applied first by
-# ansible/roles/observability/tasks/install.yml). No long-term storage
-# backend is installed (the Collector's debug/log exporter is enough to
-# prove the pipeline for a demo) - see that role's README.md.
+# Shared OTLP Collector every service sends traces/metrics to (not the
+# operator, see application-d0.yaml). No long-term storage backend; debug/log exporter only.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

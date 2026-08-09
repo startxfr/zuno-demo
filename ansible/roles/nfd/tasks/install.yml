@@ -1,14 +1,6 @@
 ---
-# ADR-0047: Node Feature Discovery must be ready *before* the nvidia_gpu
-# role's GPU Operator ClusterPolicy is applied - see
-# ansible/playbooks/{precheck,prepare}.yml's prerequisite_components
-# ordering (nfd listed before nvidia_gpu) and that role's own README for
-# why this dependency was previously undeclared.
-#
-# ADR-0312: Namespace/OperatorGroup/Subscription (operator.enabled) and
-# the NodeFeatureDiscovery instance (nodeFeatureDiscovery.enabled) both
-# live in gitops/charts/nfd, applied via two separate Applications
-# (zuno-nfd-d0/-d1) - -d1 is applied only once -d0 is Synced+Healthy.
+# Must be ready before nvidia_gpu's GPU Operator ClusterPolicy is applied -
+# see ansible/playbooks/{precheck,prepare}.yml's ordering.
 - name: "nfd | apply the nfd GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

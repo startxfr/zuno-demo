@@ -1,12 +1,6 @@
 ---
-# ADR-0312: Namespace/OperatorGroup/Subscription (cluster-gpu.project.
-# enabled/cluster-gpu.operator.enabled) and the ClusterPolicy
-# (cluster-gpu.gpu.enabled, conditional on cluster-gpu.gpu.spec) both live
-# in gitops/charts/nvidia-gpu (wrapping the vendored startx cluster-gpu
-# chart), applied via two separate Applications (zuno-nvidia-gpu-d0/-d1) -
-# the ClusterPolicy's spec is read from the CSV OLM installs in response
-# to -d0's Subscription, so it cannot be known before -d0 is
-# Synced+Healthy, and -d1 is only applied once that discovery is done.
+# The ClusterPolicy's spec is read from the CSV OLM installs in response to
+# -d0's Subscription, so it can't be known before -d0 is Synced+Healthy.
 - name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -22,19 +16,9 @@
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15
 
-    # A hand-maintained minimal spec (operator.defaultRuntime/driver/
-    # toolkit/devicePlugin only) rejected outright on a real cluster
-    # (api.demo222.startx.fr, GPU Operator v26.3.3): "spec.daemonsets:
-    # Required value, spec.dcgm: Required value, spec.dcgmExporter:
-    # Required value, spec.gfd: Required value, spec.nodeStatusExporter:
-    # Required value" - this CRD version requires several more top-level
-    # sections than it used to, and guessing the full shape by hand is
-    # exactly the kind of assumption that's already proven wrong multiple
-    # times this session (RHBK channel, PGO catalog, ESO catalog). Every
-    # OLM-published operator ships its own recommended default CR in its
-    # CSV's `alm-examples` annotation - read that instead of maintaining a
-    # hand-written spec that can silently drift from what the currently
-    # installed operator version actually requires.
+    # A hand-maintained ClusterPolicy spec risks missing required top-level
+    # sections that vary by operator version - read the CSV's own
+    # recommended default from its `alm-examples` annotation instead.
 - name: "nvidia_gpu | discover the installed GPU Operator CSV"
   kubernetes.core.k8s_info:
     api_version: operators.coreos.com/v1alpha1
@@ -56,14 +40,9 @@
 
 - name: "nvidia_gpu | extract the ClusterPolicy example from the CSV's alm-examples"
   ansible.builtin.set_fact:
-    # cluster-gpu's own ClusterPolicy.yaml template inserts .Values.gpu.spec
-    # as a raw string via `nindent` (unlike this repo's former local
-    # template, which used `toYaml` on a native map) - so the extracted
-    # spec is serialized to a YAML string here with `to_nice_yaml`, not
-    # left as a Jinja dict, otherwise apply_gitops_app.yml's own
-    # `gitops_app_extra_helm_values | to_nice_yaml` (ADR-0048) would dump
-    # it as a nested mapping and Helm's `nindent` call would fail with a
-    # "wrong type for value; expected string" template error.
+    # Serialized to a YAML string with `to_nice_yaml`, not left as a Jinja
+    # dict: the chart's template inserts .Values.gpu.spec as a raw string
+    # via `nindent`, which fails on a nested mapping.
     _nvidia_gpu_default_policy_spec: >-
       {{
         (
@@ -72,9 +51,8 @@
         ) | to_nice_yaml
       }}
 
-# ADR-0312: applies the separate zuno-nvidia-gpu-d1 Application (the
-# ClusterPolicy operand) for the first time, already with the discovered
-# spec - the role never applies the ClusterPolicy manifest itself.
+# Applies the ClusterPolicy operand with the discovered spec - the role
+# never applies the ClusterPolicy manifest itself.
 - name: "nvidia_gpu | apply the nvidia-gpu GitOps Application (d1: ClusterPolicy, with the discovered spec)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

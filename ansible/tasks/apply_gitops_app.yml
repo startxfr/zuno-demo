@@ -1,23 +1,7 @@
 ---
-# Shared task: apply a single ArgoCD Application manifest for one platform
-# component. Every role's `install.yml` includes this file twice per
-# component - once with `gitops_app_phase: d0` (operator/cluster-scoped
-# install) and once with `gitops_app_phase: d1` (CRD instances, pods,
-# secrets - the live service), with `gitops_app_name` set to the matching
-# `<component>-d0`/`<component>-d1` Application name. See
-# gitops/apps/README.md for the manifest convention
-# and docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md
-# for the architecture this implements.
-#
-# This is the *only* path that applies gitops/apps/ Application manifests
-# during `make day0|d0`/`day1|d1` - the root App-of-Apps
-# (gitops/root-app-of-apps.yaml) that used to also recurse over gitops/apps/
-# in parallel is no longer applied by Ansible (ADR-0311); it is kept only as
-# a documented example of a pure-GitOps bootstrap (docs/platform/
-# installation.md). This keeps `make day0|d0 install <component>` /
-# `make day1|d1 install <component>` self-sufficient for a single
-# component without requiring a full sync, and without a second, redundant
-# reconciliation path that could disagree with this one.
+# Applies one ArgoCD Application manifest for a component (called once per
+# gitops_app_phase: d0 for operator install, d1 for the live service). The
+# only path that applies gitops/apps/ Applications during make day0|d0/day1|d1.
 - name: "gitops | validate gitops_app_name/gitops_app_phase are set"
   ansible.builtin.assert:
     that:
@@ -41,19 +25,9 @@
         | from_yaml
       }}
 
-# ADR-0048: lets a role inject values it only knows at run time (e.g. a
-# discovered serving-runtime image) without hand-editing the checked-in
-# application-d0.yaml/application-d1.yaml, whose spec.source.helm.values is
-# otherwise fixed, checked-in configuration (gitops/apps/README.md's
-# convention). Optional - most roles never set gitops_app_extra_helm_values,
-# leaving the manifest's own helm.values (if any, e.g.
-# gitops/apps/vault/application-d1.yaml) untouched. When set, it *replaces*
-# spec.source.helm.values wholesale (rendered to a YAML string) rather than
-# deep-merging with one already present in the manifest - no current caller
-# needs both at once, and merging two independently-authored value trees is
-# more
-# complexity than this repo's actual usage justifies.
-- name: "gitops | merge extra Helm values into the Application spec, if provided (ADR-0048)"
+# Optional: lets a role inject Helm values known only at run time. Replaces
+# (not merges) the manifest's own spec.source.helm.values when set.
+- name: "gitops | merge extra Helm values into the Application spec, if provided"
   ansible.builtin.set_fact:
     _gitops_app_definition: >-
       {{

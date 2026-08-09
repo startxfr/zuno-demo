@@ -1,14 +1,7 @@
 ---
-# State detection (never fails). Does NOT use the zuno-vault Application's
-# own Synced/Healthy status: the chart's readinessProbe runs `vault
-# status`, which is non-zero while sealed, so the Application is
-# structurally never Healthy (see tasks/install.yml's gitops_app_wait:
-# false). "Installed" instead means the bootstrap credentials exist, the
-# server pod is Running, AND Vault is unsealed - reusing the same
-# status-parsing approach tasks/install.yml itself uses (`vault status`
-# exits non-zero while sealed, but stdout is still valid JSON). Guarded so
-# a missing pod (not installed yet) is reported as NOT installed instead
-# of erroring.
+# State detection (never fails). Doesn't use the Application's Synced/
+# Healthy status - it's structurally never Healthy while sealed. Instead,
+# "installed" means bootstrap credentials exist, pod is Running, and unsealed.
 - name: "vault | look up the bootstrap credentials Secret"
   kubernetes.core.k8s_info:
     kind: Secret

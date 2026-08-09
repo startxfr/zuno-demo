@@ -1,22 +1,6 @@
 apiVersion: v2
 name: cert-manager
-description: >-
-  cert-manager (Red Hat build, "openshift-cert-manager-operator") plus a
-  Vault-backed ClusterIssuer, split across the zuno-cert-manager-d0/-d1
-  ArgoCD Applications - see gitops/apps/README.md. operator.enabled
-  (Namespace/OperatorGroup/Subscription, rendered by the vendored startx
-  cluster-certmanager chart, plus the operator's own CertManager singleton
-  CR, which actually deploys the controller/webhook/cainjector pods - same
-  meta-operator pattern as gitops/charts/external-secrets' OperatorConfig)
-  is -d0; issuer.enabled (the ClusterIssuer referencing Vault's pki/
-  secrets engine, prepared by ansible/roles/vault) is -d1. Infrastructure
-  only for now - no existing Route/service consumes this issuer yet, see
-  ansible/roles/cert_manager/README.md. cluster-certmanager
-  (github.com/startxfr/helm-repository) is vendored as a dependency for the
-  Namespace/OperatorGroup/Subscription boilerplate only, same pattern as
-  gitops/charts/vault wrapping hashicorp/vault - it has no equivalent for
-  the CertManager singleton CR or the Vault-backed ClusterIssuer (both
-  Zuno-specific), which stay local templates.
+description: Deploys the cert-manager operator (Red Hat build) and a Vault-backed ClusterIssuer.
 type: application
 version: 0.2.0
 dependencies:

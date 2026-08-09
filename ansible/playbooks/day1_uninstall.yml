@@ -1,6 +1,5 @@
 ---
-# Day 1 (ADR-0056): `make day1 uninstall`/`make d1 uninstall`. Reverses
-# day1_install.yml, in the opposite order.
+# Day 1 uninstall (`make day1 uninstall`). Reverses day1_install.yml's order.
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false

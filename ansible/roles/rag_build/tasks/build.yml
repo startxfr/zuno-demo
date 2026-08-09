@@ -1,5 +1,5 @@
 ---
-# Day 1 "rag" build component (ADR-0056): builds the RAG service image.
+# Day 1 "rag" build component: builds the RAG service image.
 - name: "rag_build | build rag-service"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:

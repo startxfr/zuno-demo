@@ -1,11 +1,7 @@
 {{/*
-ADR-0052: the same default-deny-other-namespaces shape as
-templates/networkpolicy.yaml, applied to the platform namespaces this
-chart also creates via templates/namespace.yaml (see values.yaml's
-platformNamespaces comment for why zuno-ai-run is intentionally excluded
-here). Same-namespace traffic and
-router ingress are always allowed; allowedFromNamespaces adds specific,
-known real cross-namespace callers on top.
+Default-deny-other-namespaces baseline for platform namespaces (zuno-ai-run
+is intentionally excluded - see values.yaml). Same-namespace traffic and
+router ingress are always allowed; allowedFromNamespaces adds specific callers.
 */}}
 {{- range .Values.platformNamespaces }}
 apiVersion: networking.k8s.io/v1
@@ -26,21 +22,14 @@ spec:
         - podSelector: {}
         - namespaceSelector:
             matchLabels:
-              # OVN-Kubernetes (OpenShift 4.20's default CNI, ADR-0002)
-              # labels the router/ingress namespace with this key so
-              # default-deny policies can still admit router traffic to
-              # Routed Services (e.g. Keycloak's login UI).
+              # OVN-Kubernetes labels the router/ingress namespace with this
+              # key so default-deny policies can still admit router traffic.
               policy-group.network.openshift.io/ingress: ""
         {{- if .allowApiServerWebhooks }}
         - namespaceSelector:
             matchLabels:
-              # OVN-Kubernetes labels this real namespace so
-              # default-deny policies can still admit kube-apiserver
-              # traffic - the apiserver runs hostNetwork: true, so it
-              # doesn't match any normal pod/namespaceSelector. Needed
-              # wherever a ValidatingWebhookConfiguration/
-              # MutatingWebhookConfiguration's service lives, since the
-              # apiserver calls those synchronously.
+              # Admits kube-apiserver traffic (hostNetwork, matches no normal
+              # selector) - needed wherever an admission webhook's service lives.
               policy-group.network.openshift.io/host-network: ""
         {{- end }}
         {{- range .allowedFromNamespaces }}

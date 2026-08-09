@@ -1,14 +1,6 @@
 apiVersion: v2
 name: nfd
-description: >-
-  Node Feature Discovery operator (OLM Subscription) and a minimal
-  NodeFeatureDiscovery instance (ADR-0047/ADR-0312) - labels GPU-bearing
-  nodes for ansible/roles/nvidia_gpu's ClusterPolicy to select on. Wraps the
-  startx cluster-nfd chart (github.com/startxfr/helm-repository) as a
-  dependency, same pattern as gitops/charts/vault wrapping hashicorp/vault -
-  cluster-nfd itself renders the Namespace/OperatorGroup/Subscription (via
-  its own project/operator dependencies) and the NodeFeatureDiscovery CR, so
-  this chart has no templates of its own left, only values.
+description: Deploys the Node Feature Discovery operator and a minimal NodeFeatureDiscovery instance to label GPU-bearing nodes.
 type: application
 version: 0.2.0
 appVersion: "0.2.0"

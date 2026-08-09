@@ -1,21 +1,12 @@
 {{- if .Values.postgresCluster.enabled }}
 # Crunchy Postgres Operator (PGO) PostgresCluster CR. Requires PGO,
-# installed by this same chart's templates/subscription.yaml, rendered by
-# the separate zuno-postgresql-d0 Application (operator.enabled) applied
-# before this one (zuno-postgresql-d1, postgresCluster.enabled) - see
-# ansible/roles/postgresql/tasks/install.yml.
+# installed by the separate zuno-postgresql-d0 Application applied before
+# this one.
 #
-# ADR-0052: PGO's operator-managed operand pods run non-root with a
-# restricted-compatible security profile by the operator's own design
-# (same stated project goal CloudNativePG had, and the same reasoning this
-# chart used before this ADR-0015 operator swap) - there is no documented
-# PostgresCluster.spec field for overriding pod/container securityContext,
-# so this is left to the operator's default rather than a guessed-at
-# field. NetworkPolicy hardening (which this repo does fully control,
-# independent of the operator) is applied at the namespace level - see
-# gitops/charts/namespaces/values.yaml's platformNamespaces (zuno-data
-# allows zuno-ai-run in, covering sales-db-mcp's cross-namespace connection
-# here).
+# PGO's operand pods run non-root by the operator's own design; there is
+# no PostgresCluster.spec field for overriding pod/container
+# securityContext. NetworkPolicy hardening is applied at the namespace
+# level instead (gitops/charts/namespaces).
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
@@ -32,9 +23,8 @@ spec:
   # context conventions to the instances it manages.
   openshift: true
 
-  # TimescaleDB needs shared_preload_libraries (pgvector doesn't) - paired
-  # with the CREATE EXTENSION statements in templates/configmap-init-sql.yaml
-  # (spec.databaseInitSQL below).
+  # TimescaleDB needs shared_preload_libraries (pgvector doesn't); paired
+  # with the CREATE EXTENSION statements in templates/configmap-init-sql.yaml.
   config:
     parameters:
       shared_preload_libraries: "timescaledb"
@@ -58,9 +48,8 @@ spec:
         resources:
           requests:
             storage: {{ .Values.cluster.storageSize }}
-      # Separate volume for WAL - particularly useful under TimescaleDB's
-      # typically high ingestion rate, which is sensitive to WAL write
-      # latency.
+      # Separate volume for WAL: write latency matters more here under
+      # TimescaleDB's typically high ingestion rate.
       walVolumeClaimSpec:
         storageClassName: {{ .Values.cluster.storageClassName }}
         accessModes:
@@ -69,9 +58,7 @@ spec:
           requests:
             storage: {{ .Values.cluster.walStorageSize }}
 
-  # PGO-managed PgBouncer (transaction pooling) in front of the instances
-  # above - see ansible/roles/postgresql/README.md's "Connecting to this
-  # cluster" for the resulting Service name consumers should use.
+  # PGO-managed PgBouncer (transaction pooling) in front of the instances.
   proxy:
     pgBouncer:
       replicas: {{ .Values.pgBouncer.replicas }}
@@ -88,16 +75,9 @@ spec:
           max_client_conn: {{ .Values.pgBouncer.maxClientConn | quote }}
           default_pool_size: {{ .Values.pgBouncer.defaultPoolSize | quote }}
 
-  # PGO requires at least one pgBackRest repo - unlike CNPG there is no
-  # way to omit backups entirely. repo1 (local PVC) always exists; repo2
-  # (S3-compatible, off-cluster) is added only once real credentials are
-  # configured (values.yaml's backups.s3.enabled) - see
-  # templates/externalsecret-backup-s3.yaml for where its Secret comes
-  # from. UNVERIFIED: the repos[].s3/configuration shape below is
-  # reconstructed from Crunchy's general pgBackRest S3 documentation, not
-  # confirmed against the PGO 5.8.8 CRD installed on a live cluster -
-  # confirm with `oc explain postgrescluster.spec.backups.pgbackrest
-  # --recursive` and adjust if it differs.
+  # PGO requires at least one pgBackRest repo. repo1 (local PVC) always
+  # exists; repo2 (S3, off-cluster) is added once real credentials are
+  # configured (values.yaml's backups.s3.enabled).
   backups:
     pgbackrest:
       global:
@@ -129,23 +109,18 @@ spec:
             name: {{ .Values.backups.s3.secretName }}
 {{- end }}
 
-  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and (via the
-  # "bring your own password" mechanism - PGO >= 5.6) adopts the password
-  # already seeded into the {{ .Values.cluster.name }}-pguser-{{ .Values.cluster.owner }}
-  # Secret by templates/externalsecret.yaml, rather than generating its
-  # own - the Vault-backed equivalent of CNPG's
-  # bootstrap.initdb.secret.name (ADR-0024: never hand-roll a credential).
+  # Creates the zuno database owned by {{ .Values.cluster.owner }}, adopting
+  # the password already seeded into the pguser Secret by
+  # templates/externalsecret.yaml ("bring your own password") rather than
+  # generating its own.
   users:
     - name: {{ .Values.cluster.owner }}
       databases:
         - {{ .Values.cluster.database }}
 
-  # Runs once at bootstrap (per Crunchy's own Extension Management guide's
-  # documented pattern for adding extensions this way) - PGO 5.8.8 runs it
-  # against the "postgres" database, not the app database created above,
-  # regardless of spec.users[].databases (confirmed live), so
-  # templates/configmap-init-sql.yaml's init.sql explicitly `\connect`s to
-  # {{ .Values.cluster.database }} first.
+  # Runs once at bootstrap against the "postgres" database, not the app
+  # database, regardless of spec.users[].databases; init.sql explicitly
+  # `\connect`s to {{ .Values.cluster.database }} first.
   databaseInitSQL:
     name: {{ .Values.cluster.name }}-init-sql
     key: init.sql

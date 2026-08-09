@@ -1,44 +1,21 @@
 ---
-# ADR-0053: runs evaluations/tekos/run_acceptance_gate.py (the 20 Tekos
-# scenarios at a 75% threshold, plus security_checks.py and gate_checks.py
-# at 100% mandatory) as a one-shot in-cluster Job - not from the Ansible
-# control node directly, because most of what this gate must call
-# (agent-runtime, mcp-gateway, ai-gateway, rag-service) has no OpenShift
-# Route and is only reachable over in-cluster Service DNS (see
-# evaluations/tekos/README.md). Same "Job, not a GitOps Application"
-# reasoning as ansible/roles/sql_schema/tasks/install.yml: there is
-# nothing declaratively running about a test run once it has finished.
+# Runs evaluations/tekos/run_acceptance_gate.py as a one-shot in-cluster Job
+# rather than from the control node: most services it calls (agent-runtime,
+# mcp-gateway, ai-gateway, rag-service) have no OpenShift Route and are only
+# reachable over in-cluster Service DNS.
 #
-# The Job runs in zuno-ai-run, labeled app.kubernetes.io/name: acceptance-gate
-# - a real, narrowly-scoped synthetic-test workload identity, explicitly
-# allow-listed (and nowhere else) in gitops/charts/{agent-runtime,
-# mcp-gateway,ai-gateway}/templates/networkpolicy.yaml and the new
-# gitops/charts/tekos/templates/networkpolicy.yaml, the same deliberate,
-# additive way every other legitimate caller in this repository is
-# allow-listed - never a namespace-wide baseline. rag-service is already
-# reachable from any zuno-ai-run pod via zuno-data's namespace-wide platform
-# baseline (gitops/charts/namespaces/values.yaml). sales-db-mcp is
-# deliberately NOT extended - see security_checks.py's
-# direct_call_to_sales_db_mcp_denied_without_gateway_token, which now
-# treats that NetworkPolicy-level denial as itself part of what it proves.
+# The Job runs in zuno-ai-run labeled app.kubernetes.io/name: acceptance-gate,
+# explicitly allow-listed in the relevant NetworkPolicies - never a
+# namespace-wide baseline. sales-db-mcp is deliberately NOT allow-listed;
+# denial of direct calls to it is itself part of what the gate proves.
 #
-# KEYCLOAK_URL uses the Keycloak custom resource's own actual hostname
-# (gitops/charts/keycloak/templates/keycloak.yaml: "keycloak.<domain>") -
-# ground truth, since it's what the Keycloak Operator's Route is actually
-# created with. This surfaced a real, separate, pre-existing inconsistency
-# while wiring this up: gitops/charts/tekos/templates/_helpers.tpl's
-# keycloakIssuerUrl and every eval script's KEYCLOAK_URL *default* instead
-# assume a "sso.<domain>" convention that no Route in this repository
-# actually creates. That mismatch is a real bug, but it lives in
-# ADR-0032/0033's already-"Implemented" identity plumbing, not in ADR-0053's own
-# scope (the acceptance gate itself) - flagged here and in ADR-0053's
-# Implementation state rather than silently fixed as a drive-by change
-# across three other charts' checked-in values.
+# KEYCLOAK_URL uses the Keycloak CR's actual Route hostname
+# ("keycloak.<domain>"), not the "sso.<domain>" convention some other
+# charts' defaults assume but no Route here actually creates.
 
 - name: "acceptance-gate | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-# ADR-0310: ansible/roles/agents/kustomize/namespace/.
 - name: "acceptance-gate | ensure the zuno-ai-run namespace exists"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
@@ -87,11 +64,8 @@
         tekos-frontend-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
   no_log: true
 
-# ADR-0310: ansible/roles/agents/kustomize/acceptance-gate-scripts/ (a
-# configMapGenerator reading directly from evaluations/tekos/ -
-# disableNameSuffixHash keeps the name "acceptance-gate-scripts" stable so
-# the inline Job below, outside this kustomization, can still reference it
-# by that fixed name).
+# disableNameSuffixHash keeps the ConfigMap name stable so the inline Job
+# below can reference it by a fixed name.
 - name: "acceptance-gate | build the evaluations/tekos ConfigMap"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:

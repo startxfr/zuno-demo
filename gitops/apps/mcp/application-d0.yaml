@@ -1,7 +1,5 @@
 ---
-# No Day0 (operator/cluster-scoped) content for mcp - see
-# gitops/charts/noop/README.md and gitops/apps/README.md's -d0/-d1
-# convention.
+# No Day0 content for mcp; see gitops/apps/README.md's -d0/-d1 convention.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -1,7 +1,6 @@
 ---
-# Reverse of install.yml. zuno-ai-run (shared namespace) is also owned by
-# gitops/charts/namespaces, so -d0's own Namespace delete here is harmless
-# even if that role's Application is still present.
+# zuno-ai-run is also owned by gitops/charts/namespaces, so -d0's own
+# Namespace delete here is harmless even if that role's Application remains.
 - name: "smtp | delete the smtp GitOps Application (d1: technical mail identity ExternalSecret)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

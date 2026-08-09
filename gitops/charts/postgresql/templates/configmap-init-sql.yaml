@@ -1,17 +1,8 @@
 {{- if .Values.postgresCluster.enabled }}
-# Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL -
-# PGO runs this once at cluster bootstrap, per Crunchy's own Extension
-# Management guide's documented pattern for adding extensions this way.
-# TimescaleDB additionally needs shared_preload_libraries=timescaledb
-# (spec.config.parameters in postgrescluster.yaml) - CREATE EXTENSION
-# alone isn't enough for it, unlike pgvector.
-#
-# \connect {{ .Values.cluster.database }} is required: confirmed live on
-# api.demo222.startx.fr (2026-08-08, PGO 5.8.8) that databaseInitSQL runs
-# against the "postgres" database regardless of spec.users[].databases,
-# not against the app database created alongside the user - without this,
-# both extensions get created in "postgres" and the actual "{{ .Values.cluster.database }}"
-# database never gets them at all.
+# Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL; PGO
+# runs this once at cluster bootstrap.
+# \connect is required: databaseInitSQL runs against the "postgres"
+# database regardless of spec.users[].databases, not the app database.
 apiVersion: v1
 kind: ConfigMap
 metadata:

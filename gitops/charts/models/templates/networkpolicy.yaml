@@ -1,14 +1,6 @@
-# ADR-0052/ADR-0037: precise ingress allow-list, not a zuno-ai-run namespace
-# baseline (see gitops/charts/namespaces/values.yaml's platformNamespaces
-# comment). serving.kserve.io/inferenceservice is KServe's own pod label
-# on every predictor pod it creates for this InferenceService.
-#
-# This chart is instantiated once for the local LLM (ai-gateway is the
-# caller, same namespace) - if a second instance of this chart is used for
-# an embeddings model (rag-service's embeddingServiceUrl points at one,
-# gitops/charts/rag-service/values.yaml), rag-service's cross-namespace
-# (zuno-data) call needs the same allow, included below unconditionally
-# since this chart cannot know which role a given instance plays.
+# Precise ingress allow-list, not a namespace-wide baseline. Both ai-gateway
+# (local LLM instance) and rag-service (embeddings instance) are allowed
+# unconditionally since this chart can't know which role a given instance plays.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

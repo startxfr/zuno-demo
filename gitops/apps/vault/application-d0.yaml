@@ -1,8 +1,5 @@
 ---
-# No Day0 (operator/cluster-scoped) content for vault - see
-# gitops/charts/noop/README.md and gitops/apps/README.md's -d0/-d1
-# convention. Vault has no OLM operator at all (a plain Helm deployment),
-# so all of its content is -d1 (see application-d1.yaml).
+# No Day0 content for vault: no OLM operator, plain Helm deployment (see application-d1.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

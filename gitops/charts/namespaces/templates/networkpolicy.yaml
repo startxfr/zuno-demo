@@ -1,10 +1,6 @@
 {{/*
-Default-deny ingress from other namespaces, per agent namespace (ADR-0023).
-Explicit allows (e.g. the frontend's Route-fronted Service accepting
-external ingress via the OpenShift router, or the BFF accepting only from
-its own frontend) are added by the workload chart (gitops/charts/tekos) that
-owns those Services, not here - this policy only establishes the default
-isolation boundary every agent namespace starts from.
+Default-deny ingress from other namespaces, per agent namespace. Explicit
+allows are added by the workload chart that owns those Services, not here.
 */}}
 {{- range .Values.namespaces }}
 apiVersion: networking.k8s.io/v1
@@ -25,10 +21,8 @@ spec:
         - podSelector: {}
         - namespaceSelector:
             matchLabels:
-              # OVN-Kubernetes (OpenShift 4.20's default CNI, ADR-0002)
-              # labels the router/ingress namespace with this key so
-              # default-deny policies can still admit router traffic to
-              # Routed Services (e.g. the Tekos frontend).
+              # OVN-Kubernetes labels the router/ingress namespace with this
+              # key so default-deny policies can still admit router traffic.
               policy-group.network.openshift.io/ingress: ""
 ---
 {{- end }}

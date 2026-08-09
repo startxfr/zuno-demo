@@ -1,14 +1,6 @@
 ---
-# NVIDIA GPU Operator ClusterPolicy operand (ADR-0312). See
-# gitops/charts/nvidia-gpu (cluster-gpu.gpu.enabled) - NOT the operator
-# itself (see gitops/apps/nvidia-gpu/application-d0.yaml, applied first).
-# gpu.enabled stays false here (unlike this repo's former local template,
-# cluster-gpu's own ClusterPolicy.yaml renders an (invalid, CRD-rejected)
-# empty `spec: {}` as soon as gpu.enabled is true, regardless of whether
-# gpu.spec was supplied - it doesn't gate on spec truthiness) until
-# ansible/roles/nvidia_gpu/tasks/install.yml's second apply against this
-# Application flips gpu.enabled to true together with the installed CSV's
-# own recommended spec, via gitops_app_extra_helm_values (ADR-0048).
+# ClusterPolicy operand (not the operator, see application-d0.yaml). gpu.enabled
+# stays false until Ansible's second apply flips it true with the CSV's spec; the chart renders an invalid empty spec otherwise.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

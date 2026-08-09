@@ -1,20 +1,6 @@
 ---
-# Demo-grade Vault: single replica, file storage, no HA/auto-unseal via
-# cloud KMS. Sufficient for a solo demo; production hardening is tracked by
-# ADR-0112 (production-grade backup and recovery, v1).
-#
-# Deploys the local wrapper chart at gitops/charts/vault, which pulls in
-# the upstream hashicorp/vault chart as a Helm dependency (see that
-# chart's Chart.yaml) - the same internal-chart convention as
-# postgresql/keycloak, instead of pointing straight at HashiCorp's Helm
-# repo. All server/ui/injector defaults now live in
-# gitops/charts/vault/values.yaml; only the optional Route feature is
-# toggled here. No OLM operator involved, so all of this component's
-# content is -d1 (see gitops/apps/vault/application-d0.yaml) - this
-# Application's name intentionally stays a static "zuno-vault-d1" (not
-# derived from any per-run discovery), to avoid ever creating a second,
-# divergent Vault release if the root App-of-Apps bootstrap path is ever
-# used on the same cluster.
+# Demo-grade Vault: single replica, file storage, no HA/auto-unseal.
+# Application name stays static ("zuno-vault-d1") to avoid ever creating a second, divergent release.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -29,14 +15,7 @@ spec:
     targetRevision: main
     path: gitops/charts/vault
     helm:
-      # Forces the Helm release name to "zuno-vault" - without this,
-      # ArgoCD defaults the release name to this Application's own name
-      # ("zuno-vault-d1", kept static for the reason above), and every
-      # resource the chart creates (StatefulSet, Services, ...) inherits
-      # that instead of "zuno-vault", contradicting the fixed-release-name
-      # assumption gitops/charts/vault/values.yaml and templates/
-      # _helpers.tpl both document and rely on (vault.uiServiceName's
-      # `contains "vault" .Release.Name` shortcut).
+      # Forces the release name to "zuno-vault"; without it, resources would inherit "zuno-vault-d1" and break the chart's fixed-release-name assumption.
       releaseName: zuno-vault
       values: |
         route:

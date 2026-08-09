@@ -1,27 +1,6 @@
 ---
-# Discovers (and, if needed, registers a fallback catalog for) the Crunchy
-# Postgres Operator package/catalog/channel this cluster actually
-# publishes it under, then applies the postgresql GitOps Application. This
-# discovery stays imperative in Ansible even after ADR-0312 (unlike the
-# Subscription itself, now in gitops/charts/postgresql): registering
-# operatorhubio-catalog is a cluster-wide OLM catalog concern, not this
-# component's own workload, the same reasoning that keeps
-# ansible/roles/argocd/tasks/apply_resource_health_checks.yml out of any
-# chart.
-#
-# This role originally hardcoded `source: redhat-operators, channel:
-# stable` for PGO (reasoning it'd be safer than CloudNativePG's
-# fallback-catalog dance, since redhat-operators is a default catalog) -
-# proven wrong on a real cluster: OLM's ResolutionFailed condition showed
-# `crunchy-postgres-operator` isn't published in redhat-operators there at
-# all. Same lesson as CNPG's catalog/channel mismatches, generalized one
-# step further this time: don't even trust the *package name* is exactly
-# "crunchy-postgres-operator" on every cluster - discover it by fuzzy name
-# match across every enabled catalog (ADR-0048-style), falling back to
-# registering the well-known public operatorhubio-catalog (already present
-# on at least one real cluster from the earlier CloudNativePG fallback)
-# if nothing matches anywhere, and failing loudly - listing every
-# postgres-ish package actually found - rather than guessing a fourth time.
+# Discovers the Crunchy Postgres Operator package/catalog/channel actually
+# published (neither is fixed across clusters); falls back to operatorhubio-catalog.
 - name: "postgresql | list every PackageManifest published in this cluster's catalogs"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
@@ -37,7 +16,6 @@
         | selectattr('metadata.name', 'search', 'crunchy', ignorecase=True) | list
       }}
 
-# ADR-0310: ansible/roles/postgresql/kustomize/catalogsource-fallback/.
 - name: "postgresql | register the operatorhubio-catalog fallback if nothing crunchy-named was found anywhere"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
@@ -128,9 +106,8 @@
       Subscribing to package '{{ _postgresql_package_name }}', catalog
       '{{ _postgresql_catalog_source }}', channel '{{ _postgresql_channel }}'.
 
-# ADR-0312: the Subscription (operator.enabled, rendered by the vendored
-# startx `operator` chart) lives in gitops/charts/postgresql, applied via
-# the separate zuno-postgresql-d0 Application.
+# The Subscription (operator.enabled) lives in gitops/charts/postgresql,
+# applied via the separate zuno-postgresql-d0 Application.
 - name: "postgresql | apply the PostgreSQL GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -149,17 +126,12 @@
               name: "{{ _postgresql_catalog_source }}"
     gitops_app_wait_retries: 60
 
-# PGO 5.8.8's own operand image bundles pgvector 0.8.2 and TimescaleDB -
-# no custom image/build needed (UNVERIFIED - confirm once the cluster is
-# reachable: `SELECT extname, extversion FROM pg_extension;` once
-# connected). templates/postgrescluster.yaml omits spec.image entirely so
-# PGO picks its own default operand image for the installed version, no
-# separate registry credentials required.
+# PGO's own operand image bundles pgvector and TimescaleDB - no custom
+# image/build needed (unverified: confirm versions once connected via
+# `SELECT extname, extversion FROM pg_extension;`).
 #
-# Soft-read of ansible/confidential.yml (keycloak-role style, not vault's
-# hard fail - postgresql stays independently runnable per
-# ansible/README.md's design principle) - needed below for the optional
-# S3 pgBackRest backup repo credentials.
+# Soft-read of ansible/confidential.yml (not a hard fail like vault's) for
+# optional S3 backup creds.
 - name: "postgresql | check for ansible/confidential.yml"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
@@ -171,9 +143,7 @@
   when: _postgresql_confidential_file.stat.exists
 
 # Only add the S3 pgBackRest repo when real credentials exist - never
-# rendered half-configured (same guard pattern as keycloak's
-# googleOAuth.enabled). ansible/roles/vault/tasks/install.yml seeds the
-# same five fields into Vault under the same condition.
+# rendered half-configured.
 - name: "postgresql | determine whether S3 backup credentials are configured"
   ansible.builtin.set_fact:
     _postgresql_backup_s3_enabled: >-
@@ -195,9 +165,8 @@
       `make d0 install postgresql` to add the off-cluster S3 repo (repo2).
   when: not (_postgresql_backup_s3_enabled | bool)
 
-# templates/postgrescluster.yaml (postgresCluster.enabled) lives in the
-# same chart, applied via the separate zuno-postgresql-d1 Application,
-# after -d0 (above) is Synced+Healthy.
+# postgresCluster.enabled lives in the same chart, applied via the
+# separate zuno-postgresql-d1 Application after -d0 is Synced+Healthy.
 - name: "postgresql | apply the PostgreSQL GitOps Application (d1: PostgresCluster)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -215,18 +184,10 @@
           region: "{{ zuno_postgresql_backup_s3_region | default('') }}"
     gitops_app_wait_retries: 60
 
-# PGO 5.8.8 does NOT set a "Progressing" condition once a PostgresCluster
-# is stable - confirmed live on api.demo222.startx.fr (2026-08-08): a
-# fully healthy, fully-rolled-out cluster's status.conditions only ever
-# contained PGBackRestRepoHostReady/PGBackRestReplicaRepoReady/
-# PGBackRestReplicaCreate/ProxyAvailable, no "Progressing" entry at all -
-# the documented `kubectl wait --for=condition=Progressing=False` approach
-# (Crunchy's own admin-tasks tutorial) never matches on this version, so
-# the original `until` here span its full retry budget on an already-
-# healthy cluster. Compare status.instances[].readyReplicas against
-# .replicas instead (summed across every instance set, for multi-instance
-# HA) plus ProxyAvailable, both directly observed to reflect real rollout
-# state on this PGO version.
+# PGO 5.8.8 never sets a "Progressing" condition, so the documented
+# `wait --for=condition=Progressing=False` approach never matches here;
+# compare readyReplicas against replicas (summed across instance sets)
+# plus ProxyAvailable instead.
 - name: "postgresql | wait for the zuno-postgresql PostgresCluster to finish rolling out"
   kubernetes.core.k8s_info:
     api_version: postgres-operator.crunchydata.com/v1beta1

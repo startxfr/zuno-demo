@@ -1,15 +1,7 @@
 ---
-# Reverse of install.yml. Delete -d1 (the OpenTelemetryCollector operand)
-# first, via ArgoCD prune, before remove_operator.yml deletes the CRD it's
-# an instance of - avoids ArgoCD fighting a CR deletion its own
-# Application still desires. remove_operator.yml then runs *before*
-# deleting -d0: it discovers the installed CSV via the Subscription's own
-# status.installedCSV field, which only exists while the Subscription (a
-# -d0-managed resource) still exists - running it before -d0's own delete
-# also means its CRD delete and CSV/Subscription delete happen before
-# ArgoCD's own cascade prune would otherwise race to remove the same
-# Subscription object - same ordering ADR-0312 established for the other
-# converted roles.
+# Reverse of install.yml: delete -d1 first (avoids ArgoCD fighting a CR
+# deletion), then remove_operator.yml (needs the Subscription to still
+# exist) before -d0's own delete.
 - name: "observability | delete the observability GitOps Application (d1: shared OTLP collector)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

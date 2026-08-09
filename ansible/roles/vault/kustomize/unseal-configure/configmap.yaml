@@ -8,11 +8,8 @@ metadata:
 data:
   unseal-and-configure.sh: |
     #!/bin/sh
-    # Unseals Vault (safe to call even if already unsealed - the endpoint
-    # just reports the current state back), then enables the KV v2 engine
-    # and the eso-reader policy/role every ExternalSecret in the platform
-    # resolves through. Idempotent and safe to re-run any time (e.g. after
-    # a Vault pod restart reseals it), independent of ansible.
+    # Unseals Vault (safe if already unsealed), then enables the KV v2
+    # engine and the eso-reader policy/role. Idempotent, safe to re-run.
     set -eu
 
     echo "Unsealing Vault..."
@@ -46,12 +43,8 @@ data:
 
     echo "KV store and default policies configured."
 
-    # ansible/roles/cert_manager: the pki/ engine + cert-manager-issuer
-    # role/policy this prepares are consumed by that role's ClusterIssuer
-    # (gitops/charts/cert-manager/templates/clusterissuer.yaml) - cert_manager
-    # itself never writes to Vault, it only points a declarative
-    # ClusterIssuer at this already-configured backend, same as
-    # external-secrets' ClusterSecretStore above.
+    # Prepares the pki/ engine + cert-manager-issuer role/policy consumed
+    # by cert_manager's ClusterIssuer (that role never writes to Vault itself).
     enable_if_new "PKI secrets engine at pki/" vault secrets enable -path=pki pki
     vault secrets tune -max-lease-ttl=87600h pki
 

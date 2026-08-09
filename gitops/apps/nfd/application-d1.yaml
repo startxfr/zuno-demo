@@ -1,8 +1,5 @@
 ---
-# Node Feature Discovery instance CR (ADR-0047, ADR-0312). See
-# gitops/charts/nfd (cluster-nfd.nfd.enabled) - NOT the operator itself
-# (see gitops/apps/nfd/application-d0.yaml, applied first by
-# ansible/roles/nfd/tasks/install.yml).
+# Node Feature Discovery instance CR (not the operator itself, see application-d0.yaml).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

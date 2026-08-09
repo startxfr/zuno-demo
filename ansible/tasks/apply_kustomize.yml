@@ -1,13 +1,7 @@
 ---
-# Shared task (ADR-0310): apply every resource in a per-role kustomize/
-# directory. Shells out to `kustomize build` and feeds the parsed
-# multi-document output through kubernetes.core.k8s per resource.
-#
-# Required var: kustomize_dir (absolute path to a directory containing a
-# kustomization.yaml).
-# Optional var: kustomize_replacements (dict of literal-string ->
-# replacement-value substitutions applied to the rendered YAML before
-# parsing).
+# Applies every resource in a role's kustomize/ directory via `kustomize build`.
+# Requires kustomize_dir; optional kustomize_replacements (literal-string
+# substitutions applied to the rendered YAML before parsing).
 - name: "kustomize | validate kustomize_dir is set"
   ansible.builtin.assert:
     that:
@@ -15,10 +9,8 @@
       - kustomize_dir | length > 0
     fail_msg: "apply_kustomize.yml requires 'kustomize_dir' to be set by the including role"
 
-# --load-restrictor LoadRestrictionsNone: some roles' configMapGenerator
-# `files:` sources reach outside their own kustomize/ directory (e.g.
-# ansible/roles/sql_schema/kustomize/schema/), which kustomize's default
-# same-directory-or-below restriction otherwise rejects.
+# LoadRestrictionsNone: some roles' configMapGenerator files: reach outside
+# their own kustomize/ directory, which kustomize's default restriction rejects.
 - name: "kustomize | build manifests from {{ kustomize_dir }}"
   ansible.builtin.set_fact:
     _kustomize_raw: >-
