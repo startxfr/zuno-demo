@@ -15,4 +15,7 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/hook: PreSync
+    openshift.io/description: "Agent Runtime, AI Gateway and MCP Gateway - shared runtime hosting every active agent."
+    openshift.io/display-name: "Zuno AI Runtime"
+    openshift.io/requester: zuno
 {{- end }}

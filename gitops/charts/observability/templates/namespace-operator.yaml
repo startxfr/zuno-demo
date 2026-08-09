@@ -14,4 +14,7 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/hook: PreSync
+    openshift.io/description: "Red Hat build of OpenTelemetry Collector operator subscription, installed by Zuno."
+    openshift.io/display-name: "Zuno OpenTelemetry Operator"
+    openshift.io/requester: zuno
 {{- end }}

@@ -4,3 +4,7 @@ metadata:
   name: zuno-ai-run
   labels:
     zuno.io/managed-by: zuno-ansible
+  annotations:
+    openshift.io/description: "Agent Runtime, AI Gateway and MCP Gateway - shared runtime hosting every active agent."
+    openshift.io/display-name: "Zuno AI Runtime"
+    openshift.io/requester: zuno

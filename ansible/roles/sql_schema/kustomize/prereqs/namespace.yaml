@@ -4,3 +4,7 @@ metadata:
   name: zuno-data
   labels:
     zuno.io/managed-by: zuno-ansible
+  annotations:
+    openshift.io/description: "PostgreSQL and pgvector, the platform's persistent data and RAG vector store."
+    openshift.io/display-name: "Zuno Data"
+    openshift.io/requester: zuno

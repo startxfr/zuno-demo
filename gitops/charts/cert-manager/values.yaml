@@ -58,8 +58,9 @@ cluster-certmanager:
       hooked: true
       type: namespace
       name: cert-manager-operator
-      display_name: Operator CertManager
+      display_name: Zuno Cert-Manager Operator
       description: cert-manager operator, configured by Zuno
+      requester: zuno
 
   operator:
     enabled: false

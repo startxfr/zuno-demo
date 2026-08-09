@@ -26,7 +26,7 @@ cluster-ods:
       hooked: true
       type: namespace
       name: redhat-ods-operator
-      display_name: Operator OpenShift AI
+      display_name: Zuno OpenShift AI Operator
       description: Red Hat OpenShift AI, configured by Zuno
       # Overrides startx's own cluster-ods default (requester: startx).
       requester: zuno

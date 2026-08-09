@@ -9,18 +9,36 @@ namespaces:
   - name: zuno-agent-comage
     agent: comage
     status: placeholder
+    displayName: Zuno Comage Agent
+    description: >-
+      Sales assistant - placeholder namespace reserved for the
+      follow-up/PO-tracking agent (ADR-0023).
   - name: zuno-agent-tekos
     agent: tekos
     status: active
+    displayName: Zuno Tekos Agent
+    description: Technical consultant assistant - the only active v0 agent instance.
   - name: zuno-agent-advantage
     agent: advantage
     status: placeholder
+    displayName: Zuno Advantage Agent
+    description: >-
+      Sales administration assistant - placeholder namespace reserved for
+      new-business/PO reporting.
   - name: zuno-agent-finage
     agent: finage
     status: placeholder
+    displayName: Zuno Finage Agent
+    description: >-
+      Finance assistant - placeholder namespace reserved for
+      invoicing-readiness reporting.
   - name: zuno-agent-arkos
     agent: arkos
     status: placeholder
+    displayName: Zuno Arkos Agent
+    description: >-
+      Architecture assistant - placeholder namespace reserved for
+      DAT/Odyssey-workshop support.
 
 # Default ResourceQuota applied to every agent namespace regardless of
 # status, so the isolation model (ADR-0023) is real even for namespaces
@@ -59,11 +77,17 @@ quota:
 # pass bounded).
 platformNamespaces:
   - name: zuno-auth
+    displayName: Zuno Authentication
+    description: Keycloak, the platform's central identity provider.
     # Keycloak: JWKS/token-endpoint callers.
     allowedFromNamespaces:
       - zuno-agent-tekos
       - zuno-ai-run
   - name: zuno-vault
+    displayName: Zuno Vault
+    description: >-
+      HashiCorp Vault and External Secrets Operator, the platform's secret
+      storage.
     # cert-manager's ClusterIssuer talks to Vault's pki/ engine, but the
     # Red Hat cert-manager operator hardcodes its operand controller pods
     # into the fixed "cert-manager" namespace (not chart-managed - see
@@ -82,6 +106,10 @@ platformNamespaces:
     # templates/networkpolicy-platform.yaml).
     allowApiServerWebhooks: true
   - name: zuno-data
+    displayName: Zuno Data
+    description: >-
+      PostgreSQL and pgvector, the platform's persistent data and RAG vector
+      store.
     # postgresql: rag-service (same-ns, already covered) + sales-db-mcp
     # (zuno-ai-run, cross-ns). vault: External Secrets Operator's
     # ClusterSecretStore controller.
@@ -89,15 +117,25 @@ platformNamespaces:
       - zuno-ai-run
       - zuno-vault
   - name: zuno-telemetry
+    displayName: Zuno Telemetry
+    description: OpenTelemetry Collector, the platform's observability pipeline.
     # OTel Collector: every OTel-instrumented service.
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
   - name: zuno-ai-build
-    allowedFromNamespaces: 
+    displayName: Zuno AI Build
+    description: >-
+      In-cluster OpenShift build pipeline producing this platform's
+      component images.
+    allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
   - name: zuno-ai-run
+    displayName: Zuno AI Runtime
+    description: >-
+      Agent Runtime, AI Gateway and MCP Gateway - shared runtime hosting
+      every active agent.
     allowedFromNamespaces: []
     # ADR-0312: the RHOAI dashboard label used to be applied by a second,
     # independent Namespace object in ansible/roles/openshift_ai's own

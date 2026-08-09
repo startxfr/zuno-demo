@@ -26,8 +26,9 @@ cluster-nfd:
       hooked: true
       type: namespace
       name: openshift-nfd
-      display_name: Operator NFD
+      display_name: Zuno NFD Operator
       description: Node Feature Discovery, configured by Zuno
+      requester: zuno
   operator:
     enabled: false
     context:
