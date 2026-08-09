@@ -1,7 +1,8 @@
 ---
 # Discovers the cluster's real apps wildcard domain directly from the
 # OpenShift API (authoritative, and Ansible already has direct API access
-# via K8S_AUTH_HOST/K8S_AUTH_API_KEY - no need to round-trip through Vault
+# via the operator's kubeconfig - K8S_AUTH_KUBECONFIG, see
+# ansible/tasks/load_k8s_auth_env.yml - no need to round-trip through Vault
 # just to read a value this same run can query directly). Idempotent within
 # a single playbook run via the `is not defined` guard, so every include
 # site (apply_gitops_app.yml, the vault role, the agents role's smoke
@@ -27,8 +28,9 @@
   ansible.builtin.fail:
     msg: >-
       Could not read status.domain from Ingress.config.openshift.io/cluster
-      - is K8S_AUTH_HOST pointed at a real OpenShift cluster (not vanilla
-      Kubernetes, which has no Ingress.config.openshift.io resource)?
+      - is the current kubeconfig context (`oc login`) pointed at a real
+      OpenShift cluster (not vanilla Kubernetes, which has no
+      Ingress.config.openshift.io resource)?
   when:
     - cluster_base_domain is not defined
     - (_resolve_cluster_ingress.resources | default([]) | length) == 0

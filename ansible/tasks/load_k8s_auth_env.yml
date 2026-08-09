@@ -1,0 +1,37 @@
+---
+# Common: every role/task that talks to the OpenShift cluster does so via
+# kubernetes.core, authenticated from the operator's own kubeconfig (`oc
+# login <cluster-api-url>`, done once before any `make`/playbook - see
+# ansible/README.md) rather than any credential exported by hand or stored
+# in this repo. This task resolves that kubeconfig path once and exposes it
+# as K8S_AUTH_KUBECONFIG, which every playbook's play-level `environment:`
+# then makes visible to each module call in the play (include_role/
+# include_tasks included) - so no individual role has its own copy of this
+# logic. Idempotent within a single playbook run via the `is not defined`
+# guard, same pattern as resolve_cluster_base_domain.yml.
+- name: "k8s-auth | resolve the operator's kubeconfig path"
+  ansible.builtin.set_fact:
+    k8s_auth_kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') | default(lookup('env', 'HOME') + '/.kube/config', true) }}"
+  when: k8s_auth_environment is not defined
+
+- name: "k8s-auth | verify the kubeconfig exists"
+  ansible.builtin.stat:
+    path: "{{ k8s_auth_kubeconfig_path }}"
+  register: _k8s_auth_kubeconfig_file
+  when: k8s_auth_environment is not defined
+
+- name: "k8s-auth | fail if not logged in to a cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No kubeconfig found at {{ k8s_auth_kubeconfig_path }}. Run `oc login
+      <cluster-api-url>` (or set KUBECONFIG to point at an existing one)
+      before any `make d0/d1 ...` target or playbook.
+  when:
+    - k8s_auth_environment is not defined
+    - not _k8s_auth_kubeconfig_file.stat.exists
+
+- name: "k8s-auth | set the K8S_AUTH_* environment facts"
+  ansible.builtin.set_fact:
+    k8s_auth_environment:
+      K8S_AUTH_KUBECONFIG: "{{ k8s_auth_kubeconfig_path }}"
+  when: k8s_auth_environment is not defined

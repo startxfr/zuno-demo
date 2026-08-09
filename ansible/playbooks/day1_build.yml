@@ -11,6 +11,7 @@
 - name: "Day 1: build component images"
   hosts: localhost
   gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day1_build_components:
       - mcp_build
@@ -18,6 +19,9 @@
       - agent_build
       - ai_gateway_build
   tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.import_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
     - name: Resolve requested Day 1 build component name(s)
       ansible.builtin.set_fact:
         selected_components: >-

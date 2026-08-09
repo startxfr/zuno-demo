@@ -4,6 +4,7 @@
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day1_components:
       - mlops
@@ -14,6 +15,9 @@
       - models
       - llm
   tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.import_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
     - name: Resolve requested Day 1 component name(s)
       ansible.builtin.set_fact:
         selected_components: >-

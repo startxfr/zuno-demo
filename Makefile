@@ -32,10 +32,9 @@ help:
 	  'Zuno Demo operator interface' \
 	  '' \
 	  '  Required once, before any target below:' \
-	  '    export K8S_AUTH_HOST=https://api.mycluster.com:6443' \
-	  '    export K8S_AUTH_API_KEY=<cluster-admin token>' \
-	  '  Available at any time:' \
-	  '    export K8S_AUTH_VERIFY_SSL=false' \
+	  '    oc login https://api.mycluster.com:6443 --token=<cluster-admin token>' \
+	  '  Ansible reuses that kubeconfig (K8S_AUTH_KUBECONFIG) for every cluster' \
+	  '  call - no separate credentials to export.' \
 	  '  This is the only manual input for the entire install - everything else' \
 	  '  (Keycloak, Vault, PostgreSQL, OpenShift AI, MLOps...) is automated.' \
 	  '' \
@@ -55,8 +54,9 @@ help:
 	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)'
 
 credentials-check:
-	@if [[ -z "$${K8S_AUTH_HOST:-}" || -z "$${K8S_AUTH_API_KEY:-}" ]]; then \
-	  echo "K8S_AUTH_HOST and K8S_AUTH_API_KEY must be exported first - see 'make help'." >&2; \
+	@kubeconfig="$${KUBECONFIG:-$$HOME/.kube/config}"; \
+	if [[ ! -f "$$kubeconfig" ]]; then \
+	  echo "No kubeconfig found at $$kubeconfig - run 'oc login <cluster-api-url>' first (see 'make help')." >&2; \
 	  exit 2; \
 	fi
 

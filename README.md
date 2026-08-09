@@ -58,8 +58,7 @@ The only manual input for the entire install is the OpenShift API endpoint
 and a cluster-admin token (ADR-0024) - everything else is automated:
 
 ```bash
-export K8S_AUTH_HOST=https://api.mycluster.com:6443
-export K8S_AUTH_API_KEY=<cluster-admin token>
+oc login https://api.mycluster.com:6443 --token=<cluster-admin token>
 ansible-galaxy collection install -r ansible/requirements.yml
 
 # Day 0 (ADR-0056): cluster prerequisites - operators, CRDs, namespaces,

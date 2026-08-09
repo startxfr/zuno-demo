@@ -19,6 +19,7 @@
 - name: "Day 0: check install state"
   hosts: localhost
   gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day0_components:
       - argocd
@@ -35,6 +36,9 @@
       - observability
       - openshift_ai
   tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.import_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
     - name: Resolve requested Day 0 component name(s)
       ansible.builtin.set_fact:
         selected_components: >-
