@@ -14,11 +14,15 @@ sync.
 
 Most components have real content on only one side - a component with no
 OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
-`mcp-sales-db`, `models`, `rag`) has an empty `-d0`; `namespaces` (pure
-cluster-scoped Namespace/Quota scaffolding, no live service) has an empty
-`-d1`. The empty side points at `gitops/charts/noop` (see that chart's
-README) rather than being omitted, so the `-d0`/`-d1` naming convention is
-uniform and visible across every component directory.
+`models`, `rag`) has an empty `-d0`; `namespaces` (pure cluster-scoped
+Namespace/Quota scaffolding, no live service) has an empty `-d1`. The empty
+side points at `gitops/charts/noop` (see that chart's README) rather than
+being omitted, so the `-d0`/`-d1` naming convention is uniform and visible
+across every component directory. `mcp-sales-db` is the one exception with
+real content on *both* sides: `-d0` (`gitops/charts/sql-schema`) is a
+schema/fixtures prerequisite, not an operator, but the same "prerequisites
+before the live service" ordering the `-d0`/`-d1` split provides for every
+other component fits it too (ADR-0313).
 
 Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
 `default` project - a dedicated `AppProject` (`ansible/roles/argocd/
@@ -56,10 +60,26 @@ are the remaining exceptions - `argocd` installs itself and creates the
 `AppProject` (`zuno`) every `Application.spec.project` here references;
 both are a bootstrap chicken-and-egg no `Application` can resolve, so they
 still apply raw manifests directly via `ansible/tasks/apply_kustomize.yml`
-(ADR-0310). `sql_schema` and `rag`'s one-shot SQL `Job`s and `vault`'s
-imperative unseal are likewise one-shot/imperative actions rather than
-standing installed components, and stay outside this directory for the
-same reason. `mlops` is out of scope for v0 (ADR-0301/0302 are v3).
+(ADR-0310). `vault`'s imperative unseal is likewise a one-shot/imperative
+action rather than a standing installed component, and stays outside this
+directory for the same reason - it calls Vault's own API and captures
+generated secret material at runtime, which no combination of ArgoCD/Helm
+can express. `mlops` is out of scope for v0 (ADR-0301/0302 are v3).
+
+`sql_schema`'s and `rag`'s one-shot SQL `Job`s (schema/fixtures applies
+against PostgreSQL) *are* covered here as of ADR-0313, unlike `vault`'s
+unseal: each is an ArgoCD `PreSync` hook Job templated into the consuming
+chart (`gitops/charts/sql-schema`'s `-d0` "prerequisites" Application for
+`mcp-sales-db`; `gitops/charts/rag-service`'s own `-d1` Application for
+`rag`), with `hook-delete-policy: BeforeHookCreation` reproducing the
+delete-then-recreate idiom Ansible previously did by hand (Jobs are
+immutable). Only the static SQL/fixtures `ConfigMap` generation
+(`ansible/roles/{sql_schema,rag}/kustomize/schema/`, plain
+`configMapGenerator`s reading `data/{sxa,rag}/`) stays Ansible-applied -
+these Jobs are not "standing installed components" any more than before,
+but ArgoCD's resource-hook mechanism can express a one-shot, blocking,
+re-run-on-every-sync action just as well as Ansible's own
+delete/create/wait tasks could, without leaving it outside GitOps.
 
 `nfd`, `nvidia_gpu`, `openshift_ai`, `external_secrets`, `smtp` and
 `observability` used to be in an exception bucket like `argocd`'s above -

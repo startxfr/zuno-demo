@@ -27,7 +27,7 @@
 #
 # `api_key_env` names the environment variable this provider's API key is
 # read from at runtime (populated by an ExternalSecret -- see
-# ansible/roles/llm/tasks/configure.yml -- never a literal value here).
+# ansible/roles/vault/tasks/install.yml -- never a literal value here).
 
 providers:
   - name: local

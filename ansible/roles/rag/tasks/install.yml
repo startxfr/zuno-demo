@@ -2,98 +2,18 @@
 # ADR-0046: extends the document_embeddings table (created by
 # ansible/roles/sql_schema, which this role's own README already declares
 # as a dependency) with retrieval metadata support and seeds the demo
-# fixture corpus, before applying the RAG service itself. Same one-shot Job
-# pattern as ansible/roles/sql_schema/tasks/install.yml - a schema/data
-# apply isn't a standing GitOps Application - reusing that role's
-# `sql-schema-postgresql-credentials` Secret rather than registering a
-# second ExternalSecret for the same Vault-backed credential.
+# fixture corpus. ADR-0313: the actual apply is an ArgoCD PreSync hook Job
+# owned by gitops/charts/rag-service (templates/job-schema-apply.yaml),
+# not an ansible-managed Job - only the static SQL/fixtures ConfigMap
+# generation stays here.
 # ADR-0310: ansible/roles/rag/kustomize/schema/ (a configMapGenerator
 # reading directly from data/rag/ - disableNameSuffixHash keeps the name
-# "zuno-rag-schema" stable so the inline Job below, outside this
-# kustomization, can still reference it by that fixed name).
+# "zuno-rag-schema" stable so the chart's PreSync hook Job can reference it
+# by that fixed name).
 - name: "rag | build the RAG metadata schema + fixtures ConfigMap"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/rag/kustomize/schema"
-
-- name: "rag | delete any previous RAG schema-apply Job (Jobs are immutable, this task is idempotent-by-recreation)"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: batch/v1
-    kind: Job
-    name: zuno-rag-schema-apply
-    namespace: zuno-data
-    wait: true
-
-- name: "rag | run the RAG metadata + fixtures apply Job"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
-        name: zuno-rag-schema-apply
-        namespace: zuno-data
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      spec:
-        backoffLimit: 2
-        template:
-          spec:
-            restartPolicy: Never
-            containers:
-              - name: psql
-                image: postgres:16-bookworm
-                command:
-                  - psql
-                env:
-                  - name: PGHOST
-                    # zuno-postgresql-pgbouncer is PGO's own auto-created
-                    # PgBouncer Service in front of the zuno-postgresql
-                    # PostgresCluster - there is no plain "postgresql"
-                    # Service, and no "-rw"-suffixed one either (that was
-                    # CloudNativePG's convention - see
-                    # ansible/roles/postgresql/README.md).
-                    value: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
-                  - name: PGPORT
-                    value: "5432"
-                  - name: PGDATABASE
-                    value: zuno
-                  - name: PGUSER
-                    valueFrom:
-                      secretKeyRef:
-                        name: sql-schema-postgresql-credentials
-                        key: username
-                  - name: PGPASSWORD
-                    valueFrom:
-                      secretKeyRef:
-                        name: sql-schema-postgresql-credentials
-                        key: password
-                args:
-                  - -v
-                  - ON_ERROR_STOP=1
-                  - -f
-                  - /sql/003_rag_metadata.sql
-                  - -f
-                  - /sql/seed.sql
-                volumeMounts:
-                  - name: sql
-                    mountPath: /sql
-            volumes:
-              - name: sql
-                configMap:
-                  name: zuno-rag-schema
-
-- name: "rag | wait for the RAG schema-apply Job to complete"
-  kubernetes.core.k8s_info:
-    api_version: batch/v1
-    kind: Job
-    namespace: zuno-data
-    name: zuno-rag-schema-apply
-  register: _rag_schema_job
-  until: (_rag_schema_job.resources[0].status.succeeded | default(0)) > 0
-  retries: 30
-  delay: 10
 
 # No OLM operator involved - all of this component's content is -d1 (see
 # gitops/apps/rag/application-d0.yaml, a no-op).

@@ -1,110 +1,31 @@
 ---
-# Applies the SXA-derived schema + synthetic fixtures (ADR-0016, ADR-0025)
-# directly via a one-shot Job - not a GitOps Application, since there is
-# nothing "declaratively running" about a schema migration once it has run
-# (see gitops/apps/README.md). The sales-db MCP server that reads this
-# schema *is* a standing workload, so it's applied afterward as a proper
-# GitOps Application.
+# Applies the SXA-derived schema + synthetic fixtures (ADR-0016, ADR-0025).
+# ADR-0313: the actual apply is an ArgoCD PreSync hook Job owned by
+# gitops/charts/sql-schema (templates/job-schema-apply.yaml), registered
+# below as the sales-db MCP server's `-d0` ("prerequisites") Application -
+# only the static SQL/fixtures ConfigMap generation and the Namespace stay
+# here.
 # ADR-0310: ansible/roles/sql_schema/kustomize/schema/ (a configMapGenerator
 # reading directly from data/sxa/ - disableNameSuffixHash keeps the name
-# "zuno-sxa-schema" stable so the inline Job below, which is outside this
-# kustomization, can still reference it by that fixed name) and
-# ansible/roles/sql_schema/kustomize/prereqs/ (the static Namespace and
-# ExternalSecret).
+# "zuno-sxa-schema" stable so the chart's PreSync hook Job can reference it
+# by that fixed name) and ansible/roles/sql_schema/kustomize/prereqs/ (the
+# static Namespace only now - the ExternalSecret moved into
+# gitops/charts/sql-schema itself).
 - name: "sql_schema | build the SQL ConfigMap from data/sxa/"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/sql_schema/kustomize/schema"
 
-- name: "sql_schema | ensure the zuno-data namespace and PostgreSQL credentials ExternalSecret exist"
+- name: "sql_schema | ensure the zuno-data namespace exists"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/sql_schema/kustomize/prereqs"
 
-- name: "sql_schema | delete any previous schema-apply Job (Jobs are immutable, this task is idempotent-by-recreation)"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: batch/v1
-    kind: Job
-    name: zuno-sxa-schema-apply
-    namespace: zuno-data
-    wait: true
-
-- name: "sql_schema | run the schema + fixtures apply Job"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
-        name: zuno-sxa-schema-apply
-        namespace: zuno-data
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      spec:
-        backoffLimit: 2
-        template:
-          spec:
-            restartPolicy: Never
-            containers:
-              - name: psql
-                image: postgres:16-bookworm
-                command:
-                  - psql
-                env:
-                  - name: PGHOST
-                    # zuno-postgresql-pgbouncer is PGO's own auto-created
-                    # PgBouncer Service in front of the zuno-postgresql
-                    # PostgresCluster - there is no plain "postgresql"
-                    # Service, and no "-rw"-suffixed one either (that was
-                    # CloudNativePG's convention - see
-                    # ansible/roles/postgresql/README.md).
-                    value: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
-                  - name: PGPORT
-                    value: "5432"
-                  - name: PGDATABASE
-                    value: zuno
-                  - name: PGUSER
-                    valueFrom:
-                      secretKeyRef:
-                        name: sql-schema-postgresql-credentials
-                        key: username
-                  - name: PGPASSWORD
-                    valueFrom:
-                      secretKeyRef:
-                        name: sql-schema-postgresql-credentials
-                        key: password
-                args:
-                  - -v
-                  - ON_ERROR_STOP=1
-                  - -f
-                  - /sql/001_init.sql
-                  - -f
-                  - /sql/002_pgvector.sql
-                  - -f
-                  - /sql/seed.sql
-                volumeMounts:
-                  - name: sql
-                    mountPath: /sql
-            volumes:
-              - name: sql
-                configMap:
-                  name: zuno-sxa-schema
-
-- name: "sql_schema | wait for the apply Job to complete"
-  kubernetes.core.k8s_info:
-    api_version: batch/v1
-    kind: Job
-    namespace: zuno-data
-    name: zuno-sxa-schema-apply
-  register: _sql_schema_job
-  until: (_sql_schema_job.resources[0].status.succeeded | default(0)) > 0
-  retries: 30
-  delay: 10
-
-# No OLM operator involved - all of this component's content is -d1 (see
-# gitops/apps/mcp-sales-db/application-d0.yaml, a no-op).
-- name: "sql_schema | apply the sales-db MCP server GitOps Application (d0, no-op)"
+# The schema-apply Job (gitops/charts/sql-schema, a PreSync hook) and the
+# ExternalSecret it depends on both live in this Application's chart, so
+# gitops_app_wait: true (the default) already blocks here until the Job has
+# succeeded - no separate Ansible-side wait needed.
+- name: "sql_schema | apply the sales-db MCP server GitOps Application (d0, schema prerequisites)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "mcp-sales-db"
