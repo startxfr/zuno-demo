@@ -26,4 +26,4 @@ appVersion: "16"
 dependencies:
   - name: operator
     version: "21.3.277"
-    repository: "http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable"
+    repository: "alias:startx"

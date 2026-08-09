@@ -7,12 +7,24 @@
 # sourceRepos (appproject.yaml) is NOT enough on its own - that only
 # allow-lists which repoURLs an Application's own spec.source.repoURL may
 # point to, it does not make the repo-server aware of a Helm repo for
-# subchart dependency resolution. Without this Secret, sync fails with
-# "no repository definition for ... Please add the missing repos via
-# 'helm repo add'" the first time a repo-server pod has never fetched this
-# URL's index before (its Helm client cache/config is otherwise empty per
-# pod, not seeded from anywhere declarative) - this is the standard
-# ArgoCD mechanism (same shape `argocd repo add --type helm` generates).
+# subchart dependency resolution. This Secret is the standard ArgoCD
+# mechanism (same shape `argocd repo add --type helm` generates).
+#
+# IMPORTANT - the `name: startx` field is load-bearing, not cosmetic: those
+# 6 Chart.yaml files must reference this repo as `repository: "alias:startx"`
+# (Helm's repo-alias syntax), NOT the literal http:// URL. ArgoCD's
+# repo-server only auto-registers a Chart.yaml dependency's repo before
+# running `helm dependency build` when its `repository:` field's URL scheme
+# is https:// or oci://, or when it's a `@name`/`alias:name` reference
+# resolved against a configured Repository secret's `name` (see
+# reposerver/repository/repository.go's getHelmDependencyRepos in argo-cd
+# v3.4.4). This repo's index is only served over http:// (S3 static
+# website hosting doesn't support TLS), so the literal-URL form is silently
+# skipped by that filter and `helm dependency build` fails with "no
+# repository definition for ... Please add the missing repos via
+# 'helm repo add'" even though this Secret exists and is otherwise correct.
+# `project: zuno` and `enableOCI: "false"` are not required for this - they
+# were tried while chasing the bug above and left in as harmless.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -24,4 +36,6 @@ metadata:
 stringData:
   type: helm
   name: startx
+  project: zuno
+  enableOCI: "false"
   url: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
