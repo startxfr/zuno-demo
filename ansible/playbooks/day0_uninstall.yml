@@ -12,8 +12,8 @@
       - nvidia_gpu
       - nfd
       - smtp
-      - postgresql
       - keycloak
+      - postgresql
       - external_secrets
       - cert_manager
       - vault

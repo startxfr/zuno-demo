@@ -1,4 +1,14 @@
 ---
+# zuno-vault is owned/created exclusively by the namespaces role
+# (gitops/apps/external-secrets/application-d0.yaml sets CreateNamespace=false
+# to avoid two Applications racing to own it - see commit 2531b78). Ensure it
+# exists here so `make d0 install external-secrets` is self-sufficient standalone,
+# same principle as the llm role's build-role includes.
+- name: "external_secrets | ensure the namespaces component (zuno-vault) is installed"
+  ansible.builtin.include_role:
+    name: namespaces
+    tasks_from: install
+
     # Catalog source varies per cluster (e.g. community-operators, not always
     # redhat-operators); discover it from the PackageManifest rather than
     # hardcoding, or the Subscription fails to resolve.
