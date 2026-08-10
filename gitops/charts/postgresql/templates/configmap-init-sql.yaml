@@ -15,7 +15,19 @@ metadata:
 data:
   init.sql: |
     \set ON_ERROR_STOP on
+    -- PGO grants each spec.users[] entry database-level CONNECT/TEMP/CREATE
+    -- via GRANT, but leaves "postgres" as the actual database owner - it
+    -- never reassigns ownership. Since PG15, the public schema is owned by
+    -- the pg_database_owner pseudo-role (= whoever owns the database), so
+    -- without this explicit grant the app user can create new schemas but
+    -- can't create objects in the pre-existing public schema itself
+    -- (confirmed live: Keycloak's Liquibase migration failed with
+    -- "permission denied for schema public" for exactly this reason).
     \connect {{ .Values.cluster.database }}
     CREATE EXTENSION IF NOT EXISTS vector;
     CREATE EXTENSION IF NOT EXISTS timescaledb;
+    GRANT ALL ON SCHEMA public TO {{ .Values.cluster.owner }};
+
+    \connect {{ .Values.keycloakDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.keycloakDatabase.owner }};
 {{- end }}
