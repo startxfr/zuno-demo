@@ -111,10 +111,7 @@ in this repository re-creates it. `ansible/roles/argocd/tasks/
 uninstall.yml` and its header comment were updated to match: it now only
 removes the operator's own Subscription/ClusterRoleBinding.
 
-## Migration / evolution
-
-Future changes must be documented by a new ADR using `Supersedes
-ADR-0311` when applicable.
+See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 

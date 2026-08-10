@@ -478,7 +478,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   trusting similarity alone to pick the right version, forwards a soft
   French-language ranking preference, forwards the caller's groups so
   rag-service enforces ACL-restricted documents server-side (fail closed),
-  and escalates `effective_classification` (ADR-0034) to the highest
+  and escalates `effective_classification` to the highest
   classification among retrieved docs instead of a fixed C1 baseline. A
   new fictional fixture corpus (`data/rag/fixtures/seed.sql`) includes
   deliberately conflicting per-version guidance and an EN/FR document pair

@@ -119,10 +119,7 @@ creates the `startx` `HelmChartRepository`, which didn't exist before.
 `make d0 uninstall admin-context` now deletes via the two `Application`s'
 cascade finalizer rather than direct `PriorityClass` deletes.
 
-## Migration / evolution
-
-Future changes must be documented by a new ADR using `Supersedes
-ADR-0314` when applicable.
+See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 

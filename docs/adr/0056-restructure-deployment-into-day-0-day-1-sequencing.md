@@ -40,126 +40,16 @@ The `zuno-ai-run`/`zuno-ai-build` split narrows the blast radius of a compromise
 
 ## Implementation state
 
-**Implemented (2026-08-05)**, landed as four separate commits (ADR-level
-review evidence + code, in order): the ADR itself; the Day 0 restructuring
-(new roles, new playbooks, Makefile `day0`/`d0` dispatch, and every
-operator-facing doc/fail-message reference to the old command names);
-the `zuno-ai`→`zuno-ai-run`/`zuno-ai-build` rename, deliberately isolated
-so a mistake in a 59-file mechanical rename is easy to bisect/revert
-independently of the rest; and the Day 1 build mechanism plus Makefile
-`day1`/`d1` dispatch.
+**Implemented (2026-08-05)**, landed as four separate commits: the ADR itself; the Day 0 restructuring (new roles, new playbooks, Makefile `day0`/`d0` dispatch, every operator-facing doc/fail-message reference to the old command names); the `zuno-ai`→`zuno-ai-run`/`zuno-ai-build` rename, deliberately isolated so a mistake in a 59-file mechanical rename is easy to bisect/revert independently; and the Day 1 build mechanism plus Makefile `day1`/`d1` dispatch.
 
-**Day 0** (`ansible/playbooks/day0_{check,install,configure}.yml`,
-`Makefile`'s `day0`/`d0` targets): `admin_context` (new role - `check`
-verifies cluster API reachability; `install` verifies at least one
-`StorageClass` exists, discover-only, and applies two `PriorityClass`
-objects, `zuno-platform-critical`/`zuno-workload-default`; `configure`
-re-applies the PriorityClasses and reports on the `argocd` role's
-`ClusterRoleBinding`, non-fatally, since `admin_context` runs before
-`argocd` in sequence and that binding legitimately doesn't exist yet the
-first time). `namespaces` (new role, moved out of `agents` - `check`
-reads the expected namespace list directly from `gitops/charts/
-namespaces/values.yaml`, never duplicated as a hardcoded list, and fails
-naming exactly which are missing; `install`/`configure` apply/re-apply
-the same GitOps Application `agents`'s `configure.yml` used to apply
-itself). `openshift_ai` absorbed the former `datascience` role's
-namespace-creation and GPU `ResourceQuota` tasks (one role for one
-conceptual prerequisite). The formerly separate `api` role was retired
-into `agents`: once namespace-apply moved out of `agents`'s
-`configure.yml`, it was doing exactly what `api` did.
+- **Day 0**: `admin_context` (new role - `check` verifies cluster API reachability; `install` verifies at least one `StorageClass` exists (discover-only) and applies two `PriorityClass` objects; `configure` re-applies the PriorityClasses and non-fatally reports on `argocd`'s `ClusterRoleBinding`, since `admin_context` runs before `argocd` and that binding legitimately doesn't exist yet the first time). `namespaces` (new role, moved out of `agents` - `check` reads the expected namespace list directly from `gitops/charts/namespaces/values.yaml`, never a hardcoded duplicate). `openshift_ai` absorbed the former `datascience` role's namespace-creation and GPU `ResourceQuota` tasks. The formerly separate `api` role was retired into `agents` (once namespace-apply moved out of `agents`'s `configure.yml`, it was doing exactly what `api` did).
+- **Day 1**: `run` components (`llm`, `models`, `sql_schema`, `rag`, `mcp`, `agents`, `mlops`) reuse each role's existing `precheck.yml`/`configure.yml` unchanged - `configure` and `run` are literal aliases. `day1_check.yml` special-cases `agents` to run `tasks_from: check` (the real ADR-0053 acceptance/security gate) rather than `tasks_from: precheck`, so that capability wasn't silently lost in the rename.
+- **Day 1 build**: new `ansible/tasks/apply_openshift_build.yml` and roles `ansible/roles/{mcp,rag,agent}_build` apply an `ImageStream` + git-source `BuildConfig` (Docker strategy, `ConfigChange` trigger, no new operator dependency) per image in `zuno-ai-build`, wait for `status.phase: Complete`, fail loudly otherwise. Idempotent: a `ConfigChange` trigger only starts a new build when content actually changed; forcing a rebuild needs deleting the BuildConfig or `oc start-build` directly (documented manual escape hatch, same pattern as `models_vllm_image_override`). Covers 6 of the 8 images the CI matrix already builds (`mcp`→mcp-gateway+mcp-sales-db; `rag`→rag-service; `agent`→agent-runtime+agent-bff+agent-frontend) - `ai-gateway` and the `postgresql-pgvector` base image aren't part of any Day 1 build component, an explicit flagged gap; both still build via the existing GitHub Actions pipeline (ADR-0051). `zuno-ai-build` gets a `default-deny-all-ingress` NetworkPolicy and grants exactly the three namespaces that run a build-produced image (`zuno-ai-run`, `zuno-data`, `zuno-agent-tekos`) scoped `system:image-puller` access via a RoleBinding to the `system:serviceaccounts:<namespace>` group. This grant is created at Day 1 build time, not by the Day 0 `namespaces` role, since `zuno-ai-build` doesn't exist until a build first runs.
+- **`zuno-ai` → `zuno-ai-run`/`zuno-ai-build`**: renamed across every chart, `Application` destination, service default and current (non-ADR) doc mention - a `grep -rn` sweep confirmed zero bare `zuno-ai` references remain outside `docs/adr/*.md`'s historical ADRs (0007/0023/0037/0052/0053), correctly left untouched per this project's "ADRs are immutable" convention. One real bug caught mid-rename: a blind `sed` pass double-mangled this ADR's own already-forward-looking `zuno-ai-run`/`zuno-ai-build` mentions into `zuno-ai-run-run`/`zuno-ai-run-build` - found and fixed by grepping for that exact double-suffix pattern before committing.
+- **`make day0|d0 all`/`make day1|d1 all`**: `day0`'s `all` runs check→install→configure unconditionally. `day1`'s `all` handles build components (`mcp`, `rag`, `agent`) and run components (`llm`, `models`, `sql_schema`, `rag`, `mcp`, `agents`, `mlops`) as different, overlapping-but-not-identical sets - `agent` (singular) only builds, `agents` (plural) only runs, a real distinct name pair. `make d1 all <component>` checks set membership in both lists independently and only runs the stages that apply.
+- **Verified**: `ansible-playbook --syntax-check` (all playbooks), `helm lint` (every chart), and the new dispatch logic (`make -n` dry runs plus real invocations of deliberately-invalid combinations, confirming each fails with the intended diagnostic) were actually run and pass. **Not executed**: no live OpenShift cluster exists in this environment, so the actual `BuildConfig`/`Build` lifecycle, the cross-namespace pulls, and the full Day 0 → Day 1 sequence were not exercised against a real cluster.
 
-**Day 1** (`ansible/playbooks/day1_{check,configure,build}.yml`,
-`Makefile`'s `day1`/`d1` targets): `run` components (`llm`, `models`,
-`sql_schema`, `rag`, `mcp`, `agents`, `mlops`) reuse each role's existing
-`precheck.yml`/`configure.yml` unchanged - `configure` and `run` are
-literal aliases, same playbook. `day1_check.yml` special-cases `agents`
-to run `tasks_from: check` (the real ADR-0053 acceptance/security gate,
-what bare `make check` used to run) rather than `tasks_from: precheck`,
-so that capability wasn't silently lost in the rename - every other Day 1
-component's `check` verb is a genuine dependency precheck.
-
-**Day 1 build** (new `ansible/tasks/apply_openshift_build.yml`, new
-roles `ansible/roles/{mcp,rag,agent}_build`): applies an `ImageStream` +
-git-source `BuildConfig` (Docker strategy, `ConfigChange` trigger - no
-new operator dependency) per image in `zuno-ai-build`, waits for
-`status.phase: Complete`, fails loudly (naming the exact `oc logs`
-command to inspect) otherwise. Idempotent, not "always rebuild": a
-`ConfigChange` trigger only starts a new build when the BuildConfig
-content actually changed, matching every other `kubernetes.core.k8s`
-task's idempotency in this repository - to force a rebuild against
-unchanged source, delete the BuildConfig first or run `oc start-build`
-directly (a documented manual escape hatch, same pattern as
-`models_vllm_image_override`). Covers 6 of the 8 images
-`.github/workflows/build-publish.yml`'s CI matrix already builds
-(`mcp` → `mcp-gateway`+`mcp-sales-db`; `rag` → `rag-service`; `agent` →
-`agent-runtime`+`agent-bff`+`agent-frontend`) - `ai-gateway` and the
-`postgresql-pgvector` base image aren't part of any named Day 1 build
-component, an explicit, flagged gap rather than a silent omission; both
-still build via the existing GitHub Actions pipeline (ADR-0051).
-`zuno-ai-build` gets a `default-deny-all-ingress` `NetworkPolicy` (build
-pods pull source and push images out; nothing needs inbound access) and
-grants exactly the three namespaces that actually run a build-produced
-image (`zuno-ai-run`, `zuno-data`, `zuno-agent-tekos`) scoped
-`system:image-puller` access via a `RoleBinding` to the
-`system:serviceaccounts:<namespace>` group (not a shared "default"
-ServiceAccount name, since every workload uses its own dedicated
-least-privilege ServiceAccount per ADR-0052). This grant is created here,
-at Day 1 build time, deliberately not by the Day 0 `namespaces` role:
-`zuno-ai-build` doesn't exist until a build first runs, so granting on it
-any earlier would make Day 0 depend on Day 1 having partially run first -
-the same reasoning `gitops/charts/namespaces/values.yaml`'s own comment
-gives for why `zuno-ai-build` isn't in that chart's `platformNamespaces`
-list either. The five affected charts' `image.repository`/
-`frontendRepository`/`bffRepository` defaults now point at
-`zuno-ai-build` instead of each workload's own run namespace.
-
-**`zuno-ai` → `zuno-ai-run`/`zuno-ai-build`**: renamed across every
-chart `values.yaml`/`NetworkPolicy` namespaceSelector, every GitOps
-`Application` destination, every Go/Python service default, and every
-current (non-ADR) doc mention - a `grep -rn` sweep confirmed zero bare
-`zuno-ai` references remain outside `docs/adr/*.md`'s historical ADRs
-(0007/0023/0037/0052/0053), which are correctly left untouched per this
-project's "ADRs are immutable" convention - they accurately recorded the
-name that existed when they were written. One real bug caught mid-rename:
-a blind `sed` pass double-mangled this ADR's own already-forward-looking
-`zuno-ai-run`/`zuno-ai-build` mentions (written that way from the start,
-in the Phase 1 commit) into `zuno-ai-run-run`/`zuno-ai-run-build` - found
-and fixed by grepping for that exact double-suffix pattern across every
-touched file before committing.
-
-**`make day0|d0 all [component]`/`make day1|d1 all [component]`**:
-`day0`'s `all` runs check→install→configure unconditionally, since every
-Day 0 component has all three (even if some are documented no-ops).
-`day1`'s `all` is not that simple: build components (`mcp`, `rag`,
-`agent`) and run components (`llm`, `models`, `sql_schema`, `rag`, `mcp`,
-`agents`, `mlops`) are different, overlapping-but-not-identical sets -
-most visibly, `agent` (singular) only builds and `agents` (plural) only
-runs, a real distinct name pair, not a typo. `make d1 all <component>`
-checks set membership in both lists independently and only runs the
-stages that actually apply, rather than assuming one shared list or
-hard-failing on `agent`/`agents` cross-verb combinations that are
-individually valid but not simultaneously so.
-
-**Verified**: every `ansible-playbook --syntax-check` (all playbooks,
-including the 6 new ones), `helm lint` (every chart, including the 5 with
-new `zuno-ai-build` image references), and the new Day 0/Day 1 Makefile
-dispatch logic (`make -n` dry runs across representative verb/component
-combinations, plus real invocations of the deliberately-invalid ones -
-`make d1 build agents`, `make d1 check agent`, bad verbs, bad components -
-confirming each fails with the intended clear diagnostic) were actually
-run in this environment and pass. **Not executed**: no live OpenShift
-cluster exists in this environment (the same constraint as every other
-cluster-dependent change in this repository), so the actual `BuildConfig`/
-`Build` lifecycle, the `system:image-puller` cross-namespace pulls, and
-the full Day 0 → Day 1 sequence end to end were not exercised against a
-real cluster.
-
-## Acceptance criteria
-
-- The implementation is merged through the normal repository review process.
-- Relevant documentation and `MEMORY.md` are updated to describe the implemented state rather than the target state.
-- `make check` or component-specific automated tests demonstrate the behavior described in this ADR.
-- Security-negative tests are included whenever the decision changes an authorization, identity, data-classification or trust boundary.
+See [Standard clauses](README.md#standard-clauses) for Acceptance criteria.
 
 ## Related ADRs
 

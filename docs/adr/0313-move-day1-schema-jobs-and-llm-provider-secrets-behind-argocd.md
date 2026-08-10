@@ -142,10 +142,7 @@ the previous Ansible-managed `Job` object (`zuno-rag-schema-apply` /
 orphaned (not ArgoCD-owned) and should be deleted manually once the new
 hook Job (labeled `zuno.io/managed-by: argocd`) has run successfully.
 
-## Migration / evolution
-
-Future changes must be documented by a new ADR using `Supersedes
-ADR-0313` when applicable.
+See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 
