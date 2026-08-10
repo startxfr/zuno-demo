@@ -599,3 +599,25 @@ The cluster's real apps domain is auto-discovered from
 `ansible/tasks/resolve_cluster_base_domain.yml`, `gitops/apps/README.md`).
 Everything here was built and validated (Helm lint/template, YAML/JSON/Python
 syntax) without a live OpenShift cluster to run it against.
+
+The `sso.<domain>` vs `keycloak.<domain>` mismatch flagged in ADR-0053's
+Implementation state (surfaced but deliberately not fixed there) is now
+fixed: `tekos.keycloakIssuerUrl`, `agent-frontend`/`agent-bff`'s
+`KeycloakIssuerURL` doc comments, and both `evaluations/tekos` scripts'
+`KEYCLOAK_URL` defaults all converge on `keycloak.<clusterBaseDomain>`,
+matching the Keycloak CR's real Route hostname and
+`run_acceptance_gate.yml`'s already-correct value. Separately, the Keycloak
+CR (`gitops/charts/keycloak/templates/keycloak.yaml`) now sets
+`spec.hostname.strict: true` and `KC_PROXY_HEADERS=xforwarded` explicitly
+(previously relied on unverified operator defaults for an edge-terminated
+Route) - addresses the admin console's "Timeout when waiting for 3rd party
+check iframe message" error, which is caused by Keycloak computing its own
+origin as `http://` while the browser's real origin is `https://` behind
+the edge-terminated Route. Also, `spec.db` is no longer omitted: Keycloak
+now gets its own dedicated `keycloak`/`keycloak` Postgres database/role on
+the shared `zuno-postgresql` cluster (not the shared `zunoapp`/`zuno`
+app-data database - least-privilege/lifecycle isolation), wired the same
+"own ExternalSecret + secretKeyRef" cross-namespace way as `mcp-sales-db`.
+Neither the hostname/proxy nor the Postgres wiring has been exercised
+against a live cluster - see `ansible/roles/keycloak/README.md`'s "What's
+unverified against a real cluster" section.

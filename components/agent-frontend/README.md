@@ -135,7 +135,7 @@ surface) - see `go.mod`/`go.sum`.
 | `AGENTS_DIR` | no (default `/agents`, set to `/app/agents` in the image) | Directory of `<name>/agent.okf.md` bundles |
 | `WEB_DIST_DIR` | no (default `web/dist`, set to `/app/web/dist` in the image) | Vite build output directory (ADR-0044) - see `internal/assets` |
 | `ACTIVE_AGENT` | no (default `tekos`) | Which agent this deployment renders a chat UI for |
-| `KEYCLOAK_ISSUER_URL` | **yes** | `https://sso.apps.<cluster-domain>/realms/zuno` - see assumption below |
+| `KEYCLOAK_ISSUER_URL` | **yes** | `https://keycloak.apps.<cluster-domain>/realms/zuno` |
 | `OIDC_CLIENT_ID` | no (default `tekos-frontend`) | Keycloak client ID, contract: `<agent>-frontend` |
 | `OIDC_CLIENT_SECRET` | **yes** | From an `ExternalSecret` (ADR-0024), never hardcoded |
 | `OIDC_REDIRECT_URL` | no (derived from `SELF_BASE_URL` + `/callback`) | Must match the Keycloak client's registered redirect URI |
@@ -143,17 +143,13 @@ surface) - see `go.mod`/`go.sum`.
 | `BFF_BASE_URL` | no (default `http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080`) | In-cluster BFF Service URL |
 | `SESSION_HMAC_SECRET` | **yes** | Signs the session cookie; from an `ExternalSecret` |
 
-## Assumption flagged for the identity track
+## Keycloak hostname
 
-`ansible/roles/keycloak` was still a scaffold at the time this track was
-built, so there is no published Keycloak route hostname convention yet.
-This component assumes `sso.<cluster_base_domain>` (e.g.
-`sso.apps.mycluster.example.com`) as `KEYCLOAK_ISSUER_URL`'s host and a confidential
-OIDC client per agent (`<agent>-frontend`) that supports the Authorization
-Code + PKCE flow with a client secret. If the identity track lands a
-different hostname or makes the frontend clients public (no secret), update
-`gitops/charts/tekos`'s `KEYCLOAK_ISSUER_URL` value and drop
-`OIDC_CLIENT_SECRET` accordingly.
+`KEYCLOAK_ISSUER_URL`'s host is `keycloak.<cluster_base_domain>` (e.g.
+`keycloak.apps.mycluster.example.com`), matching the Keycloak CR's actual
+Route hostname (`gitops/charts/keycloak/templates/keycloak.yaml`). This
+component uses a confidential OIDC client per agent (`<agent>-frontend`)
+that supports the Authorization Code + PKCE flow with a client secret.
 
 ## Endpoints
 

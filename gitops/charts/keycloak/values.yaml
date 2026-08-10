@@ -22,6 +22,15 @@ clusterBaseDomain: apps.mycluster.example.com
 # vault-backend ClusterSecretStore. Never hardcode values here.
 adminSecretName: keycloak-admin
 googleOAuthSecretName: google-oauth-client
+postgresqlSecretName: keycloak-postgresql-app
+
+# Dedicated Postgres database (ADR-0315) on the shared zuno-postgresql
+# cluster (gitops/charts/postgresql) - connects through PgBouncer, like
+# every other consumer. See templates/externalsecret-postgresql.yaml for
+# how the credential crosses from zuno-data into this namespace.
+postgresqlHost: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
+postgresqlPort: 5432
+postgresqlDatabase: keycloak
 
 # Disables the realm's "google" identity provider and skips the
 # google-oauth-client ExternalSecret when false.

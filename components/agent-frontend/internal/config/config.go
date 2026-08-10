@@ -29,11 +29,9 @@ type Config struct {
 	ActiveAgent string
 
 	// KeycloakIssuerURL is the OIDC issuer, e.g.
-	// https://sso.apps.<cluster-domain>/realms/zuno. ASSUMPTION: the identity
-	// track has not yet published a Keycloak route hostname convention
-	// (ansible/roles/keycloak is still a scaffold at the time this was
-	// written), so "sso.<cluster_base_domain>" is this track's placeholder;
-	// see components/agent-frontend/README.md.
+	// https://keycloak.apps.<cluster-domain>/realms/zuno - matches the
+	// Keycloak CR's actual Route hostname, see
+	// gitops/charts/keycloak/templates/keycloak.yaml.
 	KeycloakIssuerURL string
 
 	// OIDCClientID is the confidential client registered in the zuno realm

@@ -11,13 +11,14 @@ tekos.{{ .Values.global.clusterBaseDomain }}
 {{- end -}}
 
 {{/*
-Keycloak issuer URL, defaulting to the sso.<clusterBaseDomain> convention.
+Keycloak issuer URL, defaulting to the Keycloak CR's actual Route hostname
+(keycloak.<clusterBaseDomain> - see gitops/charts/keycloak/templates/keycloak.yaml).
 */}}
 {{- define "tekos.keycloakIssuerUrl" -}}
 {{- if .Values.keycloak.issuerUrl -}}
 {{ .Values.keycloak.issuerUrl }}
 {{- else -}}
-https://sso.{{ .Values.global.clusterBaseDomain }}/realms/zuno
+https://keycloak.{{ .Values.global.clusterBaseDomain }}/realms/zuno
 {{- end -}}
 {{- end -}}
 

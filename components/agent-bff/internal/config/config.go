@@ -19,11 +19,10 @@ type Config struct {
 	AgentName string
 
 	// KeycloakIssuerURL is the OIDC issuer whose JWKS validates incoming
-	// bearer tokens, e.g. https://sso.apps.<cluster-domain>/realms/zuno.
-	// Standard JWKS validation against
-	// <issuer>/protocol/openid-connect/certs - see README.md for the
-	// assumption this makes in the absence of a published
-	// platform/identity/README.md contract at the time this was written.
+	// bearer tokens, e.g. https://keycloak.apps.<cluster-domain>/realms/zuno -
+	// matches the Keycloak CR's actual Route hostname, see
+	// gitops/charts/keycloak/templates/keycloak.yaml. Standard JWKS
+	// validation against <issuer>/protocol/openid-connect/certs.
 	KeycloakIssuerURL string
 
 	// OIDCAudience is the expected `aud`/`azp` claim on incoming access

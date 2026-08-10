@@ -1,8 +1,8 @@
 {{- if .Values.keycloak.enabled }}
 # Demo-grade: single instance, HTTP behind an edge-terminated Route rather
-# than a dedicated serving certificate. spec.db is intentionally omitted -
-# Keycloak falls back to its bundled dev database (not durable across pod
-# loss); wiring the shared PostgreSQL instance is a follow-up.
+# than a dedicated serving certificate. spec.db points at a dedicated
+# database/role on the shared PostgreSQL cluster (ADR-0315) - see
+# README.md's "Database" section.
 # Google OAuth / demo-persona secrets are injected via Keycloak's "vault" SPI:
 # `${vault.<key>}` placeholders in the realm JSON resolve at runtime from files
 # under KC_VAULT_DIR. Must be KC_VAULT=file, not env - the env provider doesn't
@@ -20,6 +20,10 @@ spec:
   instances: 1
   hostname:
     hostname: "keycloak.{{ .Values.clusterBaseDomain }}"
+    # Pins hostname validation to this one Route rather than relying on the
+    # operator's (unstated) default - see README.md's "What's unverified"
+    # section for the KC_PROXY_HEADERS caveat this pairs with.
+    strict: true
   http:
     httpEnabled: true
   ingress:
@@ -27,6 +31,24 @@ spec:
   bootstrapAdmin:
     user:
       secret: {{ .Values.adminSecretName }}
+  # Dedicated keycloak/keycloak database (ADR-0315), not the shared
+  # zunoapp/zuno app-data database - keeps Keycloak's own schema/lifecycle
+  # isolated. Credential resolved into postgresqlSecretName by
+  # templates/externalsecret-postgresql.yaml (not verified against a real
+  # cluster - see README.md's "What's unverified" section, including
+  # whether transaction-mode PgBouncer pooling is safe for Keycloak's
+  # prepared-statement-heavy JDBC traffic).
+  db:
+    vendor: postgres
+    host: {{ .Values.postgresqlHost }}
+    port: {{ .Values.postgresqlPort }}
+    database: {{ .Values.postgresqlDatabase }}
+    usernameSecret:
+      name: {{ .Values.postgresqlSecretName }}
+      key: username
+    passwordSecret:
+      name: {{ .Values.postgresqlSecretName }}
+      key: password
   unsupported:
     podTemplate:
       spec:
@@ -73,6 +95,17 @@ spec:
                 value: file
               - name: KC_VAULT_DIR
                 value: /opt/keycloak/vault
+              # TLS terminates at the edge Route; the pod itself only ever
+              # sees plain HTTP. Without this, Keycloak computes its own
+              # origin as http://, while the browser's real origin is
+              # https:// - a scheme mismatch that breaks the admin
+              # console's 3rd-party-cookie-check iframe postMessage
+              # handshake ("Timeout when waiting for 3rd party check
+              # iframe message"). KC_PROXY_HEADERS is the Keycloak >=24
+              # option name; see README.md's "What's unverified" section
+              # for the KC_PROXY=edge fallback on older channels.
+              - name: KC_PROXY_HEADERS
+                value: xforwarded
             volumeMounts:
               - name: vault-secrets
                 mountPath: /opt/keycloak/vault

@@ -44,9 +44,12 @@ work (not present in the original per-track build):
 
 Applied by `install.yml`, once `external_secrets` (earlier in
 `day0_components`) has made the `vault-backend` `ClusterSecretStore`
-Ready - the two `ExternalSecret`s above resolve against it, so this
-role's own ordering in the component list is what keeps that dependency
-satisfied.
+Ready - the `ExternalSecret`s above resolve against it, so this role's
+own ordering in the component list is what keeps that dependency
+satisfied. `postgresql` (also earlier in `day0_components`, same
+"operand's `ExternalSecret`s depend on an earlier role having run" shape)
+is now a same-way-satisfied prerequisite too, for the dedicated database
+`spec.db` points at - see "## Database" below.
 
 ## Operator package/channel discovery
 
@@ -142,15 +145,51 @@ by its own naming, an unsupported/best-effort operator API - if a future
 RHBK version exposes a first-class `spec.db`-style secret reference for
 identity provider config, prefer that instead).
 
-## Database
+## Database (ADR-0015, ADR-0315)
 
-The `Keycloak` CR intentionally omits `spec.db`, so the operator falls back
-to its bundled dev database. Acceptable for this demo (single instance, no
-HA requirement - see MEMORY.md section 2's ~50-user scale), but not durable
-across a database pod loss. Wiring the shared PostgreSQL instance (ADR-0015)
-is a documented follow-up once the `postgresql` role/track exposes a stable
-service name and credentials contract; track this alongside ADR-0112
-(production-grade backup and recovery, v1).
+The `Keycloak` CR's `spec.db` points at a **dedicated** `keycloak`/`keycloak`
+database and role on the shared `zuno-postgresql` cluster
+(`ansible/roles/postgresql`) - not the `zunoapp`/`zuno` database every other
+consumer shares. Keycloak owns and migrates its own schema on every version
+upgrade; PGO's `spec.users[].databases` model grants a role full rights over
+"its" database with no per-schema scoping, so sharing would give one
+workload blanket rights over the other's tables - a real regression given
+this repo's least-privilege/Vault-only credential conventions elsewhere.
+
+Wiring, mirroring the `mcp-sales-db` "own ExternalSecret + secretKeyRef"
+pattern:
+
+- `ansible/roles/vault/tasks/install.yml` seeds `zuno/keycloak/postgresql-app`
+  (username `keycloak`, auto-generated password) alongside the other
+  `keycloak/*` Vault entries.
+- `gitops/charts/postgresql` adds a second `spec.users[]` entry
+  (`keycloakDatabase.owner`/`.name`) to the `PostgresCluster`, and a second
+  `ExternalSecret` (`templates/externalsecret-keycloak.yaml`) that syncs the
+  same Vault path into the PGO-conventional
+  `zuno-postgresql-pguser-keycloak` Secret in `zuno-data` ("bring your own
+  password", same mechanism as `zunoapp`'s).
+- That Secret lives in `zuno-data`; Keycloak's pod lives in `zuno-auth`, and
+  `secretKeyRef` can't cross namespaces - so this chart resolves the same
+  Vault path **independently** via its own `templates/
+  externalsecret-postgresql.yaml` into `postgresqlSecretName`
+  (`keycloak-postgresql-app`), which `spec.db.usernameSecret`/
+  `passwordSecret` then reference directly.
+- Connects through PgBouncer (`postgresqlHost`:
+  `zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local:5432`), like every
+  other consumer of that cluster.
+- `gitops/charts/namespaces/values.yaml`'s `zuno-data` platform namespace
+  grants `zuno-auth` in `allowedFromNamespaces`, since that namespace's
+  NetworkPolicy default-denies ingress otherwise.
+
+No new cross-role ordering/health-check gating was needed: `postgresql`
+already precedes `keycloak` in `day0_components`
+(`ansible/playbooks/day0_install.yml`), and `postgresql`'s `install.yml`
+already blocks until the `PostgresCluster` (and therefore the new
+`keycloak` database/role) is ready before returning.
+
+Track ADR-0112 (production-grade backup and recovery, v1) separately -
+this only makes Keycloak durable across a pod restart, not a full backup
+story beyond what `ansible/roles/postgresql` already provides for `zuno`.
 
 ## Namespace-per-agent alignment (ADR-0023)
 
@@ -219,3 +258,42 @@ entitlement/business-role negative-test fixtures:
 username, email or job title in `realm-zuno.json` identifies a real person,
 and no password is stored in Git - see the "Two integration fixes" section
 above.
+
+## What's unverified against a real cluster
+
+This environment has no network path to the real OpenShift cluster this
+role targets (same constraint as `ansible/roles/postgresql`), so the
+following were reasoned from documented Operator/Keycloak behavior but not
+exercised end to end:
+
+- **`KC_PROXY_HEADERS` vs `KC_PROXY`** (admin-console 3rd-party-cookie-check
+  iframe timeout fix, `templates/keycloak.yaml`): `KC_PROXY_HEADERS=xforwarded`
+  is the Keycloak >=24 option name; Keycloak <=23 uses `KC_PROXY=edge`
+  instead, and the two aren't safe to set together - an unrecognized option
+  can crash-loop the pod (the same failure mode already hit for
+  `KC_VAULT=env` vs `file`, see above). Since `tasks/install.yml` discovers
+  the Subscription channel dynamically, the installed version isn't pinned
+  ahead of time. If the pod fails to start with an "Unknown option:
+  --proxy-headers" error, switch to `KC_PROXY=edge`.
+- Whether `spec.ingress.enabled: true` really produces an edge-terminated
+  Route, as the top-of-file comment assumes - confirm with `oc get route -n
+  zuno-auth -o yaml` once live.
+- Whether `KC_PROXY_HEADERS`/`spec.hostname.strict` together fully resolve
+  the admin-console iframe timeout, or whether a live cluster still needs
+  `spec.hostname.admin` set explicitly (a version-dependent field, RHBK
+  >=24).
+- The `spec.db` field names (`vendor`, `usernameSecret`/`passwordSecret`) -
+  no CRD is vendored locally to check against (the vendored
+  `operator-21.3.277.tgz` is only the OLM Subscription chart); confirm via
+  `oc explain keycloak.spec.db --recursive` once live.
+- Whether Keycloak's JDBC layer works correctly against PgBouncer's
+  `poolMode: transaction` (`ansible/roles/postgresql`'s default) - Keycloak
+  relies on server-side prepared statements, which transaction-mode pooling
+  doesn't reliably support under sustained load (`sql_schema`/`rag` never
+  hit this, since they're one-shot Jobs; Keycloak is long-running). If this
+  surfaces live, point `postgresqlHost` at `zuno-postgresql-primary`
+  directly for this one consumer instead (documented exception, not the
+  default).
+
+Run `make d0 check keycloak` → `make d0 install keycloak` against the real
+cluster and adjust any of the above that turns out to be wrong.

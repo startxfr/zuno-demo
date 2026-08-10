@@ -53,4 +53,6 @@ vault:
   sessionSecretPath: zuno/tekos/frontend-session
 
 keycloak:
-  issuerUrl: ""  # empty means "https://sso.<global.clusterBaseDomain>/realms/zuno"
+  issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
+  # matches the Keycloak CR's actual Route hostname, see
+  # gitops/charts/keycloak/templates/keycloak.yaml

@@ -101,3 +101,12 @@ credentials:
   # instead of set here, so the two don't need to agree independently.
   secretStoreName: vault-backend
   refreshInterval: 1h
+
+# Dedicated database/role for Keycloak (ADR-0315) - not the same
+# zunoapp/zuno pair every other consumer shares, to keep Keycloak's own
+# schema/lifecycle isolated. Same PGO "bring your own password" mechanism
+# as cluster.owner above, via templates/externalsecret-keycloak.yaml.
+keycloakDatabase:
+  name: keycloak
+  owner: keycloak
+  vaultPath: keycloak/postgresql-app

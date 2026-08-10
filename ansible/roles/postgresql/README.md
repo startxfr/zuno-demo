@@ -164,3 +164,11 @@ the real cluster and adjust any of the above that turns out to be wrong.
   via its own `ExternalSecret`).
 - Track D's RAG service (queries `document_embeddings`, see
   `data/sxa/schema/002_pgvector.sql`).
+- `ansible/roles/keycloak` (ADR-0315) - a **second**, dedicated
+  `keycloak`/`keycloak` database/role (not `zunoapp`/`zuno`), via its own
+  `ExternalSecret` (`gitops/charts/keycloak/templates/
+  externalsecret-postgresql.yaml`) reading the same
+  `zuno/keycloak/postgresql-app` Vault path this chart's
+  `templates/externalsecret-keycloak.yaml` also resolves - same
+  cross-namespace pattern as `mcp-sales-db`. `spec.users[]` in
+  `templates/postgrescluster.yaml` is accordingly a two-entry list now.

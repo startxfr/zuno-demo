@@ -109,14 +109,18 @@ spec:
             name: {{ .Values.backups.s3.secretName }}
 {{- end }}
 
-  # Creates the zuno database owned by {{ .Values.cluster.owner }}, adopting
-  # the password already seeded into the pguser Secret by
-  # templates/externalsecret.yaml ("bring your own password") rather than
-  # generating its own.
+  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and a
+  # second, dedicated database/role for Keycloak (ADR-0315) - each adopting
+  # the password already seeded into its own pguser Secret by
+  # templates/externalsecret.yaml / templates/externalsecret-keycloak.yaml
+  # ("bring your own password") rather than generating its own.
   users:
     - name: {{ .Values.cluster.owner }}
       databases:
         - {{ .Values.cluster.database }}
+    - name: {{ .Values.keycloakDatabase.owner }}
+      databases:
+        - {{ .Values.keycloakDatabase.name }}
 
   # Runs once at bootstrap against the "postgres" database, not the app
   # database, regardless of spec.users[].databases; init.sql explicitly

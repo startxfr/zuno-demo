@@ -18,7 +18,7 @@ for a narrower check, or the combined gate for what
 ```bash
 cd evaluations/tekos
 pip install -r requirements.txt
-export KEYCLOAK_URL=https://sso.apps.<cluster-domain>
+export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
 export FRONTEND_URL=https://tekos.apps.<cluster-domain>
 export TEKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/tekos-frontend)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)

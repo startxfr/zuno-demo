@@ -126,7 +126,7 @@ than inventing endpoints to satisfy the ADR's generic template wording.
 |---|---|---|
 | `LISTEN_ADDR` | no (default `:8080`) | HTTP listen address |
 | `AGENT_NAME` | no (default `tekos`) | Which agent's Agent Runtime path this BFF calls |
-| `KEYCLOAK_ISSUER_URL` | **yes** | `https://sso.apps.<cluster-domain>/realms/zuno` |
+| `KEYCLOAK_ISSUER_URL` | **yes** | `https://keycloak.apps.<cluster-domain>/realms/zuno` |
 | `OIDC_AUDIENCE` | no (default `tekos-frontend`) | Expected `aud`/`azp` claim on incoming tokens |
 | `AGENT_RUNTIME_BASE_URL` | no (default `http://agent-runtime.zuno-ai-run.svc.cluster.local:8080`) | Shared Agent Runtime in-cluster base URL |
 

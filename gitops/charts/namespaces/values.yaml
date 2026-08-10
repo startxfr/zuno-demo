@@ -82,10 +82,11 @@ platformNamespaces:
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
     # postgresql: sales-db-mcp (cross-ns). vault: ESO's ClusterSecretStore
-    # controller.
+    # controller. keycloak: dedicated postgres database, ADR-0315.
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-vault
+      - zuno-auth
   - name: zuno-telemetry
     displayName: Zuno Telemetry
     description: OpenTelemetry Collector, the platform's observability pipeline.

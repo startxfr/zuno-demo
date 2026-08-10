@@ -304,6 +304,12 @@
         # from this, and unquoted PostgreSQL identifiers reject hyphens.
         username: zunoapp
         password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+      keycloak/postgresql-app:
+        # Dedicated database/role, not zunoapp/zuno - keeps Keycloak's own
+        # schema/lifecycle isolated from the unrelated app-data database
+        # (ADR-0315). Same naming constraint as postgresql/app above.
+        username: keycloak
+        password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:
