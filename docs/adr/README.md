@@ -2,6 +2,8 @@
 
 ADRs are immutable decision records. When a decision changes, a new ADR supersedes the previous record instead of rewriting history.
 
+Most ADRs below carry only a title, status/target/date, and their unique Decision text — the boilerplate clauses every ADR used to repeat (Context, Alternatives, Consequences, Security/Operational considerations, Acceptance criteria, Review evidence, Migration) now live once in [Standard clauses](#standard-clauses) and apply unless a specific ADR overrides them inline.
+
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0001](0001-use-a-monorepo-for-the-zuno-agent-platform.md) | v0 | Implemented | Use a monorepo for the Zuno agent platform |
@@ -60,38 +62,58 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | To be implemented | Repository review change-set index |
 | [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | v0 | Implemented | Restructure deployment into Day 0 / Day 1 sequencing |
-| [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v1 | Proposed | Provide HA for shared agent platform services |
-| [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v1 | Proposed | Target 99.9 percent platform availability |
-| [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v1 | Proposed | Persist resumable long-running agent workflows |
-| [ADR-0104](0104-introduce-controlled-semantic-caching.md) | v1 | Proposed | Introduce controlled semantic caching |
-| [ADR-0105](0105-automate-monthly-knowledge-ingestion.md) | v1 | Proposed | Automate monthly knowledge ingestion |
-| [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v1 | Proposed | Enforce OKF bundle signing and validation |
-| [ADR-0107](0107-introduce-automated-model-quality-gates.md) | v1 | Proposed | Introduce automated model quality gates |
-| [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v1 | Proposed | Automate model evaluation with LM-Eval |
-| [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | v1 | Proposed | Implement source freshness and trust scoring |
-| [ADR-0110](0110-automate-document-acl-synchronization.md) | v1 | Proposed | Automate document ACL synchronization |
-| [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v1 | Proposed | Strengthen SecNumCloud-oriented security controls |
-| [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | v1 | Proposed | Implement production-grade backup and recovery |
-| [ADR-0201](0201-introduce-agent-to-agent-communication.md) | v2 | Proposed | Introduce agent-to-agent communication |
-| [ADR-0202](0202-adopt-a2a-as-the-inter-agent-protocol.md) | v2 | Proposed | Adopt A2A as the inter-agent protocol |
-| [ADR-0203](0203-propagate-user-identity-across-agent-to-agent-calls.md) | v2 | Proposed | Propagate user identity across agent-to-agent calls |
-| [ADR-0204](0204-introduce-controlled-shared-agent-memory.md) | v2 | Proposed | Introduce controlled shared agent memory |
-| [ADR-0205](0205-expose-agent-delegation-traces-to-users.md) | v2 | Proposed | Expose agent delegation traces to users |
-| [ADR-0206](0206-limit-recursive-agent-delegation.md) | v2 | Proposed | Limit recursive agent delegation |
-| [ADR-0207](0207-add-specialized-task-oriented-frontend-views.md) | v2 | Proposed | Add specialized task-oriented frontend views |
-| [ADR-0208](0208-automate-removal-of-inaccessible-private-rag-content.md) | v2 | Proposed | Automate removal of inaccessible private RAG content |
-| [ADR-0209](0209-introduce-advanced-human-approval-workflows.md) | v2 | Proposed | Introduce advanced human approval workflows |
-| [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v3 | Proposed | Introduce LoRA and PEFT model customization |
-| [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v3 | Proposed | Build dataset-to-model MLOps pipelines |
-| [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v3 | Proposed | Support dynamic LoRA adapter loading |
-| [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | v3 | Proposed | Optimize model selection using quality cost and latency |
-| [ADR-0305](0305-introduce-automated-model-benchmarking.md) | v3 | Proposed | Introduce automated model benchmarking |
-| [ADR-0306](0306-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v3 | Proposed | Expand the agent catalog beyond the initial five agents |
-| [ADR-0307](0307-support-self-service-agent-onboarding.md) | v3 | Proposed | Support self-service agent onboarding |
-| [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v3 | Proposed | Expand agent lifecycle management through the AIAgent Operator |
-| [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v3 | Proposed | Introduce policy-driven autonomous optimization |
+| [ADR-0101](0100-v1-roadmap.md#adr-0101-provide-ha-for-shared-agent-platform-services) | v1 | Proposed | Provide HA for shared agent platform services |
+| [ADR-0102](0100-v1-roadmap.md#adr-0102-target-999-percent-platform-availability) | v1 | Proposed | Target 99.9 percent platform availability |
+| [ADR-0103](0100-v1-roadmap.md#adr-0103-persist-resumable-long-running-agent-workflows) | v1 | Proposed | Persist resumable long-running agent workflows |
+| [ADR-0104](0100-v1-roadmap.md#adr-0104-introduce-controlled-semantic-caching) | v1 | Proposed | Introduce controlled semantic caching |
+| [ADR-0105](0100-v1-roadmap.md#adr-0105-automate-monthly-knowledge-ingestion) | v1 | Proposed | Automate monthly knowledge ingestion |
+| [ADR-0106](0100-v1-roadmap.md#adr-0106-enforce-okf-bundle-signing-and-validation) | v1 | Proposed | Enforce OKF bundle signing and validation |
+| [ADR-0107](0100-v1-roadmap.md#adr-0107-introduce-automated-model-quality-gates) | v1 | Proposed | Introduce automated model quality gates |
+| [ADR-0108](0100-v1-roadmap.md#adr-0108-automate-model-evaluation-with-lm-eval) | v1 | Proposed | Automate model evaluation with LM-Eval |
+| [ADR-0109](0100-v1-roadmap.md#adr-0109-implement-source-freshness-and-trust-scoring) | v1 | Proposed | Implement source freshness and trust scoring |
+| [ADR-0110](0100-v1-roadmap.md#adr-0110-automate-document-acl-synchronization) | v1 | Proposed | Automate document ACL synchronization |
+| [ADR-0111](0100-v1-roadmap.md#adr-0111-strengthen-secnumcloud-oriented-security-controls) | v1 | Proposed | Strengthen SecNumCloud-oriented security controls |
+| [ADR-0112](0100-v1-roadmap.md#adr-0112-implement-production-grade-backup-and-recovery) | v1 | Proposed | Implement production-grade backup and recovery |
+| [ADR-0201](0200-v2-roadmap.md#adr-0201-introduce-agent-to-agent-communication) | v2 | Proposed | Introduce agent-to-agent communication |
+| [ADR-0202](0200-v2-roadmap.md#adr-0202-adopt-a2a-as-the-inter-agent-protocol) | v2 | Proposed | Adopt A2A as the inter-agent protocol |
+| [ADR-0203](0200-v2-roadmap.md#adr-0203-propagate-user-identity-across-agent-to-agent-calls) | v2 | Proposed | Propagate user identity across agent-to-agent calls |
+| [ADR-0204](0200-v2-roadmap.md#adr-0204-introduce-controlled-shared-agent-memory) | v2 | Proposed | Introduce controlled shared agent memory |
+| [ADR-0205](0200-v2-roadmap.md#adr-0205-expose-agent-delegation-traces-to-users) | v2 | Proposed | Expose agent delegation traces to users |
+| [ADR-0206](0200-v2-roadmap.md#adr-0206-limit-recursive-agent-delegation) | v2 | Proposed | Limit recursive agent delegation |
+| [ADR-0207](0200-v2-roadmap.md#adr-0207-add-specialized-task-oriented-frontend-views) | v2 | Proposed | Add specialized task-oriented frontend views |
+| [ADR-0208](0200-v2-roadmap.md#adr-0208-automate-removal-of-inaccessible-private-rag-content) | v2 | Proposed | Automate removal of inaccessible private RAG content |
+| [ADR-0209](0200-v2-roadmap.md#adr-0209-introduce-advanced-human-approval-workflows) | v2 | Proposed | Introduce advanced human approval workflows |
+| [ADR-0301](0300-v3-roadmap.md#adr-0301-introduce-lora-and-peft-model-customization) | v3 | Proposed | Introduce LoRA and PEFT model customization |
+| [ADR-0302](0300-v3-roadmap.md#adr-0302-build-dataset-to-model-mlops-pipelines) | v3 | Proposed | Build dataset-to-model MLOps pipelines |
+| [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) | v3 | Proposed | Support dynamic LoRA adapter loading |
+| [ADR-0304](0300-v3-roadmap.md#adr-0304-optimize-model-selection-using-quality-cost-and-latency) | v3 | Proposed | Optimize model selection using quality cost and latency |
+| [ADR-0305](0300-v3-roadmap.md#adr-0305-introduce-automated-model-benchmarking) | v3 | Proposed | Introduce automated model benchmarking |
+| [ADR-0306](0300-v3-roadmap.md#adr-0306-expand-the-agent-catalog-beyond-the-initial-five-agents) | v3 | Proposed | Expand the agent catalog beyond the initial five agents |
+| [ADR-0307](0300-v3-roadmap.md#adr-0307-support-self-service-agent-onboarding) | v3 | Proposed | Support self-service agent onboarding |
+| [ADR-0308](0300-v3-roadmap.md#adr-0308-expand-agent-lifecycle-management-through-the-aiagent-operator) | v3 | Proposed | Expand agent lifecycle management through the AIAgent Operator |
+| [ADR-0309](0300-v3-roadmap.md#adr-0309-introduce-policy-driven-autonomous-optimization) | v3 | Proposed | Introduce policy-driven autonomous optimization |
 | [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) | v0 | Implemented | Manage static Kubernetes resources as per-role kustomize directories |
 | [ADR-0311](0311-stop-applying-the-root-app-of-apps-from-ansible.md) | v0 | Implemented | Stop applying the root App-of-Apps from Ansible bootstrap tasks |
 | [ADR-0312](0312-route-operator-installs-through-argocd-applications.md) | v0 | Implemented | Route operator installs through ArgoCD Applications |
 | [ADR-0313](0313-move-day1-schema-jobs-and-llm-provider-secrets-behind-argocd.md) | v0 | Implemented | Move Day 1 schema Jobs and LLM provider secret seeding behind ArgoCD/Vault |
 | [ADR-0314](0314-convert-admin-context-to-a-d0-d1-argocd-application-pair.md) | v0 | Implemented | Convert admin_context to a -d0/-d1 ArgoCD Application pair |
+
+## Standard clauses
+
+Every ADR is implicitly bound by the clauses below unless it explicitly overrides one inline. This keeps identical boilerplate from being repeated in every file — an ADR that says nothing more than "see Standard clauses" is not skipping a step, it is accepting these defaults as-is.
+
+- **Context** (when not stated otherwise): Zuno Demo requires an explicit, reviewable architecture decision so implementation, security and roadmap work remain aligned across the MVP and future releases.
+- **Alternatives considered** (when not stated otherwise): Alternatives remain valid when documented in implementation discussions, but the ADR records the selected direction for the stated target release.
+- **Alternatives considered** (ADR-0031–0054, when not stated otherwise): Keep the current implementation unchanged and rely on conventions or documentation - rejected because the reviewed code shows that implicit contracts already diverge from intended behavior; or defer the decision until all five agents are implemented - rejected because this decision affects the platform contract and should be resolved before additional agents amplify the current pattern.
+- **Consequences** (when not stated otherwise): Implementation and documentation must follow the decision. Any material change requires a superseding ADR and an explicit migration/evolution note.
+- **Security considerations** (when not stated otherwise): Security implications must be evaluated during implementation. A decision must not weaken identity propagation, data classification, least privilege, secret management or auditability.
+- **Operational considerations** (when not stated otherwise): Operational checks, observability and rollback/diagnostic procedures must be added as the corresponding capability becomes executable.
+- **Migration / evolution** (when not stated otherwise): Future changes must be documented by a new ADR using `Supersedes ADR-NNNN` when applicable.
+- **Acceptance criteria** (extended-template ADRs, when not stated otherwise):
+  - The implementation is merged through the normal repository review process.
+  - Relevant documentation and `MEMORY.md` are updated to describe the implemented state rather than the target state.
+  - `make check` or component-specific automated tests demonstrate the behavior described in the ADR.
+  - Security-negative tests are included whenever the decision changes an authorization, identity, data-classification or trust boundary.
+- **Implementation state** (extended-template ADRs still `To be implemented`, when not stated otherwise): This ADR records an agreed architectural change identified during the 2026-08-05 repository review. No implementation is claimed by this ADR. The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
+- **Review evidence** (extended-template ADRs, when not stated otherwise): The decision is grounded in the repository snapshot reviewed on 2026-08-05 (`zuno-demo-main.zip`) and the project requirements already recorded in the repository; paths named in the ADR's own Context/Decision sections identify the primary implementation evidence.
+- **Related ADRs** (when not stated otherwise): See this index.

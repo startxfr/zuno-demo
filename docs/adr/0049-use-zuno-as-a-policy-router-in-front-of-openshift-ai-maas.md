@@ -13,11 +13,6 @@
 
 Evolve the custom AI Gateway into a Zuno Model Policy Router. Zuno retains business-aware decisions such as C1/C2/C3, sovereignty, task requirements, quality tier, cost objective and semantic complexity. The selected request is then sent through OpenShift AI MaaS for model access, subscription/quota enforcement, provider publication and compatible inference endpoints. Local models use OpenShift AI serving (KServe/vLLM/llm-d as appropriate); approved external providers use MaaS external-model capabilities when supported.
 
-## Alternatives considered
-
-- Keep the current implementation unchanged and rely on conventions or documentation. Rejected because the reviewed code shows that implicit contracts already diverge from intended behavior.
-- Defer the decision until all five agents are implemented. Rejected because this decision affects the platform contract and should be resolved before additional agents amplify the current pattern.
-
 ## Consequences
 
 Zuno differentiates on business/context policy instead of duplicating the OpenShift AI model access plane. Migration requires a stable adapter so Agent Runtime is not tied directly to changing MaaS APIs during EA/TP stages.
@@ -30,16 +25,7 @@ Zuno classification/source restrictions always remain a stricter outer policy. M
 
 Prototype the MaaS adapter behind the existing OpenAI-compatible model client and compare feature coverage before removing current gateway capabilities.
 
-## Implementation state
-
-This ADR records an agreed architectural change identified during the 2026-08-05 repository review. **No implementation is claimed by this ADR.** The status remains `To be implemented` until code, GitOps, documentation and acceptance tests prove the decision is in effect.
-
-## Acceptance criteria
-
-- The implementation is merged through the normal repository review process.
-- Relevant documentation and `MEMORY.md` are updated to describe the implemented state rather than the target state.
-- `make check` or component-specific automated tests demonstrate the behavior described in this ADR.
-- Security-negative tests are included whenever the decision changes an authorization, identity, data-classification or trust boundary.
+See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Implementation state, Acceptance criteria and Review evidence.
 
 ## Related ADRs
 
@@ -49,7 +35,3 @@ This ADR records an agreed architectural change identified during the 2026-08-05
 - ADR-0021
 - ADR-0034
 - ADR-0035
-
-## Review evidence
-
-This decision is grounded in the repository snapshot reviewed on 2026-08-05 (`zuno-demo-main.zip`) and the project requirements already recorded in the repository. Paths named in the Context section identify the primary implementation evidence where applicable.
