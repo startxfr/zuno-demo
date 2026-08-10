@@ -70,6 +70,9 @@ platformNamespaces:
     allowedFromNamespaces:
       - zuno-agent-tekos
       - zuno-ai-run
+    # Sidecar-injected + mTLS-enforced (service-mesh component, phase 3).
+    extraLabels:
+      istio-injection: enabled
   - name: zuno-vault
     displayName: Zuno Vault
     description: >-
@@ -96,6 +99,9 @@ platformNamespaces:
       - zuno-ai-run
       - zuno-vault
       - zuno-auth
+    # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
+    extraLabels:
+      istio-injection: enabled
   - name: zuno-telemetry
     displayName: Zuno Telemetry
     description: OpenTelemetry Collector, the platform's observability pipeline.
@@ -111,6 +117,9 @@ platformNamespaces:
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
+    # Sidecar-injected + mTLS-enforced (service-mesh component, phase 4).
+    extraLabels:
+      istio-injection: enabled
   - name: zuno-ai-run
     displayName: Zuno AI Runtime
     description: >-
@@ -118,9 +127,27 @@ platformNamespaces:
       every active agent.
     allowedFromNamespaces: []
     # RHOAI dashboard label, folded in here since this chart already owns
-    # zuno-ai-run's Namespace object.
+    # zuno-ai-run's Namespace object. istio-injection: sidecar-injected +
+    # mTLS-enforced (service-mesh component, phase 4).
     extraLabels:
       opendatahub.io/dashboard: "true"
+      istio-injection: enabled
+  - name: zuno-mesh
+    displayName: Zuno Service Mesh
+    description: >-
+      Istio control plane (istiod), IstioCNI and istio-csr - the platform's
+      mesh/mTLS layer (service-mesh component).
+    # istiod's XDS server is polled by sidecars in every meshed namespace.
+    # zuno-vault is deliberately NOT meshed (it's the mTLS/PKI trust root
+    # for everything else - meshing it risks a bootstrap circularity).
+    allowedFromNamespaces:
+      - zuno-data
+      - zuno-auth
+      - zuno-ai-run
+      - zuno-ai-build
+    # istiod's sidecar-injector + validating webhooks are called synchronously
+    # by the API server, same pattern as ESO's secretstore-validate webhook.
+    allowApiServerWebhooks: true
 
 # Caps GPU consumption at 1 - this demo has exactly one 24GB L4 budgeted for the
 # single local model; without this a second InferenceService could silently

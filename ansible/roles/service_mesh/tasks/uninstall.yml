@@ -1,0 +1,25 @@
+---
+# Order matters: delete d1 (mesh CA/IstioCNI/Istio control plane) first to
+# avoid ArgoCD fighting the CRD deletion, then remove the operator while
+# the Subscription (a d0-managed resource) still exists to read its
+# installedCSV, then delete d0. Vault's pki/roles/istio engine and the
+# istio-issuer role/policy are not cleaned up here (demo scope, same as
+# cert_manager's pki/roles/cert-manager). Namespace-level istio-injection
+# labels on zuno-data/zuno-auth/zuno-ai-run/zuno-ai-build are left in place
+# (owned by the namespaces role) - harmless once the injection webhook is
+# gone, and avoids this role reaching into another component's chart.
+- name: "service_mesh | delete the service-mesh GitOps Application (d1: mesh CA, IstioCNI, Istio control plane)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-service-mesh-d1"
+
+- name: "service_mesh | remove the operator (its owned CRDs - cascading any remaining Istio/IstioCNI/IstioRevision CRs - then the CSV, then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: servicemeshoperator3
+    operator_namespace: openshift-operators
+
+- name: "service_mesh | delete the service-mesh GitOps Application (d0: cascades any remaining resources)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-service-mesh-d0"

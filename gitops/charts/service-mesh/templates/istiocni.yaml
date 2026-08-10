@@ -1,0 +1,21 @@
+{{- if .Values.istiocni.enabled }}
+# CNI plugin for sidecar traffic redirection - lets app pods run without the
+# NET_ADMIN capability the older init-container iptables approach needed.
+# Required on OpenShift with the Sail Operator (servicemeshoperator3).
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: default
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  namespace: {{ .Values.meshNamespace }}
+  version: {{ .Values.istioVersion }}
+  values:
+    global:
+      platform: openshift
+      priorityClassName: zuno-platform-critical
+      imagePullPolicy: IfNotPresent
+{{- end }}

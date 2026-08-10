@@ -75,3 +75,29 @@ data:
       ttl=1h
 
     echo "PKI engine and cert-manager-issuer role configured."
+
+    # Dedicated pki/roles/istio + istio-issuer role/policy, separate from
+    # cert-manager's own role above, consumed by service_mesh's
+    # vault-issuer-istio ClusterIssuer (that role never writes to Vault
+    # itself). Isolated from pki/roles/cert-manager so the mesh's SPIFFE
+    # trust root has a different blast radius than general-purpose TLS certs.
+    # allowed_uri_sans: istio-csr signs workload certs with SPIFFE identity
+    # URIs (spiffe://cluster.local/ns/<ns>/sa/<sa>) as the SAN, not DNS names.
+    vault write pki/roles/istio \
+      allowed_domains="zuno-demo.internal,svc.cluster.local,cluster.local" \
+      allow_subdomains=true \
+      allow_bare_domains=true \
+      allowed_uri_sans="spiffe://cluster.local/*" \
+      max_ttl=24h
+
+    printf 'path "pki/sign/istio" {\n  capabilities = ["create","update"]\n}\n' | vault policy write istio-issuer -
+
+    # bound_service_account_names=cert-manager-istio-csr: fixed by the
+    # cert-manager-istio-csr chart itself, not configurable.
+    vault write auth/kubernetes/role/istio-issuer \
+      bound_service_account_names=cert-manager-istio-csr \
+      bound_service_account_namespaces=zuno-mesh \
+      policies=istio-issuer \
+      ttl=1h
+
+    echo "istio-issuer role configured."

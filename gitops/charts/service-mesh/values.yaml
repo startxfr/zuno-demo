@@ -1,0 +1,74 @@
+# Gates which resources render - subscription.enabled for the Day 0 OLM
+# install (gitops/apps/service-mesh/application-d0.yaml), the rest for the
+# Day 1 operands (application-d1.yaml). All default false so `helm template`
+# with no overrides renders nothing.
+subscription:
+  enabled: false
+clusterIssuer:
+  enabled: false
+# Gates the vendored cert-manager-istio-csr subchart - see Chart.yaml's
+# dependency `condition` for why this isn't nested under
+# cert-manager-istio-csr itself.
+istioCsr:
+  enabled: false
+istiocni:
+  enabled: false
+istio:
+  enabled: false
+
+# Discovered by ansible and injected via gitops_app_extra_helm_values on the
+# -d1 apply; clusterissuer-istio.yaml renders nothing until it's set.
+vaultServiceName: ""
+
+# ASSUMPTION: not yet verified against a live cluster (same posture as
+# gitops/charts/cert-manager, which was also never installed here before -
+# see its README). If `make d0 check service-mesh` shows this is wrong,
+# discover the real package/channel/catalog from the cluster's
+# PackageManifest instead of trusting these hardcoded values.
+istioSubscription:
+  channel: stable
+  name: servicemeshoperator3
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: servicemeshoperator3.v3.4.1
+
+istioVersion: v1.30.3
+meshNamespace: zuno-mesh
+
+# Values validated against the actual published chart's values.schema.json
+# (v0.16.0, https://charts.jetstack.io) - additionalProperties: false, so
+# unknown keys (serviceAccount.name, fullnameOverride, priorityClassName -
+# none of which this chart's schema supports) fail the render outright.
+# ServiceAccount/Service names are NOT configurable here: both default to
+# the fixed name "cert-manager-istio-csr" regardless of release name (see
+# `cert-manager-istio-csr.name` in the chart's _helpers.tpl), which is why
+# istio.yaml's global.caAddress and the Vault kubernetes-auth role
+# (ansible/roles/vault) both hardcode that same name. No priorityClassName
+# support in this chart version - a real limitation, not an oversight; if
+# scheduling priority for istio-csr's own pods matters, revisit via
+# `resources`/`nodeSelector` or a future chart version.
+cert-manager-istio-csr:
+  replicaCount: 2
+  app:
+    certmanager:
+      # Namespace istio-csr creates its own CertificateRequests in - must be
+      # where istio-csr itself runs (zuno-mesh), not cert-manager's namespace.
+      namespace: zuno-mesh
+      issuer:
+        name: vault-issuer-istio
+        kind: ClusterIssuer
+        group: cert-manager.io
+    controller:
+      leaderElectionNamespace: zuno-mesh
+      configmapNamespaceSelector: "istio-injection=enabled"
+    istio:
+      namespace: zuno-mesh
+      revisions: ["default"]
+    server:
+      maxCertificateDuration: 1h
+    tls:
+      trustDomain: cluster.local
+      certificateDuration: 24h
+      certificateDNSNames:
+        - cert-manager-istio-csr.zuno-mesh.svc
+      istiodCertificateDuration: 1h

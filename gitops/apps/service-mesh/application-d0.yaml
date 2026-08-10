@@ -1,0 +1,35 @@
+---
+# servicemeshoperator3 (Sail Operator) OLM install; the Istio control plane,
+# IstioCNI and Vault-backed mesh CA (istio-csr) are a separate Application
+# (application-d1.yaml) applied after this one is healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-service-mesh-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # applies this after `postgresql` instead (ansible/playbooks/day0_install.yml).
+    argocd.argoproj.io/sync-wave: "-172"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/service-mesh
+    helm:
+      releaseName: zuno-service-mesh-d0
+      values: |
+        subscription:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-mesh
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # zuno-mesh is owned by gitops/charts/namespaces; don't also track it
+      # here (avoids a SharedResourceWarning, same reasoning as external-secrets).
+      - CreateNamespace=false

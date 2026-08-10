@@ -13,6 +13,7 @@
       - cert_manager
       - external_secrets
       - postgresql
+      - service_mesh
       - keycloak
       - smtp
       - nfd

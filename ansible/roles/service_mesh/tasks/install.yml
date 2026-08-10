@@ -1,0 +1,208 @@
+---
+# zuno-mesh is owned/created exclusively by the namespaces role (same
+# reasoning as external_secrets/cert_manager and zuno-vault - see commit
+# 2531b78). Ensure it exists here so `make d0 install service-mesh` is
+# self-sufficient standalone.
+- name: "service_mesh | ensure the namespaces component (zuno-mesh) is installed"
+  ansible.builtin.include_role:
+    name: namespaces
+    tasks_from: install
+
+    # This role's Subscription uses static channel/CSV values (given, not
+    # discovered - see gitops/charts/service-mesh/README.md), unlike
+    # external_secrets/postgresql's PackageManifest-driven discovery. Fail
+    # fast at this boundary instead of letting OLM silently fail to resolve.
+- name: "service_mesh | look up the servicemeshoperator3 PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: servicemeshoperator3
+  register: _service_mesh_pkg_info
+
+- name: "service_mesh | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named 'servicemeshoperator3' was found in
+      openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i servicemesh` for the correct package
+      name on this cluster and update gitops/charts/service-mesh/values.yaml
+      (istioSubscription).
+  when: (_service_mesh_pkg_info.resources | default([]) | length) == 0
+
+- name: "service_mesh | fail if the configured channel/startingCSV aren't actually published"
+  ansible.builtin.fail:
+    msg: >-
+      Package 'servicemeshoperator3' (catalog
+      '{{ _service_mesh_pkg_info.resources[0].status.catalogSource }}') does
+      not publish channel 'stable' with CSV
+      'servicemeshoperator3.v3.4.1'. Published channels/CSVs:
+      {{ _service_mesh_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+      Update gitops/charts/service-mesh/values.yaml (istioSubscription) to
+      match what this cluster actually publishes.
+  when: >-
+    _service_mesh_pkg_info.resources[0].status.channels
+    | selectattr('name', 'equalto', 'stable')
+    | map(attribute='currentCSV')
+    | select('equalto', 'servicemeshoperator3.v3.4.1')
+    | list | length == 0
+
+    # Operator install (d0) is separate from the mesh CA / IstioCNI / Istio
+    # control plane (all d1, applied below once the Vault client Service is
+    # discovered) - same split as cert_manager/external_secrets.
+- name: "service_mesh | apply the service-mesh GitOps Application (d0: operator install only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "service-mesh"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+    gitops_app_extra_helm_values:
+      subscription:
+        enabled: true
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 10
+
+    # ArgoCD's custom Subscription health check (ansible/roles/argocd/tasks/
+    # apply_resource_health_checks.yml) reports d0 Healthy once the CSV
+    # succeeds, but confirm directly too - avoids guessing the operator's own
+    # controller-manager Deployment name (never verified on a live cluster).
+- name: "service_mesh | look up the servicemeshoperator3 Subscription's installed CSV"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: servicemeshoperator3
+    namespace: openshift-operators
+  register: _service_mesh_subscription
+  until: (_service_mesh_subscription.resources | default([]) | length) > 0 and (_service_mesh_subscription.resources[0].status.installedCSV | default('')) | length > 0
+  retries: 30
+  delay: 10
+
+- name: "service_mesh | wait for the installed CSV to report Succeeded"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    name: "{{ _service_mesh_subscription.resources[0].status.installedCSV }}"
+    namespace: openshift-operators
+  register: _service_mesh_csv
+  until: (_service_mesh_csv.resources | default([]) | length) > 0 and (_service_mesh_csv.resources[0].status.phase | default('')) == 'Succeeded'
+  retries: 30
+  delay: 10
+
+    # Discovered rather than hardcoded: the Helm release name isn't a
+    # repo-wide constant, and the chart creates three Services sharing this
+    # label (same pattern as cert_manager/external_secrets).
+- name: "service_mesh | discover the Vault client Service"
+  kubernetes.core.k8s_info:
+    kind: Service
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+  register: _service_mesh_vault_services
+
+- name: "service_mesh | select the client Service (excludes the -internal headless and -ui variants)"
+  ansible.builtin.set_fact:
+    _service_mesh_vault_service_name: >-
+      {{
+        (_service_mesh_vault_services.resources
+         | rejectattr('metadata.labels.vault-internal', 'defined')
+         | map(attribute='metadata.name') | list)[0]
+      }}
+
+- name: "service_mesh | apply the service-mesh GitOps Application (d1: mesh CA, IstioCNI, Istio control plane)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "service-mesh"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_extra_helm_values:
+      clusterIssuer:
+        enabled: true
+      istioCsr:
+        enabled: true
+      istiocni:
+        enabled: true
+      istio:
+        enabled: true
+      vaultServiceName: "{{ _service_mesh_vault_service_name }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+- name: "service_mesh | wait for the vault-issuer-istio ClusterIssuer to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: cert-manager.io/v1
+    kind: ClusterIssuer
+    name: vault-issuer-istio
+  register: _service_mesh_issuer
+  until: >-
+    (_service_mesh_issuer.resources | default([]) | length) > 0 and
+    (_service_mesh_issuer.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+  retries: 30
+  delay: 10
+
+- name: "service_mesh | wait for the Istio control plane (default) to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: sailoperator.io/v1
+    kind: Istio
+    name: default
+    namespace: zuno-mesh
+  register: _service_mesh_istio
+  until: >-
+    (_service_mesh_istio.resources | default([]) | length) > 0 and
+    (_service_mesh_istio.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+  retries: 60
+  delay: 15
+
+    # zuno-data was labeled istio-injection: enabled from the very start of
+    # Day 0 (gitops/charts/namespaces), long before this component existed -
+    # postgresql's pods (created at the 'postgresql' step, before this one)
+    # came up without a sidecar and won't get one until restarted. Every
+    # component after this one in day0_components (keycloak) and every Day 1
+    # AI/agent workload auto-injects on first create, so needs no such step.
+- name: "service_mesh | discover the PostgreSQL instance StatefulSets in zuno-data"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: zuno-data
+    label_selectors:
+      - "postgres-operator.crunchydata.com/cluster=zuno-postgresql"
+  register: _service_mesh_postgresql_statefulsets
+
+- name: "service_mesh | rollout-restart the PostgreSQL instance StatefulSets to pick up the sidecar"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: apps/v1
+    kind: StatefulSet
+    name: "{{ _service_mesh_sts.metadata.name }}"
+    namespace: zuno-data
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              # gather_facts is false in every day0 playbook, so no
+              # ansible_date_time - shell out for the timestamp instead.
+              zuno.io/restartedAt: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+  loop: "{{ _service_mesh_postgresql_statefulsets.resources | default([]) }}"
+  loop_control:
+    loop_var: _service_mesh_sts
+    label: "{{ _service_mesh_sts.metadata.name }}"
+
+- name: "service_mesh | wait for the restarted PostgreSQL StatefulSets to roll out"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    name: "{{ _service_mesh_sts.metadata.name }}"
+    namespace: zuno-data
+  register: _service_mesh_sts_rollout
+  until: >-
+    (_service_mesh_sts_rollout.resources | default([]) | length) > 0 and
+    (_service_mesh_sts_rollout.resources[0].status.updatedReplicas | default(0)) ==
+    (_service_mesh_sts_rollout.resources[0].status.replicas | default(-1)) and
+    (_service_mesh_sts_rollout.resources[0].status.readyReplicas | default(0)) ==
+    (_service_mesh_sts_rollout.resources[0].status.replicas | default(-1))
+  retries: 60
+  delay: 15
+  loop: "{{ _service_mesh_postgresql_statefulsets.resources | default([]) }}"
+  loop_control:
+    loop_var: _service_mesh_sts
+    label: "{{ _service_mesh_sts.metadata.name }}"

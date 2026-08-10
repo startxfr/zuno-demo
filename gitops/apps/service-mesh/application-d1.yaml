@@ -1,0 +1,43 @@
+---
+# Vault-backed mesh CA (ClusterIssuer + cert-manager-istio-csr), IstioCNI and
+# the Istio control plane itself - applied after the operator install
+# (application-d0.yaml) is healthy, with the Vault client Service name
+# injected at apply time.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-service-mesh-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-171"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/service-mesh
+    helm:
+      releaseName: zuno-service-mesh-d1
+      values: |
+        clusterIssuer:
+          enabled: true
+        istioCsr:
+          enabled: true
+        istiocni:
+          enabled: true
+        istio:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-mesh
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      # On a cold cluster the sailoperator.io CRDs don't exist yet until d0's
+      # CSV finishes installing, which makes ArgoCD abort the whole sync as
+      # invalid; this skips discovery validation to break that deadlock
+      # (same trick external-secrets uses for OperatorConfig).
+      - SkipDryRunOnMissingResource=true

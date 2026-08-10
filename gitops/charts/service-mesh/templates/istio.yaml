@@ -1,0 +1,51 @@
+{{- if .Values.istio.enabled }}
+# Corrected from the original example: spec.namespace must match
+# values.global.istioNamespace (it didn't in the source example, which had
+# spec.namespace: istio-system alongside global.istioNamespace: zuno-mesh).
+#
+# CA delegated to cert-manager-istio-csr (pilot.env.ENABLE_CA_SERVER=false +
+# global.caAddress) instead of istiod's built-in self-signed CA, so mesh
+# workload identity certs chain to the same Vault PKI root as everything
+# else cert-manager issues. Renders last (sync-wave 40), after
+# clusterissuer-istio (-10), the cert-manager-istio-csr subchart (default
+# wave 0) and istiocni (30) - ASSUMPTION: not verified against a live
+# servicemeshoperator3 CSV; confirm ENABLE_CA_SERVER/caAddress is still the
+# correct delegation mechanism for this operator version before relying on it.
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  namespace: {{ .Values.meshNamespace }}
+  updateStrategy:
+    type: InPlace
+    inactiveRevisionDeletionGracePeriodSeconds: 30
+  values:
+    global:
+      networkPolicy:
+        enabled: true
+      proxy:
+        startupProbe:
+          enabled: true
+          failureThreshold: 4
+      meshID: zuno01
+      istioNamespace: {{ .Values.meshNamespace }}
+      priorityClassName: zuno-platform-critical
+      imagePullPolicy: IfNotPresent
+      caAddress: cert-manager-istio-csr.{{ .Values.meshNamespace }}.svc:443
+      platform: openshift
+    pilot:
+      env:
+        ENABLE_CA_SERVER: "false"
+    telemetry:
+      v2:
+        prometheus:
+          enabled: true
+        enabled: true
+      enabled: true
+  version: {{ .Values.istioVersion }}
+{{- end }}
