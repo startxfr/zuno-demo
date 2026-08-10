@@ -66,6 +66,10 @@ cluster-istio:
         # alias:startx-wrapped operator here (see cert-manager/values.yaml)
         # uses Automatic instead.
         installPlanApproval: Automatic
+        # Overrides the vendored chart's own default (config.infra: true,
+        # which pins the operator pod to infra nodes via a
+        # nodeSelector/toleration) - not wanted for this component.
+        config: null
         source:
           name: redhat-operators
           namespace: openshift-marketplace
