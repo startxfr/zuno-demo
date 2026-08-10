@@ -1,12 +1,16 @@
 ---
 # Day 1 install (`make day1 install`). See day1_check.yml for why
 # models/sql_schema/mlops are included alongside llm/rag/mcp/agents.
+# `namespaces` runs first so the ResourceQuota/NetworkPolicy overlay (its
+# Day 1 half - see ansible/roles/namespaces/README.md) is in place before
+# any other Day 1 workload rolls out.
 - name: "Day 1: install components"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day1_components:
+      - namespaces
       - llm
       - models
       - sql_schema
@@ -27,7 +31,7 @@
     - name: Install Day 1 components
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: install
+        tasks_from: "{{ 'install_d1' if item == 'namespaces' else 'install' }}"
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

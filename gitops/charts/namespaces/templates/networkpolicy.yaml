@@ -2,6 +2,7 @@
 Default-deny ingress from other namespaces, per agent namespace. Explicit
 allows are added by the workload chart that owns those Services, not here.
 */}}
+{{- if .Values.policy.enabled }}
 {{- range .Values.namespaces }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -25,4 +26,5 @@ spec:
               # key so default-deny policies can still admit router traffic.
               policy-group.network.openshift.io/ingress: ""
 ---
+{{- end }}
 {{- end }}

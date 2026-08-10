@@ -1,7 +1,7 @@
 ---
-# No Day1 content for namespaces; it only creates cluster-scoped
-# Namespaces/Quotas/NetworkPolicies, classified entirely as -d0 (see
-# application-d0.yaml).
+# ResourceQuota + default-deny NetworkPolicy baseline for the namespaces
+# application-d0.yaml already created. Applied by `make day1 install
+# namespaces` (first component in day1_install.yml), not bundled into Day 0.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -14,9 +14,12 @@ spec:
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
-    path: gitops/charts/noop
+    path: gitops/charts/namespaces
     helm:
       releaseName: zuno-namespaces-d1
+      values: |
+        policy:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-gitops

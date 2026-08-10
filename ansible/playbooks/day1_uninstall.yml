@@ -1,5 +1,8 @@
 ---
 # Day 1 uninstall (`make day1 uninstall`). Reverses day1_install.yml's order.
+# `namespaces` runs last, removing its Day 1 half (ResourceQuota/NetworkPolicy
+# overlay - see ansible/roles/namespaces/README.md) only after every other
+# Day 1 workload it may constrain is already gone.
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false
@@ -13,6 +16,7 @@
       - sql_schema
       - models
       - llm
+      - namespaces
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -26,7 +30,7 @@
     - name: Uninstall Day 1 components
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: uninstall
+        tasks_from: "{{ 'uninstall_d1' if item == 'namespaces' else 'uninstall' }}"
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

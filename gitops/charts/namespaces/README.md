@@ -13,13 +13,18 @@ cross-namespace callers. `zuno-ai-run` is deliberately excluded - see
 `values.yaml`'s comment on why ADR-0037 needs per-workload NetworkPolicies
 there instead of a namespace-wide baseline.
 
-Referenced by `gitops/apps/namespaces/application-d0.yaml` (all of this
-chart's content is cluster-scoped, so it's entirely `-d0`;
-`application-d1.yaml` is a no-op - see `gitops/apps/README.md`), applied
-by `ansible/roles/namespaces`, a Day 0 component (ADR-0056 - reachable via
-`make d0 install namespaces`). The formerly separate
-`gitops/apps/agents/application.yaml` (a stale, orphaned duplicate
-pointing at this same chart) has been removed.
+Referenced by both `gitops/apps/namespaces/application-d0.yaml` (Namespace
+objects only, `namespace.enabled: true`) and `application-d1.yaml`
+(ResourceQuota + NetworkPolicy, `policy.enabled: true`) - same chart, two
+Applications, each turning on only its own top-level `enabled` toggle (see
+`values.yaml`; both default `false`, mirroring `gitops/charts/cert-manager`'s
+operator/ClusterIssuer split). `-d0` is applied by `ansible/roles/namespaces`
+as a Day 0 component (ADR-0056 - `make d0 install namespaces`); `-d1` is
+applied separately as a Day 1 component (`make d1 install namespaces`,
+first in `day1_install.yml`) so a bare Day 0 install creates namespaces
+without the quota/netpol overlay until Day 1 explicitly layers it on. The
+formerly separate `gitops/apps/agents/application.yaml` (a stale, orphaned
+duplicate pointing at this same chart) has been removed.
 
 ## Why all five exist, not just zuno-agent-tekos
 

@@ -1,6 +1,8 @@
 ---
-# Platform namespace/quota scaffolding. Namespace objects are cluster-scoped,
-# so this component's content is entirely -d0 (application-d1.yaml is a no-op).
+# Platform Namespace objects only - ResourceQuota/NetworkPolicy is the Day 1
+# overlay (application-d1.yaml, same chart, policy.enabled instead of
+# namespace.enabled), applied later by `make day1 install namespaces` so a
+# bare Day 0 install creates namespaces without yet layering on policy.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,6 +20,9 @@ spec:
     path: gitops/charts/namespaces
     helm:
       releaseName: zuno-namespaces-d0
+      values: |
+        namespace:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

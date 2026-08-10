@@ -1,4 +1,6 @@
-# Must exist before this chart's ResourceQuota/NetworkPolicy templates, which
+{{- if .Values.namespace.enabled }}
+# Must exist before this chart's ResourceQuota/NetworkPolicy templates (the
+# policy.enabled half, applied separately - see application-d1.yaml), which
 # target these namespaces.
 {{- range .Values.namespaces }}
 apiVersion: v1
@@ -31,4 +33,5 @@ metadata:
     openshift.io/display-name: {{ .displayName | quote }}
     openshift.io/requester: zuno
 ---
+{{- end }}
 {{- end }}

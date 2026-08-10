@@ -14,15 +14,18 @@ sync.
 
 Most components have real content on only one side - a component with no
 OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
-`models`, `rag`) has an empty `-d0`; `namespaces` (pure cluster-scoped
-Namespace/Quota scaffolding, no live service) has an empty `-d1`. The empty
-side points at `gitops/charts/noop` (see that chart's README) rather than
-being omitted, so the `-d0`/`-d1` naming convention is uniform and visible
-across every component directory. `mcp-sales-db` is the one exception with
-real content on *both* sides: `-d0` (`gitops/charts/sql-schema`) is a
+`models`, `rag`) has an empty `-d0`. The empty side points at
+`gitops/charts/noop` (see that chart's README) rather than being omitted,
+so the `-d0`/`-d1` naming convention is uniform and visible across every
+component directory. `mcp-sales-db` and `namespaces` have real content on
+*both* sides: `mcp-sales-db`'s `-d0` (`gitops/charts/sql-schema`) is a
 schema/fixtures prerequisite, not an operator, but the same "prerequisites
 before the live service" ordering the `-d0`/`-d1` split provides for every
-other component fits it too (ADR-0313).
+other component fits it too (ADR-0313). `namespaces`' `-d0` (Namespace
+objects) and `-d1` (ResourceQuota/NetworkPolicy) are the one component pair
+that also spans the *macro* Day 0/Day 1 split (`day0_install.yml` and
+`day1_install.yml` respectively, not just Day 0's own internal ordering) -
+see `ansible/roles/namespaces/README.md` for why.
 
 Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
 `default` project - a dedicated `AppProject` (`ansible/roles/argocd/
@@ -179,7 +182,7 @@ Directories present:
 | `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |
 | `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) - no operator, `-d0` is a no-op |
 | `agent-runtime` | local chart, `gitops/charts/agent-runtime` (applied by the `llm` role, see its README) - no operator, `-d0` is a no-op |
-| `namespaces` | local chart, `gitops/charts/namespaces` (Namespace/Quota/NetworkPolicy scaffolding, cluster-scoped - entirely `-d0`, `-d1` is a no-op) |
+| `namespaces` | local chart, `gitops/charts/namespaces` (`-d0`: Namespace objects, `namespace.enabled`; `-d1`: ResourceQuota/NetworkPolicy scaffolding, `policy.enabled` - spans the macro Day 0/Day 1 split, not just this component's own internal ordering) |
 | `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) - no operator, `-d0` is a no-op |

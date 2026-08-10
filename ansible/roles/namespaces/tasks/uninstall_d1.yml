@@ -1,0 +1,10 @@
+---
+# Day 1 half: deletes the ResourceQuota/NetworkPolicy overlay Application.
+# Invoked from day1_uninstall.yml, which special-cases this role's
+# tasks_from to "uninstall_d1", and runs `namespaces` last (mirroring
+# day1_install.yml's order) so the overlay is removed only after every
+# other Day 1 workload it may constrain is already gone.
+- name: "namespaces | delete the namespaces ArgoCD Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-namespaces-d1"

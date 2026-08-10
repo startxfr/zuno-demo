@@ -1,29 +1,50 @@
 # namespaces
 
-Applies the namespace-scaffolding GitOps Application (`gitops/apps/namespaces`
+Applies the namespace-scaffolding GitOps Applications (`gitops/apps/namespaces`
 → `gitops/charts/namespaces`, ADR-0023): the 5 agent namespaces + the
 `zuno-auth`/`zuno-data`/`zuno-telemetry`/`zuno-ai-run`/`zuno-ai-build`
-platform namespaces, each with a `ResourceQuota` and a default-deny
-`NetworkPolicy` baseline. A Day 0 component (ADR-0056) - moved out of
-`ansible/roles/agents` so namespace creation is its own explicit,
-checkable step rather than only ever happening as a side effect of
-deploying the Tekos workloads.
+platform namespaces (`-d0`), each with a `ResourceQuota` and a default-deny
+`NetworkPolicy` baseline (`-d1`). Moved out of `ansible/roles/agents` so
+namespace creation is its own explicit, checkable step rather than only
+ever happening as a side effect of deploying the Tekos workloads.
 
-Namespace objects are cluster-scoped, so this component's entire content
-is `-d0` (`zuno-namespaces-d0`) - `-d1` (`zuno-namespaces-d1`) is a no-op,
-applied anyway for the uniform two-Application pattern every component
-follows (see `gitops/apps/README.md`). The formerly orphaned
-`gitops/apps/agents/` directory (a stale duplicate of this same chart,
-never applied by any role) has been removed.
+Unlike every other component, this role's `-d0`/`-d1` split spans the
+*macro* Day 0/Day 1 boundary, not just Day 0's own internal ordering:
+`-d0` (bare Namespace objects, `namespace.enabled: true`) is a Day 0
+component so every other Day 0 role can assume the namespaces it deploys
+into already exist; `-d1` (`ResourceQuota`/`NetworkPolicy`,
+`policy.enabled: true`) is deliberately deferred to Day 1 so a bare
+`make day0 install` doesn't bundle policy enforcement with cluster
+bootstrap. This means the `namespaces` role is invoked from **both**
+`ansible/playbooks/day0_*.yml` and `ansible/playbooks/day1_*.yml`, each
+selecting a different task file via a special-cased `tasks_from` - the
+same pattern `day1_check.yml` already uses for `agents`' `check.yml`:
 
-- `precheck.yml` - state detection, never fails: checks both the
-  `zuno-namespaces-d0` and `zuno-namespaces-d1` Applications' Synced+Healthy
-  status, setting `namespaces_state_installed` and a line in the shared
-  `/tmp` state report (see `ansible/playbooks/day0_check.yml`).
-- `install.yml` - applies both GitOps Applications (idempotent - ArgoCD's
-  own `selfHeal: true` also reconciles continuously on its own cycle, but
-  re-running this role gives an explicit on-demand re-sync after a
-  `values.yaml` change).
+| Playbook | Component list position | `tasks_from` |
+|---|---|---|
+| `day0_install.yml` / `day0_check.yml` / `day0_uninstall.yml` | `day0_components` (unchanged position) | `install` / `precheck` / `uninstall` (default - Day 0 half only) |
+| `day1_install.yml` / `day1_check.yml` | first in `day1_components` | `install_d1` / `precheck_d1` |
+| `day1_uninstall.yml` | last in `day1_components` | `uninstall_d1` |
+
+- `precheck.yml` / `precheck_d1.yml` - state detection, never fails: each
+  checks one Application's (`zuno-namespaces-d0` / `zuno-namespaces-d1`)
+  Synced+Healthy status and records a line in the shared `/tmp` state
+  report (see `ansible/playbooks/day0_check.yml` / `day1_check.yml`).
+- `install.yml` / `install_d1.yml` - applies one GitOps Application each
+  (idempotent - ArgoCD's own `selfHeal: true` also reconciles continuously
+  on its own cycle, but re-running this role gives an explicit on-demand
+  re-sync after a `values.yaml` change).
+- `uninstall.yml` / `uninstall_d1.yml` - deletes one GitOps Application
+  each. Run `make day1 uninstall namespaces` before `make day0 uninstall
+  namespaces` so the `-d1` Application isn't left targeting namespaces the
+  `-d0` half already removed.
+
+**Tradeoff:** every other Day 0 component (`vault`, `cert_manager`,
+`external_secrets`, `postgresql`, `keycloak`, `smtp`, `nfd`, `nvidia_gpu`,
+`observability`, `openshift_ai`) runs immediately after `namespaces` in
+`day0_install.yml` and comes up with no quota/network-policy baseline
+until `make day1 install namespaces` (or `make day1 install`, which runs
+`namespaces` first) is run separately.
 
 `ansible/roles/agents` still exists and still applies the `api` (Tekos
 workloads) Applications - it no longer applies this one.

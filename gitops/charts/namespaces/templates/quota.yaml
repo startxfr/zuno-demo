@@ -1,3 +1,4 @@
+{{- if .Values.policy.enabled }}
 {{- range .Values.namespaces }}
 apiVersion: v1
 kind: ResourceQuota
@@ -16,4 +17,5 @@ spec:
     limits.memory: {{ $.Values.quota.limitsMemory | quote }}
     pods: {{ $.Values.quota.pods | quote }}
 ---
+{{- end }}
 {{- end }}

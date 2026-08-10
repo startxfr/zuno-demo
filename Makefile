@@ -14,11 +14,14 @@ DAY0_VERBS := check install uninstall all
 # Day 1 has two different valid component sets depending on the verb:
 # "build" only knows how to build the 3 named image groups (mcp, rag,
 # agent - see ansible/roles/{mcp,rag,agent}_build); "check"/"install"
-# operate on the 7 deployable components (models/sql-schema/mlops go
+# operate on the 8 deployable components (models/sql-schema/mlops go
 # beyond your original "llm, rag, mcp, agents" list deliberately - see
 # ansible/playbooks/day1_check.yml's header comment for why dropping them
-# would be a functional regression, not just a naming choice).
-DAY1_RUN_COMPONENTS := llm models sql-schema rag mcp agents mlops
+# would be a functional regression, not just a naming choice). "namespaces"
+# is also here despite being a Day 0 component everywhere else in this
+# Makefile - only its quota/network-policy overlay is Day 1, see
+# ansible/roles/namespaces/README.md.
+DAY1_RUN_COMPONENTS := namespaces llm models sql-schema rag mcp agents mlops
 DAY1_BUILD_COMPONENTS := mcp rag agent ai-gateway
 DAY1_VERBS := check install build uninstall all
 

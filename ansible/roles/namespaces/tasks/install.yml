@@ -1,9 +1,7 @@
 ---
-# Creates the platform namespaces, each with a ResourceQuota and a
-# default-deny NetworkPolicy baseline.
-#
-# Namespace objects are cluster-scoped, so all content is -d0; -d1 is a
-# no-op applied for the uniform two-call pattern every role follows.
+# Day 0 half: creates the platform Namespace objects only. The
+# ResourceQuota/NetworkPolicy overlay is Day 1 (install_d1.yml, invoked from
+# day1_install.yml) - see this role's README for why.
 - name: "namespaces | apply the namespaces GitOps Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -11,13 +9,6 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
 
-- name: "namespaces | apply the namespaces GitOps Application (d1, no-op)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  vars:
-    gitops_component_name: "namespaces"
-    gitops_app_phase: "d1"
-    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
-
 - name: "namespaces | prepare summary"
   ansible.builtin.debug:
-    msg: "Namespaces Application applied and healthy."
+    msg: "Namespace objects applied and healthy."

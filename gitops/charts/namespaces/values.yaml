@@ -1,3 +1,12 @@
+# Gates which half of this chart renders - namespace.enabled for the Day 0
+# Namespace objects (gitops/apps/namespaces/application-d0.yaml), policy.enabled
+# for the Day 1 ResourceQuota/NetworkPolicy overlay (application-d1.yaml).
+# Both default false so `helm template` with no overrides renders nothing.
+namespace:
+  enabled: false
+policy:
+  enabled: false
+
 # `status: active` namespaces host real workloads (only zuno-agent-tekos in
 # v0); `status: placeholder` namespaces are created and labeled but stay empty.
 namespaces:

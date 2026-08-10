@@ -1,12 +1,15 @@
 ---
 # Day 1 state check (`make day1 check`). Includes `models`/`sql_schema`
 # beyond llm/rag/mcp/agents so they stay reachable (nothing else triggers them).
+# `namespaces` is first, checking its Day 1 half (ResourceQuota/NetworkPolicy
+# overlay) only - see ansible/roles/namespaces/README.md.
 - name: "Day 1: check install state"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day1_components:
+      - namespaces
       - llm
       - models
       - sql_schema
@@ -34,7 +37,7 @@
     - name: Run Day 1 component state checks
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: "{{ 'check' if item == 'agents' else 'precheck' }}"
+        tasks_from: "{{ 'check' if item == 'agents' else ('precheck_d1' if item == 'namespaces' else 'precheck') }}"
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

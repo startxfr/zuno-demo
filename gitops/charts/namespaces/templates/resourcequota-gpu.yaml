@@ -1,4 +1,4 @@
-{{- if .Values.openshiftAi }}
+{{- if and .Values.policy.enabled .Values.openshiftAi }}
 apiVersion: v1
 kind: ResourceQuota
 metadata:

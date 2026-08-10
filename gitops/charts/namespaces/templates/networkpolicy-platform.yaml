@@ -3,6 +3,7 @@ Default-deny-other-namespaces baseline for platform namespaces (zuno-ai-run
 is intentionally excluded - see values.yaml). Same-namespace traffic and
 router ingress are always allowed; allowedFromNamespaces adds specific callers.
 */}}
+{{- if .Values.policy.enabled }}
 {{- range .Values.platformNamespaces }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -39,4 +40,5 @@ spec:
               kubernetes.io/metadata.name: {{ . }}
         {{- end }}
 ---
+{{- end }}
 {{- end }}

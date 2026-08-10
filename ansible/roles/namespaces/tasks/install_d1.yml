@@ -1,0 +1,16 @@
+---
+# Day 1 half: applies the ResourceQuota/NetworkPolicy overlay for namespaces
+# already created by install.yml's Day 0 half. Invoked from
+# day1_install.yml, which special-cases this role's tasks_from to
+# "install_d1" (same pattern day1_check.yml already uses for `agents`'
+# "check") since `namespaces` is otherwise a Day 0 component.
+- name: "namespaces | apply the namespaces GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "namespaces"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
+- name: "namespaces | prepare summary (d1)"
+  ansible.builtin.debug:
+    msg: "Namespace ResourceQuota/NetworkPolicy overlay applied and healthy."
