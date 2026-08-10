@@ -54,9 +54,12 @@
       Subscribing to package 'external-secrets-operator', catalog
       '{{ _eso_catalog_source }}', channel '{{ _eso_channel }}'.
 
-# Operator (d0) is separate from the Vault-backed ClusterSecretStore (d1,
-# applied below once the Vault client Service is discovered).
-- name: "external_secrets | apply the external-secrets GitOps Application (d0: operator + OperatorConfig)"
+# Operator install (d0) is separate from OperatorConfig and the
+# Vault-backed ClusterSecretStore (both d1, applied below once the Vault
+# client Service is discovered) - deferring OperatorConfig to d1 avoids
+# racing its CRD registration, since by d1 time this d0 Application has
+# already gone Synced+Healthy (CSV installed).
+- name: "external_secrets | apply the external-secrets GitOps Application (d0: operator install only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "external-secrets"
@@ -65,28 +68,10 @@
     gitops_app_extra_helm_values:
       operator:
         enabled: true
-      externalsecret:
-        enabled: true
       subscriptionChannel: "{{ _eso_channel }}"
       subscriptionCatalogSource: "{{ _eso_catalog_source }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 10
-
-# ArgoCD reports the OperatorConfig CR Healthy as soon as synced, not once
-# the operand Deployment is ready - the ClusterSecretStore below needs the
-# ServiceAccount that Deployment's rollout creates.
-- name: "external_secrets | wait for the ESO operand Deployment to be ready"
-  kubernetes.core.k8s_info:
-    api_version: apps/v1
-    kind: Deployment
-    namespace: zuno-vault
-    name: external-secrets
-  register: _eso_operand_deploy
-  until: >-
-    (_eso_operand_deploy.resources | default([]) | length) > 0 and
-    (_eso_operand_deploy.resources[0].status.readyReplicas | default(0)) > 0
-  retries: 60
-  delay: 10
 
     # Discovered rather than hardcoded: the Helm release name isn't a repo-wide
     # constant, and the chart creates three Services sharing this label.
@@ -107,18 +92,38 @@
          | map(attribute='metadata.name') | list)[0]
       }}
 
-- name: "external_secrets | apply the external-secrets GitOps Application (d1: Vault-backed ClusterSecretStore)"
+- name: "external_secrets | apply the external-secrets GitOps Application (d1: OperatorConfig + Vault-backed ClusterSecretStore)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "external-secrets"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_extra_helm_values:
+      operatorconfig:
+        enabled: true
       clusterSecretStore:
         enabled: true
       vaultServiceName: "{{ _eso_vault_service_name }}"
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
+
+# ArgoCD reports the OperatorConfig CR Healthy as soon as synced, not once
+# the operand Deployment it triggers is ready - the ClusterSecretStore
+# below needs the ServiceAccount that Deployment's rollout creates. Runs
+# after d1, since OperatorConfig (created by d1 above) is what makes the
+# operator deploy this Deployment in the first place.
+- name: "external_secrets | wait for the ESO operand Deployment to be ready"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-vault
+    name: external-secrets
+  register: _eso_operand_deploy
+  until: >-
+    (_eso_operand_deploy.resources | default([]) | length) > 0 and
+    (_eso_operand_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 60
+  delay: 10
 
 - name: "external_secrets | wait for the ClusterSecretStore to report Valid"
   kubernetes.core.k8s_info:

@@ -20,18 +20,21 @@ or an Ansible variable file; every workload consumes credentials through an
 
 ## Two-phase apply (ADR-0312)
 
-The chart's `Namespace`s/`Subscription` (sync-wave `"10"`) and
-`OperatorConfig` operand (sync-wave `"20"`) are applied by `tasks/
-install.yml`'s first `apply_gitops_app.yml` call. The `ClusterSecretStore`
-(sync-wave `"30"`) and cluster-domain `ExternalSecret` (sync-wave `"40"`)
-are deliberately left unrendered by that call (`gitops/charts/
-external-secrets/values.yaml`'s `vaultServiceName` stays unset) and only
-applied by a second `apply_gitops_app.yml` call further down the same
-file, once `vault` (earlier in `day0_components`) has prepared the
-Kubernetes auth method + `eso-reader` role they depend on - this
-two-phase split enforces the Vault-readiness ordering the paragraph above
-describes; sync-wave alone cannot (ArgoCD has no way to know about a
-*different* Application's readiness). The second call re-supplies the
-operator's catalog/channel alongside the newly-discovered Vault client
-`Service` name, since `gitops_app_extra_helm_values` replaces the
-Application's Helm values wholesale (ADR-0048) rather than merging.
+The chart's `Namespace`s/`Subscription` (sync-wave `"10"`) are applied by
+`tasks/install.yml`'s first `apply_gitops_app.yml` call. The `OperatorConfig`
+operand (sync-wave `"20"`), `ClusterSecretStore` (sync-wave `"30"`) and
+cluster-domain `ExternalSecret` (sync-wave `"40"`) are deliberately left
+unrendered by that call and only applied by a second `apply_gitops_app.yml`
+call further down the same file, once `vault` (earlier in
+`day0_components`) has prepared the Kubernetes auth method + `eso-reader`
+role the `ClusterSecretStore` depends on - this two-phase split enforces
+the Vault-readiness ordering the paragraph above describes; sync-wave alone
+cannot (ArgoCD has no way to know about a *different* Application's
+readiness). Deferring `OperatorConfig` to the second call also avoids a
+CRD-registration race: by then the first call's Application has already
+gone Synced+Healthy, guaranteeing OLM's CSV install has registered the
+`OperatorConfig` CRD. The second call sets `operatorconfig.enabled`,
+`clusterSecretStore.enabled` and the newly-discovered Vault client
+`Service` name (`vaultServiceName`), since `gitops_app_extra_helm_values`
+replaces the Application's Helm values wholesale (ADR-0048) rather than
+merging.
