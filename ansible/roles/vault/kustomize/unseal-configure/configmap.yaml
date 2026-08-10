@@ -88,11 +88,18 @@ data:
     # trust root has a different blast radius than general-purpose TLS certs.
     # allowed_uri_sans: the mesh CA signs workload certs with SPIFFE identity
     # URIs (spiffe://cluster.local/ns/<ns>/sa/<sa>) as the SAN, not DNS names.
+    # allowed_domains includes bare "svc" (not just svc.cluster.local) because
+    # cert-manager-istio-csr requests istiod's serving cert for the
+    # short-form in-cluster DNS name (istiod.<namespace>.svc), not only the
+    # fully-qualified one - allow_subdomains=true then covers it.
+    # require_cn=false: istio-csr's own serving cert CSR has no commonName
+    # (SANs only), which Vault rejects outright unless this is set.
     vault write pki/roles/istio \
-      allowed_domains="zuno-demo.internal,svc.cluster.local,cluster.local" \
+      allowed_domains="zuno-demo.internal,svc.cluster.local,cluster.local,svc" \
       allow_subdomains=true \
       allow_bare_domains=true \
       allowed_uri_sans="spiffe://cluster.local/*" \
+      require_cn=false \
       max_ttl=24h
 
     printf 'path "pki/sign/istio" {\n  capabilities = ["create","update"]\n}\n' | vault policy write istio-issuer -

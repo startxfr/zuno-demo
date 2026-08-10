@@ -7,7 +7,7 @@
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day0_components:
-      - openshift_aic
+      - openshift_ai
       - nvidia_gpu
       - nfd
       - smtp
