@@ -16,6 +16,10 @@ spec:
   values:
     global:
       platform: openshift
-      priorityClassName: zuno-platform-critical
+      # NOT priorityClassName: unlike the Istio CR, the Sail Operator
+      # silently strips this field from IstioCNI's spec.values.global on
+      # reconcile (confirmed live: the applied object never retains it) -
+      # declaring it here just causes permanent ArgoCD drift (selfHeal
+      # reapplies it, the operator strips it again, forever).
       imagePullPolicy: IfNotPresent
 {{- end }}
