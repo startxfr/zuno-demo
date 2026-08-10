@@ -60,8 +60,13 @@ data:
       issuing_certificates="$VAULT_ADDR/v1/pki/ca" \
       crl_distribution_points="$VAULT_ADDR/v1/pki/crl"
 
+    # ${CLUSTER_BASE_DOMAIN} (the OpenShift apps wildcard domain, e.g.
+    # apps.<cluster>.<base-domain>) is included so cert-manager can sign
+    # certs for externally-facing hostnames like keycloak.<domain> - see
+    # gitops/charts/keycloak/templates/ingress.yaml, the first real consumer
+    # of vault-issuer. allow_subdomains=true covers keycloak.<domain>.
     vault write pki/roles/cert-manager \
-      allowed_domains="zuno-demo.internal,svc.cluster.local" \
+      allowed_domains="zuno-demo.internal,svc.cluster.local,${CLUSTER_BASE_DOMAIN}" \
       allow_subdomains=true \
       allow_bare_domains=true \
       max_ttl=720h

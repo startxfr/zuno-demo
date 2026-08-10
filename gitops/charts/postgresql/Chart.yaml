@@ -8,7 +8,7 @@ description: >-
   fuzzy-discovered at run time rather than fixed.
 type: application
 version: 0.2.0
-appVersion: "16"
+appVersion: "18"
 dependencies:
   - name: operator
     version: "21.3.277"

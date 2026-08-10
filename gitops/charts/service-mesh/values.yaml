@@ -16,16 +16,16 @@ clusterIssuer:
 # -d1 apply; clusterissuer-istio.yaml renders nothing until it's set.
 vaultServiceName: ""
 
-# ASSUMPTION: not yet verified against a live cluster (same posture as
-# gitops/charts/cert-manager, which was also never installed here before -
-# see its README). If `make d0 check service-mesh` shows this is wrong,
-# discover the real package/channel/catalog from the cluster's
-# PackageManifest instead of trusting these hardcoded values.
+# Verified against the live PackageManifest (oc get packagemanifest
+# servicemeshoperator -n openshift-marketplace): catalog redhat-operators,
+# defaultChannel stable, channel stable's currentCSV is
+# servicemeshoperator.v2.6.17 (no trailing "-0" - that was an unverified
+# guess carried over from a different cluster's example values.yaml).
 istioSubscription:
   channel: stable
   name: servicemeshoperator
   namespace: istio-operators
-  csv: servicemeshoperator.v2.6.17-0
+  csv: servicemeshoperator.v2.6.17
 
 istioVersion: "v2.6"
 meshNamespace: zuno-mesh
@@ -90,7 +90,7 @@ cluster-istio:
       enabled: true
       name: servicemeshoperator
       namespace: istio-operators
-      version: "v2.6.17-0"
+      version: "v2.6.17"
       operator:
         channel: stable
         name: servicemeshoperator
@@ -106,6 +106,14 @@ cluster-istio:
       enabled: true
       name: istio-operators
       namespace: istio-operators
+      # servicemeshoperator's CSV only supports the AllNamespaces install
+      # mode (verified on a live cluster: OwnNamespace/SingleNamespace/
+      # MultiNamespace are all `supported: false` in its
+      # spec.installModes) - target: all-ns renders an OperatorGroup with no
+      # targetNamespaces instead of scoping it to istio-operators, same
+      # reason the pre-swap chart put its Subscription in the shared
+      # openshift-operators namespace.
+      target: "all-ns"
       # ServiceMeshMember is v1 (verified against the real chart's
       # templates/serviceMeshMember.yaml), not v2 as some upstream examples
       # show.
@@ -128,17 +136,22 @@ cluster-istio:
         # istio-injection: enabled from the start of Day 0 (see
         # ansible/roles/service_mesh/README.md for why zuno-data's pods need
         # an explicit rollout-restart once this component is Ready).
+        #
+        # controlePlane must match templates/istio.yaml's
+        # ServiceMeshControlPlane metadata.name, which is meshNamespace
+        # ("zuno-mesh") - not the literal string "default". values.yaml isn't
+        # templated, so this can't reference .Values.meshNamespace directly.
         - namespace: zuno-data
-          controlePlane: default
+          controlePlane: zuno-mesh
           controlePlaneNS: zuno-mesh
         - namespace: zuno-auth
-          controlePlane: default
+          controlePlane: zuno-mesh
           controlePlaneNS: zuno-mesh
         - namespace: zuno-ai-run
-          controlePlane: default
+          controlePlane: zuno-mesh
           controlePlaneNS: zuno-mesh
         - namespace: zuno-ai-build
-          controlePlane: default
+          controlePlane: zuno-mesh
           controlePlaneNS: zuno-mesh
 
   # Optional observability stack cluster-istio can also install (Elastic,

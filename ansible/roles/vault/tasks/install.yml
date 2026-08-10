@@ -178,6 +178,16 @@
         root_token: "{{ _vault_creds.resources[0].data.root_token }}"
   no_log: true
 
+# Resolved early (idempotent, `is not defined` guarded - see
+# resolve_cluster_base_domain.yml) so it's available to inject into the
+# unseal-configure Job below, which needs it to allow-list
+# pki/roles/cert-manager for externally-facing hostnames like
+# keycloak.<domain>. Re-resolved/reused again later in this file for the
+# zuno/platform/cluster-domain KV write; the guard makes calling it twice
+# a no-op the second time.
+- name: "vault | resolve the cluster's real apps domain (early, for the unseal-configure Job)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
 # The script is static (kustomize/unseal-configure/); only the Job that
 # runs it stays inline, since it's deleted and recreated every run.
 - name: "vault | apply the unseal/configure script ConfigMap"
@@ -220,6 +230,8 @@
                 env:
                   - name: VAULT_ADDR
                     value: "http://{{ _vault_service_name }}.zuno-vault.svc:8200"
+                  - name: CLUSTER_BASE_DOMAIN
+                    value: "{{ cluster_base_domain }}"
                   - name: VAULT_TOKEN
                     valueFrom:
                       secretKeyRef:

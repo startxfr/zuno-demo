@@ -28,13 +28,13 @@ chart installs the operator only; the wrapper owns the operand CR).
 `ServiceMeshMember` has no such sensitivity, so it's left to the vendored
 chart via `cluster-istio.istio.members`.
 
-## Why the CSV, CA-delegation mechanism, and CNI handling are flagged as assumptions
+## Why the CA-delegation mechanism and CNI handling are still flagged as assumptions
 
-`servicemeshoperator` was never installed anywhere in this repository before
-- its exact package/channel/CSV (`stable` / `servicemeshoperator.v2.6.17-0`
-/ `redhat-operators`) are taken as given rather than discovered from the
-cluster's `PackageManifest` (same posture as the Sail Operator pin this
-chart previously used).
+`servicemeshoperator`'s package/channel/CSV (`stable` /
+`servicemeshoperator.v2.6.17` / `redhat-operators`) were confirmed against a
+live cluster's `PackageManifest` - `ansible/roles/service_mesh/tasks/install.yml`
+re-validates this on every run rather than trusting it blindly, since a
+different cluster's catalog can publish a different CSV.
 
 `templates/istio.yaml`'s `spec.security.certificateAuthority` block
 (delegating the control plane's CA to `vault-issuer-istio`) is asserted from

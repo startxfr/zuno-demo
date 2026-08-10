@@ -7,10 +7,14 @@ cainjector pods) and `application-d1.yaml` (issuer.enabled: a Vault-backed
 `ClusterIssuer`) - same `-d0`/`-d1` operator/operand split as
 `nfd`/`nvidia-gpu`/`openshift-ai` (ADR-0312).
 
-Infrastructure only for now (see `ansible/roles/cert_manager/README.md`):
-no existing Route or service consumes `vault-issuer` yet. Issuing an
-actual `Certificate` for a specific Route/service is left as a documented,
-opt-in follow-up.
+`ansible/roles/keycloak` (ADR-0316) is the first consumer of `vault-issuer`:
+`gitops/charts/keycloak/templates/ingress.yaml` requests a `Certificate`
+for Keycloak's external hostname via the `cert-manager.io/cluster-issuer`
+annotation on a hand-authored `Ingress`, which cert-manager's ingress-shim
+and OpenShift's Ingress-to-Route sync turn into an edge-terminated Route
+with the issued certificate embedded. See
+`ansible/roles/keycloak/README.md`'s "External TLS via cert-manager"
+section for the mechanism and its unverified assumptions.
 
 ## Why the CertManager CR and the OLM package/channel/catalog are flagged as assumptions
 

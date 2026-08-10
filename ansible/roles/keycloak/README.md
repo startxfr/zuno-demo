@@ -174,9 +174,14 @@ pattern:
   externalsecret-postgresql.yaml` into `postgresqlSecretName`
   (`keycloak-postgresql-app`), which `spec.db.usernameSecret`/
   `passwordSecret` then reference directly.
-- Connects through PgBouncer (`postgresqlHost`:
-  `zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local:5432`), like every
-  other consumer of that cluster.
+- Connects directly to the primary instance (`postgresqlHost`:
+  `zuno-postgresql-primary.zuno-data.svc.cluster.local:5432`), unlike every
+  other consumer of that cluster, which goes through PgBouncer. Keycloak's
+  JDBC layer relies on server-side prepared statements, which PgBouncer's
+  `poolMode: transaction` (`ansible/roles/postgresql`'s default) doesn't
+  reliably support under sustained load - `sql_schema`/`rag` never hit this
+  since they're one-shot Jobs, but Keycloak is long-running. A documented
+  exception, not the default.
 - `gitops/charts/namespaces/values.yaml`'s `zuno-data` platform namespace
   grants `zuno-auth` in `allowedFromNamespaces`, since that namespace's
   NetworkPolicy default-denies ingress otherwise.
@@ -190,6 +195,61 @@ already blocks until the `PostgresCluster` (and therefore the new
 Track ADR-0112 (production-grade backup and recovery, v1) separately -
 this only makes Keycloak durable across a pod restart, not a full backup
 story beyond what `ansible/roles/postgresql` already provides for `zuno`.
+
+## External TLS via cert-manager (ADR-0316)
+
+`templates/keycloak.yaml`'s `Keycloak` CR no longer lets the RHBK operator
+manage the externally-facing Route/Ingress itself
+(`spec.ingress.enabled: {{ .Values.ingress.operatorManaged }}`, default
+`false`) - `templates/ingress.yaml` hand-authors a plain
+`networking.k8s.io/v1 Ingress` instead, so it can carry the
+`cert-manager.io/cluster-issuer: vault-issuer` annotation. Letting the
+operator keep managing the object while bolting cert-manager annotations
+onto it out-of-band would risk a reconcile fight (the operator's own
+reconcile loop plausibly overwrites foreign annotations/fields every pass);
+owning the object in this chart's own templates avoids that risk entirely.
+
+Mechanism: cert-manager's built-in ingress-shim watches the annotation and
+creates/renews a `Certificate` (issued via `ansible/roles/cert_manager`'s
+`vault-issuer` `ClusterIssuer`), populating `spec.tls[].secretName`
+(`.Values.ingress.tlsSecretName`, default `keycloak-tls`) on the Ingress.
+OpenShift's own Ingress-to-Route controller then auto-generates a shadow
+`Route` from that Ingress with the certificate embedded, pinned to `edge`
+termination (not `reencrypt`) via the `route.openshift.io/termination: edge`
+annotation - mirrors `gitops/charts/tekos/templates/route.yaml`'s existing
+edge+`Redirect` pattern.
+
+**`edge`, not `reencrypt`, is deliberate.** `reencrypt` would mean the
+router decrypts external TLS and re-encrypts to the backend over HTTPS,
+which requires the Keycloak pod itself to terminate TLS - it doesn't and
+shouldn't: `spec.http.httpEnabled: true` and `KC_PROXY_HEADERS=xforwarded`
+both depend on the pod only ever seeing plain HTTP and trusting the
+terminating proxy's headers for scheme/host reconstruction. `edge`
+termination only changes *where the certificate comes from* (OpenShift's
+default wildcard → cert-manager/`vault-issuer`); the router-to-pod hop
+stays plain HTTP exactly as before this change.
+
+`vault-issuer`'s backing PKI role (`ansible/roles/vault`'s
+`pki/roles/cert-manager`) had to be extended to allow the cluster's real
+apps domain (`${CLUSTER_BASE_DOMAIN}`), not just `zuno-demo.internal`/
+`svc.cluster.local` - this is the first consumer requesting a cert-manager
+cert for a public-facing hostname. See `ansible/roles/vault/README.md`.
+
+The certificate chain served is signed by Vault's self-signed internal
+root CA (`common_name=zuno-demo.internal`), same as every other
+`vault-issuer` consumer - browsers won't trust it out of the box. Not a
+regression versus the OpenShift default wildcard cert on a demo cluster
+(also typically self-signed), just worth noting so it isn't mistaken for a
+problem introduced by this change.
+
+**Fallback if the Ingress-to-Route TLS sync doesn't hold** (see "What's
+unverified" below): pivot to a hand-authored `route.openshift.io/v1 Route`
+(mirroring `gitops/charts/tekos/templates/route.yaml`) plus the community
+`cert-utils-operator` (redhat-cop) to bridge the cert-manager Secret into
+the Route's `spec.tls` fields directly, following this repo's existing
+OLM-subscription/`startx`-alias/`-d0`+`-d1` pattern (as used by
+`gitops/charts/cert-manager`). A larger, separately-scoped follow-up, not
+attempted speculatively here.
 
 ## Namespace-per-agent alignment (ADR-0023)
 
@@ -275,9 +335,27 @@ exercised end to end:
   the Subscription channel dynamically, the installed version isn't pinned
   ahead of time. If the pod fails to start with an "Unknown option:
   --proxy-headers" error, switch to `KC_PROXY=edge`.
-- Whether `spec.ingress.enabled: true` really produces an edge-terminated
-  Route, as the top-of-file comment assumes - confirm with `oc get route -n
-  zuno-auth -o yaml` once live.
+- **Load-bearing**: whether OpenShift's Ingress-to-Route controller
+  actually copies the cert-manager-populated Secret's `tls.crt`/`tls.key`
+  into the shadow Route's `spec.tls`, and keeps it synced across renewals
+  (see "External TLS via cert-manager" above) - documented OpenShift
+  behavior, not exercised end to end here. Confirm with `oc get route -n
+  zuno-auth -o yaml` once live; if it doesn't hold, use the
+  `cert-utils-operator` fallback described above.
+- `templates/ingress.yaml`'s backend Service name/port
+  (`{{ .Values.keycloakCRName }}-service` / `8080`, `.Values.ingress.
+  backendServiceName`/`backendServicePort`) - not confirmed against the
+  RHBK operator's actual Service output with `ingress.enabled: false` set;
+  confirm via `oc get svc -n zuno-auth` once live and override if it
+  differs.
+- Whether the RHBK operator still creates the backing Service at all when
+  `spec.ingress.enabled: false` (assumed yes - Service and Ingress/Route
+  creation are assumed independent).
+- Whether the target OpenShift version's router picks up a bare `Ingress`
+  without an explicit `spec.ingressClassName`, and whether
+  `route.openshift.io/termination`/`.../insecureEdgeTerminationPolicy` are
+  the annotations actually respected by Ingress-to-Route sync on that
+  version - asserted from general OpenShift docs, not confirmed locally.
 - Whether `KC_PROXY_HEADERS`/`spec.hostname.strict` together fully resolve
   the admin-console iframe timeout, or whether a live cluster still needs
   `spec.hostname.admin` set explicitly (a version-dependent field, RHBK
@@ -286,14 +364,6 @@ exercised end to end:
   no CRD is vendored locally to check against (the vendored
   `operator-21.3.277.tgz` is only the OLM Subscription chart); confirm via
   `oc explain keycloak.spec.db --recursive` once live.
-- Whether Keycloak's JDBC layer works correctly against PgBouncer's
-  `poolMode: transaction` (`ansible/roles/postgresql`'s default) - Keycloak
-  relies on server-side prepared statements, which transaction-mode pooling
-  doesn't reliably support under sustained load (`sql_schema`/`rag` never
-  hit this, since they're one-shot Jobs; Keycloak is long-running). If this
-  surfaces live, point `postgresqlHost` at `zuno-postgresql-primary`
-  directly for this one consumer instead (documented exception, not the
-  default).
 
 Run `make d0 check keycloak` → `make d0 install keycloak` against the real
 cluster and adjust any of the above that turns out to be wrong.

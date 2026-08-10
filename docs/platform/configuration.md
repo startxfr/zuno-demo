@@ -4,9 +4,9 @@ Day 0 (cluster prerequisites, ADR-0056) components: `admin-context`
 (PriorityClasses, StorageClass check), `argocd`, `namespaces`, `vault`,
 `cert-manager` (Vault-backed `ClusterIssuer` for workload/mesh certs),
 `external-secrets` (syncs Vault secrets into Kubernetes `Secret`s),
-`keycloak`, `postgresql`, `service-mesh` (Istio via the Sail Operator,
-mesh-wide mTLS), `smtp`, `nfd`, `nvidia-gpu`, `observability`,
-`openshift-ai`.
+`keycloak`, `postgresql`, `service-mesh` (Istio via Red Hat OpenShift
+Service Mesh / Maistra, `servicemeshoperator`, mesh-wide mTLS), `smtp`,
+`nfd`, `nvidia-gpu`, `observability`, `openshift-ai`.
 
 Day 1 (build + run the platform) components: `llm`, `models`,
 `sql_schema`, `rag`, `mcp`, `agents`, `mlops`.

@@ -19,14 +19,23 @@ the Vault client Service (same `app.kubernetes.io/name=vault`
 label-selector lookup `vault`/`external_secrets` already use) and applies
 a declarative `ClusterIssuer` pointing at the already-configured backend.
 
-**Infrastructure only for now.** No existing Route or service (`vault`,
-`tekos`, `keycloak`) is modified to consume `vault-issuer` - all three
-still rely on OpenShift's default ingress wildcard certificate for their
-edge-terminated Routes. Wiring a specific Route/service to actually
-request a `Certificate` from this issuer (which for an OpenShift `Route`
-requires switching from `edge` to `reencrypt` termination, since a Route's
-`spec.tls` has no `secretName`-style reference the way an `Ingress` does)
-is a documented, opt-in follow-up, not part of this component.
+**First real consumer: `ansible/roles/keycloak` (ADR-0316).** `vault`
+and `tekos` still rely on OpenShift's default ingress wildcard certificate
+for their edge-terminated Routes, unchanged. Keycloak's Route, by
+contrast, is no longer left to the RHBK operator's own Route/Ingress
+management - `gitops/charts/keycloak/templates/ingress.yaml` hand-authors
+a Kubernetes `Ingress` (not a Route directly, since a Route's `spec.tls`
+has no `secretName`-style reference the way an `Ingress` does) annotated
+for `vault-issuer`; cert-manager's ingress-shim issues the `Certificate`
+and OpenShift's own Ingress-to-Route controller generates the actual Route
+from it, still `edge`-terminated (not `reencrypt` - Keycloak's backend
+stays plain HTTP, only the certificate's origin changes). See
+`ansible/roles/keycloak/README.md`'s "External TLS via cert-manager"
+section for the full mechanism, including the fallback if the
+Ingress-to-Route TLS sync doesn't hold on a live cluster.
+
+`vault`/`tekos` remaining on the default wildcard cert is still a
+documented, opt-in follow-up if/when they need one.
 
 See `gitops/charts/cert-manager/README.md` for why the operator's exact
 package/channel/catalog and its singleton `CertManager` config CR shape

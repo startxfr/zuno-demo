@@ -1,0 +1,45 @@
+{{- if and .Values.keycloak.enabled (not .Values.ingress.operatorManaged) }}
+# Hand-authored so it can carry the cert-manager.io/cluster-issuer
+# annotation (ADR-0316) - the RHBK operator's own ingress.enabled path
+# (templates/keycloak.yaml) has no template we can attach cert-manager
+# annotations to, and bolting them on out-of-band would fight the
+# operator's own reconcile loop.
+#
+# cert-manager's ingress-shim watches for the cluster-issuer annotation and
+# creates/renews a Certificate into .Values.ingress.tlsSecretName; OpenShift's
+# own Ingress-to-Route controller then generates a shadow Route embedding
+# that secret's cert/key, pinned to edge termination via the
+# route.openshift.io/termination annotation below (matches the tls:
+# termination: edge pattern in gitops/charts/tekos/templates/route.yaml).
+# ASSUMPTION: the Ingress-to-Route TLS sync itself is unverified against a
+# live cluster - see README.md's "External TLS via cert-manager" section for
+# the fallback if it doesn't hold.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.keycloakCRName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+    cert-manager.io/cluster-issuer: vault-issuer
+    route.openshift.io/termination: edge
+    route.openshift.io/insecureEdgeTerminationPolicy: Redirect
+spec:
+  rules:
+    - host: "keycloak.{{ .Values.clusterBaseDomain }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ingress.backendServiceName | default (printf "%s-service" .Values.keycloakCRName) }}
+                port:
+                  number: {{ .Values.ingress.backendServicePort }}
+  tls:
+    - hosts:
+        - "keycloak.{{ .Values.clusterBaseDomain }}"
+      secretName: {{ .Values.ingress.tlsSecretName }}
+{{- end }}

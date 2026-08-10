@@ -36,7 +36,7 @@
       Package 'servicemeshoperator' (catalog
       '{{ _service_mesh_pkg_info.resources[0].status.catalogSource }}') does
       not publish channel 'stable' with CSV
-      'servicemeshoperator.v2.6.17-0'. Published channels/CSVs:
+      'servicemeshoperator.v2.6.17'. Published channels/CSVs:
       {{ _service_mesh_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
       Update gitops/charts/service-mesh/values.yaml (istioSubscription) to
       match what this cluster actually publishes.
@@ -44,7 +44,7 @@
     _service_mesh_pkg_info.resources[0].status.channels
     | selectattr('name', 'equalto', 'stable')
     | map(attribute='currentCSV')
-    | select('equalto', 'servicemeshoperator.v2.6.17-0')
+    | select('equalto', 'servicemeshoperator.v2.6.17')
     | list | length == 0
 
 # Operator install (d0) is separate from the mesh CA / ServiceMeshControlPlane

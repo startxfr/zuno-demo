@@ -1,7 +1,11 @@
 {{- if .Values.keycloak.enabled }}
-# Demo-grade: single instance, HTTP behind an edge-terminated Route rather
-# than a dedicated serving certificate. spec.db points at a dedicated
-# database/role on the shared PostgreSQL cluster (ADR-0315) - see
+# Demo-grade: single instance, HTTP behind an edge-terminated Route. The
+# Route/Ingress is no longer operator-managed (ingress.enabled here tracks
+# .Values.ingress.operatorManaged, default false) - it's hand-authored in
+# templates/ingress.yaml so it can carry the cert-manager.io/cluster-issuer
+# annotation and get a vault-issuer-signed serving certificate instead of
+# OpenShift's default wildcard cert (ADR-0316). spec.db points at a
+# dedicated database/role on the shared PostgreSQL cluster (ADR-0315) - see
 # README.md's "Database" section.
 # Google OAuth / demo-persona secrets are injected via Keycloak's "vault" SPI:
 # `${vault.<key>}` placeholders in the realm JSON resolve at runtime from files
@@ -27,7 +31,7 @@ spec:
   http:
     httpEnabled: true
   ingress:
-    enabled: true
+    enabled: {{ .Values.ingress.operatorManaged }}
   bootstrapAdmin:
     user:
       secret: {{ .Values.adminSecretName }}

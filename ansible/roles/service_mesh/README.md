@@ -43,17 +43,18 @@ mTLS/PKI trust root this role's own `ClusterIssuer` depends on, so meshing
 it risks a bootstrap circularity between Vault and the CA that would sign
 its own sidecar's certificate.
 
-## Why the Subscription channel/CSV and the CA-delegation mechanism are flagged as assumptions
+## Why the CA-delegation mechanism is still flagged as an assumption
 
-Like `cert_manager` before it, `servicemeshoperator` was never installed
-anywhere in this repository before - its exact package/channel/catalog
-(`stable` / `servicemeshoperator.v2.6.17-0` / `redhat-operators`) are taken
-as given rather than discovered from the cluster's `PackageManifest`, but
-`install.yml` validates the package/channel/CSV actually exist on-cluster
-before applying (fail-fast, rather than blindly trusting the hardcoded
-Subscription) - see `gitops/charts/service-mesh/README.md` for the same
-caveat applied to the `ServiceMeshControlPlane`'s
-`spec.security.certificateAuthority` CA-delegation mechanism.
+`servicemeshoperator`'s package/channel/CSV (`stable` /
+`servicemeshoperator.v2.6.17` / `redhat-operators`) were confirmed against a
+live cluster's `PackageManifest` (`oc get packagemanifest
+servicemeshoperator -n openshift-marketplace`) - unlike most of this role's
+other pins, this one is no longer a guess. `install.yml` still validates it
+on every run (fail-fast, rather than blindly trusting the hardcoded
+Subscription), since a different cluster's catalog can publish a different
+CSV. See `gitops/charts/service-mesh/README.md` for the still-unverified
+`ServiceMeshControlPlane` `spec.security.certificateAuthority`
+CA-delegation mechanism.
 
 **Infrastructure + mTLS rollout is staged, not immediate.** This role only
 brings the mesh control plane up and retrofits postgresql's sidecar; it

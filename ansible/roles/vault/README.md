@@ -12,6 +12,15 @@ role only ever *references* declaratively, never configures itself - all
 prepared by the same idempotent script,
 `ansible/roles/vault/kustomize/unseal-configure/configmap.yaml`.
 
+`pki/roles/cert-manager`'s `allowed_domains` also includes the cluster's
+real apps wildcard domain (`${CLUSTER_BASE_DOMAIN}`, resolved early via
+`ansible/tasks/resolve_cluster_base_domain.yml` and injected into the
+unseal-configure Job's env), not just `zuno-demo.internal`/
+`svc.cluster.local` - `ansible/roles/keycloak`'s Ingress is the first
+consumer requesting a cert-manager cert for a public-facing hostname
+(`keycloak.<domain>`), which Vault's PKI role would otherwise reject as
+out of domain.
+
 This is the one role that cannot depend on Vault for its own bootstrap
 secret: `install.yml` captures the unseal key and root token into a
 Kubernetes `Secret` (`vault-bootstrap-credentials`) in a locked-down,

@@ -118,10 +118,13 @@ PGO auto-creates several Services for a `PostgresCluster` named
 `-replicas`, `-pods`, `-ha`, `-ha-config`, and - since `spec.proxy.
 pgBouncer` is configured - `zuno-postgresql-pgbouncer`. **Every consumer
 connects through PgBouncer**, `zuno-postgresql-pgbouncer.zuno-data.svc.
-cluster.local:5432` (transaction pooling), not `-primary` directly.
-There is no plain `postgresql` Service, and no `-rw`-suffixed Service
-either (that was CNPG's convention, not PGO's) - nothing in this
-repository creates one.
+cluster.local:5432` (transaction pooling), not `-primary` directly -
+except `ansible/roles/keycloak` (ADR-0315), which connects to
+`zuno-postgresql-primary` directly, since Keycloak's JDBC layer relies on
+server-side prepared statements that transaction-mode pooling doesn't
+reliably support under sustained load. There is no plain `postgresql`
+Service, and no `-rw`-suffixed Service either (that was CNPG's convention,
+not PGO's) - nothing in this repository creates one.
 
 ## What's unverified against a real cluster
 

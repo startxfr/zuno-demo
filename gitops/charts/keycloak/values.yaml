@@ -25,10 +25,15 @@ googleOAuthSecretName: google-oauth-client
 postgresqlSecretName: keycloak-postgresql-app
 
 # Dedicated Postgres database (ADR-0315) on the shared zuno-postgresql
-# cluster (gitops/charts/postgresql) - connects through PgBouncer, like
-# every other consumer. See templates/externalsecret-postgresql.yaml for
-# how the credential crosses from zuno-data into this namespace.
-postgresqlHost: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
+# cluster (gitops/charts/postgresql). See templates/externalsecret-postgresql.yaml
+# for how the credential crosses from zuno-data into this namespace.
+#
+# Deliberate exception to "every consumer goes through PgBouncer": PgBouncer
+# runs in poolMode: transaction (gitops/charts/postgresql/values.yaml), but
+# Keycloak's JDBC layer relies on server-side prepared statements, which
+# transaction-mode pooling doesn't reliably support under sustained load.
+# Connects directly to the primary instead.
+postgresqlHost: zuno-postgresql-primary.zuno-data.svc.cluster.local
 postgresqlPort: 5432
 postgresqlDatabase: keycloak
 
@@ -36,6 +41,22 @@ postgresqlDatabase: keycloak
 # google-oauth-client ExternalSecret when false.
 googleOAuth:
   enabled: true
+
+# External TLS via cert-manager (ADR-0316). operatorManaged: false means the
+# RHBK operator does NOT create the Route/Ingress itself (spec.ingress.enabled
+# on the Keycloak CR tracks this) - templates/ingress.yaml hand-authors it
+# instead, annotated for cert-manager's vault-issuer ClusterIssuer. See
+# README.md's "External TLS via cert-manager" section.
+ingress:
+  operatorManaged: false
+  # Empty by default: templates/ingress.yaml falls back to
+  # "<keycloakCRName>-service" when unset. ASSUMPTION, unverified against a
+  # live cluster - see README.md. Confirm via `oc get svc -n zuno-auth` once
+  # the RHBK operator has reconciled with operatorManaged: false, and
+  # override here if the actual Service name differs.
+  backendServiceName: ""
+  backendServicePort: 8080
+  tlsSecretName: keycloak-tls
 
 # zuno-auth needs its own OperatorGroup - RHBK only supports
 # OwnNamespace/SingleNamespace install modes.

@@ -97,6 +97,8 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0312](0312-route-operator-installs-through-argocd-applications.md) | v0 | Implemented | Route operator installs through ArgoCD Applications |
 | [ADR-0313](0313-move-day1-schema-jobs-and-llm-provider-secrets-behind-argocd.md) | v0 | Implemented | Move Day 1 schema Jobs and LLM provider secret seeding behind ArgoCD/Vault |
 | [ADR-0314](0314-convert-admin-context-to-a-d0-d1-argocd-application-pair.md) | v0 | Implemented | Convert admin_context to a -d0/-d1 ArgoCD Application pair |
+| [ADR-0315](0315-dedicated-keycloak-postgresql-database.md) | v0 | Implemented | Dedicated Keycloak database/role on the shared PostgreSQL cluster |
+| [ADR-0316](0316-keycloak-route-tls-via-cert-manager.md) | v0 | Implemented | Keycloak's Route gets a cert-manager-issued certificate via a hand-authored Ingress |
 
 ## Standard clauses
 
