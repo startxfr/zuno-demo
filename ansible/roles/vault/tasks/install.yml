@@ -299,18 +299,21 @@
     _vault_generated_secrets:
       keycloak/admin:
         username: admin
-        password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+        password: "{{ zuno_admin_keycloak_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       postgresql/app:
         # Lowercase letters/digits only: PGO derives an RFC 1123 Secret name
         # from this, and unquoted PostgreSQL identifiers reject hyphens.
         username: zunoapp
-        password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+        password: "{{ zuno_admin_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       keycloak/postgresql-app:
         # Dedicated database/role, not zunoapp/zuno - keeps Keycloak's own
         # schema/lifecycle isolated from the unrelated app-data database
         # (ADR-0315). Same naming constraint as postgresql/app above.
         username: keycloak
-        password: "{{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+        password: "{{ zuno_admin_keycloak_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:
@@ -319,7 +322,8 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/tekos-frontend
-      client_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+      client_secret={{ zuno_admin_tekos_frontend_token |
+      default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
 - name: "vault | generate and seed the shared demo-persona password (ADR-0041)"
@@ -329,7 +333,8 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/demo-personas
-      password={{ lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits']) }}"
+      password={{ zuno_admin_demo_personas_root_password |
+      default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
 - name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037)"
@@ -339,7 +344,7 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mcp/gateway-workload-token
-      token={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+      token={{ zuno_admin_mcp_gateway_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
 - name: "vault | generate and seed the Tekos frontend session HMAC secret"
@@ -349,7 +354,7 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/tekos/frontend-session
-      hmac_secret={{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+      hmac_secret={{ zuno_admin_tekos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
 # These can't be self-generated - real external service credentials,

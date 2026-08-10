@@ -67,3 +67,5 @@ zuno_llm_provider_openai_api_key: "xxxxxx"
 zuno_llm_provider_gemini_api_key: "xxxxxx"
 zuno_llm_provider_anthropic_api_key: "xxxxxx"
 zuno_llm_provider_mistral_api_key: "xxxxxx"
+
+zuno_admin_mainpwd: "AbcdeF_Ghi123"

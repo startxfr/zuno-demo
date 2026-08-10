@@ -4,3 +4,6 @@ zuno_orgId: zn
 
 zuno_env: demo
 zuno_envId: demo
+
+zuno_admin_password: "{{ zuno_admin_mainpwd | default('AbcdeF_Ghi123') }}"
+zuno_admin_token: "token-{{ zuno_admin_password }}"

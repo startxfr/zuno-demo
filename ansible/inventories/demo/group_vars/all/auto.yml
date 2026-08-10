@@ -11,3 +11,16 @@ zuno_repo_root: "{{ playbook_dir }}/../.."
 zuno_name: "{{ zuno_org }}-{{ zuno_env }}"
 zuno_id: "{{ zuno_orgId }}{{ zuno_envId }}"
 zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"
+
+# One root token/password per Vault-seeded secret in
+# ansible/roles/vault/tasks/install.yml, so an operator can set
+# zuno_admin_mainpwd once (ansible/confidential.yml) and get known
+# credentials everywhere instead of the role's random fallback.
+zuno_admin_vault_token: "{{ zuno_admin_token }}"
+zuno_admin_postgresql_root_password: "{{ zuno_admin_password }}"
+zuno_admin_keycloak_root_password: "{{ zuno_admin_password }}"
+zuno_admin_keycloak_postgresql_root_password: "{{ zuno_admin_password }}"
+zuno_admin_demo_personas_root_password: "{{ zuno_admin_password }}"
+zuno_admin_tekos_frontend_token: "{{ zuno_admin_token }}"
+zuno_admin_mcp_gateway_token: "{{ zuno_admin_token }}"
+zuno_admin_tekos_session_token: "{{ zuno_admin_token }}"
