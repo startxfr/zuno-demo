@@ -105,10 +105,15 @@ platformNamespaces:
   - name: zuno-telemetry
     displayName: Zuno Telemetry
     description: OpenTelemetry Collector, the platform's observability pipeline.
-    # OTel Collector: every OTel-instrumented service.
+    # OTel Collector: every OTel-instrumented service. zuno-auth/zuno-ai-build
+    # added alongside zuno-ai-run/zuno-data so every meshed (istio-injection:
+    # enabled) namespace's sidecars can export traces directly to the
+    # collector (service-mesh component's OTel tracing provider).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
+      - zuno-auth
+      - zuno-ai-build
   - name: zuno-ai-build
     displayName: Zuno AI Build
     description: >-

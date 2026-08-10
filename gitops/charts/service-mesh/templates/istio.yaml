@@ -43,5 +43,18 @@ spec:
           enabled: true
         enabled: true
       enabled: true
+    # Lets sidecar Envoys export traces directly to the platform's shared
+    # OTel Collector (gitops/charts/observability, zuno-otel-collector) -
+    # actually enabled mesh-wide by templates/telemetry.yaml's Telemetry CR.
+    # ASSUMPTION: meshConfig.extensionProviders/the "opentelemetry" provider
+    # shape, and global.istioNamespace doubling as meshConfig.rootNamespace
+    # via the Sail Operator's values passthrough, are not verified against a
+    # live cluster.
+    meshConfig:
+      extensionProviders:
+        - name: otel-tracing
+          opentelemetry:
+            service: zuno-otel-collector-collector.zuno-telemetry.svc.cluster.local
+            port: 4317
   version: {{ .Values.istioVersion }}
 {{- end }}

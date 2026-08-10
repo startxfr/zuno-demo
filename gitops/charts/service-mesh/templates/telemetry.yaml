@@ -1,0 +1,19 @@
+{{- if .Values.istio.enabled }}
+# Mesh-wide default (no selector, created in the root/config namespace) -
+# enables trace export via the "otel-tracing" extensionProvider defined in
+# templates/istio.yaml's meshConfig. Same sync-wave as istio.yaml since it
+# depends on the Istio CRDs the operator installs.
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-default
+  namespace: {{ .Values.meshNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  tracing:
+    - providers:
+        - name: otel-tracing
+{{- end }}

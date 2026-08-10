@@ -28,7 +28,15 @@ spec:
         role: istio-issuer
         mountPath: /v1/auth/kubernetes
         serviceAccountRef:
-          # Fixed by the cert-manager-istio-csr chart itself (not
-          # configurable via its values.schema.json) - see values.yaml.
-          name: cert-manager-istio-csr
+          # Identifies who cert-manager authenticates to Vault as - always
+          # cert-manager's own controller ServiceAccount (TokenRequest for
+          # itself, no extra RBAC needed), same as the general vault-issuer
+          # ClusterIssuer (gitops/charts/cert-manager/templates/clusterissuer.yaml).
+          # NOT cert-manager-istio-csr: that SA belongs to the istio-csr
+          # Deployment, which merely requests Certificates through this
+          # issuer - it has nothing to do with how cert-manager itself logs
+          # into Vault. Referencing it here made cert-manager try to
+          # impersonate a different SA via TokenRequest, which its default
+          # RBAC doesn't permit.
+          name: cert-manager
 {{- end }}

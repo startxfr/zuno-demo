@@ -97,11 +97,15 @@ data:
 
     printf 'path "pki/sign/istio" {\n  capabilities = ["create","update"]\n}\n' | vault policy write istio-issuer -
 
-    # bound_service_account_names=cert-manager-istio-csr: fixed by the
-    # cert-manager-istio-csr chart itself, not configurable.
+    # bound_service_account_names/namespaces=cert-manager/cert-manager: same
+    # identity as cert-manager-issuer's role above - cert-manager always
+    # authenticates to Vault as itself (TokenRequest for its own SA), never
+    # as the workload requesting a Certificate through the issuer. NOT
+    # cert-manager-istio-csr/zuno-mesh: that SA belongs to the istio-csr
+    # Deployment, not cert-manager's own controller pod.
     vault write auth/kubernetes/role/istio-issuer \
-      bound_service_account_names=cert-manager-istio-csr \
-      bound_service_account_namespaces=zuno-mesh \
+      bound_service_account_names=cert-manager \
+      bound_service_account_namespaces=cert-manager \
       policies=istio-issuer \
       ttl=1h
 
