@@ -18,6 +18,8 @@ spec:
     helm:
       releaseName: zuno-external-secrets-d1
       values: |
+        operatorconfig:
+          enabled: true
         clusterSecretStore:
           enabled: true
   destination:

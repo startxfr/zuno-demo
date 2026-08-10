@@ -4,6 +4,8 @@ clusterSecretStore:
   enabled: false
 operator:
   enabled: false
+operatorconfig:
+  enabled: false
 
 # subscriptionChannel/subscriptionCatalogSource are discovered by ansible and
 # set on the -d0 apply. vaultServiceName is only set on the -d1 apply, after

@@ -1,4 +1,4 @@
-{{- if .Values.operator.enabled }}
+{{- if .Values.operatorconfig.enabled }}
 # The operator only watches this CR; it won't deploy the actual ESO
 # controller/webhook/cert-controller until it exists.
 apiVersion: operator.external-secrets.io/v1alpha1
