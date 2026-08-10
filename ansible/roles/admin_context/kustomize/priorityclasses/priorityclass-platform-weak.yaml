@@ -7,4 +7,8 @@ metadata:
 value: 1
 globalDefault: false
 description: >-
-  to do
+  For best-effort, transient platform jobs (schema-apply/init Jobs, the
+  Vault unseal/configure bootstrap Job, the acceptance-gate test runner) -
+  deliberately below zuno-workload-default so these one-shot jobs never
+  preempt real business traffic, yet still explicitly classified above
+  unset-priority pods.

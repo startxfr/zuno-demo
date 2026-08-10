@@ -52,6 +52,7 @@ spec:
   unsupported:
     podTemplate:
       spec:
+        priorityClassName: zuno-platform-critical
         # No readOnlyRootFilesystem: Keycloak/the JVM write caches and logs
         # under its own filesystem at runtime, and the exact writable paths
         # aren't verified.

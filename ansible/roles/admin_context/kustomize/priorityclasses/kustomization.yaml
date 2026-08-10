@@ -2,6 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - priorityclass-platform-critical.yaml
-  - priorityclass-workload-important.yaml
-  - priorityclass-platform-default.yaml
-  - priorityclass-workload-weak.yaml
+  - priorityclass-platform-important.yaml
+  - priorityclass-platform-weak.yaml
+  - priorityclass-workload-default.yaml

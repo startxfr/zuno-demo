@@ -16,6 +16,7 @@ vault:
   global:
     openshift: true
   server:
+    priorityClassName: zuno-platform-critical
     image:
       # Fully qualified: the unqualified "hashicorp/vault" short name resolves
       # to a Red Hat Connect registry requiring a paid pull secret this

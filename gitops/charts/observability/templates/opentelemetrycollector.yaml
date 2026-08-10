@@ -10,6 +10,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
 spec:
   mode: deployment
+  priorityClassName: zuno-platform-important
   config:
     receivers:
       otlp:

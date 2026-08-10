@@ -38,7 +38,8 @@
   ansible.builtin.debug:
     msg: >-
       {{ _admin_context_storageclasses.resources | length }} StorageClass(es)
-      found; zuno-platform-critical/zuno-workload-default PriorityClasses
-      applied. zuno-argocd-application-controller-admin ClusterRoleBinding:
+      found; zuno-platform-critical/zuno-platform-important/zuno-platform-weak/
+      zuno-workload-default PriorityClasses applied.
+      zuno-argocd-application-controller-admin ClusterRoleBinding:
       {{ 'present (created by the argocd role)' if (_admin_context_argocd_crb.resources | default([]) | length) > 0
          else 'not present yet - expected before `make d0 install argocd` has run once' }}.

@@ -99,6 +99,7 @@
               app.kubernetes.io/name: acceptance-gate
           spec:
             restartPolicy: Never
+            priorityClassName: zuno-platform-weak
             containers:
               - name: acceptance-gate
                 image: "docker.io/library/python:3.12-slim"

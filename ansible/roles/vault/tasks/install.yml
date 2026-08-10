@@ -210,6 +210,7 @@
         template:
           spec:
             restartPolicy: Never
+            priorityClassName: zuno-platform-weak
             containers:
               - name: vault-unseal-configure
                 image: docker.io/hashicorp/vault:1.17.2

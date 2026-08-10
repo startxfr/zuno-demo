@@ -20,6 +20,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      priorityClassName: zuno-platform-weak
       containers:
         - name: psql
           image: postgres:16-bookworm

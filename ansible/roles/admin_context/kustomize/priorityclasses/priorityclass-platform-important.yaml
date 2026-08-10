@@ -7,4 +7,9 @@ metadata:
 value: 10000
 globalDefault: false
 description: >-
-  to do
+  For platform infrastructure the platform depends on but that isn't in the
+  critical failure path of auth/secrets/data/GitOps (observability/tracing
+  pipeline today; node feature discovery, the GPU operator, OpenShift AI,
+  ArgoCD, cert-manager and External Secrets are candidates once their
+  operator-managed pod specs are confirmed) - above zuno-workload-default,
+  preemptable ahead of zuno-platform-critical.

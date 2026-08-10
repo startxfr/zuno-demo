@@ -1,6 +1,6 @@
 ---
 # admin_context is a bootstrap role with no ArgoCD Application; installed
-# state is detected from the two PriorityClasses it applies directly.
+# state is detected from the four PriorityClasses it applies directly.
 - name: "admin_context | look up the PriorityClasses"
   kubernetes.core.k8s_info:
     api_version: scheduling.k8s.io/v1
@@ -9,6 +9,8 @@
   register: _admin_context_pc_lookup
   loop:
     - zuno-platform-critical
+    - zuno-platform-important
+    - zuno-platform-weak
     - zuno-workload-default
   loop_control:
     loop_var: pc_name

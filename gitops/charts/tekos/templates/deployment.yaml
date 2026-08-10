@@ -21,6 +21,7 @@ spec:
         zuno.io/agent: tekos
     spec:
       serviceAccountName: tekos-frontend
+      priorityClassName: zuno-workload-default
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -103,6 +104,7 @@ spec:
         zuno.io/agent: tekos
     spec:
       serviceAccountName: tekos-bff
+      priorityClassName: zuno-workload-default
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true

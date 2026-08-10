@@ -34,6 +34,7 @@ spec:
   instances:
     - name: instance1
       replicas: {{ .Values.cluster.instances }}
+      priorityClassName: zuno-platform-critical
       resources:
         requests:
           cpu: {{ .Values.cluster.resources.requests.cpu | quote }}
@@ -62,6 +63,7 @@ spec:
   proxy:
     pgBouncer:
       replicas: {{ .Values.pgBouncer.replicas }}
+      priorityClassName: zuno-platform-critical
       resources:
         requests:
           cpu: {{ .Values.pgBouncer.resources.requests.cpu | quote }}
