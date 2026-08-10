@@ -29,9 +29,9 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0009
-- ADR-0019
-- ADR-0020
-- ADR-0021
-- ADR-0034
-- ADR-0035
+- [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md)
+- [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md)
+- [ADR-0020](0020-support-both-local-and-external-llm-providers.md)
+- [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md)
+- [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md)
+- [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md)

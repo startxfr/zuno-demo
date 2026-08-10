@@ -37,6 +37,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0024
-- ADR-0025
-- ADR-0051
+- [ADR-0024](0024-use-vault-for-application-secrets.md)
+- [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md)
+- [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md)

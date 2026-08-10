@@ -38,7 +38,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0005
-- ADR-0006
+- [ADR-0005](0005-use-okf-v0-2-as-the-declarative-agent-definition-contract.md)
+- [ADR-0006](0006-extend-okf-with-zuno-agent-specific-metadata.md)
 - ADR-0106
 - ADR-0109

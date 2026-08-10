@@ -25,4 +25,4 @@ See [Standard clauses](README.md#standard-clauses) for Consequences, Operational
 
 ## Related ADRs
 
-See ADR-0031 through ADR-0054 and the [ADR index](README.md).
+See [ADR-0031](0031-formalize-tekos-as-the-v0-vertical-slice.md) through [ADR-0054](0054-define-the-bff-contract-openapi-first.md) and the [ADR index](README.md).

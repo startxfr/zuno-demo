@@ -48,5 +48,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0009
-- ADR-0032
+- [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md)
+- [ADR-0032](0032-propagate-trusted-identity-end-to-end.md)

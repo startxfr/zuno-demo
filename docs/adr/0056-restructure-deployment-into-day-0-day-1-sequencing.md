@@ -53,12 +53,12 @@ See [Standard clauses](README.md#standard-clauses) for Acceptance criteria.
 
 ## Related ADRs
 
-- ADR-0003
-- ADR-0023
-- ADR-0037
-- ADR-0047
-- ADR-0048
-- ADR-0051
+- [ADR-0003](0003-use-ansible-and-make-as-the-deployment-entry-point.md)
+- [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md)
+- [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md)
+- [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md)
+- [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md)
+- [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md)
 
 ## Review evidence
 

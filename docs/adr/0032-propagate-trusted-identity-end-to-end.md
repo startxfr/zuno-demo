@@ -38,6 +38,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0012
-- ADR-0013
-- ADR-0009
+- [ADR-0012](0012-use-keycloak-as-the-central-identity-provider.md)
+- [ADR-0013](0013-propagate-end-user-identity-through-agent-calls.md)
+- [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md)

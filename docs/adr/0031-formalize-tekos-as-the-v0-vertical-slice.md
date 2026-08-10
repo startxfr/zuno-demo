@@ -36,7 +36,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0007
-- ADR-0008
-- ADR-0027
-- ADR-0028
+- [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md)
+- [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md)
+- [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md)
+- [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md)

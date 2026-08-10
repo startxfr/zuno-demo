@@ -38,8 +38,8 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0004
-- ADR-0022
-- ADR-0024
-- ADR-0041
-- ADR-0048
+- [ADR-0004](0004-use-github-as-the-canonical-source-repository.md)
+- [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
+- [ADR-0024](0024-use-vault-for-application-secrets.md)
+- [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md)
+- [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md)

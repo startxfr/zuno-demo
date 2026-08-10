@@ -38,8 +38,8 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0015
+- [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md)
 - ADR-0109
 - ADR-0110
-- ADR-0034
-- ADR-0035
+- [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md)
+- [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md)

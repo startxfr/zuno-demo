@@ -41,10 +41,10 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0027
-- ADR-0028
-- ADR-0030
-- ADR-0032
-- ADR-0035
-- ADR-0036
-- ADR-0045
+- [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md)
+- [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md)
+- [ADR-0030](0030-use-a-command-dispatch-makefile-interface.md)
+- [ADR-0032](0032-propagate-trusted-identity-end-to-end.md)
+- [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md)
+- [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)
+- [ADR-0045](0045-stream-responses-end-to-end-with-sse.md)

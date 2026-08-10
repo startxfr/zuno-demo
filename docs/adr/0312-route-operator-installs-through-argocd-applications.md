@@ -264,12 +264,12 @@ See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 
-- ADR-0310 (amended, for these six roles only)
-- ADR-0311 (established the sync-wave-is-cosmetic-for-Ansible convention
+- [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) (amended, for these six roles only)
+- [ADR-0311](0311-stop-applying-the-root-app-of-apps-from-ansible.md) (established the sync-wave-is-cosmetic-for-Ansible convention
   this ADR partially reverses, by making waves functional within a
   single Application's own sync)
-- ADR-0048 (`gitops_app_extra_helm_values` mechanism reused here)
-- ADR-0047 (NFD→GPU Operator node-label ordering, unaffected)
+- [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) (`gitops_app_extra_helm_values` mechanism reused here)
+- [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) (NFD→GPU Operator node-label ordering, unaffected)
 
 ## Review evidence
 

@@ -36,6 +36,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0021
-- ADR-0034
-- ADR-0046
+- [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md)
+- [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md)
+- [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md)

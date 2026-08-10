@@ -38,7 +38,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0010
-- ADR-0011
-- ADR-0023
-- ADR-0052
+- [ADR-0010](0010-introduce-a-central-mcp-gateway.md)
+- [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md)
+- [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md)
+- [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md)

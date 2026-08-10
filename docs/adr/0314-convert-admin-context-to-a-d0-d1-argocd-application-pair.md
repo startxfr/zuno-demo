@@ -123,13 +123,13 @@ See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 
-- ADR-0312 (the operator-install conversion whose stated `admin_context`
+- [ADR-0312](0312-route-operator-installs-through-argocd-applications.md) (the operator-install conversion whose stated `admin_context`
   exception this ADR closes)
-- ADR-0310 (the kustomize-per-role pattern this replaces for
+- [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) (the kustomize-per-role pattern this replaces for
   `admin_context`; still governs `argocd`, the remaining exception)
-- ADR-0056 (original Day 0/Day 1 split establishing this role's position
+- [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) (original Day 0/Day 1 split establishing this role's position
   and purpose)
-- ADR-0313 (the prior ADR narrowing the exception list the same way, for
+- [ADR-0313](0313-move-day1-schema-jobs-and-llm-provider-secrets-behind-argocd.md) (the prior ADR narrowing the exception list the same way, for
   the two Day 1 imperative-Job cases it closed)
 
 ## Review evidence

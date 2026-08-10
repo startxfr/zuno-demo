@@ -41,7 +41,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0010
-- ADR-0011
-- ADR-0022
-- ADR-0043
+- [ADR-0010](0010-introduce-a-central-mcp-gateway.md)
+- [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md)
+- [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
+- [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md)

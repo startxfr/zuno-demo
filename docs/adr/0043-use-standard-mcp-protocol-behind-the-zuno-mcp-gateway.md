@@ -29,6 +29,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0010
-- ADR-0036
-- ADR-0037
+- [ADR-0010](0010-introduce-a-central-mcp-gateway.md)
+- [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)
+- [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md)

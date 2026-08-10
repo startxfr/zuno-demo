@@ -143,8 +143,8 @@ See [Standard clauses](README.md#standard-clauses) for Acceptance criteria (note
 
 ## Related ADRs
 
-- ADR-0003
-- ADR-0022
+- [ADR-0003](0003-use-ansible-and-make-as-the-deployment-entry-point.md)
+- [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
 
 ## Review evidence
 

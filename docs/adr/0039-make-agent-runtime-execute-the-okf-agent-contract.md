@@ -37,9 +37,9 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0005
-- ADR-0006
-- ADR-0007
-- ADR-0018
-- ADR-0022
-- ADR-0038
+- [ADR-0005](0005-use-okf-v0-2-as-the-declarative-agent-definition-contract.md)
+- [ADR-0006](0006-extend-okf-with-zuno-agent-specific-metadata.md)
+- [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md)
+- [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md)
+- [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
+- [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md)

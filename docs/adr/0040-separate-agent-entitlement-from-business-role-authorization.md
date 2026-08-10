@@ -37,5 +37,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0012
-- ADR-0011
+- [ADR-0012](0012-use-keycloak-as-the-central-identity-provider.md)
+- [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md)

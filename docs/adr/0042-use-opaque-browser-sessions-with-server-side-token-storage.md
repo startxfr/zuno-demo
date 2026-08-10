@@ -29,6 +29,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0013
+- [ADR-0013](0013-propagate-end-user-identity-through-agent-calls.md)
 - ADR-0101
 - ADR-0103

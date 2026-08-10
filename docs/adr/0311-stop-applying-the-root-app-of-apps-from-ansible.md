@@ -115,8 +115,8 @@ See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 
-- ADR-0022 (amends its "Bootstrap architecture" addendum)
-- ADR-0056
+- [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md) (amends its "Bootstrap architecture" addendum)
+- [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md)
 
 ## Review evidence
 

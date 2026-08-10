@@ -146,13 +146,13 @@ See [Standard clauses](README.md#standard-clauses) for Migration/evolution.
 
 ## Related ADRs
 
-- ADR-0312 (the operator-install conversion this extends to the two
+- [ADR-0312](0312-route-operator-installs-through-argocd-applications.md) (the operator-install conversion this extends to the two
   remaining Day 1 imperative-Job cases it explicitly left out of scope)
-- ADR-0311 (Ansible-driven `-d0`-before-`-d1` ordering, relied on here for
+- [ADR-0311](0311-stop-applying-the-root-app-of-apps-from-ansible.md) (Ansible-driven `-d0`-before-`-d1` ordering, relied on here for
   `mcp-sales-db`'s new `-d0` prerequisites Application)
-- ADR-0024 (Vault as the platform's single source of truth for secrets,
+- [ADR-0024](0024-use-vault-for-application-secrets.md) (Vault as the platform's single source of truth for secrets,
   the principle `llm`'s direct read violated)
-- ADR-0020 (ModelRouter provider fail-over, unaffected - still fails over
+- [ADR-0020](0020-support-both-local-and-external-llm-providers.md) (ModelRouter provider fail-over, unaffected - still fails over
   past any provider whose key is still the `__placeholder__` sentinel)
 
 ## Review evidence

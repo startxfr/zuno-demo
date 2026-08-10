@@ -39,8 +39,8 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0002
-- ADR-0003
-- ADR-0018
-- ADR-0019
-- ADR-0030
+- [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-ea2-for-the-mvp.md)
+- [ADR-0003](0003-use-ansible-and-make-as-the-deployment-entry-point.md)
+- [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md)
+- [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md)
+- [ADR-0030](0030-use-a-command-dispatch-makefile-interface.md)

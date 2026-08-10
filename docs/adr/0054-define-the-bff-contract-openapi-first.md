@@ -39,7 +39,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0008
-- ADR-0032
-- ADR-0033
-- ADR-0045
+- [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md)
+- [ADR-0032](0032-propagate-trusted-identity-end-to-end.md)
+- [ADR-0033](0033-derive-user-identity-only-from-validated-tokens.md)
+- [ADR-0045](0045-stream-responses-end-to-end-with-sse.md)

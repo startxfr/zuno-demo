@@ -29,6 +29,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0015
-- ADR-0018
-- ADR-0046
+- [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md)
+- [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md)
+- [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md)

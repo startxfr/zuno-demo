@@ -38,7 +38,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- ADR-0023
-- ADR-0024
+- [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md)
+- [ADR-0024](0024-use-vault-for-application-secrets.md)
 - ADR-0111
-- ADR-0037
+- [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md)
