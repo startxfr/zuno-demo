@@ -1,13 +1,21 @@
 apiVersion: v2
 name: service-mesh
 description: >-
-  Deploys the servicemeshoperator (Red Hat OpenShift Service Mesh / Maistra)
-  OLM package, its dedicated istio-operators namespace, and a
-  ServiceMeshControlPlane/ServiceMeshMember set in zuno-mesh with a
-  Vault-backed CA, via the startx cluster-istio chart.
+  Deploys the servicemeshoperator3 (Sail Operator) OLM package via the
+  startx cluster-istio chart's generic operator subchart, an Istio control
+  plane in zuno-mesh with IstioCNI, and a Vault-backed CA for mesh workload
+  identity via cert-manager-istio-csr.
 type: application
 version: 0.1.0
 dependencies:
   - name: cluster-istio
     version: "21.3.277"
     repository: "alias:startx"
+  - name: cert-manager-istio-csr
+    version: "0.16.0"
+    repository: "https://charts.jetstack.io"
+    # NOT cert-manager-istio-csr.enabled: this chart's values.schema.json is
+    # additionalProperties: false, so an "enabled" key nested under its own
+    # values block gets passed straight through to it and rejected. A
+    # sibling top-level flag avoids that.
+    condition: istioCsr.enabled

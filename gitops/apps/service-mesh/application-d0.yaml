@@ -1,8 +1,8 @@
 ---
-# servicemeshoperator (Red Hat OpenShift Service Mesh / Maistra) OLM install
-# via the startx cluster-istio chart; the ServiceMeshControlPlane and
-# Vault-backed mesh CA are a separate Application (application-d1.yaml)
-# applied after this one is healthy.
+# servicemeshoperator3 (Sail Operator) OLM install, via the startx
+# cluster-istio chart's generic operator subchart; the Istio control plane,
+# IstioCNI and Vault-backed mesh CA (istio-csr) are a separate Application
+# (application-d1.yaml) applied after this one is healthy.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -22,20 +22,11 @@ spec:
       releaseName: zuno-service-mesh-d0
       values: |
         cluster-istio:
-          projectOperator:
-            enabled: true
           operatorIstio:
             enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-mesh
-  ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
-    - group: operators.coreos.com
-      kind: OperatorGroup
-      jsonPointers:
-        - /metadata/annotations/olm.providedAPIs
   syncPolicy:
     automated:
       prune: true

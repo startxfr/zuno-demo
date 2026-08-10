@@ -1,12 +1,12 @@
 # service_mesh
 
 A Day 0 component (`make d0 install service-mesh`). Applies
-`gitops/apps/service-mesh/application-d0.yaml` (the `servicemeshoperator`
-OLM package, Red Hat OpenShift Service Mesh / Maistra, via the startx
-`cluster-istio` chart) then `application-d1.yaml` (a Vault-backed mesh CA,
-the `ServiceMeshControlPlane`, and the `ServiceMeshMember` set) -
-`gitops/charts/service-mesh` - see `gitops/apps/README.md` and
-`gitops/charts/service-mesh/README.md`.
+`gitops/apps/service-mesh/application-d0.yaml` (the `servicemeshoperator3`
+OLM package, Red Hat's productized Sail Operator, via the startx
+`cluster-istio` chart's generic operator subchart) then `application-d1.yaml`
+(a Vault-backed mesh CA via `cert-manager-istio-csr`, `IstioCNI`, and the
+`Istio` control plane itself) - `gitops/charts/service-mesh` - see
+`gitops/apps/README.md` and `gitops/charts/service-mesh/README.md`.
 
 Positioned right after `postgresql` in `day0_components`
 (`ansible/playbooks/day0_{install,check}.yml`, reversed in
@@ -43,18 +43,17 @@ mTLS/PKI trust root this role's own `ClusterIssuer` depends on, so meshing
 it risks a bootstrap circularity between Vault and the CA that would sign
 its own sidecar's certificate.
 
-## Why the CA-delegation mechanism is still flagged as an assumption
+## Why the Subscription channel/CSV and the CA-delegation mechanism are flagged as assumptions
 
-`servicemeshoperator`'s package/channel/CSV (`stable` /
-`servicemeshoperator.v2.6.17` / `redhat-operators`) were confirmed against a
-live cluster's `PackageManifest` (`oc get packagemanifest
-servicemeshoperator -n openshift-marketplace`) - unlike most of this role's
-other pins, this one is no longer a guess. `install.yml` still validates it
-on every run (fail-fast, rather than blindly trusting the hardcoded
-Subscription), since a different cluster's catalog can publish a different
-CSV. See `gitops/charts/service-mesh/README.md` for the still-unverified
-`ServiceMeshControlPlane` `spec.security.certificateAuthority`
-CA-delegation mechanism.
+Like `cert_manager` before it, `servicemeshoperator3` was never installed
+anywhere in this repository before - its exact package/channel/catalog
+(`stable` / `servicemeshoperator3.v3.4.1` / `redhat-operators`) are taken as
+given rather than discovered from the cluster's `PackageManifest`, but
+`install.yml` validates the package/channel/CSV actually exist on-cluster
+before applying (fail-fast, rather than blindly trusting the hardcoded
+Subscription) - see `gitops/charts/service-mesh/README.md` for the same
+caveat applied to `cert-manager-istio-csr`'s chart version and the
+`pilot.env.ENABLE_CA_SERVER`/`global.caAddress` CA-delegation mechanism.
 
 **Infrastructure + mTLS rollout is staged, not immediate.** This role only
 brings the mesh control plane up and retrofits postgresql's sidecar; it

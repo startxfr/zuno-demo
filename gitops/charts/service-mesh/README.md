@@ -1,58 +1,63 @@
 # service-mesh
 
 Referenced by `gitops/apps/service-mesh/application-d0.yaml`
-(`cluster-istio.projectOperator`/`operatorIstio`: the `servicemeshoperator`
-`Subscription` in `istio-operators`) and `application-d1.yaml`
-(`clusterIssuer.enabled` + `istio.enabled` + `cluster-istio.istio.enabled`/
-`members.enabled`: the Vault-backed mesh CA, the `ServiceMeshControlPlane`,
-and the `ServiceMeshMember` set) - see `gitops/apps/README.md` - same
-`-d0`/`-d1` operator/operand split as `cert-manager` (ADR-0312).
+(`cluster-istio.operatorIstio`: the `servicemeshoperator3` `Subscription` in
+`openshift-operators`) and `application-d1.yaml` (`clusterIssuer.enabled` +
+`istioCsr.enabled` + `istiocni.enabled` + `istio.enabled`: the Vault-backed
+mesh CA via `cert-manager-istio-csr`, the `IstioCNI`, and the `Istio` control
+plane) - see `gitops/apps/README.md` - same `-d0`/`-d1` operator/operand
+split as `cert-manager` (ADR-0312).
 
-Wraps the startx `cluster-istio` chart (`alias:startx`, same convention as
-`openshift-ai`/`nvidia-gpu`/`keycloak`/`postgresql`/`nfd`/`cert-manager`) as
-its sole Helm dependency, replacing the previous direct
-`https://charts.jetstack.io` dependency on `cert-manager-istio-csr` and the
-Sail Operator (`servicemeshoperator3`, `sailoperator.io` `Istio`/`IstioCNI`
-CRs) approach it came with.
+## Why `cluster-istio` is a dependency at all, and why it only renders a `Subscription`
 
-## Why the `ServiceMeshControlPlane` is created by this chart, not `cluster-istio`
+This chart deploys OpenShift Service Mesh **3** (the Sail Operator,
+`servicemeshoperator3`), not the Maistra-based OSSM 2. There's no
+OSSM-3-specific startx chart, so this wraps the generic startx `cluster-istio`
+chart (`alias:startx`, same convention as `openshift-ai`/`nvidia-gpu`/
+`keycloak`/`postgresql`/`nfd`/`cert-manager`) purely for its vendored
+`operator` subchart (`cluster-istio.operatorIstio`), which renders nothing
+beyond a plain `Subscription`/`OperatorGroup` pair driven entirely by
+values - nothing in it is OSSM-2-specific. `cluster-istio`'s own top-level
+templates (`serviceMeshControlPlane.yaml`, `serviceMeshMember.yaml`) **are**
+Maistra/OSSM-2-specific and are never rendered here (`cluster-istio.istio.*`
+stays untouched, at the vendored chart's own `enabled: false` default).
 
-`cluster-istio`'s own `templates/serviceMeshControlPlane.yaml` (gated by
-`istio.enabledControlPlane`) renders a **hardcoded** spec with no values
-hook for `spec.security.certificateAuthority` - it can't express delegating
-the mesh CA to our Vault-backed `ClusterIssuer`. So this wrapper leaves
-`cluster-istio.istio.enabledControlPlane: false` and creates the
-`ServiceMeshControlPlane` itself (`templates/istio.yaml`), the same split
-this repo already uses for `cert-manager`/`cluster-certmanager` (vendored
-chart installs the operator only; the wrapper owns the operand CR).
-`ServiceMeshMember` has no such sensitivity, so it's left to the vendored
-chart via `cluster-istio.istio.members`.
+`operatorGroup.enabled: false`: unlike the OSSM 2 setup, the Subscription
+installs into `openshift-operators`, which already carries OpenShift's own
+global `AllNamespaces` `OperatorGroup` - creating a second one there would
+make OLM reject the Subscription (`TooManyOperatorGroups`). `project`/
+`projectOperator` stay disabled too - OSSM 3 needs no dedicated operator
+namespace the way OSSM 2's `istio-operators` did.
 
-## Why the CA-delegation mechanism and CNI handling are still flagged as assumptions
+## Why the `Istio`/`IstioCNI` control plane is hand-authored, not vendored
 
-`servicemeshoperator`'s package/channel/CSV (`stable` /
-`servicemeshoperator.v2.6.17` / `redhat-operators`) were confirmed against a
-live cluster's `PackageManifest` - `ansible/roles/service_mesh/tasks/install.yml`
-re-validates this on every run rather than trusting it blindly, since a
-different cluster's catalog can publish a different CSV.
+The Sail Operator's `Istio`/`IstioCNI` CRDs (`sailoperator.io/v1`) have no
+equivalent in `cluster-istio` (which only knows how to render Maistra's
+`ServiceMeshControlPlane`/`ServiceMeshMember`), so `templates/istio.yaml` and
+`templates/istiocni.yaml` create them directly. CA delegation is expressed
+via `pilot.env.ENABLE_CA_SERVER: "false"` + `global.caAddress` pointing at
+the vendored `cert-manager-istio-csr` chart's Service, so mesh workload
+identity certs chain to the same Vault PKI root as everything else
+cert-manager issues (`templates/clusterissuer-istio.yaml`'s
+`vault-issuer-istio` `ClusterIssuer`).
 
-`templates/istio.yaml`'s `spec.security.certificateAuthority` block
-(delegating the control plane's CA to `vault-issuer-istio`) is asserted from
-general knowledge of OpenShift Service Mesh / Maistra's cert-manager
-integration, **not verified** against this operator's exact CSV. Confirm the
-real field names via `oc explain
-servicemeshcontrolplane.spec.security --api-version=maistra.io/v2` (or the
-operator's docs) on a live cluster before relying on it. The Vault
-`auth/kubernetes/role/istio-issuer` binding
-(`ansible/roles/vault/kustomize/unseal-configure/configmap.yaml`) was
-updated to the `cert-manager`/`cert-manager` controller identity (matching
-`pki/roles/cert-manager`'s own role, on the assumption the same controller
-processes both delegation chains) - re-verify alongside the CA-delegation
-mechanism itself.
+## Why the Subscription channel/CSV and the CA-delegation mechanism are still flagged as assumptions
 
-Legacy OSSM/Maistra 2.x is assumed to manage the Istio CNI plugin
-automatically as part of the control plane install on OpenShift (unlike the
-Sail Operator's separate `IstioCNI` CR) - not independently verified either.
+`servicemeshoperator3`'s package/channel/CSV (`stable` /
+`servicemeshoperator3.v3.4.1` / `redhat-operators`) were never installed on
+a live cluster from this repo - `ansible/roles/service_mesh/tasks/install.yml`
+validates the package/channel/CSV actually exist on-cluster before applying
+rather than trusting the hardcoded values blindly.
+
+`templates/istio.yaml`'s `pilot.env.ENABLE_CA_SERVER`/`global.caAddress`
+CA-delegation mechanism and the `cert-manager-istio-csr` chart version
+(`0.16.0`) are asserted from general Sail Operator/istio-csr documentation,
+**not verified** against a live cluster. Confirm both hold for the actual
+installed CSV before relying on them.
+
+`IstioCNI` is required on OpenShift with the Sail Operator (unlike legacy
+Maistra, which manages the CNI plugin as part of the control plane install)
+- not independently verified either.
 
 **Infrastructure + mTLS rollout is staged, not immediate.** This chart only
 brings the mesh control plane up; it does not create

@@ -97,19 +97,11 @@ data:
 
     printf 'path "pki/sign/istio" {\n  capabilities = ["create","update"]\n}\n' | vault policy write istio-issuer -
 
-    # bound_service_account_names/namespaces=cert-manager/cert-manager: the
-    # ServiceMeshControlPlane (gitops/charts/service-mesh/templates/istio.yaml)
-    # delegates its CA to this issuer via spec.security.certificateAuthority,
-    # processed by cert-manager's own controller - same identity as
-    # pki/roles/cert-manager's role above, since it's the same controller pod
-    # regardless of which Issuer/CertificateRequest it's servicing. Previously
-    # bound to the now-removed cert-manager-istio-csr workload's own identity
-    # (zuno-mesh namespace) when that chart requested certs itself directly.
-    # ASSUMPTION: the SMCP-to-cert-manager delegation mechanism itself is
-    # unverified against a live cluster - see gitops/charts/service-mesh/templates/istio.yaml.
+    # bound_service_account_names=cert-manager-istio-csr: fixed by the
+    # cert-manager-istio-csr chart itself, not configurable.
     vault write auth/kubernetes/role/istio-issuer \
-      bound_service_account_names=cert-manager \
-      bound_service_account_namespaces=cert-manager \
+      bound_service_account_names=cert-manager-istio-csr \
+      bound_service_account_namespaces=zuno-mesh \
       policies=istio-issuer \
       ttl=1h
 

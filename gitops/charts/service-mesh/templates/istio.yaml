@@ -1,57 +1,47 @@
 {{- if .Values.istio.enabled }}
-# Created directly by this wrapper chart rather than by the vendored
-# cluster-istio dependency's own serviceMeshControlPlane.yaml template
-# (cluster-istio.istio.enabledControlPlane is left false) - that template
-# hardcodes its spec with no values hook for spec.security.certificateAuthority,
-# so it can't express delegating the mesh CA to the Vault-backed ClusterIssuer
-# below. Renders after clusterissuer-istio (sync-wave -10) so the issuer
-# already exists when this control plane comes up.
-#
-# ASSUMPTION: the spec.security.certificateAuthority shape below is asserted
-# from general knowledge of OpenShift Service Mesh / Maistra's cert-manager
-# integration, not verified against this operator's exact CSV
-# ({{ .Values.istioSubscription.csv }}). Confirm the real field names via
-# `oc explain servicemeshcontrolplane.spec.security --api-version=maistra.io/v2`
-# on a live cluster (or the operator's docs) before relying on it - same
-# posture as istioSubscription's channel/CSV pin above.
-apiVersion: maistra.io/v2
-kind: ServiceMeshControlPlane
+# CA delegated to cert-manager-istio-csr (pilot.env.ENABLE_CA_SERVER=false +
+# global.caAddress) instead of istiod's built-in self-signed CA, so mesh
+# workload identity certs chain to the same Vault PKI root as everything
+# else cert-manager issues. Renders last (sync-wave 40), after
+# clusterissuer-istio (-10), the cert-manager-istio-csr subchart (default
+# wave 0) and istiocni (30) - ASSUMPTION: not verified against a live
+# servicemeshoperator3 CSV; confirm ENABLE_CA_SERVER/caAddress is still the
+# correct delegation mechanism for this operator version before relying on it.
+apiVersion: sailoperator.io/v1
+kind: Istio
 metadata:
-  name: {{ .Values.meshNamespace | default "default" | quote }}
-  namespace: {{ .Values.meshNamespace }}
+  name: default
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "25"
+    argocd.argoproj.io/sync-wave: "40"
 spec:
-  version: {{ .Values.istioVersion | quote }}
-  telemetry:
-    type: Istiod
-  policy:
-    type: Istiod
-  general:
-    logging:
-      logAsJSON: true
-  runtime:
-    defaults:
-      pod:
-        priorityClassName: zuno-platform-critical
-      container:
-        imagePullPolicy: IfNotPresent
-  gateways:
-    enabled: true
-    openshiftRoute:
+  namespace: {{ .Values.meshNamespace }}
+  updateStrategy:
+    type: InPlace
+    inactiveRevisionDeletionGracePeriodSeconds: 30
+  values:
+    global:
+      networkPolicy:
+        enabled: true
+      proxy:
+        startupProbe:
+          enabled: true
+          failureThreshold: 4
+      meshID: zuno01
+      istioNamespace: {{ .Values.meshNamespace }}
+      priorityClassName: zuno-platform-critical
+      imagePullPolicy: IfNotPresent
+      caAddress: cert-manager-istio-csr.{{ .Values.meshNamespace }}.svc:443
+      platform: openshift
+    pilot:
+      env:
+        ENABLE_CA_SERVER: "false"
+    telemetry:
+      v2:
+        prometheus:
+          enabled: true
+        enabled: true
       enabled: true
-  addons:
-    prometheus:
-      enabled: true
-  security:
-    certificateAuthority:
-      type: Custom
-      custom:
-        provider: cert-manager
-        certManager:
-          address: "vault-issuer-istio.cert-manager.io"
-          issuerKind: ClusterIssuer
-          issuerName: vault-issuer-istio
+  version: {{ .Values.istioVersion }}
 {{- end }}

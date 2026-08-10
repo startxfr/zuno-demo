@@ -1,45 +1,39 @@
-# Gates which resources render - cluster-istio.projectOperator/operatorIstio
-# for the Day 0 OLM install (gitops/apps/service-mesh/application-d0.yaml),
-# istio/clusterIssuer/cluster-istio.istio for the Day 1 operands
-# (application-d1.yaml). All default false so `helm template` with no
-# overrides renders nothing.
-
-# Gates templates/istio.yaml (this wrapper's own ServiceMeshControlPlane CR -
-# see cluster-istio.istio.enabledControlPlane below for why that CR isn't
-# created by the vendored chart itself).
-istio:
-  enabled: false
+# Gates which resources render - cluster-istio.operatorIstio for the Day 0
+# OLM install (gitops/apps/service-mesh/application-d0.yaml), the rest for
+# the Day 1 operands (application-d1.yaml). All default false so `helm
+# template` with no overrides renders nothing.
 clusterIssuer:
+  enabled: false
+# Gates the vendored cert-manager-istio-csr subchart - see Chart.yaml's
+# dependency `condition` for why this isn't nested under
+# cert-manager-istio-csr itself.
+istioCsr:
+  enabled: false
+istiocni:
+  enabled: false
+# Gates templates/istio.yaml (this wrapper's own Istio CR).
+istio:
   enabled: false
 
 # Discovered by ansible and injected via gitops_app_extra_helm_values on the
 # -d1 apply; clusterissuer-istio.yaml renders nothing until it's set.
 vaultServiceName: ""
 
-# Verified against the live PackageManifest (oc get packagemanifest
-# servicemeshoperator -n openshift-marketplace): catalog redhat-operators,
-# defaultChannel stable, channel stable's currentCSV is
-# servicemeshoperator.v2.6.17 (no trailing "-0" - that was an unverified
-# guess carried over from a different cluster's example values.yaml).
-istioSubscription:
-  channel: stable
-  name: servicemeshoperator
-  namespace: istio-operators
-  csv: servicemeshoperator.v2.6.17
-
-istioVersion: "v2.6"
+istioVersion: v1.30.3
 meshNamespace: zuno-mesh
 
 # Thin wrapper around the startx `cluster-istio` chart (vendored as a Helm
-# dependency, resolved via the "alias:startx" Helm repo). Structure mirrors
-# gitops/charts/cert-manager/values.yaml's cluster-certmanager block: the
-# vendored chart only installs the operator (project/projectOperator +
-# operatorIstio); the ServiceMeshControlPlane CR is created by this wrapper's
-# own templates/istio.yaml instead of cluster-istio's own
-# serviceMeshControlPlane.yaml template, because that template hardcodes its
-# spec with no values hook for spec.security.certificateAuthority - it can't
-# express our Vault-backed CA delegation. ServiceMeshMember has no such
-# sensitivity, so it's left to the vendored chart via istio.members.
+# dependency, resolved via the "alias:startx" Helm repo) - but only for its
+# generic operator subchart (operatorIstio), which renders nothing more than
+# a Subscription driven entirely by these values. cluster-istio's own
+# top-level templates (serviceMeshControlPlane.yaml/serviceMeshMember.yaml)
+# are Maistra/OSSM-2-specific and aren't used here - OSSM 3 (Sail Operator)
+# has no ServiceMeshControlPlane/ServiceMeshMember CRDs at all. The Day 1
+# Istio/IstioCNI control plane is instead hand-authored in this chart's own
+# templates/ (istio.yaml, istiocni.yaml), same split this repo already uses
+# for cert-manager/cluster-certmanager (vendored chart installs the operator
+# only; the wrapper owns the operand CRs) - just with cluster-istio unable
+# to own the operand at all in this case, rather than choosing not to.
 cluster-istio:
   context: &context
     scope: zuno
@@ -48,52 +42,25 @@ cluster-istio:
     component: service-mesh
     app: service-mesh
 
-  # zuno-mesh itself is owned/created exclusively by gitops/charts/namespaces
-  # (see ansible/roles/service_mesh/tasks/install.yml) - cluster-istio.project
-  # stays disabled so this chart never fights that ownership. projectOperator
-  # instead creates the dedicated istio-operators namespace the Subscription
-  # below lives in.
-  project:
-    enabled: false
-    context:
-      <<: *context
-
-  projectOperator:
-    enabled: false
-    context:
-      <<: *context
-    project:
-      enabled: true
-      type: namespace
-      name: istio-operators
-      display_name: Operator ISTIO
-      description: ISTIO operators configured by Zuno
-    rbac:
-      enabled: false
-    networkpolicy:
-      enabled: false
-    limits:
-      enabled: false
-    quotas:
-      enabled: false
-    serviceAccounts:
-      enabled: false
-    dockercfg:
-      enabled: false
-
   operatorIstio:
     enabled: false
     context:
       <<: *context
-      version: "2.6.17"
+      version: "3.4.1"
     subscription:
       enabled: true
-      name: servicemeshoperator
-      namespace: istio-operators
-      version: "v2.6.17"
+      name: servicemeshoperator3
+      # ASSUMPTION: not yet verified against a live cluster (same posture as
+      # cluster-istio's OSSM2 config before it). If `make d0 check
+      # service-mesh` shows this is wrong, discover the real
+      # package/channel/catalog/CSV from the cluster's PackageManifest
+      # instead of trusting these hardcoded values.
+      namespace: openshift-operators
+      version: "v3.4.1"
       operator:
         channel: stable
-        name: servicemeshoperator
+        name: servicemeshoperator3
+        csv: servicemeshoperator3
         # Deviates from the startx chart's own default (Manual): this repo
         # has no ansible InstallPlan-approval step, so every other
         # alias:startx-wrapped operator here (see cert-manager/values.yaml)
@@ -103,58 +70,48 @@ cluster-istio:
           name: redhat-operators
           namespace: openshift-marketplace
     operatorGroup:
-      enabled: true
-      name: istio-operators
-      namespace: istio-operators
-      # servicemeshoperator's CSV only supports the AllNamespaces install
-      # mode (verified on a live cluster: OwnNamespace/SingleNamespace/
-      # MultiNamespace are all `supported: false` in its
-      # spec.installModes) - target: all-ns renders an OperatorGroup with no
-      # targetNamespaces instead of scoping it to istio-operators, same
-      # reason the pre-swap chart put its Subscription in the shared
-      # openshift-operators namespace.
-      target: "all-ns"
-      # ServiceMeshMember is v1 (verified against the real chart's
-      # templates/serviceMeshMember.yaml), not v2 as some upstream examples
-      # show.
-      providedAPIs: "ServiceMeshControlPlane.v2.maistra.io,ServiceMeshMember.v1.maistra.io"
-
-  # Master toggle for cluster-istio's own istio.* templates (currently only
-  # serviceMeshMember.yaml, since enabledControlPlane is false below).
-  istio:
-    enabled: false
-    hooked: false
-    infra_enabled: false
-    # false: this wrapper creates the ServiceMeshControlPlane itself
-    # (templates/istio.yaml) instead - see the comment above cluster-istio:.
-    enabledControlPlane: false
-    name: default
-    members:
+      # openshift-operators already carries OpenShift's own global
+      # AllNamespaces OperatorGroup - creating a second one here would make
+      # OLM reject the Subscription (TooManyOperatorGroups). No dedicated
+      # namespace/project either (project/projectOperator stay at the
+      # vendored chart's own enabled: false default): unlike OSSM 2, OSSM 3
+      # doesn't need one of its own.
       enabled: false
-      list:
-        # The four namespaces gitops/charts/namespaces pre-labels
-        # istio-injection: enabled from the start of Day 0 (see
-        # ansible/roles/service_mesh/README.md for why zuno-data's pods need
-        # an explicit rollout-restart once this component is Ready).
-        #
-        # controlePlane must match templates/istio.yaml's
-        # ServiceMeshControlPlane metadata.name, which is meshNamespace
-        # ("zuno-mesh") - not the literal string "default". values.yaml isn't
-        # templated, so this can't reference .Values.meshNamespace directly.
-        - namespace: zuno-data
-          controlePlane: zuno-mesh
-          controlePlaneNS: zuno-mesh
-        - namespace: zuno-auth
-          controlePlane: zuno-mesh
-          controlePlaneNS: zuno-mesh
-        - namespace: zuno-ai-run
-          controlePlane: zuno-mesh
-          controlePlaneNS: zuno-mesh
-        - namespace: zuno-ai-build
-          controlePlane: zuno-mesh
-          controlePlaneNS: zuno-mesh
 
-  # Optional observability stack cluster-istio can also install (Elastic,
-  # Loki, Kiali, Jaeger operators). Not used elsewhere in this repo - left at
-  # the chart's own defaults (enabled: false) as a documented follow-up
-  # rather than part of this swap.
+# Values validated against the actual published chart's values.schema.json
+# (v0.16.0, https://charts.jetstack.io) - additionalProperties: false, so
+# unknown keys (serviceAccount.name, fullnameOverride, priorityClassName -
+# none of which this chart's schema supports) fail the render outright.
+# ServiceAccount/Service names are NOT configurable here: both default to
+# the fixed name "cert-manager-istio-csr" regardless of release name (see
+# `cert-manager-istio-csr.name` in the chart's _helpers.tpl), which is why
+# istio.yaml's global.caAddress and the Vault kubernetes-auth role
+# (ansible/roles/vault) both hardcode that same name. No priorityClassName
+# support in this chart version - a real limitation, not an oversight; if
+# scheduling priority for istio-csr's own pods matters, revisit via
+# `resources`/`nodeSelector` or a future chart version.
+cert-manager-istio-csr:
+  replicaCount: 2
+  app:
+    certmanager:
+      # Namespace istio-csr creates its own CertificateRequests in - must be
+      # where istio-csr itself runs (zuno-mesh), not cert-manager's namespace.
+      namespace: zuno-mesh
+      issuer:
+        name: vault-issuer-istio
+        kind: ClusterIssuer
+        group: cert-manager.io
+    controller:
+      leaderElectionNamespace: zuno-mesh
+      configmapNamespaceSelector: "istio-injection=enabled"
+    istio:
+      namespace: zuno-mesh
+      revisions: ["default"]
+    server:
+      maxCertificateDuration: 1h
+    tls:
+      trustDomain: cluster.local
+      certificateDuration: 24h
+      certificateDNSNames:
+        - cert-manager-istio-csr.zuno-mesh.svc
+      istiodCertificateDuration: 1h
