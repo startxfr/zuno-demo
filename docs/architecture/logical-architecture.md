@@ -21,4 +21,4 @@ flowchart TB
     AIGW -. secrets .-> VAULT[Vault]
 ```
 
-Dedicated frontends/BFFs are instantiated per agent; runtime, AI gateway and MCP gateway are shared platform services.
+Dedicated frontends/BFFs are instantiated per agent; runtime, AI gateway and MCP gateway are shared platform services. The PostgreSQL + pgvector target is an HA cluster (see `docs/architecture/data-architecture.md`), not a single instance.

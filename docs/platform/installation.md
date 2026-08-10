@@ -13,11 +13,13 @@ The public operator interface is intentionally small, structured as Day 0
 ```bash
 make day0|d0 check [component]
 make day0|d0 install [component]
+make day0|d0 uninstall [component]  # reverse order
 make day0|d0 all [component]        # check + install, in order
 
 make day1|d1 check [component]      # `agents` runs the ADR-0053 acceptance gate
 make day1|d1 build [component]
 make day1|d1 install [component]
+make day1|d1 uninstall [component]  # reverse order
 make day1|d1 all [component]
 ```
 
@@ -36,7 +38,8 @@ repository as a worked example of bootstrapping the platform with ArgoCD
 alone, with no Ansible involved: install the OpenShift GitOps operator,
 then `oc apply -f gitops/root-app-of-apps.yaml`. This path is illustrative
 only - it is never applied by `make day0|d0`/`day1|d1`, and isn't
-exercised by `make check` or CI. It also has no native ordering between a
+exercised by `make day1|d1 check agents` (the ADR-0053 gate) or CI. It
+also has no native ordering between a
 component's `-d0` and `-d1` Applications (unlike the `make day0|d0`/
 `day1|d1` path, where Ansible applies `-d0` and waits for it to be
 Synced+Healthy before applying `-d1`) - see ADR-0311 and ADR-0312's

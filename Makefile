@@ -8,7 +8,7 @@ EXTRA_VARS ?=
 # ADR-0056: Day 0 (cluster prerequisites) / Day 1 (build + run the
 # platform) sequencing, replacing the former precheck/prepare/configure/
 # install/check interface outright.
-DAY0_COMPONENTS := admin-context argocd namespaces vault cert-manager external-secrets keycloak postgresql smtp nfd nvidia-gpu observability openshift-ai
+DAY0_COMPONENTS := admin-context argocd namespaces vault cert-manager external-secrets keycloak postgresql service-mesh smtp nfd nvidia-gpu observability openshift-ai
 DAY0_VERBS := check install uninstall all
 
 # Day 1 has two different valid component sets depending on the verb:
