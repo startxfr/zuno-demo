@@ -12,13 +12,13 @@
       - vault
       - cert_manager
       - external_secrets
+      - observability
       - postgresql
       - service_mesh
       - keycloak
       - smtp
       - nfd
       - nvidia_gpu
-      - observability
       - openshift_ai
   tasks:
     - name: Resolve cluster API credentials
