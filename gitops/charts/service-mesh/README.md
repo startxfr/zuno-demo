@@ -1,43 +1,60 @@
 # service-mesh
 
 Referenced by `gitops/apps/service-mesh/application-d0.yaml`
-(subscription.enabled: the `servicemeshoperator3` `Subscription` in
-`openshift-operators`) and `application-d1.yaml` (clusterIssuer.enabled +
-cert-manager-istio-csr.enabled + istiocni.enabled + istio.enabled: the
-Vault-backed mesh CA, `IstioCNI`, and the `Istio` control plane itself in
-`zuno-mesh`) - same `-d0`/`-d1` operator/operand split as `cert-manager`
-(ADR-0312).
+(`cluster-istio.projectOperator`/`operatorIstio`: the `servicemeshoperator`
+`Subscription` in `istio-operators`) and `application-d1.yaml`
+(`clusterIssuer.enabled` + `istio.enabled` + `cluster-istio.istio.enabled`/
+`members.enabled`: the Vault-backed mesh CA, the `ServiceMeshControlPlane`,
+and the `ServiceMeshMember` set) - see `gitops/apps/README.md` - same
+`-d0`/`-d1` operator/operand split as `cert-manager` (ADR-0312).
 
-Deployed **after `postgresql`, before `keycloak`** in `day0_components`
-(`ansible/playbooks/day0_install.yml`): `zuno-data`/`zuno-auth`/
-`zuno-ai-run`/`zuno-ai-build` are pre-labeled `istio-injection: enabled` by
-`gitops/charts/namespaces` from the very start of Day 0, but the injection
-webhook doesn't exist until this component installs -  so postgresql's pods
-(created before this component) need an explicit rollout-restart to pick up
-their sidecar (done at the end of `ansible/roles/service_mesh/tasks/install.yml`),
-while keycloak and every Day 1 AI/agent workload (deployed after this
-component) auto-inject on first create with no restart needed.
+Wraps the startx `cluster-istio` chart (`alias:startx`, same convention as
+`openshift-ai`/`nvidia-gpu`/`keycloak`/`postgresql`/`nfd`/`cert-manager`) as
+its sole Helm dependency, replacing the previous direct
+`https://charts.jetstack.io` dependency on `cert-manager-istio-csr` and the
+Sail Operator (`servicemeshoperator3`, `sailoperator.io` `Istio`/`IstioCNI`
+CRs) approach it came with.
 
-`zuno-vault` is deliberately **not** meshed - it's the mTLS/PKI trust root
-for cert-manager's `vault-issuer` and this chart's own `vault-issuer-istio`,
-so adding it to the mesh risks a bootstrap circularity between Vault and the
-CA that would sign its own sidecar's certificate.
+## Why the `ServiceMeshControlPlane` is created by this chart, not `cluster-istio`
 
-## Why the CSV, istio-csr chart version, and CA-delegation mechanism are flagged as assumptions
+`cluster-istio`'s own `templates/serviceMeshControlPlane.yaml` (gated by
+`istio.enabledControlPlane`) renders a **hardcoded** spec with no values
+hook for `spec.security.certificateAuthority` - it can't express delegating
+the mesh CA to our Vault-backed `ClusterIssuer`. So this wrapper leaves
+`cluster-istio.istio.enabledControlPlane: false` and creates the
+`ServiceMeshControlPlane` itself (`templates/istio.yaml`), the same split
+this repo already uses for `cert-manager`/`cluster-certmanager` (vendored
+chart installs the operator only; the wrapper owns the operand CR).
+`ServiceMeshMember` has no such sensitivity, so it's left to the vendored
+chart via `cluster-istio.istio.members`.
 
-Like `cert-manager` before it, `servicemeshoperator3` was never installed
-anywhere in this repository before Subscription channel/CSV
-(`stable` / `servicemeshoperator3.v3.4.1`) are taken as given rather than
-discovered from the cluster's `PackageManifest`. `ansible/roles/service_mesh/tasks/precheck.yml`
-validates the CSV is actually published before applying - if it isn't,
-switch to the dynamic-discovery pattern `external_secrets`/`postgresql`
-already use instead of hardcoding.
+## Why the CSV, CA-delegation mechanism, and CNI handling are flagged as assumptions
 
-The `cert-manager-istio-csr` chart version pin (`0.14.0`,
-`https://charts.jetstack.io`) and the `pilot.env.ENABLE_CA_SERVER` /
-`global.caAddress` mechanism for delegating CA duties away from istiod's
-built-in self-signed CA are asserted from general knowledge of upstream
-Istio/cert-manager-istio-csr, not verified against this operator's exact
-CSV. Confirm both against the operator's supported-versions
-docs/ConfigMap and the chart's published `values.schema.json` before
-relying on them in a real rollout.
+`servicemeshoperator` was never installed anywhere in this repository before
+- its exact package/channel/CSV (`stable` / `servicemeshoperator.v2.6.17-0`
+/ `redhat-operators`) are taken as given rather than discovered from the
+cluster's `PackageManifest` (same posture as the Sail Operator pin this
+chart previously used).
+
+`templates/istio.yaml`'s `spec.security.certificateAuthority` block
+(delegating the control plane's CA to `vault-issuer-istio`) is asserted from
+general knowledge of OpenShift Service Mesh / Maistra's cert-manager
+integration, **not verified** against this operator's exact CSV. Confirm the
+real field names via `oc explain
+servicemeshcontrolplane.spec.security --api-version=maistra.io/v2` (or the
+operator's docs) on a live cluster before relying on it. The Vault
+`auth/kubernetes/role/istio-issuer` binding
+(`ansible/roles/vault/kustomize/unseal-configure/configmap.yaml`) was
+updated to the `cert-manager`/`cert-manager` controller identity (matching
+`pki/roles/cert-manager`'s own role, on the assumption the same controller
+processes both delegation chains) - re-verify alongside the CA-delegation
+mechanism itself.
+
+Legacy OSSM/Maistra 2.x is assumed to manage the Istio CNI plugin
+automatically as part of the control plane install on OpenShift (unlike the
+Sail Operator's separate `IstioCNI` CR) - not independently verified either.
+
+**Infrastructure + mTLS rollout is staged, not immediate.** This chart only
+brings the mesh control plane up; it does not create
+`PeerAuthentication`/`AuthorizationPolicy` resources - left as a documented,
+opt-in follow-up (see `ansible/roles/service_mesh/README.md`).

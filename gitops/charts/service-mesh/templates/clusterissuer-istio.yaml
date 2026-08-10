@@ -3,14 +3,12 @@
 # istio-issuer role/policy are provisioned (ansible/roles/vault). Deliberately
 # a separate ClusterIssuer/PKI role from cert-manager's own vault-issuer
 # (pki/sign/cert-manager) - isolates the mesh's SPIFFE trust root from
-# general-purpose TLS certs. cert-manager-istio-csr (not istiod) requests
-# certs from this issuer directly.
+# general-purpose TLS certs. The ServiceMeshControlPlane (templates/istio.yaml)
+# delegates CA duties to this issuer directly via spec.security.certificateAuthority.
 #
-# sync-wave must be negative: the vendored cert-manager-istio-csr subchart's
-# own resources are unannotated (default wave "0") and its Deployment can't
-# go Ready without this issuer already existing - a positive wave here would
-# deadlock ArgoCD's wave progression (istio-csr never Healthy -> ClusterIssuer
-# wave never reached -> istio-csr never Healthy).
+# sync-wave must be negative: templates/istio.yaml's ServiceMeshControlPlane
+# (wave 25) can't go Ready without this issuer already existing - a later
+# wave here would deadlock ArgoCD's wave progression.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -28,7 +26,11 @@ spec:
         role: istio-issuer
         mountPath: /v1/auth/kubernetes
         serviceAccountRef:
-          # Fixed by the cert-manager-istio-csr chart itself (not
-          # configurable via its values.schema.json) - see values.yaml.
-          name: cert-manager-istio-csr
+          # cert-manager's own controller ServiceAccount processes the
+          # CertificateRequest chain the ServiceMeshControlPlane's CA
+          # delegation creates - same identity as cert-manager's own
+          # vault-issuer ClusterIssuer. Must match
+          # ansible/roles/vault/kustomize/unseal-configure/configmap.yaml's
+          # auth/kubernetes/role/istio-issuer binding.
+          name: cert-manager
 {{- end }}

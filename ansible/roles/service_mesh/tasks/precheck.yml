@@ -22,11 +22,11 @@
     name: vault-issuer-istio
   register: _service_mesh_issuer_lookup
 
-- name: "service_mesh | look up the Istio control plane (default)"
+- name: "service_mesh | look up the ServiceMeshControlPlane (zuno-mesh)"
   kubernetes.core.k8s_info:
-    api_version: sailoperator.io/v1
-    kind: Istio
-    name: default
+    api_version: maistra.io/v2
+    kind: ServiceMeshControlPlane
+    name: zuno-mesh
     namespace: zuno-mesh
   register: _service_mesh_istio_lookup
 

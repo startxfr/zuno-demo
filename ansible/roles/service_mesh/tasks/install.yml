@@ -12,18 +12,18 @@
     # discovered - see gitops/charts/service-mesh/README.md), unlike
     # external_secrets/postgresql's PackageManifest-driven discovery. Fail
     # fast at this boundary instead of letting OLM silently fail to resolve.
-- name: "service_mesh | look up the servicemeshoperator3 PackageManifest"
+- name: "service_mesh | look up the servicemeshoperator PackageManifest"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
     kind: PackageManifest
     namespace: openshift-marketplace
-    name: servicemeshoperator3
+    name: servicemeshoperator
   register: _service_mesh_pkg_info
 
 - name: "service_mesh | fail if the package isn't published anywhere on this cluster"
   ansible.builtin.fail:
     msg: >-
-      No PackageManifest named 'servicemeshoperator3' was found in
+      No PackageManifest named 'servicemeshoperator' was found in
       openshift-marketplace. Check `oc get packagemanifest -n
       openshift-marketplace | grep -i servicemesh` for the correct package
       name on this cluster and update gitops/charts/service-mesh/values.yaml
@@ -33,10 +33,10 @@
 - name: "service_mesh | fail if the configured channel/startingCSV aren't actually published"
   ansible.builtin.fail:
     msg: >-
-      Package 'servicemeshoperator3' (catalog
+      Package 'servicemeshoperator' (catalog
       '{{ _service_mesh_pkg_info.resources[0].status.catalogSource }}') does
       not publish channel 'stable' with CSV
-      'servicemeshoperator3.v3.4.1'. Published channels/CSVs:
+      'servicemeshoperator.v2.6.17-0'. Published channels/CSVs:
       {{ _service_mesh_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
       Update gitops/charts/service-mesh/values.yaml (istioSubscription) to
       match what this cluster actually publishes.
@@ -44,12 +44,12 @@
     _service_mesh_pkg_info.resources[0].status.channels
     | selectattr('name', 'equalto', 'stable')
     | map(attribute='currentCSV')
-    | select('equalto', 'servicemeshoperator3.v3.4.1')
+    | select('equalto', 'servicemeshoperator.v2.6.17-0')
     | list | length == 0
 
-# Operator install (d0) is separate from the mesh CA / IstioCNI / Istio
-# control plane (all d1, applied below once the Vault client Service is
-# discovered) - same split as cert_manager/external_secrets.
+# Operator install (d0) is separate from the mesh CA / ServiceMeshControlPlane
+# (all d1, applied below once the Vault client Service is discovered) - same
+# split as cert_manager/external_secrets.
 - name: "service_mesh | apply the service-mesh GitOps Application (d0: operator install only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -57,8 +57,11 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
-      subscription:
-        enabled: true
+      cluster-istio:
+        projectOperator:
+          enabled: true
+        operatorIstio:
+          enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 10
 
@@ -66,12 +69,12 @@
     # apply_resource_health_checks.yml) reports d0 Healthy once the CSV
     # succeeds, but confirm directly too - avoids guessing the operator's own
     # controller-manager Deployment name (never verified on a live cluster).
-- name: "service_mesh | look up the servicemeshoperator3 Subscription's installed CSV"
+- name: "service_mesh | look up the servicemeshoperator Subscription's installed CSV"
   kubernetes.core.k8s_info:
     api_version: operators.coreos.com/v1alpha1
     kind: Subscription
-    name: servicemeshoperator3
-    namespace: openshift-operators
+    name: servicemeshoperator
+    namespace: istio-operators
   register: _service_mesh_subscription
   until: (_service_mesh_subscription.resources | default([]) | length) > 0 and (_service_mesh_subscription.resources[0].status.installedCSV | default('')) | length > 0
   retries: 30
@@ -82,7 +85,7 @@
     api_version: operators.coreos.com/v1alpha1
     kind: ClusterServiceVersion
     name: "{{ _service_mesh_subscription.resources[0].status.installedCSV }}"
-    namespace: openshift-operators
+    namespace: istio-operators
   register: _service_mesh_csv
   until: (_service_mesh_csv.resources | default([]) | length) > 0 and (_service_mesh_csv.resources[0].status.phase | default('')) == 'Succeeded'
   retries: 30
@@ -108,21 +111,22 @@
          | map(attribute='metadata.name') | list)[0]
       }}
 
-- name: "service_mesh | apply the service-mesh GitOps Application (d1: mesh CA, IstioCNI, Istio control plane)"
+- name: "service_mesh | apply the service-mesh GitOps Application (d1: mesh CA, ServiceMeshControlPlane, ServiceMeshMember)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "service-mesh"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_extra_helm_values:
-      clusterIssuer:
-        enabled: true
-      istioCsr:
-        enabled: true
-      istiocni:
-        enabled: true
       istio:
         enabled: true
+      clusterIssuer:
+        enabled: true
+      cluster-istio:
+        istio:
+          enabled: true
+          members:
+            enabled: true
       vaultServiceName: "{{ _service_mesh_vault_service_name }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
@@ -139,11 +143,11 @@
   retries: 30
   delay: 10
 
-- name: "service_mesh | wait for the Istio control plane (default) to report Ready"
+- name: "service_mesh | wait for the ServiceMeshControlPlane (zuno-mesh) to report Ready"
   kubernetes.core.k8s_info:
-    api_version: sailoperator.io/v1
-    kind: Istio
-    name: default
+    api_version: maistra.io/v2
+    kind: ServiceMeshControlPlane
+    name: zuno-mesh
     namespace: zuno-mesh
   register: _service_mesh_istio
   until: >-

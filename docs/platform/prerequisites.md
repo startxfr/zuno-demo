@@ -9,7 +9,7 @@ The MVP assumes an existing OpenShift 4.20 AWS IPI cluster. Preparation/configur
 - Vault;
 - External Secrets Operator (syncs Vault secrets into cluster `Secret`s);
 - cert-manager (Vault-backed `ClusterIssuer` for workload/mesh certs);
-- service mesh (Istio via the Sail Operator/`servicemeshoperator3`, mesh-wide mTLS);
+- service mesh (Istio via `servicemeshoperator`/Red Hat OpenShift Service Mesh, mesh-wide mTLS);
 - PostgreSQL with pgvector and TimescaleDB support - provisions an HA cluster (1 primary + 2 replicas plus PgBouncer), so plan StorageClass capacity accordingly, not a single instance;
 - observability stack;
 - SMTP technical identity/connectivity;
