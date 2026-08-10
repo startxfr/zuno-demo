@@ -1,0 +1,7 @@
+# Shared by two ArgoCD Applications: priorityclasses (zuno-admin-context-d0)
+# and the startx HelmChartRepository (zuno-admin-context-d1). Both default
+# false so `helm template`/`helm lint` render nothing.
+priorityClasses:
+  enabled: false
+helmChartRepository:
+  enabled: false

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: admin-context
+description: >-
+  Cluster-admin objects every other Day 0 component depends on: the four
+  zuno PriorityClasses and the startx HelmChartRepository.
+type: application
+version: 0.1.0

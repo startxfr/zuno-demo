@@ -1,0 +1,33 @@
+---
+# Registers the startx Helm chart repository in the OpenShift Developer
+# Catalog (cluster-scoped, helm.openshift.io/v1beta1) - separate from the
+# ArgoCD-native repository Secret (ansible/roles/argocd/kustomize/appproject/
+# repository-startx.yaml) that lets ArgoCD itself resolve startx chart
+# dependencies at render time.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-admin-context-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-209"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/admin-context
+    helm:
+      releaseName: zuno-admin-context-d1
+      values: |
+        helmChartRepository:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

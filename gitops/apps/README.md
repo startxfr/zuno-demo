@@ -58,16 +58,20 @@ Operator config), or at `gitops/charts/<component>` in this repository for
 Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).
 
-Not every component has an Application here. `argocd` and `admin_context`
-are the remaining exceptions - `argocd` installs itself and creates the
-`AppProject` (`zuno`) every `Application.spec.project` here references;
-both are a bootstrap chicken-and-egg no `Application` can resolve, so they
-still apply raw manifests directly via `ansible/tasks/apply_kustomize.yml`
-(ADR-0310). `vault`'s imperative unseal is likewise a one-shot/imperative
-action rather than a standing installed component, and stays outside this
-directory for the same reason - it calls Vault's own API and captures
-generated secret material at runtime, which no combination of ArgoCD/Helm
-can express. `mlops` is out of scope for v0 (ADR-0301/0302 are v3).
+Not every component has an Application here. `argocd` is the sole remaining
+exception - it installs itself and creates the `AppProject` (`zuno`) every
+`Application.spec.project` here references, a bootstrap chicken-and-egg no
+`Application` can resolve, so it still applies raw manifests directly via
+`ansible/tasks/apply_kustomize.yml` (ADR-0310). `admin_context` used to be
+in this bucket too, for the same reason, but the Day 0 sequence now runs
+`argocd` before it, so the `AppProject` is always already in place by the
+time `admin_context` registers its own Applications - see `admin-context`
+in the table below and ADR-0314. `vault`'s imperative unseal is likewise a
+one-shot/imperative action rather than a standing installed component, and
+stays outside this directory for the same reason - it calls Vault's own API
+and captures generated secret material at runtime, which no combination of
+ArgoCD/Helm can express. `mlops` is out of scope for v0 (ADR-0301/0302 are
+v3).
 
 `sql_schema`'s and `rag`'s one-shot SQL `Job`s (schema/fixtures applies
 against PostgreSQL) *are* covered here as of ADR-0313, unlike `vault`'s
@@ -173,6 +177,7 @@ Directories present:
 
 | Component | Source |
 |---|---|
+| `admin-context` | local chart, `gitops/charts/admin-context` (ADR-0314 - `-d0`: the four zuno `PriorityClass` objects, `priorityClasses.enabled`; `-d1`: the `startx` `HelmChartRepository`, `helmChartRepository.enabled`) - no operator, both halves are cluster-scoped |
 | `vault` | local chart, `gitops/charts/vault` (wraps Helm chart `hashicorp/vault` as a dependency) - no operator, `-d0` is a no-op |
 | `cert-manager` | local chart, `gitops/charts/cert-manager` (`-d0`: startx `cluster-certmanager` dependency for Namespace/OperatorGroup/Subscription + local `CertManager` config CR; `-d1`: Vault-backed `ClusterIssuer` - see the `cert_manager` role's README) |
 | `keycloak` | local chart, `gitops/charts/keycloak` (`-d0`: startx `operator` dependency for the RHBK `Subscription`/`OperatorGroup` - not `cluster-sso`, see that chart's Chart.yaml; `-d1`: Keycloak CR/RealmImport/ExternalSecrets - ADR-0312, see the `keycloak` role's README) |

@@ -1,0 +1,12 @@
+{{- if .Values.helmChartRepository.enabled }}
+apiVersion: helm.openshift.io/v1beta1
+kind: HelmChartRepository
+metadata:
+  name: startx
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  connectionConfig:
+    url: 'http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable'
+  name: startx
+{{- end }}

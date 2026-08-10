@@ -1,9 +1,10 @@
+{{- if .Values.priorityClasses.enabled }}
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: zuno-platform-weak
   labels:
-    zuno.io/managed-by: zuno-ansible
+    zuno.io/managed-by: argocd
 value: 1
 globalDefault: false
 description: >-
@@ -12,3 +13,4 @@ description: >-
   deliberately below zuno-workload-default so these one-shot jobs never
   preempt real business traffic, yet still explicitly classified above
   unset-priority pods.
+{{- end }}

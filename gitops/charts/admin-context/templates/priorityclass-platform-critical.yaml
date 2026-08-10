@@ -1,12 +1,14 @@
+{{- if .Values.priorityClasses.enabled }}
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: zuno-platform-critical
   labels:
-    zuno.io/managed-by: zuno-ansible
+    zuno.io/managed-by: argocd
 value: 1000000
 globalDefault: false
 description: >-
   For operators and shared platform infrastructure (Vault, Keycloak,
   PostgreSQL, ArgoCD) - must not be preempted by ordinary workload
   pods under node pressure.
+{{- end }}

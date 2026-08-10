@@ -1,7 +1,9 @@
 ---
-# Cluster-admin objects other Day 0 components depend on; runs first, before
-# argocd. StorageClass is discover-only: provisioner details vary per cluster,
-# so we only verify one exists rather than guessing parameters.
+# Cluster-admin objects other Day 0 components depend on; runs right after
+# argocd (day0_install.yml), whose zuno AppProject this role's Applications
+# reference via `project: zuno` (ADR-0314). StorageClass is discover-only:
+# provisioner details vary per cluster, so we only verify one exists rather
+# than guessing parameters.
 - name: "admin_context | discover existing StorageClasses"
   kubernetes.core.k8s_info:
     api_version: storage.k8s.io/v1
@@ -18,15 +20,22 @@
       provisioner-specific parameters here, since they vary per cluster).
   when: (_admin_context_storageclasses.resources | default([]) | length) == 0
 
-- name: "admin_context | apply the PriorityClasses"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+- name: "admin_context | apply the admin-context GitOps Application (d0: PriorityClasses)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/admin_context/kustomize/priorityclasses"
+    gitops_component_name: "admin-context"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
 
-# The zuno AppProject is applied by argocd's own install.yml, since its CRD
-# doesn't exist until that role has subscribed and reconciled the operator.
-# This binding won't exist yet on a fresh cluster (admin_context runs
-# before argocd) - that's expected, not an error.
+- name: "admin_context | apply the admin-context GitOps Application (d1: startx HelmChartRepository)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "admin-context"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
+# Consolidation/visibility point, not a new grant - this binding is created
+# by the argocd role, which now always runs before this one.
 - name: "admin_context | look up the ArgoCD application-controller ClusterRoleBinding"
   kubernetes.core.k8s_info:
     api_version: rbac.authorization.k8s.io/v1
@@ -39,7 +48,8 @@
     msg: >-
       {{ _admin_context_storageclasses.resources | length }} StorageClass(es)
       found; zuno-platform-critical/zuno-platform-important/zuno-platform-weak/
-      zuno-workload-default PriorityClasses applied.
-      zuno-argocd-application-controller-admin ClusterRoleBinding:
+      zuno-workload-default PriorityClasses and the startx HelmChartRepository
+      applied via ArgoCD. zuno-argocd-application-controller-admin
+      ClusterRoleBinding:
       {{ 'present (created by the argocd role)' if (_admin_context_argocd_crb.resources | default([]) | length) > 0
-         else 'not present yet - expected before `make d0 install argocd` has run once' }}.
+         else 'not present - unexpected, since the argocd role always runs before this one' }}.
