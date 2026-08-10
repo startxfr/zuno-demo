@@ -29,6 +29,13 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-mesh
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
   syncPolicy:
     automated:
       prune: true
