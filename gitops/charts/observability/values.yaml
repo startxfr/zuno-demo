@@ -18,7 +18,7 @@ project:
     hooked: true  # PreSync ArgoCD hook
     type: namespace
     name: openshift-opentelemetry-operator
-    display_name: Zuno OpenTelemetry Operator
+    display_name: Zuno Infra OpenTelemetry Operator
     description: "Red Hat build of OpenTelemetry Collector operator subscription, installed by Zuno."
     requester: zuno
 

@@ -110,7 +110,7 @@ platformNamespaces:
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-monitoring
-    displayName: Zuno Monitoring
+    displayName: Zuno Infra AI Monitoring
     description: >-
       OpenTelemetry Collector, Tempo and the OpenShift AI monitoring
       stack - the platform's tracing/telemetry/monitoring pipeline for the
@@ -128,7 +128,7 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
   - name: zuno-ai-build
-    displayName: Zuno AI Build
+    displayName: Zuno Infra AI Runtime
     description: >-
       In-cluster OpenShift build pipeline producing this platform's
       component images.

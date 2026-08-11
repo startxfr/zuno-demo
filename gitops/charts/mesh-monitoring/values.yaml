@@ -26,7 +26,7 @@ project:
     hooked: true  # PreSync ArgoCD hook
     type: namespace
     name: openshift-cluster-observability-operator
-    display_name: Zuno Cluster Observability Operator
+    display_name: Zuno Infra Cluster Observability Operator
     description: "Red Hat Cluster Observability operator subscription, installed by Zuno."
     requester: zuno
 

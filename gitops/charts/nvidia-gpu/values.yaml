@@ -19,7 +19,7 @@ cluster-gpu:
       hooked: true  # PreSync ArgoCD hook
       type: namespace
       name: nvidia-gpu-operator
-      display_name: Zuno Infra NVIDIA GPU
+      display_name: Zuno NVIDIA GPU Operator
       description: NVIDIA GPU Operator, configured by Zuno
       requester: zuno
 
