@@ -64,7 +64,12 @@ ADR-0317 installs both operators (`ansible/roles/connectivity_link`,
 `ansible/roles/lws`) ahead of `openshift_ai` in the Day 0 sequence, ahead
 of any actual consumer - see that ADR and `platform/openshift-ai/
 README.md`'s per-capability breakdown for the current disposition of
-every capability ADR-0047 named.
+every capability ADR-0047 named. Custom Metrics Autoscaler and JobSet -
+not named in ADR-0047 at all, but needed now that this repository's
+`DataScienceCluster` enables `kserve`'s richer autoscaling-relevant
+configuration and `trainer`/`trainingoperator` respectively - are
+installed the same way by ADR-0318 (`ansible/roles/
+custom_metrics_autoscaler`, `ansible/roles/jobset`).
 
 ## Sync-wave ordering within the Application (ADR-0312)
 

@@ -1,0 +1,31 @@
+# operator.enabled renders the Namespace/OperatorGroup/Subscription;
+# kedaController.enabled renders the operand KedaController CR. Both
+# default false so templates render nothing by default. Two separate
+# ArgoCD Applications (zuno-custom-metrics-autoscaler-d0/-d1) each set
+# one - same shape as gitops/charts/nvidia-gpu (OwnNamespace-scoped
+# OperatorGroup, unlike gitops/charts/connectivity-link/lws which use
+# AllNamespaces - this operator's CSV supports OwnNamespace per Red Hat's
+# documented install procedure, confirmed by that procedure rather than a
+# real-cluster test - ADR-0318).
+operator:
+  enabled: false
+kedaController:
+  enabled: false
+
+namespace: openshift-keda
+
+# ASSUMPTION, not yet verified against a live cluster (ADR-0318): the real
+# OLM package name for this operator on a given catalog. If wrong, run
+# `oc get packagemanifest -n openshift-marketplace | grep -i keda` (or
+# `-i custom-metrics-autoscaler`) against the target cluster and correct
+# this value - ansible/roles/custom_metrics_autoscaler/tasks/install.yml's
+# PackageManifest lookup fails with a clear diagnostic listing published
+# channels if it's wrong, rather than silently subscribing to nothing.
+subscriptionName: openshift-custom-metrics-autoscaler-operator
+
+# subscriptionChannel/subscriptionCatalogSource are discovered from the
+# cluster's own PackageManifest by ansible and injected via
+# gitops_app_extra_helm_values on the -d0 apply (ADR-0048);
+# templates/subscription.yaml renders nothing until both are set.
+subscriptionChannel: ""
+subscriptionCatalogSource: ""

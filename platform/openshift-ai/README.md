@@ -12,9 +12,10 @@ serving) enabled and `kserve.serving.managementState: Removed`
 `datascience` role, merged into `openshift_ai` (ADR-0056: one role for
 one conceptual prerequisite). `ansible/roles/nfd` and
 `ansible/roles/nvidia_gpu` (`platform/gpu`) are GPU-serving prerequisites,
-applied before it. `ansible/roles/connectivity_link` and `ansible/roles/lws`
-(ADR-0317) are also applied before it - ahead of any actual consumer, see
-below.
+applied before it. `ansible/roles/connectivity_link` and `ansible/roles/lws` (ADR-0317),
+`ansible/roles/custom_metrics_autoscaler` and `ansible/roles/jobset`
+(ADR-0318) are also applied before it - all four ahead of any actual
+consumer, see below.
 
 ## Which OpenShift AI 3.5 capabilities this repository actually uses
 
@@ -52,6 +53,19 @@ ways: it also means *not* installing operators nothing here uses.
   (`gitops/charts/models`) with no multi-node/multi-GPU topology, but the
   operator is now installed to get the platform ready for that. See
   `ansible/roles/lws` and `platform/lws/README.md`.
+- **Custom Metrics Autoscaler** (Red Hat's productized KEDA build) -
+  **installed as of ADR-0318**, ahead of any consumer. This repository's
+  `DataScienceCluster` now enables a richer `kserve` configuration
+  (`modelsAsService`, `wva`, `nim`) that RHOAI's custom-metrics-based
+  model-serving autoscaling depends on; no `ScaledObject`/
+  `TriggerAuthentication` exists yet. See
+  `ansible/roles/custom_metrics_autoscaler`.
+- **JobSet** - **installed as of ADR-0318**, ahead of any consumer. This
+  repository's `DataScienceCluster` now enables `trainer`/`trainingoperator`
+  (Kubeflow Trainer v2), which schedules distributed training runs on the
+  JobSet API - without this operator/CRD, `trainer`/`trainingoperator`
+  cannot actually schedule a distributed run, even though none exists yet
+  in this repository. See `ansible/roles/jobset`.
 - **MaaS** (Models-as-a-Service policy routing) - not applicable to v0.
   ADR-0049 ("Zuno as MaaS policy router") is explicitly deferred to v1 in
   the implementation sequencing plan; nothing in the current build routes

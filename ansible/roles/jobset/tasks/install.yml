@@ -1,0 +1,81 @@
+---
+# Ordered alongside custom_metrics_autoscaler/connectivity_link/lws and
+# ahead of openshift_ai - ADR-0318 installs this operator ahead of any
+# actual distributed training run.
+
+# Catalog source/channel naming isn't verified against a live cluster
+# (ADR-0318's Operational considerations) - nor is it confirmed this
+# package is OLM-installable at all (see this role's README); discover
+# from the PackageManifest rather than hardcoding, same pattern as
+# ansible/roles/external_secrets/tasks/install.yml.
+- name: "jobset | look up the {{ jobset_package_name | default('jobset-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ jobset_package_name | default('jobset-operator') }}"
+  register: _jobset_pkg_info
+
+- name: "jobset | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ jobset_package_name | default('jobset-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i jobset` for the correct package name
+      on this cluster - JobSet may not be OLM-packaged at all on this
+      catalog (see this role's README); if so, install it via its
+      upstream raw-manifest release instead and update this role
+      accordingly. Otherwise re-run with `-e jobset_package_name=<name>`
+      or update this role's default (ADR-0318 - the name checked in is an
+      unverified placeholder).
+  when: (_jobset_pkg_info.resources | default([]) | length) == 0
+
+- name: "jobset | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _jobset_catalog_source: "{{ _jobset_pkg_info.resources[0].status.catalogSource }}"
+    _jobset_channel: >-
+      {{
+        'stable'
+        if (_jobset_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_jobset_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "jobset | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ jobset_package_name | default('jobset-operator') }}'
+      (catalog '{{ _jobset_catalog_source }}') has no "stable" channel and
+      no defaultChannel to fall back to. Published channels:
+      {{ _jobset_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _jobset_channel | length == 0
+
+- name: "jobset | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ jobset_package_name | default('jobset-operator') }}',
+      catalog '{{ _jobset_catalog_source }}', channel '{{ _jobset_channel }}'.
+
+- name: "jobset | apply the jobset GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "jobset"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-jobset-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+      subscriptionChannel: "{{ _jobset_channel }}"
+      subscriptionCatalogSource: "{{ _jobset_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# No singleton operand CR exists for JobSet - d1 is a no-op
+# (gitops/charts/noop), applied here only to keep the Application object
+# itself present/synced, same convention ansible/roles/models uses for its
+# own no-op d0.
+- name: "jobset | apply the jobset GitOps Application (d1, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "jobset"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-jobset-d1"

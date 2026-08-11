@@ -10,7 +10,7 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/hook: PreSync
-    openshift.io/description: "LeaderWorkerSet operator, configured by Zuno."
-    openshift.io/display-name: "Zuno LeaderWorkerSet Operator"
+    openshift.io/description: "Custom Metrics Autoscaler operator, configured by Zuno."
+    openshift.io/display-name: "Zuno Custom Metrics Autoscaler Operator"
     openshift.io/requester: zuno
 {{- end }}

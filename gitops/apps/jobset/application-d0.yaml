@@ -1,28 +1,25 @@
 ---
-# LeaderWorkerSet operator install (ADR-0317). No singleton operand CR -
-# see application-d1.yaml. Subscribes into openshift-operators
-# (AllNamespaces) - not a dedicated namespace + own OperatorGroup, which
-# is exactly the shape that failed on a real cluster for
-# zuno-connectivity-link-d0 ("OwnNamespace InstallModeType is not
-# supported") before it was fixed; applying the same fix here
-# preemptively.
+# JobSet operator install (ADR-0318). No singleton operand CR - see
+# application-d1.yaml. Subscribes into openshift-operators (AllNamespaces) -
+# the now-confirmed-safe gitops/charts/external-secrets/lws shape, not the
+# dedicated-namespace shape that failed for connectivity-link (ADR-0317).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: zuno-lws-d0
+  name: zuno-jobset-d0
   namespace: openshift-gitops
   annotations:
     # Sync-wave order only matters for the root App-of-Apps path; Ansible
     # orders this ahead of `openshift_ai` in day0_install.yml instead.
-    argocd.argoproj.io/sync-wave: "-195"
+    argocd.argoproj.io/sync-wave: "-191"
 spec:
   project: zuno
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
-    path: gitops/charts/lws
+    path: gitops/charts/jobset
     helm:
-      releaseName: zuno-lws-d0
+      releaseName: zuno-jobset-d0
       values: |
         operator:
           enabled: true

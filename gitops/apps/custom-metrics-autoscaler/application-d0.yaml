@@ -1,0 +1,45 @@
+---
+# Custom Metrics Autoscaler operator install (ADR-0318); the KedaController
+# operand is a separate Application (application-d1.yaml) applied after
+# this one is healthy. This operator's CSV supports OwnNamespace per Red
+# Hat's documented install procedure (unlike connectivity-link's
+# rhcl-operator, which only supports AllNamespaces - ADR-0317) - a
+# dedicated namespace + its own OperatorGroup is deliberate here, not a
+# repeat of that mistake.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-custom-metrics-autoscaler-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # orders this ahead of `openshift_ai` in day0_install.yml instead.
+    argocd.argoproj.io/sync-wave: "-193"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/custom-metrics-autoscaler
+    helm:
+      releaseName: zuno-custom-metrics-autoscaler-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-keda
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Namespace isn't created elsewhere, so CreateNamespace is required here.
+      - CreateNamespace=true

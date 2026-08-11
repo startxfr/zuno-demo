@@ -1,0 +1,19 @@
+---
+# Reverse of install.yml: delete d1 (KedaController instance) first
+# (avoids ArgoCD fighting a CR deletion), then remove_operator.yml (needs
+# the Subscription to still exist) before d0's own delete.
+- name: "custom_metrics_autoscaler | delete the custom-metrics-autoscaler GitOps Application (d1: KedaController instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-custom-metrics-autoscaler-d1"
+
+- name: "custom_metrics_autoscaler | remove the operator (its owned CRDs - cascading the KedaController instance - then the CSV, then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ custom_metrics_autoscaler_package_name | default('openshift-custom-metrics-autoscaler-operator') }}"
+    operator_namespace: openshift-keda
+
+- name: "custom_metrics_autoscaler | delete the custom-metrics-autoscaler GitOps Application (d0: cascades the remaining OperatorGroup/Namespace)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-custom-metrics-autoscaler-d0"

@@ -1,0 +1,79 @@
+---
+# Ordered alongside connectivity_link/jobset and ahead of openshift_ai -
+# ADR-0318 installs this operator ahead of any actual
+# ScaledObject/TriggerAuthentication consumer.
+
+# Catalog source/channel naming isn't verified against a live cluster
+# (ADR-0318's Operational considerations); discover both from the
+# PackageManifest rather than hardcoding, same pattern as
+# ansible/roles/external_secrets/tasks/install.yml.
+- name: "custom_metrics_autoscaler | look up the {{ custom_metrics_autoscaler_package_name | default('openshift-custom-metrics-autoscaler-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ custom_metrics_autoscaler_package_name | default('openshift-custom-metrics-autoscaler-operator') }}"
+  register: _cma_pkg_info
+
+- name: "custom_metrics_autoscaler | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ custom_metrics_autoscaler_package_name | default('openshift-custom-metrics-autoscaler-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i keda` (or `-i
+      custom-metrics-autoscaler`) for the correct package name on this
+      cluster, then re-run with `-e
+      custom_metrics_autoscaler_package_name=<name>` or update this role's
+      default (ADR-0318 - the name checked in is an unverified placeholder).
+  when: (_cma_pkg_info.resources | default([]) | length) == 0
+
+- name: "custom_metrics_autoscaler | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _cma_catalog_source: "{{ _cma_pkg_info.resources[0].status.catalogSource }}"
+    _cma_channel: >-
+      {{
+        'stable'
+        if (_cma_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_cma_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "custom_metrics_autoscaler | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ custom_metrics_autoscaler_package_name | default('openshift-custom-metrics-autoscaler-operator') }}'
+      (catalog '{{ _cma_catalog_source }}') has no "stable" channel and no
+      defaultChannel to fall back to. Published channels:
+      {{ _cma_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _cma_channel | length == 0
+
+- name: "custom_metrics_autoscaler | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ custom_metrics_autoscaler_package_name | default('openshift-custom-metrics-autoscaler-operator') }}',
+      catalog '{{ _cma_catalog_source }}', channel '{{ _cma_channel }}'.
+
+- name: "custom_metrics_autoscaler | apply the custom-metrics-autoscaler GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "custom-metrics-autoscaler"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-custom-metrics-autoscaler-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+      subscriptionChannel: "{{ _cma_channel }}"
+      subscriptionCatalogSource: "{{ _cma_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+- name: "custom_metrics_autoscaler | apply the custom-metrics-autoscaler GitOps Application (d1: KedaController instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "custom-metrics-autoscaler"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-custom-metrics-autoscaler-d1"
+    gitops_app_extra_helm_values:
+      kedaController:
+        enabled: true
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15

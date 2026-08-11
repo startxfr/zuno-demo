@@ -60,13 +60,43 @@ cluster-ods:
     namespace: redhat-ods-operator
     spec: |
       components:
+        sparkoperator:
+          managementState: Managed
         kserve:
           managementState: Managed
-          # serving:
-          #   managementState: Managed
+          modelsAsService:
+            managementState: Managed
+          nim:
+            airGapped: false
+            managementState: Managed
+          rawDeploymentServiceConfig: Headless
+          wva:
+            managementState: Managed
+        modelregistry:
+          registriesNamespace: rhoai-model-registries
+        feastoperator: {}
+        trustyai:
+          eval:
+            lmeval:
+              permitCodeExecution: deny
+              permitOnline: deny
+          mcpGuardrailsMode: false
+        aipipelines: {}
+        ray: {}
+        kueue:
+          defaultClusterQueueName: default
+          defaultLocalQueueName: default
         workbenches:
-          managementState: Removed
+          managementState: Managed
+          workbenchNamespace: rhods-notebooks
+        mlflowoperator:
+          managementState: Managed
         dashboard:
           managementState: Managed
-        modelmeshserving: {}
-          # managementState: Managed
+        trainer:
+          managementState: Managed
+        llamastackoperator: 
+          managementState: Managed
+        trainingoperator: 
+          managementState: Managed
+

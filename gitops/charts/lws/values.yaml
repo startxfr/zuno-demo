@@ -1,14 +1,12 @@
-# operator.enabled renders the Namespace/OperatorGroup/Subscription.
-# Defaults false so templates render nothing. There is no singleton
-# operand CR for LeaderWorkerSet (user workloads create their own
-# LeaderWorkerSet objects later, out of scope here) - unlike
-# connectivity-link, this component has no "-d1 operand" values block;
-# zuno-lws-d1 (gitops/apps/lws/application-d1.yaml) points at
-# gitops/charts/noop instead.
+# operator.enabled renders the Subscription (into openshift-operators,
+# AllNamespaces - see templates/subscription.yaml). Defaults false so
+# templates render nothing. There is no singleton operand CR for
+# LeaderWorkerSet (user workloads create their own LeaderWorkerSet
+# objects later, out of scope here) - zuno-lws-d1
+# (gitops/apps/lws/application-d1.yaml) points at gitops/charts/noop
+# instead.
 operator:
   enabled: false
-
-namespace: openshift-lws-operator
 
 # ASSUMPTION, not yet verified against a live cluster (ADR-0317): the real
 # OLM package name for this operator on a given catalog. If wrong, run

@@ -25,6 +25,8 @@
       - nvidia_gpu
       - connectivity_link
       - lws
+      - custom_metrics_autoscaler
+      - jobset
       - openshift_ai
   tasks:
     - name: Resolve cluster API credentials

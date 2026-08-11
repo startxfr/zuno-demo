@@ -2,10 +2,8 @@
 # openshift-operators (AllNamespaces), not a dedicated namespace + own
 # OperatorGroup - gitops/charts/connectivity-link's original shape failed
 # with "OwnNamespace InstallModeType is not supported" on a real cluster
-# (ADR-0317); this operator's own install-mode support hasn't been tested
-# either, so it uses the now-confirmed-safe
-# gitops/charts/external-secrets pattern preemptively instead of the
-# risky one connectivity-link originally shipped with.
+# (ADR-0317); this repeats the now-confirmed-safe
+# gitops/charts/external-secrets pattern instead, not the risky one.
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:

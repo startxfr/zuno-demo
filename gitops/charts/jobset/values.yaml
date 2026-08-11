@@ -1,0 +1,28 @@
+# operator.enabled renders the Subscription (into openshift-operators,
+# AllNamespaces - see templates/subscription.yaml). Defaults false so
+# templates render nothing. There is no singleton operand CR for JobSet
+# (individual distributed training runs - e.g. Kubeflow Trainer's
+# TrainJob - create their own JobSet objects later, out of scope here) -
+# same shape as gitops/charts/external-secrets; zuno-jobset-d1
+# (gitops/apps/jobset/application-d1.yaml) points at gitops/charts/noop
+# instead.
+operator:
+  enabled: false
+
+# ASSUMPTION, not yet verified against a live cluster (ADR-0318) - lower
+# confidence than this repository's other operators: it isn't confirmed
+# that Red Hat even ships JobSet as a separate OLM-installable operator
+# (rather than e.g. a raw-manifest install, or bundled with the Trainer
+# operator itself). If this package doesn't exist on the target catalog at
+# all, that's the expected failure signal (see
+# ansible/roles/jobset/README.md) to go find the correct installation
+# method - run `oc get packagemanifest -n openshift-marketplace | grep -i
+# jobset` against the target cluster first.
+subscriptionName: jobset-operator
+
+# subscriptionChannel/subscriptionCatalogSource are discovered from the
+# cluster's own PackageManifest by ansible and injected via
+# gitops_app_extra_helm_values on the -d0 apply (ADR-0048);
+# templates/subscription.yaml renders nothing until both are set.
+subscriptionChannel: ""
+subscriptionCatalogSource: ""

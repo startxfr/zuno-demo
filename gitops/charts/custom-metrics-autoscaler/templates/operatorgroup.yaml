@@ -1,11 +1,12 @@
 {{- if .Values.operator.enabled }}
-# Namespace-scoped, not AllNamespaces - same "don't default to
-# startx/OLM's own AllNamespaces default" choice as
-# gitops/charts/nvidia-gpu's OperatorGroup.
+# OwnNamespace-scoped, per Red Hat's documented install procedure for
+# this operator (unlike gitops/charts/connectivity-link, whose CSV only
+# supports AllNamespaces - ADR-0318 deliberately doesn't copy that shape
+# here without checking).
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: lws-operator-group
+  name: custom-metrics-autoscaler-operator-group
   namespace: {{ .Values.namespace }}
   labels:
     zuno.io/managed-by: argocd

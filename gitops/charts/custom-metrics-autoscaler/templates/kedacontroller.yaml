@@ -1,0 +1,20 @@
+{{- if .Values.kedaController.enabled }}
+# Singleton CR the operator watches to deploy KEDA's metrics-apiserver/
+# operator pods - same "meta-operator needs a CR to actually deploy pods"
+# shape as gitops/charts/connectivity-link's Kuadrant CR and
+# gitops/charts/cert-manager's CertManager CR. Empty spec: no
+# ScaledObject/TriggerAuthentication exists yet for it to act on
+# (ADR-0318 installs the operator ahead of any consumer). If this empty
+# spec is rejected by the CRD, follow gitops/charts/nvidia-gpu/README.md's
+# alm-examples discovery pattern instead of hand-guessing a larger one.
+apiVersion: keda.sh/v1alpha1
+kind: KedaController
+metadata:
+  name: keda
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec: {}
+{{- end }}

@@ -1,0 +1,32 @@
+---
+# Minimal KedaController operand CR (not the operator, see
+# application-d0.yaml). Empty spec - no ScaledObject/TriggerAuthentication
+# exists yet for it to act on (ADR-0318 installs the operator ahead of
+# any consumer).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-custom-metrics-autoscaler-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-192"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/custom-metrics-autoscaler
+    helm:
+      releaseName: zuno-custom-metrics-autoscaler-d1
+      values: |
+        kedaController:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-keda
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
