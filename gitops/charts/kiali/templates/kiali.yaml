@@ -29,6 +29,15 @@ spec:
       enabled: true
       override_yaml:
         spec:
+          # override_yaml replaces rather than merges with the operator's own
+          # Route defaults, so the target Service/port must be given
+          # explicitly here too - omitting them left `spec.to` empty and
+          # Route creation failed validation (spec.to.name: Required value).
+          to:
+            kind: Service
+            name: kiali
+          port:
+            targetPort: tcp
           path: ''
           tls:
             termination: passthrough
