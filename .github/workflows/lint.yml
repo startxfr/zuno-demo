@@ -27,6 +27,8 @@ jobs:
       - name: Reject non-immutable image tags (ADR-0051)
         run: python3 platform/supply-chain/check_no_latest_tags.py
         continue-on-error: true
+      - name: Reconcile CI build inventory (ADR-0324)
+        run: python3 platform/supply-chain/check_build_matrix.py
       - name: Lint OpenAPI contracts (ADR-0054)
         run: python3 platform/api/lint_openapi.py
       - name: Permitted SaaS fallback capability check (ADR-0053)

@@ -96,7 +96,7 @@ START -> retrieve -> [conditional] -> reason -> respond -> END
 
 - **`retrieve`** (`app/graph/nodes.py:retrieve_node`) - calls
   `rag-service` `POST /v1/search` for technical documents relevant to the
-  question (ADR-0018's OGX retrieval substrate). Degrades to an empty
+  question (ADR-0322's OGX retrieval substrate). Degrades to an empty
   result set (logged) if rag-service is unreachable, rather than failing
   the whole request. ADR-0046: `_extract_product_version` looks for a
   named product/version in the question (e.g. "OpenShift AI 3.5") and

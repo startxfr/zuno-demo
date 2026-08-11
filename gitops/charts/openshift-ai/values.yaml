@@ -106,6 +106,7 @@ cluster-ods:
         aipipelines: {}
         ray: {}
         kueue:
+          managementState: Unmanaged
           defaultClusterQueueName: default
           defaultLocalQueueName: default
         workbenches:
@@ -117,7 +118,20 @@ cluster-ods:
           managementState: Managed
         trainer:
           managementState: Managed
-        llamastackoperator: 
+        # ADR-0322 v0: replaces the former llamastackoperator activation.
+        # VERIFIED GAP (2026-08-11, live cluster, RHOAI DataScienceCluster
+        # CRD v2): `oc explain datasciencecluster.spec.components` on the
+        # cluster connected while this change was written does NOT expose
+        # an `ogx` field yet - only `llamastackoperator`. A structural CRD
+        # schema silently prunes unknown properties, so applying this as-is
+        # today would drop `ogx` entirely and activate neither Llama Stack
+        # nor OGX. Do not apply this chart to a cluster until `oc explain
+        # datasciencecluster.spec.components` confirms `ogx` is present
+        # (i.e. the rhods-operator has been upgraded to a CRD version that
+        # actually ships the OGX Operator) - see ADR-0322's own Consequences
+        # section on EA/Technology-Preview lifecycle risk, which this is a
+        # concrete instance of.
+        ogx:
           managementState: Managed
         trainingoperator:
           managementState: Managed

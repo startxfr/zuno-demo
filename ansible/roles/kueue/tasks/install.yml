@@ -1,0 +1,87 @@
+---
+# Ordered alongside connectivity_link/lws/custom_metrics_autoscaler/jobset
+# and ahead of openshift_ai - ADR-0321 installs this operator before the
+# DataScienceCluster reconciles `spec.components.kueue.managementState:
+# Unmanaged`.
+
+# Package name confirmed against a live cluster's redhat-operators catalog
+# as "kueue-operator"; still discover catalog/channel from the
+# PackageManifest rather than hardcoding them, same pattern as
+# ansible/roles/jobset/tasks/install.yml.
+- name: "kueue | look up the {{ kueue_package_name | default('kueue-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ kueue_package_name | default('kueue-operator') }}"
+  register: _kueue_pkg_info
+
+- name: "kueue | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ kueue_package_name | default('kueue-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i kueue` for the correct package name
+      on this cluster; re-run with `-e kueue_package_name=<name>` or
+      update this role's default - the catalog on this cluster changed
+      from what ADR-0321 last confirmed.
+  when: (_kueue_pkg_info.resources | default([]) | length) == 0
+
+- name: "kueue | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _kueue_catalog_source: "{{ _kueue_pkg_info.resources[0].status.catalogSource }}"
+    _kueue_channel: >-
+      {{
+        'stable'
+        if (_kueue_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_kueue_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "kueue | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ kueue_package_name | default('kueue-operator') }}'
+      (catalog '{{ _kueue_catalog_source }}') has no "stable" channel and
+      no defaultChannel to fall back to. Published channels:
+      {{ _kueue_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _kueue_channel | length == 0
+
+- name: "kueue | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ kueue_package_name | default('kueue-operator') }}',
+      catalog '{{ _kueue_catalog_source }}', channel '{{ _kueue_channel }}'.
+
+- name: "kueue | apply the kueue GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "kueue"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-kueue-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+        subscription:
+          operator:
+            channel: "{{ _kueue_channel }}"
+            source:
+              name: "{{ _kueue_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# Unlike jobset (no operand CR at all), Kueue needs its singleton `Kueue`
+# CR plus the default ResourceFlavor/ClusterQueue/LocalQueue applied
+# before it's actually usable - see gitops/charts/kueue's Chart.yaml.
+- name: "kueue | apply the kueue GitOps Application (d1: operand CR + queue resources)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "kueue"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-kueue-d1"
+    gitops_app_extra_helm_values:
+      kueueOperand:
+        enabled: true
+      queueResources:
+        enabled: true
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15

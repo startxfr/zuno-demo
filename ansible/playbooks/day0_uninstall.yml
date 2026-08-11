@@ -8,6 +8,7 @@
   vars:
     day0_components:
       - openshift_ai
+      - kueue
       - jobset
       - custom_metrics_autoscaler
       - lws

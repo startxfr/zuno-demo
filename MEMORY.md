@@ -14,7 +14,7 @@ The MVP target is seven days with two contributors. Documentation and architectu
 
 ## 2. Platform target
 
-- OpenShift Container Platform 4.20, AWS IPI.
+- OpenShift Container Platform 4.22, AWS IPI.
 - Red Hat OpenShift AI 3.5 EA2.
 - Internet-connected cluster.
 - Two worker nodes, one NVIDIA L4 24 GB GPU per node.

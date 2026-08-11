@@ -1,0 +1,52 @@
+{{- if .Values.queueResources.enabled }}
+# Zuno-specific quota/scheduling policy, deliberately not coupled to
+# operator installation (ADR-0321's Decision: "configure ResourceFlavor,
+# ClusterQueue and LocalQueue resources only where Zuno actually requires
+# quota/scheduling policy"). Matches
+# gitops/charts/openshift-ai/values.yaml's DataScienceCluster
+# `kueue.defaultClusterQueueName`/`defaultLocalQueueName: default`.
+# sync-wave 21: after the Kueue operand CR (wave 20, templates/
+# kueue-operand.yaml) so the kueue.x-k8s.io CRDs the operator registers
+# once Kueue reconciles are already present.
+#
+# CPU/memory only for now - no GPU ResourceFlavor/quota yet, since no
+# distributed training or queued model-serving workload exists in this
+# repository yet (ADR-0321's Operational considerations call this out
+# explicitly as required "before distributed training or queued model
+# workloads are enabled").
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: {{ .Values.queueResources.resourceFlavorName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+spec: {}
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: {{ .Values.queueResources.clusterQueueName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: {{ .Values.queueResources.resourceFlavorName }}
+          resources:
+            - name: "cpu"
+              nominalQuota: {{ .Values.queueResources.cpuQuota | quote }}
+            - name: "memory"
+              nominalQuota: {{ .Values.queueResources.memoryQuota | quote }}
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: {{ .Values.queueResources.localQueueName }}
+  namespace: {{ .Values.queueResources.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+spec:
+  clusterQueue: {{ .Values.queueResources.clusterQueueName }}
+{{- end }}

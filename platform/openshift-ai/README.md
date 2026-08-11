@@ -66,12 +66,27 @@ ways: it also means *not* installing operators nothing here uses.
   JobSet API - without this operator/CRD, `trainer`/`trainingoperator`
   cannot actually schedule a distributed run, even though none exists yet
   in this repository. See `ansible/roles/jobset`.
+- **Red Hat build of Kueue Operator** - **installed as of ADR-0321**,
+  ahead of `openshift_ai`. This repository's `DataScienceCluster` declared
+  `kueue.defaultClusterQueueName`/`defaultLocalQueueName: default` from
+  the start but never installed a dedicated operator or set
+  `managementState: Unmanaged` - ADR-0321 fixes that so `trainer`/
+  `trainingoperator` (Kubeflow Trainer v2) has a supported queue-management
+  path once distributed training runs actually exist. See
+  `ansible/roles/kueue`.
 - **MaaS** (Models-as-a-Service policy routing) - not applicable to v0.
   ADR-0049 ("Zuno as MaaS policy router") is explicitly deferred to v1 in
   the implementation sequencing plan; nothing in the current build routes
   through a MaaS layer.
-- **OGX** - not a separate operator/capability to install at all. ADR-0018
-  defines OGX as this project's own name for capabilities it already
-  consumes via `kserve` (model serving) and pgvector/full-text retrieval
-  (`components/rag-service`) - both already covered above, not a distinct
-  prerequisite.
+- **OGX** - as of ADR-0322 (superseding ADR-0018 and ADR-0050 for OGX
+  product mapping), this is the actual Red Hat OpenShift AI OGX Operator,
+  a real `DataScienceCluster` component (`spec.components.ogx`), replacing
+  the former `llamastackoperator` activation. **Not yet effective on a
+  real cluster**: verified against a live cluster on 2026-08-11, the
+  installed rhods-operator's `DataScienceCluster` CRD does not expose an
+  `ogx` field yet (only `llamastackoperator`) - see the comment in
+  `gitops/charts/openshift-ai/values.yaml` next to the `ogx:` block. The
+  v0 scope here is the config swap and Day 1 diagnostic (see
+  `ansible/roles/openshift_ai/tasks/precheck.yml`); the v1 scope (an
+  actual OGX-backed RAG provider behind Zuno's retrieval contract) is
+  separate, later work.

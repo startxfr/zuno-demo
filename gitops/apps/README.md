@@ -116,7 +116,7 @@ consumes this issuer yet.
 
 **Vendored startx charts**: `nfd`, `nvidia-gpu`, `openshift-ai`,
 `cert-manager`, `keycloak`, `postgresql`, `connectivity-link`, `lws`,
-`jobset`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
+`jobset`, `kueue`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
 `mesh-monitoring`, `observability` and `tempo` vendor a chart from the
 [startx `helm-repository`](https://helm-repository.readthedocs.io) as a
 Helm `dependencies:` entry (same pattern `gitops/charts/vault` already used
@@ -138,11 +138,15 @@ depends directly on the generic `operator` chart (plus `project` when a
 dedicated Namespace is needed) since no matching `cluster-xxx` bundle is
 known to exist for any of those operators (ADR-0317) - see each chart's
 `Chart.yaml`/`values.yaml` for the specific reasoning. `connectivity-link`/
-`jobset`/`lws`/`external-secrets` subscribe into the shared
+`jobset`/`kueue`/`lws`/`external-secrets` subscribe into the shared
 `openshift-operators` namespace (`AllNamespaces`, no `project`/
 `OperatorGroup` dependency - relies on OLM's own global OperatorGroup
 there); `connectivity-link` still depends on `project` for its Kuadrant
-operand namespace (`kuadrant-system`) on the `-d1` side.
+operand namespace (`kuadrant-system`) on the `-d1` side. `kueue`'s own
+`-d1` is likewise real content, not a no-op: its singleton `Kueue` operand
+CR plus the default `ResourceFlavor`/`ClusterQueue`/`LocalQueue`
+(ADR-0321) - `jobset`/`lws` are the only two in this group with no operand
+CR at all, so their `-d1` points at `gitops/charts/noop` instead.
 `custom-metrics-autoscaler`/`kiali`/`mesh-monitoring`/`observability`/
 `tempo` depend on both `project` and `operator` for a dedicated operator
 namespace + `OperatorGroup`. `vault` was evaluated against `cluster-vault`
@@ -214,6 +218,7 @@ Directories present:
 | `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`, same shape as `connectivity-link` after its fix), no `OperatorGroup`/dedicated `Namespace`; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
 | `custom-metrics-autoscaler` | local chart, `gitops/charts/custom-metrics-autoscaler` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-keda` Namespace/OperatorGroup/Subscription (`OwnNamespace`, per Red Hat's documented install procedure); `-d1`: minimal `KedaController` operand CR) |
 | `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`), no `OperatorGroup`; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
+| `kueue` | local chart, `gitops/charts/kueue` (ADR-0321 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`), no `OperatorGroup`; `-d1`: singleton `Kueue` operand CR plus default `ResourceFlavor`/`ClusterQueue`/`LocalQueue` - installed ahead of `openshift-ai`, whose `DataScienceCluster` sets `kueue.managementState: Unmanaged` to defer to this operator) |
 | `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-tempo-operator` Namespace/OperatorGroup/Subscription; `-d1`: demo-scale `TempoMonolithic` in zuno-monitoring, storing traces exported by `observability`'s Collector) |
 | `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-cluster-observability-operator` Namespace/OperatorGroup/Subscription; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |
 | `kiali` | local chart, `gitops/charts/kiali` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-kiali-operator` Namespace/OperatorGroup/Subscription; `-d1`: `Kiali` CR in zuno-mesh, wired to `mesh-monitoring`'s Prometheus and `tempo`'s Tempo - the operator owns its own auto-created Route, not tracked as a separate chart resource) |

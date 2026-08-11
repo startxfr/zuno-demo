@@ -26,6 +26,7 @@
       - lws
       - custom_metrics_autoscaler
       - jobset
+      - kueue
       - openshift_ai
   tasks:
     - name: Resolve cluster API credentials

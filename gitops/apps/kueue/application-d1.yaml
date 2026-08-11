@@ -1,0 +1,36 @@
+---
+# Singleton Kueue operand CR (starts the operator's managed controller)
+# plus the default ResourceFlavor/ClusterQueue/LocalQueue Zuno requires
+# (ADR-0321). Unlike gitops/apps/jobset's d1 (a no-op - JobSet has no
+# operand CR), Kueue has real d1 content: the operator only registers CRDs
+# until a `Kueue` CR exists to activate it (same "meta-operator" shape as
+# custom-metrics-autoscaler's KedaController).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-kueue-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-188"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/kueue
+    helm:
+      releaseName: zuno-kueue-d1
+      values: |
+        kueueOperand:
+          enabled: true
+        queueResources:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

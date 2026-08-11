@@ -1,6 +1,6 @@
 # Platform Prerequisites
 
-The MVP assumes an existing OpenShift 4.20 AWS IPI cluster. Preparation/configuration must cover at least:
+The MVP assumes an existing OpenShift 4.22 AWS IPI cluster. Preparation/configuration must cover at least:
 
 - NVIDIA GPU Operator;
 - Red Hat OpenShift AI Operator and dependencies;

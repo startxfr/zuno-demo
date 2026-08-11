@@ -165,7 +165,7 @@ The query text is embedded via an OpenAI-compatible `POST
 {EMBEDDING_SERVICE_URL}/v1/embeddings` call (default:
 `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings`,
 override via env) - this assumes an embedding model is served through
-OpenShift AI's KServe/vLLM serving path (ADR-0018's OGX definition), or
+OpenShift AI's KServe/vLLM serving path (ADR-0322's OGX Operator activation), or
 any other OpenAI-compatible embeddings endpoint. **Degradation:** if that
 endpoint is unreachable or errors, this service logs a warning and falls
 back to full-text-search only rather than failing the request - the

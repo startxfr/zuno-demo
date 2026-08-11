@@ -1,0 +1,24 @@
+{{- if .Values.kueueOperand.enabled }}
+# Singleton CR the operator watches to actually deploy the Kueue
+# controller - same "meta-operator needs a CR to actually deploy pods"
+# shape as gitops/charts/custom-metrics-autoscaler's KedaController and
+# gitops/charts/connectivity-link's Kuadrant CR. Cluster-scoped, per the
+# operator's own alm-examples (ASSUMPTION not yet verified against a live
+# install - see values.yaml's comment above kueueOperand).
+apiVersion: kueue.openshift.io/v1
+kind: Kueue
+metadata:
+  name: {{ .Values.kueueOperand.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  managementState: Managed
+  config:
+    integrations:
+      frameworks:
+        {{- range .Values.kueueOperand.integrationFrameworks }}
+        - {{ . }}
+        {{- end }}
+{{- end }}

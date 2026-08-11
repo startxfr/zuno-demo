@@ -1,0 +1,36 @@
+---
+# Red Hat build of Kueue Operator install (ADR-0321). No dedicated
+# namespace - the same now-confirmed-safe AllNamespaces shape
+# gitops/charts/jobset/lws use (kueue-operator's CSV only supports the
+# AllNamespaces install mode, confirmed against a live cluster's
+# PackageManifest).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-kueue-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # orders this ahead of `openshift_ai` in day0_install.yml instead.
+    argocd.argoproj.io/sync-wave: "-189"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/kueue
+    helm:
+      releaseName: zuno-kueue-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # openshift-operators always exists.
+      - CreateNamespace=false

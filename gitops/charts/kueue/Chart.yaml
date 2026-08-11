@@ -1,0 +1,21 @@
+apiVersion: v2
+name: kueue
+description: >-
+  Red Hat build of Kueue Operator (OLM Subscription, channel/catalog
+  discovered at Ansible run time - ADR-0048). ADR-0321 prerequisite
+  before OpenShift AI's DataScienceCluster reconciles
+  `spec.components.kueue.managementState: Unmanaged`, so a supported,
+  dedicated operator owns Kueue lifecycle instead of RHOAI's own
+  (unsupported for this purpose) embedded management path. Also renders
+  the singleton `Kueue` operand CR that actually starts the operator's
+  managed controller, plus the default `ResourceFlavor`/`ClusterQueue`/
+  `LocalQueue` Zuno requires (matching
+  `gitops/charts/openshift-ai/values.yaml`'s `defaultClusterQueueName`/
+  `defaultLocalQueueName: default`).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"

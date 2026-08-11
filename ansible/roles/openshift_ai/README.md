@@ -69,7 +69,12 @@ not named in ADR-0047 at all, but needed now that this repository's
 `DataScienceCluster` enables `kserve`'s richer autoscaling-relevant
 configuration and `trainer`/`trainingoperator` respectively - are
 installed the same way by ADR-0318 (`ansible/roles/
-custom_metrics_autoscaler`, `ansible/roles/jobset`).
+custom_metrics_autoscaler`, `ansible/roles/jobset`). The Red Hat build of
+Kueue Operator - needed so `trainer`/`trainingoperator`'s distributed runs
+have a supported queue-management path (`kueue.managementState:
+Unmanaged`, not RHOAI's own embedded/unsupported-for-this-purpose path) -
+is installed the same way by ADR-0321 (`ansible/roles/kueue`), immediately
+before this role in the Day 0 sequence.
 
 ## Sync-wave ordering within the Application (ADR-0312)
 

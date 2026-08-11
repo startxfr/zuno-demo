@@ -1,0 +1,84 @@
+# operator.enabled renders the Subscription, via the vendored startx
+# `operator` chart (into openshift-operators, AllNamespaces - no
+# OperatorGroup here, relies on OLM's own pre-existing global-operators
+# OperatorGroup there) - confirmed against a live cluster: the
+# kueue-operator package's CSV only supports the AllNamespaces install
+# mode (OwnNamespace/SingleNamespace/MultiNamespace all `"supported":
+# false`), same shape as gitops/charts/jobset/lws, not the dedicated-
+# namespace shape gitops/charts/custom-metrics-autoscaler uses.
+#
+# Confirmed against a live cluster (redhat-operators catalog): the
+# package is named "kueue-operator", channels "stable-v1.3"/"stable-v1.4"
+# (defaultChannel "stable-v1.4").
+#
+# subscription.operator.channel/source.name are left empty by default,
+# discovered by ansible and set via gitops_app_extra_helm_values on the -d0
+# apply (ADR-0048). templates/checks.yaml fails the render if either is
+# still empty once operator.enabled is true.
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: kueue
+    app: kueue
+  subscription:
+    enabled: true
+    name: kueue-operator
+    namespace: openshift-operators
+    operator:
+      # Must be set explicitly, same name as subscription.name: the
+      # vendored `operator` chart's own values.yaml gives this a
+      # non-empty default ("codeready-workspaces") that wins the merge
+      # and silently suppresses the fallback to subscription.name.
+      name: kueue-operator
+      channel: ""
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace
+
+# Singleton `Kueue` CR (kueue.openshift.io/v1, cluster-scoped, per the
+# operator's own alm-examples - "config resource for the Kueue operand",
+# same "meta-operator needs a CR to actually deploy pods" shape as
+# gitops/charts/custom-metrics-autoscaler's KedaController) - see
+# templates/kueue-operand.yaml. ASSUMPTION, not yet verified against a
+# live install (the operator isn't installed on the cluster this was
+# written against - only its PackageManifest was checked): the CR is
+# cluster-scoped and named "cluster", exactly as the alm-example shows.
+# If the operator rejects this, re-check `oc get packagemanifest
+# kueue-operator -n openshift-marketplace -o jsonpath='{.status.channels[?(@.name=="stable-v1.4")].currentCSVDesc.annotations.alm-examples}'`
+# against the target cluster for the current example.
+kueueOperand:
+  enabled: false
+  name: cluster
+  # BatchJob is the minimal integration Zuno currently needs (no other
+  # workload framework - Kubeflow TrainJob, RayJob, etc. - is wired to a
+  # queue yet). Extend this list only once a real consumer needs it.
+  integrationFrameworks:
+    - BatchJob
+
+# Default ResourceFlavor/ClusterQueue/LocalQueue - matches
+# gitops/charts/openshift-ai/values.yaml's DataScienceCluster
+# `kueue.defaultClusterQueueName`/`defaultLocalQueueName: default`, so
+# that declared default queue name actually resolves to something.
+# GPU-aware ResourceFlavor/quota is deliberately NOT added yet (ADR-0321's
+# Operational considerations: "must account for GPU ResourceFlavor and
+# quotas before distributed training or queued model workloads are
+# enabled" - none exist in this repository yet, same "prerequisite ahead
+# of any consumer" shape as ADR-0317/ADR-0318).
+queueResources:
+  enabled: false
+  # zuno-ai-build, not zuno-ai-run: distributed training
+  # (trainer/trainingoperator, Kubeflow Trainer v2) is the only Kueue
+  # consumer named so far (see gitops/charts/jobset's Chart.yaml), and
+  # gitops/charts/openshift-ai/values.yaml's `workbenchNamespace` already
+  # puts build/training-side work in zuno-ai-build, not the runtime-side
+  # zuno-ai-run.
+  namespace: zuno-ai-build
+  resourceFlavorName: default
+  clusterQueueName: default
+  localQueueName: default
+  cpuQuota: "8"
+  memoryQuota: 32Gi

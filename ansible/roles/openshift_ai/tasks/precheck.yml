@@ -21,6 +21,26 @@
     name: zuno-dsc
   register: _openshift_ai_dsc_lookup
 
+# ADR-0322 v0 Day 1 health check: report OGX component reconciliation
+# without gating overall install state on it. VERIFIED GAP (2026-08-11,
+# live cluster): `oc explain datasciencecluster.status.components` on the
+# cluster this was written against does not expose an `ogx` field at all
+# yet (only `llamastackoperator`) - the installed rhods-operator CRD
+# version predates the OGX Operator. Making this a hard gate on
+# _state_is_installed would make the whole role permanently report "not
+# installed" on any such cluster, even once every other component is
+# healthy. Report it as a separate diagnostic line instead; tighten this
+# into a real readiness assertion once `ogx` is confirmed present in the
+# installed CRD's schema.
+- name: "openshift_ai | report OGX component status (diagnostic only, see comment above)"
+  ansible.builtin.debug:
+    msg: >-
+      OGX component status:
+      {{ (_openshift_ai_dsc_lookup.resources[0].status.components.ogx
+          | default('absent from status.components - CRD does not expose ogx yet, or DSC not reconciled'))
+         if (_openshift_ai_dsc_lookup.resources | default([]) | length) > 0
+         else 'DataScienceCluster does not exist yet' }}
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

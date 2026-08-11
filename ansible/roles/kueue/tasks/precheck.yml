@@ -1,0 +1,79 @@
+---
+# State detection (never fails). Checks both d0 (operator) and d1 (operand
+# CR + queue resources), same "AND in the extra k8s_info lookups" shape as
+# ansible/roles/custom_metrics_autoscaler/tasks/precheck.yml - jobset's
+# precheck (d0 only) doesn't apply here since, unlike JobSet, Kueue has
+# real d1 content.
+- name: "kueue | check the kueue Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-kueue-d0"
+
+- name: "kueue | save the d0 check result"
+  ansible.builtin.set_fact:
+    _kueue_d0_installed: "{{ _state_check_result }}"
+
+- name: "kueue | check the kueue Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-kueue-d1"
+
+- name: "kueue | look up the Kueue operand CR"
+  kubernetes.core.k8s_info:
+    api_version: kueue.openshift.io/v1
+    kind: Kueue
+    name: cluster
+  register: _kueue_operand_lookup
+
+- name: "kueue | look up the default ClusterQueue"
+  kubernetes.core.k8s_info:
+    api_version: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    name: default
+  register: _kueue_clusterqueue_lookup
+
+- name: "kueue | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _kueue_d0_installed
+        and _state_check_result
+        and (_kueue_operand_lookup.resources | default([]) | length) > 0
+        and (_kueue_clusterqueue_lookup.resources | default([]) | length) > 0
+      }}
+
+# Diagnostic only, not gating _state_is_installed above: kueue's own
+# install doesn't depend on openshift_ai's DataScienceCluster existing
+# (kueue is a Day 0 prerequisite ahead of it, same ordering as
+# connectivity_link/lws/custom_metrics_autoscaler/jobset). This reports
+# ADR-0321's "absence of a conflicting embedded Kueue controller"
+# criterion: once the DSC exists, its `kueue.managementState` must be
+# `Unmanaged` (this dedicated operator owns Kueue instead), not `Managed`
+# (RHOAI's own embedded path - unsupported for this purpose per ADR-0321's
+# Context - would conflict with this operator's controller).
+- name: "kueue | look up the DataScienceCluster (diagnostic - conflicting-controller check)"
+  kubernetes.core.k8s_info:
+    api_version: datasciencecluster.opendatahub.io/v1
+    kind: DataScienceCluster
+    name: zuno-dsc
+  register: _kueue_dsc_lookup
+
+- name: "kueue | report DataScienceCluster Kueue managementState (diagnostic only)"
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        'DataScienceCluster does not exist yet.'
+        if (_kueue_dsc_lookup.resources | default([]) | length) == 0
+        else
+        (
+          'OK: DataScienceCluster kueue.managementState is Unmanaged (no embedded-controller conflict).'
+          if (_kueue_dsc_lookup.resources[0].spec.components.kueue.managementState | default('')) == 'Unmanaged'
+          else
+          'WARNING: DataScienceCluster kueue.managementState is "' ~
+          (_kueue_dsc_lookup.resources[0].spec.components.kueue.managementState | default('unset')) ~
+          '", expected "Unmanaged" - risk of a conflicting embedded Kueue controller (ADR-0321).'
+        )
+      }}
+
+- name: "kueue | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
