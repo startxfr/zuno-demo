@@ -51,6 +51,12 @@ bff:
 vault:
   oidcClientSecretPath: zuno/keycloak/tekos-frontend
   sessionSecretPath: zuno/tekos/frontend-session
+  redisSecretPath: zuno/redis/session-store
+
+# ADR-0042: server-side session store (gitops/charts/redis, zuno-auth namespace).
+redis:
+  addr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
+  sessionMaxLifetimeSeconds: "43200" # 12h
 
 keycloak:
   issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"

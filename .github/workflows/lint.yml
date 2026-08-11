@@ -53,17 +53,37 @@ jobs:
 
   go:
     runs-on: ubuntu-latest
+    # ADR-0042: internal/session/session_test.go exercises a real
+    # redis.Client against a real Redis, not a fake - a service container
+    # is the standard GitHub Actions way to give a job that.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-      - name: agent-frontend (build/vet/fmt)
+          # ADR-0043 bumped mcp-gateway/sales-db off the old fastapi/
+          # starlette pins; ADR-0042 needs go-redis/v9, which requires Go
+          # 1.24 - both components/agent-frontend/go.mod and
+          # components/agent-bff/go.mod build under this version.
+          go-version: "1.24"
+      - name: agent-frontend (build/vet/fmt/test)
         working-directory: components/agent-frontend
+        env:
+          TEST_REDIS_ADDR: localhost:6379
         run: |
           go build ./...
           go vet ./...
           test -z "$(gofmt -l .)"
+          go test ./...
       - name: agent-bff (build/vet/fmt/test)
         working-directory: components/agent-bff
         run: |
@@ -91,6 +111,12 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_auth.py
+          python3 tests/test_downstream_sales_db.py
+      - name: sales-db MCP server tests
+        working-directory: components/mcp-servers/sales-db
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_mcp_protocol.py
       - name: rag-service tests
         working-directory: components/rag-service
         run: |

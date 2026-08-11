@@ -213,6 +213,41 @@ func (c *Client) Exchange(code, codeVerifier string) (*TokenResponse, error) {
 	return &t, nil
 }
 
+// Refresh trades a refresh token for a new token set at the token
+// endpoint (RFC 6749 §6) - ADR-0042: server-side session storage keeps
+// the refresh token available (the pre-ADR-0042 signed-cookie session
+// discarded it entirely) so a session can outlive one short-lived access
+// token without forcing re-login.
+func (c *Client) Refresh(refreshToken string) (*TokenResponse, error) {
+	d, err := c.discover()
+	if err != nil {
+		return nil, err
+	}
+
+	form := url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {c.ClientID},
+		"client_secret": {c.ClientSecret},
+	}
+
+	resp, err := c.httpClient.PostForm(d.TokenEndpoint, form)
+	if err != nil {
+		return nil, fmt.Errorf("calling token endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var t TokenResponse
+	if err := json.Unmarshal(body, &t); err != nil {
+		return nil, fmt.Errorf("decoding token response: %w", err)
+	}
+	return &t, nil
+}
+
 // Claims is the subset of ID/access token claims this client reads.
 type Claims struct {
 	Subject           string

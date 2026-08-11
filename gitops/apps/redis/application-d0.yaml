@@ -1,0 +1,27 @@
+---
+# No Day 0 content for redis: no OLM operator, plain Helm deployment (see
+# application-d1.yaml) - same shape as gitops/apps/vault's own -d0.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-redis-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-172"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+    helm:
+      releaseName: zuno-redis-d0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-auth
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -65,7 +66,28 @@ func main() {
 	}
 
 	oidcClient := oidc.NewClient(cfg.KeycloakIssuerURL, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCRedirectURL)
-	sessions := session.NewManager(cfg.SessionHMACSecret, isSecureBaseURL(cfg.SelfBaseURL))
+
+	// ADR-0042: server-side session store (Redis, encrypted at rest) -
+	// the opaque session-ID cookie resolves through this, never carrying
+	// tokens itself.
+	store, err := session.NewStore(cfg.RedisAddr, cfg.RedisPassword, 0, cfg.SessionEncryptionKey)
+	if err != nil {
+		log.Fatalf("agent-frontend: building session store: %v", err)
+	}
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := store.Ping(pingCtx); err != nil {
+		log.Fatalf("agent-frontend: Redis session store unreachable at %q: %v", cfg.RedisAddr, err)
+	}
+
+	refresher := func(refreshToken string) (accessToken, idToken, refreshTokenOut string, expiresIn int64, err error) {
+		t, err := oidcClient.Refresh(refreshToken)
+		if err != nil {
+			return "", "", "", 0, err
+		}
+		return t.AccessToken, t.IDToken, t.RefreshToken, t.ExpiresIn, nil
+	}
+	sessions := session.NewManager(cfg.SessionHMACSecret, isSecureBaseURL(cfg.SelfBaseURL), store, cfg.SessionMaxLifetime, refresher)
 
 	mux := http.NewServeMux()
 
@@ -180,7 +202,7 @@ func callbackHandler(oidcClient *oidc.Client, sessions *session.Manager) http.Ha
 func logoutHandler(oidcClient *oidc.Client, sessions *session.Manager, selfBaseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, _ := sessions.Load(r)
-		sessions.Clear(w)
+		sessions.Clear(w, r)
 
 		idTokenHint := ""
 		if sess != nil {

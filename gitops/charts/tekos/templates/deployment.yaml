@@ -60,6 +60,20 @@ spec:
                 secretKeyRef:
                   name: tekos-frontend-secrets
                   key: SESSION_HMAC_SECRET
+            - name: SESSION_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tekos-frontend-secrets
+                  key: SESSION_ENCRYPTION_KEY
+            - name: SESSION_MAX_LIFETIME_SECONDS
+              value: {{ .Values.redis.sessionMaxLifetimeSeconds | quote }}
+            - name: REDIS_ADDR
+              value: {{ .Values.redis.addr | quote }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tekos-frontend-secrets
+                  key: REDIS_PASSWORD
           volumeMounts:
             - name: tmp
               mountPath: /tmp

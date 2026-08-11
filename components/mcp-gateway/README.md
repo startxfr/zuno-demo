@@ -84,18 +84,41 @@ Routing is keyed by tool name (a stable, contract-wide constant), not by
 the `mcp_server` field in `tool-policy.yaml` - see `app/downstream.py` for
 the reasoning.
 
-## Assumption: sales-db MCP server address
+## Sales-db MCP server: real standards-compliant MCP protocol (ADR-0043)
 
-`components/mcp-servers/sales-db` is owned by a different track and wasn't
-inspectable while this gateway was built. We assume it is reachable
-in-cluster as an HTTP+SSE MCP endpoint at
-`http://sales-db-mcp.zuno-ai-run.svc:8000` (override via
-`SALES_DB_MCP_URL`), and that `POST {SALES_DB_MCP_URL}/mcp` accepts a
-JSON-RPC-style `{"method": "tools/call", "params": {"name": ..., "arguments": ...}}`
-body per the MCP `tools/call` shape, forwarding the caller's Bearer JWT.
-If the real server instead exposes MCP-over-stdio via a sidecar, or a
-different HTTP shape, only `app/downstream.py:_invoke_sales_db` needs to
-change - reconcile this once that track's implementation lands.
+Reconciled: `components/mcp-servers/sales-db` speaks a real, standards-
+compliant MCP server (the official `mcp` Python SDK, streamable-HTTP
+transport, mounted at `/mcp`) as of ADR-0043 - not the hand-rolled
+JSON-RPC-shaped endpoint this section used to describe as an assumption.
+`app/downstream.py:_invoke_sales_db` uses the SDK's own
+`mcp.client.session.ClientSession` +
+`mcp.client.streamable_http.streamable_http_client` (a real `initialize`
+handshake, then `tools/call`) against
+`http://sales-db-mcp.zuno-ai-run.svc:8000/mcp` (override the host/port
+via `SALES_DB_MCP_URL`), forwarding the caller's Bearer JWT for
+audit/observability (sales-db doesn't itself re-validate it - the
+gateway's own ADR-0011 policy intersection already happened) - exactly as
+this module's own docstring anticipated before the migration: "only
+`_invoke_sales_db` needs to change."
+
+The four other MCP servers named in `tool-policy.yaml`'s `mcp_server`
+field (`confluence`, `google-workspace`, `lucidchart`, `web-search`) have
+no real implementation yet - `components/mcp-servers/<name>/` is a
+one-line README each - so there is nothing to migrate for them; their
+traffic is still served by this gateway's own `app/handlers/*.py`
+demo-mode functions. "Migrate servers incrementally" (ADR-0043's
+Operational considerations) means sales-db is the first and, as of this
+change, only real migration.
+
+**Verified against the real SDK, not just this module's own code**: a
+tool function's structured-content result gets wrapped by the SDK as
+`{"result": <value>}` when its return type is a plain `Dict[str, Any]`
+(MCP requires an object-typed top-level schema for structured content,
+and a bare dict return has none) - `_invoke_sales_db` unwraps that
+single-key envelope so callers keep seeing the pre-migration
+`{"customer": ..., "contacts": ...}` shape exactly. See
+`tests/test_downstream_sales_db.py` for a from-scratch local MCP server
+fixture that reproduces and locks in this behavior.
 
 **ADR-0037**: `_invoke_sales_db` also sends `X-Zuno-Gateway-Token`
 (`MCP_GATEWAY_WORKLOAD_TOKEN` env var, sourced from an `ExternalSecret`

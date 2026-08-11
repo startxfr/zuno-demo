@@ -141,7 +141,11 @@ surface) - see `go.mod`/`go.sum`.
 | `OIDC_REDIRECT_URL` | no (derived from `SELF_BASE_URL` + `/callback`) | Must match the Keycloak client's registered redirect URI |
 | `SELF_BASE_URL` | **yes** | `https://tekos.apps.<cluster-domain>` |
 | `BFF_BASE_URL` | no (default `http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080`) | In-cluster BFF Service URL |
-| `SESSION_HMAC_SECRET` | **yes** | Signs the session cookie; from an `ExternalSecret` |
+| `SESSION_HMAC_SECRET` | **yes** | Signs the opaque session-ID cookie (ADR-0042); from an `ExternalSecret` |
+| `SESSION_ENCRYPTION_KEY` | **yes** | 32 bytes, base64-encoded (AES-256); encrypts session records at rest in Redis (ADR-0042); from an `ExternalSecret` |
+| `REDIS_ADDR` | no (default `zuno-redis-master.zuno-auth.svc.cluster.local:6379`) | Server-side session store (ADR-0042) |
+| `REDIS_PASSWORD` | **yes** | From an `ExternalSecret` |
+| `SESSION_MAX_LIFETIME_SECONDS` | no (default `43200`, 12h) | How long a session record survives in Redis regardless of access-token refreshes (ADR-0042) |
 
 ## Keycloak hostname
 
@@ -157,8 +161,8 @@ that supports the Authorization Code + PKCE flow with a client secret.
 |---|---|---|
 | GET | `/` | Agent portal (tile grid) |
 | GET | `/login` | Begins the OIDC Authorization Code + PKCE redirect |
-| GET | `/callback` | OIDC redirect URI; exchanges the code, sets the session cookie |
-| GET | `/logout` | Clears the session, redirects through Keycloak RP-initiated logout |
+| GET | `/callback` | OIDC redirect URI; exchanges the code, creates the server-side session record and sets the opaque session-ID cookie (ADR-0042) |
+| GET | `/logout` | Revokes the server-side session record, clears the cookie, redirects through Keycloak RP-initiated logout |
 | GET | `/tekos` | Chat UI for the active agent (401→redirect to `/login` if not signed in; 403 if signed in but not authorized) |
 | POST | `/api/chat` | `{"session_id","message"}` → proxied to the BFF; JSON `{"reply","citations"}`, or SSE if `Accept: text/event-stream` (ADR-0045, see above) |
 | GET | `/healthz` | Liveness/readiness probe target, also used by `ansible/roles/agents/tasks/check.yml`'s smoke check |
@@ -173,7 +177,9 @@ internal/config/           Environment-variable loading
 internal/okf/               agent.okf.md Markdown-frontmatter parsing (mirrors platform/okf/schema)
 internal/oidc/              Hand-rolled OIDC Authorization Code + PKCE + JWKS/RS256 verification
 internal/reqid/             X-Zuno-Request-Id minting/propagation (ADR-0045)
-internal/session/           Signed-cookie session (HMAC, no server-side store)
+internal/session/           Opaque session-ID cookie (HMAC-signed) resolved against a
+                            Redis-backed, AES-256-GCM-encrypted server-side store, with
+                            transparent access-token refresh (ADR-0042)
 internal/portal/            Portal page shell + config injection
 internal/chat/               Chat page shell + BFF proxy (JSON and SSE)
 web/                         Vite + React + TypeScript + PatternFly (ADR-0044) - see web/package.json

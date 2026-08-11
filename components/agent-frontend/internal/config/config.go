@@ -8,8 +8,11 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 )
 
 // Config holds every environment-derived setting agent-frontend needs.
@@ -61,9 +64,30 @@ type Config struct {
 	// public ingress) - the frontend proxies chat calls to it server-side.
 	BFFBaseURL string
 
-	// SessionHMACSecret signs the frontend's session cookie (subject,
-	// groups, access token, expiry). Sourced from Vault via ExternalSecret.
+	// SessionHMACSecret signs the frontend's opaque session-ID cookie.
+	// Sourced from Vault via ExternalSecret.
 	SessionHMACSecret []byte
+
+	// SessionEncryptionKey (32 bytes, AES-256) encrypts session records
+	// at rest in Redis (ADR-0042). Sourced from Vault via ExternalSecret;
+	// distinct from SessionHMACSecret so compromising one doesn't also
+	// compromise the other (signing vs. encryption keys stay separate).
+	SessionEncryptionKey []byte
+
+	// RedisAddr is the in-cluster Redis Service address, e.g.
+	// zuno-redis-master.zuno-auth.svc.cluster.local:6379 (ADR-0042).
+	RedisAddr string
+
+	// RedisPassword authenticates to Redis. Sourced from Vault via
+	// ExternalSecret; empty only for local development against an
+	// unauthenticated Redis.
+	RedisPassword string
+
+	// SessionMaxLifetime bounds how long a server-side session record
+	// survives in Redis regardless of how many times its access token is
+	// refreshed - ADR-0042's "revocable... TTL by default", distinct from
+	// the short-lived access token's own expiry.
+	SessionMaxLifetime time.Duration
 
 	// WebDistDir is the Vite build output directory (ADR-0044), containing
 	// .vite/manifest.json plus the hashed JS/CSS assets - see
@@ -88,6 +112,8 @@ func Load() (*Config, error) {
 		SelfBaseURL:       getenv("SELF_BASE_URL", ""),
 		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080"),
 		WebDistDir:        getenv("WEB_DIST_DIR", "web/dist"),
+		RedisAddr:         getenv("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
+		RedisPassword:     os.Getenv("REDIS_PASSWORD"),
 	}
 
 	if cfg.KeycloakIssuerURL == "" {
@@ -108,6 +134,29 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("SESSION_HMAC_SECRET is required (expected from an ExternalSecret-mounted env var)")
 	}
 	cfg.SessionHMACSecret = []byte(secret)
+
+	encKeyB64 := os.Getenv("SESSION_ENCRYPTION_KEY")
+	if encKeyB64 == "" {
+		return nil, fmt.Errorf("SESSION_ENCRYPTION_KEY is required (expected from an ExternalSecret-mounted env var, base64-encoded 32 bytes)")
+	}
+	encKey, err := base64.StdEncoding.DecodeString(encKeyB64)
+	if err != nil {
+		return nil, fmt.Errorf("SESSION_ENCRYPTION_KEY is not valid base64: %w", err)
+	}
+	if len(encKey) != 32 {
+		return nil, fmt.Errorf("SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes (AES-256), got %d", len(encKey))
+	}
+	cfg.SessionEncryptionKey = encKey
+
+	maxLifetime := 12 * time.Hour
+	if v := os.Getenv("SESSION_MAX_LIFETIME_SECONDS"); v != "" {
+		secs, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("SESSION_MAX_LIFETIME_SECONDS is not a valid integer: %w", err)
+		}
+		maxLifetime = time.Duration(secs) * time.Second
+	}
+	cfg.SessionMaxLifetime = maxLifetime
 
 	return cfg, nil
 }

@@ -27,6 +27,7 @@
       - observability
       - external_secrets
       - cert_manager
+      - redis
       - vault
       - openshift_rbac_groups
       - namespaces

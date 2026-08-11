@@ -1,0 +1,45 @@
+{{- if .Values.redis.enabled | default true }}
+# ADR-0042 session store must accept traffic only from agent-frontend
+# pods - not every pod in a namespace that happens to be allowed by
+# zuno-auth's broader default-deny-other-namespaces baseline
+# (gitops/charts/namespaces), and not from anywhere in the cluster (which
+# is what bitnami/redis's own default NetworkPolicy would otherwise
+# allow - disabled in values.yaml in favor of this). Same least-privilege
+# bar gitops/charts/mcp-sales-db already sets. Matches any agent
+# namespace generically via the zuno.io/agent label key every one of them
+# carries (gitops/charts/namespaces/templates/namespace.yaml), rather
+# than hardcoding the one active in v0 (zuno-agent-tekos) - future agents
+# going active need no change here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zuno-redis-session-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: zuno.io/agent
+                operator: Exists
+          podSelector:
+            matchLabels:
+              # Matches gitops/charts/tekos/templates/deployment.yaml's
+              # frontend Deployment label exactly (app.kubernetes.io/
+              # component: frontend, not .../name - this chart's own
+              # convention, not the app.kubernetes.io/name one
+              # mcp-gateway/mcp-sales-db use).
+              app.kubernetes.io/component: frontend
+      ports:
+        - protocol: TCP
+          port: 6379
+{{- end }}

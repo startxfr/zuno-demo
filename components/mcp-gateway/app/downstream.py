@@ -17,18 +17,24 @@ import os
 from typing import Any, Dict
 
 import httpx
+import httpx2  # the mcp SDK's own httpx fork/client type, required by streamable_http_client
+from mcp.client.session import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import MCPError
 
 from app.handlers import confluence, drive, email_report, gmail, web_search
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
-# ASSUMPTION (document + reconcile once components/mcp-servers/sales-db is
-# finalized by its owning track): the sales-db MCP server is reachable as
-# an HTTP+SSE MCP endpoint inside the cluster at this address, exposing
-# standard MCP `tools/call` semantics over a JSON-RPC-style POST. If the
-# real server instead speaks MCP-over-stdio via a sidecar, only
-# `_invoke_sales_db` below needs to change.
+# ADR-0043: sales-db is a real, standards-compliant MCP server (streamable-
+# HTTP transport, mounted at /mcp - see components/mcp-servers/sales-db/
+# server.py) reached here via the official `mcp` SDK's ClientSession, not
+# the hand-rolled JSON-RPC-shaped POST this file used before. Only
+# `_invoke_sales_db` below needed to change - `invoke()`'s own signature
+# and every caller (app/main.py) are unaffected, exactly as this module's
+# docstring anticipated before the migration.
 SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc:8000")
+SALES_DB_MCP_ENDPOINT = f"{SALES_DB_MCP_URL}/mcp"
 DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "20"))
 
 # ADR-0037: a shared secret (vault-generated,
@@ -78,22 +84,40 @@ async def invoke(
 async def _invoke_sales_db(
     tool_name: str, arguments: Dict[str, Any], bearer_token: str
 ) -> Dict[str, Any]:
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {"name": tool_name, "arguments": arguments},
-    }
+    # Authorization is still forwarded for audit/observability even though
+    # sales-db doesn't itself re-validate it (the gateway's ADR-0011 policy
+    # intersection already happened - see components/mcp-servers/sales-db/
+    # server.py's module docstring); X-Zuno-Gateway-Token is the one that's
+    # actually enforced (ADR-0037).
     headers = {"Authorization": f"Bearer {bearer_token}", "X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
     try:
-        async with httpx.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS) as client:
-            resp = await client.post(f"{SALES_DB_MCP_URL}/mcp", json=payload, headers=headers)
-        resp.raise_for_status()
-        body = resp.json()
-    except httpx.HTTPError as exc:
+        http_client = httpx2.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS, headers=headers)
+        async with streamable_http_client(SALES_DB_MCP_ENDPOINT, http_client=http_client) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
+    except MCPError as exc:
+        logger.error("sales-db MCP server returned a protocol-level error for tool '%s': %s", tool_name, exc)
+        raise DownstreamError(502, f"sales-db MCP server returned an error: {exc}") from exc
+    except (httpx.HTTPError, OSError) as exc:
         logger.error("sales-db MCP server call failed for tool '%s': %s", tool_name, exc)
         raise DownstreamError(502, f"sales-db MCP server unreachable or errored: {exc}") from exc
 
-    if isinstance(body, dict) and "error" in body:
-        raise DownstreamError(502, f"sales-db MCP server returned an error: {body['error']}")
-    return body.get("result", body) if isinstance(body, dict) else {"raw": body}
+    if result.is_error:
+        detail = "; ".join(block.text for block in result.content if hasattr(block, "text"))
+        raise DownstreamError(502, f"sales-db MCP server returned a tool error: {detail}")
+
+    if result.structured_content is not None:
+        # Verified against the real SDK (mcp==2.0.0): a tool whose return
+        # type annotation is a plain dict (every sales-db tool) gets its
+        # structured content wrapped as {"result": <value>} - MCP requires
+        # structured content to have an object-typed top-level schema, and
+        # a bare dict return has none, so the SDK wraps it. Unwrap that
+        # single-key envelope rather than leaking SDK plumbing into the
+        # gateway's own response shape, which callers expect to match the
+        # pre-migration `{"customer": ..., "contacts": ...}` shape exactly.
+        if set(result.structured_content.keys()) == {"result"}:
+            return result.structured_content["result"]
+        return result.structured_content
+    text_blocks = [block.text for block in result.content if hasattr(block, "text")]
+    return {"raw": "\n".join(text_blocks)}

@@ -1,0 +1,28 @@
+---
+# ADR-0042: server-side session store backing agent-frontend's opaque
+# browser sessions. Demo-grade: standalone (no replication), 1Gi
+# persistence - see gitops/charts/redis/values.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-redis-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-171"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/redis
+    helm:
+      releaseName: zuno-redis
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-auth
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

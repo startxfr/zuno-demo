@@ -1,0 +1,18 @@
+---
+# ADR-0042. No OLM operator (plain Helm deployment, bitnami/redis) - same
+# shape as ansible/roles/vault, all real content is -d1.
+- name: "redis | apply the redis GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "redis"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "redis | apply the redis GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "redis"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15

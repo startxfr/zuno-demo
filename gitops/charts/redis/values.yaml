@@ -1,0 +1,57 @@
+# Values for the upstream bitnami/redis chart dependency, nested under
+# "redis:" per Helm subchart convention.
+redis:
+  global:
+    compatibility:
+      openshift:
+        # ADR-0052: restricted-v2 SCC compatibility (arbitrary/non-root
+        # UID, no privileged context) - same flag family as
+        # gitops/charts/vault's "global.openshift: true" for the
+        # hashicorp/vault chart, Bitnami's own equivalent.
+        adaptSecurityContext: force
+
+  # Demo scale: this is a session cache, not the platform's durable data
+  # store (that's PostgreSQL/pgvector, ADR-0015) - standalone, not
+  # replication, same "demo-scale" choice gitops/charts/tempo's
+  # TempoMonolithic already makes for its own backing store.
+  architecture: standalone
+
+  auth:
+    enabled: true
+    # Vault-generated (ansible/roles/vault/tasks/install.yml,
+    # zuno/redis/session-store), synced via templates/externalsecret.yaml
+    # below into the Secret name/key Bitnami's chart expects.
+    existingSecret: zuno-redis-auth
+    existingSecretPasswordKey: redis-password
+
+  master:
+    priorityClassName: zuno-platform-weak
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  # No read replicas needed at this scale/purpose.
+  replica:
+    replicaCount: 0
+
+  metrics:
+    enabled: false
+
+  # Bitnami's own default NetworkPolicy has an ingress rule with no
+  # `from` selector - it allows traffic from anywhere in the cluster,
+  # which would punch a hole through zuno-auth's existing default-deny-
+  # other-namespaces baseline (gitops/charts/namespaces) rather than
+  # respect it. Disabled here in favor of this chart's own
+  # templates/networkpolicy.yaml, scoped to agent-frontend pods
+  # specifically - the same least-privilege bar
+  # gitops/charts/mcp-sales-db already sets for a comparable
+  # security-relevant backing service.
+  networkPolicy:
+    enabled: false
