@@ -16,25 +16,24 @@
 - name: "gitops | resolve the cluster base domain (for Applications whose Helm values need it)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
+# Optionally injects Helm values known only at run time (replaces, not merges,
+# the manifest's own spec.source.helm.values) - combine() with {} is a no-op
+# when gitops_app_extra_helm_values isn't set, so this stays a single step.
 - name: "gitops | render the Application manifest with apps.mycluster.example.com substituted"
   ansible.builtin.set_fact:
     _gitops_app_definition: >-
       {{
-        (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_component_name + '/application-' + gitops_app_phase + '.yaml')
-          | replace('apps.mycluster.example.com', cluster_base_domain))
-        | from_yaml
+        (
+          (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/' + gitops_component_name + '/application-' + gitops_app_phase + '.yaml')
+            | replace('apps.mycluster.example.com', cluster_base_domain))
+          | from_yaml
+        )
+        | combine(
+            {'spec': {'source': {'helm': {'values': gitops_app_extra_helm_values | to_nice_yaml}}}}
+            if gitops_app_extra_helm_values is defined else {},
+            recursive=True
+          )
       }}
-
-# Optional: lets a role inject Helm values known only at run time. Replaces
-# (not merges) the manifest's own spec.source.helm.values when set.
-- name: "gitops | merge extra Helm values into the Application spec, if provided"
-  ansible.builtin.set_fact:
-    _gitops_app_definition: >-
-      {{
-        _gitops_app_definition
-        | combine({'spec': {'source': {'helm': {'values': gitops_app_extra_helm_values | to_nice_yaml}}}}, recursive=True)
-      }}
-  when: gitops_app_extra_helm_values is defined
 
 - name: "gitops | apply ArgoCD Application: zuno-{{ gitops_app_name }}"
   kubernetes.core.k8s:

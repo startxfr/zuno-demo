@@ -11,11 +11,14 @@
       - build_context_dir is defined
     fail_msg: "apply_openshift_build.yml requires build_image_name, build_dockerfile_path and build_context_dir"
 
-- name: "openshift-build | ensure the zuno-ai-build namespace exists"
+# Build pods only pull source and push images out; nothing needs inbound
+# access, so a full default-deny-all-ingress baseline is safe here.
+- name: "openshift-build | ensure the zuno-ai-build namespace and its default-deny-ingress NetworkPolicy baseline"
   kubernetes.core.k8s:
     state: present
-    definition:
-      apiVersion: v1
+    definition: "{{ item }}"
+  loop:
+    - apiVersion: v1
       kind: Namespace
       metadata:
         name: zuno-ai-build
@@ -25,14 +28,7 @@
           openshift.io/description: "In-cluster OpenShift build pipeline producing this platform's component images."
           openshift.io/display-name: "Zuno AI Build"
           openshift.io/requester: zuno
-
-# Build pods only pull source and push images out; nothing needs inbound
-# access, so a full default-deny-all-ingress baseline is safe here.
-- name: "openshift-build | apply a default-deny-all-ingress NetworkPolicy baseline"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: networking.k8s.io/v1
+    - apiVersion: networking.k8s.io/v1
       kind: NetworkPolicy
       metadata:
         name: zuno-ai-build-default-deny-ingress
@@ -43,6 +39,8 @@
         podSelector: {}
         policyTypes:
           - Ingress
+  loop_control:
+    label: "{{ item.kind }}/{{ item.metadata.name }}"
 
 # Grants cross-namespace image-pull access to the namespaces that run these
 # images. Applied here, not by the Day 0 namespaces role, since zuno-ai-build
@@ -111,7 +109,6 @@
             name: "{{ build_image_name }}:latest"
         triggers:
           - type: ConfigChange
-  register: _openshift_build_bc
 
 - name: "openshift-build | re-read the BuildConfig to get its current lastVersion"
   kubernetes.core.k8s_info:
@@ -157,10 +154,3 @@
   when: >-
     (_openshift_build_bc_info.resources[0].status.lastVersion | default(0)) > 0 and
     (_openshift_build_status.resources[0].status.phase | default('')) != 'Complete'
-
-- name: "openshift-build | summary"
-  ansible.builtin.debug:
-    msg: >-
-      {{ build_image_name }}: BuildConfig lastVersion=
-      {{ _openshift_build_bc_info.resources[0].status.lastVersion | default(0) }},
-      phase={{ _openshift_build_status.resources[0].status.phase | default('no build triggered - BuildConfig unchanged') }}.
