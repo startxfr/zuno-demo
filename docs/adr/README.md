@@ -101,6 +101,8 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0316](0316-keycloak-route-tls-via-cert-manager.md) | v0 | Implemented | Keycloak's Route gets a cert-manager-issued certificate via a hand-authored Ingress |
 | [ADR-0317](0317-install-connectivity-link-and-leaderworkerset-operators.md) | v0 | Implemented | Install the Red Hat Connectivity Link and LeaderWorkerSet operators as OpenShift AI prerequisites |
 | [ADR-0318](0318-install-custom-metrics-autoscaler-and-jobset-operators.md) | v0 | Implemented | Install the Custom Metrics Autoscaler and JobSet operators as OpenShift AI prerequisites |
+| [ADR-0319](0319-target-openshift-4-22.md) | v0 | Proposed | Target OpenShift 4.22 |
+| [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md) | v0 | Proposed | Pre-provision OpenShift users, RBAC and Console favorites via Keycloak |
 
 ## Standard clauses
 
