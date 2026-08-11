@@ -1,6 +1,6 @@
 # ADR-0321: Delegate Kueue lifecycle to the Red Hat build of Kueue Operator
 
-- **Status:** To be implemented
+- **Status:** Implemented — see `gitops/charts/kueue/` (Subscription + operand), `gitops/apps/kueue/application-{d0,d1}.yaml`.
 - **Target:** v0
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

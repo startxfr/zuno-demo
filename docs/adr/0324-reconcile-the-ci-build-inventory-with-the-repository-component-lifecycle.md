@@ -1,6 +1,6 @@
 # ADR-0324: Reconcile the CI build inventory with the repository component lifecycle
 
-- **Status:** To be implemented
+- **Status:** Implemented — see `.github/workflows/build-publish.yml` (stale `postgresql-pgvector` matrix entry removed).
 - **Target:** v0
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

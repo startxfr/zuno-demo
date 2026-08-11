@@ -47,8 +47,8 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | Implemented | Make Agent Runtime execute the OKF agent contract |
 | [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | v0 | Implemented | Separate agent entitlement from business role authorization |
 | [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | v0 | Implemented | Remove nominative demo identities and static passwords from Git |
-| [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v1 | To be implemented | Use opaque browser sessions with server-side token storage |
-| [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md) | v1 | To be implemented | Use standard MCP protocol behind the Zuno MCP Gateway |
+| [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v1 | Implemented | Use opaque browser sessions with server-side token storage |
+| [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md) | v1 | Implemented | Use standard MCP protocol behind the Zuno MCP Gateway |
 | [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Implemented | Use PatternFly React for the agent frontend |
 | [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Implemented | Stream responses end to end with SSE |
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Implemented | Make RAG retrieval metadata-aware and bilingual |
@@ -101,12 +101,12 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0316](0316-keycloak-route-tls-via-cert-manager.md) | v0 | Implemented | Keycloak's Route gets a cert-manager-issued certificate via a hand-authored Ingress |
 | [ADR-0317](0317-install-connectivity-link-and-leaderworkerset-operators.md) | v0 | Implemented | Install the Red Hat Connectivity Link and LeaderWorkerSet operators as OpenShift AI prerequisites |
 | [ADR-0318](0318-install-custom-metrics-autoscaler-and-jobset-operators.md) | v0 | Implemented | Install the Custom Metrics Autoscaler and JobSet operators as OpenShift AI prerequisites |
-| [ADR-0319](0319-target-openshift-4-22.md) | v0 | Proposed | Target OpenShift 4.22 |
-| [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md) | v0 | Proposed | Pre-provision OpenShift users, RBAC and Console favorites via Keycloak |
-| [ADR-0321](0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md) | v0 | To be implemented | Delegate Kueue lifecycle to the Red Hat build of Kueue Operator |
+| [ADR-0319](0319-target-openshift-4-22.md) | v0 | Implemented | Target OpenShift 4.22 |
+| [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md) | v0 | Implemented | Pre-provision OpenShift users, RBAC and Console favorites via Keycloak |
+| [ADR-0321](0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md) | v0 | Implemented | Delegate Kueue lifecycle to the Red Hat build of Kueue Operator |
 | [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0/v1 | To be implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
-| [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | To be implemented | Establish canonical generated and validated platform documentation |
-| [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | To be implemented | Reconcile the CI build inventory with the repository component lifecycle |
+| [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | Implemented | Establish canonical generated and validated platform documentation |
+| [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
 | [ADR-0325](0325-complete-the-openshift-ai-maas-governance-plane-integration.md) | v1 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v1 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v1 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |

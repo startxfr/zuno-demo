@@ -1,6 +1,6 @@
 # ADR-0323: Establish canonical generated and validated platform documentation
 
-- **Status:** To be implemented
+- **Status:** Implemented — see `platform/docs/check_docs.py`, wired into `.github/workflows/lint.yml`.
 - **Target:** v0
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
