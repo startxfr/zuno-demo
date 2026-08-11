@@ -1,0 +1,16 @@
+externalSecret:
+  enabled: false
+
+oauth:
+  enabled: false
+  clientId: openshift
+  realm: zuno
+
+# Literal placeholder - gitops/apps/openshift-oauth/application-d1.yaml's
+# inline values carry the literal string "apps.mycluster.example.com",
+# which ansible/tasks/apply_gitops_app.yml text-replaces with the real
+# discovered domain before applying (same mechanism
+# gitops/apps/keycloak/application-d1.yaml already uses). This default is
+# only exercised by `helm template`/`helm lint` run directly against this
+# chart, not by the real GitOps apply path.
+clusterBaseDomain: apps.mycluster.example.com

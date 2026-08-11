@@ -1,0 +1,59 @@
+# ADR-0323: single machine-readable source for stable platform version/
+# capability intent - the facts that were otherwise duplicated (and drifting)
+# across README.md, MEMORY.md, docs/architecture/*.md, docs/platform/*.md
+# and platform/*/README.md.
+#
+# Deliberately does NOT capture dynamic OLM operator channel/catalog
+# selection (ADR-0048 - discovered at deployment time from the target
+# cluster's own PackageManifest) or any per-cluster runtime state. This
+# file is read by platform/docs/check_docs.py to validate that curated
+# prose doesn't contradict it - it is not itself generated from anything.
+
+openshift:
+  # The Container Platform baseline this repository targets (ADR-0319,
+  # superseding ADR-0002's 4.20). OpenShift AI's own release train is
+  # tracked separately below - they move independently.
+  target: "4.22"
+
+openshift_ai:
+  release_train: "3.5 EA2"
+
+# Zuno-specific platform capabilities whose documented status has
+# historically drifted from the rendered DataScienceCluster
+# (gitops/charts/openshift-ai/values.yaml). "v0-active" means the
+# underlying platform component is enabled/reconciling in v0; it does not
+# imply every related Zuno-side integration (e.g. policy routing) is done
+# - see each capability's note.
+capabilities:
+  ogx:
+    status: v0-active
+    note: >-
+      DataScienceCluster spec.components.ogx activated (ADR-0322 v0);
+      an OGX-backed RAG provider behind Zuno's retrieval contract is v1.
+  maas:
+    status: v0-active
+    note: >-
+      kserve.modelsAsService and the maas-default-gateway are active;
+      Zuno's own MaaS policy-router layer (ADR-0049) and governance plane
+      (ADR-0325) remain v1 - nothing routes through a MaaS policy layer yet.
+  kueue:
+    status: v0-active
+    note: >-
+      Red Hat build of Kueue Operator installed as a Day 0 prerequisite
+      (ADR-0321), DataScienceCluster kueue.managementState: Unmanaged.
+
+# Agent catalog/status (ADR-0031): only Tekos is a running end-to-end
+# vertical slice in v0; the other four are catalog-only placeholders
+# (OKF definitions, reserved namespaces, access-gated portal tiles, no
+# running workflow) until ADR-0326 generalizes the slice to them in v1.
+agent_catalog:
+  - name: tekos
+    status: active
+  - name: arkos
+    status: placeholder
+  - name: comage
+    status: placeholder
+  - name: advantage
+    status: placeholder
+  - name: finage
+    status: placeholder

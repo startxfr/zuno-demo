@@ -1,0 +1,71 @@
+{{- if .Values.roleBindings.enabled }}
+{{- range .Values.zunoManagedNamespaces }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-admin-admin
+  namespace: {{ . }}
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: zuno-admin
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
+---
+{{- end }}
+# aidev/aiops are deliberately pointed at the platform's real, already-
+# purposed build/runtime namespaces, not new dedicated sandboxes - an
+# accepted, documented trade-off (ADR-0320's Decision/Security
+# considerations), not an oversight.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-aidev-edit
+  namespace: zuno-ai-build
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: aidev
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-aiops-edit
+  namespace: zuno-ai-build
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: aiops
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-aiops-edit
+  namespace: zuno-ai-run
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: aiops
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

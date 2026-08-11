@@ -1,0 +1,30 @@
+---
+# Cluster-wide binding only (admin -> cluster-admin), no namespace
+# dependency - can apply as soon as this Application exists.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-rbac-groups-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-179"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-rbac-groups
+    helm:
+      releaseName: zuno-openshift-rbac-groups-d0
+      values: |
+        clusterRoleBinding:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

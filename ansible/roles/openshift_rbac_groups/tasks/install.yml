@@ -1,0 +1,33 @@
+---
+# ADR-0320. Runs after "namespaces" in ansible/playbooks/day0_install.yml -
+# the zuno-admin RoleBindings need gitops/charts/namespaces' zuno.io/managed
+# namespaces to already exist and be labeled.
+- name: "openshift_rbac_groups | apply the openshift-rbac-groups GitOps Application (d0: ClusterRoleBinding)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-rbac-groups"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-openshift-rbac-groups-d0"
+
+# Discover, don't duplicate (ADR-0048's principle applied to a label
+# selector instead of an OLM channel): the zuno-admin namespace list comes
+# from a live query of what's actually labeled, not a second hardcoded
+# list that could silently drift from gitops/charts/namespaces/values.yaml.
+- name: "openshift_rbac_groups | discover namespaces labeled zuno.io/managed=true"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    label_selectors:
+      - "zuno.io/managed=true"
+  register: _zuno_managed_namespaces
+
+- name: "openshift_rbac_groups | apply the openshift-rbac-groups GitOps Application (d1: RoleBindings)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-rbac-groups"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-openshift-rbac-groups-d1"
+    gitops_app_extra_helm_values:
+      roleBindings:
+        enabled: true
+      zunoManagedNamespaces: "{{ _zuno_managed_namespaces.resources | map(attribute='metadata.name') | sort | list }}"

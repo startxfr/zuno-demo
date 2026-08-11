@@ -66,12 +66,11 @@ ansible-galaxy collection install -r ansible/requirements.yml
 make d0 check
 make d0 check keycloak
 make d0 install
-make d0 configure
-make d0 all openshift-ai   # check + install + configure, one component
+make d0 all openshift-ai   # check + install, one component
 
 # Day 1: build the platform's own component images, then run the platform.
 make d1 build
-make d1 run
+make d1 install
 make d1 check              # ADR-0053 acceptance/security gate for `agents`
 ```
 

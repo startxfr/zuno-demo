@@ -1,0 +1,15 @@
+apiVersion: v2
+name: openshift-oauth
+description: >-
+  ADR-0320: cluster OAuth OpenID identity provider backed by Keycloak's
+  new "openshift" confidential client, plus the ExternalSecret that syncs
+  its Vault-seeded client secret into openshift-config (the namespace the
+  cluster OAuth singleton resolves identity-provider secrets from -
+  ExternalSecret can't cross namespaces, so this is a separate
+  ExternalSecret from gitops/charts/keycloak's own, reading the same
+  Vault path into a different namespace, same pattern documented in
+  ansible/roles/keycloak/README.md for the Postgres secret crossing
+  zuno-data -> zuno-auth).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

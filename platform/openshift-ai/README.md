@@ -74,10 +74,16 @@ ways: it also means *not* installing operators nothing here uses.
   `trainingoperator` (Kubeflow Trainer v2) has a supported queue-management
   path once distributed training runs actually exist. See
   `ansible/roles/kueue`.
-- **MaaS** (Models-as-a-Service policy routing) - not applicable to v0.
-  ADR-0049 ("Zuno as MaaS policy router") is explicitly deferred to v1 in
-  the implementation sequencing plan; nothing in the current build routes
-  through a MaaS layer.
+- **MaaS** (Models-as-a-Service policy routing) - the underlying platform
+  plumbing (`kserve.modelsAsService.managementState: Managed` and the
+  `maas-default-gateway` this chart's own `templates/maas-gateway.yaml`
+  renders) is active as of the OpenShift AI DSCInitialization/gateway
+  work, not deferred. What's still v1 is the *policy* layer: ADR-0049
+  ("Zuno as MaaS policy router") and ADR-0325 (completing the MaaS
+  governance plane - subscriptions, auth policy, usage observability)
+  remain "To be implemented" - nothing in the current build routes
+  application traffic through a MaaS policy layer yet, even though the
+  gateway/serving prerequisite it would sit in front of already exists.
 - **OGX** - as of ADR-0322 (superseding ADR-0018 and ADR-0050 for OGX
   product mapping), this is the actual Red Hat OpenShift AI OGX Operator,
   a real `DataScienceCluster` component (`spec.components.ogx`), replacing

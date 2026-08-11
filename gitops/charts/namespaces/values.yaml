@@ -71,8 +71,10 @@ platformNamespaces:
       - zuno-agent-tekos
       - zuno-ai-run
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 3).
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       istio-injection: enabled
+      zuno.io/managed: "true"
   - name: zuno-vault
     displayName: Zuno Vault
     description: >-
@@ -88,6 +90,9 @@ platformNamespaces:
     # ESO's secretstore-validate webhook (failurePolicy: Fail) lives here and
     # is called synchronously by the API server on every SecretStore write.
     allowApiServerWebhooks: true
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
+    extraLabels:
+      zuno.io/managed: "true"
   - name: zuno-data
     displayName: Zuno Data
     description: >-
@@ -100,8 +105,10 @@ platformNamespaces:
       - zuno-vault
       - zuno-auth
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       istio-injection: enabled
+      zuno.io/managed: "true"
   - name: zuno-monitoring
     displayName: Zuno Monitoring
     description: >-
@@ -117,6 +124,9 @@ platformNamespaces:
       - zuno-data
       - zuno-auth
       - zuno-ai-build
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
+    extraLabels:
+      zuno.io/managed: "true"
   - name: zuno-ai-build
     displayName: Zuno AI Build
     description: >-
@@ -126,8 +136,10 @@ platformNamespaces:
       - zuno-ai-run
       - zuno-data
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 4).
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       istio-injection: enabled
+      zuno.io/managed: "true"
   - name: zuno-ai-run
     displayName: Zuno AI Runtime
     description: >-
@@ -137,9 +149,11 @@ platformNamespaces:
     # RHOAI dashboard label, folded in here since this chart already owns
     # zuno-ai-run's Namespace object. istio-injection: sidecar-injected +
     # mTLS-enforced (service-mesh component, phase 4).
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
+      zuno.io/managed: "true"
   - name: zuno-mesh
     displayName: Zuno Service Mesh
     description: >-
@@ -153,6 +167,9 @@ platformNamespaces:
       - zuno-auth
       - zuno-ai-run
       - zuno-ai-build
+    # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
+    extraLabels:
+      zuno.io/managed: "true"
     # istiod's sidecar-injector + validating webhooks are called synchronously
     # by the API server, same pattern as ESO's secretstore-validate webhook.
     allowApiServerWebhooks: true

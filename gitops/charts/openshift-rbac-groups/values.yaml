@@ -1,0 +1,12 @@
+clusterRoleBinding:
+  enabled: false
+roleBindings:
+  enabled: false
+
+# Mirrors gitops/charts/namespaces' zuno.io/managed=true label set.
+# Populated by ansible/roles/openshift_rbac_groups/tasks/install.yml via
+# a live k8s_info lookup at apply time (ADR-0048-style: discover, don't
+# duplicate the 12-namespace list by hand in a second place) - never
+# hand-set. A namespace missing this label is silently excluded from
+# zuno-admin RBAC, which is intended behavior (ADR-0320's Consequences).
+zunoManagedNamespaces: []

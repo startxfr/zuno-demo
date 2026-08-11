@@ -1,0 +1,4 @@
+{
+  "_UNVERIFIED_PLACEHOLDER": "This is NOT a confirmed OpenShift Console ConfigMap format. Capture the real value by logging into the OpenShift Web Console as the aidev template account (see ../../../ansible/roles/console_favorites_provisioning/README.md), pinning the intended namespaces via the Console's own favorite/pin UI, then reading back the actual 'console.favorites' (or whatever key the running Console version actually uses) from the resulting openshift-console-user-settings/user-settings-<uid> ConfigMap and replacing this file's content with it verbatim.",
+  "profile": "aidev"
+}

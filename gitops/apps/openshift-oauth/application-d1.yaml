@@ -1,0 +1,37 @@
+---
+# The cluster OAuth/cluster singleton (config.openshift.io/v1) - depends
+# on -d0's Secret existing. Ansible orders this after -d0 in
+# ansible/roles/openshift_oauth/tasks/install.yml, same as every other
+# d0/d1 pair in this repository.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-oauth-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-14"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-oauth
+    helm:
+      releaseName: zuno-openshift-oauth-d1
+      values: |
+        oauth:
+          enabled: true
+        # Literal placeholder - ansible/tasks/apply_gitops_app.yml replaces
+        # this exact string with the real discovered domain before
+        # applying (same mechanism gitops/apps/keycloak/application-d1.yaml
+        # already uses), NOT a Helm values default.
+        clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-config
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -10,11 +10,14 @@
       - argocd
       - admin_context
       - namespaces
+      - openshift_rbac_groups
       - vault
       - cert_manager
       - external_secrets
       - observability
       - keycloak
+      - openshift_oauth
+      - console_favorites_provisioning
       - postgresql
       - service_mesh
       - tempo

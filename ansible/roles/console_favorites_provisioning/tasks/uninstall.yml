@@ -1,0 +1,11 @@
+---
+# Reverse of install.yml.
+- name: "console_favorites_provisioning | delete the console-favorites-provisioning GitOps Application (d1: CronJob)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-console-favorites-provisioning-d1"
+
+- name: "console_favorites_provisioning | delete the console-favorites-provisioning GitOps Application (d0: RBAC/Secret/ConfigMaps)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-console-favorites-provisioning-d0"

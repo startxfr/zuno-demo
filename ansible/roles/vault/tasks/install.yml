@@ -338,6 +338,32 @@
       default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
+# ADR-0320: the "openshift" client backing the cluster OAuth identity
+# provider - same single-secret shape as tekos-frontend above.
+- name: "vault | generate and seed the openshift OIDC client secret"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/openshift-client
+      client_secret={{ zuno_admin_openshift_client_token |
+      default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+  no_log: true
+
+# ADR-0320: the console_favorites_provisioning CronJob's Keycloak Admin
+# API service-account client secret - same shape again.
+- name: "vault | generate and seed the console-favorites-provisioner service-account client secret"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/console-favorites-provisioner
+      client_secret={{ zuno_admin_console_favorites_provisioner_token |
+      default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+  no_log: true
+
 - name: "vault | generate and seed the shared demo-persona password (ADR-0041)"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

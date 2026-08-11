@@ -89,6 +89,20 @@ spec:
                     items:
                       - key: password
                         path: zuno_demo_personas_password
+                - secret:
+                    # ADR-0320
+                    name: openshift-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_openshift_client_secret
+                - secret:
+                    # ADR-0320
+                    name: console-favorites-provisioner-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_console_favorites_provisioner_client_secret
         containers:
           - name: keycloak
             securityContext:

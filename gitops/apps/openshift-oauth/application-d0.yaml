@@ -1,0 +1,31 @@
+---
+# ExternalSecret only - must exist (and successfully sync) before the
+# OAuth CR (-d1) references the Secret it creates.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openshift-oauth-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openshift-oauth
+    helm:
+      releaseName: zuno-openshift-oauth-d0
+      values: |
+        externalSecret:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-config
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # openshift-config always exists.
+      - CreateNamespace=false

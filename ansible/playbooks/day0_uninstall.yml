@@ -16,6 +16,8 @@
       - nvidia_gpu
       - nfd
       - smtp
+      - console_favorites_provisioning
+      - openshift_oauth
       - keycloak
       - kiali
       - mesh_monitoring
@@ -26,6 +28,7 @@
       - external_secrets
       - cert_manager
       - vault
+      - openshift_rbac_groups
       - namespaces
       - admin_context
       - argocd

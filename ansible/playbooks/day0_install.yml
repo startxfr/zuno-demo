@@ -9,6 +9,7 @@
       - argocd
       - admin_context
       - namespaces
+      - openshift_rbac_groups
       - vault
       - cert_manager
       - external_secrets
@@ -19,6 +20,8 @@
       - mesh_monitoring
       - kiali
       - keycloak
+      - openshift_oauth
+      - console_favorites_provisioning
       - smtp
       - nfd
       - nvidia_gpu

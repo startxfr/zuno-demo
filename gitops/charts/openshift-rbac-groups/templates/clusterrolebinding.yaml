@@ -1,0 +1,24 @@
+{{- if .Values.clusterRoleBinding.enabled }}
+# Deliberate, explicit grant of unrestricted cluster access - not an
+# oversight (ADR-0320's Security considerations: "should be reviewed if
+# this profile's real-world membership ever grows beyond a small trusted
+# set"). Subject is a bare Kubernetes RBAC Group name ("admin", not
+# "/admin") because the "openshift" Keycloak client's groups protocol
+# mapper uses full.path: false (see gitops/charts/keycloak/files/
+# realm-zuno.json) - OpenShift's OAuth Group sync creates Group objects
+# named exactly as the claim delivers them.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zuno-admin-cluster-admin
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

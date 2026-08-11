@@ -1,0 +1,73 @@
+{{- if .Values.cronJob.enabled }}
+# This repository's first CronJob - every existing Job here
+# (gitops/charts/sql-schema/templates/job-schema-apply.yaml) is one-shot.
+# concurrencyPolicy: Forbid - overlapping runs would race on the same
+# create-if-missing operations; harmless if it happened, but unnecessary.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: console-favorites-provisioning
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: console-favorites-provisioning
+        spec:
+          restartPolicy: Never
+          priorityClassName: zuno-platform-weak
+          serviceAccountName: {{ .Values.serviceAccountName }}
+          automountServiceAccountToken: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reconciler
+              image: {{ .Values.image | quote }}
+              command:
+                - sh
+                - -c
+                - "pip install --quiet --no-cache-dir -r /app/requirements.txt && python3 /app/reconciler.py"
+              workingDir: /app
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false  # pip install writes site-packages under the image's own filesystem
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                - name: KEYCLOAK_URL
+                  value: {{ .Values.keycloak.url | quote }}
+                - name: KEYCLOAK_REALM
+                  value: {{ .Values.keycloak.realm | quote }}
+                - name: KEYCLOAK_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: console-favorites-provisioner-client-secret
+                      key: client_secret
+                - name: TEMPLATE_DIR
+                  value: /templates
+              volumeMounts:
+                - name: script
+                  mountPath: /app
+                - name: templates
+                  mountPath: /templates
+          volumes:
+            - name: script
+              configMap:
+                name: console-favorites-provisioning-script
+            - name: templates
+              configMap:
+                name: console-favorites-templates
+{{- end }}

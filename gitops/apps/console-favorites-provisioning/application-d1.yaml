@@ -1,0 +1,37 @@
+---
+# The CronJob itself - depends on -d0's ServiceAccount/RBAC/Secret/
+# ConfigMaps already existing.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-console-favorites-provisioning-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-14"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/console-favorites-provisioning
+    helm:
+      releaseName: zuno-console-favorites-provisioning-d1
+      values: |
+        cronJob:
+          enabled: true
+        # Literal placeholder - ansible/tasks/apply_gitops_app.yml
+        # replaces this exact string with the real discovered domain
+        # before applying (same mechanism gitops/apps/keycloak/
+        # application-d1.yaml already uses).
+        keycloak:
+          url: https://keycloak.apps.mycluster.example.com
+          realm: zuno
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

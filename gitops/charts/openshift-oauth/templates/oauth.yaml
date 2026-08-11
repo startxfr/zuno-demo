@@ -1,0 +1,30 @@
+{{- if .Values.oauth.enabled }}
+# ADR-0320: this is the only identity provider configured anywhere in
+# this repository today (confirmed: no other `kind: OAuth` resource
+# exists in gitops/ or ansible/), so this owns the full
+# spec.identityProviders list wholesale rather than trying to merge into
+# an existing one. mappingMethod: add lets a Keycloak login attach to an
+# OpenShift User pre-created by the console_favorites_provisioning
+# CronJob instead of creating a duplicate (see that role's README).
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  identityProviders:
+    - name: {{ .Values.oauth.clientId }}
+      mappingMethod: add
+      type: OpenID
+      openID:
+        clientID: {{ .Values.oauth.clientId }}
+        clientSecret:
+          name: openshift-client-secret
+        claims:
+          preferredUsername: ["preferred_username"]
+          name: ["name"]
+          email: ["email"]
+          groups: ["groups"]
+        issuer: "https://keycloak.{{ .Values.clusterBaseDomain }}/realms/{{ .Values.oauth.realm }}"
+{{- end }}
