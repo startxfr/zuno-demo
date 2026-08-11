@@ -1,0 +1,32 @@
+---
+# MonitoringStack + ServiceMonitor/PodMonitor instances (not the operator,
+# see application-d0.yaml). Prometheus source for gitops/charts/kiali's
+# Kiali instance - this repo has no OpenShift User Workload Monitoring
+# enabled to fall back to.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mesh-monitoring-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-163"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mesh-monitoring
+    helm:
+      releaseName: zuno-mesh-monitoring-d1
+      values: |
+        monitoring:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-mesh
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

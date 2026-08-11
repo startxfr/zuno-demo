@@ -20,16 +20,20 @@ spec:
     processors:
       batch: {}
     exporters:
-      # Demo scope: logs the pipeline instead of exporting to a real
-      # backend. Swap in a real exporter (Tempo, APM vendor) here later.
       debug:
         verbosity: normal
+      # gitops/charts/tempo's TempoMonolithic - kept alongside debug so
+      # `oc logs` still shows spans as a sanity check independent of Tempo.
+      otlp/tempo:
+        endpoint: tempo-tempo.zuno-telemetry.svc.cluster.local:4317
+        tls:
+          insecure: true
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [debug]
+          exporters: [debug, otlp/tempo]
         metrics:
           receivers: [otlp]
           processors: [batch]

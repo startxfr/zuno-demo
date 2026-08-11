@@ -1,0 +1,8 @@
+apiVersion: v2
+name: kiali
+description: >-
+  Web UI for the service mesh: the Red Hat Kiali operator, a Kiali instance
+  wired to istiod, gitops/charts/mesh-monitoring's Prometheus and
+  gitops/charts/tempo's Tempo, and the Route exposing it.
+type: application
+version: 0.1.0

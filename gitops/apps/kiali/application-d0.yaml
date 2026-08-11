@@ -1,0 +1,40 @@
+---
+# Kiali operator install; the Kiali instance is a separate Application
+# (application-d1.yaml) applied after this one is healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-kiali-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
+    argocd.argoproj.io/sync-wave: "-162"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/kiali
+    helm:
+      releaseName: zuno-kiali-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-kiali-operator
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Namespace isn't created elsewhere, so CreateNamespace is required here.
+      - CreateNamespace=true

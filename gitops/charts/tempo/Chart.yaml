@@ -1,0 +1,8 @@
+apiVersion: v2
+name: tempo
+description: >-
+  Distributed tracing backend: the Red Hat Tempo operator and a demo-scale
+  TempoMonolithic instance, storing traces exported by gitops/charts/observability's
+  Collector and queried by gitops/charts/kiali's Kiali instance.
+type: application
+version: 0.1.0

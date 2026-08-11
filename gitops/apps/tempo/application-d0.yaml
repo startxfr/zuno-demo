@@ -1,0 +1,40 @@
+---
+# Tempo operator install; the TempoMonolithic instance is a separate
+# Application (application-d1.yaml) applied after this one is healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-tempo-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
+    argocd.argoproj.io/sync-wave: "-166"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/tempo
+    helm:
+      releaseName: zuno-tempo-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-tempo-operator
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Namespace isn't created elsewhere, so CreateNamespace is required here.
+      - CreateNamespace=true

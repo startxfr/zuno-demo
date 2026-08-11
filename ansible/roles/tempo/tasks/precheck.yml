@@ -1,0 +1,35 @@
+---
+# State detection (never fails).
+- name: "tempo | check the tempo Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-tempo-d0"
+
+- name: "tempo | save the d0 check result"
+  ansible.builtin.set_fact:
+    _tempo_d0_installed: "{{ _state_check_result }}"
+
+- name: "tempo | check the tempo Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-tempo-d1"
+
+- name: "tempo | look up the Tempo StatefulSet"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: zuno-telemetry
+    name: tempo-tempo
+  register: _tempo_statefulset_lookup
+
+- name: "tempo | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _tempo_d0_installed and _state_check_result
+        and (_tempo_statefulset_lookup.resources | default([]) | length) > 0
+        and (_tempo_statefulset_lookup.resources[0].status.readyReplicas | default(0)) > 0
+      }}
+
+- name: "tempo | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

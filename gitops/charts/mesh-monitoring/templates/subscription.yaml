@@ -1,0 +1,24 @@
+{{- if .Values.operator.enabled }}
+# Package/channel confirmed against a live cluster's PackageManifest
+# (redhat-operators catalog) before this chart was written - see
+# `oc get packagemanifest cluster-observability-operator -n openshift-marketplace`.
+# Chosen over the Community "prometheus" package (upstream prometheus-operator)
+# to stay consistent with this repo's preference for Red Hat/certified
+# operators (kiali-ossm, tempo-product, servicemeshoperator3,
+# opentelemetry-product are all redhat-operators, not community-operators).
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: cluster-observability-operator
+  namespace: openshift-cluster-observability-operator
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  channel: stable
+  name: cluster-observability-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+{{- end }}

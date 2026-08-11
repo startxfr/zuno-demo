@@ -1,0 +1,23 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.rhobs/v1
+kind: ServiceMonitor
+metadata:
+  name: istiod-monitor
+  namespace: {{ .Values.meshNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    zuno.io/mesh-monitoring: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  selector:
+    matchLabels:
+      istio: pilot
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.meshNamespace }}
+  endpoints:
+    - port: http-monitoring
+      path: /metrics
+      interval: 15s
+{{- end }}

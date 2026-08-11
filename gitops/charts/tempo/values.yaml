@@ -1,0 +1,7 @@
+# Shared by two ArgoCD Applications: operator (zuno-tempo-d0) and instance
+# (zuno-tempo-d1). Both default false so `helm template`/`helm lint` render
+# nothing.
+operator:
+  enabled: false
+tempo:
+  enabled: false

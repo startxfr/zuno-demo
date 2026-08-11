@@ -1,0 +1,22 @@
+{{- if .Values.monitoring.enabled }}
+# No OpenShift User Workload Monitoring anywhere in this repo (no
+# cluster-monitoring-config/UWM enablement) - Kiali needs a Prometheus
+# source for its traffic graph/health views, so this deploys a small,
+# mesh-scoped one instead of depending on a cluster-admin-level UWM change.
+apiVersion: monitoring.rhobs/v1alpha1
+kind: MonitoringStack
+metadata:
+  name: mesh-monitoring
+  namespace: {{ .Values.meshNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  logLevel: info
+  retention: 24h
+  resourceSelector:
+    matchLabels:
+      zuno.io/mesh-monitoring: "true"
+  namespaceSelector: {}
+{{- end }}

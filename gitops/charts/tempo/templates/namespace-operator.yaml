@@ -1,0 +1,15 @@
+{{- if .Values.operator.enabled }}
+# PreSync hook: guarantees the namespace exists before the
+# OperatorGroup/Subscription below.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-tempo-operator
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    openshift.io/description: "Red Hat build of Tempo operator subscription, installed by Zuno."
+    openshift.io/display-name: "Zuno Tempo Operator"
+    openshift.io/requester: zuno
+{{- end }}

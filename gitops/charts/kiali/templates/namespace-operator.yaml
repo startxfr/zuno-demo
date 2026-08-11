@@ -1,0 +1,15 @@
+{{- if .Values.operator.enabled }}
+# PreSync hook: guarantees the namespace exists before the
+# OperatorGroup/Subscription below.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-kiali-operator
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    openshift.io/description: "Red Hat Kiali operator subscription, installed by Zuno."
+    openshift.io/display-name: "Zuno Kiali Operator"
+    openshift.io/requester: zuno
+{{- end }}

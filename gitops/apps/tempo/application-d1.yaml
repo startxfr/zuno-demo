@@ -1,0 +1,31 @@
+---
+# Demo-scale TempoMonolithic instance (not the operator, see
+# application-d0.yaml). Stores traces exported by gitops/charts/observability's
+# Collector.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-tempo-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-165"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/tempo
+    helm:
+      releaseName: zuno-tempo-d1
+      values: |
+        tempo:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-telemetry
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

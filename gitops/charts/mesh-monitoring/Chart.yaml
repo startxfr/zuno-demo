@@ -1,0 +1,10 @@
+apiVersion: v2
+name: mesh-monitoring
+description: >-
+  Dedicated Prometheus for the service mesh: the Red Hat Cluster
+  Observability operator, a MonitoringStack in zuno-mesh, and the
+  ServiceMonitor/PodMonitor scraping istiod and the mesh's Envoy sidecars -
+  the metrics source gitops/charts/kiali's Kiali instance uses for its
+  traffic graph and health views.
+type: application
+version: 0.1.0

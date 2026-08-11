@@ -1,0 +1,34 @@
+---
+# Dedicated Prometheus for the service mesh - no OpenShift User Workload
+# Monitoring is enabled anywhere in this repo, so gitops/charts/kiali's
+# Kiali instance needs its own metrics source.
+- name: "mesh_monitoring | apply the mesh-monitoring GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mesh-monitoring"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-mesh-monitoring-d0"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
+
+- name: "mesh_monitoring | apply the mesh-monitoring GitOps Application (d1: MonitoringStack + ServiceMonitor/PodMonitor)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mesh-monitoring"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-mesh-monitoring-d1"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10
+
+- name: "mesh_monitoring | wait for the mesh-monitoring Prometheus StatefulSet to be ready"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: StatefulSet
+    namespace: zuno-mesh
+    name: prometheus-mesh-monitoring
+  register: _mesh_monitoring_prometheus
+  until: >-
+    (_mesh_monitoring_prometheus.resources | default([]) | length) > 0 and
+    (_mesh_monitoring_prometheus.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 30
+  delay: 10

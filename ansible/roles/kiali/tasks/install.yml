@@ -1,0 +1,33 @@
+---
+# Web UI for the service mesh, wired to service_mesh's istiod,
+# mesh_monitoring's Prometheus and tempo's Tempo.
+- name: "kiali | apply the kiali GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "kiali"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-kiali-d0"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
+
+- name: "kiali | apply the kiali GitOps Application (d1: Kiali CR instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "kiali"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-kiali-d1"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10
+
+- name: "kiali | wait for the Kiali Deployment to be ready"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-mesh
+    name: kiali
+  register: _kiali_deploy
+  until: >-
+    (_kiali_deploy.resources | default([]) | length) > 0 and
+    (_kiali_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 30
+  delay: 10

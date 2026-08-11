@@ -14,6 +14,9 @@
       - nfd
       - smtp
       - keycloak
+      - kiali
+      - mesh_monitoring
+      - tempo
       - service_mesh
       - postgresql
       - observability

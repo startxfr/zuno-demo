@@ -1,0 +1,25 @@
+{{- if .Values.monitoring.enabled }}
+# Envoy sidecars aren't a Service (there's one per meshed workload pod
+# across every istio-injection: enabled namespace, not just meshNamespace),
+# so this is a PodMonitor (not a ServiceMonitor) with namespaceSelector.any
+# - pods without the named "http-envoy-prom" container port (i.e. anything
+# not sidecar-injected) are simply skipped by Prometheus, not an error.
+apiVersion: monitoring.rhobs/v1
+kind: PodMonitor
+metadata:
+  name: istio-proxy-monitor
+  namespace: {{ .Values.meshNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    zuno.io/mesh-monitoring: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  selector: {}
+  namespaceSelector:
+    any: true
+  podMetricsEndpoints:
+    - path: /stats/prometheus
+      port: http-envoy-prom
+      interval: 15s
+{{- end }}

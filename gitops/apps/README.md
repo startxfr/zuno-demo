@@ -196,9 +196,12 @@ Directories present:
 | `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: startx `cluster-ods` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-ods`'s own DataScienceCluster CR, spec overridden in full - RawDeployment, not startx's Serverless-dependent default) |
 | `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: operator + OperatorConfig; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
 | `smtp` | local chart, `gitops/charts/smtp` (`-d0`: zuno-ai-run Namespace; `-d1`: technical mail identity ExternalSecret) - no operator |
-| `observability` | local chart, `gitops/charts/observability` (`-d0`: OpenTelemetry operator; `-d1`: zuno-telemetry Namespace + shared OTLP Collector) |
+| `observability` | local chart, `gitops/charts/observability` (`-d0`: OpenTelemetry operator; `-d1`: zuno-telemetry Namespace + shared OTLP Collector, exporting to both `debug` and `tempo`'s `otlp/tempo`) |
 | `connectivity-link` | local chart, `gitops/charts/connectivity-link` (ADR-0317 - `-d0`: hand-authored Namespace/OperatorGroup/Subscription, no vendor chart; `-d1`: minimal empty `Kuadrant` operand CR) |
 | `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: hand-authored Namespace/OperatorGroup/Subscription, no vendor chart; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
+| `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: Tempo operator; `-d1`: demo-scale `TempoMonolithic` in zuno-telemetry, storing traces exported by `observability`'s Collector) |
+| `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: Cluster Observability operator; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |
+| `kiali` | local chart, `gitops/charts/kiali` (ADR-0312 - `-d0`: Kiali operator; `-d1`: `Kiali` CR in zuno-mesh, wired to `mesh-monitoring`'s Prometheus and `tempo`'s Tempo - the operator owns its own auto-created Route, not tracked as a separate chart resource) |
 
 `keycloak`, `api` and `vault`'s `Application.spec.source.helm.values`
 reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a

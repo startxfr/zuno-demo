@@ -7,7 +7,8 @@ Red Hat build of OpenTelemetry operator) and `application-d1.yaml`
 `OpenTelemetryCollector` instance) - same operator/operand `-d0`/`-d1`
 split as `nfd`/`nvidia-gpu`/`openshift-ai` (ADR-0312).
 
-ADR-0029: instruments model usage, cost and distributed traces. Installs
-the collection path only - no long-term backend (Tempo/Prometheus
-storage) is installed; the Collector's debug/log exporter is enough to
-prove the pipeline for a demo. See `ansible/roles/observability/README.md`.
+ADR-0029: instruments model usage, cost and distributed traces. The
+Collector exports traces to both `debug` (log-based sanity check) and
+`otlp/tempo` (`gitops/charts/tempo`'s `TempoMonolithic`, queried by
+`gitops/charts/kiali`'s Kiali instance). See
+`ansible/roles/observability/README.md`.

@@ -1,0 +1,38 @@
+{{- if .Values.tempo.enabled }}
+# Demo-scale, single-tenant Tempo instance (PV storage, no object storage
+# backend) - deliberately simpler than a TempoStack, matching this repo's
+# "simplest correct option for a demo cluster" posture (see cluster-istio's
+# own comments in gitops/charts/service-mesh/values.yaml for the same
+# reasoning applied elsewhere). ASSUMPTION: the Tempo operator warns that
+# TempoMonolithic without multi-tenancy "provide[s] no authentication or
+# authorization on the ingest or query paths, and [is] not supported on
+# OpenShift" - acceptable here since ingest/query stay cluster-internal
+# (no Route is created for the OTLP/query ports, only for Jaeger UI's own
+# read path via gitops/charts/kiali's Kiali, which talks to Tempo
+# in-cluster). Revisit with a TempoStack if this ever needs to be
+# multi-tenant or externally reachable.
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoMonolithic
+metadata:
+  name: tempo
+  namespace: zuno-telemetry
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  storage:
+    traces:
+      backend: pv
+      size: 10Gi
+  ingestion:
+    otlp:
+      grpc:
+        enabled: true
+      http:
+        enabled: true
+  jaegerui:
+    enabled: true
+    route:
+      enabled: false
+{{- end }}

@@ -16,4 +16,8 @@ spec:
   tracing:
     - providers:
         - name: otel-tracing
+      # Explicit, not Istio's default (1%): a demo cluster's traffic volume
+      # is too low for 1% sampling to reliably produce a visible trace in
+      # Kiali/Tempo. Revisit if trace volume/storage becomes a concern.
+      randomSamplingPercentage: 100
 {{- end }}

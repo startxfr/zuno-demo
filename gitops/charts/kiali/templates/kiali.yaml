@@ -1,0 +1,50 @@
+{{- if .Values.kiali.enabled }}
+# auth.strategy: anonymous - minimum cert/OAuth plumbing to stand this up
+# for a demo cluster behind the operator's own auto-created, passthrough-TLS
+# Route (deployment.ingress below). Revisit with the "openshift" strategy
+# (OAuth) before treating this as more than a demo/internal tool - anonymous
+# means anyone who can reach the Route has full mesh visibility.
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: {{ .Values.meshNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  auth:
+    strategy: anonymous
+  deployment:
+    accessible_namespaces:
+      - '**'
+    ingress:
+      # Kiali serves its own UI over HTTPS by default (self-signed cert,
+      # spec.external_services.istio aside) - the operator's own default
+      # Route (edge termination) would send unencrypted HTTP to a port that
+      # expects TLS and fail, same failure mode this repo already hit with
+      # istiod's webhook port. override_yaml swaps it for passthrough,
+      # verified against a live cluster before this chart was written.
+      enabled: true
+      override_yaml:
+        spec:
+          path: ''
+          tls:
+            termination: passthrough
+            insecureEdgeTerminationPolicy: None
+  external_services:
+    istio:
+      root_namespace: {{ .Values.meshNamespace }}
+      istiod_url: http://istiod.{{ .Values.meshNamespace }}:15014
+    prometheus:
+      # gitops/charts/mesh-monitoring's MonitoringStack - no OpenShift User
+      # Workload Monitoring is enabled in this repo, so there's no
+      # thanos-querier data for mesh namespaces to fall back to.
+      url: "http://mesh-monitoring-prometheus.{{ .Values.meshNamespace }}.svc.cluster.local:9090"
+    tracing:
+      enabled: true
+      provider: tempo
+      use_grpc: false
+      in_cluster_url: "http://tempo-tempo.zuno-telemetry.svc.cluster.local:3200"
+{{- end }}

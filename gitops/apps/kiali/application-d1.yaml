@@ -1,0 +1,31 @@
+---
+# Kiali CR instance (not the operator, see application-d0.yaml). The
+# operator auto-creates and owns its own Route from this CR - no separate
+# Route Application/resource exists for Kiali.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-kiali-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-161"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/kiali
+    helm:
+      releaseName: zuno-kiali-d1
+      values: |
+        kiali:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-mesh
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -17,6 +17,9 @@
       - keycloak
       - postgresql
       - service_mesh
+      - tempo
+      - mesh_monitoring
+      - kiali
       - smtp
       - nfd
       - nvidia_gpu
