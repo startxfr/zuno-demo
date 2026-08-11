@@ -1,0 +1,21 @@
+{{- if .Values.kiali.enabled }}
+# Registers Kiali as a plugin/tab in the OpenShift web console. Shares
+# kiali.enabled with the Kiali CR above since it has nothing to point at
+# without a running Kiali instance - explicit serviceName/serviceNamespace
+# rather than relying on auto-discovery from the Kiali Route, matching this
+# chart's external_services.istio.istiod_url (explicit over auto-discovery).
+apiVersion: kiali.io/v1alpha1
+kind: OSSMConsole
+metadata:
+  name: ossmconsole
+  namespace: {{ .Values.meshNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  kiali:
+    serviceName: kiali
+    serviceNamespace: {{ .Values.meshNamespace }}
+    servicePort: 20001
+{{- end }}

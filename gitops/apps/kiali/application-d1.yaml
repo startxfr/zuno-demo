@@ -1,7 +1,8 @@
 ---
-# Kiali CR instance (not the operator, see application-d0.yaml). The
-# operator auto-creates and owns its own Route from this CR - no separate
-# Route Application/resource exists for Kiali.
+# Kiali CR instance (not the operator, see application-d0.yaml), plus the
+# OSSMConsole CR registering the mesh view in the OpenShift console. The
+# operator auto-creates and owns its own Route from the Kiali CR - no
+# separate Route Application/resource exists for Kiali.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

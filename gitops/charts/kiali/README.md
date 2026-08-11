@@ -2,9 +2,13 @@
 
 Referenced by `gitops/apps/kiali/application-d0.yaml` (operator.enabled:
 `Namespace` + `OperatorGroup` + `Subscription` for the Red Hat Kiali
-operator) and `application-d1.yaml` (kiali.enabled: the `Kiali` CR in
-`zuno-mesh`) - same operator/operand `-d0`/`-d1` split as
-`observability`/`tempo`/`mesh-monitoring` (ADR-0312).
+operator) and `application-d1.yaml` (kiali.enabled: the `Kiali` CR and the
+`OSSMConsole` CR, both in `zuno-mesh`) - same operator/operand `-d0`/`-d1`
+split as `observability`/`tempo`/`mesh-monitoring` (ADR-0312).
+
+The `OSSMConsole` CR registers the Kiali OpenShift console plugin (mesh view
+in the web console). It shares the `kiali.enabled` flag with the `Kiali` CR
+since it has nothing to point at without a running Kiali instance.
 
 The Kiali operator auto-creates and owns its own Route from the `Kiali` CR
 (`deployment.ingress`) - this chart does **not** template a separate `Route`
