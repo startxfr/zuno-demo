@@ -60,7 +60,7 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | Implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
-| [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | To be implemented | Repository review change-set index |
+| [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | Implemented | Repository review change-set index |
 | [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | v0 | Implemented | Restructure deployment into Day 0 / Day 1 sequencing |
 | [ADR-0101](0100-v1-roadmap.md#adr-0101-provide-ha-for-shared-agent-platform-services) | v1 | Proposed | Provide HA for shared agent platform services |
 | [ADR-0102](0100-v1-roadmap.md#adr-0102-target-999-percent-platform-availability) | v1 | Proposed | Target 99.9 percent platform availability |
@@ -103,6 +103,13 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0318](0318-install-custom-metrics-autoscaler-and-jobset-operators.md) | v0 | Implemented | Install the Custom Metrics Autoscaler and JobSet operators as OpenShift AI prerequisites |
 | [ADR-0319](0319-target-openshift-4-22.md) | v0 | Proposed | Target OpenShift 4.22 |
 | [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md) | v0 | Proposed | Pre-provision OpenShift users, RBAC and Console favorites via Keycloak |
+| [ADR-0321](0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md) | v0 | To be implemented | Delegate Kueue lifecycle to the Red Hat build of Kueue Operator |
+| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0/v1 | To be implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
+| [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | To be implemented | Establish canonical generated and validated platform documentation |
+| [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | To be implemented | Reconcile the CI build inventory with the repository component lifecycle |
+| [ADR-0325](0325-complete-the-openshift-ai-maas-governance-plane-integration.md) | v1 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
+| [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v1 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
+| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v1 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 
 ## Standard clauses
 
