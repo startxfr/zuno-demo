@@ -59,10 +59,15 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-custom-metrics-autoscaler-d0"
     gitops_app_extra_helm_values:
+      project:
+        enabled: true
       operator:
         enabled: true
-      subscriptionChannel: "{{ _cma_channel }}"
-      subscriptionCatalogSource: "{{ _cma_catalog_source }}"
+        subscription:
+          operator:
+            channel: "{{ _cma_channel }}"
+            source:
+              name: "{{ _cma_catalog_source }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

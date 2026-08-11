@@ -1,7 +1,55 @@
-# Shared by two ArgoCD Applications: operator (zuno-observability-d0) and
-# collector (zuno-observability-d1). Both default false so `helm
-# template`/`helm lint` render nothing.
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart; collector.enabled renders the
+# shared OpenTelemetryCollector instance. Shared by two ArgoCD
+# Applications: operator (zuno-observability-d0, project+operator) and
+# collector (zuno-observability-d1, collector). All default false so
+# `helm template`/`helm lint` render nothing.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: observability
+    app: observability
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-opentelemetry-operator
+    display_name: Zuno OpenTelemetry Operator
+    description: "Red Hat build of OpenTelemetry Collector operator subscription, installed by Zuno."
+    requester: zuno
+
 operator:
   enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: observability
+    app: observability
+  subscription:
+    enabled: true
+    name: opentelemetry-product
+    namespace: openshift-opentelemetry-operator
+    operator:
+      # Must be set explicitly, same name as subscription.name: the
+      # vendored `operator` chart's own values.yaml gives this a
+      # non-empty default ("codeready-workspaces") that wins the merge
+      # and silently suppresses the fallback to subscription.name.
+      name: opentelemetry-product
+      channel: stable
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: redhat-operators
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: opentelemetry-operator-group
+    namespace: openshift-opentelemetry-operator
+    target: "all-ns"  # matches the original hand-authored spec: {}
+
 collector:
   enabled: false

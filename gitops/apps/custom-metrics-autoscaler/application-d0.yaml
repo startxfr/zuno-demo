@@ -24,6 +24,8 @@ spec:
     helm:
       releaseName: zuno-custom-metrics-autoscaler-d0
       values: |
+        project:
+          enabled: true
         operator:
           enabled: true
   destination:

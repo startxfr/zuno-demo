@@ -18,6 +18,8 @@ spec:
     helm:
       releaseName: zuno-connectivity-link-d1
       values: |
+        project:
+          enabled: true
         kuadrant:
           enabled: true
   destination:

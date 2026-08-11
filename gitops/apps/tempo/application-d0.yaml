@@ -19,6 +19,8 @@ spec:
     helm:
       releaseName: zuno-tempo-d0
       values: |
+        project:
+          enabled: true
         operator:
           enabled: true
   destination:

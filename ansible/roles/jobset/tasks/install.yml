@@ -64,8 +64,11 @@
     gitops_app_extra_helm_values:
       operator:
         enabled: true
-      subscriptionChannel: "{{ _jobset_channel }}"
-      subscriptionCatalogSource: "{{ _jobset_catalog_source }}"
+        subscription:
+          operator:
+            channel: "{{ _jobset_channel }}"
+            source:
+              name: "{{ _jobset_catalog_source }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

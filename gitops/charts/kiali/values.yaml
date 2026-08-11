@@ -1,8 +1,59 @@
-# Shared by two ArgoCD Applications: operator (zuno-kiali-d0) and instance
-# (zuno-kiali-d1). Both default false so `helm template`/`helm lint` render
-# nothing.
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart; kiali.enabled renders the Kiali
+# CR instance. Shared by two ArgoCD Applications: operator
+# (zuno-kiali-d0, project+operator) and instance (zuno-kiali-d1, kiali).
+# All default false so `helm template`/`helm lint` render nothing.
+#
+# Package/channel confirmed against a live cluster's PackageManifest
+# (redhat-operators catalog) before this chart was written - see
+# `oc get packagemanifest kiali-ossm -n openshift-marketplace`.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: kiali
+    app: kiali
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-kiali-operator
+    display_name: Zuno Kiali Operator
+    description: "Red Hat Kiali operator subscription, installed by Zuno."
+    requester: zuno
+
 operator:
   enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: kiali
+    app: kiali
+  subscription:
+    enabled: true
+    name: kiali-ossm
+    namespace: openshift-kiali-operator
+    operator:
+      # Must be set explicitly, same name as subscription.name: the
+      # vendored `operator` chart's own values.yaml gives this a
+      # non-empty default ("codeready-workspaces") that wins the merge
+      # and silently suppresses the fallback to subscription.name.
+      name: kiali-ossm
+      channel: stable
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: redhat-operators
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: kiali-operator-group
+    namespace: openshift-kiali-operator
+    target: "all-ns"  # matches the original hand-authored spec: {}
+
 kiali:
   enabled: false
 

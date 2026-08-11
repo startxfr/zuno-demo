@@ -1,14 +1,14 @@
-# operator.enabled renders the Subscription (into openshift-operators,
-# AllNamespaces - see templates/subscription.yaml). Defaults false so
-# templates render nothing. There is no singleton operand CR for JobSet
-# (individual distributed training runs - e.g. Kubeflow Trainer's
-# TrainJob - create their own JobSet objects later, out of scope here) -
-# same shape as gitops/charts/external-secrets; zuno-jobset-d1
+# operator.enabled renders the Subscription, via the vendored startx
+# `operator` chart (into openshift-operators, AllNamespaces - no
+# OperatorGroup here, relies on OLM's own pre-existing global-operators
+# OperatorGroup there). Defaults false so templates render nothing. There
+# is no singleton operand CR for JobSet (individual distributed training
+# runs - e.g. Kubeflow Trainer's TrainJob - create their own JobSet
+# objects later, out of scope here) - same shape as
+# gitops/charts/external-secrets; zuno-jobset-d1
 # (gitops/apps/jobset/application-d1.yaml) points at gitops/charts/noop
 # instead.
-operator:
-  enabled: false
-
+#
 # ASSUMPTION, not yet verified against a live cluster (ADR-0318) - lower
 # confidence than this repository's other operators: it isn't confirmed
 # that Red Hat even ships JobSet as a separate OLM-installable operator
@@ -18,11 +18,31 @@ operator:
 # ansible/roles/jobset/README.md) to go find the correct installation
 # method - run `oc get packagemanifest -n openshift-marketplace | grep -i
 # jobset` against the target cluster first.
-subscriptionName: jobset-operator
-
-# subscriptionChannel/subscriptionCatalogSource are discovered from the
-# cluster's own PackageManifest by ansible and injected via
-# gitops_app_extra_helm_values on the -d0 apply (ADR-0048);
-# templates/subscription.yaml renders nothing until both are set.
-subscriptionChannel: ""
-subscriptionCatalogSource: ""
+#
+# subscription.operator.channel/source.name are left empty by default,
+# discovered by ansible and set via gitops_app_extra_helm_values on the -d0
+# apply (ADR-0048). templates/checks.yaml fails the render if either is
+# still empty once operator.enabled is true.
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: jobset
+    app: jobset
+  subscription:
+    enabled: true
+    name: jobset-operator
+    namespace: openshift-operators
+    operator:
+      # Must be set explicitly, same name as subscription.name: the
+      # vendored `operator` chart's own values.yaml gives this a
+      # non-empty default ("codeready-workspaces") that wins the merge
+      # and silently suppresses the fallback to subscription.name.
+      name: jobset-operator
+      channel: ""
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace

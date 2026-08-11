@@ -1,8 +1,64 @@
-# Shared by two ArgoCD Applications: operator (zuno-mesh-monitoring-d0) and
-# instance (zuno-mesh-monitoring-d1). Both default false so `helm
-# template`/`helm lint` render nothing.
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart; monitoring.enabled renders the
+# MonitoringStack/ServiceMonitor/PodMonitor instances. Shared by two ArgoCD
+# Applications: operator (zuno-mesh-monitoring-d0, project+operator) and
+# instance (zuno-mesh-monitoring-d1, monitoring). All default false so
+# `helm template`/`helm lint` render nothing.
+#
+# Package/channel confirmed against a live cluster's PackageManifest
+# (redhat-operators catalog) before this chart was written - see
+# `oc get packagemanifest cluster-observability-operator -n openshift-marketplace`.
+# Chosen over the Community "prometheus" package (upstream prometheus-operator)
+# to stay consistent with this repo's preference for Red Hat/certified
+# operators (kiali-ossm, tempo-product, servicemeshoperator3,
+# opentelemetry-product are all redhat-operators, not community-operators).
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: mesh-monitoring
+    app: mesh-monitoring
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-cluster-observability-operator
+    display_name: Zuno Cluster Observability Operator
+    description: "Red Hat Cluster Observability operator subscription, installed by Zuno."
+    requester: zuno
+
 operator:
   enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: mesh-monitoring
+    app: mesh-monitoring
+  subscription:
+    enabled: true
+    name: cluster-observability-operator
+    namespace: openshift-cluster-observability-operator
+    operator:
+      # Must be set explicitly, same name as subscription.name: the
+      # vendored `operator` chart's own values.yaml gives this a
+      # non-empty default ("codeready-workspaces") that wins the merge
+      # and silently suppresses the fallback to subscription.name.
+      name: cluster-observability-operator
+      channel: stable
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: redhat-operators
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: cluster-observability-operator-group
+    namespace: openshift-cluster-observability-operator
+    target: "all-ns"  # matches the original hand-authored spec: {}
+
 monitoring:
   enabled: false
 

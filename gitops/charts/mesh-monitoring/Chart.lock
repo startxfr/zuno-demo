@@ -1,0 +1,9 @@
+dependencies:
+- name: operator
+  repository: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  version: 21.3.277
+- name: project
+  repository: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  version: 21.3.277
+digest: sha256:ded999d12799ff0ea8cd432f6b01749371f2685de99490d9c0afb42426437ec8
+generated: "2026-08-11T13:53:38.025783852+02:00"

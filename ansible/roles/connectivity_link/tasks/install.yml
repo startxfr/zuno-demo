@@ -61,8 +61,11 @@
     gitops_app_extra_helm_values:
       operator:
         enabled: true
-      subscriptionChannel: "{{ _connectivity_link_channel }}"
-      subscriptionCatalogSource: "{{ _connectivity_link_catalog_source }}"
+        subscription:
+          operator:
+            channel: "{{ _connectivity_link_channel }}"
+            source:
+              name: "{{ _connectivity_link_catalog_source }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
@@ -73,6 +76,8 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-connectivity-link-d1"
     gitops_app_extra_helm_values:
+      project:
+        enabled: true
       kuadrant:
         enabled: true
     gitops_app_wait_retries: 30

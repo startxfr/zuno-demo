@@ -5,3 +5,10 @@ description: >-
   the shared OpenTelemetryCollector instance every service sends OTLP to.
 type: application
 version: 0.1.0
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
+  - name: project
+    version: "21.3.277"
+    repository: "alias:startx"

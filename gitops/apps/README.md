@@ -115,7 +115,9 @@ role's README). Infrastructure only for now - no existing Route/service
 consumes this issuer yet.
 
 **Vendored startx charts**: `nfd`, `nvidia-gpu`, `openshift-ai`,
-`cert-manager`, `keycloak` and `postgresql` vendor a chart from the
+`cert-manager`, `keycloak`, `postgresql`, `connectivity-link`, `lws`,
+`jobset`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
+`mesh-monitoring`, `observability` and `tempo` vendor a chart from the
 [startx `helm-repository`](https://helm-repository.readthedocs.io) as a
 Helm `dependencies:` entry (same pattern `gitops/charts/vault` already used
 for `hashicorp/vault`), instead of hand-authoring their own Namespace/
@@ -124,20 +126,30 @@ the chart's `.tgz` (gitignored, resolved at render time) and pins its
 version in a committed `Chart.lock`. Only the genuinely Zuno-specific
 content (the `CertManager`/`ClusterIssuer` CRs, the Keycloak CR/RealmImport/
 ExternalSecrets, the PostgresCluster/pgvector wiring, the discovered
-`ClusterPolicy`/`DataScienceCluster` specs) stays as local templates in
-these charts. `nfd`/`nvidia-gpu`/`openshift-ai`/`cert-manager` use that
-component's matching `cluster-xxx` chart (`cluster-nfd`/`cluster-gpu`/
-`cluster-ods`/`cluster-certmanager`), which already bundles startx's own
-`project`+`operator` dependencies; `keycloak`/`postgresql` instead depend
-directly on the generic `operator` chart (skipping `cluster-sso`/
-`cluster-crunchy`) since this repo's install targets a different operator
-package/namespace topology than those charts' own opinionated defaults -
-see each chart's `Chart.yaml` for the specific reasoning. `vault` was
-evaluated against `cluster-vault` and deliberately NOT migrated: its own
-`project` dependency isn't needed (`zuno-data` is already created by
-`gitops/charts/namespaces`), and adopting it would force an unrelated,
-unreviewed `hashicorp/vault` chart version jump (0.28.1 → 1.21.2) for no
-offsetting benefit.
+`ClusterPolicy`/`DataScienceCluster` specs, the various operand CRs -
+`Kuadrant`/`KedaController`/`Kiali`/`OSSMConsole`/`MonitoringStack`/
+`OpenTelemetryCollector`/`TempoMonolithic`/`OperatorConfig`/
+`ClusterSecretStore`) stays as local templates in these charts.
+`nfd`/`nvidia-gpu`/`openshift-ai`/`cert-manager` use that component's
+matching `cluster-xxx` chart (`cluster-nfd`/`cluster-gpu`/`cluster-ods`/
+`cluster-certmanager`), which already bundles startx's own
+`project`+`operator` dependencies; every other chart in that list instead
+depends directly on the generic `operator` chart (plus `project` when a
+dedicated Namespace is needed) since no matching `cluster-xxx` bundle is
+known to exist for any of those operators (ADR-0317) - see each chart's
+`Chart.yaml`/`values.yaml` for the specific reasoning. `connectivity-link`/
+`jobset`/`lws`/`external-secrets` subscribe into the shared
+`openshift-operators` namespace (`AllNamespaces`, no `project`/
+`OperatorGroup` dependency - relies on OLM's own global OperatorGroup
+there); `connectivity-link` still depends on `project` for its Kuadrant
+operand namespace (`kuadrant-system`) on the `-d1` side.
+`custom-metrics-autoscaler`/`kiali`/`mesh-monitoring`/`observability`/
+`tempo` depend on both `project` and `operator` for a dedicated operator
+namespace + `OperatorGroup`. `vault` was evaluated against `cluster-vault`
+and deliberately NOT migrated: its own `project` dependency isn't needed
+(`zuno-data` is already created by `gitops/charts/namespaces`), and
+adopting it would force an unrelated, unreviewed `hashicorp/vault` chart
+version jump (0.28.1 → 1.21.2) for no offsetting benefit.
 
 **`Namespace` resources on the `-d0` side**: every chart that declares its
 own `Namespace` (the operator's dedicated namespace, or - for
@@ -194,16 +206,16 @@ Directories present:
 | `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: startx `cluster-nfd` dependency, entirely - Namespace/OperatorGroup/Subscription; `-d1`: `cluster-nfd`'s own NodeFeatureDiscovery CR) |
 | `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: startx `cluster-gpu` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-gpu`'s own ClusterPolicy CR, spec injected once discovered - see that chart's README) |
 | `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: startx `cluster-ods` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-ods`'s own DataScienceCluster CR, spec overridden in full - RawDeployment, not startx's Serverless-dependent default) |
-| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: operator + OperatorConfig; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
+| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`, no `OperatorGroup`), plus local `OperatorConfig`; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
 | `smtp` | local chart, `gitops/charts/smtp` (`-d0`: zuno-ai-run Namespace; `-d1`: technical mail identity ExternalSecret) - no operator |
-| `observability` | local chart, `gitops/charts/observability` (`-d0`: OpenTelemetry operator; `-d1`: zuno-telemetry Namespace + shared OTLP Collector, exporting to both `debug` and `tempo`'s `otlp/tempo`) |
-| `connectivity-link` | local chart, `gitops/charts/connectivity-link` (ADR-0317 - `-d0`: hand-authored `Subscription` into `openshift-operators` (`AllNamespaces` - the operator's CSV doesn't support `OwnNamespace`, confirmed against a real cluster), no vendor chart, no `OperatorGroup`; `-d1`: dedicated `kuadrant-system` Namespace + minimal empty `Kuadrant` operand CR) |
-| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: hand-authored `Subscription` into `openshift-operators` (`AllNamespaces`, same shape as `connectivity-link` after its fix), no vendor chart, no `OperatorGroup`/dedicated `Namespace`; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
-| `custom-metrics-autoscaler` | local chart, `gitops/charts/custom-metrics-autoscaler` (ADR-0318 - `-d0`: hand-authored Namespace/OperatorGroup/Subscription into dedicated `openshift-keda` (`OwnNamespace`, per Red Hat's documented install procedure), no vendor chart; `-d1`: minimal `KedaController` operand CR) |
-| `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: hand-authored `Subscription` into `openshift-operators` (`AllNamespaces`), no vendor chart, no `OperatorGroup`; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
-| `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: Tempo operator; `-d1`: demo-scale `TempoMonolithic` in zuno-telemetry, storing traces exported by `observability`'s Collector) |
-| `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: Cluster Observability operator; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |
-| `kiali` | local chart, `gitops/charts/kiali` (ADR-0312 - `-d0`: Kiali operator; `-d1`: `Kiali` CR in zuno-mesh, wired to `mesh-monitoring`'s Prometheus and `tempo`'s Tempo - the operator owns its own auto-created Route, not tracked as a separate chart resource) |
+| `observability` | local chart, `gitops/charts/observability` (`-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-opentelemetry-operator` Namespace/OperatorGroup/Subscription; `-d1`: shared OTLP Collector, exporting to both `debug` and `tempo`'s `otlp/tempo`) |
+| `connectivity-link` | local chart, `gitops/charts/connectivity-link` (ADR-0317 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces` - the operator's CSV doesn't support `OwnNamespace`, confirmed against a real cluster), no `OperatorGroup`; `-d1`: startx `project` dependency for the dedicated `kuadrant-system` Namespace + minimal empty `Kuadrant` operand CR) |
+| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`, same shape as `connectivity-link` after its fix), no `OperatorGroup`/dedicated `Namespace`; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
+| `custom-metrics-autoscaler` | local chart, `gitops/charts/custom-metrics-autoscaler` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-keda` Namespace/OperatorGroup/Subscription (`OwnNamespace`, per Red Hat's documented install procedure); `-d1`: minimal `KedaController` operand CR) |
+| `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`), no `OperatorGroup`; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
+| `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-tempo-operator` Namespace/OperatorGroup/Subscription; `-d1`: demo-scale `TempoMonolithic` in zuno-telemetry, storing traces exported by `observability`'s Collector) |
+| `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-cluster-observability-operator` Namespace/OperatorGroup/Subscription; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |
+| `kiali` | local chart, `gitops/charts/kiali` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-kiali-operator` Namespace/OperatorGroup/Subscription; `-d1`: `Kiali` CR in zuno-mesh, wired to `mesh-monitoring`'s Prometheus and `tempo`'s Tempo - the operator owns its own auto-created Route, not tracked as a separate chart resource) |
 
 `keycloak`, `api` and `vault`'s `Application.spec.source.helm.values`
 reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a

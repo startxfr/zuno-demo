@@ -60,8 +60,11 @@
     gitops_app_extra_helm_values:
       operator:
         enabled: true
-      subscriptionChannel: "{{ _lws_channel }}"
-      subscriptionCatalogSource: "{{ _lws_catalog_source }}"
+        subscription:
+          operator:
+            channel: "{{ _lws_channel }}"
+            source:
+              name: "{{ _lws_catalog_source }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

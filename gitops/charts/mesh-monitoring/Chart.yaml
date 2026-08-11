@@ -8,3 +8,10 @@ description: >-
   traffic graph and health views.
 type: application
 version: 0.1.0
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
+  - name: project
+    version: "21.3.277"
+    repository: "alias:startx"

@@ -4,3 +4,7 @@ description: Deploys the External Secrets Operator and the Vault-backed ClusterS
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"

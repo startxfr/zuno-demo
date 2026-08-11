@@ -19,6 +19,8 @@ spec:
     helm:
       releaseName: zuno-observability-d0
       values: |
+        project:
+          enabled: true
         operator:
           enabled: true
   destination:
