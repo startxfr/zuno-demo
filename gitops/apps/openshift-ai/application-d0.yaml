@@ -24,6 +24,8 @@ spec:
             enabled: true
           operator:
             enabled: true
+          DSCInitialization:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator
@@ -34,6 +36,12 @@ spec:
       kind: OperatorGroup
       jsonPointers:
         - /metadata/annotations/olm.providedAPIs
+    # Same reasoning as application-d1.yaml's DataScienceCluster entry: the
+    # operator expands spec with defaulted sub-fields at runtime.
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+      jsonPointers:
+        - /spec
   syncPolicy:
     automated:
       prune: true

@@ -26,7 +26,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
-    namespace: zuno-telemetry
+    namespace: zuno-monitoring
     name: zuno-otel-collector-collector
   register: _observability_collector
   until: >-

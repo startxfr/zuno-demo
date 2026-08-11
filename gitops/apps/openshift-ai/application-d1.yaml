@@ -19,6 +19,11 @@ spec:
         cluster-ods:
           DataScienceCluster:
             enabled: true
+        maasGateway:
+          enabled: true
+          # Placeholder auto-substituted with the real cluster domain by
+          # ansible/tasks/apply_gitops_app.yml.
+          clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator

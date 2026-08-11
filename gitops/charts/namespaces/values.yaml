@@ -102,9 +102,12 @@ platformNamespaces:
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
     extraLabels:
       istio-injection: enabled
-  - name: zuno-telemetry
-    displayName: Zuno Telemetry
-    description: OpenTelemetry Collector, the platform's observability pipeline.
+  - name: zuno-monitoring
+    displayName: Zuno Monitoring
+    description: >-
+      OpenTelemetry Collector, Tempo and the OpenShift AI monitoring
+      stack - the platform's tracing/telemetry/monitoring pipeline for the
+      AI chain and apps.
     # OTel Collector: every OTel-instrumented service. zuno-auth/zuno-ai-build
     # added alongside zuno-ai-run/zuno-data so every meshed (istio-injection:
     # enabled) namespace's sidecars can export traces directly to the

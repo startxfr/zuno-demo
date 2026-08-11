@@ -46,5 +46,5 @@ spec:
       enabled: true
       provider: tempo
       use_grpc: false
-      in_cluster_url: "http://tempo-tempo.zuno-telemetry.svc.cluster.local:3200"
+      in_cluster_url: "http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200"
 {{- end }}

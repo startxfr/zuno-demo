@@ -1,0 +1,21 @@
+{{- /*
+Not part of the vendored startx `cluster-ods` chart (it only templates
+DataScienceCluster) - see values.yaml's cluster-ods.DSCInitialization
+comment for why this needs to exist and land before DataScienceCluster.
+DSCInitialization is cluster-scoped (no namespace), same shape as
+DataScienceCluster's own template in the vendored chart.
+*/ -}}
+{{- $dsci := index .Values "cluster-ods" "DSCInitialization" -}}
+{{- if $dsci -}}{{- if $dsci.enabled -}}
+{{- $name := $dsci.name | default "default-dsci" -}}
+apiVersion: dscinitialization.opendatahub.io/v1
+kind: DSCInitialization
+metadata:
+  name: {{ $name | quote }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  {{- $dsci.spec | nindent 2 }}
+{{- end -}}{{- end -}}

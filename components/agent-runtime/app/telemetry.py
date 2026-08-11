@@ -24,7 +24,7 @@ logger = logging.getLogger("agent_runtime.telemetry")
 
 OTEL_ENDPOINT = os.getenv(
     "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "http://zuno-otel-collector-collector.zuno-telemetry.svc:4318",
+    "http://zuno-otel-collector-collector.zuno-monitoring.svc:4318",
 )
 
 

@@ -1,0 +1,84 @@
+{{- /*
+Gateway RHOAI's own DataScienceCluster requires to exist in openshift-ingress
+before it will reconcile kserve.modelsAsService ("the specified Gateway must
+exist before enabling MaaS platform reconcile"). Modeled directly on the
+already-working data-science-gateway RHOAI provisions for itself (same
+ClusterIP+Route+service-ca pattern) - reuses its GatewayClass rather than
+standing up a second Istio control plane, since maas-controller only checks
+that a Gateway named maas-default-gateway exists, not which class backs it.
+*/ -}}
+{{- if .Values.maasGateway.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maas-gateway-config
+  namespace: openshift-ingress
+data:
+  service: |
+    metadata:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: "maas-gateway-service-tls"
+    spec:
+      type: ClusterIP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: maas-default-gateway
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/name: maas
+    app.kubernetes.io/instance: maas-default-gateway
+    app.kubernetes.io/component: gateway
+    opendatahub.io/managed: "false"
+  annotations:
+    opendatahub.io/managed: "false"
+    # Read by the RHOAI/ODH platform layer (not maas-controller itself) to wire
+    # the Gateway -> Authorino EnvoyFilter automatically.
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
+spec:
+  gatewayClassName: data-science-gateway-class
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: maas-gateway-config
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - openshift-ingress
+                  - redhat-ods-applications
+                  - zuno-ai-run
+      tls:
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: maas-gateway-service-tls
+        mode: Terminate
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: maas-gateway-route
+  namespace: openshift-ingress
+spec:
+  host: maas.{{ .Values.maasGateway.clusterBaseDomain }}
+  to:
+    kind: Service
+    name: maas-default-gateway-data-science-gateway-class
+    weight: 100
+  port:
+    targetPort: 443
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

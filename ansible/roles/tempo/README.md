@@ -1,7 +1,7 @@
 # tempo
 
 Installs the Red Hat build of the Tempo Operator and a demo-scale
-`TempoMonolithic` (`tempo`, `zuno-telemetry` namespace, PV storage, no
+`TempoMonolithic` (`tempo`, `zuno-monitoring` namespace, PV storage, no
 multi-tenancy) via `gitops/apps/tempo/application-d0.yaml` (operator) and
 `application-d1.yaml` (instance) - see `gitops/apps/README.md` and
 `gitops/charts/tempo/README.md`.

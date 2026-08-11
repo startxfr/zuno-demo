@@ -62,7 +62,7 @@ project:
     hooked: true  # PreSync ArgoCD hook
     type: namespace
     name: kuadrant-system
-    display_name: Zuno Connectivity Link
+    display_name: Zuno Infra Connectivity Link
     description: "Red Hat Connectivity Link (Kuadrant) operand, configured by Zuno."
     requester: zuno
 

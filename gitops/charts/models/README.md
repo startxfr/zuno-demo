@@ -15,9 +15,9 @@ fallback only - it is never trusted for a real deploy. `ansible/roles/models`'s
 `tasks/discover_vllm_image.yml` (included by both `tasks/precheck.yml` and
 `tasks/install.yml`) discovers the actual vLLM serving-runtime image
 Red Hat OpenShift AI published for the installed cluster/catalog, by
-reading the `Template` objects in `redhat-ods-applications` (the same
+reading the `Template` objects in `zuno-ai-build` (the same
 catalog the dashboard's "Serving runtimes" page reads from - `oc get
-templates -n redhat-ods-applications | grep -i vllm` is the manual
+templates -n zuno-ai-build | grep -i vllm` is the manual
 equivalent), and overrides this chart's default at apply time via the
 ArgoCD Application's `spec.source.helm.values` (see
 `ansible/tasks/apply_gitops_app.yml`'s `gitops_app_extra_helm_values`).

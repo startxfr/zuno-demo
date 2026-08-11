@@ -15,7 +15,7 @@ apiVersion: tempo.grafana.com/v1alpha1
 kind: TempoMonolithic
 metadata:
   name: tempo
-  namespace: zuno-telemetry
+  namespace: zuno-monitoring
   labels:
     zuno.io/managed-by: argocd
   annotations:

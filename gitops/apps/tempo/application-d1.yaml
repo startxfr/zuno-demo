@@ -22,7 +22,7 @@ spec:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: zuno-telemetry
+    namespace: zuno-monitoring
   syncPolicy:
     automated:
       prune: true

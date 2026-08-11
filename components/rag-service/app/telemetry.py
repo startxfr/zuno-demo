@@ -1,6 +1,6 @@
 """OpenTelemetry instrumentation (ADR-0029) - sends OTLP traces/metrics to
 the shared Collector installed by ansible/roles/observability
-(`zuno-otel-collector-collector.zuno-telemetry.svc`).
+(`zuno-otel-collector-collector.zuno-monitoring.svc`).
 
 Same pattern as components/agent-runtime/app/telemetry.py and
 components/mcp-gateway/app/telemetry.py (duplicated per-service rather than
@@ -29,7 +29,7 @@ logger = logging.getLogger("rag_service.telemetry")
 
 OTEL_ENDPOINT = os.getenv(
     "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "http://zuno-otel-collector-collector.zuno-telemetry.svc:4318",
+    "http://zuno-otel-collector-collector.zuno-monitoring.svc:4318",
 )
 
 _tracer: Optional[trace.Tracer] = None

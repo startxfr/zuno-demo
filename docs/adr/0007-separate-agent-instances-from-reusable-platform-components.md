@@ -14,7 +14,7 @@ ADR describes are grouped into namespaces by functional domain rather than
 one catch-all namespace: `zuno-auth` (Keycloak), `zuno-ai` (ai-gateway,
 agent-runtime, mcp-gateway, mcp-sales-db, models/KServe - the AI/agent-
 serving stack), `zuno-data` (PostgreSQL, Vault, rag-service, the SXA
-schema/fixtures Job) and `zuno-telemetry` (the shared OTel Collector). This
+schema/fixtures Job) and `zuno-monitoring` (the shared OTel Collector). This
 reflects a deliberate choice to group by what a component *is* rather than
 scatter everything into a single namespace or, at the other extreme, give
 every platform service its own namespace - see [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md)

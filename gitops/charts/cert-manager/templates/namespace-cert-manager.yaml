@@ -11,6 +11,6 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: PreSync
     openshift.io/description: "cert-manager operand (controller, webhook, CA injector), configured by Zuno."
-    openshift.io/display-name: "Zuno Cert-Manager"
+    openshift.io/display-name: "Zuno Infra Cert-Manager"
     openshift.io/requester: zuno
 {{- end }}

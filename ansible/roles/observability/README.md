@@ -1,7 +1,7 @@
 # observability
 
 Installs the Red Hat build of the OpenTelemetry Operator and a shared OTLP
-`OpenTelemetryCollector` (`zuno-otel-collector`, `zuno-telemetry` namespace)
+`OpenTelemetryCollector` (`zuno-otel-collector`, `zuno-monitoring` namespace)
 every service sends traces/metrics to (ADR-0029), via
 `gitops/apps/observability/application-d0.yaml` (operator) and
 `application-d1.yaml` (Collector) - see `gitops/apps/README.md` and

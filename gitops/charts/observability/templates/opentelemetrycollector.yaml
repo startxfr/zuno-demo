@@ -3,7 +3,7 @@ apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: zuno-otel-collector
-  namespace: zuno-telemetry
+  namespace: zuno-monitoring
   labels:
     zuno.io/managed-by: argocd
   annotations:
@@ -25,7 +25,7 @@ spec:
       # gitops/charts/tempo's TempoMonolithic - kept alongside debug so
       # `oc logs` still shows spans as a sanity check independent of Tempo.
       otlp/tempo:
-        endpoint: tempo-tempo.zuno-telemetry.svc.cluster.local:4317
+        endpoint: tempo-tempo.zuno-monitoring.svc.cluster.local:4317
         tls:
           insecure: true
     service:

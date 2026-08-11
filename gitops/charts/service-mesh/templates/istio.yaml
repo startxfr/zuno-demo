@@ -54,7 +54,7 @@ spec:
       extensionProviders:
         - name: otel-tracing
           opentelemetry:
-            service: zuno-otel-collector-collector.zuno-telemetry.svc.cluster.local
+            service: zuno-otel-collector-collector.zuno-monitoring.svc.cluster.local
             port: 4317
   version: {{ .Values.istioVersion }}
 {{- end }}

@@ -1,12 +1,12 @@
 ---
 # Selects the vLLM image OpenShift AI actually publishes (a Template in
-# redhat-ods-applications), matched by name since RHOAI's label taxonomy isn't
+# zuno-ai-build), matched by name since RHOAI's label taxonomy isn't
 # verified.
 - name: "models | discover the vLLM serving-runtime Templates OpenShift AI published (ADR-0048)"
   kubernetes.core.k8s_info:
     api_version: template.openshift.io/v1
     kind: Template
-    namespace: redhat-ods-applications
+    namespace: zuno-ai-build
   register: _models_ods_templates
   when: models_vllm_image_override is not defined
 
@@ -25,7 +25,7 @@
   ansible.builtin.fail:
     msg: >-
       No Template with "vllm" in its name was found in
-      redhat-ods-applications - this OpenShift AI installation may not
+      zuno-ai-build - this OpenShift AI installation may not
       have the vLLM serving runtime available yet, or publishes it under a
       different naming convention. Templates found in that namespace:
       {{ _models_ods_templates.resources | default([]) | map(attribute='metadata.name') | list }}.
@@ -57,7 +57,7 @@
   ansible.builtin.fail:
     msg: >-
       Template {{ _models_selected_template.metadata.name }} in
-      redhat-ods-applications has no ServingRuntime or
+      zuno-ai-build has no ServingRuntime or
       ClusterServingRuntime object among its objects - cannot discover an
       image from it. Object kinds present:
       {{ _models_selected_template.objects | default([]) | map(attribute='kind') | list }}.
@@ -121,5 +121,5 @@
         if models_vllm_image_override is defined
         else 'vLLM serving-runtime image: ' ~ _models_discovered_vllm_image ~
              ' (discovered from Template ' ~ _models_selected_template.metadata.name ~
-             ' in redhat-ods-applications)'
+             ' in zuno-ai-build)'
       }}

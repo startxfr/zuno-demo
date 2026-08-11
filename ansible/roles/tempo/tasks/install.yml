@@ -23,7 +23,7 @@
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: StatefulSet
-    namespace: zuno-telemetry
+    namespace: zuno-monitoring
     name: tempo-tempo
   register: _tempo_statefulset
   until: >-

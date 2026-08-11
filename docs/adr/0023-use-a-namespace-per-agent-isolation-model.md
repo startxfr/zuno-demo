@@ -15,7 +15,7 @@ follows the `zuno-agent-<agent>` naming convention (`zuno-agent-tekos`,
 `zuno-agent-arkos` - `gitops/charts/namespaces/values.yaml`), so the family
 reads clearly alongside the functional-domain namespaces from
 [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md)
-(`zuno-auth`/`zuno-ai`/`zuno-data`/`zuno-telemetry`). Only `zuno-agent-tekos`
+(`zuno-auth`/`zuno-ai`/`zuno-data`/`zuno-monitoring`). Only `zuno-agent-tekos`
 hosts a real workload in v0; the default-deny-other-namespaces
 `NetworkPolicy` and per-namespace `ResourceQuota` this ADR calls for are
 unchanged in shape, just renamed with their namespace.

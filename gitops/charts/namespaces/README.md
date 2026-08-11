@@ -7,7 +7,7 @@ for every one of them regardless of status.
 
 Also applies the same default-deny-other-namespaces `NetworkPolicy` shape
 (ADR-0052) to platform namespaces this chart does not itself create
-(`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-telemetry` - `values.yaml`'s
+(`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-monitoring` - `values.yaml`'s
 `platformNamespaces`), each with a small, explicit list of known real
 cross-namespace callers. `zuno-ai-run` is deliberately excluded - see
 `values.yaml`'s comment on why ADR-0037 needs per-workload NetworkPolicies

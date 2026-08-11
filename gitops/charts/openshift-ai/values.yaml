@@ -19,7 +19,7 @@ cluster-ods:
       hooked: true  # PreSync ArgoCD hook
       type: namespace
       name: redhat-ods-operator
-      display_name: Zuno OpenShift AI Operator
+      display_name: Zuno Infra OpenShift AI
       description: Red Hat OpenShift AI, configured by Zuno
       requester: zuno  # overrides startx's own default (requester: startx)
     # Disabled to avoid granting group RBAC (devops-view/ops-admin) this
@@ -50,6 +50,28 @@ cluster-ods:
       target: all-ns  # AllNamespaces
       name: rhods-operator-group
       namespace: redhat-ods-operator
+
+  # Not part of the vendored startx `cluster-ods` chart (it only templates
+  # DataScienceCluster) - rendered by this chart's own
+  # templates/dscinitialization.yaml. Must land before DataScienceCluster
+  # (zuno-openshift-ai-d1): the RHOAI operator auto-creates its own default
+  # DSCInitialization (applicationsNamespace: redhat-ods-applications,
+  # monitoring.namespace: redhat-ods-monitoring) the first time it
+  # reconciles if none exists yet, so this is enabled alongside
+  # project/operator in zuno-openshift-ai-d0 (sync-wave -199, before d1's
+  # -198). applicationsNamespace is immutable once the CR exists - on a
+  # cluster where RHOAI was already installed with the operator's default,
+  # applying this alone will NOT move the already-created operands; the
+  # existing DSCInitialization/DataScienceCluster must be deleted so the
+  # operator recreates operands under these namespaces.
+  DSCInitialization:
+    enabled: false
+    name: default-dsci
+    spec: |
+      applicationsNamespace: zuno-ai-build
+      monitoring:
+        managementState: Managed
+        namespace: zuno-monitoring
 
   # Spec deliberately overridden in full, not startx's default: uses kserve
   # RawDeployment rather than Serverless, which would require the Service
@@ -88,7 +110,7 @@ cluster-ods:
           defaultLocalQueueName: default
         workbenches:
           managementState: Managed
-          workbenchNamespace: rhods-notebooks
+          workbenchNamespace: zuno-ai-build
         mlflowoperator:
           managementState: Managed
         dashboard:
@@ -97,6 +119,18 @@ cluster-ods:
           managementState: Managed
         llamastackoperator: 
           managementState: Managed
-        trainingoperator: 
+        trainingoperator:
           managementState: Managed
+
+# Not part of the vendored startx `cluster-ods` chart - rendered by this
+# chart's own templates/maas-gateway.yaml. DataScienceCluster's
+# kserve.modelsAsService (above) will not reach Ready until a Gateway named
+# maas-default-gateway exists in openshift-ingress; RHOAI's own
+# maas-controller (deployed automatically by the rhods-operator once
+# modelsAsService is Managed) otherwise reconciles everything else itself.
+maasGateway:
+  enabled: false
+  # Placeholder auto-substituted with the real cluster domain by
+  # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
+  clusterBaseDomain: apps.mycluster.example.com
 

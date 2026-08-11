@@ -2,7 +2,7 @@
 
 Applies the namespace-scaffolding GitOps Applications (`gitops/apps/namespaces`
 → `gitops/charts/namespaces`, ADR-0023): the 5 agent namespaces + the
-`zuno-auth`/`zuno-data`/`zuno-telemetry`/`zuno-ai-run`/`zuno-ai-build`
+`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-run`/`zuno-ai-build`
 platform namespaces (`-d0`), each with a `ResourceQuota` and a default-deny
 `NetworkPolicy` baseline (`-d1`). Moved out of `ansible/roles/agents` so
 namespace creation is its own explicit, checkable step rather than only

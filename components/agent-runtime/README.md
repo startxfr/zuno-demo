@@ -213,7 +213,7 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 | `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-ai-run.svc:8080` | tool_call node |
 | `AI_GATEWAY_URL` | `http://ai-gateway.zuno-ai-run.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
 | `AGENTS_DIR` | `/app/agents` | Directory of `<name>/agent.okf.md` OKF bundles (ADR-0038) `app/registry.py`'s `AgentRegistry` loads at import time (ADR-0039) |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-telemetry.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
 
 ## Observability (ADR-0029)
 

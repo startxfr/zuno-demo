@@ -3,7 +3,7 @@
 Referenced by `gitops/apps/observability/application-d0.yaml`
 (operator.enabled: `Namespace` + `OperatorGroup` + `Subscription` for the
 Red Hat build of OpenTelemetry operator) and `application-d1.yaml`
-(collector.enabled: the `zuno-telemetry` Namespace + the shared
+(collector.enabled: the `zuno-monitoring` Namespace + the shared
 `OpenTelemetryCollector` instance) - same operator/operand `-d0`/`-d1`
 split as `nfd`/`nvidia-gpu`/`openshift-ai` (ADR-0312).
 
