@@ -1,0 +1,29 @@
+---
+# No Day 1 content for lws - there is no singleton operand CR for
+# LeaderWorkerSet (user workloads create their own LeaderWorkerSet objects
+# later, out of scope here); see gitops/apps/README.md's -d0/-d1
+# convention and gitops/charts/noop's README.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-lws-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-194"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+    helm:
+      releaseName: zuno-lws-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -99,6 +99,7 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0314](0314-convert-admin-context-to-a-d0-d1-argocd-application-pair.md) | v0 | Implemented | Convert admin_context to a -d0/-d1 ArgoCD Application pair |
 | [ADR-0315](0315-dedicated-keycloak-postgresql-database.md) | v0 | Implemented | Dedicated Keycloak database/role on the shared PostgreSQL cluster |
 | [ADR-0316](0316-keycloak-route-tls-via-cert-manager.md) | v0 | Implemented | Keycloak's Route gets a cert-manager-issued certificate via a hand-authored Ingress |
+| [ADR-0317](0317-install-connectivity-link-and-leaderworkerset-operators.md) | v0 | Implemented | Install the Red Hat Connectivity Link and LeaderWorkerSet operators as OpenShift AI prerequisites |
 
 ## Standard clauses
 

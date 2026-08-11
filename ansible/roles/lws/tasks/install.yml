@@ -1,0 +1,77 @@
+---
+# Ordered alongside connectivity_link and ahead of openshift_ai -
+# ADR-0317 installs this operator ahead of any actual multi-node/
+# multi-GPU workload.
+
+# Catalog source/channel naming isn't verified against a live cluster
+# (ADR-0317's Operational considerations); discover both from the
+# PackageManifest rather than hardcoding, same pattern as
+# ansible/roles/external_secrets/tasks/install.yml.
+- name: "lws | look up the {{ lws_package_name | default('leader-worker-set') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ lws_package_name | default('leader-worker-set') }}"
+  register: _lws_pkg_info
+
+- name: "lws | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ lws_package_name | default('leader-worker-set') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i leader-worker` (or `-i lws`) for the
+      correct package name on this cluster, then re-run with `-e
+      lws_package_name=<name>` or update this role's default (ADR-0317 -
+      the name checked in is an unverified placeholder).
+  when: (_lws_pkg_info.resources | default([]) | length) == 0
+
+- name: "lws | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _lws_catalog_source: "{{ _lws_pkg_info.resources[0].status.catalogSource }}"
+    _lws_channel: >-
+      {{
+        'stable'
+        if (_lws_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_lws_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "lws | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ lws_package_name | default('leader-worker-set') }}'
+      (catalog '{{ _lws_catalog_source }}') has no "stable" channel and no
+      defaultChannel to fall back to. Published channels:
+      {{ _lws_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _lws_channel | length == 0
+
+- name: "lws | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ lws_package_name | default('leader-worker-set') }}',
+      catalog '{{ _lws_catalog_source }}', channel '{{ _lws_channel }}'.
+
+- name: "lws | apply the lws GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "lws"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-lws-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+      subscriptionChannel: "{{ _lws_channel }}"
+      subscriptionCatalogSource: "{{ _lws_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# No singleton operand CR exists for LeaderWorkerSet - d1 is a no-op
+# (gitops/charts/noop), applied here only to keep the Application object
+# itself present/synced, same convention ansible/roles/models uses for its
+# own no-op d0.
+- name: "lws | apply the lws GitOps Application (d1, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "lws"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-lws-d1"

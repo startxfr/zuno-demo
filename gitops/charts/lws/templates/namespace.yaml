@@ -1,0 +1,16 @@
+{{- if .Values.operator.enabled }}
+# Pre-created as a PreSync hook since nothing else in this repository
+# creates this operator's dedicated namespace (same idiom as
+# gitops/charts/cert-manager/templates/namespace-cert-manager.yaml).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    openshift.io/description: "LeaderWorkerSet operator, configured by Zuno."
+    openshift.io/display-name: "Zuno LeaderWorkerSet Operator"
+    openshift.io/requester: zuno
+{{- end }}

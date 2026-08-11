@@ -56,10 +56,15 @@ reasoning, and `gitops/charts/models/README.md` for the
 `InferenceService`-level annotation that makes the same choice explicit
 at that layer too.
 
-Connectivity Link, LeaderWorkerSet and MaaS-related dependencies (also
-named in ADR-0047's Operational considerations) are deliberately not
-installed either - see `platform/openshift-ai/README.md` for why none of
-them are applicable to this repository's actual v0 feature set.
+MaaS-related dependencies (also named in ADR-0047's Operational
+considerations) are deliberately not installed - see
+`platform/openshift-ai/README.md` for why. Connectivity Link and
+LeaderWorkerSet, named in that same list, are no longer in that bucket:
+ADR-0317 installs both operators (`ansible/roles/connectivity_link`,
+`ansible/roles/lws`) ahead of `openshift_ai` in the Day 0 sequence, ahead
+of any actual consumer - see that ADR and `platform/openshift-ai/
+README.md`'s per-capability breakdown for the current disposition of
+every capability ADR-0047 named.
 
 ## Sync-wave ordering within the Application (ADR-0312)
 

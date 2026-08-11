@@ -1,0 +1,27 @@
+# operator.enabled renders the Namespace/OperatorGroup/Subscription.
+# Defaults false so templates render nothing. There is no singleton
+# operand CR for LeaderWorkerSet (user workloads create their own
+# LeaderWorkerSet objects later, out of scope here) - unlike
+# connectivity-link, this component has no "-d1 operand" values block;
+# zuno-lws-d1 (gitops/apps/lws/application-d1.yaml) points at
+# gitops/charts/noop instead.
+operator:
+  enabled: false
+
+namespace: openshift-lws-operator
+
+# ASSUMPTION, not yet verified against a live cluster (ADR-0317): the real
+# OLM package name for this operator on a given catalog. If wrong, run
+# `oc get packagemanifest -n openshift-marketplace | grep -i leader-worker`
+# (or `-i lws`) against the target cluster and correct this value -
+# ansible/roles/lws/tasks/install.yml's PackageManifest lookup fails with a
+# clear diagnostic listing published channels if it's wrong, rather than
+# silently subscribing to nothing.
+subscriptionName: leader-worker-set
+
+# subscriptionChannel/subscriptionCatalogSource are discovered from the
+# cluster's own PackageManifest by ansible and injected via
+# gitops_app_extra_helm_values on the -d0 apply (ADR-0048);
+# templates/subscription.yaml renders nothing until both are set.
+subscriptionChannel: ""
+subscriptionCatalogSource: ""

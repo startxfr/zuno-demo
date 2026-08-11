@@ -8,6 +8,8 @@
   vars:
     day0_components:
       - openshift_ai
+      - lws
+      - connectivity_link
       - nvidia_gpu
       - nfd
       - smtp

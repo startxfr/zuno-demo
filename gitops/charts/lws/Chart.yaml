@@ -1,0 +1,10 @@
+apiVersion: v2
+name: lws
+description: >-
+  LeaderWorkerSet operator (OLM Subscription, channel/catalog discovered
+  at Ansible run time - ADR-0048). ADR-0317 prerequisite for OpenShift AI
+  multi-node/multi-GPU model serving; no LeaderWorkerSet workload is
+  created here.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

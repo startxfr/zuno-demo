@@ -12,7 +12,9 @@ serving) enabled and `kserve.serving.managementState: Removed`
 `datascience` role, merged into `openshift_ai` (ADR-0056: one role for
 one conceptual prerequisite). `ansible/roles/nfd` and
 `ansible/roles/nvidia_gpu` (`platform/gpu`) are GPU-serving prerequisites,
-applied before it.
+applied before it. `ansible/roles/connectivity_link` and `ansible/roles/lws`
+(ADR-0317) are also applied before it - ahead of any actual consumer, see
+below.
 
 ## Which OpenShift AI 3.5 capabilities this repository actually uses
 
@@ -37,16 +39,19 @@ ways: it also means *not* installing operators nothing here uses.
   ADR-0047: the previous `Managed` configuration implicitly needed all
   three operators, none of which this repository ever installed, and
   would never have reached `Ready` on a real cluster).
-- **Connectivity Link** (Kuadrant-based API policy gateway) - not
-  applicable. Nothing in this repository's architecture uses it; the
-  MCP Gateway (`components/mcp-gateway`) and AI Inference Gateway
-  (`components/ai-gateway`) are this project's own purpose-built policy
-  enforcement points (ADR-0010, ADR-0011, ADR-0009), not a
-  Connectivity-Link-fronted API.
-- **LeaderWorkerSet** - not applicable. This demo serves exactly one
-  always-on, single-GPU model (`gitops/charts/models`); LeaderWorkerSet
-  exists for multi-node/multi-GPU serving topologies this project has no
-  instance of.
+- **Connectivity Link** (Kuadrant-based API policy gateway) - **installed
+  as of ADR-0317**, ahead of any consumer. Nothing in this repository's
+  architecture uses it yet - the MCP Gateway (`components/mcp-gateway`)
+  and AI Inference Gateway (`components/ai-gateway`) remain this project's
+  actual policy enforcement points (ADR-0010, ADR-0011, ADR-0009) - but the
+  operator and a minimal, empty `Kuadrant` CR are now installed to get the
+  platform ready for Gateway API-fronted inference policy. See
+  `ansible/roles/connectivity_link` and `platform/networking/README.md`.
+- **LeaderWorkerSet** - **installed as of ADR-0317**, ahead of any
+  consumer. This demo still serves exactly one always-on, single-GPU model
+  (`gitops/charts/models`) with no multi-node/multi-GPU topology, but the
+  operator is now installed to get the platform ready for that. See
+  `ansible/roles/lws` and `platform/lws/README.md`.
 - **MaaS** (Models-as-a-Service policy routing) - not applicable to v0.
   ADR-0049 ("Zuno as MaaS policy router") is explicitly deferred to v1 in
   the implementation sequencing plan; nothing in the current build routes

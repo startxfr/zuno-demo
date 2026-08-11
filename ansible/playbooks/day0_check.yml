@@ -20,6 +20,8 @@
       - smtp
       - nfd
       - nvidia_gpu
+      - connectivity_link
+      - lws
       - openshift_ai
   tasks:
     - name: Resolve cluster API credentials

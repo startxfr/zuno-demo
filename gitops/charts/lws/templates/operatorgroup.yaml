@@ -1,0 +1,17 @@
+{{- if .Values.operator.enabled }}
+# Namespace-scoped, not AllNamespaces - same "don't default to
+# startx/OLM's own AllNamespaces default" choice as
+# gitops/charts/nvidia-gpu's OperatorGroup.
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: lws-operator-group
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  targetNamespaces:
+    - {{ .Values.namespace }}
+{{- end }}

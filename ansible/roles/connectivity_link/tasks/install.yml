@@ -1,0 +1,79 @@
+---
+# Must be ready before openshift_ai (or rather, alongside its other
+# prerequisites) - ADR-0317 installs this operator ahead of any actual
+# Gateway/policy consumer.
+
+# Catalog source/channel naming isn't verified against a live cluster
+# (ADR-0317's Operational considerations); discover both from the
+# PackageManifest rather than hardcoding, same pattern as
+# ansible/roles/external_secrets/tasks/install.yml.
+- name: "connectivity_link | look up the {{ connectivity_link_package_name | default('rhcl-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ connectivity_link_package_name | default('rhcl-operator') }}"
+  register: _connectivity_link_pkg_info
+
+- name: "connectivity_link | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ connectivity_link_package_name | default('rhcl-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i connectivity` (or `-i kuadrant`/`-i
+      rhcl`) for the correct package name on this cluster, then re-run with
+      `-e connectivity_link_package_name=<name>` or update this role's
+      default (ADR-0317 - the name checked in is an unverified placeholder).
+  when: (_connectivity_link_pkg_info.resources | default([]) | length) == 0
+
+- name: "connectivity_link | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _connectivity_link_catalog_source: "{{ _connectivity_link_pkg_info.resources[0].status.catalogSource }}"
+    _connectivity_link_channel: >-
+      {{
+        'stable'
+        if (_connectivity_link_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_connectivity_link_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "connectivity_link | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ connectivity_link_package_name | default('rhcl-operator') }}'
+      (catalog '{{ _connectivity_link_catalog_source }}') has no "stable"
+      channel and no defaultChannel to fall back to. Published channels:
+      {{ _connectivity_link_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _connectivity_link_channel | length == 0
+
+- name: "connectivity_link | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ connectivity_link_package_name | default('rhcl-operator') }}',
+      catalog '{{ _connectivity_link_catalog_source }}', channel
+      '{{ _connectivity_link_channel }}'.
+
+- name: "connectivity_link | apply the connectivity-link GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "connectivity-link"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-connectivity-link-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+      subscriptionChannel: "{{ _connectivity_link_channel }}"
+      subscriptionCatalogSource: "{{ _connectivity_link_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+- name: "connectivity_link | apply the connectivity-link GitOps Application (d1: Kuadrant instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "connectivity-link"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-connectivity-link-d1"
+    gitops_app_extra_helm_values:
+      kuadrant:
+        enabled: true
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15

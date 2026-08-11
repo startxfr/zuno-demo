@@ -1,0 +1,19 @@
+{{- if .Values.kuadrant.enabled }}
+# Singleton CR the operator watches to deploy its sub-controllers
+# (Limitador, Authorino, DNS operator integration) - same "meta-operator
+# needs a CR to actually deploy pods" shape as
+# gitops/charts/external-secrets's OperatorConfig and
+# gitops/charts/cert-manager's CertManager CR. Empty spec: no
+# Gateway/AuthPolicy/RateLimitPolicy exists yet for it to enforce
+# (ADR-0317 installs the operator ahead of any consumer).
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: kuadrant
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec: {}
+{{- end }}

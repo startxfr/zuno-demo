@@ -1,0 +1,31 @@
+---
+# Minimal Kuadrant operand CR (not the operator, see application-d0.yaml).
+# Empty spec - no Gateway/AuthPolicy/RateLimitPolicy exists yet for it to
+# enforce (ADR-0317 installs the operator ahead of any consumer).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-connectivity-link-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-196"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/connectivity-link
+    helm:
+      releaseName: zuno-connectivity-link-d1
+      values: |
+        kuadrant:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kuadrant-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

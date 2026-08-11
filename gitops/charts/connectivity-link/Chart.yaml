@@ -1,0 +1,10 @@
+apiVersion: v2
+name: connectivity-link
+description: >-
+  Red Hat Connectivity Link operator (OLM Subscription, channel/catalog
+  discovered at Ansible run time - ADR-0048) and a minimal Kuadrant
+  operand CR. ADR-0317 prerequisite for OpenShift AI; no Gateway/
+  AuthPolicy/RateLimitPolicy is created here.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

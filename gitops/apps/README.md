@@ -197,6 +197,8 @@ Directories present:
 | `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: operator + OperatorConfig; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
 | `smtp` | local chart, `gitops/charts/smtp` (`-d0`: zuno-ai-run Namespace; `-d1`: technical mail identity ExternalSecret) - no operator |
 | `observability` | local chart, `gitops/charts/observability` (`-d0`: OpenTelemetry operator; `-d1`: zuno-telemetry Namespace + shared OTLP Collector) |
+| `connectivity-link` | local chart, `gitops/charts/connectivity-link` (ADR-0317 - `-d0`: hand-authored Namespace/OperatorGroup/Subscription, no vendor chart; `-d1`: minimal empty `Kuadrant` operand CR) |
+| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: hand-authored Namespace/OperatorGroup/Subscription, no vendor chart; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
 
 `keycloak`, `api` and `vault`'s `Application.spec.source.helm.values`
 reference `clusterBaseDomain: apps.mycluster.example.com` - a token, not a
