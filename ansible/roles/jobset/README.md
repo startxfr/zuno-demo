@@ -27,20 +27,16 @@ instantiate: the operator only registers the `JobSet` CRD/controller;
 individual distributed training runs create their own `JobSet` objects
 later (out of scope here).
 
-## Package name is the least confirmed of any operator this repository installs
+## Package name
 
-`jobset-operator` (checked in as `gitops/charts/jobset/values.yaml`'s
-`subscriptionName`) is a placeholder with lower confidence than this
-repository's other operators: it isn't confirmed that Red Hat ships JobSet
-as a separate OLM-installable operator at all, rather than e.g. a
-raw-manifest install from the upstream `kubernetes-sigs/jobset` releases,
-or a dependency bundled inside the Trainer operator's own install. If
-`install.yml`'s `PackageManifest` lookup fails because no such package
-exists on the target catalog, that is the expected signal to check `oc
-get packagemanifest -n openshift-marketplace | grep -i jobset` and, if it
-genuinely isn't there, switch this role to whatever the correct
-installation method turns out to be instead of continuing to guess an OLM
-package name.
+`job-set` (checked in as `gitops/charts/jobset/values.yaml`'s
+`subscription.name`/`subscription.operator.name`), channel `stable-v1.0`,
+confirmed against a live cluster's `redhat-operators` catalog. ADR-0318
+originally guessed `jobset-operator`, which doesn't exist on this catalog
+- if `install.yml`'s `PackageManifest` lookup ever fails again on a
+different cluster, check `oc get packagemanifest -n openshift-marketplace
+| grep -i job` for that cluster's actual name and update this default (or
+pass `-e jobset_package_name=<name>`).
 
 Subscribes into `openshift-operators` (`AllNamespaces`) rather than a
 dedicated namespace - the now-confirmed-safe shape

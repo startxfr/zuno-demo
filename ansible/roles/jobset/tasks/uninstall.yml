@@ -10,7 +10,7 @@
 - name: "jobset | remove the operator (its owned CRDs then the CSV then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
   vars:
-    operator_subscription_name: "{{ jobset_package_name | default('jobset-operator') }}"
+    operator_subscription_name: "{{ jobset_package_name | default('job-set') }}"
     operator_namespace: openshift-operators
 
 - name: "jobset | delete the jobset GitOps Application (d0: the Subscription itself)"

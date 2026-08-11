@@ -24,6 +24,14 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-mesh
+  ignoreDifferences:
+    # The Kiali operator defaults nearly every leaf under spec (deployment,
+    # external_services, ...) at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: kiali.io
+      kind: Kiali
+      jsonPointers:
+        - /spec
   syncPolicy:
     automated:
       prune: true

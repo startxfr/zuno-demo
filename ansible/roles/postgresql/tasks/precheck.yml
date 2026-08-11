@@ -31,7 +31,7 @@
         and (_postgresql_cluster_lookup.resources | default([]) | length) > 0
         and (_postgresql_cluster_lookup.resources[0].status.conditions | default([])
              | selectattr('type', 'equalto', 'Progressing') | map(attribute='status') | list
-             | first | default('True')) == 'False'
+             | first | default('False')) == 'False'
       }}
 
 - name: "postgresql | record install state"

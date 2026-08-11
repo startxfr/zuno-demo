@@ -22,6 +22,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator
+  ignoreDifferences:
+    # The RHOAI operator expands spec.components with many defaulted
+    # entries/sub-fields at runtime (and stores the CR as v2 while this
+    # Application renders v1); without this, ArgoCD sees permanent drift
+    # and fights it.
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
+      jsonPointers:
+        - /spec
   syncPolicy:
     automated:
       prune: true
