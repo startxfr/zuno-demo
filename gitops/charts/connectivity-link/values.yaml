@@ -1,14 +1,19 @@
-# operator.enabled renders the Namespace/OperatorGroup/Subscription;
-# kuadrant.enabled renders the operand Kuadrant CR. Both default false so
-# templates render nothing by default. Two separate ArgoCD Applications
-# (zuno-connectivity-link-d0/-d1) each set one - same shape as
-# gitops/charts/external-secrets.
+# operator.enabled renders the Subscription (into openshift-operators -
+# rhcl-operator's CSV only supports AllNamespaces, confirmed against a
+# real cluster, so no dedicated namespace/OperatorGroup is created for
+# it); kuadrant.enabled renders the operand namespace + Kuadrant CR. Both
+# default false so templates render nothing by default. Two separate
+# ArgoCD Applications (zuno-connectivity-link-d0/-d1) each set one - same
+# shape as gitops/charts/external-secrets.
 operator:
   enabled: false
 kuadrant:
   enabled: false
 
-namespace: kuadrant-system
+# Namespace for the Kuadrant operand CR only - NOT the operator's
+# namespace (that's the hardcoded openshift-operators in
+# templates/subscription.yaml).
+operandNamespace: kuadrant-system
 
 # ASSUMPTION, not yet verified against a live cluster (ADR-0317): the real
 # OLM package name for this operator on a given catalog. If wrong, run

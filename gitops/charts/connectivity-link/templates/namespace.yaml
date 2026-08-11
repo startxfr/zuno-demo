@@ -1,16 +1,19 @@
-{{- if .Values.operator.enabled }}
+{{- if .Values.kuadrant.enabled }}
+# The operator itself installs into openshift-operators (see
+# subscription.yaml - its CSV only supports AllNamespaces); this namespace
+# is only for the Kuadrant operand CR, so it's a -d1 concern now.
 # Pre-created as a PreSync hook since nothing else in this repository
-# creates this operator's dedicated namespace (same idiom as
+# creates it (same idiom as
 # gitops/charts/cert-manager/templates/namespace-cert-manager.yaml).
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .Values.namespace }}
+  name: {{ .Values.operandNamespace }}
   labels:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/hook: PreSync
-    openshift.io/description: "Red Hat Connectivity Link operator, configured by Zuno."
-    openshift.io/display-name: "Zuno Connectivity Link Operator"
+    openshift.io/description: "Red Hat Connectivity Link (Kuadrant) operand, configured by Zuno."
+    openshift.io/display-name: "Zuno Connectivity Link"
     openshift.io/requester: zuno
 {{- end }}

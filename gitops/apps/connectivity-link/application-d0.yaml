@@ -1,7 +1,11 @@
 ---
 # Red Hat Connectivity Link operator install (ADR-0317); the Kuadrant
 # operand is a separate Application (application-d1.yaml) applied after
-# this one is healthy.
+# this one is healthy. rhcl-operator's CSV only supports the AllNamespaces
+# install mode, so this subscribes into openshift-operators (OLM's own
+# pre-existing global-operators OperatorGroup) rather than a dedicated
+# namespace - confirmed against a real cluster, same pattern
+# zuno-external-secrets-d0 already uses.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,18 +28,11 @@ spec:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: kuadrant-system
-  ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
-    - group: operators.coreos.com
-      kind: OperatorGroup
-      jsonPointers:
-        - /metadata/annotations/olm.providedAPIs
+    namespace: openshift-operators
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      # Namespace isn't created elsewhere, so CreateNamespace is required here.
-      - CreateNamespace=true
+      # openshift-operators always exists.
+      - CreateNamespace=false
