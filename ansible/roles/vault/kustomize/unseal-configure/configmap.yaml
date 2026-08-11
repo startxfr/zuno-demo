@@ -65,10 +65,15 @@ data:
     # certs for externally-facing hostnames like keycloak.<domain> - see
     # gitops/charts/keycloak/templates/ingress.yaml, the first real consumer
     # of vault-issuer. allow_subdomains=true covers keycloak.<domain>.
+    # require_cn=false: ingress-shim generates Certificates from Ingress
+    # tls.hosts without a commonName (SANs only) unless the
+    # cert-manager.io/common-name annotation is set, which Vault rejects
+    # outright unless this is set - same issue as pki/roles/istio below.
     vault write pki/roles/cert-manager \
       allowed_domains="zuno-demo.internal,svc.cluster.local,${CLUSTER_BASE_DOMAIN}" \
       allow_subdomains=true \
       allow_bare_domains=true \
+      require_cn=false \
       max_ttl=720h
 
     printf 'path "pki/sign/cert-manager" {\n  capabilities = ["create","update"]\n}\n' | vault policy write cert-manager-issuer -
