@@ -3,6 +3,8 @@
 # any Ansible task. Each component's Application is applied by its own role.
 # Requires the "zuno" AppProject to already exist (apply
 # ansible/roles/argocd/kustomize/appproject/appproject.yaml by hand first).
+# Components are auto-discovered by recursing gitops/apps/*/application-*.yaml —
+# see gitops/apps/README.md for the current component list, nothing to add here.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
