@@ -44,6 +44,27 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
+  # rhcl-operator's own CSV/controller already creates this ConsolePlugin
+  # (confirmed on a live cluster: labels app.kubernetes.io/managed-by:
+  # kuadrant-operator) - declaring it here too is intentional, not a
+  # duplicate to clean up. It buys GitOps visibility/drift-detection for
+  # a resource that would otherwise exist outside git entirely. spec below
+  # is copied verbatim from the live cluster object; keep it in sync if
+  # RHCL ever changes its backend service/port.
+  consolePlugin:
+    enabled: true
+    name: kuadrant-console-plugin
+    spec: |
+      backend:
+        service:
+          basePath: /
+          name: kuadrant-console-plugin
+          namespace: openshift-operators
+          port: 9443
+        type: Service
+      displayName: Kuadrant Console Plugin
+      i18n:
+        loadType: Preload
 
 # Namespace for the Kuadrant operand CR only - NOT the operator's namespace
 # (that's the hardcoded openshift-operators above). Pre-created as a
