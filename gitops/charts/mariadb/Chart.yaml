@@ -1,17 +1,21 @@
 apiVersion: v2
 name: mariadb
 description: >-
-  MariaDB Enterprise Operator (OLM Subscription, channel/catalog discovered
-  at Ansible run time - ADR-0048) and a single-node MariaDB CR with a
+  Open-source mariadb-operator (community-operators, Apache-2.0 - OLM
+  Subscription, channel/catalog discovered at Ansible run time - ADR-0048),
+  its MariadbOperator activation CR, and a single-node MariaDB CR with a
   Vault-backed root password and an optional S3-backed PhysicalBackup
   schedule. Depends on startx's generic `operator` chart, not a MariaDB-
-  specific one - same "fuzzy-discovered at run time" shape as
-  gitops/charts/postgresql. No `project` dependency: the destination
-  namespace (zuno-data) already exists, created by gitops/charts/namespaces
-  and shared with gitops/charts/postgresql's PGO operand.
+  specific one - same "discovered at run time" shape as
+  gitops/charts/postgresql. No `project` dependency and no dedicated
+  OperatorGroup: subscribed into the shared openshift-operators namespace
+  (AllNamespaces), same Pattern B shape as gitops/charts/postgresql - the
+  MariaDB/PhysicalBackup operand CRs still target zuno-data, which already
+  exists (created by gitops/charts/namespaces, shared with
+  gitops/charts/postgresql's PGO operand).
 type: application
 version: 0.1.0
-appVersion: "25.8"
+appVersion: "26.6.0"
 dependencies:
   - name: operator
     version: "21.3.277"

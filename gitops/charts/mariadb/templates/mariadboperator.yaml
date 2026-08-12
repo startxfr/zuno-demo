@@ -1,0 +1,22 @@
+{{- if .Values.mariadbOperand.enabled }}
+# mariadb-operator ships as an operator-sdk Helm-operator: the CSV's own
+# Deployment (installed by zuno-mariadb-d0) is a thin controller that only
+# runs its embedded Helm chart - and so only starts the real
+# mariadb-operator controller-manager that reconciles MariaDB CRs - once
+# this CR exists. Sync-wave ordered ahead of templates/mariadb.yaml so it
+# applies first; ansible/roles/mariadb/tasks/install.yml also waits for
+# the resulting controller-manager Deployment to become Available before
+# waiting on the MariaDB CR itself.
+apiVersion: helm.mariadb.mmontes.io/v1alpha1
+kind: MariadbOperator
+metadata:
+  name: mariadb-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-32"
+spec:
+  metrics:
+    enabled: {{ .Values.mariadbOperatorActivation.metrics.enabled }}
+{{- end }}

@@ -1,28 +1,36 @@
 ---
 # Ordered right after postgresql - the other data-tier operator sharing
-# the zuno-data namespace. Package name given as "mariadb-enterprise-
-# operator"; still discover catalog/channel from the PackageManifest
-# rather than hardcoding them (ADR-0048), same pattern as
+# the zuno-data namespace. Package name given as "mariadb-operator" - the
+# open-source (Apache-2.0) community-operators listing, not the paid
+# "mariadb-enterprise-operator" certified listing (which needs MariaDB
+# Enterprise registry credentials this cluster doesn't have); still
+# discover catalog/channel from the PackageManifest rather than
+# hardcoding them (ADR-0048), same pattern as
 # ansible/roles/jobset/tasks/install.yml.
-- name: "mariadb | look up the {{ mariadb_package_name | default('mariadb-enterprise-operator') }} PackageManifest"
+- name: "mariadb | look up the {{ mariadb_package_name | default('mariadb-operator') }} PackageManifest"
   kubernetes.core.k8s_info:
     api_version: packages.operators.coreos.com/v1
     kind: PackageManifest
     namespace: openshift-marketplace
-    name: "{{ mariadb_package_name | default('mariadb-enterprise-operator') }}"
+    name: "{{ mariadb_package_name | default('mariadb-operator') }}"
   register: _mariadb_pkg_info
 
 - name: "mariadb | fail if the package isn't published anywhere on this cluster"
   ansible.builtin.fail:
     msg: >-
-      No PackageManifest named '{{ mariadb_package_name | default('mariadb-enterprise-operator') }}'
+      No PackageManifest named '{{ mariadb_package_name | default('mariadb-operator') }}'
       was found in openshift-marketplace. Check `oc get packagemanifest -n
       openshift-marketplace | grep -i mariadb` for the correct package name
-      on this cluster (it must be published by the certified-operators
+      on this cluster (it must be published by the community-operators
       catalog). Re-run with `-e mariadb_package_name=<name>` or update this
       role's default if the catalog on this cluster differs.
   when: (_mariadb_pkg_info.resources | default([]) | length) == 0
 
+# mariadb-operator only publishes a single "alpha" channel (also its
+# defaultChannel) - no code change needed here, the "stable else
+# defaultChannel" fallback below already resolves to it since no "stable"
+# channel exists. "alpha" reflects this project's date-based versioning
+# convention, not alpha-quality software.
 - name: "mariadb | select the catalog/channel to subscribe from"
   ansible.builtin.set_fact:
     _mariadb_catalog_source: "{{ _mariadb_pkg_info.resources[0].status.catalogSource }}"
@@ -36,7 +44,7 @@
 - name: "mariadb | fail if no usable channel was found"
   ansible.builtin.fail:
     msg: >-
-      Package '{{ mariadb_package_name | default('mariadb-enterprise-operator') }}'
+      Package '{{ mariadb_package_name | default('mariadb-operator') }}'
       (catalog '{{ _mariadb_catalog_source }}') has no "stable" channel and
       no defaultChannel to fall back to. Published channels:
       {{ _mariadb_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
@@ -45,7 +53,7 @@
 - name: "mariadb | discovery summary"
   ansible.builtin.debug:
     msg: >-
-      Subscribing to package '{{ mariadb_package_name | default('mariadb-enterprise-operator') }}',
+      Subscribing to package '{{ mariadb_package_name | default('mariadb-operator') }}',
       catalog '{{ _mariadb_catalog_source }}', channel '{{ _mariadb_channel }}'.
 
 # The Subscription/OperatorGroup (operator.enabled) live in
@@ -61,9 +69,9 @@
       operator:
         enabled: true
         subscription:
-          name: "{{ mariadb_package_name | default('mariadb-enterprise-operator') }}"
+          name: "{{ mariadb_package_name | default('mariadb-operator') }}"
           operator:
-            name: "{{ mariadb_package_name | default('mariadb-enterprise-operator') }}"
+            name: "{{ mariadb_package_name | default('mariadb-operator') }}"
             channel: "{{ _mariadb_channel }}"
             source:
               name: "{{ _mariadb_catalog_source }}"
@@ -126,16 +134,43 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
-# UNVERIFIED against a live cluster - the MariaDB Enterprise Operator's
-# exact status shape wasn't confirmed from this environment (no network
-# path to a real OpenShift cluster). Assumes a standard status.conditions
-# entry of type "Ready", the common kubebuilder convention (same
-# assumption gitops/charts/kueue's operand documents for its own CR).
-# Re-check with `oc get mariadb mariadb -n zuno-data -o yaml` against the
-# target cluster and adjust if the operator uses a different field.
+# mariadb-operator ships as an operator-sdk Helm-operator: the CSV's own
+# Deployment (installed by -d0) only runs its embedded Helm chart - and so
+# only starts the real mariadb-operator controller-manager that reconciles
+# MariaDB CRs - once the MariadbOperator activation CR (applied as part of
+# -d1 above) has been reconciled. Wait for that controller-manager
+# Deployment before waiting on the MariaDB CR below, otherwise that wait
+# would spin for its full retry budget before any controller exists to
+# reconcile it. UNVERIFIED against a live cluster: the exact Deployment
+# name the embedded Helm chart derives wasn't confirmed from this
+# environment - re-check with `oc get deployment -n zuno-data -l
+# app.kubernetes.io/name=mariadb-operator` against the target cluster and
+# adjust if it differs.
+- name: "mariadb | wait for the mariadb-operator controller-manager to become Available"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-data
+    name: mariadb-operator
+  register: _mariadb_operator_deployment
+  until: >-
+    (_mariadb_operator_deployment.resources | default([]) | length) > 0 and
+    (_mariadb_operator_deployment.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 60
+  delay: 10
+
+# UNVERIFIED against a live cluster - the MariaDB CR's exact status shape
+# wasn't confirmed from this environment (no network path to a real
+# OpenShift cluster). Assumes a standard status.conditions entry of type
+# "Ready", the common kubebuilder convention (same assumption
+# gitops/charts/kueue's operand documents for its own CR). Re-check with
+# `oc get mariadb mariadb -n zuno-data -o yaml` against the target cluster
+# and adjust if the operator uses a different field.
 - name: "mariadb | wait for the mariadb MariaDB CR to report Ready"
   kubernetes.core.k8s_info:
-    api_version: enterprise.mariadb.com/v1alpha1
+    api_version: k8s.mariadb.com/v1alpha1
     kind: MariaDB
     namespace: zuno-data
     name: mariadb

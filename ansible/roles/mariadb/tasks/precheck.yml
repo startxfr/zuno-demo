@@ -16,7 +16,7 @@
 
 - name: "mariadb | look up the mariadb MariaDB CR"
   kubernetes.core.k8s_info:
-    api_version: enterprise.mariadb.com/v1alpha1
+    api_version: k8s.mariadb.com/v1alpha1
     kind: MariaDB
     namespace: zuno-data
     name: mariadb

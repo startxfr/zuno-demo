@@ -2,7 +2,7 @@
 # Scheduled S3 backup of the MariaDB CR above. Only rendered once real S3
 # credentials exist (backups.s3.enabled) - same "never rendered
 # half-configured" rule gitops/charts/postgresql's repo2 follows.
-apiVersion: enterprise.mariadb.com/v1alpha1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: PhysicalBackup
 metadata:
   name: mariadb-backup

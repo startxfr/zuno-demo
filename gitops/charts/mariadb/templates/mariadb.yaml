@@ -1,7 +1,10 @@
 {{- if .Values.mariadbOperand.enabled }}
-# MariaDB Enterprise Operator MariaDB CR. Requires the operator, installed
-# by the separate zuno-mariadb-d0 Application applied before this one.
-apiVersion: enterprise.mariadb.com/v1alpha1
+# mariadb-operator MariaDB CR. Requires the operator's controller-manager
+# to actually be running, which only happens once the MariadbOperator
+# activation CR (templates/mariadboperator.yaml) has been reconciled -
+# both applied by the same zuno-mariadb-d1 Application, ordered by
+# sync-wave ahead of this one.
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: mariadb

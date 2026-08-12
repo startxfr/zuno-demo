@@ -9,21 +9,24 @@ mariadbOperand:
 # subscription.name/operator.name/operator.channel/operator.source.name are
 # all discovered at run time by ansible/roles/mariadb/tasks/install.yml and
 # set via gitops_app_extra_helm_values (ADR-0048) - the known package name
-# is "mariadb-enterprise-operator", but it's still resolved from the live
-# cluster's PackageManifest rather than hardcoded here, same as
-# postgresql/jobset/kueue. templates/checks.yaml fails the render if any is
-# still empty once operator.enabled is true.
+# is "mariadb-operator" (the open-source, Apache-2.0 community-operators
+# listing - not the paid "mariadb-enterprise-operator" certified listing,
+# which needs MariaDB Enterprise registry credentials this cluster doesn't
+# have), but it's still resolved from the live cluster's PackageManifest
+# rather than hardcoded here, same as postgresql/jobset/kueue.
+# templates/checks.yaml fails the render if any is still empty once
+# operator.enabled is true.
 #
-# Dedicated OperatorGroup scoped to zuno-data (targetNamespaces: [zuno-data]),
-# not a new dedicated namespace: zuno-data already exists (created by
-# gitops/charts/namespaces, shared with gitops/charts/postgresql's operand),
-# so this chart has no `project` dependency. ASSUMPTION, not yet verified
-# against a live cluster's PackageManifest install modes (same kind of
-# check gitops/charts/jobset/kueue document): confirm
-# mariadb-enterprise-operator supports OwnNamespace/SingleNamespace before
-# relying on this namespace-scoped shape - if it turns out to require
-# AllNamespaces only, this needs operatorGroup.target: "all-ns" instead
-# (gitops/charts/kueue's shape).
+# No OperatorGroup: this package's CSV supports every install mode
+# (OwnNamespace/SingleNamespace/MultiNamespace/AllNamespaces all
+# confirmed true against a live cluster's PackageManifest), so - same as
+# gitops/charts/postgresql - it's subscribed into the shared
+# openshift-operators namespace and relies on OpenShift's own default
+# global OperatorGroup there (AllNamespaces) rather than a dedicated one.
+# This also sidesteps the MultipleOperatorGroupsFound conflict a
+# dedicated, namespace-scoped OperatorGroup in zuno-data previously hit
+# on a live cluster (a stray pre-existing OperatorGroup there, unrelated
+# to this chart).
 operator:
   enabled: false
   context:
@@ -35,7 +38,7 @@ operator:
   subscription:
     enabled: true
     name: ""
-    namespace: zuno-data
+    namespace: openshift-operators
     operator:
       # Must be set explicitly, same name as subscription.name: the
       # vendored `operator` chart's own values.yaml gives this a
@@ -47,15 +50,21 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
-  operatorGroup:
-    enabled: true
-    name: zuno-data
-    namespace: zuno-data
-    # Namespace-scoped (targetNamespaces: [zuno-data]), not "all-ns" - see
-    # the ASSUMPTION note above.
-    target: zuno-data
 
-# Single-node MariaDB (enterprise.mariadb.com/v1alpha1 MariaDB CR).
+# mariadb-operator ships as an operator-sdk Helm-operator: its CSV
+# Deployment is a thin controller that only runs its embedded Helm chart
+# (and so only starts the real mariadb-operator controller-manager that
+# reconciles MariaDB CRs) once a MariadbOperator CR exists - see
+# templates/mariadboperator.yaml. Same "operator needs an
+# activation/config singleton CR" shape gitops/charts/jobset's
+# JobSetOperator / gitops/charts/kueue's Kueue CR already use.
+mariadbOperatorActivation:
+  # No ServiceMonitor CRD assumed installed - kept minimal, everything
+  # else left at the CSV's own embedded-chart defaults.
+  metrics:
+    enabled: false
+
+# Single-node MariaDB (k8s.mariadb.com/v1alpha1 MariaDB CR).
 cluster:
   replicas: 1
   storageClassName: gp3-csi
@@ -80,7 +89,7 @@ credentials:
   secretStoreName: vault-backend
   refreshInterval: 1h
 
-# PhysicalBackup (enterprise.mariadb.com/v1alpha1) only renders once real
+# PhysicalBackup (k8s.mariadb.com/v1alpha1) only renders once real
 # S3 credentials exist - same "never rendered half-configured" rule
 # gitops/charts/postgresql's repo2 follows. bucket/endpoint/region are not
 # secret and are set via gitops_app_extra_helm_values by

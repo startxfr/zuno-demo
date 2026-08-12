@@ -1,10 +1,10 @@
 ---
-# MariaDB Enterprise Operator install; the MariaDB/PhysicalBackup operand
-# CRs are a separate Application (application-d1.yaml). Dedicated
-# OperatorGroup scoped to zuno-data (the namespace already exists, created
-# by gitops/charts/namespaces and shared with gitops/apps/postgresql's PGO
-# operand) - see gitops/charts/mariadb/values.yaml for the install-mode
-# assumption.
+# Open-source mariadb-operator install (community-operators, Apache-2.0);
+# the MariadbOperator activation CR and MariaDB/PhysicalBackup operand CRs
+# are a separate Application (application-d1.yaml). No dedicated
+# OperatorGroup: subscribed into the shared openshift-operators namespace
+# (AllNamespaces) - same Pattern B shape as gitops/apps/postgresql, see
+# gitops/charts/mariadb/values.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,13 +28,6 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-data
-  ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
-    - group: operators.coreos.com
-      kind: OperatorGroup
-      jsonPointers:
-        - /metadata/annotations/olm.providedAPIs
   syncPolicy:
     automated:
       prune: true
