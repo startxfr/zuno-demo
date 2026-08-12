@@ -1,6 +1,8 @@
-# Grants the acceptance-gate Job (runs in zuno-ai-run) ingress to the BFF,
-# additive to the namespace-wide default-deny baseline the frontend already
-# relies on.
+# Grants the acceptance-gate Job (same zuno-ai-run namespace as this
+# chart's own workloads) ingress to the BFF, additive to the namespace-wide
+# default-deny baseline the frontend already relies on. No namespaceSelector
+# needed: an ingress `from` peer with only a podSelector matches same-
+# namespace pods.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -19,10 +21,7 @@ spec:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-ai-run
-          podSelector:
+        - podSelector:
             matchLabels:
               app.kubernetes.io/name: acceptance-gate
       ports:

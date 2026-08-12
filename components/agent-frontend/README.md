@@ -140,7 +140,7 @@ surface) - see `go.mod`/`go.sum`.
 | `OIDC_CLIENT_SECRET` | **yes** | From an `ExternalSecret` (ADR-0024), never hardcoded |
 | `OIDC_REDIRECT_URL` | no (derived from `SELF_BASE_URL` + `/callback`) | Must match the Keycloak client's registered redirect URI |
 | `SELF_BASE_URL` | **yes** | `https://tekos.apps.<cluster-domain>` |
-| `BFF_BASE_URL` | no (default `http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080`) | In-cluster BFF Service URL |
+| `BFF_BASE_URL` | no (default `http://tekos-bff.zuno-ai-run.svc.cluster.local:8080`) | In-cluster BFF Service URL |
 | `SESSION_HMAC_SECRET` | **yes** | Signs the opaque session-ID cookie (ADR-0042); from an `ExternalSecret` |
 | `SESSION_ENCRYPTION_KEY` | **yes** | 32 bytes, base64-encoded (AES-256); encrypts session records at rest in Redis (ADR-0042); from an `ExternalSecret` |
 | `REDIS_ADDR` | no (default `zuno-redis-master.zuno-auth.svc.cluster.local:6379`) | Server-side session store (ADR-0042) |

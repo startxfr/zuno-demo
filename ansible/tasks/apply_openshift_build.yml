@@ -68,7 +68,6 @@
   loop:
     - zuno-ai-run
     - zuno-data
-    - zuno-agent-tekos
 
 - name: "openshift-build | apply the ImageStream: {{ build_image_name }}"
   kubernetes.core.k8s:

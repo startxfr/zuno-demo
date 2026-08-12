@@ -621,3 +621,30 @@ app-data database - least-privilege/lifecycle isolation), wired the same
 Neither the hostname/proxy nor the Postgres wiring has been exercised
 against a live cluster - see `ansible/roles/keycloak/README.md`'s "What's
 unverified against a real cluster" section.
+
+ADR-0328 (`zuno-ai-platform`, To be implemented) and ADR-0329 (agent
+namespace consolidation, Implemented) landed together on 2026-08-12.
+`gitops/charts/namespaces` gained a `zuno-ai-platform` platformNamespaces
+entry (same shape as `zuno-ai-run`, plus
+`opendatahub.io/application-namespace: "true"`) - the future OpenShift AI
+applications namespace ADR-0328 targets; wiring `DSCInitialization` and
+the DataScienceCluster components to it is deliberately out of scope for
+now (`gitops/charts/openshift-ai` still targets `zuno-ai-build`, unchanged).
+Separately, ADR-0329 supersedes ADR-0023: the per-agent
+`zuno-agent-<name>` namespace model is retired, since real isolation
+between agents was already carried by precise per-workload NetworkPolicies
+(ADR-0037), not the namespace boundary. `gitops/charts/namespaces` no
+longer creates or quotas any `zuno-agent-*` namespace (`namespaces:` key
+and its `quota.yaml`/`networkpolicy.yaml` templates removed);
+`gitops/charts/tekos` now deploys into `zuno-ai-run` alongside Agent
+Runtime/AI Gateway/MCP Gateway. The NetworkPolicies that used to cross the
+`zuno-agent-tekos`/`zuno-ai-run` boundary (`agent-runtime`, `tekos`,
+`redis` charts) became same-namespace `podSelector` rules or now target
+`zuno-ai-run` by name instead of the old generic `zuno.io/agent` namespace
+label match. Every other `zuno-agent-tekos` reference (Day 1 build
+image-puller RoleBinding, Keycloak realm `agent.namespace` client
+attributes, `agent-frontend`'s `BFF_BASE_URL`/OpenAPI default, the Tekos
+acceptance-gate scenario, architecture docs) was updated to `zuno-ai-run`
+to match. Placeholder agents (Comage, Advantage, Finage, Arkos) now carry
+no namespace footprint at all - only their `agent.okf.md` bundle exists
+until a future FE/BFF chart deploys for them into `zuno-ai-run`.

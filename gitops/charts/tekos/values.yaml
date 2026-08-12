@@ -3,10 +3,10 @@
 global:
   clusterBaseDomain: apps.mycluster.example.com
 
-namespace: zuno-agent-tekos
+namespace: zuno-ai-run
 
 # Both images are built by the "agent" build component into
-# zuno-ai-build's ImageStream, pulled cross-namespace into zuno-agent-tekos
+# zuno-ai-build's ImageStream, pulled cross-namespace into zuno-ai-run
 # via the system:image-puller RoleBinding.
 image:
   registry: image-registry.openshift-image-registry.svc:5000
@@ -43,8 +43,8 @@ bff:
       memory: 256Mi
   agentName: tekos
   oidcAudience: tekos-frontend
-  # In-cluster Agent Runtime Service, deployed to zuno-ai-run (not
-  # zuno-agent-tekos) by gitops/charts/agent-runtime.
+  # In-cluster Agent Runtime Service, deployed to zuno-ai-run (same
+  # namespace as this chart's own workloads) by gitops/charts/agent-runtime.
   agentRuntimeBaseUrl: "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"
 
 # Vault paths this chart's ExternalSecrets resolve.

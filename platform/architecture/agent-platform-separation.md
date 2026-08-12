@@ -40,10 +40,13 @@ Each agent is the same four ingredients, filled in differently:
    (ADR-0036) - three independent parsers of the same bundle format, per
    this repo's convention of duplicating small well-specified parsing code
    across independently deployed services rather than sharing a module.
-2. **Namespace** - `zuno-agent-<name>`, with `zuno.io/agent` and
-   `zuno.io/status` labels, dedicated service account(s), quotas and
-   NetworkPolicies (ADR-0023). Created by the `gitops/charts/namespaces`
-   chart for all five agents regardless of whether the agent is active.
+2. **Namespace** - every active agent's FE/BFF deploys into the single
+   shared `zuno-ai-run` namespace (ADR-0329, supersedes ADR-0023's
+   namespace-per-agent isolation model), with dedicated service account(s)
+   and precise, per-workload NetworkPolicies (ADR-0037) rather than a
+   dedicated namespace, quota or namespace-wide policy baseline per agent.
+   A placeholder agent (`status: placeholder`) has no infrastructure
+   footprint at all until it goes active.
 3. **FE + BFF deployment** - one frontend and one BFF `Deployment` (plain
    Kubernetes, not the AIAgent CRD - see "Why not the AIAgent CRD" below),
    built from the shared `components/agent-frontend` and `components/agent-bff`
@@ -58,21 +61,21 @@ Each agent is the same four ingredients, filled in differently:
 ## What v0 actually runs
 
 Of the five agents, **only Tekos has all four ingredients present and
-live**: `status: active` in its OKF file, a populated `zuno-agent-tekos`
-namespace, and a running FE + BFF `Deployment`/`Service`/`Route`
+live**: `status: active` in its OKF file, and a running FE + BFF
+`Deployment`/`Service`/`Route` in the shared `zuno-ai-run` namespace
 (`gitops/charts/tekos`).
 
-Comage, Advantage, Finage and Arkos each have ingredients 1 and 2 only:
+Comage, Advantage, Finage and Arkos each have ingredient 1 only:
 
 - an `agent.okf.md` with `zuno.status: placeholder`, a single `coming-soon`
   task (`tasks/coming-soon.md`) with an empty tool list, and real
   `zuno.access.groups` / `zuno.ui` metadata so the portal can render an
-  honest, access-gated tile;
-- a reserved, labeled, empty `zuno-agent-<name>` namespace, so the
-  namespace-per-agent isolation model (ADR-0023) is demonstrably real
-  infrastructure and not just a diagram - a reviewer can
-  `oc get ns -l zuno.io/agent` and see all five agent boundaries already
-  exist.
+  honest, access-gated tile.
+
+Since ADR-0329 retired the namespace-per-agent isolation model, a
+placeholder agent has no dedicated namespace, quota or NetworkPolicy of
+its own to demonstrate - going active means deploying an FE/BFF chart into
+`zuno-ai-run`, not flipping on infrastructure that already exists.
 
 They have **no** FE/BFF `Deployment` and no Keycloak OIDC client wired up.
 This is not a partial or broken build of those four agents - it is the

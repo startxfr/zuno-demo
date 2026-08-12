@@ -38,10 +38,12 @@ zuno:
 
 # Comage
 
-v0 scope: status is `placeholder` - this bundle, the reserved
-`zuno-agent-comage` namespace and this portal tile are the only things
-that exist for Comage in v0. No Agent Runtime task graph, FE or BFF is
-deployed (ADR-0007, `platform/architecture/agent-platform-separation.md`).
+v0 scope: status is `placeholder` - this bundle and this portal tile are
+the only things that exist for Comage in v0. No dedicated namespace is
+reserved (ADR-0329, supersedes ADR-0023): a future active Comage
+deployment would run in the shared `zuno-ai-run` namespace. No Agent
+Runtime task graph, FE or BFF is deployed (ADR-0007,
+`platform/architecture/agent-platform-separation.md`).
 `tasks/coming-soon.md` describes the intended v1 build from
 `agents/comage/README.md` and `MEMORY.md` section 9, kept here so
 onboarding Comage later is primarily a `status: active` flip plus real

@@ -38,8 +38,9 @@ zuno:
 
 # Advantage
 
-v0 scope: status is `placeholder` - this bundle, the reserved
-`zuno-agent-advantage` namespace and this portal tile are the only things
-that exist for Advantage in v0 (ADR-0007). `tasks/coming-soon.md`
-describes the intended v1 build from `agents/advantage/README.md` and
-`MEMORY.md` section 9.
+v0 scope: status is `placeholder` - this bundle and this portal tile are
+the only things that exist for Advantage in v0 (ADR-0007). No dedicated
+namespace is reserved (ADR-0329, supersedes ADR-0023): a future active
+Advantage deployment would run in the shared `zuno-ai-run` namespace.
+`tasks/coming-soon.md` describes the intended v1 build from
+`agents/advantage/README.md` and `MEMORY.md` section 9.

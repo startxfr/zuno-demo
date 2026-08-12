@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080",
+      "url": "http://tekos-bff.zuno-ai-run.svc.cluster.local:8080",
       "description": "In-cluster Service (Tekos deployment, v0's only agent)"
     }
   ],

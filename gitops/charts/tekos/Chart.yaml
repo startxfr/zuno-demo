@@ -3,7 +3,7 @@ name: tekos
 description: >-
   Tekos frontend (portal + chat UI) and BFF: plain Kubernetes
   Deployment/Service/Route (frontend) and Deployment/Service (BFF) in the
-  zuno-agent-tekos namespace.
+  shared zuno-ai-run namespace.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

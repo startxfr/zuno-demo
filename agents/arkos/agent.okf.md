@@ -39,10 +39,12 @@ zuno:
 
 # Arkos
 
-v0 scope: status is `placeholder` - this bundle, the reserved
-`zuno-agent-arkos` namespace and this portal tile are the only things that
-exist for Arkos in v0 (ADR-0007). `tasks/coming-soon.md` describes the
-intended v1 build from `agents/arkos/README.md` and `MEMORY.md` sections
-8-9. Access group is `board` per the Track E contract; note this reads
+v0 scope: status is `placeholder` - this bundle and this portal tile are
+the only things that exist for Arkos in v0 (ADR-0007). No dedicated
+namespace is reserved (ADR-0329, supersedes ADR-0023): a future active
+Arkos deployment would run in the shared `zuno-ai-run` namespace.
+`tasks/coming-soon.md` describes the intended v1 build from
+`agents/arkos/README.md` and `MEMORY.md` sections 8-9. Access group is
+`board` per the Track E contract; note this reads
 unusually for an architects' audience - flagged as an open question in the
 final report.

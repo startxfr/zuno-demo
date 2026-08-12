@@ -37,8 +37,9 @@ zuno:
 
 # Finage
 
-v0 scope: status is `placeholder` - this bundle, the reserved
-`zuno-agent-finage` namespace and this portal tile are the only things
-that exist for Finage in v0 (ADR-0007). `tasks/coming-soon.md` describes
-the intended v1 build from `agents/finage/README.md` and `MEMORY.md`
-section 9.
+v0 scope: status is `placeholder` - this bundle and this portal tile are
+the only things that exist for Finage in v0 (ADR-0007). No dedicated
+namespace is reserved (ADR-0329, supersedes ADR-0023): a future active
+Finage deployment would run in the shared `zuno-ai-run` namespace.
+`tasks/coming-soon.md` describes the intended v1 build from
+`agents/finage/README.md` and `MEMORY.md` section 9.

@@ -1,10 +1,13 @@
 # namespaces
 
 Applies the namespace-scaffolding GitOps Applications (`gitops/apps/namespaces`
-→ `gitops/charts/namespaces`, ADR-0023): the 5 agent namespaces + the
-`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-run`/`zuno-ai-build`
+→ `gitops/charts/namespaces`, ADR-0329): the
+`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-platform`/`zuno-ai-run`/`zuno-ai-build`
 platform namespaces (`-d0`), each with a `ResourceQuota` and a default-deny
-`NetworkPolicy` baseline (`-d1`). Moved out of `ansible/roles/agents` so
+`NetworkPolicy` baseline (`-d1`). Agent workloads no longer get their own
+namespace - every active agent's FE/BFF deploys into the shared
+`zuno-ai-run` namespace instead (ADR-0329, supersedes ADR-0023). Moved out
+of `ansible/roles/agents` so
 namespace creation is its own explicit, checkable step rather than only
 ever happening as a side effect of deploying the Tekos workloads.
 

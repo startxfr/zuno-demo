@@ -28,7 +28,7 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0020](0020-support-both-local-and-external-llm-providers.md) | v0 | Implemented | Support both local and external LLM providers |
 | [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md) | v0 | Implemented | Route models according to C1 C2 C3 classification |
 | [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md) | v0 | Implemented | Use GitOps-managed declarative agent tasks and policies |
-| [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Implemented | Use a namespace-per-agent isolation model |
+| [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Superseded by ADR-0329 | Use a namespace-per-agent isolation model |
 | [ADR-0024](0024-use-vault-for-application-secrets.md) | v0 | Implemented | Use Vault for application secrets |
 | [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md) | v0 | Implemented | Keep sensitive and real commercial data outside the public repository |
 | [ADR-0026](0026-provide-an-aiagent-kubernetes-crd-and-operator.md) | v1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
@@ -110,6 +110,8 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0325](0325-complete-the-openshift-ai-maas-governance-plane-integration.md) | v1 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v1 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v1 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
+| [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | To be implemented | Separate the OpenShift AI control plane from AI build and run workload namespaces |
+| [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
 
 ## Standard clauses
 

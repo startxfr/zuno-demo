@@ -1,11 +1,21 @@
 # ADR-0023: Use a namespace-per-agent isolation model
 
-- **Status:** Implemented
+- **Status:** Superseded by ADR-0329
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
+- **Superseded:** 2026-08-12 by [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md)
 
-## Decision
+## Historical context
+
+This ADR's dedicated `zuno-agent-<name>` namespace per agent was retired:
+every active agent's FE/BFF now deploys into the single shared
+`zuno-ai-run` namespace instead, since real isolation between agents was
+already carried by precise, per-workload NetworkPolicies (ADR-0037) rather
+than the namespace boundary itself - see ADR-0329 for the full rationale
+and implementation record.
+
+## Historical decision
 
 Separate each agent instance with dedicated namespaces, service accounts, quotas and NetworkPolicies.
 

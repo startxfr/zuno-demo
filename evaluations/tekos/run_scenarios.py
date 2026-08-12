@@ -23,7 +23,7 @@ import yaml
 
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://keycloak.apps.mycluster.example.com")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tekos.apps.mycluster.example.com")
-BFF_URL = os.getenv("BFF_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080")
+BFF_URL = os.getenv("BFF_URL", "http://tekos-bff.zuno-ai-run.svc.cluster.local:8080")
 RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080")
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")
 RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster.local:8080")
@@ -329,25 +329,30 @@ def bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code}")
 
 
-def namespace_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
+def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     # Requires `oc`/`kubectl` on PATH and a valid kubeconfig - the one
     # scenario that inspects cluster state directly rather than an HTTP API.
+    # ADR-0329 (supersedes ADR-0023): placeholder agents no longer get their
+    # own namespace, so this checks for zero pods carrying each placeholder
+    # agent's zuno.io/agent label inside the single shared namespace
+    # instead of per-agent namespace emptiness.
     import subprocess
 
+    ns = s["namespace"]
     all_empty = True
     details = []
-    for ns in s["namespaces"]:
+    for agent in s["agents"]:
         try:
             out = subprocess.run(
-                ["oc", "get", "pods", "-n", ns, "-o", "name"],
+                ["oc", "get", "pods", "-n", ns, "-l", f"zuno.io/agent={agent}", "-o", "name"],
                 capture_output=True, text=True, timeout=15, check=True,
             )
             pod_count = len([l for l in out.stdout.splitlines() if l.strip()])
         except Exception as exc:
-            details.append(f"{ns}: error ({exc})")
+            details.append(f"{agent}: error ({exc})")
             all_empty = False
             continue
-        details.append(f"{ns}: {pod_count} pods")
+        details.append(f"{agent}: {pod_count} pods")
         if pod_count > 0:
             all_empty = False
     return ScenarioResult(s["id"], s["title"], all_empty, "; ".join(details))
@@ -382,7 +387,7 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "model_router_prefers_local": model_router_prefers_local,
     "bff_rejects_missing_jwt": bff_rejects_missing_jwt,
     "bff_rejects_wrong_audience": bff_rejects_wrong_audience,
-    "namespace_isolation_placeholder_empty": namespace_isolation_placeholder_empty,
+    "agent_isolation_placeholder_empty": agent_isolation_placeholder_empty,
     "health_endpoints_all_ok": health_endpoints_all_ok,
 }
 

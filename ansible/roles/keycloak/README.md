@@ -251,23 +251,24 @@ OLM-subscription/`startx`-alias/`-d0`+`-d1` pattern (as used by
 `gitops/charts/cert-manager`). A larger, separately-scoped follow-up, not
 attempted speculatively here.
 
-## Namespace-per-agent alignment (ADR-0023)
+## Agent frontend namespace alignment (ADR-0329, supersedes ADR-0023)
 
-This role's realm defines one OIDC client per agent frontend. The
-namespace each client's frontend actually deploys into (owned by another
-track) must match the client's `redirectUris`/`webOrigins` host and the
-`agent.namespace` attribute already set on each client in
-`realm-zuno.json`:
+This role's realm defines one OIDC client per agent frontend. Every
+agent's frontend deploys into the single shared `zuno-ai-run` namespace
+(`agent.namespace` attribute already set on each client in
+`realm-zuno.json`), not a dedicated per-agent namespace. The client's
+`redirectUris`/`webOrigins` host must still match the Route hostname the
+frontend actually deploys with (owned by another track):
 
-| Keycloak client | Agent namespace | Agent |
-|---|---|---|
-| `comage-frontend` | `zuno-agent-comage` | Comage (sales) |
-| `tekos-frontend` | `zuno-agent-tekos` | Tekos (technical consultants) - the only agent live in v0 |
-| `advantage-frontend` | `zuno-agent-advantage` | Advantage (sales admin) |
-| `finage-frontend` | `zuno-agent-finage` | Finage (finance) |
-| `arkos-frontend` | `zuno-agent-arkos` | Arkos (architects) |
+| Keycloak client | Agent |
+|---|---|
+| `comage-frontend` | Comage (sales) |
+| `tekos-frontend` | Tekos (technical consultants) - the only agent live in v0 |
+| `advantage-frontend` | Advantage (sales admin) |
+| `finage-frontend` | Finage (finance) |
+| `arkos-frontend` | Arkos (architects) |
 
-If a namespace or Route hostname changes on the other track's side, update
+If a Route hostname changes on the other track's side, update
 `clusterBaseDomain`/the per-client `redirectUris` in
 `gitops/charts/keycloak/files/realm-zuno.json` (and re-run
 `make d0 install keycloak`) to keep the two in sync.

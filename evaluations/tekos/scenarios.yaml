@@ -124,9 +124,10 @@ scenarios:
     expect_status: 403
 
   - id: 19
-    title: Placeholder agent namespaces exist but host no workloads
-    type: namespace_isolation_placeholder_empty
-    namespaces: [zuno-agent-comage, zuno-agent-advantage, zuno-agent-finage, zuno-agent-arkos]
+    title: Placeholder agents have no live workloads in the shared zuno-ai-run namespace
+    type: agent_isolation_placeholder_empty
+    namespace: zuno-ai-run
+    agents: [comage, advantage, finage, arkos]
 
   - id: 20
     title: Every service's health endpoint returns 200

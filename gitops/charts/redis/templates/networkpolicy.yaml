@@ -5,11 +5,10 @@
 # (gitops/charts/namespaces), and not from anywhere in the cluster (which
 # is what bitnami/redis's own default NetworkPolicy would otherwise
 # allow - disabled in values.yaml in favor of this). Same least-privilege
-# bar gitops/charts/mcp-sales-db already sets. Matches any agent
-# namespace generically via the zuno.io/agent label key every one of them
-# carries (gitops/charts/namespaces/templates/namespace.yaml), rather
-# than hardcoding the one active in v0 (zuno-agent-tekos) - future agents
-# going active need no change here.
+# bar gitops/charts/mcp-sales-db already sets. Every active agent's
+# frontend deploys into the single shared zuno-ai-run namespace (ADR-0329,
+# supersedes ADR-0023's namespace-per-agent model), so this matches that
+# namespace by name rather than a per-agent namespace label.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -28,9 +27,8 @@ spec:
   ingress:
     - from:
         - namespaceSelector:
-            matchExpressions:
-              - key: zuno.io/agent
-                operator: Exists
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-ai-run
           podSelector:
             matchLabels:
               # Matches gitops/charts/tekos/templates/deployment.yaml's

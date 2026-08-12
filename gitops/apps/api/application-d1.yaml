@@ -23,7 +23,7 @@ spec:
           clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
-    namespace: zuno-agent-tekos
+    namespace: zuno-ai-run
   syncPolicy:
     automated:
       prune: true

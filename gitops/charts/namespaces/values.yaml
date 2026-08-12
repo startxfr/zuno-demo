@@ -7,53 +7,13 @@ namespace:
 policy:
   enabled: false
 
-# `status: active` namespaces host real workloads (only zuno-agent-tekos in
-# v0); `status: placeholder` namespaces are created and labeled but stay empty.
-namespaces:
-  - name: zuno-agent-comage
-    agent: comage
-    status: placeholder
-    displayName: Zuno Agent Comage
-    description: >-
-      Sales assistant - placeholder namespace reserved for the
-      follow-up/PO-tracking agent (ADR-0023).
-  - name: zuno-agent-tekos
-    agent: tekos
-    status: active
-    displayName: Zuno Agent Tekos
-    description: Technical consultant assistant - the only active v0 agent instance.
-  - name: zuno-agent-advantage
-    agent: advantage
-    status: placeholder
-    displayName: Zuno Agent Advantage
-    description: >-
-      Sales administration assistant - placeholder namespace reserved for
-      new-business/PO reporting.
-  - name: zuno-agent-finage
-    agent: finage
-    status: placeholder
-    displayName: Zuno Agent Finage
-    description: >-
-      Finance assistant - placeholder namespace reserved for
-      invoicing-readiness reporting.
-  - name: zuno-agent-arkos
-    agent: arkos
-    status: placeholder
-    displayName: Zuno Agent Arkos
-    description: >-
-      Architecture assistant - placeholder namespace reserved for
-      DAT/Odyssey-workshop support.
+# ADR-0329 (supersedes ADR-0023): agent workloads no longer get a
+# dedicated zuno-agent-<name> namespace. Every active agent's FE/BFF
+# deploys into the shared zuno-ai-run namespace instead (see
+# platformNamespaces below); this chart no longer creates or quotas any
+# per-agent namespace.
 
-# Default ResourceQuota applied to every agent namespace regardless of status.
-quota:
-  requestsCpu: "4"
-  requestsMemory: 8Gi
-  limitsCpu: "8"
-  limitsMemory: 16Gi
-  pods: "20"
-
-# Default-deny-other-namespaces baseline platform namespaces, same as the
-# agent namespaces above. zuno-ai-run is deliberately excluded: it hosts
+# Default-deny-other-namespaces baseline platform namespaces. zuno-ai-run is deliberately excluded: it hosts
 # mcp-sales-db, which must not trust arbitrary same-namespace pods, so a
 # namespace-wide baseline would silently defeat its per-workload
 # NetworkPolicy (see gitops/charts/mcp-sales-db). zuno-ai-build is also
@@ -68,7 +28,6 @@ platformNamespaces:
     description: Keycloak, the platform's central identity provider.
     # Keycloak: JWKS/token-endpoint callers.
     allowedFromNamespaces:
-      - zuno-agent-tekos
       - zuno-ai-run
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 3).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
@@ -126,6 +85,19 @@ platformNamespaces:
       - zuno-ai-build
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
+      zuno.io/managed: "true"
+  - name: zuno-ai-platform
+    displayName: Zuno AI Platform
+    description: >-
+      Shared OpenShift AI control plane and cross-lifecycle services (Model
+      Registry, AI Gateway, OGX, KServe controllers and other components
+      common to both AI build and AI run workloads - ADR-0328).
+    # Same model as zuno-ai-run below, plus the RHOAI applications-
+    # namespace label ADR-0328 requires.
+    allowedFromNamespaces: []
+    extraLabels:
+      opendatahub.io/application-namespace: "true"
+      istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-ai-build
     displayName: Zuno Infra AI Runtime

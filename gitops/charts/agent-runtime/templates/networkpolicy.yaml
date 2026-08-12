@@ -1,5 +1,7 @@
 # Precise ingress allow-list, not a namespace-wide baseline: only Tekos's
-# BFF and the acceptance-gate test Job may call this service.
+# BFF and the acceptance-gate test Job may call this service. Tekos's BFF
+# runs in this same zuno-ai-run namespace (gitops/charts/tekos), so its
+# `from` peer below is a podSelector with no namespaceSelector.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -17,10 +19,7 @@ spec:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-agent-tekos
-          podSelector:
+        - podSelector:
             matchLabels:
               app.kubernetes.io/component: bff
               zuno.io/agent: tekos

@@ -59,9 +59,9 @@ type Config struct {
 	SelfBaseURL string
 
 	// BFFBaseURL is the in-cluster ClusterIP Service URL for this agent's
-	// BFF, e.g. http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080. The BFF
-	// has no OpenShift Route (ADR-0023 isolation + no need for a second
-	// public ingress) - the frontend proxies chat calls to it server-side.
+	// BFF, e.g. http://tekos-bff.zuno-ai-run.svc.cluster.local:8080. The BFF
+	// has no OpenShift Route (no need for a second public ingress) - the
+	// frontend proxies chat calls to it server-side.
 	BFFBaseURL string
 
 	// SessionHMACSecret signs the frontend's opaque session-ID cookie.
@@ -110,7 +110,7 @@ func Load() (*Config, error) {
 		OIDCClientSecret:  os.Getenv("OIDC_CLIENT_SECRET"),
 		OIDCRedirectURL:   getenv("OIDC_REDIRECT_URL", ""),
 		SelfBaseURL:       getenv("SELF_BASE_URL", ""),
-		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-agent-tekos.svc.cluster.local:8080"),
+		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-ai-run.svc.cluster.local:8080"),
 		WebDistDir:        getenv("WEB_DIST_DIR", "web/dist"),
 		RedisAddr:         getenv("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
 		RedisPassword:     os.Getenv("REDIS_PASSWORD"),

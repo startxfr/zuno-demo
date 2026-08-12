@@ -2,28 +2,6 @@
 # Must exist before this chart's ResourceQuota/NetworkPolicy templates (the
 # policy.enabled half, applied separately - see application-d1.yaml), which
 # target these namespaces.
-{{- range .Values.namespaces }}
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .name }}
-  labels:
-    zuno.io/agent: {{ .agent }}
-    zuno.io/status: {{ .status }}
-    zuno.io/managed-by: argocd
-    # ADR-0320: every agent namespace falls under the zuno-admin RBAC
-    # profile (gitops/charts/openshift-rbac-groups) and the
-    # console_favorites_provisioning CronJob's namespace resolution -
-    # both derive their namespace list from this one label, not a
-    # separate hardcoded list.
-    zuno.io/managed: "true"
-    openshift.io/cluster-monitoring: "true"
-  annotations:
-    openshift.io/description: {{ .description | quote }}
-    openshift.io/display-name: {{ .displayName | quote }}
-    openshift.io/requester: zuno
----
-{{- end }}
 {{- range .Values.platformNamespaces }}
 apiVersion: v1
 kind: Namespace
