@@ -1,11 +1,20 @@
-# operator.enabled renders the Subscription, via the vendored startx
-# `operator` chart (into openshift-operators, AllNamespaces - no
-# OperatorGroup here, relies on OLM's own pre-existing global-operators
-# OperatorGroup there) - confirmed against a live cluster: the
-# kueue-operator package's CSV only supports the AllNamespaces install
-# mode (OwnNamespace/SingleNamespace/MultiNamespace all `"supported":
-# false`), same shape as gitops/charts/jobset/lws, not the dedicated-
-# namespace shape gitops/charts/custom-metrics-autoscaler uses.
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart. kueue-operator's CSV only
+# supports the AllNamespaces install mode (OwnNamespace/SingleNamespace/
+# MultiNamespace all `"supported": false`, confirmed against a live
+# cluster) - unlike gitops/charts/custom-metrics-autoscaler's OwnNamespace
+# shape, this dedicated namespace hosts its own AllNamespaces-mode
+# OperatorGroup (operator.operatorGroup.target: "all-ns" below), not a
+# namespace-scoped one. Deliberately NOT sharing openshift-operators (the
+# original shape, same as gitops/charts/jobset/lws): that put Kueue's
+# webhook Service selector (`control-plane: controller-manager`, the
+# generic kubebuilder convention label) in the same namespace as other
+# operators' pods carrying that same label (kuadrant, external-secrets,
+# limitador), so the webhook Service's Endpoints round-robinned across
+# those unrelated pods too and admission calls intermittently got
+# "connection refused", leaving zuno-kueue-d1 stuck OutOfSync. A dedicated
+# namespace makes that collision structurally impossible.
 #
 # Confirmed against a live cluster (redhat-operators catalog): the
 # package is named "kueue-operator", channels "stable-v1.3"/"stable-v1.4"
@@ -15,6 +24,23 @@
 # discovered by ansible and set via gitops_app_extra_helm_values on the -d0
 # apply (ADR-0048). templates/checks.yaml fails the render if either is
 # still empty once operator.enabled is true.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: kueue
+    app: kueue
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-kueue-operator
+    display_name: Zuno Infra Kueue
+    description: "Red Hat build of Kueue operator, configured by Zuno."
+    requester: zuno
+
 operator:
   enabled: false
   context:
@@ -26,7 +52,7 @@ operator:
   subscription:
     enabled: true
     name: kueue-operator
-    namespace: openshift-operators
+    namespace: openshift-kueue-operator
     operator:
       # Must be set explicitly, same name as subscription.name: the
       # vendored `operator` chart's own values.yaml gives this a
@@ -38,6 +64,16 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: kueue-operator-group
+    namespace: openshift-kueue-operator
+    # "all-ns" (-> spec: {}, empty targetNamespaces = AllNamespaces mode),
+    # not a target namespace list: kueue-operator's CSV doesn't support
+    # OwnNamespace (see comment above), so this dedicated namespace still
+    # needs an AllNamespaces-scoped OperatorGroup, unlike
+    # custom-metrics-autoscaler's OwnNamespace one.
+    target: "all-ns"
 
 # Singleton `Kueue` CR (kueue.openshift.io/v1, cluster-scoped, per the
 # operator's own alm-examples - "config resource for the Kueue operand",

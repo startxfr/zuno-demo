@@ -1,9 +1,17 @@
 ---
-# Red Hat build of Kueue Operator install (ADR-0321). No dedicated
-# namespace - the same now-confirmed-safe AllNamespaces shape
-# gitops/charts/jobset/lws use (kueue-operator's CSV only supports the
-# AllNamespaces install mode, confirmed against a live cluster's
-# PackageManifest).
+# Red Hat build of Kueue Operator install (ADR-0321). Dedicated namespace
+# (openshift-kueue-operator), unlike gitops/charts/jobset/lws which share
+# openshift-operators: kueue-operator's CSV only supports the
+# AllNamespaces install mode (confirmed against a live cluster's
+# PackageManifest), but sharing openshift-operators put its webhook
+# Service selector (`control-plane: controller-manager`) in collision with
+# other operators' pods carrying that same generic label there
+# (kuadrant, external-secrets, limitador) - Kubernetes round-robinned
+# webhook calls across all of them, causing intermittent "connection
+# refused" admission failures and leaving zuno-kueue-d1 stuck OutOfSync.
+# A dedicated namespace with its own AllNamespaces-mode OperatorGroup
+# (operator.operatorGroup.target: "all-ns") removes that collision
+# structurally.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -22,15 +30,24 @@ spec:
     helm:
       releaseName: zuno-kueue-d0
       values: |
+        project:
+          enabled: true
         operator:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-operators
+    namespace: openshift-kueue-operator
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      # openshift-operators always exists.
-      - CreateNamespace=false
+      # openshift-kueue-operator isn't a pre-existing namespace.
+      - CreateNamespace=true

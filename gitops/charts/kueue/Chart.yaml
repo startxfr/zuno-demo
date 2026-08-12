@@ -19,3 +19,6 @@ dependencies:
   - name: operator
     version: "21.3.277"
     repository: "alias:startx"
+  - name: project
+    version: "21.3.277"
+    repository: "alias:startx"

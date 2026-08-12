@@ -27,7 +27,7 @@ spec:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-operators
+    namespace: openshift-kueue-operator
   syncPolicy:
     automated:
       prune: true
