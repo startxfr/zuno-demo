@@ -5,11 +5,17 @@ description: >-
   Ansible run time - ADR-0048). ADR-0318 prerequisite for OpenShift AI's
   Kubeflow Trainer v2 (trainer/trainingoperator DataScienceCluster
   components), which schedules distributed training runs on the JobSet
-  API; no JobSet workload is created here.
+  API; no JobSet workload is created here. Dedicated namespace
+  (openshift-jobset-operator) with its own AllNamespaces-mode
+  OperatorGroup - see values.yaml for why (same collision this repo
+  already fixed for gitops/charts/kueue).
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
 dependencies:
   - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
+  - name: project
     version: "21.3.277"
     repository: "alias:startx"

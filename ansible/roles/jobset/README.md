@@ -4,13 +4,14 @@ Applies the `gitops/apps/jobset` ArgoCD Application pair (ADR-0318), whose
 chart (`gitops/charts/jobset`) installs the JobSet operator (OLM
 `Subscription`, channel/catalog discovered from the cluster's own
 `PackageManifest` at apply time - ADR-0048, same pattern as
-`ansible/roles/external_secrets`) into `openshift-operators`. A Day 0
-component (ADR-0056) with all three verbs: `check` verifies the `-d0`
-Application is Synced+Healthy; `install` discovers the package/channel and
-applies `-d0` (`Subscription` only, sync-wave `"10"`) then the no-op `-d1`
-(`gitops/charts/noop` - kept present/synced the same way
-`ansible/roles/models` applies its own no-op side); `uninstall` tears both
-down in reverse order plus the OLM-owned CRDs/CSV/Subscription
+`ansible/roles/external_secrets`) into its own dedicated
+`openshift-jobset-operator` namespace. A Day 0 component (ADR-0056) with
+all three verbs: `check` verifies the `-d0` Application is
+Synced+Healthy; `install` discovers the package/channel and applies `-d0`
+(dedicated Namespace + `OperatorGroup` + `Subscription`, sync-wave `"10"`)
+then the no-op `-d1` (`gitops/charts/noop` - kept present/synced the same
+way `ansible/roles/models` applies its own no-op side); `uninstall` tears
+both down in reverse order plus the OLM-owned CRDs/CSV/Subscription
 (`ansible/tasks/remove_operator.yml`).
 
 ## Why this role exists, and why there's no operand CR
@@ -38,11 +39,22 @@ different cluster, check `oc get packagemanifest -n openshift-marketplace
 | grep -i job` for that cluster's actual name and update this default (or
 pass `-e jobset_package_name=<name>`).
 
-Subscribes into `openshift-operators` (`AllNamespaces`) rather than a
-dedicated namespace - the now-confirmed-safe shape
-`ansible/roles/external_secrets`/`ansible/roles/lws` already use, not the
-dedicated-namespace shape that failed for `connectivity_link` on a real
-cluster (`OwnNamespace InstallModeType is not supported`, ADR-0317).
+Originally subscribed into the shared `openshift-operators` namespace
+(`AllNamespaces`, no dedicated `OperatorGroup`) alongside `connectivity-link`/
+`external_secrets`/`limitador`/`lws`. Moved to a dedicated
+`openshift-jobset-operator` namespace with its own `AllNamespaces`-mode
+`OperatorGroup` (`operator.operatorGroup.target: "all-ns"` in
+`gitops/charts/jobset/values.yaml`) after `gitops/charts/kueue` hit a
+real-cluster collision from that same shared-namespace shape: multiple
+kubebuilder-scaffolded operators there carry the same generic
+`control-plane: controller-manager` label, so a webhook Service's
+Endpoints round-robinned admission calls across unrelated pods and
+intermittently returned "connection refused" - see that chart's
+`values.yaml` for the full incident. Isolating JobSet the same way removes
+that collision risk structurally, while keeping the same `AllNamespaces`
+install mode it was already subscribed under - not the `OwnNamespace`
+shape that separately failed for `connectivity_link` on a real cluster
+(`OwnNamespace InstallModeType is not supported`, ADR-0317).
 
 ## Day 0 ordering
 

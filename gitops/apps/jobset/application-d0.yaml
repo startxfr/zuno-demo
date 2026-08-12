@@ -1,8 +1,17 @@
 ---
 # JobSet operator install (ADR-0318). No singleton operand CR - see
-# application-d1.yaml. Subscribes into openshift-operators (AllNamespaces) -
-# the now-confirmed-safe gitops/charts/external-secrets/lws shape, not the
-# dedicated-namespace shape that failed for connectivity-link (ADR-0317).
+# application-d1.yaml. Dedicated namespace (openshift-jobset-operator),
+# not the originally shared openshift-operators shape: that put JobSet's
+# webhook Service selector (`control-plane: controller-manager`, the
+# generic kubebuilder convention label) in collision with other
+# operators' pods carrying that same generic label there (kuadrant,
+# external-secrets, limitador, lws) - the same collision already found
+# and fixed for gitops/charts/kueue (see that chart's values.yaml). A
+# dedicated namespace with its own AllNamespaces-mode OperatorGroup
+# (operator.operatorGroup.target: "all-ns") removes that collision
+# structurally, while keeping the same AllNamespaces install mode job-set
+# was already subscribed under (via OLM's own global-operators
+# OperatorGroup in openshift-operators).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -21,15 +30,24 @@ spec:
     helm:
       releaseName: zuno-jobset-d0
       values: |
+        project:
+          enabled: true
         operator:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-operators
+    namespace: openshift-jobset-operator
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      # openshift-operators always exists.
-      - CreateNamespace=false
+      # openshift-jobset-operator isn't a pre-existing namespace.
+      - CreateNamespace=true

@@ -4,11 +4,12 @@ Applies the `gitops/apps/lws` ArgoCD Application pair (ADR-0317), whose
 chart (`gitops/charts/lws`) installs the LeaderWorkerSet operator (OLM
 `Subscription`, channel/catalog discovered from the cluster's own
 `PackageManifest` at apply time - ADR-0048, same pattern as
-`ansible/roles/external_secrets`) into `openshift-operators`. A Day 0
-component (ADR-0056) with all three verbs: `check` verifies the `-d0`
-Application is Synced+Healthy; `install` discovers the package/channel and
-applies `-d0` (`Subscription` only, sync-wave `"10"`) then the no-op `-d1`
-(`gitops/charts/noop` - kept present/synced the same way
+`ansible/roles/external_secrets`) into its own dedicated
+`openshift-lws-operator` namespace. A Day 0 component (ADR-0056) with all
+three verbs: `check` verifies the `-d0` Application is Synced+Healthy;
+`install` discovers the package/channel and applies `-d0` (dedicated
+Namespace + `OperatorGroup` + `Subscription`, sync-wave `"10"`) then the
+no-op `-d1` (`gitops/charts/noop` - kept present/synced the same way
 `ansible/roles/models` applies its own no-op side); `uninstall` tears both
 down in reverse order plus the OLM-owned CRDs/CSV/Subscription
 (`ansible/tasks/remove_operator.yml`).
@@ -34,9 +35,24 @@ here - none exists in this repository yet).
 operator's own install-mode support was never tested against a real
 cluster before that fix landed, so it was changed preemptively to the
 same `openshift-operators` (`AllNamespaces`) shape `external_secrets`
-already uses, rather than risk shipping the same bug twice. If this
-operator's CSV turns out to require a dedicated namespace after all,
-revert to the `connectivity-link`-style shape instead.
+already uses, rather than risk shipping the same bug twice.
+
+That shared-namespace shape later caused a *different* real-cluster
+failure: `gitops/charts/kueue` (also originally in `openshift-operators`)
+hit a webhook Service selector collision there - multiple
+kubebuilder-scaffolded operators sharing the namespace (`connectivity-link`/
+`external_secrets`/`limitador`/`jobset`) all carry the same generic
+`control-plane: controller-manager` label, so a webhook Service's
+Endpoints round-robinned admission calls across unrelated pods and
+intermittently returned "connection refused" - see
+`gitops/charts/kueue/values.yaml` for the full incident. LWS is now moved
+to a dedicated `openshift-lws-operator` namespace with its own
+`AllNamespaces`-mode `OperatorGroup`
+(`operator.operatorGroup.target: "all-ns"` in
+`gitops/charts/lws/values.yaml`), the same fix applied to Kueue - this
+removes that collision risk structurally while keeping the same
+`AllNamespaces` install mode LWS was already subscribed under, not the
+`OwnNamespace` shape that failed for `connectivity_link`.
 
 Neither this operator's exact OLM package name (checked in as
 `leader-worker-set`, `gitops/charts/lws/values.yaml`'s `subscriptionName`)

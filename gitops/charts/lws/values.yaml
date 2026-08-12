@@ -1,11 +1,10 @@
-# operator.enabled renders the Subscription, via the vendored startx
-# `operator` chart (into openshift-operators, AllNamespaces - no
-# OperatorGroup here, relies on OLM's own pre-existing global-operators
-# OperatorGroup there). Defaults false so templates render nothing. There
-# is no singleton operand CR for LeaderWorkerSet (user workloads create
-# their own LeaderWorkerSet objects later, out of scope here) -
-# zuno-lws-d1 (gitops/apps/lws/application-d1.yaml) points at
-# gitops/charts/noop instead.
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart. Both default false so templates
+# render nothing. There is no singleton operand CR for LeaderWorkerSet
+# (user workloads create their own LeaderWorkerSet objects later, out of
+# scope here) - zuno-lws-d1 (gitops/apps/lws/application-d1.yaml) points
+# at gitops/charts/noop instead.
 #
 # ASSUMPTION, not yet verified against a live cluster (ADR-0317): the real
 # OLM package name for this operator on a given catalog. If wrong, run
@@ -15,10 +14,41 @@
 # clear diagnostic listing published channels if it's wrong, rather than
 # silently subscribing to nothing.
 #
+# Dedicated namespace (openshift-lws-operator) with its own
+# AllNamespaces-mode OperatorGroup, not the original shared
+# openshift-operators shape: sharing that namespace with kuadrant/
+# external-secrets/limitador/jobset is exactly what caused
+# gitops/charts/kueue's webhook Service selector
+# (`control-plane: controller-manager`, the generic kubebuilder
+# convention label) to collide with those other operators' pods there,
+# so its Endpoints round-robinned admission calls across unrelated pods
+# and intermittently returned "connection refused" - see
+# gitops/charts/kueue/values.yaml's history. LeaderWorkerSet's own
+# webhook/resource naming was never checked against that same collision
+# risk before this fix landed; isolating it removes the risk
+# structurally instead of relying on it not mattering in practice.
+#
 # subscription.operator.channel/source.name are left empty by default,
 # discovered by ansible and set via gitops_app_extra_helm_values on the -d0
 # apply (ADR-0048). templates/checks.yaml fails the render if either is
 # still empty once operator.enabled is true.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: lws
+    app: lws
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-lws-operator
+    display_name: Zuno Infra LeaderWorkerSet
+    description: "LeaderWorkerSet operator, configured by Zuno."
+    requester: zuno
+
 operator:
   enabled: false
   context:
@@ -30,7 +60,7 @@ operator:
   subscription:
     enabled: true
     name: leader-worker-set
-    namespace: openshift-operators
+    namespace: openshift-lws-operator
     operator:
       # Must be set explicitly, same name as subscription.name: the
       # vendored `operator` chart's own values.yaml gives this a
@@ -42,3 +72,14 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: lws-operator-group
+    namespace: openshift-lws-operator
+    # "all-ns" (-> spec: {}, empty targetNamespaces = AllNamespaces mode):
+    # leader-worker-set was previously subscribed via OLM's own
+    # pre-existing global-operators OperatorGroup in openshift-operators
+    # (also AllNamespaces), so this preserves the same install mode while
+    # moving out of the shared namespace - see gitops/charts/kueue/
+    # values.yaml's operatorGroup.target for the identical shape.
+    target: "all-ns"

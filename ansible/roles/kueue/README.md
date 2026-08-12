@@ -4,8 +4,9 @@ Applies the `gitops/apps/kueue` ArgoCD Application pair (ADR-0321), whose
 chart (`gitops/charts/kueue`) installs the Red Hat build of Kueue Operator
 (OLM `Subscription`, channel/catalog discovered from the cluster's own
 `PackageManifest` at apply time - ADR-0048, same pattern as
-`ansible/roles/jobset`) into `openshift-operators`. A Day 0 component
-(ADR-0056) with all three verbs: `check` verifies both Applications are
+`ansible/roles/jobset`) into its own dedicated `openshift-kueue-operator`
+namespace. A Day 0 component (ADR-0056) with all three verbs: `check`
+verifies both Applications are
 Synced+Healthy plus the singleton `Kueue` operand CR and default
 `ClusterQueue` exist; `install` discovers the package/channel and applies
 `-d0` (`Subscription` only) then `-d1` (the `Kueue` operand CR and the
@@ -48,10 +49,19 @@ ADR-0317/ADR-0318).
 `subscription.name`/`subscription.operator.name`), channels
 `stable-v1.3`/`stable-v1.4` (default `stable-v1.4`), confirmed against a
 live cluster's `redhat-operators` catalog - including that its CSV only
-supports the `AllNamespaces` install mode, so this subscribes into
-`openshift-operators` the same way `ansible/roles/jobset`/`ansible/roles/lws`
-do, not the dedicated-namespace shape
-`ansible/roles/custom_metrics_autoscaler` uses.
+supports the `AllNamespaces` install mode. This originally subscribed
+into the shared `openshift-operators` namespace the same way
+`ansible/roles/jobset`/`ansible/roles/lws` did, but that shape caused a
+real-cluster webhook Service selector collision (multiple
+kubebuilder-scaffolded operators sharing the namespace all carry the
+generic `control-plane: controller-manager` label - see
+`gitops/charts/kueue/values.yaml` for the incident), so Kueue now uses a
+dedicated `openshift-kueue-operator` namespace with its own
+`AllNamespaces`-mode `OperatorGroup` instead -
+`ansible/roles/jobset`/`ansible/roles/lws` were moved the same way
+pre-emptively. Still not the `OwnNamespace`-scoped shape
+`ansible/roles/custom_metrics_autoscaler` uses - Kueue's CSV doesn't
+support that mode.
 
 **Not yet verified against a live install** (only the `PackageManifest`
 was checked, not an actual running operator): that the `Kueue` operand CR

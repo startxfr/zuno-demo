@@ -58,6 +58,15 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-lws-d0"
     gitops_app_extra_helm_values:
+      # project.enabled: true must be repeated here even though
+      # application-d0.yaml already sets it: apply_gitops_app.yml's
+      # gitops_app_extra_helm_values REPLACES spec.source.helm.values
+      # wholesale rather than merging into it, so omitting this would
+      # silently drop the Namespace-creating project subchart from the
+      # actual applied Application - the exact bug already hit and fixed
+      # for ansible/roles/kueue/tasks/install.yml.
+      project:
+        enabled: true
       operator:
         enabled: true
         subscription:

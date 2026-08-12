@@ -138,18 +138,27 @@ depends directly on the generic `operator` chart (plus `project` when a
 dedicated Namespace is needed) since no matching `cluster-xxx` bundle is
 known to exist for any of those operators (ADR-0317) - see each chart's
 `Chart.yaml`/`values.yaml` for the specific reasoning. `connectivity-link`/
-`jobset`/`kueue`/`lws`/`external-secrets` subscribe into the shared
-`openshift-operators` namespace (`AllNamespaces`, no `project`/
-`OperatorGroup` dependency - relies on OLM's own global OperatorGroup
-there); `connectivity-link` still depends on `project` for its Kuadrant
-operand namespace (`kuadrant-system`) on the `-d1` side. `kueue`'s own
-`-d1` is likewise real content, not a no-op: its singleton `Kueue` operand
-CR plus the default `ResourceFlavor`/`ClusterQueue`/`LocalQueue`
-(ADR-0321) - `jobset`/`lws` are the only two in this group with no operand
-CR at all, so their `-d1` points at `gitops/charts/noop` instead.
-`custom-metrics-autoscaler`/`kiali`/`mesh-monitoring`/`observability`/
-`tempo` depend on both `project` and `operator` for a dedicated operator
-namespace + `OperatorGroup`. `vault` was evaluated against `cluster-vault`
+`external-secrets` subscribe into the shared `openshift-operators`
+namespace (`AllNamespaces`, no `project`/`OperatorGroup` dependency -
+relies on OLM's own global OperatorGroup there); `connectivity-link`
+still depends on `project` for its Kuadrant operand namespace
+(`kuadrant-system`) on the `-d1` side. `jobset`/`kueue`/`lws` originally
+shared that same `openshift-operators` namespace too, but all three now
+depend on both `project` and `operator` for their own dedicated
+`openshift-{jobset,kueue,lws}-operator` namespace + `AllNamespaces`-mode
+`OperatorGroup`, after `kueue` hit a real-cluster webhook Service
+selector collision from the shared-namespace shape (multiple
+kubebuilder-scaffolded operators there carry the same generic
+`control-plane: controller-manager` label - see
+`gitops/charts/kueue/values.yaml` for the incident); `jobset`/`lws` were
+moved the same way pre-emptively. `kueue`'s own `-d1` is real content,
+not a no-op: its singleton `Kueue` operand CR plus the default
+`ResourceFlavor`/`ClusterQueue`/`LocalQueue` (ADR-0321) - `jobset`/`lws`
+have no operand CR at all, so their `-d1` points at `gitops/charts/noop`
+instead. `custom-metrics-autoscaler`/`kiali`/`mesh-monitoring`/
+`observability`/`tempo` depend on both `project` and `operator` for a
+dedicated operator namespace + `OperatorGroup` too. `vault` was evaluated
+against `cluster-vault`
 and deliberately NOT migrated: its own `project` dependency isn't needed
 (`zuno-data` is already created by `gitops/charts/namespaces`), and
 adopting it would force an unrelated, unreviewed `hashicorp/vault` chart
@@ -215,10 +224,10 @@ Directories present:
 | `observability` | local chart, `gitops/charts/observability` (`-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-opentelemetry-operator` Namespace/OperatorGroup/Subscription; `-d1`: shared OTLP Collector, exporting to both `debug` and `tempo`'s `otlp/tempo`) |
 | `service-mesh` | local chart, `gitops/charts/service-mesh` (`-d0`: startx `cluster-istio` dependency, `operatorIstio.enabled`, installs the servicemeshoperator3/Sail Operator; `-d1`: Vault-backed mesh CA (`clusterIssuer`/`istioCsr`), `istiocni` and the `istio` control plane itself, in zuno-mesh) |
 | `connectivity-link` | local chart, `gitops/charts/connectivity-link` (ADR-0317 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces` - the operator's CSV doesn't support `OwnNamespace`, confirmed against a real cluster), no `OperatorGroup`; `-d1`: startx `project` dependency for the dedicated `kuadrant-system` Namespace + minimal empty `Kuadrant` operand CR) |
-| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`, same shape as `connectivity-link` after its fix), no `OperatorGroup`/dedicated `Namespace`; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
+| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-lws-operator` Namespace/OperatorGroup (`AllNamespaces`)/Subscription - moved out of the shared `openshift-operators` namespace after the webhook-selector collision `kueue` hit there; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
 | `custom-metrics-autoscaler` | local chart, `gitops/charts/custom-metrics-autoscaler` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-keda` Namespace/OperatorGroup/Subscription (`OwnNamespace`, per Red Hat's documented install procedure); `-d1`: minimal `KedaController` operand CR) |
-| `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`), no `OperatorGroup`; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
-| `kueue` | local chart, `gitops/charts/kueue` (ADR-0321 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`), no `OperatorGroup`; `-d1`: singleton `Kueue` operand CR plus default `ResourceFlavor`/`ClusterQueue`/`LocalQueue` - installed ahead of `openshift-ai`, whose `DataScienceCluster` sets `kueue.managementState: Unmanaged` to defer to this operator) |
+| `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-jobset-operator` Namespace/OperatorGroup (`AllNamespaces`)/Subscription - moved out of the shared `openshift-operators` namespace after the webhook-selector collision `kueue` hit there; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
+| `kueue` | local chart, `gitops/charts/kueue` (ADR-0321 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-kueue-operator` Namespace/OperatorGroup (`AllNamespaces` - the operator's CSV doesn't support any other install mode, confirmed against a real cluster); `-d1`: singleton `Kueue` operand CR plus default `ResourceFlavor`/`ClusterQueue`/`LocalQueue` - installed ahead of `openshift-ai`, whose `DataScienceCluster` sets `kueue.managementState: Unmanaged` to defer to this operator) |
 | `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-tempo-operator` Namespace/OperatorGroup/Subscription; `-d1`: demo-scale `TempoMonolithic` in zuno-monitoring, storing traces exported by `observability`'s Collector) |
 | `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-cluster-observability-operator` Namespace/OperatorGroup/Subscription; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |
 | `kiali` | local chart, `gitops/charts/kiali` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-kiali-operator` Namespace/OperatorGroup/Subscription; `-d1`: `Kiali` CR in zuno-mesh, wired to `mesh-monitoring`'s Prometheus and `tempo`'s Tempo - the operator owns its own auto-created Route, not tracked as a separate chart resource) |
