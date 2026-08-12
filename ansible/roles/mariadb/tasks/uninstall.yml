@@ -1,0 +1,37 @@
+---
+# Reverse of install.yml. The Subscription name is runtime-discovered, not
+# a fixed constant, so it's rediscovered here by listing.
+#
+# Order matters: delete -d1 (the MariaDB/PhysicalBackup operand) first so
+# ArgoCD isn't fighting a CR deletion its own Application still desires,
+# then run remove_operator.yml (needs the Subscription to still exist)
+# before -d0's own delete, to avoid racing ArgoCD's cascade prune of the
+# same Subscription.
+- name: "mariadb | delete the mariadb ArgoCD Application (d1: MariaDB/PhysicalBackup)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-mariadb-d1"
+
+- name: "mariadb | find the MariaDB Enterprise Operator Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: zuno-data
+  register: _mariadb_subscriptions
+
+- name: "mariadb | remove the discovered operator(s) (owned CRDs - cascading the MariaDB CR - then CSV, then Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ _mariadb_subscription.metadata.name }}"
+    operator_namespace: zuno-data
+  loop: >-
+    {{ _mariadb_subscriptions.resources | default([])
+       | selectattr('metadata.name', 'search', 'mariadb') | list }}
+  loop_control:
+    loop_var: _mariadb_subscription
+    label: "{{ _mariadb_subscription.metadata.name }}"
+
+- name: "mariadb | delete the mariadb ArgoCD Application (d0: cascades the remaining operator install)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-mariadb-d0"

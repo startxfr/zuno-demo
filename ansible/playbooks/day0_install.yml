@@ -16,6 +16,7 @@
       - external_secrets
       - observability
       - postgresql
+      - mariadb
       - service_mesh
       - tempo
       - mesh_monitoring

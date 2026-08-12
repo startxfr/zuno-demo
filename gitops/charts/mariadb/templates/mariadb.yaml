@@ -1,0 +1,30 @@
+{{- if .Values.mariadbOperand.enabled }}
+# MariaDB Enterprise Operator MariaDB CR. Requires the operator, installed
+# by the separate zuno-mariadb-d0 Application applied before this one.
+apiVersion: enterprise.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: mariadb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  replicas: {{ .Values.cluster.replicas }}
+  rootPasswordSecretKeyRef:
+    name: mariadb-root-password
+    key: password
+  storage:
+    size: {{ .Values.cluster.storageSize }}
+    storageClassName: {{ .Values.cluster.storageClassName }}
+  resources:
+    requests:
+      cpu: {{ .Values.cluster.resources.requests.cpu | quote }}
+      memory: {{ .Values.cluster.resources.requests.memory | quote }}
+    limits:
+      cpu: {{ .Values.cluster.resources.limits.cpu | quote }}
+      memory: {{ .Values.cluster.resources.limits.memory | quote }}
+  myCnf: |
+{{ .Values.cluster.myCnf | indent 4 }}
+{{- end }}

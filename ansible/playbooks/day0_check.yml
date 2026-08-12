@@ -20,6 +20,7 @@
       - openshift_oauth
       - console_favorites_provisioning
       - postgresql
+      - mariadb
       - service_mesh
       - tempo
       - mesh_monitoring

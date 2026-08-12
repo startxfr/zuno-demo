@@ -1,0 +1,38 @@
+---
+# State detection (never fails).
+- name: "mariadb | check the mariadb Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mariadb-d0"
+
+- name: "mariadb | save the d0 check result"
+  ansible.builtin.set_fact:
+    _mariadb_d0_installed: "{{ _state_check_result }}"
+
+- name: "mariadb | check the mariadb Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mariadb-d1"
+
+- name: "mariadb | look up the mariadb MariaDB CR"
+  kubernetes.core.k8s_info:
+    api_version: enterprise.mariadb.com/v1alpha1
+    kind: MariaDB
+    namespace: zuno-data
+    name: mariadb
+  register: _mariadb_cluster_lookup
+
+- name: "mariadb | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _mariadb_d0_installed
+        and _state_check_result
+        and (_mariadb_cluster_lookup.resources | default([]) | length) > 0
+        and (_mariadb_cluster_lookup.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+             | first | default('False')) == 'True'
+      }}
+
+- name: "mariadb | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

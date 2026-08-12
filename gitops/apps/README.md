@@ -218,6 +218,7 @@ Directories present:
 | `cert-manager` | local chart, `gitops/charts/cert-manager` (`-d0`: startx `cluster-certmanager` dependency for Namespace/OperatorGroup/Subscription + local `CertManager` config CR; `-d1`: Vault-backed `ClusterIssuer` - see the `cert_manager` role's README) |
 | `keycloak` | local chart, `gitops/charts/keycloak` (`-d0`: startx `operator` dependency for the RHBK `Subscription`/`OperatorGroup` - not `cluster-sso`, see that chart's Chart.yaml; `-d1`: Keycloak CR/RealmImport/ExternalSecrets - ADR-0312, see the `keycloak` role's README) |
 | `postgresql` | local chart, `gitops/charts/postgresql` (`-d0`: startx `operator` dependency for the PGO `Subscription` - not `cluster-crunchy`, see that chart's Chart.yaml; `-d1`: PostgresCluster/ExternalSecret/ConfigMap - ADR-0312, see the `postgresql` role's README) |
+| `mariadb` | local chart, `gitops/charts/mariadb` (`-d0`: startx `operator` dependency for the MariaDB Enterprise Operator `Subscription` plus a dedicated `OperatorGroup` scoped to the pre-existing `zuno-data` namespace - no `project` dependency, unlike `jobset`/`lws`/`kueue`, since that namespace already exists; `-d1`: MariaDB/PhysicalBackup CRs and their ExternalSecrets, see the `mariadb` role's README) |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) - no operator, `-d0` is a no-op |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` - no operator, `-d0` is a no-op |
 | `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |

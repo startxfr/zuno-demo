@@ -1,0 +1,101 @@
+# Shared by two ArgoCD Applications: operator (zuno-mariadb-d0) renders the
+# MariaDB Enterprise Operator Subscription/OperatorGroup, mariadbOperand
+# (zuno-mariadb-d1) renders the MariaDB/PhysicalBackup CRs and their
+# ExternalSecrets. Both default false so `helm template`/`helm lint` render
+# nothing.
+mariadbOperand:
+  enabled: false
+
+# subscription.name/operator.name/operator.channel/operator.source.name are
+# all discovered at run time by ansible/roles/mariadb/tasks/install.yml and
+# set via gitops_app_extra_helm_values (ADR-0048) - the known package name
+# is "mariadb-enterprise-operator", but it's still resolved from the live
+# cluster's PackageManifest rather than hardcoded here, same as
+# postgresql/jobset/kueue. templates/checks.yaml fails the render if any is
+# still empty once operator.enabled is true.
+#
+# Dedicated OperatorGroup scoped to zuno-data (targetNamespaces: [zuno-data]),
+# not a new dedicated namespace: zuno-data already exists (created by
+# gitops/charts/namespaces, shared with gitops/charts/postgresql's operand),
+# so this chart has no `project` dependency. ASSUMPTION, not yet verified
+# against a live cluster's PackageManifest install modes (same kind of
+# check gitops/charts/jobset/kueue document): confirm
+# mariadb-enterprise-operator supports OwnNamespace/SingleNamespace before
+# relying on this namespace-scoped shape - if it turns out to require
+# AllNamespaces only, this needs operatorGroup.target: "all-ns" instead
+# (gitops/charts/kueue's shape).
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: mariadb
+    app: mariadb
+  subscription:
+    enabled: true
+    name: ""
+    namespace: zuno-data
+    operator:
+      # Must be set explicitly, same name as subscription.name: the
+      # vendored `operator` chart's own values.yaml gives this a
+      # non-empty default ("codeready-workspaces") that wins the merge
+      # and silently suppresses the fallback to subscription.name.
+      name: ""
+      channel: ""
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: zuno-data
+    namespace: zuno-data
+    # Namespace-scoped (targetNamespaces: [zuno-data]), not "all-ns" - see
+    # the ASSUMPTION note above.
+    target: zuno-data
+
+# Single-node MariaDB (enterprise.mariadb.com/v1alpha1 MariaDB CR).
+cluster:
+  replicas: 1
+  storageClassName: gp3-csi
+  storageSize: 100Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  myCnf: |
+    [mariadb]
+    bind-address=*
+    max_connections=200
+
+credentials:
+  # Resolves to Vault path zuno/mariadb/root (single `password` field -
+  # MariaDB's root user is fixed, unlike postgresql's configurable owner
+  # role). Seeded by ansible/roles/vault/tasks/install.yml.
+  rootVaultPath: mariadb/root
+  secretStoreName: vault-backend
+  refreshInterval: 1h
+
+# PhysicalBackup (enterprise.mariadb.com/v1alpha1) only renders once real
+# S3 credentials exist - same "never rendered half-configured" rule
+# gitops/charts/postgresql's repo2 follows. bucket/endpoint/region are not
+# secret and are set via gitops_app_extra_helm_values by
+# ansible/roles/mariadb/tasks/install.yml; access-key-id/secret-access-key
+# are secret and come from Vault (zuno/mariadb/s3) via
+# templates/externalsecret-backup-s3.yaml.
+backups:
+  schedule: "0 */6 * * *"
+  maxRetention: 168h
+  compression: gzip
+  s3:
+    enabled: false
+    bucket: zuno-mariadb-backups
+    prefix: zuno-mariadb
+    region: eu-west-2
+    endpoint: s3.eu-west-2.amazonaws.com
+    secretName: mariadb-backup-s3
+    vaultPath: mariadb/s3

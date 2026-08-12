@@ -1,0 +1,40 @@
+{{- if and .Values.mariadbOperand.enabled .Values.backups.s3.enabled }}
+# Scheduled S3 backup of the MariaDB CR above. Only rendered once real S3
+# credentials exist (backups.s3.enabled) - same "never rendered
+# half-configured" rule gitops/charts/postgresql's repo2 follows.
+apiVersion: enterprise.mariadb.com/v1alpha1
+kind: PhysicalBackup
+metadata:
+  name: mariadb-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  mariaDbRef:
+    name: mariadb
+    # Important for a single-node MariaDB. Do not require another ready
+    # replica before scheduling the backup.
+    waitForIt: false
+  target: PreferReplica
+  schedule:
+    cron: {{ .Values.backups.schedule | quote }}
+    suspend: false
+  maxRetention: {{ .Values.backups.maxRetention }}
+  compression: {{ .Values.backups.compression }}
+  storage:
+    s3:
+      bucket: {{ .Values.backups.s3.bucket | quote }}
+      prefix: {{ .Values.backups.s3.prefix | quote }}
+      region: {{ .Values.backups.s3.region | quote }}
+      endpoint: {{ .Values.backups.s3.endpoint | quote }}
+      accessKeyIdSecretKeyRef:
+        name: {{ .Values.backups.s3.secretName }}
+        key: access-key-id
+      secretAccessKeySecretKeyRef:
+        name: {{ .Values.backups.s3.secretName }}
+        key: secret-access-key
+      tls:
+        enabled: true
+{{- end }}

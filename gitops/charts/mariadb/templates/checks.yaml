@@ -1,0 +1,18 @@
+{{- /*
+Fails the render if the operator is enabled without a discovered package
+name/channel/catalog source. Renders no resource otherwise.
+*/ -}}
+{{- if .Values.operator.enabled -}}
+{{- if not .Values.operator.subscription.name -}}
+{{- fail "operator.subscription.name (the package name) must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
+{{- end -}}
+{{- if not .Values.operator.subscription.operator.name -}}
+{{- fail "operator.subscription.operator.name (same package name as subscription.name) must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
+{{- end -}}
+{{- if not .Values.operator.subscription.operator.channel -}}
+{{- fail "operator.subscription.operator.channel must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
+{{- end -}}
+{{- if not .Values.operator.subscription.operator.source.name -}}
+{{- fail "operator.subscription.operator.source.name must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
+{{- end -}}
+{{- end -}}

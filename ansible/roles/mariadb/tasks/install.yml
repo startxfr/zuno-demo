@@ -1,0 +1,156 @@
+---
+# Ordered right after postgresql - the other data-tier operator sharing
+# the zuno-data namespace. Package name given as "mariadb-enterprise-
+# operator"; still discover catalog/channel from the PackageManifest
+# rather than hardcoding them (ADR-0048), same pattern as
+# ansible/roles/jobset/tasks/install.yml.
+- name: "mariadb | look up the {{ mariadb_package_name | default('mariadb-enterprise-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ mariadb_package_name | default('mariadb-enterprise-operator') }}"
+  register: _mariadb_pkg_info
+
+- name: "mariadb | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ mariadb_package_name | default('mariadb-enterprise-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i mariadb` for the correct package name
+      on this cluster (it must be published by the certified-operators
+      catalog). Re-run with `-e mariadb_package_name=<name>` or update this
+      role's default if the catalog on this cluster differs.
+  when: (_mariadb_pkg_info.resources | default([]) | length) == 0
+
+- name: "mariadb | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _mariadb_catalog_source: "{{ _mariadb_pkg_info.resources[0].status.catalogSource }}"
+    _mariadb_channel: >-
+      {{
+        'stable'
+        if (_mariadb_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_mariadb_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "mariadb | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ mariadb_package_name | default('mariadb-enterprise-operator') }}'
+      (catalog '{{ _mariadb_catalog_source }}') has no "stable" channel and
+      no defaultChannel to fall back to. Published channels:
+      {{ _mariadb_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _mariadb_channel | length == 0
+
+- name: "mariadb | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ mariadb_package_name | default('mariadb-enterprise-operator') }}',
+      catalog '{{ _mariadb_catalog_source }}', channel '{{ _mariadb_channel }}'.
+
+# The Subscription/OperatorGroup (operator.enabled) live in
+# gitops/charts/mariadb, applied via the separate zuno-mariadb-d0
+# Application.
+- name: "mariadb | apply the MariaDB GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mariadb"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-mariadb-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+        subscription:
+          name: "{{ mariadb_package_name | default('mariadb-enterprise-operator') }}"
+          operator:
+            name: "{{ mariadb_package_name | default('mariadb-enterprise-operator') }}"
+            channel: "{{ _mariadb_channel }}"
+            source:
+              name: "{{ _mariadb_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# Soft-read of ansible/confidential.yml (not a hard fail like vault's) for
+# optional S3 backup creds - same shape as
+# ansible/roles/postgresql/tasks/install.yml.
+- name: "mariadb | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _mariadb_confidential_file
+
+- name: "mariadb | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _mariadb_confidential_file.stat.exists
+
+# Only add the PhysicalBackup S3 schedule when real credentials exist -
+# never rendered half-configured (same rule postgresql's repo2 follows).
+- name: "mariadb | determine whether S3 backup credentials are configured"
+  ansible.builtin.set_fact:
+    _mariadb_backup_s3_enabled: >-
+      {{
+        (zuno_mariadb_backup_s3_bucket | default('xxxxxx') != 'xxxxxx')
+        and (zuno_mariadb_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx')
+        and (zuno_mariadb_backup_s3_region | default('xxxxxx') != 'xxxxxx')
+        and (zuno_mariadb_backup_s3_access_key_id | default('xxxxxx') != 'xxxxxx')
+        and (zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx')
+      }}
+
+- name: "mariadb | note that the S3 backup schedule is not configured"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_mariadb_backup_s3_* fields are not all set in
+      ansible/confidential.yml - the mariadb MariaDB will not get a
+      PhysicalBackup schedule. Fill in the bucket/endpoint/region/
+      access_key_id/secret_access_key fields and re-run
+      `make d0 install mariadb` to add it.
+  when: not (_mariadb_backup_s3_enabled | bool)
+
+# mariadbOperand.enabled/backups.s3.* live in the same chart, applied via
+# the separate zuno-mariadb-d1 Application after -d0 is Synced+Healthy.
+- name: "mariadb | apply the MariaDB GitOps Application (d1: MariaDB/PhysicalBackup)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mariadb"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-mariadb-d1"
+    gitops_app_extra_helm_values:
+      mariadbOperand:
+        enabled: true
+      backups:
+        s3:
+          enabled: "{{ _mariadb_backup_s3_enabled | bool }}"
+          bucket: "{{ zuno_mariadb_backup_s3_bucket | default('') }}"
+          endpoint: "{{ zuno_mariadb_backup_s3_endpoint | default('') }}"
+          region: "{{ zuno_mariadb_backup_s3_region | default('') }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# UNVERIFIED against a live cluster - the MariaDB Enterprise Operator's
+# exact status shape wasn't confirmed from this environment (no network
+# path to a real OpenShift cluster). Assumes a standard status.conditions
+# entry of type "Ready", the common kubebuilder convention (same
+# assumption gitops/charts/kueue's operand documents for its own CR).
+# Re-check with `oc get mariadb mariadb -n zuno-data -o yaml` against the
+# target cluster and adjust if the operator uses a different field.
+- name: "mariadb | wait for the mariadb MariaDB CR to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: enterprise.mariadb.com/v1alpha1
+    kind: MariaDB
+    namespace: zuno-data
+    name: mariadb
+  register: _mariadb_cluster
+  until: >-
+    (_mariadb_cluster.resources | default([]) | length) > 0 and
+    (_mariadb_cluster.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 60
+  delay: 10
+
+- name: "mariadb | configure summary"
+  ansible.builtin.debug:
+    msg: >-
+      mariadb MariaDB has reported Ready in the zuno-data namespace
+      ({{ 'with' if (_mariadb_backup_s3_enabled | bool) else 'without' }}
+      a PhysicalBackup schedule).

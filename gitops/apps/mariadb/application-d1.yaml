@@ -1,0 +1,36 @@
+---
+# Single-node MariaDB CR, its Vault-backed root-password ExternalSecret,
+# and (once real S3 credentials exist) a scheduled PhysicalBackup with its
+# own ExternalSecret. Manages the operand (not the operator, see
+# application-d0.yaml). backups.s3.enabled/bucket/endpoint/region are
+# injected at apply time by ansible/roles/mariadb once real S3 credentials
+# are configured - same as gitops/apps/postgresql/application-d1.yaml's
+# repo2, this Application intentionally leaves them unset so the chart
+# defaults to backups disabled.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mariadb-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-173"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mariadb
+    helm:
+      releaseName: zuno-mariadb-d1
+      values: |
+        mariadbOperand:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

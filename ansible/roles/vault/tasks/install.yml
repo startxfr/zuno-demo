@@ -413,6 +413,17 @@
       password={{ zuno_admin_redis_session_store_password | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
+- name: "vault | generate and seed the MariaDB root password"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mariadb/root
+      password={{ zuno_admin_mariadb_root_password |
+      default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+  no_log: true
+
 # These can't be self-generated - real external service credentials,
 # supplied via ansible/confidential.yml and re-applied idempotently.
 - name: "vault | seed the Google OAuth client from ansible/confidential.yml"
@@ -480,6 +491,27 @@
     and zuno_postgresql_backup_s3_region | default('xxxxxx') != 'xxxxxx'
     and zuno_postgresql_backup_s3_access_key | default('xxxxxx') != 'xxxxxx'
     and zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+# Only seeded when both key fields are real - no placeholder fallback,
+# since the ExternalSecret that reads it only renders under the same
+# condition (mariadb role's backups.s3.enabled). Property names are
+# camelCase (accessKeyId/secretAccessKey), matching
+# gitops/charts/mariadb/templates/externalsecret-backup-s3.yaml's
+# remoteRef.property - unlike postgresql/backup-s3's snake_case
+# access_key/secret_key above.
+- name: "vault | seed the MariaDB backup S3 credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mariadb/s3
+      accessKeyId={{ zuno_mariadb_backup_s3_access_key_id | quote }}
+      secretAccessKey={{ zuno_mariadb_backup_s3_secret_access_key | quote }}"
+  when: >-
+    zuno_mariadb_backup_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 - name: "vault | check whether operator-supplied secrets already exist"

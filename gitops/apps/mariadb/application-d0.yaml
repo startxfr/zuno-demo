@@ -1,0 +1,43 @@
+---
+# MariaDB Enterprise Operator install; the MariaDB/PhysicalBackup operand
+# CRs are a separate Application (application-d1.yaml). Dedicated
+# OperatorGroup scoped to zuno-data (the namespace already exists, created
+# by gitops/charts/namespaces and shared with gitops/apps/postgresql's PGO
+# operand) - see gitops/charts/mariadb/values.yaml for the install-mode
+# assumption.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mariadb-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave order only matters for the root App-of-Apps path; Ansible
+    # ignores it.
+    argocd.argoproj.io/sync-wave: "-174"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mariadb
+    helm:
+      releaseName: zuno-mariadb-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-data
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
+    # permanent drift and fights it.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
