@@ -24,6 +24,7 @@
         name: zuno-ai-build
         labels:
           zuno.io/managed-by: zuno-ansible
+          openshift.io/cluster-monitoring: "true"
         annotations:
           openshift.io/description: "In-cluster OpenShift build pipeline producing this platform's component images."
           openshift.io/display-name: "Zuno AI Build"

@@ -17,6 +17,7 @@ metadata:
     # both derive their namespace list from this one label, not a
     # separate hardcoded list.
     zuno.io/managed: "true"
+    openshift.io/cluster-monitoring: "true"
   annotations:
     openshift.io/description: {{ .description | quote }}
     openshift.io/display-name: {{ .displayName | quote }}
@@ -31,6 +32,7 @@ metadata:
   labels:
     zuno.io/tier: platform
     zuno.io/managed-by: argocd
+    openshift.io/cluster-monitoring: "true"
     {{- range $k, $v := .extraLabels }}
     {{ $k }}: {{ $v | quote }}
     {{- end }}

@@ -4,6 +4,7 @@ metadata:
   name: openshift-gitops-operator
   labels:
     zuno.io/managed-by: zuno-ansible
+    openshift.io/cluster-monitoring: "true"
   annotations:
     openshift.io/description: "OpenShift GitOps (ArgoCD) operator subscription, installed by Zuno."
     openshift.io/display-name: "Zuno Infra GitOps Operator"
@@ -15,6 +16,7 @@ metadata:
   name: openshift-gitops
   labels:
     zuno.io/managed-by: zuno-ansible
+    openshift.io/cluster-monitoring: "true"
   annotations:
     openshift.io/description: "OpenShift GitOps (ArgoCD) instance driving this platform's GitOps deployments, installed by Zuno."
     openshift.io/display-name: "Zuno Infra GitOps"

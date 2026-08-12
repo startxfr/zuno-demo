@@ -8,6 +8,7 @@ metadata:
   name: cert-manager
   labels:
     zuno.io/managed-by: argocd
+    openshift.io/cluster-monitoring: "true"
   annotations:
     argocd.argoproj.io/hook: PreSync
     openshift.io/description: "cert-manager operand (controller, webhook, CA injector), configured by Zuno."
