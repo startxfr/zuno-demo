@@ -51,17 +51,26 @@ ADR-0317/ADR-0318).
 live cluster's `redhat-operators` catalog - including that its CSV only
 supports the `AllNamespaces` install mode. This originally subscribed
 into the shared `openshift-operators` namespace the same way
-`ansible/roles/jobset`/`ansible/roles/lws` did, but that shape caused a
-real-cluster webhook Service selector collision (multiple
-kubebuilder-scaffolded operators sharing the namespace all carry the
-generic `control-plane: controller-manager` label - see
-`gitops/charts/kueue/values.yaml` for the incident), so Kueue now uses a
-dedicated `openshift-kueue-operator` namespace with its own
-`AllNamespaces`-mode `OperatorGroup` instead -
-`ansible/roles/jobset`/`ansible/roles/lws` were moved the same way
-pre-emptively. Still not the `OwnNamespace`-scoped shape
-`ansible/roles/custom_metrics_autoscaler` uses - Kueue's CSV doesn't
-support that mode.
+`ansible/roles/jobset`/`ansible/roles/lws` originally did, but that
+namespace's webhook Service selector (`control-plane:
+controller-manager`, the generic kubebuilder convention label) collided
+with other operators' pods carrying that same label there - so Kueue now
+uses a dedicated `openshift-kueue-operator` namespace with its own
+`AllNamespaces`-mode `OperatorGroup` instead (`AllNamespaces` because
+that's the only mode Kueue's CSV supports).
+
+`ansible/roles/jobset`/`ansible/roles/lws` separately hit a *different*,
+unrelated real-cluster failure and were also moved to dedicated
+namespaces - but with an `OwnNamespace`-scoped `OperatorGroup`
+(`ansible/roles/custom_metrics_autoscaler`'s shape), not
+`AllNamespaces`: their CSVs only support `OwnNamespace`, confirmed
+against a live cluster's `PackageManifest`. Don't copy Kueue's
+`AllNamespaces` target for a new operator without checking its own
+`PackageManifest.status.channels[].currentCSVDesc.installModes` first -
+this repository has now hit both directions of this mismatch on live
+clusters (Kueue needs `AllNamespaces` only; JobSet/LWS/Keycloak need
+`OwnNamespace` only; `connectivity-link`/`external_secrets` need
+`AllNamespaces` only).
 
 **Not yet verified against a live install** (only the `PackageManifest`
 was checked, not an actual running operator): that the `Kueue` operand CR

@@ -1,17 +1,16 @@
 ---
 # JobSet operator install (ADR-0318). No singleton operand CR - see
-# application-d1.yaml. Dedicated namespace (openshift-jobset-operator),
-# not the originally shared openshift-operators shape: that put JobSet's
-# webhook Service selector (`control-plane: controller-manager`, the
-# generic kubebuilder convention label) in collision with other
-# operators' pods carrying that same generic label there (kuadrant,
-# external-secrets, limitador, lws) - the same collision already found
-# and fixed for gitops/charts/kueue (see that chart's values.yaml). A
-# dedicated namespace with its own AllNamespaces-mode OperatorGroup
-# (operator.operatorGroup.target: "all-ns") removes that collision
-# structurally, while keeping the same AllNamespaces install mode job-set
-# was already subscribed under (via OLM's own global-operators
-# OperatorGroup in openshift-operators).
+# application-d1.yaml. Dedicated namespace (openshift-jobset-operator)
+# with an OwnNamespace-scoped OperatorGroup, not the originally shared
+# openshift-operators namespace (which relies on OLM's own
+# AllNamespaces-mode global-operators OperatorGroup there). CONFIRMED
+# against a live cluster: job-set's CSV only supports
+# OwnNamespace/SingleNamespace, not AllNamespaces - subscribing via the
+# shared namespace put the CSV into Failed phase (reason
+# UnsupportedOperatorGroup, message "AllNamespaces InstallModeType not
+# supported, cannot configure to watch all namespaces"), which is what
+# showed as "Job Set Operator" Failed in Installed Operators. See
+# gitops/charts/jobset/values.yaml for the full detail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -6,9 +6,9 @@ description: >-
   Kubeflow Trainer v2 (trainer/trainingoperator DataScienceCluster
   components), which schedules distributed training runs on the JobSet
   API; no JobSet workload is created here. Dedicated namespace
-  (openshift-jobset-operator) with its own AllNamespaces-mode
-  OperatorGroup - see values.yaml for why (same collision this repo
-  already fixed for gitops/charts/kueue).
+  (openshift-jobset-operator) with its own OwnNamespace-scoped
+  OperatorGroup - see values.yaml for why (the CSV doesn't support
+  AllNamespaces, confirmed against a live cluster).
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

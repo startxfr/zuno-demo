@@ -41,20 +41,23 @@ pass `-e jobset_package_name=<name>`).
 
 Originally subscribed into the shared `openshift-operators` namespace
 (`AllNamespaces`, no dedicated `OperatorGroup`) alongside `connectivity-link`/
-`external_secrets`/`limitador`/`lws`. Moved to a dedicated
-`openshift-jobset-operator` namespace with its own `AllNamespaces`-mode
-`OperatorGroup` (`operator.operatorGroup.target: "all-ns"` in
-`gitops/charts/jobset/values.yaml`) after `gitops/charts/kueue` hit a
-real-cluster collision from that same shared-namespace shape: multiple
-kubebuilder-scaffolded operators there carry the same generic
-`control-plane: controller-manager` label, so a webhook Service's
-Endpoints round-robinned admission calls across unrelated pods and
-intermittently returned "connection refused" - see that chart's
-`values.yaml` for the full incident. Isolating JobSet the same way removes
-that collision risk structurally, while keeping the same `AllNamespaces`
-install mode it was already subscribed under - not the `OwnNamespace`
-shape that separately failed for `connectivity_link` on a real cluster
-(`OwnNamespace InstallModeType is not supported`, ADR-0317).
+`external_secrets`/`limitador`/`lws` - the "now-confirmed-safe shape"
+assumption ADR-0318 made by analogy with those other operators. That
+assumption was wrong for JobSet specifically: CONFIRMED against a live
+cluster's `PackageManifest`, `job-set`'s CSV only supports
+`OwnNamespace`/`SingleNamespace`, not `AllNamespaces`. Subscribing via
+the shared namespace's implicit `AllNamespaces` global-operators
+`OperatorGroup` put the CSV into `Failed` phase (reason
+`UnsupportedOperatorGroup`, message "AllNamespaces InstallModeType not
+supported, cannot configure to watch all namespaces") - this is what
+showed as "Job Set Operator" Failed in Installed Operators. Fixed by
+moving to a dedicated `openshift-jobset-operator` namespace with its own
+`OwnNamespace`-scoped `OperatorGroup`
+(`operator.operatorGroup.target: openshift-jobset-operator` in
+`gitops/charts/jobset/values.yaml`) - the same shape
+`ansible/roles/custom_metrics_autoscaler` already uses for KEDA, not the
+`AllNamespaces`-mode dedicated namespace `gitops/charts/kueue` uses
+(Kueue's CSV requires the opposite install mode).
 
 ## Day 0 ordering
 

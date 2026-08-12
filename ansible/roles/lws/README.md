@@ -37,34 +37,37 @@ cluster before that fix landed, so it was changed preemptively to the
 same `openshift-operators` (`AllNamespaces`) shape `external_secrets`
 already uses, rather than risk shipping the same bug twice.
 
-That shared-namespace shape later caused a *different* real-cluster
-failure: `gitops/charts/kueue` (also originally in `openshift-operators`)
-hit a webhook Service selector collision there - multiple
-kubebuilder-scaffolded operators sharing the namespace (`connectivity-link`/
-`external_secrets`/`limitador`/`jobset`) all carry the same generic
-`control-plane: controller-manager` label, so a webhook Service's
-Endpoints round-robinned admission calls across unrelated pods and
-intermittently returned "connection refused" - see
-`gitops/charts/kueue/values.yaml` for the full incident. LWS is now moved
-to a dedicated `openshift-lws-operator` namespace with its own
-`AllNamespaces`-mode `OperatorGroup`
-(`operator.operatorGroup.target: "all-ns"` in
-`gitops/charts/lws/values.yaml`), the same fix applied to Kueue - this
-removes that collision risk structurally while keeping the same
-`AllNamespaces` install mode LWS was already subscribed under, not the
-`OwnNamespace` shape that failed for `connectivity_link`.
+That `AllNamespaces` assumption turned out wrong for LWS specifically:
+CONFIRMED against a live cluster's `PackageManifest`,
+`leader-worker-set`'s CSV only supports `OwnNamespace` (not even
+`SingleNamespace`/`MultiNamespace`, and not `AllNamespaces`). Subscribing
+via the shared namespace's implicit `AllNamespaces` global-operators
+`OperatorGroup` put the CSV into `Failed` phase (reason
+`UnsupportedOperatorGroup`, message "AllNamespaces InstallModeType not
+supported, cannot configure to watch all namespaces") - this is what
+showed as "Red Hat build of Leader Worker Set" Failed in Installed
+Operators; the *opposite* install-mode problem from `connectivity_link`
+(whose CSV only supports `AllNamespaces`, not `OwnNamespace`). Fixed by
+moving to a dedicated `openshift-lws-operator` namespace with its own
+`OwnNamespace`-scoped `OperatorGroup`
+(`operator.operatorGroup.target: openshift-lws-operator` in
+`gitops/charts/lws/values.yaml`) - the same shape
+`ansible/roles/custom_metrics_autoscaler` already uses for KEDA, not the
+`AllNamespaces`-mode dedicated namespace `gitops/charts/kueue` uses
+(Kueue's CSV requires the opposite install mode).
 
-Neither this operator's exact OLM package name (checked in as
-`leader-worker-set`, `gitops/charts/lws/values.yaml`'s `subscriptionName`)
-nor its channel naming has been confirmed against a live OpenShift AI
-3.5+ catalog. `install.yml`'s `PackageManifest` lookup fails with a clear
-diagnostic (listing every published channel) if the guessed package name
-is wrong on a given cluster - run `oc get packagemanifest -n
-openshift-marketplace | grep -i leader-worker` (or `-i lws`) against the
-target cluster and either pass `-e lws_package_name=<real name>` or
-correct the role/chart defaults, the same idiom `ansible/roles/
-external_secrets/tasks/install.yml` already documents for its own
-operator.
+Package name confirmed against a live cluster's `redhat-operators`
+catalog: `leader-worker-set` (checked in as
+`gitops/charts/lws/values.yaml`'s `subscription.name`/
+`subscription.operator.name`), channel `stable-v1.0` - ADR-0317's "not
+yet verified" placeholder guess turned out correct. If this ever stops
+matching on a different cluster, `install.yml`'s `PackageManifest` lookup
+fails with a clear diagnostic (listing every published channel) - run
+`oc get packagemanifest -n openshift-marketplace | grep -i leader-worker`
+(or `-i lws`) against the target cluster and either pass `-e
+lws_package_name=<real name>` or correct the role/chart defaults, the
+same idiom `ansible/roles/external_secrets/tasks/install.yml` already
+documents for its own operator.
 
 ## Day 0 ordering
 

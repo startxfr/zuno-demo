@@ -1,18 +1,18 @@
 ---
 # LeaderWorkerSet operator install (ADR-0317). No singleton operand CR -
-# see application-d1.yaml. Dedicated namespace (openshift-lws-operator),
-# not the originally shared openshift-operators shape: that put LWS's
-# webhook Service selector (`control-plane: controller-manager`, the
-# generic kubebuilder convention label) in collision with other
-# operators' pods carrying that same generic label there (kuadrant,
-# external-secrets, limitador, jobset) - the same collision already found
-# and fixed for gitops/charts/kueue (see that chart's values.yaml). A
-# dedicated namespace with its own AllNamespaces-mode OperatorGroup
-# (operator.operatorGroup.target: "all-ns") removes that collision
-# structurally, while keeping the same AllNamespaces install mode
-# leader-worker-set was already subscribed under (via OLM's own
-# global-operators OperatorGroup in openshift-operators) - not the
-# OwnNamespace shape that separately failed for connectivity-link.
+# see application-d1.yaml. Dedicated namespace (openshift-lws-operator)
+# with an OwnNamespace-scoped OperatorGroup, not the originally shared
+# openshift-operators namespace (which relies on OLM's own
+# AllNamespaces-mode global-operators OperatorGroup there). CONFIRMED
+# against a live cluster: leader-worker-set's CSV only supports
+# OwnNamespace, not AllNamespaces - subscribing via the shared namespace
+# put the CSV into Failed phase (reason UnsupportedOperatorGroup, message
+# "AllNamespaces InstallModeType not supported, cannot configure to watch
+# all namespaces"), which is what showed as "Red Hat build of Leader
+# Worker Set" Failed in Installed Operators. This is the *opposite*
+# install-mode problem from connectivity-link (whose CSV only supports
+# AllNamespaces, not OwnNamespace) - see
+# gitops/charts/lws/values.yaml for the full detail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

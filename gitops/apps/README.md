@@ -145,13 +145,21 @@ still depends on `project` for its Kuadrant operand namespace
 (`kuadrant-system`) on the `-d1` side. `jobset`/`kueue`/`lws` originally
 shared that same `openshift-operators` namespace too, but all three now
 depend on both `project` and `operator` for their own dedicated
-`openshift-{jobset,kueue,lws}-operator` namespace + `AllNamespaces`-mode
-`OperatorGroup`, after `kueue` hit a real-cluster webhook Service
-selector collision from the shared-namespace shape (multiple
+`openshift-{jobset,kueue,lws}-operator` namespace + `OperatorGroup` -
+each for a *different*, CSV-specific reason confirmed against a live
+cluster's `PackageManifest`, not the same fix copy-pasted three times:
+`kueue`'s CSV only supports `AllNamespaces` (moved after a real-cluster
+webhook Service selector collision in the shared namespace - multiple
 kubebuilder-scaffolded operators there carry the same generic
-`control-plane: controller-manager` label - see
-`gitops/charts/kueue/values.yaml` for the incident); `jobset`/`lws` were
-moved the same way pre-emptively. `kueue`'s own `-d1` is real content,
+`control-plane: controller-manager` label; see
+`gitops/charts/kueue/values.yaml` for that incident), while `jobset`'s
+and `lws`'s CSVs only support `OwnNamespace` (subscribing them via the
+shared namespace's implicit `AllNamespaces` OperatorGroup instead put
+both CSVs into `Failed` phase - reason `UnsupportedOperatorGroup`,
+message "AllNamespaces InstallModeType not supported" - which is what
+showed as "Job Set Operator"/"Red Hat build of Leader Worker Set" Failed
+in Installed Operators; see `gitops/charts/jobset/values.yaml`/
+`gitops/charts/lws/values.yaml`). `kueue`'s own `-d1` is real content,
 not a no-op: its singleton `Kueue` operand CR plus the default
 `ResourceFlavor`/`ClusterQueue`/`LocalQueue` (ADR-0321) - `jobset`/`lws`
 have no operand CR at all, so their `-d1` points at `gitops/charts/noop`
@@ -224,9 +232,9 @@ Directories present:
 | `observability` | local chart, `gitops/charts/observability` (`-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-opentelemetry-operator` Namespace/OperatorGroup/Subscription; `-d1`: shared OTLP Collector, exporting to both `debug` and `tempo`'s `otlp/tempo`) |
 | `service-mesh` | local chart, `gitops/charts/service-mesh` (`-d0`: startx `cluster-istio` dependency, `operatorIstio.enabled`, installs the servicemeshoperator3/Sail Operator; `-d1`: Vault-backed mesh CA (`clusterIssuer`/`istioCsr`), `istiocni` and the `istio` control plane itself, in zuno-mesh) |
 | `connectivity-link` | local chart, `gitops/charts/connectivity-link` (ADR-0317 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces` - the operator's CSV doesn't support `OwnNamespace`, confirmed against a real cluster), no `OperatorGroup`; `-d1`: startx `project` dependency for the dedicated `kuadrant-system` Namespace + minimal empty `Kuadrant` operand CR) |
-| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-lws-operator` Namespace/OperatorGroup (`AllNamespaces`)/Subscription - moved out of the shared `openshift-operators` namespace after the webhook-selector collision `kueue` hit there; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
+| `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-lws-operator` Namespace/OperatorGroup (`OwnNamespace` - the operator's CSV doesn't support `AllNamespaces`, confirmed against a real cluster after subscribing via the shared `openshift-operators` namespace's `AllNamespaces` OperatorGroup left the CSV Failed)/Subscription; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
 | `custom-metrics-autoscaler` | local chart, `gitops/charts/custom-metrics-autoscaler` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-keda` Namespace/OperatorGroup/Subscription (`OwnNamespace`, per Red Hat's documented install procedure); `-d1`: minimal `KedaController` operand CR) |
-| `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-jobset-operator` Namespace/OperatorGroup (`AllNamespaces`)/Subscription - moved out of the shared `openshift-operators` namespace after the webhook-selector collision `kueue` hit there; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
+| `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-jobset-operator` Namespace/OperatorGroup (`OwnNamespace` - the operator's CSV doesn't support `AllNamespaces`, confirmed against a real cluster after subscribing via the shared `openshift-operators` namespace's `AllNamespaces` OperatorGroup left the CSV Failed)/Subscription; `-d1` is a no-op, no singleton operand CR exists for JobSet) |
 | `kueue` | local chart, `gitops/charts/kueue` (ADR-0321 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-kueue-operator` Namespace/OperatorGroup (`AllNamespaces` - the operator's CSV doesn't support any other install mode, confirmed against a real cluster); `-d1`: singleton `Kueue` operand CR plus default `ResourceFlavor`/`ClusterQueue`/`LocalQueue` - installed ahead of `openshift-ai`, whose `DataScienceCluster` sets `kueue.managementState: Unmanaged` to defer to this operator) |
 | `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-tempo-operator` Namespace/OperatorGroup/Subscription; `-d1`: demo-scale `TempoMonolithic` in zuno-monitoring, storing traces exported by `observability`'s Collector) |
 | `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-cluster-observability-operator` Namespace/OperatorGroup/Subscription; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |

@@ -13,18 +13,24 @@
 # guessed in ADR-0318), channel "stable-v1.0".
 #
 # Dedicated namespace (openshift-jobset-operator) with its own
-# AllNamespaces-mode OperatorGroup, not the original shared
-# openshift-operators shape: sharing that namespace with kuadrant/
-# external-secrets/limitador/lws is exactly what caused
-# gitops/charts/kueue's webhook Service selector
-# (`control-plane: controller-manager`, the generic kubebuilder
-# convention label) to collide with those other operators' pods there,
-# so its Endpoints round-robinned admission calls across unrelated pods
-# and intermittently returned "connection refused" - see
-# gitops/charts/kueue/values.yaml's history. JobSet's own webhook/
-# resource naming was never checked against that same collision risk
-# before this fix landed; isolating it removes the risk structurally
-# instead of relying on it not mattering in practice.
+# OwnNamespace-scoped OperatorGroup. CONFIRMED against a live cluster's
+# PackageManifest (`oc get packagemanifest job-set -n
+# openshift-marketplace -o jsonpath='{.status.channels[?(@.name=="stable-v1.0")].currentCSVDesc.installModes}'`):
+# job-set's CSV only supports OwnNamespace/SingleNamespace, NOT
+# AllNamespaces. Subscribing it via the shared openshift-operators
+# namespace's implicit AllNamespaces global-operators OperatorGroup put
+# its CSV into Failed phase with reason UnsupportedOperatorGroup, message
+# "AllNamespaces InstallModeType not supported, cannot configure to watch
+# all namespaces" - this is what showed as "Job Set Operator" Failed in
+# Installed Operators. Moving to a dedicated namespace with an
+# OwnNamespace OperatorGroup (operator.operatorGroup.target set to the
+# namespace itself, not "all-ns") fixes that - same shape
+# gitops/charts/custom-metrics-autoscaler already uses for KEDA. (A prior
+# version of this fix moved JobSet to a dedicated namespace but kept
+# AllNamespaces mode, assuming the failure was gitops/charts/kueue's
+# separately-documented webhook Service selector collision; that
+# assumption was wrong - the CSV's own install-mode message above is the
+# actual, confirmed cause.)
 #
 # subscription.operator.channel/source.name are left empty by default,
 # discovered by ansible and set via gitops_app_extra_helm_values on the -d0
@@ -74,10 +80,9 @@ operator:
     enabled: true
     name: jobset-operator-group
     namespace: openshift-jobset-operator
-    # "all-ns" (-> spec: {}, empty targetNamespaces = AllNamespaces mode):
-    # job-set was previously subscribed via OLM's own pre-existing
-    # global-operators OperatorGroup in openshift-operators (also
-    # AllNamespaces), so this preserves the same install mode while
-    # moving out of the shared namespace - see gitops/charts/kueue/
-    # values.yaml's operatorGroup.target for the identical shape.
-    target: "all-ns"
+    # OwnNamespace-scoped (targetNamespaces: [openshift-jobset-operator]),
+    # confirmed against a live cluster's PackageManifest - job-set's CSV
+    # doesn't support AllNamespaces (see comment above). NOT "all-ns"
+    # (that's gitops/charts/kueue's shape - a different operator whose CSV
+    # requires the opposite: AllNamespaces only).
+    target: openshift-jobset-operator

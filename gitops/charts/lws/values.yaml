@@ -6,27 +6,35 @@
 # scope here) - zuno-lws-d1 (gitops/apps/lws/application-d1.yaml) points
 # at gitops/charts/noop instead.
 #
-# ASSUMPTION, not yet verified against a live cluster (ADR-0317): the real
-# OLM package name for this operator on a given catalog. If wrong, run
-# `oc get packagemanifest -n openshift-marketplace | grep -i leader-worker`
-# (or `-i lws`) against the target cluster and correct this value -
-# ansible/roles/lws/tasks/install.yml's PackageManifest lookup fails with a
-# clear diagnostic listing published channels if it's wrong, rather than
-# silently subscribing to nothing.
+# Confirmed against a live cluster (redhat-operators catalog): the
+# package is named "leader-worker-set", channel "stable-v1.0" (ADR-0317's
+# "not yet verified" placeholder guess turned out correct). If this ever
+# stops matching on a different cluster, run `oc get packagemanifest -n
+# openshift-marketplace | grep -i leader-worker` (or `-i lws`) and correct
+# this value - ansible/roles/lws/tasks/install.yml's PackageManifest
+# lookup fails with a clear diagnostic listing published channels if it's
+# wrong, rather than silently subscribing to nothing.
 #
 # Dedicated namespace (openshift-lws-operator) with its own
-# AllNamespaces-mode OperatorGroup, not the original shared
-# openshift-operators shape: sharing that namespace with kuadrant/
-# external-secrets/limitador/jobset is exactly what caused
-# gitops/charts/kueue's webhook Service selector
-# (`control-plane: controller-manager`, the generic kubebuilder
-# convention label) to collide with those other operators' pods there,
-# so its Endpoints round-robinned admission calls across unrelated pods
-# and intermittently returned "connection refused" - see
-# gitops/charts/kueue/values.yaml's history. LeaderWorkerSet's own
-# webhook/resource naming was never checked against that same collision
-# risk before this fix landed; isolating it removes the risk
-# structurally instead of relying on it not mattering in practice.
+# OwnNamespace-scoped OperatorGroup. CONFIRMED against a live cluster's
+# PackageManifest (`oc get packagemanifest leader-worker-set -n
+# openshift-marketplace -o jsonpath='{.status.channels[?(@.name=="stable-v1.0")].currentCSVDesc.installModes}'`):
+# leader-worker-set's CSV only supports OwnNamespace, NOT AllNamespaces
+# (not even SingleNamespace/MultiNamespace). Subscribing it via the
+# shared openshift-operators namespace's implicit AllNamespaces
+# global-operators OperatorGroup put its CSV into Failed phase with
+# reason UnsupportedOperatorGroup, message "AllNamespaces InstallModeType
+# not supported, cannot configure to watch all namespaces" - this is what
+# showed as "Red Hat build of Leader Worker Set" Failed in Installed
+# Operators. Moving to a dedicated namespace with an OwnNamespace
+# OperatorGroup (operator.operatorGroup.target set to the namespace
+# itself, not "all-ns") fixes that - same shape
+# gitops/charts/custom-metrics-autoscaler already uses for KEDA. (A prior
+# version of this fix moved LWS to a dedicated namespace but kept
+# AllNamespaces mode, assuming the failure was gitops/charts/kueue's
+# separately-documented webhook Service selector collision; that
+# assumption was wrong - the CSV's own install-mode message above is the
+# actual, confirmed cause.)
 #
 # subscription.operator.channel/source.name are left empty by default,
 # discovered by ansible and set via gitops_app_extra_helm_values on the -d0
@@ -76,10 +84,10 @@ operator:
     enabled: true
     name: lws-operator-group
     namespace: openshift-lws-operator
-    # "all-ns" (-> spec: {}, empty targetNamespaces = AllNamespaces mode):
-    # leader-worker-set was previously subscribed via OLM's own
-    # pre-existing global-operators OperatorGroup in openshift-operators
-    # (also AllNamespaces), so this preserves the same install mode while
-    # moving out of the shared namespace - see gitops/charts/kueue/
-    # values.yaml's operatorGroup.target for the identical shape.
-    target: "all-ns"
+    # OwnNamespace-scoped (targetNamespaces: [openshift-lws-operator]),
+    # confirmed against a live cluster's PackageManifest -
+    # leader-worker-set's CSV doesn't support AllNamespaces (see comment
+    # above). NOT "all-ns" (that's gitops/charts/kueue's shape - a
+    # different operator whose CSV requires the opposite: AllNamespaces
+    # only).
+    target: openshift-lws-operator
