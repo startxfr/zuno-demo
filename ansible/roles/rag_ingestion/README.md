@@ -14,18 +14,19 @@ DataSciencePipelinesApplication/Pipeline CRDs) having run first.
    `zuno-ai-build`.
 2. Waits for the `rag-dspa` `DataSciencePipelinesApplication` to report
    Ready.
+3. Best-effort activates the KFP recurring run (`schedule.cron` in
+   `values.yaml`) via the DSPA's v2beta1 HTTP API - UNVERIFIED against a
+   live cluster, failure here doesn't block the rest of the install. See
+   `gitops/charts/rag-ingestion/README.md`'s "Scheduling" section.
 
 ## Not covered by this role
 
 - **Building the runtime image** - a separate day1-build component,
   `ansible/roles/rag_ingestion_build` (`make d1 build rag-ingestion`),
   distinct from this run component, same split as `rag`/`rag_build`.
-- **Activating the KFP recurring run** (`schedule.cron` in
-  `values.yaml`) - this RHOAI/DSP version doesn't expose a
-  Kubernetes-native `RecurringRun` CRD, only the KFP v2beta1 HTTP API.
-  See `gitops/charts/rag-ingestion/README.md`'s "Scheduling" section.
-- **The eight ingestion stage implementations themselves**
-  (`components/rag-ingestion/src/rag_ingestion.py`) - intentionally
-  guarded until the remaining environment-specific values (real
-  Confluence spaces/directories, confirmed Red Hat doc version strings)
-  are fixed.
+
+The eight ingestion CLI stages themselves
+(`components/rag-ingestion/src/rag_ingestion.py`) are implemented - see
+`gitops/charts/rag-ingestion/README.md`'s "Runtime image / CLI stages"
+section for what each one does and what remains unverified against a
+live cluster/real credentials.

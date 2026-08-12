@@ -27,10 +27,19 @@
 
 - name: "kueue | look up the default ClusterQueue"
   kubernetes.core.k8s_info:
-    api_version: kueue.x-k8s.io/v1beta1
+    # v1beta2 (the CRD's actual storage version on the subscribed
+    # stable-v1.4 channel), not the deprecated v1beta1: a plain read at the
+    # storage version needs no conversion webhook, so this diagnostic check
+    # doesn't depend on the operator's kueue-webhook-service being up.
+    api_version: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     name: default
   register: _kueue_clusterqueue_lookup
+  # This file's contract (see header) is "never fails": don't let a 500 from
+  # an unready/transiently-broken conversion webhook turn a diagnostic check
+  # into a hard playbook failure. A failed lookup is treated as "not found"
+  # below.
+  ignore_errors: true
 
 - name: "kueue | compute install state"
   ansible.builtin.set_fact:
@@ -39,6 +48,7 @@
         _kueue_d0_installed
         and _state_check_result
         and (_kueue_operand_lookup.resources | default([]) | length) > 0
+        and not (_kueue_clusterqueue_lookup.failed | default(false))
         and (_kueue_clusterqueue_lookup.resources | default([]) | length) > 0
       }}
 

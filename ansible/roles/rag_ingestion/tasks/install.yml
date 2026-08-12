@@ -41,10 +41,148 @@
   retries: 60
   delay: 15
 
-- name: "rag_ingestion | configure summary"
+- name: "rag_ingestion | configure summary (DSPA)"
   ansible.builtin.debug:
     msg: >-
       rag-dspa DataSciencePipelinesApplication has reported Ready in
-      zuno-ai-build. See gitops/charts/rag-ingestion/README.md
-      "Scheduling" section for the (currently manual) KFP recurring-run
-      activation step.
+      zuno-ai-build.
+
+# --- KFP recurring-run activation (best-effort, UNVERIFIED against a live
+# cluster) -----------------------------------------------------------------
+# RHOAI's DSPA doesn't expose a Kubernetes-native scheduling CRD, only the
+# KFP v2beta1 HTTP API behind the DSPA's own OAuth-proxied Route - the same
+# path the OpenShift AI dashboard itself uses to create a schedule. Every
+# step below is wrapped so a failure here only skips scheduling, never
+# fails the rest of `make d1 install rag-ingestion`: the pipeline itself is
+# already usable via manual/dashboard-triggered runs regardless of whether
+# this succeeds. Re-verify each assumption below against a real cluster
+# (`oc get route -n zuno-ai-build | grep ds-pipeline`, a real `curl` against
+# the v2beta1 API) and correct this task file once confirmed.
+- name: "rag_ingestion | resolve the caller's OpenShift bearer token for the DSPA API"
+  ansible.builtin.command: oc whoami -t
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  register: _rag_ingestion_oc_token
+  changed_when: false
+  ignore_errors: true
+
+- name: "rag_ingestion | look up the rag-dspa API server Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: zuno-ai-build
+    # ds-pipeline-<dspa-name> is the DSPA operator's own Route-naming
+    # convention (unverified against a live cluster - confirm with `oc get
+    # route -n zuno-ai-build`).
+    name: "ds-pipeline-{{ rag_ingestion_dspa_name | default('rag-dspa') }}"
+  register: _rag_ingestion_dspa_route
+  ignore_errors: true
+
+- name: "rag_ingestion | resolve the KFP API base URL and schedule availability"
+  ansible.builtin.set_fact:
+    _rag_ingestion_kfp_api_base: >-
+      {{ 'https://' + _rag_ingestion_dspa_route.resources[0].spec.host
+         if (_rag_ingestion_dspa_route.resources | default([]) | length) > 0 else '' }}
+    _rag_ingestion_kfp_token: "{{ _rag_ingestion_oc_token.stdout | default('') | trim }}"
+
+- name: "rag_ingestion | skip recurring-run activation if the Route or token could not be resolved"
+  ansible.builtin.debug:
+    msg: >-
+      Skipping KFP recurring-run activation: could not resolve
+      {{ 'the DSPA Route' if _rag_ingestion_kfp_api_base == '' else 'an OpenShift bearer token (oc whoami -t)' }}.
+      Create the schedule manually via the OpenShift AI dashboard, or
+      re-run `make d1 install rag-ingestion` once `oc login` is active
+      and the Route exists.
+  when: _rag_ingestion_kfp_api_base == '' or _rag_ingestion_kfp_token == ''
+
+- name: "rag_ingestion | KFP recurring-run activation"
+  when: _rag_ingestion_kfp_api_base != '' and _rag_ingestion_kfp_token != ''
+  block:
+    - name: "rag_ingestion | list pipelines on the DSPA API server"
+      ansible.builtin.uri:
+        url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines"
+        headers:
+          Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+        validate_certs: false
+        status_code: [200]
+        return_content: true
+      register: _rag_ingestion_pipelines_list
+
+    - name: "rag_ingestion | resolve the rag-corpus-ingestion pipeline_id"
+      ansible.builtin.set_fact:
+        _rag_ingestion_pipeline_id: >-
+          {{
+            (_rag_ingestion_pipelines_list.json.pipelines | default([])
+             | selectattr('display_name', 'equalto', 'RAG corpus ingestion')
+             | map(attribute='pipeline_id') | list | first) | default('')
+          }}
+
+    - name: "rag_ingestion | fail this block loudly if the pipeline isn't registered yet"
+      ansible.builtin.fail:
+        msg: >-
+          No pipeline named 'RAG corpus ingestion' found via
+          {{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines - the
+          Pipeline CR (templates/pipeline.yaml) may not have synced yet.
+      when: _rag_ingestion_pipeline_id == ''
+
+    - name: "rag_ingestion | list versions for the resolved pipeline"
+      ansible.builtin.uri:
+        url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines/{{ _rag_ingestion_pipeline_id }}/versions"
+        headers:
+          Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+        validate_certs: false
+        status_code: [200]
+        return_content: true
+      register: _rag_ingestion_pipeline_versions
+
+    - name: "rag_ingestion | resolve the latest pipeline_version_id"
+      ansible.builtin.set_fact:
+        # Assumes the API returns versions newest-first (index 0) -
+        # UNVERIFIED, confirm against a live cluster and sort by
+        # created_at explicitly if that assumption is wrong.
+        _rag_ingestion_pipeline_version_id: >-
+          {{ (_rag_ingestion_pipeline_versions.json.pipeline_versions | default([]) | first).pipeline_version_id | default('') }}
+
+    - name: "rag_ingestion | create or update the recurring run"
+      ansible.builtin.uri:
+        url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+          Content-Type: application/json
+        validate_certs: false
+        status_code: [200, 201, 409]
+        body_format: json
+        body:
+          display_name: "rag-corpus-ingestion-schedule"
+          pipeline_version_reference:
+            pipeline_id: "{{ _rag_ingestion_pipeline_id }}"
+            pipeline_version_id: "{{ _rag_ingestion_pipeline_version_id }}"
+          # 6-field (seconds-first) cron, matching values.yaml's
+          # schedule.cron. schedule.timezone (Europe/Paris by default) has
+          # no confirmed equivalent field in this API version and is
+          # omitted rather than guessed - the KFP/Argo cron scheduler's
+          # timezone handling needs confirming against a live cluster.
+          trigger:
+            cron_schedule:
+              cron: "{{ rag_ingestion_schedule_cron | default('0 0 2 * * 0') }}"
+          mode: ENABLE
+          no_catchup: true
+      register: _rag_ingestion_recurring_run
+      when: _rag_ingestion_pipeline_version_id != ''
+
+    - name: "rag_ingestion | recurring-run activation summary"
+      ansible.builtin.debug:
+        msg: >-
+          KFP recurring run 'rag-corpus-ingestion-schedule' request returned
+          HTTP {{ _rag_ingestion_recurring_run.status | default('unknown') }}
+          (409 = already exists, treated as success).
+      when: _rag_ingestion_pipeline_version_id != ''
+  rescue:
+    - name: "rag_ingestion | recurring-run activation failed - not fatal"
+      ansible.builtin.debug:
+        msg: >-
+          KFP recurring-run activation failed (see the task output above).
+          This does not block the rest of the install - create the
+          schedule manually via the OpenShift AI dashboard instead, or
+          re-run `make d1 install rag-ingestion` after correcting the
+          issue.

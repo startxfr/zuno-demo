@@ -74,32 +74,78 @@ DataSciencePipelinesApplication/Pipeline CRDs come from `openshift_ai`'s
 `ansible/playbooks/day1_{install,check,uninstall,build}.yml`'s component
 lists; the `postgresql`/`models`/`keycloak` chart additions above.
 
-**Not implemented by this ADR** (deliberately, same "guarded until
-values are fixed" posture the chart already documented before this
-change):
-
-- The eight ingestion CLI stage implementations
-  (`components/rag-ingestion/src/rag_ingestion.py`) remain guarded -
-  they need to parse the new `REDHAT_SOURCES_JSON`/
-  `CONFLUENCE_SOURCES_JSON` multi-source config and stamp
-  `acl_groups`/directory metadata per chunk, which is application code,
-  not chart/GitOps/Ansible wiring.
-- KFP recurring-run activation for `schedule.cron`: this
-  RHOAI/DataSciencePipelinesApplication version exposes scheduling only
-  through the KFP v2beta1 HTTP API, not a Kubernetes-native
-  `RecurringRun` CRD - shipping a guessed custom-resource manifest here
-  would be worse than leaving it a documented manual step (see
-  `gitops/charts/rag-ingestion/README.md`'s "Scheduling" section).
-- Real version strings for the non-Satellite `redhat[]` entries
-  (OpenShift Container Platform, OpenShift AI, Red Hat build of
-  Keycloak) are this chart's current best guess, marked `CONFIRM` in
-  `values.yaml` pending verification against docs.redhat.com.
-- Real Confluence space keys and page-tree `directories` (currently
-  demo placeholders under a single `ARCH` space).
-
 No new Day 0 component was required beyond the additive `models` chart
 change: `postgresql`, `keycloak` and `openshift_ai` already existed as
 Day 0 components this feature depends on.
+
+## Follow-up implementation (2026-08-12)
+
+The three items the first cut of this ADR deliberately left undone are
+now implemented:
+
+- **All eight ingestion CLI stages** (`components/rag-ingestion/src/
+  rag_ingestion.py`) - fetch-redhat (crawls `redhat[]` doc URLs, discovers
+  same-book chapter links), fetch-confluence (Confluence Cloud REST API v1
+  CQL search, directory/label filtering, `acl_groups` tagging from
+  `requiredGroups`), detect-changes (sha256 manifest diffing, new/changed/
+  deleted/unchanged), normalize (HTML cleanup preserving code blocks/
+  tables), chunk (tiktoken token-aware splitting with overlap, oversized-
+  paragraph and code-block-atomicity handling), embed (batches calls
+  against the exact same request/response contract as `rag-service`'s own
+  `app/embeddings.py`), index-pgvector (upserts into
+  `document_embeddings`), validate (fails loudly on incomplete rows).
+  Every stage round-trips state through S3 rather than local disk, since
+  KFP runs each stage in its own pod. Verified via `py_compile`, and
+  fixture-driven tests of the pure logic (HTML normalization, chunk
+  splitting including oversized-paragraph and code-block-atomicity edge
+  cases, and full new/changed/deleted/unchanged manifest-diffing across
+  chained detect-changes -> normalize -> chunk runs) against the real
+  `boto3`/`psycopg`/`pgvector`/`tiktoken`/`beautifulsoup4` dependencies -
+  **not** exercised against real Red Hat docs, Confluence, or a live
+  Postgres/S3 (no network egress to those from the environment this was
+  built in).
+- **A schema bug found and fixed along the way**: `data/sxa/schema/
+  002_pgvector.sql` sized `embedding vector(1536)` for an OpenAI-class
+  model, but the model actually wired up everywhere in this repo
+  (`rag-service`'s own default, and this ADR's `embeddingModel` addition)
+  is 384-dimensional - every real `index-pgvector` write would have
+  failed with a dimension mismatch. `data/rag/schema/004_rag_chunking.sql`
+  fixes the column width, and - since it was already touching this table -
+  also lands the compound `(source, chunk_index)` uniqueness
+  `003_rag_metadata.sql`'s own header comment had already flagged as a
+  future revisit for real chunked ingestion (replacing the source-only
+  uniqueness a single-row-per-document fixture corpus didn't need).
+  `data/rag/fixtures/seed.sql`'s `ON CONFLICT` target and the schema-apply
+  Job/kustomization (`gitops/charts/rag-service/templates/
+  job-schema-apply.yaml`, `ansible/roles/rag/kustomize/schema/`) were
+  updated to match.
+- **KFP recurring-run activation**, best-effort: a new task block in
+  `ansible/roles/rag_ingestion/tasks/install.yml` resolves the DSPA's
+  Route and the caller's OpenShift bearer token (`oc whoami -t`), then
+  calls the KFP v2beta1 HTTP API (list pipelines -> list versions ->
+  create recurring run) to activate `schedule.cron`. Wrapped in a
+  `block`/`rescue` so a failure here is logged but never fails the rest
+  of the install - genuinely **UNVERIFIED against a live cluster**: the
+  Route-naming assumption, the "latest version is index 0" assumption,
+  and the exact recurring-run payload shape all need confirming for real.
+- **Every non-Satellite `redhat[]` version string reviewed**, expanded
+  from 4 products (8 entries) to the full 17-product list the user
+  requested (34 entries): OpenShift, OpenStack, Keycloak, Satellite,
+  RHEL, Ansible Automation Platform, OpenShift AI, ACM, ACS, Identity
+  Management, Quay, OpenShift Virtualization (replacing the now-EOL Red
+  Hat Virtualization), MTV, MTA, MTC, ODF, Connectivity Link - each with
+  its 2 most recent versions, or the parent product's 2 versions for the
+  3 products (IdM, MTC, and effectively RHV/OpenShift Virtualization)
+  that have no independent release cadence of their own. Every entry is
+  WebSearch-sourced best effort, not HTTP-verified: `docs.redhat.com`
+  returns HTTP 403 to this environment's fetch tooling, so individual URL
+  verification wasn't possible. Every non-Satellite entry stays marked
+  `CONFIRM` in `values.yaml`.
+
+Still not done, and out of scope for this pass: real Confluence space
+keys and page-tree `directories` (demo placeholders remain), and the
+actual HTTP-verified confirmation of every `CONFIRM`-marked `redhat[]`
+entry.
 
 ## Security considerations
 

@@ -33,6 +33,8 @@ data:
   CHUNKING_STRATEGY: {{ .Values.chunking.strategy | quote }}
   CHUNK_MAX_TOKENS: {{ .Values.chunking.maxTokens | quote }}
   CHUNK_OVERLAP_TOKENS: {{ .Values.chunking.overlapTokens | quote }}
+  CHUNK_PRESERVE_CODE_BLOCKS: {{ .Values.chunking.preserveCodeBlocks | quote }}
+  CHUNK_PRESERVE_TABLES: {{ .Values.chunking.preserveTables | quote }}
   CORPUS_INCREMENTAL: {{ .Values.corpus.incremental | quote }}
   CORPUS_HASH_ALGORITHM: {{ .Values.corpus.hashAlgorithm | quote }}
   CORPUS_DELETE_ORPHANS: {{ .Values.corpus.deleteOrphans | quote }}

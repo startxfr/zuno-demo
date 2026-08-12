@@ -50,12 +50,23 @@ Set the real bucket and region in `values.yaml` or an environment-specific value
 An array, one entry per product+version pair - not a single product with a
 `versions:` list, so each version can carry its own `documentationUrl`/
 `include`/`exclude` independently. Public to everyone: no `acl_groups` is
-ever stamped on chunks from these sources. Ships with 8 entries (2 latest
-versions x 4 techs: Red Hat Satellite, OpenShift Container Platform,
-OpenShift AI, Red Hat build of Keycloak) - only the Satellite 6.17/6.16
-version strings are confirmed; the rest are this chart's current best
-guess and are marked `CONFIRM` in `values.yaml` pending verification
-against docs.redhat.com.
+ever stamped on chunks from these sources. Ships with 34 entries (2 latest
+versions x 17 techs: Satellite, OpenShift Container Platform, OpenShift
+AI, Red Hat build of Keycloak, RHEL, Ansible Automation Platform, ACM,
+ACS, Quay, OpenShift Data Foundation, Connectivity Link, Migration
+Toolkit for Applications/Virtualization/Containers, OpenStack, OpenShift
+Virtualization, and Identity Management) - only the Satellite 6.17/6.16
+version strings are confirmed; every other entry is WebSearch-sourced
+best effort (`docs.redhat.com` returns HTTP 403 to this environment's
+fetch tooling, so individual URL verification wasn't possible) and stays
+marked `CONFIRM` in `values.yaml` pending verification against
+docs.redhat.com before the first real run. Three products have no
+independent version numbering of their own and are modeled as sub-entries
+of their parent product instead of invented version numbers: Identity
+Management (a RHEL doc chapter), Migration Toolkit for Containers (an
+OpenShift Container Platform doc chapter), and OpenShift Virtualization
+(also an OpenShift Container Platform doc chapter, standing in for the
+now-EOL Red Hat Virtualization, which only ever had one release).
 
 ## Confluence Cloud (`confluence[]`)
 
@@ -120,36 +131,59 @@ OpenShift AI / Kubeflow Pipelines orchestrates the chain. The chart creates the 
 ## Scheduling
 
 `schedule.cron`/`schedule.timezone` describe the desired KFP recurring-run
-cadence, but are not yet wired into a chart-rendered resource: this
-RHOAI/DataSciencePipelinesApplication version does not expose a
-Kubernetes-native `RecurringRun` CRD, only the KFP v2beta1 HTTP API.
-Creating the recurring run is a follow-up activation step (manual via the
-OpenShift AI dashboard / KFP UI, or a future `uri`-based Ansible task
-against the DSPA's API route) - deliberately left undone rather than
-shipping an unverified custom-resource manifest.
+cadence. RHOAI's DataSciencePipelinesApplication doesn't expose a
+Kubernetes-native `RecurringRun` CRD, only the KFP v2beta1 HTTP API, so
+`ansible/roles/rag_ingestion/tasks/install.yml` activates the schedule via
+`ansible.builtin.uri` calls against the DSPA's own OAuth-proxied Route
+(the same path the OpenShift AI dashboard itself uses) after the pipeline
+is confirmed Ready. This is **best-effort and UNVERIFIED against a live
+cluster** - the Route-naming assumption (`ds-pipeline-rag-dspa`), the
+"newest version is index 0" assumption, and the recurring-run payload
+shape all need confirming on a real cluster; a failure here is logged but
+does not block the rest of `make d1 install rag-ingestion` - create the
+schedule manually via the dashboard if it doesn't activate automatically.
+`schedule.timezone` is not passed to the API: this KFP version has no
+confirmed equivalent field, and guessing one felt worse than omitting it.
 
-## Runtime image status
+## Runtime image / CLI stages
 
-The build context and CLI contract are included under
-`components/rag-ingestion/`. The container is buildable now, but the
-eight ingestion stage implementations are intentionally guarded until the
-remaining environment-specific values are fixed (AWS bucket/region,
-Confluence spaces/directories, pgvector endpoint/schema and embedding
-endpoint/model). This prevents a successful-looking but incomplete data
-ingestion.
-
-The stable command contract is:
+The build context and CLI are at `components/rag-ingestion/`
+(`src/rag_ingestion.py`). All eight stages are implemented - each one
+round-trips its state through S3 rather than local disk, since KFP runs
+every stage in its own pod:
 
 ```text
-rag-ingestion fetch-redhat
-rag-ingestion fetch-confluence
-rag-ingestion detect-changes
-rag-ingestion normalize
-rag-ingestion chunk
-rag-ingestion embed
-rag-ingestion index-pgvector
-rag-ingestion validate
+fetch-redhat      crawls each enabled redhat[] documentationUrl, discovers same-book
+                  chapter links, writes raw HTML + metadata to <rawPrefix>/<doc_id>.json
+                  (fetchMode: pdf is not implemented - logged and skipped, not faked)
+fetch-confluence  Confluence Cloud REST API v1 (wiki/rest/api/content/search, CQL by
+                  space), filters by directories (ancestor-title path match, best-effort -
+                  Confluence has no literal directories) and excludeLabels, tags each
+                  page's acl_groups from its confluence[] entry's requiredGroups
+detect-changes    diffs raw doc sha256 against a persisted manifest; incremental=false
+                  reprocesses everything; corpus.deleteOrphans drives orphan cleanup
+normalize         strips nav/script/style, preserves code blocks/tables as atomic
+                  fenced/tabular text per chunking.preserveCodeBlocks/preserveTables
+chunk             tiktoken (cl100k_base) token-aware splitting at chunking.maxTokens/
+                  overlapTokens; falls back to a whitespace approximation if tiktoken's
+                  encoding can't be loaded (no network egress); code-fenced blocks are
+                  never split, even when they alone exceed maxTokens
+embed             calls embedding.endpoint in embedding.batchSize batches, using the
+                  exact same request/response contract as rag-service's own
+                  app/embeddings.py (POST {endpoint}/embeddings, {model, input: [...]})
+index-pgvector    upserts into document_embeddings (source, chunk_index) - see
+                  data/rag/schema/004_rag_chunking.sql - and deletes orphaned rows
+validate          fails (non-zero exit) if any document this run touched has zero rows
+                  or any chunk with a NULL embedding
 ```
+
+Not yet exercised end to end against a live cluster/real credentials from
+this environment (no network egress to Red Hat docs/Confluence/a real
+Postgres+S3 from here) - verified instead via `py_compile`, `helm lint`/
+`helm template`, and targeted fixture tests of the pure logic (HTML
+normalization, chunk splitting incl. oversized-paragraph and
+code-block-atomicity edge cases, manifest diffing across new/changed/
+deleted/unchanged documents).
 
 ## Files still requiring real environment values
 

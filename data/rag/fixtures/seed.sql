@@ -8,8 +8,9 @@
 -- stale document, per ADR-0046's Operational consideration ("Add test
 -- corpora containing conflicting versions and bilingual content").
 --
--- Run after data/sxa/schema/002_pgvector.sql and data/rag/schema/003_rag_metadata.sql
--- against a database with the `document_embeddings` table already created.
+-- Run after data/sxa/schema/002_pgvector.sql, data/rag/schema/003_rag_metadata.sql
+-- and data/rag/schema/004_rag_chunking.sql against a database with the
+-- `document_embeddings` table already created.
 -- No `embedding` values are set (NULL) - no live embedding model is
 -- reachable in the environment this fixture was authored in; hybrid
 -- search still serves these rows via full-text search alone (see
@@ -127,4 +128,8 @@ INSERT INTO document_embeddings (source, title, content, metadata) VALUES
     '{"product": "postgresql", "language": "fr", "source_type": "product-doc", "classification": "C1", "last_modified": "2026-01-20", "provenance": "zuno-demo-fixture"}'::jsonb
 )
 
-ON CONFLICT (source) DO NOTHING;
+-- (source, chunk_index), not (source) alone: 004_rag_chunking.sql replaced
+-- the source-only uniqueness with a compound one to support real chunked
+-- ingestion. Every row here implicitly takes chunk_index's default (0),
+-- so the conflict target still matches.
+ON CONFLICT (source, chunk_index) DO NOTHING;

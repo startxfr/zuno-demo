@@ -50,6 +50,8 @@ spec:
             - -f
             - /sql/003_rag_metadata.sql
             - -f
+            - /sql/004_rag_chunking.sql
+            - -f
             - /sql/seed.sql
           volumeMounts:
             - name: sql
