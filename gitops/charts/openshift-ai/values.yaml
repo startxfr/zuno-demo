@@ -95,18 +95,23 @@ cluster-ods:
           wva:
             managementState: Managed
         modelregistry:
+          managementState: Managed
           registriesNamespace: rhoai-model-registries
-        feastoperator: {}
+        feastoperator: 
+          managementState: Managed
         trustyai:
+          managementState: Managed
           eval:
             lmeval:
               permitCodeExecution: deny
               permitOnline: deny
           mcpGuardrailsMode: false
-        aipipelines: {}
-        ray: {}
+        aipipelines:
+          managementState: Managed
+        ray:
+          managementState: Managed
         kueue:
-          managementState: Unmanaged
+          managementState: Managed
           defaultClusterQueueName: default
           defaultLocalQueueName: default
         workbenches:
