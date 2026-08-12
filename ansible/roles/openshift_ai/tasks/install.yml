@@ -60,6 +60,97 @@
           subscription:
             operator:
               channel: "{{ _openshift_ai_channel }}"
+        # VERIFIED live, 2026-08-13: this was never enabled, so the
+        # chart's own DSCInitialization (values.yaml's
+        # cluster-ods.DSCInitialization.spec, applicationsNamespace:
+        # zuno-ai-platform - ADR-0328) never rendered/applied, and the
+        # rhods-operator fell back to auto-creating its own default
+        # (applicationsNamespace: redhat-ods-applications) the moment it
+        # first reconciled - exactly the failure mode this chart's values.yaml
+        # comment already warned about. Must land in this d0 apply (sync-wave
+        # -199, alongside project/operator) so it's Applied before d1's
+        # DataScienceCluster (sync-wave -198) ever gets created.
+        DSCInitialization:
+          enabled: true
+    # Don't wait here: the Subscription below is installPlanApproval:
+    # Manual (gitops/charts/openshift-ai/values.yaml - deliberate, so
+    # Automatic can't silently advance past the pinned EA2 build), and
+    # nothing approves its InstallPlan until the tasks below run - Argo
+    # would report this Application Progressing forever otherwise.
+    gitops_app_wait: false
+
+# rhods-operator's Subscription is deliberately installPlanApproval: Manual.
+# VERIFIED live, 2026-08-13: without an explicit approval step the
+# Subscription (and therefore zuno-openshift-ai-d0's health) sits at
+# InstallPlanPending/RequiresApproval forever - `oc get installplan -n
+# redhat-ods-operator` showed APPROVED: false with no other task in this
+# repo ever flipping it. Approve only the InstallPlan that targets the
+# exact CSV the Subscription itself was configured to pin to (checked
+# below), never anything else - that preserves the "don't drift past the
+# pinned build" property Manual exists for.
+- name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+  register: _openshift_ai_subscription
+  until: >-
+    (_openshift_ai_subscription.resources | default([]) | length) > 0 and
+    (_openshift_ai_subscription.resources[0].status.installPlanRef.name | default('')) | length > 0
+  retries: 30
+  delay: 10
+
+- name: "openshift_ai | look up the pending InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _openshift_ai_subscription.resources[0].status.installPlanRef.name }}"
+    namespace: redhat-ods-operator
+  register: _openshift_ai_installplan
+
+- name: "openshift_ai | fail loudly if the pending InstallPlan targets a different CSV than the pinned startingCSV"
+  ansible.builtin.fail:
+    msg: >-
+      InstallPlan {{ _openshift_ai_installplan.resources[0].metadata.name }}
+      targets {{ _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames }},
+      not the pinned [{{ _openshift_ai_subscription.resources[0].spec.startingCSV }}]
+      this Subscription was configured to install - refusing to
+      auto-approve an unexpected upgrade. Investigate and approve
+      manually (or update gitops/charts/openshift-ai/values.yaml's
+      subscription.version/operator.csv) before re-running.
+  when: _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames != [_openshift_ai_subscription.resources[0].spec.startingCSV]
+
+- name: "openshift_ai | approve the pinned InstallPlan"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _openshift_ai_installplan.resources[0].metadata.name }}"
+    namespace: redhat-ods-operator
+    definition:
+      spec:
+        approved: true
+  when: not (_openshift_ai_installplan.resources[0].spec.approved | default(false))
+
+- name: "openshift_ai | re-apply the openshift-ai GitOps Application (d0: operator) and wait for Synced/Healthy now the InstallPlan is approved"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-ai"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+    gitops_app_extra_helm_values:
+      cluster-ods:
+        project:
+          enabled: true
+        operator:
+          enabled: true
+          subscription:
+            operator:
+              channel: "{{ _openshift_ai_channel }}"
+        # See the identical block's comment in the first d0 apply above.
+        DSCInitialization:
+          enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
@@ -79,7 +170,11 @@
 # as soon as synced, not once status.phase is actually Ready.
 - name: "openshift_ai | wait for the DataScienceCluster to report Ready"
   kubernetes.core.k8s_info:
-    api_version: datasciencecluster.opendatahub.io/v1
+    # v2, not v1: v2 is the CRD's storage version (VERIFIED live,
+    # 2026-08-12/13 - same reasoning as precheck.yml's DataScienceCluster
+    # lookup and this chart's own templates/datasciencecluster.yaml, which
+    # already renders the CR at v2).
+    api_version: datasciencecluster.opendatahub.io/v2
     kind: DataScienceCluster
     name: zuno-dsc
   register: _openshift_ai_dsc
