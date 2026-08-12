@@ -42,7 +42,7 @@ cluster-ods:
         # Left empty; discovered and injected by
         # ansible/roles/openshift_ai/tasks/install.yml at apply time. See
         # templates/checks.yaml, which fails the render if still empty.
-        channel: ""
+        channel: "beta"
         name: rhods-operator
         # Pinned to startingCSV (rhods-operator.3.5.0-ea.2) below, so this
         # must stay Manual: Automatic would approve the next install plan

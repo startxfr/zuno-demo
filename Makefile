@@ -70,6 +70,23 @@ credentials-check:
 define DAY0_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
+if [[ -z "$$verb" ]]; then \
+  printf '%s\n' \
+    'Zuno Demo - Day 0 (cluster prerequisites)' \
+    '' \
+    'Usage: make day0|d0 <verb> [component]' \
+    '' \
+    '  check       Check one/all Day 0 components'"'"' install state' \
+    '  install     Install one/all Day 0 prerequisites' \
+    '  uninstall   Uninstall one/all Day 0 prerequisites (reverse order)' \
+    '  all         check + install, in order' \
+    '' \
+    'Components (optional, default: all):' \
+    '  $(DAY0_COMPONENTS)' \
+    '' \
+    'Example: make d0 install argocd'; \
+  exit 0; \
+fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY0_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day0 verb: '$$verb' (expected one of: $(DAY0_VERBS))" >&2; exit 2;; esac; \
 case " $(DAY0_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day0 component: '$$component' (expected one of: $(DAY0_COMPONENTS) or all)" >&2; exit 2;; esac; \
@@ -82,10 +99,10 @@ case "$$verb" in \
 esac
 endef
 
-day0: credentials-check
+day0: $(if $(DAY_VERB),credentials-check)
 	$(DAY0_RECIPE)
 
-d0: credentials-check
+d0: $(if $(DAY_VERB),credentials-check)
 	$(DAY0_RECIPE)
 
 # day1/d1 share this exact recipe. "all" is handled specially: build
@@ -98,6 +115,27 @@ d0: credentials-check
 define DAY1_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
+if [[ -z "$$verb" ]]; then \
+  printf '%s\n' \
+    'Zuno Demo - Day 1 (build + run the platform)' \
+    '' \
+    'Usage: make day1|d1 <verb> [component]' \
+    '' \
+    '  check       Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
+    '  build       Build one/all Day 1 component images' \
+    '  install     Install/deploy one/all Day 1 components' \
+    '  uninstall   Uninstall one/all Day 1 components (reverse order)' \
+    '  all         check + build + install, whichever apply to the component' \
+    '' \
+    'Components (check/install/uninstall/all; optional, default: all):' \
+    '  $(DAY1_RUN_COMPONENTS)' \
+    '' \
+    'Components (build; optional, default: all):' \
+    '  $(DAY1_BUILD_COMPONENTS)' \
+    '' \
+    'Example: make d1 install rag'; \
+  exit 0; \
+fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY1_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day1 verb: '$$verb' (expected one of: $(DAY1_VERBS))" >&2; exit 2;; esac; \
 run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
@@ -130,10 +168,10 @@ case "$$verb" in \
 esac
 endef
 
-day1: credentials-check
+day1: $(if $(DAY_VERB),credentials-check)
 	$(DAY1_RECIPE)
 
-d1: credentials-check
+d1: $(if $(DAY_VERB),credentials-check)
 	$(DAY1_RECIPE)
 
 # Verb/component tokens are intentionally no-op Make targets. The day0/d0/
