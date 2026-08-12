@@ -1,0 +1,428 @@
+# RAG ingestion Helm chart configuration.
+# No secret value belongs in this file: External Secrets Operator materializes Kubernetes Secrets.
+
+platform:
+  openshiftVersion: "4.22"
+  openshiftAIVersion: "3.5"
+  namespace: "zuno-ai-build"
+  createNamespace: false
+
+serviceAccount:
+  create: true
+  name: "rag-ingestion"
+
+externalSecrets:
+  enabled: true
+  refreshPolicy: Periodic
+  refreshInterval: 1h
+  storeRef:
+    kind: ClusterSecretStore
+    name: "vault-backend"
+
+# OpenShift AI Pipelines server. pgvector is NOT this database.
+pipelineServer:
+  manage: true
+  name: rag-dspa
+  pipelineStore: kubernetes
+  cacheEnabled: false
+  objectStorage:
+    useCorpusS3: true
+  metadataDatabase:
+    mode: externalMySQL      # embeddedMariaDB | externalMySQL
+    externalMySQL:
+      host: "mariadb.zuno-data.svc.cluster.local"
+      port: 3306
+      database: mlpipeline
+      username: mlpipeline
+      secretName: rag-pipeline-db
+      externalSecret:
+        remoteKey: "rag/pipeline-db"
+        passwordProperty: password
+
+# Red Hat product documentation sources - public to everyone, no acl_groups
+# stamped on their chunks. One array entry per product+version pair (not
+# a versions: [] list per product) so each version can carry its own
+# documentationUrl/include/exclude independently. Two latest versions per
+# product, per the platform's own access policy (see confluence[] below
+# for the equivalent persona-restricted Confluence sources). Satellite
+# 6.17/6.16 are confirmed; the OpenShift/OpenShift AI/Keycloak version
+# strings below are this chart's current best guess (openshift_version/
+# openshift_ai_version above are this repo's own already-declared
+# targets; RHBK's are not referenced anywhere else in this repo) - CONFIRM
+# against docs.redhat.com before the first real fetch-redhat run.
+redhat:
+  - enabled: true
+    product: "Red Hat Satellite"
+    productSlug: "red-hat-satellite"
+    version: "6.17"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17"
+    languages: [en-US]
+    fetchMode: html              # html | pdf | both
+    include: []                  # empty = all documents discovered under documentationUrl
+    exclude: []
+  - enabled: true
+    product: "Red Hat Satellite"
+    productSlug: "red-hat-satellite"
+    version: "6.16"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_satellite/6.16"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"              # CONFIRM: matches platform.openshiftVersion above, not yet verified against docs.redhat.com
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"              # CONFIRM: one minor before platform.openshiftVersion, not yet verified
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift AI"
+    productSlug: "red-hat-openshift-ai-self-managed"
+    version: "3.5"                # CONFIRM: matches platform.openshiftAIVersion above, not yet verified
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift AI"
+    productSlug: "red-hat-openshift-ai-self-managed"
+    version: "3.4"                # CONFIRM: not yet verified against docs.redhat.com
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat build of Keycloak"
+    productSlug: "red-hat-build-of-keycloak"
+    version: "26.2"               # CONFIRM: not yet verified against docs.redhat.com
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.2"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat build of Keycloak"
+    productSlug: "red-hat-build-of-keycloak"
+    version: "26.0"               # CONFIRM: not yet verified against docs.redhat.com
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.0"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+
+# Shared Confluence Cloud authentication, reused by every confluence[]
+# entry below via YAML anchor (one Atlassian site, one token secret for
+# this demo) - Helm parses values.yaml as plain YAML before templating,
+# so anchors/aliases work here same as anywhere else. Override an
+# individual entry's authentication block if a source ever needs a
+# different site/credential.
+confluenceAuthDefault: &confluenceAuthDefault
+  type: api-token              # api-token | bearer-token
+  secretName: rag-confluence
+  externalSecret:
+    remoteKey: "rag/confluence"
+    tokenProperty: token
+    usernameProperty: username
+
+# Confluence Cloud sources - persona/skill-restricted. Each entry is
+# filterable by Space (spaces:[]) and by page-tree path (directories:[]),
+# and carries requiredGroups: the acl_groups values stamped onto every
+# chunk ingested from it (document_embeddings.metadata.acl_groups,
+# ADR-0046) - components/rag-service's existing query-time filtering
+# (app/search.py's `?|` intersection against caller_groups) enforces
+# access with no serving-side changes needed. One entry per
+# (tech x skill-tier) combination, matching the 12
+# confluence-{archi,build,run}-<tech> Keycloak groups 1:1
+# (gitops/charts/keycloak/files/realm-zuno.json's /board and /consultant
+# subGroups) - architects (archi) get one tier across all 4 techs;
+# consultants get build and run tiers separately. Space key "ARCH" and
+# the directories below are demo placeholders - replace with real
+# Confluence space keys/page paths per environment (see
+# examples/values-*.yaml).
+confluence:
+  - enabled: true
+    name: satellite-archi
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["Satellite/Architecture"]
+    requiredGroups: ["confluence-archi-satellite"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: satellite-build
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["Satellite/Build"]
+    requiredGroups: ["confluence-build-satellite"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: satellite-run
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["Satellite/Run"]
+    requiredGroups: ["confluence-run-satellite"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: openshift-archi
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["OpenShift/Architecture"]
+    requiredGroups: ["confluence-archi-openshift"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: openshift-build
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["OpenShift/Build"]
+    requiredGroups: ["confluence-build-openshift"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: openshift-run
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["OpenShift/Run"]
+    requiredGroups: ["confluence-run-openshift"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: openshift-ai-archi
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["OpenShiftAI/Architecture"]
+    requiredGroups: ["confluence-archi-openshift-ai"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: openshift-ai-build
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["OpenShiftAI/Build"]
+    requiredGroups: ["confluence-build-openshift-ai"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: openshift-ai-run
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["OpenShiftAI/Run"]
+    requiredGroups: ["confluence-run-openshift-ai"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: keycloak-archi
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["Keycloak/Architecture"]
+    requiredGroups: ["confluence-archi-keycloak"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: keycloak-build
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["Keycloak/Build"]
+    requiredGroups: ["confluence-build-keycloak"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+  - enabled: true
+    name: keycloak-run
+    type: cloud
+    baseUrl: "https://startxfr.atlassian.net"
+    spaces: ["ARCH"]
+    directories: ["Keycloak/Run"]
+    requiredGroups: ["confluence-run-keycloak"]
+    includeAttachments: true
+    preserveAcl: true
+    excludeLabels: [obsolete]
+    authentication: *confluenceAuthDefault
+
+attachmentMimeTypes:
+  - application/pdf
+  - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  - application/vnd.openxmlformats-officedocument.presentationml.presentation
+
+s3:
+  type: aws
+  # Empty endpoint means the chart derives https://s3.<region>.amazonaws.com.
+  endpoint: ""
+  bucket: "zuno-demo-rag-corpus"
+  region: "eu-west-2"         # replace with the actual AWS region
+  pathStyle: false
+  secretName: rag-s3
+  externalSecret:
+    remoteKey: "rag/s3"
+    accessKeyProperty: accessKeyId
+    secretKeyProperty: secretAccessKey
+
+# PostgreSQL + pgvector used by the RAG corpus/index: a dedicated
+# "rag-tech" database (owner role "ragtech") on the shared zuno-postgresql
+# PGO cluster in zuno-data (gitops/charts/postgresql's ragTechDatabase
+# block), holding a "rag" schema - not the shared zunoapp/zuno database.
+# host/secretName below match PGO's own naming convention
+# (<cluster>-pgbouncer Service, <cluster>-pguser-<owner> Secret) rather
+# than a chart-invented name, same as gitops/charts/rag-service's pg.*
+# values. The pguser Secret lives in zuno-data; the ExternalSecret in
+# templates/external-secrets.yaml re-materializes it here in
+# zuno-ai-build (secretKeyRef can't cross namespaces), reading the same
+# Vault path gitops/charts/postgresql/templates/externalsecret-ragtech.yaml
+# also resolves - same cross-namespace pattern as Keycloak (ADR-0315).
+postgres:
+  existing: true
+  host: "zuno-postgresql-pgbouncer.zuno-data.svc"
+  port: 5432
+  database: rag-tech
+  schema: rag
+  sslmode: require
+  secretName: rag-postgres
+  externalSecret:
+    # Vault KV property names (as seeded by ansible/roles/vault/tasks/install.yml's
+    # "username"/"password" keys) - not PGO's own K8s Secret key names
+    # ("user"/"password"), which templates/external-secrets.yaml maps
+    # independently into PGUSER/PGPASSWORD.
+    remoteKey: "rag/postgresql-app"
+    usernameProperty: username
+    passwordProperty: password
+
+# Endpoint/model align with gitops/charts/models' additive embeddingModel
+# (KServe InferenceService "embeddings" -> Service
+# embeddings-predictor.zuno-ai-run.svc) - the same backing service
+# gitops/charts/rag-service already expects by default, closing what was
+# previously a dangling placeholder on that side too.
+embedding:
+  endpoint: "http://embeddings-predictor.zuno-ai-run.svc:8080/v1"
+  model: "BAAI/bge-small-en-v1.5"
+  dimensions: 384
+  batchSize: 64
+  auth:
+    enabled: false
+    secretName: rag-embedding
+    externalSecret:
+      remoteKey: "rag/embedding"
+      tokenProperty: token
+
+chunking:
+  strategy: structural
+  maxTokens: 700
+  overlapTokens: 100
+  preserveCodeBlocks: true
+  preserveTables: true
+
+corpus:
+  rawPrefix: raw
+  normalizedPrefix: normalized
+  manifestPrefix: manifests
+  failedPrefix: failed
+  incremental: true
+  hashAlgorithm: sha256
+  deleteOrphans: true
+
+schedule:
+  enabled: true
+  # KFP recurring runs are created through the OpenShift AI/KFP API, not a
+  # chart-rendered CRD (this RHOAI version's DataSciencePipelinesApplication
+  # doesn't expose a K8s-native RecurringRun resource) - see README's
+  # "Scheduling" section for the manual/follow-up activation step.
+  cron: "0 0 2 * * 0"
+  timezone: Europe/Paris
+
+pipeline:
+  name: rag-corpus-ingestion
+  version: v0-2-0
+  displayName: RAG corpus ingestion
+  description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
+  createPipelineResource: true
+
+# Runtime image is built imperatively by the day1-build Ansible role
+# (ansible/roles/rag_ingestion_build, ansible/tasks/apply_openshift_build.yml)
+# - the same mechanism as every other component's image (rag-service,
+# mcp-gateway, agent-runtime, ai-gateway), not an ArgoCD-managed
+# BuildConfig. Tag is always "latest": apply_openshift_build.yml hardcodes
+# "<name>:latest" as its BuildConfig output, matching every other
+# component.
+images:
+  ingestion:
+    repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/rag-ingestion
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Unused by any template today - components/rag-ingestion/tooling holds
+  # a separate KFP pipeline-compiler image source, not yet wired to a
+  # BuildConfig/consumer. Left for a future compile-time step.
+  compiler:
+    repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/rag-pipeline-compiler
+    tag: latest
+
+resources:
+  fetch:
+    requests: {cpu: "250m", memory: "512Mi"}
+    limits: {cpu: "2", memory: "2Gi"}
+  normalize:
+    requests: {cpu: "1", memory: "2Gi"}
+    limits: {cpu: "4", memory: "8Gi"}
+  embed:
+    requests: {cpu: "1", memory: "2Gi"}
+    limits: {cpu: "4", memory: "8Gi"}
+  index:
+    requests: {cpu: "500m", memory: "1Gi"}
+    limits: {cpu: "2", memory: "4Gi"}
+
+networkPolicy:
+  enabled: true
+  egressCidrs: []
+
+podSecurity:
+  runAsNonRoot: true
+  seccompProfile: RuntimeDefault
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  dropAllCapabilities: true

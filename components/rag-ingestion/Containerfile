@@ -1,0 +1,14 @@
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+USER 0
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm -f /tmp/requirements.txt
+
+COPY src/rag_ingestion.py /opt/app-root/src/rag_ingestion.py
+COPY rag-ingestion /opt/app-root/src/rag-ingestion
+RUN chmod 0755 /opt/app-root/src/rag-ingestion
+
+USER 1001
+WORKDIR /opt/app-root/src
+ENTRYPOINT ["/opt/app-root/src/rag-ingestion"]

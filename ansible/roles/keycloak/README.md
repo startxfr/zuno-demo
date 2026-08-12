@@ -297,6 +297,11 @@ the two; ADR-0040 corrected that):
    v0). These carry no `clientRoles`; they gate tool/data permissions
    inside an already-authorized agent via `policies/tools/tool-policy.yaml`'s
    `allowed_groups`, evaluated by the MCP Gateway.
+   `consultant` and `board` also carry `confluence-{build,run}-<tech>` /
+   `confluence-archi-<tech>` subgroups (tech ∈ satellite, openshift,
+   openshift-ai, keycloak) - these are consumed by `rag-ingestion`/
+   `rag-service` (`document_embeddings.metadata.acl_groups`, ADR-0046),
+   not by the MCP Gateway's tool policy.
 
 A user typically holds one of each (e.g. `consultant-user-01` holds both
 `/consultant` and `/agent_tekos`), but the two are independent claims -

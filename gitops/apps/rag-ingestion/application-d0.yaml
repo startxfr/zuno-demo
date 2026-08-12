@@ -1,0 +1,29 @@
+---
+# No Day0 content for rag-ingestion - no OLM operator of its own (the
+# DataSciencePipelinesApplication/Pipeline CRDs it uses come from
+# openshift_ai's aipipelines component); see gitops/apps/README.md's
+# -d0/-d1 convention.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rag-ingestion-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-134"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+    helm:
+      releaseName: zuno-rag-ingestion-d0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

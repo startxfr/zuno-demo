@@ -1,0 +1,7 @@
+boto3>=1.40,<2
+requests>=2.32,<3
+beautifulsoup4>=4.13,<5
+lxml>=5.4,<6
+psycopg[binary]>=3.2,<4
+pgvector>=0.4,<1
+tiktoken>=0.11,<1

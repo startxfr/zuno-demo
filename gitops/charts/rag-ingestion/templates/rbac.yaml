@@ -1,0 +1,27 @@
+# The ingestion workload does not require Kubernetes API access to read credentials:
+# kfp-kubernetes injects the Secrets/ConfigMap into component Pods.
+# Keep this Role intentionally minimal; extend only for components that create Kubernetes resources.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "rag-ingestion.fullname" . }}
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" . | nindent 4 }}
+rules: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "rag-ingestion.fullname" . }}
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "rag-ingestion.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "rag-ingestion.serviceAccountName" . }}
+    namespace: {{ .Values.platform.namespace }}

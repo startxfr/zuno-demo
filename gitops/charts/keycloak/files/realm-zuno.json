@@ -130,7 +130,80 @@
                 "description": [
                     "Technical consultant business role \u2014 grants Confluence/Drive/Gmail/web-search tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
                 ]
-            }
+            },
+            "subGroups": [{
+                    "name": "confluence-build-satellite",
+                    "path": "/consultant/confluence-build-satellite",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-build-openshift",
+                    "path": "/consultant/confluence-build-openshift",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-build-openshift-ai",
+                    "path": "/consultant/confluence-build-openshift-ai",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-build-keycloak",
+                    "path": "/consultant/confluence-build-keycloak",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-run-satellite",
+                    "path": "/consultant/confluence-run-satellite",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-run-openshift",
+                    "path": "/consultant/confluence-run-openshift",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-run-openshift-ai",
+                    "path": "/consultant/confluence-run-openshift-ai",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-run-keycloak",
+                    "path": "/consultant/confluence-run-keycloak",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                }
+            ]
         },
         {
             "name": "adv",
@@ -157,7 +230,44 @@
                 "description": [
                     "Board / architects business role \u2014 grants Confluence/Drive/Gmail/sales-db/web-search/SMTP tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
                 ]
-            }
+            },
+            "subGroups": [{
+                    "name": "confluence-archi-satellite",
+                    "path": "/board/confluence-archi-satellite",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants architect-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-archi-openshift",
+                    "path": "/board/confluence-archi-openshift",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants architect-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-archi-openshift-ai",
+                    "path": "/board/confluence-archi-openshift-ai",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants architect-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-archi-keycloak",
+                    "path": "/board/confluence-archi-keycloak",
+                    "attributes": {
+                        "description": [
+                            "rag-ingestion ACL group \u2014 grants architect-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                }
+            ]
         },
         {
             "name": "admin",
@@ -248,6 +358,8 @@
             },
             "groups": [
                 "/consultant",
+                "/consultant/confluence-build-satellite",
+                "/consultant/confluence-run-satellite",
                 "/agent_tekos"
             ],
             "credentials": [{
@@ -268,6 +380,8 @@
             },
             "groups": [
                 "/consultant",
+                "/consultant/confluence-build-openshift",
+                "/consultant/confluence-build-openshift-ai",
                 "/agent_tekos"
             ],
             "credentials": [{
@@ -288,6 +402,8 @@
             },
             "groups": [
                 "/consultant",
+                "/consultant/confluence-run-openshift",
+                "/consultant/confluence-run-keycloak",
                 "/agent_tekos"
             ],
             "credentials": [{
@@ -388,6 +504,10 @@
             },
             "groups": [
                 "/board",
+                "/board/confluence-archi-satellite",
+                "/board/confluence-archi-openshift",
+                "/board/confluence-archi-openshift-ai",
+                "/board/confluence-archi-keycloak",
                 "/agent_arkos"
             ],
             "credentials": [{
@@ -408,6 +528,10 @@
             },
             "groups": [
                 "/board",
+                "/board/confluence-archi-satellite",
+                "/board/confluence-archi-openshift",
+                "/board/confluence-archi-openshift-ai",
+                "/board/confluence-archi-keycloak",
                 "/agent_arkos"
             ],
             "credentials": [{
@@ -759,7 +883,7 @@
         {
             "clientId": "openshift",
             "name": "OpenShift Console/oc OIDC identity provider client (ADR-0320)",
-            "description": "Confidential client backing the cluster OAuth OpenID identity provider — server-side code exchange, same shape as tekos-frontend, not a browser SPA",
+            "description": "Confidential client backing the cluster OAuth OpenID identity provider - server-side code exchange, same shape as tekos-frontend, not a browser SPA",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
@@ -799,7 +923,7 @@
         {
             "clientId": "console-favorites-provisioner",
             "name": "Console favorites provisioner service account (ADR-0320)",
-            "description": "Non-interactive client the console_favorites_provisioning CronJob authenticates as to call the Keycloak Admin REST API — never used for a browser login flow",
+            "description": "Non-interactive client the console_favorites_provisioning CronJob authenticates as to call the Keycloak Admin REST API - never used for a browser login flow",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,

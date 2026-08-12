@@ -1,0 +1,28 @@
+---
+# RAG ingestion pipeline (DSPA + KFP Pipeline). Applied after postgresql,
+# keycloak, models and openshift_ai (day0) have prepared the cluster -
+# see ansible/roles/rag_ingestion for the ordering this Application relies on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rag-ingestion-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-133"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/rag-ingestion
+    helm:
+      releaseName: zuno-rag-ingestion-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-build
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

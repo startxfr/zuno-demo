@@ -15,6 +15,7 @@
       - models
       - sql_schema
       - rag
+      - rag_ingestion
       - mcp
       - agents
       - mlops

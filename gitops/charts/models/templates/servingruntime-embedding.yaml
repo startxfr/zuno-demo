@@ -1,0 +1,40 @@
+# Namespace-scoped ServingRuntime, not ClusterServingRuntime, to keep this
+# scoped to zuno-ai-run rather than the cluster-wide catalog. Second
+# instance alongside templates/servingruntime.yaml, serving embeddings
+# instead of chat completions.
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ .Values.embeddingModel.servingRuntimeName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    # Must sync before inferenceservice-embedding.yaml, which references
+    # this runtime by name.
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  supportedModelFormats:
+    - name: vLLM
+      autoSelect: true
+  containers:
+    - name: kserve-container
+      image: "{{ .Values.image.vllm }}"
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      args:
+        - --model=/mnt/models
+        - --served-model-name={{ .Values.embeddingModel.modelId }}
+        - --task=embed
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      # Same rationale as templates/servingruntime.yaml: vLLM writes a
+      # HuggingFace/compilation cache under its container filesystem at
+      # startup, so no readOnlyRootFilesystem/runAsNonRoot override here.
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        {{- toYaml .Values.embeddingModel.resources | nindent 8 }}
+  multiModel: false

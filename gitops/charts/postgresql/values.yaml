@@ -110,3 +110,21 @@ keycloakDatabase:
   name: keycloak
   owner: keycloak
   vaultPath: keycloak/postgresql-app
+
+# Dedicated database/role for the rag-ingestion pipeline's structured
+# corpus/index tables - same isolation rationale and "bring your own
+# password" mechanism as keycloakDatabase above, via
+# templates/externalsecret-ragtech.yaml. owner must be alphanumeric only
+# (no hyphen, no underscore): it feeds PGO's "<cluster>-pguser-<owner>"
+# Secret name, which is RFC 1123-constrained (rejects underscores) same
+# as every other owner in this file, while database.name keeps the
+# hyphen the platform's naming convention asks for - CONFIRM PGO quotes
+# this identifier when creating the database (every other database name
+# in this file avoids the hyphen precisely to sidestep that question;
+# this one doesn't, per an explicit request - verify against a real PGO
+# instance before relying on it, same "not exercised against a real
+# cluster" caveat this role's README already carries elsewhere).
+ragTechDatabase:
+  name: rag-tech
+  owner: ragtech
+  vaultPath: rag/postgresql-app

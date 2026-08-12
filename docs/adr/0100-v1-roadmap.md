@@ -5,7 +5,7 @@
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
 
-Consolidated from 12 individual ADR files. Each entry below is its own immutable decision record, citable as `ADR-0NNN`; only the Decision line is unique per entry — [Standard clauses](README.md#standard-clauses) (Context, Alternatives, Consequences, Security/Operational considerations, Migration/evolution, Related ADRs) apply to every entry unless overridden here.
+Consolidated from 12 individual ADR files. Each entry below is its own immutable decision record, citable as `ADR-0NNN`; only the Decision line is unique per entry - [Standard clauses](README.md#standard-clauses) (Context, Alternatives, Consequences, Security/Operational considerations, Migration/evolution, Related ADRs) apply to every entry unless overridden here.
 
 ### ADR-0101: Provide HA for shared agent platform services
 

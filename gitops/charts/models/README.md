@@ -46,3 +46,20 @@ Depends on the `openshift_ai` role's `DataScienceCluster` having the
 `nfd`, Node Feature Discovery, prepared first - ADR-0047) being ready -
 all are Day 0 components (ADR-0056) installed before `models` (a Day 1
 component) in `ansible/playbooks/day0_install.yml`.
+
+## Second model: embeddings
+
+`values.yaml`'s `embeddingModel.*` block plus `templates/servingruntime-embedding.yaml`,
+`templates/inferenceservice-embedding.yaml` and `templates/networkpolicy-embedding.yaml`
+add a second, additive vLLM `ServingRuntime`/`InferenceService`
+(`granite-embedding`, `ibm-granite/granite-embedding-125m-english`,
+768-dim) serving embeddings via vLLM's `--task embed` mode, reusing the
+same `image.vllm` runtime image discovered for the chat model above -
+kept additive rather than folding both models into a `models: []` list,
+since only these two exist and a list-based rewrite would be a breaking
+change to this chart's flat values shape for no benefit at this scale.
+
+Consumed by `gitops/charts/rag-ingestion`'s `embedding.endpoint`
+(fetch-time chunk embedding, from `zuno-ai-build`) and available to
+`rag-service` for query-time embedding (from `zuno-data`) - both allowed
+by `templates/networkpolicy-embedding.yaml`.

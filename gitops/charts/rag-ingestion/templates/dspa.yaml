@@ -1,0 +1,46 @@
+{{- if .Values.pipelineServer.manage }}
+{{- $s3Endpoint := include "rag-ingestion.s3Endpoint" . }}
+apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+kind: DataSciencePipelinesApplication
+metadata:
+  name: {{ .Values.pipelineServer.name }}
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" . | nindent 4 }}
+spec:
+  dspVersion: v2
+  apiServer:
+    deploy: true
+    pipelineStore: {{ .Values.pipelineServer.pipelineStore }}
+    cacheEnabled: {{ .Values.pipelineServer.cacheEnabled }}
+    enableSamplePipeline: false
+  workflowController:
+    deploy: true
+  mlmd:
+    deploy: true
+  objectStorage:
+    externalStorage:
+      scheme: {{ ternary "https" "http" (hasPrefix "https://" $s3Endpoint) }}
+      host: {{ trimPrefix "https://" (trimPrefix "http://" $s3Endpoint) | quote }}
+      port: {{ ternary "443" "80" (hasPrefix "https://" $s3Endpoint) | quote }}
+      bucket: {{ .Values.s3.bucket | quote }}
+      region: {{ .Values.s3.region | quote }}
+      s3CredentialsSecret:
+        secretName: {{ .Values.s3.secretName }}
+        accessKey: AWS_ACCESS_KEY_ID
+        secretKey: AWS_SECRET_ACCESS_KEY
+  database:
+{{- if eq .Values.pipelineServer.metadataDatabase.mode "embeddedMariaDB" }}
+    mariaDB:
+      deploy: true
+{{- else if eq .Values.pipelineServer.metadataDatabase.mode "externalMySQL" }}
+    externalDB:
+      host: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.host | quote }}
+      port: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.port | quote }}
+      username: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.username | quote }}
+      pipelineDBName: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.database | quote }}
+      passwordSecret:
+        name: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.secretName }}
+        key: password
+{{- end }}
+{{- end }}

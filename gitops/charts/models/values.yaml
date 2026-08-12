@@ -28,3 +28,40 @@ resources:
 
 minReplicas: 1
 maxReplicas: 1
+
+# Additive second model: text embeddings for rag-ingestion (see
+# gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and
+# rag-service's query-side embedding calls. inferenceServiceName is
+# "embeddings", not "embeddings-predictor": KServe RawDeployment appends
+# "-predictor" to the InferenceService name to build its Service name
+# (see qwen25-7b-instruct -> qwen25-7b-instruct-predictor below), and
+# gitops/charts/rag-service/values.yaml's embeddingServiceUrl /
+# components/rag-service/app/config.py's EMBEDDING_SERVICE_URL default
+# already hardcode http://embeddings-predictor.zuno-ai-run.svc:8080 -
+# this closes that previously-dangling reference rather than inventing a
+# third, inconsistent embedding endpoint. Kept as its own
+# servingRuntime/inferenceService pair rather than folding into a
+# models: [] list, since only these two models exist and a list-based
+# rewrite would be a breaking change to every consumer of this chart's
+# flat values shape for no benefit at this scale.
+embeddingModel:
+  servingRuntimeName: vllm-embedding-runtime
+  inferenceServiceName: embeddings
+  # BAAI/bge-small-en-v1.5, 384-dim: matches rag-service's existing
+  # embeddingModelName default (gitops/charts/rag-service/values.yaml) -
+  # same reasoning as the endpoint name above. Served via vLLM's
+  # embedding task (--task embed), not chat.
+  modelId: BAAI/bge-small-en-v1.5
+  dimensions: 384
+  # No GPU request, unlike the 7B chat model above: bge-small-en-v1.5 is
+  # a ~130MB encoder model, cheap enough to run on CPU and avoid
+  # contending with the chat model for the cluster's one GPU.
+  resources:
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  minReplicas: 1
+  maxReplicas: 1

@@ -1,6 +1,6 @@
 # ADR-0319: Target OpenShift 4.22
 
-- **Status:** Implemented — see `platform/docs/platform_profile.yaml`, `README.md`, `MEMORY.md`.
+- **Status:** Implemented - see `platform/docs/platform_profile.yaml`, `README.md`, `MEMORY.md`.
 - **Target:** v0
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

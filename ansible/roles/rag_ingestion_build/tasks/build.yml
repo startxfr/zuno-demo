@@ -1,0 +1,10 @@
+---
+# Day 1 "rag-ingestion" build component: builds the rag-ingestion CLI
+# image via native OpenShift BuildConfig/ImageStream in zuno-ai-build -
+# see ansible/tasks/apply_openshift_build.yml for the shared mechanism.
+- name: "rag_ingestion_build | build rag-ingestion"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: rag-ingestion
+    build_dockerfile_path: Containerfile
+    build_context_dir: components/rag-ingestion

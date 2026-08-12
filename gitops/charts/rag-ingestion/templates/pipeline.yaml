@@ -1,0 +1,12 @@
+{{- if .Values.pipeline.createPipelineResource }}
+apiVersion: pipelines.kubeflow.org/v2beta1
+kind: Pipeline
+metadata:
+  name: {{ .Values.pipeline.name }}
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" . | nindent 4 }}
+spec:
+  displayName: {{ .Values.pipeline.displayName | quote }}
+  description: {{ .Values.pipeline.description | quote }}
+{{- end }}

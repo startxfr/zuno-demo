@@ -1,0 +1,12 @@
+RAG ingestion chart installed in {{ .Values.platform.namespace }}.
+
+Runtime image (built imperatively by `make d1 build rag-ingestion`, not by this chart):
+  {{ include "rag-ingestion.image" . }}
+
+External Secrets store:
+  {{ .Values.externalSecrets.storeRef.kind }}/{{ .Values.externalSecrets.storeRef.name }}
+
+Before running ingestion, replace all remaining environment placeholders in values.yaml,
+including the non-Satellite redhat[] documentationUrl/version entries (CONFIRM against
+docs.redhat.com) and the confluence[] spaces/directories (real Confluence space keys and
+page-tree paths).

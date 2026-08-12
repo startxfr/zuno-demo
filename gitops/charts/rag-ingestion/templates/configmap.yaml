@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rag-ingestion.fullname" . }}-config
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" . | nindent 4 }}
+data:
+  # redhat/confluence are now multi-entry arrays (one product+version pair
+  # per redhat[] entry, one tech x skill-tier source per confluence[]
+  # entry) - KFP's use_config_map_as_env only maps flat key/value pairs,
+  # so each array is passed through as a single JSON blob for the CLI to
+  # parse, rather than as flat REDHAT_*/CONFLUENCE_* keys.
+  REDHAT_SOURCES_JSON: {{ .Values.redhat | toJson | quote }}
+  CONFLUENCE_SOURCES_JSON: {{ .Values.confluence | toJson | quote }}
+  S3_ENDPOINT: {{ include "rag-ingestion.s3Endpoint" . | quote }}
+  S3_BUCKET: {{ .Values.s3.bucket | quote }}
+  S3_REGION: {{ .Values.s3.region | quote }}
+  S3_PATH_STYLE: {{ .Values.s3.pathStyle | quote }}
+  S3_RAW_PREFIX: {{ .Values.corpus.rawPrefix | quote }}
+  S3_NORMALIZED_PREFIX: {{ .Values.corpus.normalizedPrefix | quote }}
+  S3_MANIFEST_PREFIX: {{ .Values.corpus.manifestPrefix | quote }}
+  S3_FAILED_PREFIX: {{ .Values.corpus.failedPrefix | quote }}
+  PGHOST: {{ .Values.postgres.host | quote }}
+  PGPORT: {{ .Values.postgres.port | quote }}
+  PGDATABASE: {{ .Values.postgres.database | quote }}
+  PGSCHEMA: {{ .Values.postgres.schema | quote }}
+  PGSSLMODE: {{ .Values.postgres.sslmode | quote }}
+  EMBEDDING_ENDPOINT: {{ .Values.embedding.endpoint | quote }}
+  EMBEDDING_MODEL: {{ .Values.embedding.model | quote }}
+  EMBEDDING_DIMENSIONS: {{ .Values.embedding.dimensions | quote }}
+  EMBEDDING_BATCH_SIZE: {{ .Values.embedding.batchSize | quote }}
+  CHUNKING_STRATEGY: {{ .Values.chunking.strategy | quote }}
+  CHUNK_MAX_TOKENS: {{ .Values.chunking.maxTokens | quote }}
+  CHUNK_OVERLAP_TOKENS: {{ .Values.chunking.overlapTokens | quote }}
+  CORPUS_INCREMENTAL: {{ .Values.corpus.incremental | quote }}
+  CORPUS_HASH_ALGORITHM: {{ .Values.corpus.hashAlgorithm | quote }}
+  CORPUS_DELETE_ORPHANS: {{ .Values.corpus.deleteOrphans | quote }}

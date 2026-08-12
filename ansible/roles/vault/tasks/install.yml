@@ -326,6 +326,15 @@
         username: keycloak
         password: "{{ zuno_admin_keycloak_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      rag/postgresql-app:
+        # Dedicated database/role for the rag-ingestion pipeline's rag-tech
+        # corpus/index database - keeps its schema/lifecycle isolated from
+        # the unrelated app-data database, same rationale as
+        # keycloak/postgresql-app above. Same naming constraint as
+        # postgresql/app above.
+        username: ragtech
+        password: "{{ zuno_admin_rag_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:

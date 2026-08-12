@@ -1,0 +1,78 @@
+platform:
+  namespace: zuno-ai-build
+
+externalSecrets:
+  enabled: true
+  storeRef:
+    kind: ClusterSecretStore
+    name: replace-with-existing-store
+
+redhat:
+  - enabled: true
+    product: Red Hat Satellite
+    productSlug: red-hat-satellite
+    version: "6.17"
+    documentationUrl: https://docs.redhat.com/en/documentation/red_hat_satellite/6.17
+    languages: [en-US]
+    fetchMode: html
+  - enabled: true
+    product: Red Hat Satellite
+    productSlug: red-hat-satellite
+    version: "6.16"
+    documentationUrl: https://docs.redhat.com/en/documentation/red_hat_satellite/6.16
+    languages: [en-US]
+    fetchMode: html
+
+confluence:
+  - enabled: true
+    name: satellite-archi
+    type: cloud
+    baseUrl: https://startxfr.atlassian.net
+    spaces: [ARCH]
+    directories: ["Satellite/Architecture"]
+    requiredGroups: ["confluence-archi-satellite"]
+    preserveAcl: true
+    authentication:
+      type: api-token
+      secretName: rag-confluence
+      externalSecret:
+        remoteKey: platform/rag/confluence
+        tokenProperty: token
+        usernameProperty: username
+
+s3:
+  type: aws
+  endpoint: ""
+  bucket: replace-with-aws-bucket
+  region: eu-west-1
+  pathStyle: false
+  secretName: rag-s3
+  externalSecret:
+    remoteKey: platform/rag/s3
+    accessKeyProperty: accessKeyId
+    secretKeyProperty: secretAccessKey
+
+postgres:
+  existing: true
+  host: zuno-postgresql-pgbouncer.zuno-data.svc
+  port: 5432
+  database: rag-tech
+  schema: rag
+  sslmode: require
+  secretName: rag-postgres
+  externalSecret:
+    remoteKey: rag/postgresql-app
+    usernameProperty: username
+    passwordProperty: password
+
+embedding:
+  endpoint: http://embeddings-predictor.zuno-ai-run.svc:8080/v1
+  model: BAAI/bge-small-en-v1.5
+  dimensions: 384
+  auth:
+    enabled: false
+
+images:
+  ingestion:
+    repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/rag-ingestion
+    tag: latest

@@ -46,7 +46,7 @@ cluster-gpu:
       # Scoped to this single namespace, not all-ns (startx's own default).
 
   # Must stay false until a real ClusterPolicy spec is discovered from the
-  # installed operator's CSV — an empty spec is rejected by the CRD.
+  # installed operator's CSV - an empty spec is rejected by the CRD.
   # gpu.spec must be pre-serialized YAML text (a string), not a native map.
   gpu:
     enabled: false

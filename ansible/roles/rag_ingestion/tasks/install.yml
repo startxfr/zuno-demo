@@ -1,0 +1,50 @@
+---
+# No OLM operator of its own - the DataSciencePipelinesApplication/Pipeline
+# CRDs this chart uses come from openshift_ai's aipipelines component
+# (day0), so -d0 is a documented no-op, same pattern as
+# ansible/roles/rag/tasks/install.yml.
+- name: "rag_ingestion | apply the rag-ingestion GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "rag-ingestion"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-rag-ingestion-d0"
+
+- name: "rag_ingestion | apply the rag-ingestion GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "rag-ingestion"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-rag-ingestion-d1"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# UNVERIFIED against a live cluster - the DataSciencePipelinesApplication
+# CR's exact status shape wasn't confirmed from this environment. Assumes
+# a standard status.conditions entry of type "Ready" (the common
+# kubebuilder convention, same assumption ansible/roles/mariadb/tasks/
+# install.yml documents for its own CR). Re-check with `oc get dspa
+# rag-dspa -n zuno-ai-build -o yaml` against the target cluster and
+# adjust if the operator uses a different field.
+- name: "rag_ingestion | wait for the rag-dspa DataSciencePipelinesApplication to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: datasciencepipelinesapplications.opendatahub.io/v1
+    kind: DataSciencePipelinesApplication
+    namespace: zuno-ai-build
+    name: rag-dspa
+  register: _rag_ingestion_dspa
+  until: >-
+    (_rag_ingestion_dspa.resources | default([]) | length) > 0 and
+    (_rag_ingestion_dspa.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 60
+  delay: 15
+
+- name: "rag_ingestion | configure summary"
+  ansible.builtin.debug:
+    msg: >-
+      rag-dspa DataSciencePipelinesApplication has reported Ready in
+      zuno-ai-build. See gitops/charts/rag-ingestion/README.md
+      "Scheduling" section for the (currently manual) KFP recurring-run
+      activation step.

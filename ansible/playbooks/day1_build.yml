@@ -10,6 +10,7 @@
     day1_build_components:
       - mcp_build
       - rag_build
+      - rag_ingestion_build
       - agent_build
       - ai_gateway_build
   tasks:

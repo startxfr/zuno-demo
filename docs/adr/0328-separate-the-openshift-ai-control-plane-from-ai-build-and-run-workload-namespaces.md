@@ -786,15 +786,15 @@ unless the component, Operator or Custom Resource explicitly imposes another nam
 
 ## Related ADRs
 
-- ADR-0047 — Manage the complete OpenShift AI prerequisite lifecycle
-- ADR-0048 — Discover supported operator channels and serving runtimes at deployment time
-- ADR-0056 — Restructure deployment into Day 0 / Day 1 sequencing
-- ADR-0319 — Target OpenShift 4.22
-- ADR-0320 — Pre-provision OpenShift users, RBAC and console favorites via Keycloak
-- ADR-0321 — Delegate Kueue lifecycle to the Red Hat build of Kueue Operator
-- ADR-0322 — Migrate from Llama Stack configuration to OpenShift AI OGX
-- ADR-0325 — Complete the OpenShift AI MaaS governance plane integration
-- ADR-0329 — Consolidate agent workloads into the shared zuno-ai-run namespace, retiring the namespace-per-agent isolation model
+- ADR-0047 - Manage the complete OpenShift AI prerequisite lifecycle
+- ADR-0048 - Discover supported operator channels and serving runtimes at deployment time
+- ADR-0056 - Restructure deployment into Day 0 / Day 1 sequencing
+- ADR-0319 - Target OpenShift 4.22
+- ADR-0320 - Pre-provision OpenShift users, RBAC and console favorites via Keycloak
+- ADR-0321 - Delegate Kueue lifecycle to the Red Hat build of Kueue Operator
+- ADR-0322 - Migrate from Llama Stack configuration to OpenShift AI OGX
+- ADR-0325 - Complete the OpenShift AI MaaS governance plane integration
+- ADR-0329 - Consolidate agent workloads into the shared zuno-ai-run namespace, retiring the namespace-per-agent isolation model
 
 ## Review evidence
 

@@ -77,28 +77,57 @@ activation/config singleton CR" shape `gitops/charts/jobset`'s
 `JobSetOperator` and `gitops/charts/kueue`'s `Kueue` CR already use in this
 repo.
 
-## What's unverified against a real cluster
+## Confirmed against a live cluster (api.demo222.startx.fr, 2026-08-12)
 
-This environment has no network path to a real OpenShift cluster, so the
-following were written from `mariadb-operator`'s general CRD/CSV shape but
-not exercised end to end:
+- The `mariadb-operator` controller-manager Deployment is indeed named
+  `mariadb-operator` in `zuno-data` (`install.yml`'s wait step). The
+  `MariadbOperator` activation CR also brings up two sibling Deployments,
+  `mariadb-operator-cert-controller` and `mariadb-operator-webhook`, not
+  waited on directly - `MariaDB` CR reconciliation itself blocks (via a
+  validating webhook call) until the webhook Deployment has real endpoints,
+  so `install.yml`'s existing "wait for controller-manager Available, then
+  wait for MariaDB Ready" order is sufficient; the webhook race resolves on
+  its own within the `MariaDB` CR wait's retry budget.
+- The `MariaDB` CR does report a `status.conditions[]` entry of
+  `type: Ready` (`status: "True"` once healthy) - the
+  `install.yml`/`precheck.yml` assumption was correct.
+- `status.currentPrimary`/`status.tls.*` are also populated
+  (`mariadb-0` as primary, an auto-generated CA/server/client cert chain) -
+  not currently read by this role, but available if needed later.
+- The `PhysicalBackup` CR's `spec.storage.s3` shape has *not* been
+  exercised live yet (no S3 credentials configured in
+  `ansible/confidential.yml` on this cluster) - still only confirmed
+  against the community operator's `alm-examples`.
 
-- The `mariadb-operator` controller-manager Deployment's exact name once
-  started by the `MariadbOperator` activation CR (`install.yml` assumes
-  `mariadb-operator` in `zuno-data` - confirm with `oc get deployment -n
-  zuno-data -l app.kubernetes.io/name=mariadb-operator` against the target
-  cluster and adjust if the embedded Helm chart derives a different name).
-- The `MariaDB` CR's ready-condition shape (`install.yml`/`precheck.yml`
-  assume a `status.conditions[]` entry of `type: Ready`, the common
-  kubebuilder convention) - confirm with
-  `oc get mariadb mariadb -n zuno-data -o yaml` against the target cluster.
-- The `PhysicalBackup` CR's `spec.storage.s3` field shape
-  (`gitops/charts/mariadb/templates/physicalbackup.yaml`) - confirmed
-  field-for-field against the community operator's own `alm-examples`, but
-  not against a live `PhysicalBackup` reconciliation.
+## Vault must be (re-)seeded before the first install
 
-Run `make d0 check mariadb` → `make d0 install mariadb` against the real
-cluster and adjust any of the above that turns out to be wrong.
+`ExternalSecret`s only resolve once their Vault path actually exists.
+`zuno/mariadb/root` is seeded by `ansible/roles/vault/tasks/install.yml`,
+which only runs via `make d0 install vault` (or `all`) - a targeted
+`make d0 install mariadb` on a cluster where `vault` hasn't been re-run
+since this component was added will hang retrying
+`gitops | wait for zuno-mariadb-d1 to become Synced and Healthy` forever,
+because the `mariadb-root-password` `ExternalSecret` can never sync. Note
+that **`vault`'s per-secret password generation is not idempotent**
+(`lookup('ansible.builtin.password', '/dev/null', ...)` can't persist/read
+back a prior value), so a full `make d0 install vault` re-run regenerates
+*every* secret it seeds, not just this component's - risky against a
+cluster with other components already relying on their current values. To
+seed just the new path without touching anything else, run a scoped
+`vault kv put zuno/mariadb/root password=<random>` directly against the
+`zuno-vault-0` pod instead.
+
+Separately: if ArgoCD's automated sync already exhausted its retry budget
+(5 attempts) against a real failure, fixing the underlying cause (e.g. the
+Vault seed above) is not by itself enough to make it retry - a plain
+`argocd.argoproj.io/refresh=hard` annotation alone did not trigger a new
+sync attempt either. A fresh sync operation had to be triggered explicitly
+(`oc patch application <name> -n openshift-gitops --type merge -p
+'{"operation":{"sync":{"revision":"HEAD","prune":true}}}'`, what the
+`argocd` CLI's `app sync` does under the hood) before `-d1` proceeded.
+
+Run `make d0 check mariadb` → `make d0 install mariadb` again after any of
+the above to pick up wherever it left off.
 
 ## Credentials
 

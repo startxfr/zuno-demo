@@ -1,0 +1,14 @@
+apiVersion: v2
+name: rag-ingestion
+description: OpenShift AI RAG ingestion pipeline for Red Hat documentation and Confluence into PostgreSQL/pgvector
+type: application
+version: 0.2.0
+appVersion: "0.2.0"
+kubeVersion: ">=1.29.0-0"
+keywords:
+  - openshift-ai
+  - kubeflow-pipelines
+  - rag
+  - pgvector
+  - confluence
+  - external-secrets

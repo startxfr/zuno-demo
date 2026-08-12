@@ -1,0 +1,25 @@
+# Model weights are pulled from Hugging Face at pod start (hf://), no
+# offline/mirrored cache; same cold-start caveat as
+# templates/inferenceservice.yaml, though this model is far smaller.
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ .Values.embeddingModel.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    # RawDeployment: this always-on model has no need for Serverless/Knative.
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    minReplicas: {{ .Values.embeddingModel.minReplicas }}
+    maxReplicas: {{ .Values.embeddingModel.maxReplicas }}
+    model:
+      modelFormat:
+        name: vLLM
+      runtime: {{ .Values.embeddingModel.servingRuntimeName }}
+      storageUri: "hf://{{ .Values.embeddingModel.modelId }}"
+      resources:
+        {{- toYaml .Values.embeddingModel.resources | nindent 8 }}

@@ -173,5 +173,12 @@ the real cluster and adjust any of the above that turns out to be wrong.
   externalsecret-postgresql.yaml`) reading the same
   `zuno/keycloak/postgresql-app` Vault path this chart's
   `templates/externalsecret-keycloak.yaml` also resolves - same
-  cross-namespace pattern as `mcp-sales-db`. `spec.users[]` in
-  `templates/postgrescluster.yaml` is accordingly a two-entry list now.
+  cross-namespace pattern as `mcp-sales-db`.
+- `ansible/roles/rag_ingestion` - a **third**, dedicated `ragtech`/
+  `rag-tech` database/role for the ingestion pipeline's structured
+  corpus/index tables, via its own `ExternalSecret`
+  (`gitops/charts/rag-ingestion/templates/external-secrets.yaml`) reading
+  the same `zuno/rag/postgresql-app` Vault path this chart's
+  `templates/externalsecret-ragtech.yaml` also resolves - same
+  cross-namespace pattern as Keycloak above. `spec.users[]` in
+  `templates/postgrescluster.yaml` is accordingly a three-entry list now.
