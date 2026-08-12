@@ -16,9 +16,8 @@ spec:
     helm:
       releaseName: zuno-openshift-ai-d1
       values: |
-        cluster-ods:
-          DataScienceCluster:
-            enabled: true
+        dataScienceCluster:
+          enabled: true
         maasGateway:
           enabled: true
           # Placeholder auto-substituted with the real cluster domain by

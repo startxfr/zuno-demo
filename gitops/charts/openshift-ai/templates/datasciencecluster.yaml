@@ -1,0 +1,25 @@
+{{- /*
+Not part of the vendored startx `cluster-ods` chart: its own
+DataScienceCluster template (templates/dataScienceCluster.yaml inside the
+vendored dependency) hardcodes apiVersion v1 and has no support for custom
+metadata.labels or a spec.applicationsNamespace field. RHOAI 3.5's v2 CRD
+needs both, so this chart renders its own CR here instead, the same reason
+templates/dscinitialization.yaml exists. cluster-ods.DataScienceCluster is
+hardcoded to enabled: false in values.yaml so the vendored template never
+also renders this object.
+*/ -}}
+{{- with .Values.dataScienceCluster -}}
+{{- if .enabled -}}
+{{- $name := .name | default "default-dsc" -}}
+apiVersion: datasciencecluster.opendatahub.io/v2
+kind: DataScienceCluster
+metadata:
+  name: {{ $name | quote }}
+  {{- with .labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- .spec | nindent 2 }}
+{{- end -}}
+{{- end -}}

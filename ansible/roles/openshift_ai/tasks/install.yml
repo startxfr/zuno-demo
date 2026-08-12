@@ -12,15 +12,21 @@
     msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d0 check openshift-ai' first."
   when: (_openshift_ai_pkg.resources | default([]) | length) == 0
 
-# Selects the 3.5-family channel actually published, rather than a
+# Prefers a literal 'beta' channel (ADR-0002: target OpenShift AI 3.5 EA2,
+# published under 'beta' rather than a '3.5'-named channel), falling back
+# to whatever 3.5-family channel is actually published, rather than a
 # hardcoded guess (exact channel naming isn't standardized across catalogs).
-- name: "openshift_ai | select the 3.5-family channel actually published by this cluster's catalog"
+- name: "openshift_ai | select the beta channel if published, else the 3.5-family channel actually published by this cluster's catalog"
   ansible.builtin.set_fact:
     _openshift_ai_channel: >-
       {{
-        ((_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | map(attribute='name') | list)[0])
-        if (_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | list | length) > 0
-        else (_openshift_ai_pkg.resources[0].status.defaultChannel | default(''))
+        'beta'
+        if ('beta' in (_openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list))
+        else (
+          ((_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | map(attribute='name') | list)[0])
+          if (_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | list | length) > 0
+          else (_openshift_ai_pkg.resources[0].status.defaultChannel | default(''))
+        )
       }}
 
 - name: "openshift_ai | fail with a clear diagnostic if no usable channel was found"
@@ -64,9 +70,8 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_extra_helm_values:
-      cluster-ods:
-        DataScienceCluster:
-          enabled: true
+      dataScienceCluster:
+        enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 

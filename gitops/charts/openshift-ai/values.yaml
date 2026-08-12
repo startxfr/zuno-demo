@@ -1,7 +1,7 @@
 # Thin wrapper around the startx `cluster-ods` chart (vendored as a Helm
 # dependency). Shared by two ArgoCD Applications: project + operator
 # (zuno-openshift-ai-d0) render the Namespace/OperatorGroup/Subscription,
-# DataScienceCluster.enabled (zuno-openshift-ai-d1) renders the CR.
+# dataScienceCluster.enabled (zuno-openshift-ai-d1) renders the CR.
 cluster-ods:
   context: &context
     scope: zuno
@@ -35,13 +35,21 @@ cluster-ods:
       enabled: true
       name: rhods-operator
       namespace: redhat-ods-operator
+      # Combined with operator.csv below to build startingCSV
+      # (rhods-operator.3.5.0-ea.2, the beta-channel EA2 build - ADR-0002).
+      version: "3.5.0-ea.2"
       operator:
         # Left empty; discovered and injected by
         # ansible/roles/openshift_ai/tasks/install.yml at apply time. See
         # templates/checks.yaml, which fails the render if still empty.
         channel: ""
         name: rhods-operator
-        installPlanApproval: Automatic  # startx chart defaults to Manual
+        # Pinned to startingCSV (rhods-operator.3.5.0-ea.2) below, so this
+        # must stay Manual: Automatic would approve the next install plan
+        # in the beta channel and immediately move past the pinned build.
+        installPlanApproval: Manual
+        # Combined with subscription.version above to build startingCSV.
+        csv: rhods-operator
         source:
           name: redhat-operators
           namespace: openshift-marketplace
@@ -73,73 +81,98 @@ cluster-ods:
         managementState: Managed
         namespace: zuno-monitoring
 
-  # Spec deliberately overridden in full, not startx's default: uses kserve
-  # RawDeployment rather than Serverless, which would require the Service
-  # Mesh, Serverless and cert-manager operators this repo doesn't install.
+  # Superseded by the top-level dataScienceCluster key below (rendered by
+  # this chart's own templates/datasciencecluster.yaml, not the vendored
+  # one): the vendored template hardcodes apiVersion v1 and has no support
+  # for metadata.labels or a spec.applicationsNamespace field, both needed
+  # for RHOAI 3.5's v2 CRD. Hardcoded false (not toggled by
+  # application-d1.yaml/Ansible) so the vendored template never also
+  # renders a second DataScienceCluster object.
   DataScienceCluster:
     enabled: false
-    name: zuno-dsc
-    namespace: redhat-ods-operator
-    spec: |
-      components:
-        sparkoperator:
+
+# Not part of the vendored startx `cluster-ods` chart - rendered by this
+# chart's own templates/datasciencecluster.yaml (see the
+# cluster-ods.DataScienceCluster comment above for why the vendored
+# template can't be used: no apiVersion v2, no metadata.labels, no
+# spec.applicationsNamespace). Spec deliberately overridden in full, not
+# startx's default: uses kserve RawDeployment rather than Serverless, which
+# would require the Service Mesh, Serverless and cert-manager operators
+# this repo doesn't install. NOTE: applicationsNamespace here
+# (zuno-ai-platform) currently differs from cluster-ods.DSCInitialization's
+# applicationsNamespace (zuno-ai-build) above - two different namespaces
+# for what conceptually could be the same operand namespace; left as-is
+# pending confirmation this is intentional.
+dataScienceCluster:
+  enabled: false
+  name: zuno-dsc
+  labels:
+    app.kubernetes.io/name: datasciencecluster
+  spec: |
+    applicationsNamespace: zuno-ai-platform
+    components:
+      ogx:
+        managementState: Managed
+      sparkoperator:
+        managementState: Managed
+      kserve:
+        modelCache:
           managementState: Managed
-        kserve:
+          cacheSize: "140Gi"
+          nodeSelector:
+            matchExpressions:
+              - values:
+                  - 'true'
+                key: nvidia.com/gpu.present
+                operator: In
+        modelsAsService:
           managementState: Managed
-          modelsAsService:
-            managementState: Managed
-          nim:
-            airGapped: false
-            managementState: Managed
-          rawDeploymentServiceConfig: Headless
-          wva:
-            managementState: Managed
-        modelregistry:
+        nim:
+          airGapped: false
           managementState: Managed
-          registriesNamespace: rhoai-model-registries
-        feastoperator: 
+        rawDeploymentServiceConfig: Headless
+        wva:
           managementState: Managed
-        trustyai:
+        managementState: Managed
+      modelregistry:
+        registriesNamespace: zuno-ai-build
+        managementState: Managed
+      feastoperator:
+        managementState: Managed
+      trustyai:
+        eval:
+          lmeval:
+            permitCodeExecution: deny
+            permitOnline: deny
+        mcpGuardrailsMode: false
+        managementState: Managed
+      aipipelines:
+        argoWorkflowsControllers:
           managementState: Managed
-          eval:
-            lmeval:
-              permitCodeExecution: deny
-              permitOnline: deny
-          mcpGuardrailsMode: false
-        aipipelines:
+        managementState: Managed
+      ray:
+        managementState: Managed
+      kueue:
+        defaultClusterQueueName: default
+        defaultLocalQueueName: default
+        managementState: Unmanaged
+      workbenches:
+        workbenchNamespace: zuno-ai-build
+        managementState: Managed
+      mlflowoperator:
+        managementState: Managed
+      dashboard:
+        managementState: Managed
+      trainer:
+        managementState: Managed
+      llamastackoperator:
+        managementState: Removed
+      aigateway:
+        batchGateway:
           managementState: Managed
-        ray:
-          managementState: Managed
-        kueue:
-          managementState: Managed
-          defaultClusterQueueName: default
-          defaultLocalQueueName: default
-        workbenches:
-          managementState: Managed
-          workbenchNamespace: zuno-ai-build
-        mlflowoperator:
-          managementState: Managed
-        dashboard:
-          managementState: Managed
-        trainer:
-          managementState: Managed
-        # ADR-0322 v0: replaces the former llamastackoperator activation.
-        # VERIFIED GAP (2026-08-11, live cluster, RHOAI DataScienceCluster
-        # CRD v2): `oc explain datasciencecluster.spec.components` on the
-        # cluster connected while this change was written does NOT expose
-        # an `ogx` field yet - only `llamastackoperator`. A structural CRD
-        # schema silently prunes unknown properties, so applying this as-is
-        # today would drop `ogx` entirely and activate neither Llama Stack
-        # nor OGX. Do not apply this chart to a cluster until `oc explain
-        # datasciencecluster.spec.components` confirms `ogx` is present
-        # (i.e. the rhods-operator has been upgraded to a CRD version that
-        # actually ships the OGX Operator) - see ADR-0322's own Consequences
-        # section on EA/Technology-Preview lifecycle risk, which this is a
-        # concrete instance of.
-        ogx:
-          managementState: Managed
-        trainingoperator:
-          managementState: Managed
+        managementState: Managed
+      trainingoperator:
+        managementState: Managed
 
 # Not part of the vendored startx `cluster-ods` chart - rendered by this
 # chart's own templates/maas-gateway.yaml. DataScienceCluster's

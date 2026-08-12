@@ -5,8 +5,8 @@ description: >-
   Ansible run time) and the DataScienceCluster with kserve (RawDeployment)
   enabled. Wraps the startx cluster-ods chart as a dependency.
 type: application
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.3.0
+appVersion: "0.3.0"
 dependencies:
   - name: cluster-ods
     version: "21.3.277"
