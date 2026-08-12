@@ -45,6 +45,8 @@ namespace is reserved (ADR-0329, supersedes ADR-0023): a future active
 Arkos deployment would run in the shared `zuno-ai-run` namespace.
 `tasks/coming-soon.md` describes the intended v1 build from
 `agents/arkos/README.md` and `MEMORY.md` sections 8-9. Access group is
-`board` per the Track E contract; note this reads
-unusually for an architects' audience - flagged as an open question in the
-final report.
+`board` per ADR-0040's business-role dimension - intentional, not the
+`agent_arkos` entitlement group: DATs are reviewed and approved at board
+level, so tool/data permissions inside Arkos are gated on `board`
+membership rather than on the broader (and orthogonal) architects'
+entitlement to the agent itself.

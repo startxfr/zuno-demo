@@ -76,7 +76,7 @@ cluster-ods:
     enabled: false
     name: default-dsci
     spec: |
-      applicationsNamespace: zuno-ai-build
+      applicationsNamespace: zuno-ai-platform
       monitoring:
         managementState: Managed
         namespace: zuno-monitoring
@@ -98,11 +98,10 @@ cluster-ods:
 # spec.applicationsNamespace). Spec deliberately overridden in full, not
 # startx's default: uses kserve RawDeployment rather than Serverless, which
 # would require the Service Mesh, Serverless and cert-manager operators
-# this repo doesn't install. NOTE: applicationsNamespace here
-# (zuno-ai-platform) currently differs from cluster-ods.DSCInitialization's
-# applicationsNamespace (zuno-ai-build) above - two different namespaces
-# for what conceptually could be the same operand namespace; left as-is
-# pending confirmation this is intentional.
+# this repo doesn't install. applicationsNamespace here matches
+# cluster-ods.DSCInitialization's applicationsNamespace above
+# (zuno-ai-platform, ADR-0328): both must agree since they describe the
+# same operand namespace.
 dataScienceCluster:
   enabled: false
   name: zuno-dsc
@@ -135,7 +134,7 @@ dataScienceCluster:
           managementState: Managed
         managementState: Managed
       modelregistry:
-        registriesNamespace: zuno-ai-build
+        registriesNamespace: zuno-ai-platform
         managementState: Managed
       feastoperator:
         managementState: Managed

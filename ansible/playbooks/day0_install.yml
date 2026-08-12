@@ -11,9 +11,9 @@
       - namespaces
       - openshift_rbac_groups
       - vault
-      - redis
       - cert_manager
       - external_secrets
+      - redis
       - observability
       - postgresql
       - mariadb

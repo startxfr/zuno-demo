@@ -42,7 +42,16 @@ values point at - never a literal password in Git, per ADR-0024.
 
 ## Day 0 ordering
 
-Positioned right after `vault` - its only real dependency (the
-`zuno/redis/session-store` Vault secret and the `zuno-auth` namespace,
-owned by `namespaces`) - well ahead of the agent workload charts
-(`tekos`, applied Day 1) that actually consume it.
+Positioned right after `external_secrets` (`ansible/playbooks/
+day0_install.yml`/`day0_check.yml`), not right after `vault` as originally
+documented here - **VERIFIED live, 2026-08-12**: this chart's own
+`templates/externalsecret.yaml` creates an `external-secrets.io/v1beta1
+ExternalSecret`, so the External Secrets Operator's CRD must already be
+registered on the cluster before ArgoCD can sync `zuno-redis-d1`, or the
+sync fails outright (`could not find version "v1beta1" of
+external-secrets.io/ExternalSecret`) - the original "vault is the only
+real dependency" reasoning missed this. `vault` (the secret's source) and
+`namespaces` (owner of `zuno-auth`) still matter too, but `external_secrets`
+(the CRD provider) is the binding constraint on ordering. Still well ahead
+of the agent workload charts (`tekos`, applied Day 1) that actually
+consume it.

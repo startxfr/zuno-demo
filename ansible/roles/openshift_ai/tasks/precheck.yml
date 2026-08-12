@@ -16,7 +16,15 @@
 
 - name: "openshift_ai | look up the DataScienceCluster"
   kubernetes.core.k8s_info:
-    api_version: datasciencecluster.opendatahub.io/v1
+    # v2, not v1: v2 is the CRD's storage version (VERIFIED live,
+    # 2026-08-12: `oc get crd ... -o jsonpath='{.spec.versions[*].name}
+    # {.spec.versions[*].storage}'` shows v1 served=true/storage=false, v2
+    # served=true/storage=true) - same reasoning as
+    # ansible/roles/kueue/tasks/uninstall.yml's ClusterQueue lookup and
+    # gitops/charts/openshift-ai/templates/datasciencecluster.yaml, which
+    # already renders the CR at v2: reading at the storage version avoids
+    # an unnecessary conversion-webhook round-trip.
+    api_version: datasciencecluster.opendatahub.io/v2
     kind: DataScienceCluster
     name: zuno-dsc
   register: _openshift_ai_dsc_lookup

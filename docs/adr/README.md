@@ -83,8 +83,8 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0207](0200-v2-roadmap.md#adr-0207-add-specialized-task-oriented-frontend-views) | v2 | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0208](0200-v2-roadmap.md#adr-0208-automate-removal-of-inaccessible-private-rag-content) | v2 | Proposed | Automate removal of inaccessible private RAG content |
 | [ADR-0209](0200-v2-roadmap.md#adr-0209-introduce-advanced-human-approval-workflows) | v2 | Proposed | Introduce advanced human approval workflows |
-| [ADR-0301](0300-v3-roadmap.md#adr-0301-introduce-lora-and-peft-model-customization) | v3 | Proposed | Introduce LoRA and PEFT model customization |
-| [ADR-0302](0300-v3-roadmap.md#adr-0302-build-dataset-to-model-mlops-pipelines) | v3 | Proposed | Build dataset-to-model MLOps pipelines |
+| [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v3 | To be implemented | Introduce LoRA and PEFT model customization |
+| [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v3 | To be implemented | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) | v3 | Proposed | Support dynamic LoRA adapter loading |
 | [ADR-0304](0300-v3-roadmap.md#adr-0304-optimize-model-selection-using-quality-cost-and-latency) | v3 | Proposed | Optimize model selection using quality cost and latency |
 | [ADR-0305](0300-v3-roadmap.md#adr-0305-introduce-automated-model-benchmarking) | v3 | Proposed | Introduce automated model benchmarking |

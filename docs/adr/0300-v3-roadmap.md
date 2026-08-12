@@ -9,11 +9,11 @@ Consolidated from 9 individual ADR files. Each entry below is its own immutable 
 
 ### ADR-0301: Introduce LoRA and PEFT model customization
 
-Allow efficient task/domain adaptation, starting with Comage candidate use cases.
+Promoted to a full decision record: see [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) (`ansible/roles/mlops` needed a real design to scaffold against).
 
 ### ADR-0302: Build dataset-to-model MLOps pipelines
 
-Automate dataset preparation, training, evaluation, registry and deployment.
+Promoted to a full decision record: see [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md).
 
 ### ADR-0303: Support dynamic LoRA adapter loading
 

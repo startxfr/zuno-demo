@@ -4,7 +4,7 @@
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
-- **Last reviewed:** 2026-08-11
+- **Last reviewed:** 2026-08-12
 
 ## Context
 
@@ -34,7 +34,10 @@ The release workflow must reconcile source revision, image digest, chart values 
 
 ## Implementation state
 
-**Partially implemented as of 2026-08-11.**
+**Partially implemented as of 2026-08-12.** Two of the original seven gaps
+(build inventory staleness, moving Dockerfile base images) are now closed;
+the remaining five reduce to one real blocker (gap 7, a credentialed
+GitHub Actions + Quay run) plus its three direct downstream consequences.
 
 ### Implemented foundations
 
@@ -45,13 +48,13 @@ The release workflow must reconcile source revision, image digest, chart values 
 
 ### Gaps preventing `Implemented` status
 
-1. **The build inventory is stale.** `.github/workflows/build-publish.yml` still contains the `postgresql-pgvector` matrix entry referencing `gitops/charts/postgresql/image/Dockerfile`, although that custom image was removed when PostgreSQL moved to the Crunchy PGO operand image. ADR-0324 owns this repository/CI reconciliation.
-2. **Six deployable charts still use `tag: latest`.** The current policy check reports `agent-runtime`, `ai-gateway`, `mcp-gateway`, `mcp-sales-db`, `rag-service` and `tekos`.
-3. **The immutable-tag policy is non-blocking.** `lint.yml` currently sets `continue-on-error: true` for `check_no_latest_tags.py`; a known failure is reported but cannot block a merge.
-4. **GitOps still tracks moving Git refs.** Argo CD Applications continue to use `targetRevision: main`; deployment state is therefore not yet tied to a reviewed release revision.
-5. **Two first-party Dockerfiles still inherit moving base images.** `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` use `registry.access.redhat.com/ubi9/ubi-minimal:latest`.
-6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment.
-7. **The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.** The workflow is authored, but repository evidence does not yet prove a successful publication/promotion cycle with real credentials and registry artifacts.
+1. ~~The build inventory is stale.~~ **Resolved by ADR-0324** (2026-08-11, same review cycle as this gap list, which wasn't updated at the time): the `postgresql-pgvector` matrix entry is gone from `.github/workflows/build-publish.yml`, and `platform/supply-chain/check_build_matrix.py` passes (7/7 matrix entries valid, every first-party Dockerfile tracked).
+2. **Deployable charts still use `tag: latest`.** `check_no_latest_tags.py` reports 8 fields across 7 charts as of 2026-08-12: `agent-runtime`, `ai-gateway`, `mcp-gateway`, `mcp-sales-db`, `rag-service`, `tekos` (`image.tag`), plus `rag-ingestion` (`images.ingestion.tag`, `images.compiler.tag`, added by ADR-0330 after this gap list was first written). **Genuinely blocked on gap 7**: pinning these to a real immutable reference now, before any real build-publish-sign cycle has run, would mean writing a tag that doesn't exist in the registry - the honest fix is a real release, not a placeholder SHA.
+3. **The immutable-tag policy is non-blocking.** `lint.yml` still sets `continue-on-error: true` for `check_no_latest_tags.py`. Deliberately left non-blocking until gap 2 is actually closed - flipping it now would just make every merge fail on the still-open `latest` references above, not surface new information.
+4. **GitOps still tracks moving Git refs.** Argo CD Applications continue to use `targetRevision: main`; deployment state is therefore not yet tied to a reviewed release revision. Same dependency as gap 2: there is no reviewed release tag to point at until gap 7 produces one.
+5. ~~Two first-party Dockerfiles still inherit moving base images.~~ **Resolved 2026-08-12**: `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` now pin `registry.access.redhat.com/ubi9/ubi-minimal` by digest (`sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221`, version 9.8, confirmed live via `skopeo inspect` against the real Red Hat registry) rather than `:latest`. This gap was independent of the others - it depends on Red Hat's registry, not this repository's own release pipeline.
+6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. Blocked on gap 7 (nothing has been signed for real yet to verify against).
+7. **The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.** The workflow is authored, but repository evidence does not yet prove a successful publication/promotion cycle with real credentials and registry artifacts. **This is the actual blocker for gaps 2, 3, 4 and 6** - they are one connected release-and-promote step, not four independent fixes, and need real Quay/GitHub Actions credentials to close for real rather than being faked with placeholder tags.
 
 ### Completion criteria
 
