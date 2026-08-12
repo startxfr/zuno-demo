@@ -1,0 +1,24 @@
+{{- if .Values.jobsetOperator.enabled }}
+# Singleton operand CR the operator watches to actually manage the JobSet
+# controller/CRD (managementState: Managed) - same "meta-operator needs a
+# CR to actually do anything" shape as
+# gitops/charts/custom-metrics-autoscaler's KedaController CR and
+# gitops/charts/connectivity-link's Kuadrant CR. Cluster-scoped singleton
+# named "cluster" (operator.openshift.io/v1 convention, e.g.
+# KubeStorageVersionMigrator/Network/etc.) - no namespace field. NOT a
+# JobSet workload: individual distributed training runs (e.g. Kubeflow
+# Trainer's TrainJob) create their own jobset.x-k8s.io JobSet objects
+# later, out of scope here.
+apiVersion: operator.openshift.io/v1
+kind: JobSetOperator
+metadata:
+  name: cluster
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  logLevel: Normal
+  operatorLogLevel: Normal
+  managementState: Managed
+{{- end }}

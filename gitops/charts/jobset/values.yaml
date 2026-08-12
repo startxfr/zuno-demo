@@ -1,12 +1,14 @@
 # project.enabled renders the dedicated Namespace, via the vendored startx
 # `project` chart; operator.enabled renders the OperatorGroup/Subscription,
-# via the vendored startx `operator` chart. Both default false so templates
-# render nothing. There is no singleton operand CR for JobSet (individual
-# distributed training runs - e.g. Kubeflow Trainer's TrainJob - create
-# their own JobSet objects later, out of scope here) - same shape as
-# gitops/charts/external-secrets; zuno-jobset-d1
-# (gitops/apps/jobset/application-d1.yaml) points at gitops/charts/noop
-# instead.
+# via the vendored startx `operator` chart; jobsetOperator.enabled renders
+# the operand JobSetOperator CR (the operator's own management-state
+# singleton - templates/jobsetoperator.yaml). All default false so
+# templates render nothing by default. Two separate ArgoCD Applications
+# (zuno-jobset-d0/-d1) set project+operator / jobsetOperator respectively -
+# same shape as gitops/charts/custom-metrics-autoscaler's
+# operator/KedaController split. Note this is NOT a JobSet workload: JobSet
+# CRD instances (individual distributed training runs - e.g. Kubeflow
+# Trainer's TrainJob) are created later, out of scope here.
 #
 # Confirmed against a live cluster (redhat-operators catalog): the
 # package is named "job-set" (not "jobset-operator" as originally
@@ -86,3 +88,6 @@ operator:
     # (that's gitops/charts/kueue's shape - a different operator whose CSV
     # requires the opposite: AllNamespaces only).
     target: openshift-jobset-operator
+
+jobsetOperator:
+  enabled: false

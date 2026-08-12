@@ -1,8 +1,9 @@
 ---
-# No Day 1 content for jobset - there is no singleton operand CR for
-# JobSet (distributed training runs create their own JobSet objects
-# later, out of scope here); see gitops/apps/README.md's -d0/-d1
-# convention and gitops/charts/noop's README.
+# Minimal JobSetOperator operand CR (not the operator, see
+# application-d0.yaml). Cluster-scoped singleton named "cluster"
+# (managementState: Managed) - not a JobSet workload; individual
+# distributed training runs create their own jobset.x-k8s.io JobSet
+# objects later, out of scope here. See gitops/charts/jobset/values.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,12 +16,15 @@ spec:
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
-    path: gitops/charts/noop
+    path: gitops/charts/jobset
     helm:
       releaseName: zuno-jobset-d1
+      values: |
+        jobsetOperator:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-gitops
+    namespace: openshift-jobset-operator
   syncPolicy:
     automated:
       prune: true

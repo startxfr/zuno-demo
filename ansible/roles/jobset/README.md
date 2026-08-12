@@ -5,16 +5,17 @@ chart (`gitops/charts/jobset`) installs the JobSet operator (OLM
 `Subscription`, channel/catalog discovered from the cluster's own
 `PackageManifest` at apply time - ADR-0048, same pattern as
 `ansible/roles/external_secrets`) into its own dedicated
-`openshift-jobset-operator` namespace. A Day 0 component (ADR-0056) with
-all three verbs: `check` verifies the `-d0` Application is
-Synced+Healthy; `install` discovers the package/channel and applies `-d0`
+`openshift-jobset-operator` namespace, plus a minimal, cluster-scoped
+`JobSetOperator` operand CR (name `cluster`, `managementState: Managed`).
+A Day 0 component (ADR-0056) with all three verbs: `check` verifies the
+Application pair is Synced+Healthy and the `JobSetOperator` instance
+exists; `install` discovers the package/channel, applies `-d0`
 (dedicated Namespace + `OperatorGroup` + `Subscription`, sync-wave `"10"`)
-then the no-op `-d1` (`gitops/charts/noop` - kept present/synced the same
-way `ansible/roles/models` applies its own no-op side); `uninstall` tears
-both down in reverse order plus the OLM-owned CRDs/CSV/Subscription
-(`ansible/tasks/remove_operator.yml`).
+then `-d1` (`JobSetOperator`, sync-wave `"20"`) once `-d0` is Healthy;
+`uninstall` tears both down in reverse order plus the OLM-owned
+CRDs/CSV/Subscription (`ansible/tasks/remove_operator.yml`).
 
-## Why this role exists, and why there's no operand CR
+## Why this role exists, and what the JobSetOperator CR does (and doesn't do)
 
 `gitops/charts/openshift-ai/values.yaml`'s `DataScienceCluster` now
 enables `trainer`/`trainingoperator` (Kubeflow Trainer v2), which runs
@@ -23,10 +24,14 @@ Jobs/Pods - without this operator/CRD, `trainer`/`trainingoperator` cannot
 actually schedule a distributed run. ADR-0318 installs the operator ahead
 of any actual `TrainJob`/distributed run - none exists in this repository
 yet, same "prerequisite before the feature that needs it" shape ADR-0047
-used for `nfd`. There is no cluster-singleton operand for JobSet to
-instantiate: the operator only registers the `JobSet` CRD/controller;
-individual distributed training runs create their own `JobSet` objects
-later (out of scope here).
+used for `nfd`. The `JobSetOperator` CR (`operator.openshift.io/v1`,
+cluster-scoped singleton named `cluster`) is the operator's own
+management-state switch - same "meta-operator needs a CR to actually do
+anything" shape as `gitops/charts/custom-metrics-autoscaler`'s
+`KedaController` and `gitops/charts/connectivity-link`'s `Kuadrant` CR.
+It is NOT a JobSet workload: the operator only registers the `JobSet`
+CRD/controller once `Managed`; individual distributed training runs still
+create their own `JobSet` objects later (out of scope here).
 
 ## Package name
 

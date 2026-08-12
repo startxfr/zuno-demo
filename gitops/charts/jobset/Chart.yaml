@@ -2,7 +2,9 @@ apiVersion: v2
 name: jobset
 description: >-
   JobSet operator (OLM Subscription, channel/catalog discovered at
-  Ansible run time - ADR-0048). ADR-0318 prerequisite for OpenShift AI's
+  Ansible run time - ADR-0048) and a minimal JobSetOperator operand CR
+  (the operator's own management-state singleton, not a JobSet
+  workload - see values.yaml). ADR-0318 prerequisite for OpenShift AI's
   Kubeflow Trainer v2 (trainer/trainingoperator DataScienceCluster
   components), which schedules distributed training runs on the JobSet
   API; no JobSet workload is created here. Dedicated namespace

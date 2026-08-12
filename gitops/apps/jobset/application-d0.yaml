@@ -1,6 +1,7 @@
 ---
-# JobSet operator install (ADR-0318). No singleton operand CR - see
-# application-d1.yaml. Dedicated namespace (openshift-jobset-operator)
+# JobSet operator install (ADR-0318); the JobSetOperator operand CR is a
+# separate Application (application-d1.yaml) applied after this one is
+# healthy. Dedicated namespace (openshift-jobset-operator)
 # with an OwnNamespace-scoped OperatorGroup, not the originally shared
 # openshift-operators namespace (which relies on OLM's own
 # AllNamespaces-mode global-operators OperatorGroup there). CONFIRMED

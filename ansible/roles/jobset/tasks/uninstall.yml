@@ -1,13 +1,13 @@
 ---
-# Reverse of install.yml: delete the no-op d1 Application, then
-# remove_operator.yml (needs the Subscription to still exist) before d0's
-# own delete.
-- name: "jobset | delete the jobset GitOps Application (d1, no-op)"
+# Reverse of install.yml: delete d1 (JobSetOperator instance) first
+# (avoids ArgoCD fighting a CR deletion), then remove_operator.yml (needs
+# the Subscription to still exist) before d0's own delete.
+- name: "jobset | delete the jobset GitOps Application (d1: JobSetOperator instance)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-jobset-d1"
 
-- name: "jobset | remove the operator (its owned CRDs then the CSV then the Subscription)"
+- name: "jobset | remove the operator (its owned CRDs - cascading the JobSetOperator instance - then the CSV, then the Subscription)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
   vars:
     operator_subscription_name: "{{ jobset_package_name | default('job-set') }}"
