@@ -55,14 +55,14 @@ pipelineServer:
 #     parent product's own two latest versions, not invented version
 #     numbers.
 # Satellite 6.17/6.16 are confirmed (given directly). Every other entry
-# below is WebSearch-sourced best effort, not HTTP-verified:
-# docs.redhat.com returns 403 to this environment's fetch tooling, so
-# individual URL verification wasn't possible - CONFIRM every non-Satellite
-# entry against docs.redhat.com before the first real fetch-redhat run.
-# platform.openshiftVersion (4.22, ADR-0319) is this repo's own declared
-# cluster *target*, which can run ahead of the latest GA release with
-# public documentation - deliberately different from the 4.21 used below,
-# which is the latest version docs.redhat.com actually publishes today.
+# was re-verified 2026-08-13 via WebSearch (docs.redhat.com still returns
+# 403 to this environment's direct fetch tooling, so per-URL HTTP
+# confirmation still isn't possible - version numbers are WebSearch
+# cross-checked against release-notes/announcement pages instead). MTC
+# (entries versioned alongside OCP) is high-confidence but not directly
+# confirmed - flagged inline below.
+# platform.openshiftVersion (4.22, ADR-0319) now matches the "latest"
+# redhat[] OCP entry below - both track the real current GA release.
 redhat:
   - enabled: true
     product: "Red Hat Satellite"
@@ -85,8 +85,8 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
-    version: "4.21"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/release_notes/index"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -94,8 +94,8 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
-    version: "4.20"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/release_notes/index"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -229,8 +229,8 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Data Foundation"
     productSlug: "red-hat-openshift-data-foundation"
-    version: "4.18"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.18"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -238,8 +238,8 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Data Foundation"
     productSlug: "red-hat-openshift-data-foundation"
-    version: "4.16"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.16"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.21"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -247,8 +247,8 @@ redhat:
   - enabled: true
     product: "Red Hat Connectivity Link"
     productSlug: "red-hat-connectivity-link"
-    version: "1.2"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.2"
+    version: "1.4"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -256,8 +256,8 @@ redhat:
   - enabled: true
     product: "Red Hat Connectivity Link"
     productSlug: "red-hat-connectivity-link"
-    version: "1.1"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.1"
+    version: "1.3"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.3"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -283,8 +283,8 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Virtualization"
     productSlug: "migration-toolkit-for-virtualization"
-    version: "2.9"
-    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.9"
+    version: "2.11"
+    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -292,8 +292,8 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Virtualization"
     productSlug: "migration-toolkit-for-virtualization"
-    version: "2.6"                # gap vs. 2.9 wider than other pairs: 2.7/2.8 never surfaced in search, used the next confirmed-to-exist version instead of guessing
-    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.6"
+    version: "2.10"
+    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.10"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -319,8 +319,8 @@ redhat:
   - enabled: true
     product: "OpenShift Virtualization"                      # replaces Red Hat Virtualization (RHV), which is EOL with no second version to pair - ships as an OpenShift Container Platform doc chapter, versioned alongside it
     productSlug: "openshift-virtualization"
-    version: "4.21"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/virtualization/index"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -328,8 +328,8 @@ redhat:
   - enabled: true
     product: "OpenShift Virtualization"
     productSlug: "openshift-virtualization"
-    version: "4.20"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/virtualization/index"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/virtualization/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -353,10 +353,10 @@ redhat:
     include: []
     exclude: []
   - enabled: true
-    product: "Migration Toolkit for Containers"              # no independent version - an OpenShift Container Platform doc chapter; versioned alongside OCP 4.21 above
+    product: "Migration Toolkit for Containers"              # no independent version - an OpenShift Container Platform doc chapter; versioned alongside OCP 4.22 above. Inferred from OCP's own 4.22 GA + MTC's historical every-release cadence, not a directly-confirmed MTC 4.22 doc URL - CONFIRM before the first real fetch-redhat run.
     productSlug: "migration-toolkit-for-containers"
-    version: "4.21"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/migration_toolkit_for_containers/index"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migration_toolkit_for_containers/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -364,8 +364,8 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Containers"
     productSlug: "migration-toolkit-for-containers"
-    version: "4.20"                                          # versioned alongside OCP 4.20 above - the only MTC version pairing with concrete search evidence
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html-single/migration_toolkit_for_containers/index"
+    version: "4.21"                                          # versioned alongside OCP 4.21 above - same inference caveat as 4.22 above
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/migration_toolkit_for_containers/index"
     languages: [en-US]
     fetchMode: html
     include: []
