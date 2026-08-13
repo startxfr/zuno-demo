@@ -50,6 +50,18 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
+      # Propagated by OLM into the CSV's controller-manager Deployment
+      # (spec.config.resources on the Subscription). Default 512Mi limit
+      # OOM-kills the manager container (exitCode 137, restarts) on a live
+      # cluster - bumped to 700Mi.
+      config:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 700Mi
 
 # mariadb-operator ships as an operator-sdk Helm-operator: its CSV
 # Deployment is a thin controller that only runs its embedded Helm chart
