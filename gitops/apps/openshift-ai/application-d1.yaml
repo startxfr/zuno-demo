@@ -21,11 +21,12 @@ spec:
             enabled: true
         dataScienceCluster:
           enabled: true
+        # Moved to application-d0.yaml: the Gateway must exist before this
+        # Application's own DataScienceCluster will reconcile
+        # kserve.modelsAsService, so it belongs in the earlier sync-wave/
+        # Application phase, not alongside the DataScienceCluster itself.
         maasGateway:
-          enabled: true
-          # Placeholder auto-substituted with the real cluster domain by
-          # ansible/tasks/apply_gitops_app.yml.
-          clusterBaseDomain: apps.mycluster.example.com
+          enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator

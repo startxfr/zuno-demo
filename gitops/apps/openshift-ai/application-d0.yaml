@@ -26,6 +26,17 @@ spec:
             enabled: true
           DSCInitialization:
             enabled: false
+        # Lives here, not in application-d1.yaml: this Gateway is a
+        # prerequisite DataScienceCluster (d1) needs to already exist before
+        # it will reconcile kserve.modelsAsService - putting it in d0
+        # (sync-wave -199, a full Application phase before d1's -198)
+        # guarantees that ordering instead of relying on same-Application
+        # resource ordering, which ArgoCD doesn't strictly guarantee.
+        maasGateway:
+          enabled: true
+          # Placeholder auto-substituted with the real cluster domain by
+          # ansible/tasks/apply_gitops_app.yml.
+          clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator

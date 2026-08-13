@@ -216,15 +216,19 @@ dataScienceCluster:
 # maas-default-gateway exists in openshift-ingress; RHOAI's own
 # maas-controller (deployed automatically by the rhods-operator once
 # modelsAsService is Managed) otherwise reconciles everything else itself.
+# False by default, same pattern as cluster-ods's own sub-blocks above -
+# gitops/apps/openshift-ai/application-d0.yaml opts this in explicitly
+# (VERIFIED live, 2026-08-13: Wave 3 MaaS-prerequisite work pulled forward;
+# lives in d0 specifically since DataScienceCluster/d1 needs the Gateway to
+# already exist before it reconciles kserve.modelsAsService).
+# templates/maas-gateway.yaml's gatewayClassName was switched from
+# data-science-gateway-class (a GatewayClass RHOAI would provision itself
+# once kserve.modelsAsService is healthy - it wasn't, on this cluster) to
+# istio (the Gateway API controller this platform already runs via the
+# service-mesh component, zuno-mesh namespace) - see that template's own
+# comment for the full reasoning.
 maasGateway:
-  # VERIFIED live, 2026-08-13: enabled now (Wave 3 MaaS-prerequisite work
-  # pulled forward). templates/maas-gateway.yaml's gatewayClassName was
-  # switched from data-science-gateway-class (a GatewayClass RHOAI would
-  # provision itself once kserve.modelsAsService is healthy - it wasn't,
-  # on this cluster) to istio (the Istio Gateway API controller this
-  # platform already runs via the service-mesh component, zuno-mesh
-  # namespace) - see that template's own comment for the full reasoning.
-  enabled: true
+  enabled: false
   # Placeholder auto-substituted with the real cluster domain by
   # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
   clusterBaseDomain: apps.mycluster.example.com
