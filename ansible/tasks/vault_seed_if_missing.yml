@@ -1,0 +1,33 @@
+---
+# Idempotent self-generated secret seeding: writes vault_seed_fields to
+# zuno/{{ vault_seed_path }} only if that path doesn't already hold a value.
+# ansible.builtin.password('/dev/null', ...) never persists its generated
+# value anywhere (ansible-doc password: "will generate a new random
+# password each time, but will not write it to /dev/null") - without this
+# check-first guard, every re-run of the vault role would silently
+# regenerate and overwrite every credential seeded this way, desyncing it
+# from whatever any already-running consumer cached (VERIFIED live,
+# 2026-08-13: this desync broke maas-api and briefly broke MariaDB's root
+# password after an unrelated `make d0 install vault` re-run).
+- name: "vault | check whether zuno/{{ vault_seed_path }} already exists"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/{{ vault_seed_path }}"
+  register: _vault_seed_existing
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "vault | seed zuno/{{ vault_seed_path }} (first run only)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ vault_seed_path }}
+      {% for field_name, field_value in vault_seed_fields.items() %}{{ field_name }}={{ field_value | quote }} {% endfor %}"
+  when: _vault_seed_existing.rc != 0
+  no_log: true

@@ -292,22 +292,18 @@
       see the output above.
   when: (_vault_unseal_configure_job.resources[0].status.succeeded | default(0)) == 0
 
-- name: "vault | generate and seed self-generatable application secrets"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    # k8s_exec has no env-passing parameter, so VAULT_TOKEN is set inside
-    # the shell command itself rather than via Ansible's `environment:`.
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/{{ generated_secret.key }}
-      username={{ generated_secret.value.username }} password={{ generated_secret.value.password }}"
+- name: "vault | generate and seed self-generatable application secrets (idempotent - first run only, see vault_seed_if_missing.yml)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   loop: "{{ _vault_generated_secrets | dict2items }}"
   loop_control:
     loop_var: generated_secret
     label: "{{ generated_secret.key }}"
   no_log: true
   vars:
+    vault_seed_path: "{{ generated_secret.key }}"
+    vault_seed_fields:
+      username: "{{ generated_secret.value.username }}"
+      password: "{{ generated_secret.value.password }}"
     _vault_generated_secrets:
       keycloak/admin:
         username: admin
@@ -348,89 +344,76 @@
         password: "{{ zuno_admin_maas_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
-- name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/tekos-frontend
-      client_secret={{ zuno_admin_tekos_frontend_token |
-      default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the tekos-frontend confidential OIDC client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: keycloak/tekos-frontend
+    vault_seed_fields:
+      client_secret: "{{ zuno_admin_tekos_frontend_token |
+        default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
 # ADR-0320: the "openshift" client backing the cluster OAuth identity
 # provider - same single-secret shape as tekos-frontend above.
-- name: "vault | generate and seed the openshift OIDC client secret"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/openshift-client
-      client_secret={{ zuno_admin_openshift_client_token |
-      default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the openshift OIDC client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: keycloak/openshift-client
+    vault_seed_fields:
+      client_secret: "{{ zuno_admin_openshift_client_token |
+        default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
-- name: "vault | generate and seed the shared demo-persona password (ADR-0041)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/keycloak/demo-personas
-      password={{ zuno_admin_demo_personas_root_password |
-      default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the shared demo-persona password (ADR-0041, idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: keycloak/demo-personas
+    vault_seed_fields:
+      password: "{{ zuno_admin_demo_personas_root_password |
+        default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
-- name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mcp/gateway-workload-token
-      token={{ zuno_admin_mcp_gateway_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the MCP Gateway workload identity token (ADR-0037, idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: mcp/gateway-workload-token
+    vault_seed_fields:
+      token: "{{ zuno_admin_mcp_gateway_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
-- name: "vault | generate and seed the Tekos frontend session HMAC secret and encryption key"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
+- name: "vault | generate and seed the Tekos frontend session HMAC secret and encryption key (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: tekos/frontend-session
     # ADR-0042: encryption_key is distinct from hmac_secret (signing vs.
     # encryption keys stay separate) - must be 32 raw bytes, base64-encoded,
     # not the printable-ASCII-chars generator every other secret here uses,
     # since components/agent-frontend/internal/session/store.go base64-decodes
     # it directly into an AES-256 key. Both keys must be written in the same
     # `vault kv put` - KV v2 put replaces the whole secret version, so a
-    # second put to this path would silently wipe out hmac_secret.
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/tekos/frontend-session
-      hmac_secret={{ zuno_admin_tekos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}
-      encryption_key={{ zuno_admin_tekos_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-  no_log: true
+    # second put to this path would silently wipe out hmac_secret; the
+    # check-first guard in vault_seed_if_missing.yml keeps that a one-shot.
+    vault_seed_fields:
+      hmac_secret: "{{ zuno_admin_tekos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+      encryption_key: "{{ zuno_admin_tekos_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
 
-- name: "vault | generate and seed the Redis session-store password"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/redis/session-store
-      password={{ zuno_admin_redis_session_store_password | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the Redis session-store password (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: redis/session-store
+    vault_seed_fields:
+      password: "{{ zuno_admin_redis_session_store_password | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
-- name: "vault | generate and seed the MariaDB root password"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/mariadb/root
-      password={{ zuno_admin_mariadb_root_password |
-      default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the MariaDB root password (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: mariadb/root
+    vault_seed_fields:
+      password: "{{ zuno_admin_mariadb_root_password |
+        default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 # Internal service credential (the rag-ingestion KFP pipeline's "mlpipeline"
 # MariaDB user, gitops/charts/rag-ingestion's
@@ -438,16 +421,14 @@
 # self-generated same as mariadb/root above, not sourced from
 # ansible/confidential.yml. username is static ("mlpipeline") in that
 # chart's own values.yaml, so only password needs to live here.
-- name: "vault | generate and seed the rag-ingestion pipeline metadata DB password"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/rag/pipeline-db
-      password={{ zuno_admin_rag_pipeline_db_password |
-      default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+- name: "vault | generate and seed the rag-ingestion pipeline metadata DB password (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  vars:
+    vault_seed_path: rag/pipeline-db
+    vault_seed_fields:
+      password: "{{ zuno_admin_rag_pipeline_db_password |
+        default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 # These can't be self-generated - real external service credentials,
 # supplied via ansible/confidential.yml and re-applied idempotently.

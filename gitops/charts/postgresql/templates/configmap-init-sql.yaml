@@ -1,6 +1,12 @@
 {{- if .Values.postgresCluster.enabled }}
 # Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL; PGO
-# runs this once at cluster bootstrap.
+# runs this once at cluster bootstrap. Databases added to spec.users after
+# that first bootstrap (ragTechDatabase, maasDatabase) do NOT get this
+# script re-run - VERIFIED live, 2026-08-13: maas-api hit "permission denied
+# for schema public" because the grant below didn't exist yet when
+# maasDatabase was added; the GRANT had to be applied by hand once against
+# the already-running cluster. Adding a new dedicated database to an
+# existing cluster always needs that same one-time manual GRANT.
 # \connect is required: databaseInitSQL runs against the "postgres"
 # database regardless of spec.users[].databases, not the app database.
 apiVersion: v1
@@ -30,4 +36,10 @@ data:
 
     \connect {{ .Values.keycloakDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.keycloakDatabase.owner }};
+
+    \connect {{ .Values.ragTechDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.ragTechDatabase.owner }};
+
+    \connect {{ .Values.maasDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.maasDatabase.owner }};
 {{- end }}

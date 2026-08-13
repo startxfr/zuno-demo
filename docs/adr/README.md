@@ -138,6 +138,7 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | To be implemented | Support multiple agent graph shapes in Agent Runtime |
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | v0.1 | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
 | [ADR-0344](0344-track-blocked-resources-and-add-a-day-0-reconcile-verb.md) | v0.1 | Implemented | Track blocked resources and add a Day 0 reconcile verb |
+| [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) | v0.1 | Implemented | Make self-generated Vault credentials idempotent across ansible re-runs |
 
 ## version 0.4
 
