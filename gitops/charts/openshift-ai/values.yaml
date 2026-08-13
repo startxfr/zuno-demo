@@ -149,8 +149,20 @@ dataScienceCluster:
         argoWorkflowsControllers:
           managementState: Managed
         managementState: Managed
+      # Removed, not Managed: VERIFIED live, 2026-08-13 - kuberay-operator's
+      # pod is rejected outright by every SCC on the cluster ("unable to
+      # validate against any security context constraint") in the
+      # zuno-ai-platform namespace. RHOAI 3.5 EA2's Ray component appears to
+      # assume namespace-specific SCC/RBAC bindings that only exist for the
+      # product's default redhat-ods-applications namespace, not a custom
+      # applicationsNamespace (ADR-0328). Nothing in this repository submits
+      # a Ray job yet (only `trainer` would, and that's also Removed below
+      # for the same underlying EA2 limitation) - revisit alongside
+      # ADR-0301/ADR-0302 (v3 LoRA/PEFT + MLOps pipelines), the actual future
+      # consumer, once RHOAI ships a fix or this repo stops using a custom
+      # applicationsNamespace.
       ray:
-        managementState: Managed
+        managementState: Removed
       kueue:
         defaultClusterQueueName: default
         defaultLocalQueueName: default
@@ -160,10 +172,35 @@ dataScienceCluster:
         managementState: Managed
       mlflowoperator:
         managementState: Managed
+      # Removed, not Managed: VERIFIED live, 2026-08-13 - fails with "unable
+      # to get: zuno-monitoring/dashboard-perses-access because of unknown
+      # namespace for the cache", even on a freshly-reinstalled rhods-operator
+      # (new pods, so not stale operator state). RHOAI 3.5 EA2's dashboard/
+      # observability reconciliation doesn't derive its watched namespaces
+      # from DSCInitialization.spec.monitoring.namespace (ADR-0328) - same
+      # class of hardcoded-namespace limitation as `trainer`/`ray` below.
+      # Nothing in this repository links to or depends on the RHOAI console
+      # UI (Zuno has its own agent-frontend) - revisit if that changes or
+      # RHOAI ships a fix.
       dashboard:
-        managementState: Managed
+        managementState: Removed
+      # Removed, not Managed: VERIFIED live, 2026-08-13 - the
+      # ClusterTrainingRuntime this component seeds fails validation because
+      # its ValidatingWebhookConfiguration (RHOAI's own bundled manifest, not
+      # rendered by this chart) hardcodes
+      # kubeflow-trainer-controller-manager.redhat-ods-applications.svc as
+      # the webhook target, even though the real Service now lives in
+      # zuno-ai-platform (ADR-0328) - confirmed unchanged after a full
+      # operator uninstall/reinstall, so this isn't stale state, it's baked
+      # into RHOAI 3.5 EA2's trainer-module bundle. Consistent with
+      # platform/openshift-ai/README.md's own precedent (KServe Serverless
+      # was similarly disabled in ADR-0047 because it "would never have
+      # reached Ready on a real cluster"). Nothing in this repository
+      # schedules a distributed training run yet - revisit alongside
+      # ADR-0301/ADR-0302, once RHOAI ships a fix or this repo stops using a
+      # custom applicationsNamespace.
       trainer:
-        managementState: Managed
+        managementState: Removed
       llamastackoperator:
         managementState: Removed
       aigateway:

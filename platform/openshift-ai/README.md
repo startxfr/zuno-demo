@@ -60,20 +60,46 @@ ways: it also means *not* installing operators nothing here uses.
   model-serving autoscaling depends on; no `ScaledObject`/
   `TriggerAuthentication` exists yet. See
   `ansible/roles/custom_metrics_autoscaler`.
-- **JobSet** - **installed as of ADR-0318**, ahead of any consumer. This
-  repository's `DataScienceCluster` now enables `trainer`/`trainingoperator`
-  (Kubeflow Trainer v2), which schedules distributed training runs on the
-  JobSet API - without this operator/CRD, `trainer`/`trainingoperator`
-  cannot actually schedule a distributed run, even though none exists yet
-  in this repository. See `ansible/roles/jobset`.
+- **JobSet** - **installed as of ADR-0318**, ahead of any consumer.
+  `DataScienceCluster`'s `trainingoperator` (Kubeflow Training Operator v1,
+  distinct from `trainer`/Kubeflow Trainer v2 below) schedules distributed
+  training runs on the JobSet API - without this operator/CRD it couldn't
+  actually schedule a distributed run, even though none exists yet in this
+  repository. See `ansible/roles/jobset`.
 - **Red Hat build of Kueue Operator** - **installed as of ADR-0321**,
   ahead of `openshift_ai`. This repository's `DataScienceCluster` declared
   `kueue.defaultClusterQueueName`/`defaultLocalQueueName: default` from
   the start but never installed a dedicated operator or set
-  `managementState: Unmanaged` - ADR-0321 fixes that so `trainer`/
-  `trainingoperator` (Kubeflow Trainer v2) has a supported queue-management
-  path once distributed training runs actually exist. See
-  `ansible/roles/kueue`.
+  `managementState: Unmanaged` - ADR-0321 fixes that so `trainingoperator`
+  has a supported queue-management path once distributed training runs
+  actually exist. See `ansible/roles/kueue`.
+- **`trainer` (Kubeflow Trainer v2) and `ray`** - **`managementState:
+  Removed`, not Managed, as of 2026-08-13.** Both were enabled ahead of any
+  consumer like the rest of this list, but verified live against a real
+  cluster to be genuinely broken under this repository's custom
+  `applicationsNamespace: zuno-ai-platform` (ADR-0328): `trainer`'s
+  `ClusterTrainingRuntime` fails validation because RHOAI's own bundled
+  `ValidatingWebhookConfiguration` hardcodes
+  `kubeflow-trainer-controller-manager.redhat-ods-applications.svc`
+  regardless of the configured applications namespace (confirmed unchanged
+  after a full operator uninstall/reinstall - not stale state, baked into
+  the RHOAI 3.5 EA2 trainer-module bundle), and `ray`'s `kuberay-operator`
+  pod is rejected by every SCC on the cluster in `zuno-ai-platform` (RHOAI's
+  namespace-specific SCC/RBAC bindings for Ray appear to only exist for the
+  product's default namespace). Same precedent as ADR-0047 disabling KServe
+  Serverless mode because it "would never have reached Ready on a real
+  cluster." Nothing in this repository schedules a distributed training or
+  Ray run yet - revisit alongside ADR-0301/ADR-0302 (v3 LoRA/PEFT and
+  dataset-to-model MLOps pipelines, the actual future consumers), once
+  RHOAI ships a fix or this repo stops using a custom
+  `applicationsNamespace`.
+- **`dashboard`** - also `managementState: Removed` as of 2026-08-13, same
+  underlying EA2 limitation (its observability/Perses reconciliation
+  doesn't derive watched namespaces from
+  `DSCInitialization.spec.monitoring.namespace` either - fails with
+  "unknown namespace for the cache" for `zuno-monitoring`, confirmed on a
+  freshly-reinstalled operator). Nothing in this repository links to or
+  depends on the RHOAI console UI - Zuno has its own `agent-frontend`.
 - **MaaS** (Models-as-a-Service policy routing) - the underlying platform
   plumbing (`kserve.modelsAsService.managementState: Managed` and the
   `maas-default-gateway` this chart's own `templates/maas-gateway.yaml`
