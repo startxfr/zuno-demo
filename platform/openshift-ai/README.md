@@ -104,12 +104,20 @@ ways: it also means *not* installing operators nothing here uses.
   plumbing (`kserve.modelsAsService.managementState: Managed` and the
   `maas-default-gateway` this chart's own `templates/maas-gateway.yaml`
   renders) is active as of the OpenShift AI DSCInitialization/gateway
-  work, not deferred. What's still v1 is the *policy* layer: ADR-0049
-  ("Zuno as MaaS policy router") and ADR-0325 (completing the MaaS
-  governance plane - subscriptions, auth policy, usage observability)
-  remain "To be implemented" - nothing in the current build routes
-  application traffic through a MaaS policy layer yet, even though the
-  gateway/serving prerequisite it would sit in front of already exists.
+  work, not deferred. MaaS also requires Authorino (the auth sub-controller
+  Connectivity Link's `Kuadrant` CR provisions) to accept TLS connections
+  from the gateway - `DataScienceCluster`'s `MaaSPrerequisitesAvailable`
+  condition checks `spec.listener.tls.enabled` directly. That's now
+  satisfied by `gitops/charts/connectivity-link/templates/{kuadrant,
+  certificate}.yaml` (`kuadrant.authorinoTls.enabled`, flipped on in
+  `gitops/apps/connectivity-link/application-d1.yaml`), reusing the
+  Vault-backed `vault-issuer` `ClusterIssuer` Keycloak already consumes.
+  What's still v1 is the *policy* layer: ADR-0049 ("Zuno as MaaS policy
+  router") and ADR-0325 (completing the MaaS governance plane -
+  subscriptions, auth policy, usage observability) remain "To be
+  implemented" - nothing in the current build routes application traffic
+  through a MaaS policy layer yet, even though the gateway/serving/
+  Authorino-TLS prerequisites it would sit in front of already exist.
 - **OGX** - as of ADR-0322 (superseding ADR-0018 and ADR-0050 for OGX
   product mapping), this is the actual Red Hat OpenShift AI OGX Operator,
   a real `DataScienceCluster` component (`spec.components.ogx`), replacing

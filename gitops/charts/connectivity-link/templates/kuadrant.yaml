@@ -3,9 +3,17 @@
 # (Limitador, Authorino, DNS operator integration) - same "meta-operator
 # needs a CR to actually deploy pods" shape as
 # gitops/charts/external-secrets's OperatorConfig and
-# gitops/charts/cert-manager's CertManager CR. Empty spec: no
-# Gateway/AuthPolicy/RateLimitPolicy exists yet for it to enforce
-# (ADR-0317 installs the operator ahead of any consumer).
+# gitops/charts/cert-manager's CertManager CR. ADR-0317 originally left
+# spec empty ("no Gateway/AuthPolicy/RateLimitPolicy exists yet for it to
+# enforce"/"no consumer yet") - that's no longer true: MaaS
+# (platform/docs/platform_profile.yaml: maas: v0-active) is now a real
+# consumer, and requires Authorino's own listener to be TLS-enabled
+# (DataScienceCluster's MaaSPrerequisitesAvailable condition checks
+# spec.listener.tls.enabled). There's no standalone Authorino CR in this
+# repo to edit directly - it's owned/reconciled by this operator - so the
+# override is expressed here, the same shape the operator's own
+# AuthorinoSpec exposes on the Authorino CR itself. See
+# templates/certificate.yaml for the TLS secret referenced below.
 apiVersion: kuadrant.io/v1beta1
 kind: Kuadrant
 metadata:
@@ -15,5 +23,15 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "20"
-spec: {}
+spec:
+  {{- if .Values.kuadrant.authorinoTls.enabled }}
+  authorino:
+    listener:
+      tls:
+        enabled: true
+        certSecretRef:
+          name: {{ .Values.kuadrant.authorinoTls.certSecretName }}
+  {{- else }}
+  {}
+  {{- end }}
 {{- end }}

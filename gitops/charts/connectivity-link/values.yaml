@@ -89,6 +89,19 @@ project:
 
 kuadrant:
   enabled: false
+  # Enables the spec.authorino.listener.tls override in templates/kuadrant.yaml
+  # (backed by the Certificate in templates/certificate.yaml) so Authorino's
+  # own listener is TLS-enabled - required for DataScienceCluster's
+  # MaaSPrerequisitesAvailable condition. Off by default here, same
+  # "all default false, flipped at the Application layer" convention as
+  # operator/project/kuadrant above; set true via
+  # gitops/apps/connectivity-link/application-d1.yaml.
+  authorinoTls:
+    enabled: false
+    certSecretName: authorino-server-tls
+    dnsNames:
+      - authorino-authorino-authorization.kuadrant-system.svc
+      - authorino-authorino-authorization.kuadrant-system.svc.cluster.local
 
 # Referenced by templates/kuadrant.yaml - kept in sync with
 # project.project.name above (must match, since that's what actually

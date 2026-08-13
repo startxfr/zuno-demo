@@ -1,7 +1,9 @@
 ---
-# Minimal Kuadrant operand CR (not the operator, see application-d0.yaml).
-# Empty spec - no Gateway/AuthPolicy/RateLimitPolicy exists yet for it to
-# enforce (ADR-0317 installs the operator ahead of any consumer).
+# Kuadrant operand CR (not the operator, see application-d0.yaml). ADR-0317
+# originally left spec empty ("no consumer yet"); authorinoTls.enabled is now
+# set so Authorino's listener is TLS-enabled, required by MaaS
+# (DataScienceCluster's MaaSPrerequisitesAvailable condition) - see
+# gitops/charts/connectivity-link/templates/kuadrant.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -22,6 +24,8 @@ spec:
           enabled: true
         kuadrant:
           enabled: true
+          authorinoTls:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: kuadrant-system

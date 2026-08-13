@@ -5,8 +5,13 @@ Applies the `gitops/apps/connectivity-link` ArgoCD Application pair
 Red Hat Connectivity Link operator (OLM `Subscription`, channel/catalog
 discovered from the cluster's own `PackageManifest` at apply time -
 ADR-0048, same pattern as `ansible/roles/external_secrets`) into
-`openshift-operators`, plus a minimal, empty `Kuadrant` operand CR in its
-own `kuadrant-system` namespace. A Day 0 component (ADR-0056) with all
+`openshift-operators`, plus a `Kuadrant` operand CR in its own `kuadrant-system` namespace. That CR
+now carries a `spec.authorino.listener.tls` override
+(`gitops/charts/connectivity-link/templates/{kuadrant,certificate}.yaml`,
+`kuadrant.authorinoTls.enabled`) so the Authorino sub-controller it
+provisions has TLS enabled - required by MaaS (`DataScienceCluster`'s
+`MaaSPrerequisitesAvailable` condition checks `spec.listener.tls.enabled` on
+Authorino directly). A Day 0 component (ADR-0056) with all
 three verbs: `check` verifies the Application pair is Synced+Healthy and
 the `Kuadrant` instance exists; `install` discovers the package/channel,
 applies `-d0` (`Subscription` only, sync-wave `"10"`) then `-d1`
@@ -24,7 +29,11 @@ consumer, to get the platform ready for Gateway API-fronted inference
 policy (rate limiting/auth in front of `kserve` endpoints) - the same
 "prerequisite before the feature that needs it" shape ADR-0047 itself used
 for `nfd`. No `Gateway`, `AuthPolicy`, `RateLimitPolicy` or other policy
-object exists yet; the `Kuadrant` CR checked in is intentionally empty.
+object exists yet - but MaaS (`platform/docs/platform_profile.yaml`:
+`maas: v0-active`) turned out to be a real, earlier consumer of one part of
+this operator's operand: Authorino's TLS listener. The `Kuadrant` CR's
+`spec.authorino` override (see above) is scoped to exactly that, not a
+general policy rollout.
 
 ## Package name and namespace, confirmed against a real cluster
 
