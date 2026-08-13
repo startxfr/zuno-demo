@@ -113,11 +113,14 @@ ways: it also means *not* installing operators nothing here uses.
   work, not deferred. MaaS also requires Authorino (the auth sub-controller
   Connectivity Link's `Kuadrant` CR provisions) to accept TLS connections
   from the gateway - `DataScienceCluster`'s `MaaSPrerequisitesAvailable`
-  condition checks `spec.listener.tls.enabled` directly. That's now
-  satisfied by `gitops/charts/connectivity-link/templates/{kuadrant,
-  certificate}.yaml` (`kuadrant.authorinoTls.enabled`, flipped on in
-  `gitops/apps/connectivity-link/application-d1.yaml`), reusing the
-  Vault-backed `vault-issuer` `ClusterIssuer` Keycloak already consumes.
+  condition checks `spec.listener.tls.enabled` on the `Authorino` CR
+  directly. That's now satisfied by
+  `gitops/charts/connectivity-link/templates/{authorino,certificate}.yaml`
+  (`kuadrant.authorinoTls.enabled`, flipped on in
+  `gitops/apps/connectivity-link/application-d1.yaml`) patching the
+  `Authorino` CR directly - its `Kuadrant` CR has no override field for
+  this on the installed CRD version - reusing the Vault-backed
+  `vault-issuer` `ClusterIssuer` Keycloak already consumes.
   What's still v1 is the *policy* layer: ADR-0049 ("Zuno as MaaS policy
   router") and ADR-0325 (completing the MaaS governance plane -
   subscriptions, auth policy, usage observability) remain "To be

@@ -1,20 +1,19 @@
 {{- if .Values.kuadrant.authorinoTls.enabled }}
 # TLS secret for the Authorino operand's own listener (MaaS requires
-# spec.listener.tls.enabled on Authorino - see kuadrant.yaml, which
-# references this Secret via spec.authorino.listener.tls.certSecretRef).
+# spec.listener.tls.enabled on Authorino - see templates/authorino.yaml,
+# which references this Secret via spec.listener.tls.certSecretRef).
 # Reuses vault-issuer, the same Vault-backed ClusterIssuer
 # gitops/charts/keycloak/templates/ingress.yaml already consumes for its
 # own external TLS (gitops/charts/cert-manager/templates/clusterissuer.yaml)
 # - no new PKI setup needed.
 #
-# ASSUMPTION, not yet verified against a live cluster: the Authorino
-# operand's instance name ("authorino") and the in-cluster Service name the
-# authorino-operator derives from it (<name>-authorino-authorization). If
-# the Kuadrant CR provisions the operand under a different name, correct
-# .Values.kuadrant.authorinoTls.dnsNames after checking
-# `oc get authorino,svc -n kuadrant-system` - same posture as
-# gitops/charts/openshift-ai/templates/maas-gateway.yaml's Route
-# service-name note.
+# dnsNames default below (the "authorino" instance name and its
+# <name>-authorino-authorization Service - the one spec.listener.tls
+# actually fronts, distinct from the separate -oidc Service/oidcServer.tls
+# field) is VERIFIED live, 2026-08-13 (`oc get authorino,svc -n
+# kuadrant-system`), not a guess. If a future reinstall ever provisions the
+# operand under a different name, correct
+# .Values.kuadrant.authorinoTls.dnsNames to match.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
