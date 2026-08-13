@@ -1,6 +1,6 @@
 # Platform: supply chain
 
-Software supply chain policy (ADR-0051: "Use immutable and verifiable
+Software supply chain policy (ADR-0115: "Use immutable and verifiable
 software supply chain artifacts").
 
 `check_no_latest_tags.py` is the policy-as-code check that ADR's

@@ -34,7 +34,7 @@ password). The rest genuinely require external input and can't be
 generated: the Google Workspace OAuth client (ADR-0014), the SMTP
 technical-mail credentials, the Atlassian Confluence technical token, the
 Quay registry credentials (stored for future cluster-side use - separate
-from ADR-0051's GitHub Actions `QUAY_USERNAME`/`QUAY_PASSWORD` CI secrets),
+from ADR-0115's GitHub Actions `QUAY_USERNAME`/`QUAY_PASSWORD` CI secrets),
 the Atlassian Jira technical token (no consumer in this repo yet, reserved
 ahead of time), and the RAG corpus S3 bucket credentials. Those come from
 `ansible/confidential.yml` - copied from the checked-in

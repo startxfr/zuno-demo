@@ -41,4 +41,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 ## Related ADRs
 
 - [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md)
-- [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md)
+- [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md)

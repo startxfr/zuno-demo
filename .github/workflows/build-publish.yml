@@ -1,4 +1,4 @@
-# ADR-0051: build every component in CI, publish to Quay with immutable
+# ADR-0115: build every component in CI, publish to Quay with immutable
 # tags, generate an SBOM, scan for vulnerabilities, and sign with cosign
 # (keyless, via GitHub's OIDC identity - no pre-provisioned signing key,
 # consistent with Security considerations: "CI secrets stay outside Git").
@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compute immutable tags (ADR-0051 - never :latest)
+      - name: Compute immutable tags (ADR-0115 - never :latest)
         id: tags
         run: |
           echo "sha_tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"

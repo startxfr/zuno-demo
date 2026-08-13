@@ -67,7 +67,7 @@ Where practical, generated tables should replace manually maintained copies of t
 - A single platform-profile source captures stable platform version/capability intent without duplicating dynamic OLM channel selection.
 - `make check` or its documentation sub-gate fails on known README/ADR/component-inventory drift.
 - ADR-0319/OpenShift target, Make command examples, MaaS state and OGX state are reconciled in user-facing documentation.
-- ADR index generation/validation detects missing new ADRs and stale statuses such as ADR-0051.
+- ADR index generation/validation detects missing new ADRs and stale statuses such as ADR-0115.
 - No generated documentation contains values sourced from ignored/local confidential files.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Migration/evolution and Review evidence.

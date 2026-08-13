@@ -52,4 +52,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0014](0014-use-delegated-google-oauth-for-google-workspace-access.md)
 - [ADR-0024](0024-use-vault-for-application-secrets.md)
 - [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md)
-- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)

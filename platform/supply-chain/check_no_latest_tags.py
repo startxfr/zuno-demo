@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""ADR-0051 policy-as-code check: "Add CI checks rejecting `latest` for
+"""ADR-0115 policy-as-code check: "Add CI checks rejecting `latest` for
 deployable component images." Walks every `gitops/charts/*/values.yaml`
 looking for an image `tag` field set to the literal string "latest" -
 Kubernetes' most common non-reproducible-deployment mistake, and exactly
-what ADR-0051's Context names ("component Helm values use `tag: latest`.
+what ADR-0115's Context names ("component Helm values use `tag: latest`.
 This makes a deployed environment non-reproducible").
 
 No live cluster or registry needed - pure static YAML inspection, same
 style as platform/security/check_workload_hardening.py. Currently a
 correctly-failing check against this repository's actual state: 6 charts
-still use `tag: latest` as of ADR-0051's landing, because the CI pipeline
+still use `tag: latest` as of ADR-0115's landing, because the CI pipeline
 that would publish real immutable tags for it to reference
 (.github/workflows/build-publish.yml) has never actually run in this
 sandbox (no live Quay credentials here) - see .github/README.md and
@@ -78,7 +78,7 @@ def main() -> int:
     print(
         "\nRESULT: FAIL - replace each with an immutable tag (git SHA or "
         "semver release tag) published by .github/workflows/build-publish.yml "
-        "(ADR-0051)."
+        "(ADR-0115)."
     )
     return 1
 

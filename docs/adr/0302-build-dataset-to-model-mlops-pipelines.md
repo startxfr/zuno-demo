@@ -71,7 +71,7 @@ dataset-to-registered-artifact pipeline.
 - **Manual, ad hoc fine-tuning runs** (a data scientist running a
   one-off script outside GitOps/CI) - rejected: produces unversioned,
   unregistered artifacts this platform's supply-chain conventions
-  (ADR-0051) explicitly avoid elsewhere, and skips the acceptance gate
+  (ADR-0115) explicitly avoid elsewhere, and skips the acceptance gate
   every other agent-facing change goes through.
 - **A new, dedicated pipeline/orchestration system** - rejected: the
   platform already has a working KFP mechanism (ADR-0330) for exactly
@@ -112,7 +112,7 @@ Consequences, Migration/evolution and Acceptance criteria.
 - [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) - Evaluate every agent with twenty acceptance scenarios
 - [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md) - Require a seventy-five percent evaluation threshold
 - [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) - Make RAG retrieval metadata-aware and bilingual
-- [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) - Use immutable and verifiable software supply chain artifacts
+- [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) - Use immutable and verifiable software supply chain artifacts
 - [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) - Restructure deployment into Day 0 / Day 1 sequencing (`mlops` run component)
 - [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) - Introduce LoRA and PEFT model customization (this pipeline's output)
 - [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) - Integrate the rag-ingestion pipeline as a Day 1 component (the KFP/S3 pattern this ADR reuses)

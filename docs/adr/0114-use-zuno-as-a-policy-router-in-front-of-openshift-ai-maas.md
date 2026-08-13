@@ -1,9 +1,10 @@
-# ADR-0049: Use Zuno as a policy router in front of OpenShift AI MaaS
+# ADR-0114: Use Zuno as a policy router in front of OpenShift AI MaaS
 
 - **Status:** To be implemented
 - **Target:** v1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
+- **Renumbered:** formerly ADR-0049 (2026-08-13 roadmap reorganization)
 
 ## Context
 

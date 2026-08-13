@@ -64,4 +64,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0105](0100-v1-roadmap.md#adr-0105-automate-source-specific-knowledge-ingestion)
 - [ADR-0109](0100-v1-roadmap.md#adr-0109-implement-source-freshness-and-trust-scoring)
 - [ADR-0202](0202-introduce-logical-knowledge-domains.md)
-- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)

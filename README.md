@@ -40,7 +40,7 @@ they exist as OKF definitions (structurally validated by
 `make day1|d1 check agents`, ADR-0031), reserved namespaces and access-gated portal tiles, without a
 running workflow - business-functional builds for all four move to v1, see
 `platform/architecture/agent-platform-separation.md`. The
-AIAgent CRD/operator (originally v0) is retargeted to v1 - see ADR-0026.
+AIAgent CRD/operator (originally v0) is retargeted to v1 - see ADR-0113.
 
 ## Repository principles
 
@@ -50,7 +50,7 @@ AIAgent CRD/operator (originally v0) is retargeted to v1 - see ADR-0026.
 - Agent definitions use Open Knowledge Format (OKF) v0.2 plus a Zuno-specific extension profile.
 - Real commercial data and nominative data must never be committed to this public repository.
 - `MEMORY.md` captures the project context so future work can resume consistently.
-- Component images are built, scanned, SBOM'd and signed in CI and published under immutable tags (ADR-0051) - see `.github/README.md` and `RELEASING.md`.
+- Component images are built, scanned, SBOM'd and signed in CI and published under immutable tags (ADR-0115) - see `.github/README.md` and `RELEASING.md`.
 
 ## Operator workflow
 

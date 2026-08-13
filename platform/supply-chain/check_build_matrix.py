@@ -6,7 +6,7 @@ repository's actual `components/**/Dockerfile` inventory, without needing
 registry credentials or a live cluster - the ADR's Operational
 considerations require this preflight to fail fast on a PR, before any
 image build/publish/SBOM/scan/sign step (governed separately by
-ADR-0051) even starts.
+ADR-0115) even starts.
 
 Two failure modes:
   - a matrix entry's `dockerfile`/`context` path doesn't exist, its

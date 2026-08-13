@@ -1,4 +1,4 @@
-# v1 roadmap decisions (ADR-0101 – ADR-0112)
+# v1 roadmap decisions (ADR-0101 – ADR-0117)
 
 - **Status:** Proposed
 - **Target:** v1
@@ -55,3 +55,27 @@ Harden deployment, supply chain, identity, network and data controls toward SecN
 ### ADR-0112: Implement production-grade backup and recovery
 
 Define backup, restore and recovery objectives for PostgreSQL, configuration and critical state.
+
+## Renumbered into the v1 stream (2026-08-13 roadmap reorganization)
+
+ADR-0113 – ADR-0117 are full decision records in their own files, moved into the v1 stream because they are open work targeted at v1: three formerly-00xx decisions that were never implemented, plus two decisions promoted from the v2 stream because they are concretely implementable now.
+
+### ADR-0113: Provide an AIAgent Kubernetes CRD and operator
+
+Formerly ADR-0026: see [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md).
+
+### ADR-0114: Use Zuno as a policy router in front of OpenShift AI MaaS
+
+Formerly ADR-0049: see [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md).
+
+### ADR-0115: Use immutable and verifiable software supply chain artifacts
+
+Formerly ADR-0051, retargeted v0 -> v1: see [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md).
+
+### ADR-0116: Decouple logical tool capabilities from physical backend bindings
+
+Formerly ADR-0207, promoted from v2: see [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md).
+
+### ADR-0117: Implement Confluence as the first real external MCP integration
+
+Formerly ADR-0210, promoted from v2: see [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md).

@@ -19,12 +19,12 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyyaml openapi-spec-validator
-      # ADR-0051 - known-failing today (6 charts still use tag: latest,
+      # ADR-0115 - known-failing today (6 charts still use tag: latest,
       # pending the build-publish.yml pipeline actually publishing
       # immutable tags for them to reference) - see
       # platform/supply-chain/README.md. Not made a hard CI gate yet for
       # that reason; report only.
-      - name: Reject non-immutable image tags (ADR-0051)
+      - name: Reject non-immutable image tags (ADR-0115)
         run: python3 platform/supply-chain/check_no_latest_tags.py
         continue-on-error: true
       - name: Reconcile CI build inventory (ADR-0324)

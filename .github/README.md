@@ -1,6 +1,6 @@
 # .github
 
-ADR-0051's CI implementation. Every other ADR in this repository that
+ADR-0115's CI implementation. Every other ADR in this repository that
 mentions ".github/workflows/ doesn't exist yet" was written before this
 landed - two workflows now exist:
 
@@ -14,14 +14,14 @@ landed - two workflows now exist:
   `components/rag-service/tests/`), and an `ansible-playbook --syntax-check`
   pass over every playbook. Runs on every pull request and every push to
   `main`.
-- **`workflows/build-publish.yml`** (ADR-0051) - builds every component
+- **`workflows/build-publish.yml`** (ADR-0115) - builds every component
   image, publishes to Quay with an immutable `sha-<commit>` tag (plus the
   semantic version tag on an actual `v*` release tag push), generates an
   SPDX SBOM, scans for HIGH/CRITICAL vulnerabilities (fails the build),
   and signs the image keylessly via `cosign` (Sigstore/Fulcio, using
   GitHub's own OIDC identity - no pre-provisioned signing key or secret).
   Requires `QUAY_USERNAME`/`QUAY_PASSWORD` as encrypted GitHub repository
-  secrets (never committed - ADR-0051 Security considerations: "CI
+  secrets (never committed - ADR-0115 Security considerations: "CI
   secrets stay outside Git").
 
 ## What hasn't run

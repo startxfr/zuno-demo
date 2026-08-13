@@ -7,7 +7,7 @@ shared mechanism.
 
 Added after the original mcp/rag/agent build trio: ADR-0056 flagged
 `ai-gateway` as not covered by any Day 1 build component yet, intended to
-be built by the existing GitHub Actions pipeline (ADR-0051) instead. On a
+be built by the existing GitHub Actions pipeline (ADR-0115) instead. On a
 fresh cluster with no CI-published image, that leaves every `ai-gateway`
 pod in permanent `ImagePullBackOff` - found via live-cluster testing on
 api.demo222.startx.fr. This role closes that gap using the same in-cluster

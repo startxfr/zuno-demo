@@ -32,7 +32,7 @@ Four independent checks:
 - **adr_index** - every `docs/adr/NNNN-*.md` file has a
   `docs/adr/README.md` index row, and that row's status matches the
   ADR's own `**Status:**` field (caught three real drifts on
-  introduction: ADR-0051 downgraded to "Partially implemented" in its own
+  introduction: ADR-0115 downgraded to "Partially implemented" in its own
   body without its index row following, and ADR-0018/ADR-0050 both marked
   "Superseded by ADR-0322" in their own bodies while the index still
   showed their pre-supersession status - all three fixed alongside this

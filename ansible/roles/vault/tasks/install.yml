@@ -498,7 +498,7 @@
   no_log: true
 
 # Stored for future cluster-side use (e.g. an image pull secret) - distinct
-# from ADR-0051's build-publish.yml CI consumer, which reads
+# from ADR-0115's build-publish.yml CI consumer, which reads
 # QUAY_USERNAME/QUAY_PASSWORD as GitHub Actions repo secrets set directly in
 # GitHub, not from Vault/confidential.yml.
 - name: "vault | seed the Quay registry credentials from ansible/confidential.yml"

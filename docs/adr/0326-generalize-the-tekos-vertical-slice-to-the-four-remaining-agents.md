@@ -94,7 +94,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
 - [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
 - [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
-- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
 - [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)
 - [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md)
 - [ADR-0401](0400-v4-roadmap.md#adr-0401-introduce-agent-to-agent-communication)

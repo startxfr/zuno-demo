@@ -81,5 +81,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md)
 - [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md)
 - [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
-- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
 - [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)

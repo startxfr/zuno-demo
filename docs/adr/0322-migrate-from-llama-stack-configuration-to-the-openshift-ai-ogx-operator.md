@@ -127,5 +127,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md)
 - [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md)
 - [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md)
-- [ADR-0049](0049-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md)
+- [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md)
 - [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md)

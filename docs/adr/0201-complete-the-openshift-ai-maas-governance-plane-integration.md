@@ -7,7 +7,7 @@
 
 ## Context
 
-ADR-0049 decided that Zuno should become a business/context policy router in front of OpenShift AI Models-as-a-Service (MaaS) rather than reimplement product-native model publication, subscription, quota and API-access capabilities.
+ADR-0114 decided that Zuno should become a business/context policy router in front of OpenShift AI Models-as-a-Service (MaaS) rather than reimplement product-native model publication, subscription, quota and API-access capabilities.
 
 The repository has already moved part way toward this architecture:
 
@@ -22,7 +22,7 @@ OpenShift AI 3.5 documents MaaS as a subscription-based governance plane. It pro
 
 ## Decision
 
-Complete MaaS as the **model access and consumption governance plane**, while retaining Zuno as the stricter business/context policy layer defined by ADR-0049.
+Complete MaaS as the **model access and consumption governance plane**, while retaining Zuno as the stricter business/context policy layer defined by ADR-0114.
 
 The target request path is:
 
@@ -112,5 +112,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md)
 - [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md)
 - [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md)
-- [ADR-0049](0049-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md)
+- [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md)
 - [ADR-0317](0317-install-connectivity-link-and-leaderworkerset-operators.md)

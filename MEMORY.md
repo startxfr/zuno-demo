@@ -498,7 +498,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   disagree on a field name; `platform/api/lint_openapi.py` validates the
   spec itself against the OpenAPI meta-schema plus two ADR-0054-specific
   conventions.
-- Platform lifecycle and supply chain (ADR-0047/ADR-0048/ADR-0051): a new
+- Platform lifecycle and supply chain (ADR-0047/ADR-0048/ADR-0115): a new
   `ansible/roles/nfd` role closes a real, previously undeclared gap (the
   NVIDIA GPU Operator's default `ClusterPolicy` relies on NFD node
   labels, and nothing installed NFD before this). Found and fixed a real
@@ -555,7 +555,7 @@ planning narrative - see README.md's "v0 build status" for a summary:
   eval script's `KEYCLOAK_URL` default assume `sso.<domain>`, which no
   Route in this repository creates - a real bug in ADR-0032/0033's
   identity plumbing, flagged in ADR-0053's Implementation state.
-- ADR-0026 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos
+- ADR-0113 (AIAgent CRD/operator) is retargeted from v0 to v1 - Tekos
   deploys as a plain `Deployment` instead.
 - Deployment sequencing (ADR-0056): the old `precheck`/`prepare`/
   `configure`/`install`/`check` interface is replaced outright by

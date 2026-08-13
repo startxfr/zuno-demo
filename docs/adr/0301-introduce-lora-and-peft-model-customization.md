@@ -38,7 +38,7 @@ this one doesn't grow into an unreviewable bundle.
    `modelregistry.registriesNamespace: zuno-ai-build`). An adapter is
    referenced by registry name/version in `models/values.yaml`, the same
    way container images are referenced by tag elsewhere in this repo
-   (ADR-0051) - no adapter is ever loaded from an unversioned or
+   (ADR-0115) - no adapter is ever loaded from an unversioned or
    untracked location.
 4. **Classification propagates to the adapter, not just its outputs** -
    an adapter trained (even partially) on C2 or C3 source data inherits
@@ -94,7 +94,7 @@ Consequences, Migration/evolution and Acceptance criteria.
 - [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md) - Route models according to C1/C2/C3 classification
 - [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md) - Compute effective classification from the complete context
 - [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) - Make RAG retrieval metadata-aware and bilingual (precedent for metadata-driven access control)
-- [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) - Use immutable and verifiable software supply chain artifacts (precedent for versioned/registered artifacts)
+- [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) - Use immutable and verifiable software supply chain artifacts (precedent for versioned/registered artifacts)
 - [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) - Restructure deployment into Day 0 / Day 1 sequencing (`mlops` run component)
 - [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) - Build dataset-to-model MLOps pipelines (produces the adapters this ADR serves)
 - [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) - Support dynamic LoRA adapter loading (later, out of this ADR's scope)

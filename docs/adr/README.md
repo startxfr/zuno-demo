@@ -4,6 +4,8 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 
 Most ADRs below carry only a title, status/target/date, and their unique Decision text - the boilerplate clauses every ADR used to repeat (Context, Alternatives, Consequences, Security/Operational considerations, Acceptance criteria, Review evidence, Migration) now live once in [Standard clauses](#standard-clauses) and apply unless a specific ADR overrides them inline.
 
+**Renumbering note (2026-08-13):** the roadmap reorganization moved open decisions into the v1 stream. ADR-0026 -> ADR-0113, ADR-0049 -> ADR-0114, ADR-0051 -> ADR-0115 (unimplemented 00xx records), and ADR-0207 -> ADR-0116, ADR-0210 -> ADR-0117 (promoted from v2 as concretely implementable). The old numbers are retired; each moved record carries a `Renumbered:` line.
+
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0001](0001-use-a-monorepo-for-the-zuno-agent-platform.md) | v0 | Implemented | Use a monorepo for the Zuno agent platform |
@@ -31,7 +33,6 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Superseded by ADR-0329 | Use a namespace-per-agent isolation model |
 | [ADR-0024](0024-use-vault-for-application-secrets.md) | v0 | Implemented | Use Vault for application secrets |
 | [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md) | v0 | Implemented | Keep sensitive and real commercial data outside the public repository |
-| [ADR-0026](0026-provide-an-aiagent-kubernetes-crd-and-operator.md) | v1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0027](0027-evaluate-every-agent-with-twenty-acceptance-scenarios.md) | v0 | Implemented | Evaluate every agent with twenty acceptance scenarios |
 | [ADR-0028](0028-require-a-seventy-five-percent-evaluation-threshold.md) | v0 | Implemented | Require a seventy-five percent evaluation threshold |
 | [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md) | v0 | Implemented | Instrument model usage costs and distributed traces |
@@ -54,9 +55,7 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Implemented | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | v0 | Implemented | Manage the complete OpenShift AI prerequisite lifecycle |
 | [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | v0 | Implemented | Discover supported operator channels and serving runtimes at deployment time |
-| [ADR-0049](0049-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v1 | To be implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
-| [ADR-0051](0051-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | Implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
@@ -74,16 +73,19 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0110](0100-v1-roadmap.md#adr-0110-automate-document-acl-synchronization) | v1 | Proposed | Automate document ACL synchronization |
 | [ADR-0111](0100-v1-roadmap.md#adr-0111-strengthen-secnumcloud-oriented-security-controls) | v1 | Proposed | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0100-v1-roadmap.md#adr-0112-implement-production-grade-backup-and-recovery) | v1 | Proposed | Implement production-grade backup and recovery |
+| [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md) | v1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
+| [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v1 | To be implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
+| [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v1 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
+| [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v1 | To be implemented | Decouple logical tool capabilities from physical backend bindings |
+| [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v1 | To be implemented | Implement Confluence as the first real external MCP integration |
 | [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v2 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v2 | To be implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v2 | To be implemented | Enforce knowledge authorization as policy intersection |
 | [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v2 | To be implemented | Generalize the RAG platform to multiple isolated knowledge domains |
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | v2 | To be implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v2 | To be implemented | Separate current Salesforce knowledge from legacy SXA |
-| [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v2 | To be implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v2 | To be implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v2 | To be implemented | Introduce project-scoped agent memory |
-| [ADR-0210](0210-implement-confluence-as-the-first-real-external-mcp-integration.md) | v2 | To be implemented | Implement Confluence as the first real external MCP integration |
 | [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v3 | To be implemented | Introduce LoRA and PEFT model customization |
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v3 | To be implemented | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) | v3 | Proposed | Support dynamic LoRA adapter loading |

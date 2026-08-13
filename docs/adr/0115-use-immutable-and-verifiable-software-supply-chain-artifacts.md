@@ -1,9 +1,10 @@
-# ADR-0051: Use immutable and verifiable software supply chain artifacts
+# ADR-0115: Use immutable and verifiable software supply chain artifacts
 
 - **Status:** Partially implemented
-- **Target:** v0
+- **Target:** v1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
+- **Renumbered:** formerly ADR-0051, retargeted v0 -> v1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
 - **Last reviewed:** 2026-08-12
 
 ## Context
@@ -58,7 +59,7 @@ GitHub Actions + Quay run) plus its three direct downstream consequences.
 
 ### Completion criteria
 
-ADR-0051 can move back to **Implemented** only when all of the following are true:
+ADR-0115 can move back to **Implemented** only when all of the following are true:
 
 - ADR-0324 removes stale/non-buildable entries and the build inventory has a mandatory path-validation gate;
 - every deployable first-party image is published with a SHA/semantic immutable reference and chart values no longer contain `latest`;

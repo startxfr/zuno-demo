@@ -88,9 +88,9 @@ is not `active`, independent of whether the viewer's JWT groups would
 otherwise grant access - so a sales user sees a gated Comage tile, not a
 broken link.
 
-## Why not the AIAgent CRD (ADR-0026, retargeted to v1)
+## Why not the AIAgent CRD (ADR-0113, retargeted to v1)
 
-ADR-0026 originally proposed reconciling agent instances through a custom
+ADR-0113 originally proposed reconciling agent instances through a custom
 `AIAgent` CRD and operator. With a single functional agent in v0, a
 controller earns no reconciliation complexity it would actually exercise:
 a plain `Deployment` + `Service` + `Route`, applied by ArgoCD from

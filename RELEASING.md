@@ -1,8 +1,8 @@
-# Releasing (ADR-0051)
+# Releasing (ADR-0115)
 
 This project has never cut a release - every GitOps `Application`
 (`gitops/apps/*/application.yaml`, `gitops/root-app-of-apps.yaml`) still
-tracks `targetRevision: main`, a moving reference. ADR-0051 wants that
+tracks `targetRevision: main`, a moving reference. ADR-0115 wants that
 replaced with an immutable, reviewed Git revision or tag, but rewriting
 those `targetRevision` values today, before any tag has ever been pushed,
 would point every Application at a Git ref that doesn't exist and break
@@ -28,7 +28,7 @@ tag for from here.
    `.github/workflows/lint.yml`) will start passing once every chart's
    `tag: latest` is replaced this way.
 5. Bump `gitops/apps/*/application.yaml`'s `targetRevision: main` to
-   `targetRevision: v0.1.0` in the same PR - this is the point ADR-0051's
+   `targetRevision: v0.1.0` in the same PR - this is the point ADR-0115's
    "production-like Argo CD applications must deploy a reviewed Git
    revision/tag" actually takes effect, and not before. Also bump
    `gitops/root-app-of-apps.yaml`'s own `targetRevision` the same way even
