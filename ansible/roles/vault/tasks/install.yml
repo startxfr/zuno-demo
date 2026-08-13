@@ -420,6 +420,23 @@
       default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
   no_log: true
 
+# Internal service credential (the rag-ingestion KFP pipeline's "mlpipeline"
+# MariaDB user, gitops/charts/rag-ingestion's
+# pipelineServer.metadataDatabase.externalMySQL), not a third-party one -
+# self-generated same as mariadb/root above, not sourced from
+# ansible/confidential.yml. username is static ("mlpipeline") in that
+# chart's own values.yaml, so only password needs to live here.
+- name: "vault | generate and seed the rag-ingestion pipeline metadata DB password"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/rag/pipeline-db
+      password={{ zuno_admin_rag_pipeline_db_password |
+      default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+  no_log: true
+
 # These can't be self-generated - real external service credentials,
 # supplied via ansible/confidential.yml and re-applied idempotently.
 - name: "vault | seed the Google OAuth client from ansible/confidential.yml"
@@ -468,6 +485,43 @@
     and zuno_atlassian_confluence_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# Stored for future cluster-side use (e.g. an image pull secret) - distinct
+# from ADR-0051's build-publish.yml CI consumer, which reads
+# QUAY_USERNAME/QUAY_PASSWORD as GitHub Actions repo secrets set directly in
+# GitHub, not from Vault/confidential.yml.
+- name: "vault | seed the Quay registry credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/quay/registry
+      username={{ zuno_quay_username | quote }} password={{ zuno_quay_password | quote }}"
+  when: >-
+    zuno_quay_username | default('xxxxxx') != 'xxxxxx'
+    and zuno_quay_password | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+# No consumer in this repo yet - same "stored ahead of time" status
+# Confluence originally had. Same url/email/token/enabled shape as
+# confluence/technical above (Jira Cloud uses the same Atlassian
+# email+API-token Basic Auth scheme).
+- name: "vault | seed the Jira technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/jira/technical
+      url={{ zuno_jira_url | quote }} email={{ zuno_jira_email | quote }}
+      token={{ zuno_jira_token | quote }}
+      enabled={{ (zuno_jira_enabled | default(false)) | quote }}"
+  when: >-
+    zuno_jira_url | default('xxxxxx') != 'xxxxxx'
+    and zuno_jira_email | default('xxxxxx') != 'xxxxxx'
+    and zuno_jira_token | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 # Only seeded when all five fields are real - no placeholder fallback,
 # since the ExternalSecret that reads it only renders under the same
 # condition (postgresql role's backups.s3.enabled).
@@ -508,6 +562,25 @@
     and zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# rag-ingestion's corpus S3 bucket (gitops/charts/rag-ingestion's s3: block -
+# bucket/region/endpoint are chart config there, not secret). Property names
+# (accessKeyId/secretAccessKey) match that chart's
+# s3.externalSecret.accessKeyProperty/secretKeyProperty defaults, same
+# camelCase convention as mariadb/s3 above.
+- name: "vault | seed the RAG corpus S3 credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/rag/s3
+      accessKeyId={{ zuno_rag_s3_access_key_id | quote }}
+      secretAccessKey={{ zuno_rag_s3_secret_access_key | quote }}"
+  when: >-
+    zuno_rag_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_rag_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 - name: "vault | check whether operator-supplied secrets already exist"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -519,6 +592,8 @@
     - google-oauth/client
     - smtp/technical
     - confluence/technical
+    - quay/registry
+    - jira/technical
   loop_control:
     loop_var: secret_path
     label: "{{ secret_path }}"
@@ -544,14 +619,14 @@
 - name: "vault | operator action required"
   ansible.builtin.debug:
     msg: >-
-      zuno/google-oauth/client, zuno/smtp/technical and/or
-      zuno/confluence/technical are still placeholders - the corresponding
-      value(s) in ansible/confidential.yml are still the "xxxxxx" sentinel
-      from confidential.example.yml. Fill them in and re-run
-      `make d0 install vault` (this role re-seeds from confidential.yml on
-      every run, without overwriting anything already populated another
-      way). ADR-0014's real Google OAuth delegation depends on the first
-      one - everything else in this file is unattended.
+      zuno/google-oauth/client, zuno/smtp/technical, zuno/confluence/technical,
+      zuno/quay/registry and/or zuno/jira/technical are still placeholders -
+      the corresponding value(s) in ansible/confidential.yml are still the
+      "xxxxxx" sentinel from confidential.example.yml. Fill them in and
+      re-run `make d0 install vault` (this role re-seeds from
+      confidential.yml on every run, without overwriting anything already
+      populated another way). ADR-0014's real Google OAuth delegation
+      depends on the first one - everything else in this file is unattended.
 
 # LLM provider API keys, supplied via ansible/confidential.yml. Kept
 # separate from the block above because the placeholder key name differs:

@@ -1,0 +1,62 @@
+{{- if .Values.mariadbOperand.enabled }}
+# UNVERIFIED against a live cluster: mariadb-operator's Database/User/Grant
+# CRD field names below (mariaDbRef, passwordSecretKeyRef, privileges/
+# database/table/username) are the documented k8s.mariadb.com/v1alpha1
+# shape, not yet confirmed with `oc explain database.k8s.mariadb.com.spec` /
+# `oc explain user.k8s.mariadb.com.spec` / `oc explain grant.k8s.mariadb.com.spec`
+# against this cluster's actual installed CRD version - same caution this
+# chart's own README already carries for the MariaDB CR itself. Correct
+# this file once confirmed.
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Database
+metadata:
+  name: {{ .Values.pipelineDatabase.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+spec:
+  mariaDbRef:
+    name: mariadb
+  characterSet: utf8mb4
+  collate: utf8mb4_unicode_ci
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: User
+metadata:
+  name: {{ .Values.pipelineDatabase.owner }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+spec:
+  mariaDbRef:
+    name: mariadb
+  # "Bring your own password" - the Secret is pre-seeded from Vault by
+  # templates/externalsecret-pipeline-db.yaml, sync-wave -35, ahead of this
+  # User CR at -25.
+  passwordSecretKeyRef:
+    name: mariadb-pipeline-db-password
+    key: password
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Grant
+metadata:
+  name: {{ .Values.pipelineDatabase.owner }}-grant
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-24"
+spec:
+  mariaDbRef:
+    name: mariadb
+  privileges:
+    - "ALL PRIVILEGES"
+  database: {{ .Values.pipelineDatabase.name }}
+  table: "*"
+  username: {{ .Values.pipelineDatabase.owner }}
+  grantOption: false
+{{- end }}

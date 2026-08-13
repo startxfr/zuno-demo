@@ -56,6 +56,27 @@ zuno_postgresql_backup_s3_region: "xxxxxx"
 zuno_postgresql_backup_s3_access_key: "xxxxxx"
 zuno_postgresql_backup_s3_secret_key: "xxxxxx"
 
+# --- Quay.io registry (stored in Vault for future cluster-side use, e.g. an
+# image pull secret; NOT the same credential ADR-0051's build-publish.yml CI
+# workflow uses - that one is QUAY_USERNAME/QUAY_PASSWORD as a GitHub Actions
+# repo secret, set directly in GitHub, unaffected by this file) -------------
+zuno_quay_username: "xxxxxx"
+zuno_quay_password: "xxxxxx"
+
+# --- Jira (no consumer in this repo yet - slot reserved for a future
+# integration, same "stored ahead of time" status as Confluence originally
+# had) ------------------------------------------------------------------
+zuno_jira_enabled: false
+zuno_jira_url: "xxxxxx"       # e.g. https://your-company.atlassian.net
+zuno_jira_email: "xxxxxx"
+zuno_jira_token: "xxxxxx"
+
+# --- RAG corpus S3 bucket (rag-ingestion's raw/normalized/manifest storage -
+# bucket/region/endpoint are chart config, not secret: see
+# gitops/charts/rag-ingestion/values.yaml's s3: block) -----------------------
+zuno_rag_s3_access_key_id: "xxxxxx"
+zuno_rag_s3_secret_access_key: "xxxxxx"
+
 # --- LLM external provider API keys -----------------------------------------
 # Each optional: leave "xxxxxx" and the ModelRouter fails over to the next
 # eligible provider (the local model always works with none filled in).

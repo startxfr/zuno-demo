@@ -28,18 +28,27 @@ admin-only namespace (`zuno-vault`) rather than requiring any
 external input. See ADR-0024.
 
 `install.yml` also generates and seeds the secrets that can be
-self-generated (Keycloak admin, PostgreSQL app credentials). Three more
-secrets genuinely require external input and can't be generated: the
-Google Workspace OAuth client (ADR-0014), the SMTP technical-mail
-credentials, and the Atlassian Confluence technical token. Those come from
+self-generated (Keycloak admin, PostgreSQL app credentials, MariaDB root,
+and the rag-ingestion pipeline's internal `mlpipeline` metadata-DB
+password). The rest genuinely require external input and can't be
+generated: the Google Workspace OAuth client (ADR-0014), the SMTP
+technical-mail credentials, the Atlassian Confluence technical token, the
+Quay registry credentials (stored for future cluster-side use - separate
+from ADR-0051's GitHub Actions `QUAY_USERNAME`/`QUAY_PASSWORD` CI secrets),
+the Atlassian Jira technical token (no consumer in this repo yet, reserved
+ahead of time), and the RAG corpus S3 bucket credentials. Those come from
 `ansible/confidential.yml` - copied from the checked-in
 `ansible/confidential.example.yml` and filled in by an operator before the
 first `make d0 install vault`, gitignored so no secret is ever written to a
 Git-tracked file. `install.yml` re-reads it on every run and (re-)seeds
 Vault from it, so the file can be deleted again afterwards unless Vault
-needs to be reinstalled. Any of the three left as the example file's
-`"xxxxxx"` sentinel instead falls back to an empty Vault placeholder -
-never overwriting a real value however it got there.
+needs to be reinstalled. Any field left as the example file's `"xxxxxx"`
+sentinel falls back to an empty Vault placeholder (Google OAuth, SMTP,
+Confluence, Quay, Jira) or is simply not seeded at all (RAG S3 and the
+PostgreSQL/MariaDB backup S3 credentials - all three skip the placeholder
+step entirely rather than writing a `_placeholder=true` entry, since
+seeding one wouldn't mean anything useful) - never overwriting a real
+value however it got there.
 
 Vault's KV v2 secrets engine is mounted at `zuno/` (not the HashiCorp
 default `secret/`) - every platform secret lives under `zuno/<component>/

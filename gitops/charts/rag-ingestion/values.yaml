@@ -377,13 +377,20 @@ redhat:
 # so anchors/aliases work here same as anywhere else. Override an
 # individual entry's authentication block if a source ever needs a
 # different site/credential.
+# remoteKey points at the same zuno/confluence/technical identity
+# ansible/roles/vault/tasks/install.yml already seeds from
+# ansible/confidential.yml (zuno_atlassian_confluence_*) - one Confluence
+# credential total, not a separate rag-ingestion-only one. That path stores
+# an `email` field (Confluence Cloud Basic auth is email+token), hence
+# usernameProperty: email rather than a `username` field this path doesn't
+# have.
 confluenceAuthDefault: &confluenceAuthDefault
   type: api-token              # api-token | bearer-token
   secretName: rag-confluence
   externalSecret:
-    remoteKey: "rag/confluence"
+    remoteKey: "confluence/technical"
     tokenProperty: token
-    usernameProperty: username
+    usernameProperty: email
 
 # Confluence Cloud sources - persona/skill-restricted. Each entry is
 # filterable by Space (spaces:[]) and by page-tree path (directories:[]),
