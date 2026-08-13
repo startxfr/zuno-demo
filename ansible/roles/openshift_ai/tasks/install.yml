@@ -150,7 +150,7 @@
               channel: "{{ _openshift_ai_channel }}"
         # See the identical block's comment in the first d0 apply above.
         DSCInitialization:
-          enabled: true
+          enabled: false
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
@@ -163,6 +163,9 @@
     gitops_app_extra_helm_values:
       dataScienceCluster:
         enabled: true
+      cluster-ods:
+        DSCInitialization:
+          enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 

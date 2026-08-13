@@ -74,7 +74,7 @@ cluster-ods:
   # operator recreates operands under these namespaces.
   DSCInitialization:
     enabled: false
-    name: zuno-dsci
+    name: default-dsci
     spec: |
       applicationsNamespace: zuno-ai-platform
       monitoring:
