@@ -24,6 +24,8 @@ spec:
             enabled: true
           operator:
             enabled: true
+          DSCInitialization:
+            enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator
