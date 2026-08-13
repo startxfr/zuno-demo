@@ -1,0 +1,31 @@
+{{/*
+Optional per-namespace CPU/memory ResourceQuota - only rendered for
+platformNamespaces entries that set .resourceQuota. None of the original 8
+entries set it (matching this chart's existing "no CPU/mem quota" baseline);
+only the RHOAI namespaces added alongside this template need one. Distinct
+from resourcequota-gpu.yaml, which caps GPU consumption on a single
+hardcoded namespace (openshiftAi.namespace), not CPU/memory.
+*/}}
+{{- if .Values.policy.enabled }}
+{{- range .Values.platformNamespaces }}
+{{- if .resourceQuota }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: zuno-platform-quota
+  namespace: {{ .name }}
+  labels:
+    zuno.io/tier: platform
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-70"
+spec:
+  hard:
+    requests.cpu: {{ .resourceQuota.requests.cpu | quote }}
+    requests.memory: {{ .resourceQuota.requests.memory | quote }}
+    limits.cpu: {{ .resourceQuota.limits.cpu | quote }}
+    limits.memory: {{ .resourceQuota.limits.memory | quote }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

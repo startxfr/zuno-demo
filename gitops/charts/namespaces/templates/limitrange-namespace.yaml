@@ -1,0 +1,35 @@
+{{/*
+Optional per-namespace container default/defaultRequest LimitRange - only
+rendered for platformNamespaces entries that set .limitRange. Pairs with
+resourcequota-namespace.yaml: a namespace ResourceQuota that caps
+limits.cpu/limits.memory requires every container created in it to declare
+its own limits, or admission fails - this LimitRange supplies that default
+so unmodified upstream RHOAI manifests (which don't all set resources) still
+schedule.
+*/}}
+{{- if .Values.policy.enabled }}
+{{- range .Values.platformNamespaces }}
+{{- if .limitRange }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: zuno-platform-limits
+  namespace: {{ .name }}
+  labels:
+    zuno.io/tier: platform
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-70"
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: {{ .limitRange.defaultRequest.cpu | quote }}
+        memory: {{ .limitRange.defaultRequest.memory | quote }}
+      default:
+        cpu: {{ .limitRange.default.cpu | quote }}
+        memory: {{ .limitRange.default.memory | quote }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

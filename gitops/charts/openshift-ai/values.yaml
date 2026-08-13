@@ -75,7 +75,10 @@ cluster-ods:
   # redhat-ods-applications (RHOAI's own default) rather than the custom
   # zuno-ai-platform ADR-0328 originally called for - reverted by ADR-0331
   # (trainer/ray/dashboard/mlflowoperator all failed under a custom
-  # applicationsNamespace on RHOAI 3.5 EA2).
+  # applicationsNamespace on RHOAI 3.5 EA2). monitoring.namespace reverted
+  # to the RHOAI default redhat-ods-monitoring for the same reason - this
+  # is dashboard's actual fix (its documented failure referenced
+  # zuno-monitoring specifically, not applicationsNamespace).
   DSCInitialization:
     enabled: false
     name: default-dsci
@@ -83,7 +86,7 @@ cluster-ods:
       applicationsNamespace: redhat-ods-applications
       monitoring:
         managementState: Managed
-        namespace: zuno-monitoring
+        namespace: redhat-ods-monitoring
 
   # Superseded by the top-level dataScienceCluster key below (rendered by
   # this chart's own templates/datasciencecluster.yaml, not the vendored
@@ -139,7 +142,9 @@ dataScienceCluster:
           managementState: Managed
         managementState: Managed
       modelregistry:
-        registriesNamespace: redhat-ods-applications
+        # RHOAI's own true default (distinct from applicationsNamespace) -
+        # ADR-0331.
+        registriesNamespace: rhoai-model-registries
         managementState: Managed
       feastoperator:
         managementState: Managed
@@ -183,11 +188,13 @@ dataScienceCluster:
         managementState: Managed
       # Re-enabled by ADR-0331: was Removed because it failed with "unable
       # to get: zuno-monitoring/dashboard-perses-access because of unknown
-      # namespace for the cache" under the custom zuno-ai-platform
-      # applicationsNamespace (RHOAI 3.5 EA2's dashboard/observability
-      # reconciliation doesn't derive its watched namespaces from
-      # DSCInitialization.spec.monitoring.namespace) - reverting
-      # applicationsNamespace to the default resolves it.
+      # namespace for the cache" - that references monitoring.namespace
+      # (custom zuno-monitoring), not applicationsNamespace. RHOAI 3.5 EA2's
+      # dashboard/observability reconciliation doesn't derive its watched
+      # namespaces from DSCInitialization.spec.monitoring.namespace - the
+      # actual fix is monitoring.namespace: redhat-ods-monitoring above, not
+      # the applicationsNamespace revert (an earlier version of this comment
+      # wrongly credited applicationsNamespace alone).
       dashboard:
         managementState: Managed
       # Re-enabled by ADR-0331: was Removed because the ClusterTrainingRuntime

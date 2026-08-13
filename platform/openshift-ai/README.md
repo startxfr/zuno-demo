@@ -77,35 +77,48 @@ ways: it also means *not* installing operators nothing here uses.
   `mlflowoperator`** - briefly `managementState: Removed` (the first three)
   as of 2026-08-13, now back to `Managed` per **ADR-0331**. All four were
   verified live against a real cluster to be broken under this repository's
-  then-custom `applicationsNamespace: zuno-ai-platform` (ADR-0328), each for
-  the same reason: RHOAI 3.5 EA2's bundled manifests hardcode
-  `redhat-ods-applications` rather than deriving it from
-  `DSCInitialization.spec.applicationsNamespace`. `trainer`'s
-  `ClusterTrainingRuntime` failed validation because RHOAI's own bundled
+  then-custom namespace fields (ADR-0328) - three under
+  `applicationsNamespace: zuno-ai-platform`, one under
+  `monitoring.namespace: zuno-monitoring` - because RHOAI 3.5 EA2's bundled
+  manifests hardcode the RHOAI default namespace names rather than deriving
+  them from `DSCInitialization.spec`. `trainer`'s `ClusterTrainingRuntime`
+  failed validation because RHOAI's own bundled
   `ValidatingWebhookConfiguration` hardcodes
   `kubeflow-trainer-controller-manager.redhat-ods-applications.svc`;
   `ray`'s `kuberay-operator` pod was rejected by every SCC on the cluster
   (RHOAI's namespace-specific SCC/RBAC bindings for Ray only exist for the
   product's default namespace); `dashboard`'s observability/Perses
   reconciliation didn't derive watched namespaces from
-  `DSCInitialization.spec.monitoring.namespace` either (failed with
-  "unknown namespace for the cache"); `mlflow-operator-controller-manager`
-  (the pod whose CrashLoopBackOff surfaced this bug class) ran
+  `DSCInitialization.spec.monitoring.namespace` (failed with "unknown
+  namespace for the cache" for `zuno-monitoring`) - **not**
+  `applicationsNamespace`, an important distinction: an earlier pass at
+  ADR-0331 reverted only `applicationsNamespace` and wrongly assumed that
+  alone fixed `dashboard` too; `monitoring.namespace` needed its own revert
+  to `redhat-ods-monitoring`; `mlflow-operator-controller-manager` (the pod
+  whose CrashLoopBackOff surfaced this bug class) ran
   `--namespace=redhat-ods-applications` unconditionally with a generated
   `ClusterRole` that granted no list/watch on `Secret`/`ServiceAccount`/
   `ConfigMap`/`Deployment`/`Job`/`CronJob`/`Service`/`PersistentVolumeClaim`/
   `ServiceMonitor` anywhere, so its controller-runtime cache never synced.
   Same precedent as ADR-0047 disabling KServe Serverless mode because it
   "would never have reached Ready on a real cluster" - except this time,
-  with four independently-broken components, ADR-0331 reverted
-  `applicationsNamespace` itself back to the RHOAI default
-  (`redhat-ods-applications`) rather than disabling each component one by
-  one. Nothing in this repository schedules a distributed training or Ray
-  run yet, and nothing links to the RHOAI console UI (Zuno has its own
-  `agent-frontend`) - but all four are now `Managed` and expected healthy.
-  Revisit a custom `applicationsNamespace` (restoring ADR-0328's original
-  intent) alongside ADR-0301/ADR-0302 (v3 LoRA/PEFT and dataset-to-model
-  MLOps pipelines) once RHOAI ships a fix.
+  with four independently-broken components, ADR-0331 reverted the
+  underlying namespace fields themselves back to RHOAI defaults
+  (`applicationsNamespace: redhat-ods-applications`,
+  `monitoring.namespace: redhat-ods-monitoring`, and
+  `modelregistry.registriesNamespace: rhoai-model-registries` - RHOAI's own
+  true Model Registry default, a separate namespace from
+  `applicationsNamespace`) rather than disabling each component one by one.
+  `gitops/charts/namespaces` now also declares `redhat-ods-operator`/
+  `redhat-ods-applications`/`rhoai-model-registries`/`redhat-ods-monitoring`
+  so they get the same governance (labels, NetworkPolicy, quota)
+  `zuno-ai-platform` used to get. Nothing in this repository schedules a
+  distributed training or Ray run yet, and nothing links to the RHOAI
+  console UI (Zuno has its own `agent-frontend`) - but all four components
+  are now `Managed` and expected healthy. Revisit a custom
+  `applicationsNamespace` (restoring ADR-0328's original intent) alongside
+  ADR-0301/ADR-0302 (v3 LoRA/PEFT and dataset-to-model MLOps pipelines) once
+  RHOAI ships a fix.
 - **MaaS** (Models-as-a-Service policy routing) - the underlying platform
   plumbing (`kserve.modelsAsService.managementState: Managed` and the
   `maas-default-gateway` this chart's own `templates/maas-gateway.yaml`

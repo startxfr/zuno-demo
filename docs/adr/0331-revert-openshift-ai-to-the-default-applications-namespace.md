@@ -11,8 +11,23 @@
 Revert `DSCInitialization.spec.applicationsNamespace` and
 `DataScienceCluster.spec.applicationsNamespace` from the custom
 `zuno-ai-platform` (ADR-0328) back to RHOAI's own default,
-`redhat-ods-applications`, and re-enable `trainer`/`ray`/`dashboard`/
-`mlflowoperator` as `managementState: Managed`.
+`redhat-ods-applications`; re-enable `trainer`/`ray`/`dashboard`/
+`mlflowoperator` as `managementState: Managed`; and revert two more
+RHOAI namespace fields to their true product defaults, each also custom
+values ADR-0328 introduced:
+
+- `DSCInitialization.spec.monitoring.namespace`: `zuno-monitoring` →
+  `redhat-ods-monitoring`. This is `dashboard`'s actual fix - its failure
+  (`"unknown namespace for the cache"` for
+  `zuno-monitoring/dashboard-perses-access`) references
+  `monitoring.namespace`, not `applicationsNamespace`. An earlier version of
+  this ADR/its accompanying commit reverted only `applicationsNamespace`
+  and wrongly credited that alone for fixing `dashboard`; it did not.
+- `DataScienceCluster.spec.components.modelregistry.registriesNamespace`:
+  `zuno-ai-platform` (originally) / `redhat-ods-applications` (briefly, in
+  this ADR's first pass) → `rhoai-model-registries`, RHOAI's own true
+  default for Model Registry (a separate namespace from
+  `applicationsNamespace`, not merely an alternate value of it).
 
 **Rationale:** by 2026-08-13, four independently-verified RHOAI 3.5 EA2
 components failed under `applicationsNamespace: zuno-ai-platform`, all with
@@ -29,7 +44,9 @@ it from `DSCInitialization.spec.applicationsNamespace`:
   namespace.
 - `dashboard` - observability/Perses reconciliation fails with "unknown
   namespace for the cache" because it doesn't derive watched namespaces from
-  `DSCInitialization.spec.monitoring.namespace` either.
+  `DSCInitialization.spec.monitoring.namespace` (set to the custom
+  `zuno-monitoring`) - a distinct field from `applicationsNamespace`, also
+  reverted here.
 - `mlflowoperator` - `mlflow-operator-controller-manager` CrashLoopBackOff:
   its Deployment runs `--namespace=redhat-ods-applications` unconditionally,
   and its generated `ClusterRole` grants no list/watch on `Secret`/
@@ -66,9 +83,36 @@ creates its own default `applicationsNamespace` namespace as part of normal
 reconciliation, unlike the custom `zuno-ai-platform` namespace ADR-0328's
 Day-0 automation had to pre-create explicitly.
 
-Once verified, `zuno-ai-platform` is empty of RHOAI operands. Whether to
-remove it from `gitops/charts/namespaces/values.yaml` or repurpose it is a
-follow-up decision, not required to land this revert.
+`zuno-ai-platform` is empty of RHOAI operands. Its `gitops/charts/namespaces`
+entry is kept (removal/repurposing remains an open follow-up) but its
+`opendatahub.io/application-namespace: "true"` label is removed - no longer
+accurate now that RHOAI operands live in `redhat-ods-applications`.
+
+## Namespace governance
+
+`redhat-ods-operator`, `redhat-ods-applications`, `rhoai-model-registries`
+and `redhat-ods-monitoring` are added to `gitops/charts/namespaces` so they
+get the same governance (labels, default-deny-other-namespaces
+`NetworkPolicy`, and a new optional per-namespace `ResourceQuota`/
+`LimitRange`) `zuno-ai-platform` used to get - a bare operator-created
+namespace would otherwise have none of it. `redhat-ods-applications`
+doesn't need to be pre-created for RHOAI to function (the operator creates
+it itself during `DSCInitialization` reconciliation, same as it would for
+any configured namespace), but pre-creating it via GitOps adds this
+repo's governance layer on top without conflict - the same pattern already
+proven safe for 18+ hours with `zuno-ai-platform`. `redhat-ods-operator`
+already exists today (created by `gitops/charts/openshift-ai`'s vendored
+`project` block via `CreateNamespace=true`); adding it here is additive,
+since that sync option is a no-op once the namespace exists and isn't a
+resource either Application tracks/prunes.
+
+`allowApiServerWebhooks: true` is set on `redhat-ods-applications` because
+`trainer`'s `ValidatingWebhookConfiguration` targets
+`kubeflow-trainer-controller-manager.redhat-ods-applications.svc` directly
+(verified above) - kube-apiserver must reach it synchronously, the same
+`NetworkPolicy` exception already used for `zuno-vault`/`zuno-mesh`'s own
+admission webhooks. It's also set (defensively, unverified) on
+`redhat-ods-operator` for `rhods-operator`'s own CR webhooks.
 
 ## Migration / evolution
 

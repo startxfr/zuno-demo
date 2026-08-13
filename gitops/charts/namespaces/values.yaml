@@ -89,14 +89,15 @@ platformNamespaces:
   - name: zuno-ai-platform
     displayName: Zuno AI Platform
     description: >-
-      Shared OpenShift AI control plane and cross-lifecycle services (Model
-      Registry, AI Gateway, OGX, KServe controllers and other components
-      common to both AI build and AI run workloads - ADR-0328).
-    # Same model as zuno-ai-run below, plus the RHOAI applications-
-    # namespace label ADR-0328 requires.
+      Formerly the shared OpenShift AI control plane (ADR-0328). RHOAI
+      operands now live in redhat-ods-applications instead (ADR-0331 -
+      trainer/ray/dashboard/mlflowoperator all broke under a custom
+      applicationsNamespace on RHOAI 3.5 EA2). Left in place, empty of RHOAI
+      operands, pending a follow-up decision on removal/repurposing.
+    # opendatahub.io/application-namespace: "true" removed - no longer
+    # accurate, see redhat-ods-applications below.
     allowedFromNamespaces: []
     extraLabels:
-      opendatahub.io/application-namespace: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-ai-build
@@ -145,6 +146,112 @@ platformNamespaces:
     # istiod's sidecar-injector + validating webhooks are called synchronously
     # by the API server, same pattern as ESO's secretstore-validate webhook.
     allowApiServerWebhooks: true
+
+  # ADR-0331: RHOAI's own default namespaces, given the same governance
+  # (labels/NetworkPolicy/quota) zuno-ai-platform used to get, now that
+  # applicationsNamespace/monitoring.namespace/registriesNamespace are all
+  # reverted to RHOAI defaults instead of custom zuno-* ones.
+  - name: redhat-ods-operator
+    displayName: RHOAI Operator
+    description: >-
+      rhods-operator's own controller-manager, OLM Subscription and
+      OperatorGroup (ADR-0047) - installs/reconciles DataScienceCluster and
+      DSCInitialization elsewhere. Already created today by
+      gitops/charts/openshift-ai's vendored project block
+      (CreateNamespace=true); adding it here is additive, not conflicting -
+      that sync option is a no-op once the namespace exists, and it isn't a
+      tracked/pruned resource of that Application either way.
+    allowedFromNamespaces: []
+    # ASSUMPTION, not verified against a live cluster: rhods-operator
+    # commonly ships a ValidatingWebhookConfiguration for its own CRs
+    # (DataScienceCluster/DSCInitialization). Included defensively, same
+    # posture as zuno-vault/zuno-mesh above - low-cost if unneeded, avoids a
+    # silent DSC/DSCI apply failure if it is.
+    allowApiServerWebhooks: true
+    extraLabels:
+      zuno.io/managed: "true"
+    resourceQuota:
+      requests: { cpu: "500m", memory: "512Mi" }
+      limits: { cpu: "2", memory: "2Gi" }
+    limitRange:
+      defaultRequest: { cpu: "50m", memory: "128Mi" }
+      default: { cpu: "500m", memory: "512Mi" }
+  - name: redhat-ods-applications
+    displayName: RHOAI Applications Namespace
+    description: >-
+      RHOAI 3.5 EA2's default applications namespace (ADR-0331 - reverted
+      from the custom zuno-ai-platform after trainer/ray/dashboard/
+      mlflowoperator all broke under a custom one). Hosts the shared
+      OpenShift AI control plane: KServe, MLflow, Trainer, Ray, Dashboard,
+      AI Gateway, OGX, Spark Operator, Feast Operator, TrustyAI, Data
+      Science Pipelines controllers.
+    allowedFromNamespaces: []
+    # VERIFIED: trainer's ValidatingWebhookConfiguration targets
+    # kubeflow-trainer-controller-manager.redhat-ods-applications.svc
+    # directly (confirmed live during mlflow-operator crash debugging) -
+    # kube-apiserver must reach it synchronously.
+    allowApiServerWebhooks: true
+    # opendatahub.io/application-namespace: "true" deliberately NOT set here
+    # - RHOAI's DSCInitialization controller applies that label itself when
+    # it reconciles, same as it would for any namespace it's pointed at.
+    # Pre-creating the namespace here only adds our own governance layer on
+    # top, same pattern already proven safe for 18+ hours with
+    # zuno-ai-platform.
+    extraLabels:
+      istio-injection: enabled
+      zuno.io/managed: "true"
+    resourceQuota:
+      requests: { cpu: "4", memory: "8Gi" }
+      limits: { cpu: "16", memory: "32Gi" }
+    limitRange:
+      defaultRequest: { cpu: "100m", memory: "256Mi" }
+      default: { cpu: "1", memory: "1Gi" }
+  - name: rhoai-model-registries
+    displayName: RHOAI Model Registry
+    description: >-
+      Model Registry operand namespace (RHOAI's own default,
+      registriesNamespace: rhoai-model-registries) - REST API + backing
+      database bridging build (zuno-ai-build) and run (zuno-ai-run) model
+      lifecycles (ADR-0328's Model Registry section).
+    allowedFromNamespaces:
+      - zuno-ai-build
+      - zuno-ai-run
+    allowApiServerWebhooks: false
+    extraLabels:
+      istio-injection: enabled
+      zuno.io/managed: "true"
+    resourceQuota:
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "2", memory: "4Gi" }
+    limitRange:
+      defaultRequest: { cpu: "100m", memory: "256Mi" }
+      default: { cpu: "1", memory: "1Gi" }
+  - name: redhat-ods-monitoring
+    displayName: RHOAI Monitoring
+    description: >-
+      RHOAI's own monitoring/observability namespace (dashboard-perses,
+      Prometheus integration) - reverted to the RHOAI default (ADR-0331)
+      after dashboard was found not to derive its watched namespace from a
+      custom DSCInitialization.spec.monitoring.namespace.
+    # Mirrors zuno-monitoring's own allowedFromNamespaces, plus
+    # redhat-ods-applications: dashboard-perses needs to reach into the
+    # RHOAI control-plane namespace - the exact failure this namespace
+    # exists to fix.
+    allowedFromNamespaces:
+      - zuno-ai-run
+      - zuno-data
+      - zuno-auth
+      - zuno-ai-build
+      - redhat-ods-applications
+    allowApiServerWebhooks: false
+    extraLabels:
+      zuno.io/managed: "true"
+    resourceQuota:
+      requests: { cpu: "500m", memory: "1Gi" }
+      limits: { cpu: "4", memory: "8Gi" }
+    limitRange:
+      defaultRequest: { cpu: "100m", memory: "256Mi" }
+      default: { cpu: "1", memory: "2Gi" }
 
 # Caps GPU consumption at 1 - this demo has exactly one 24GB L4 budgeted for the
 # single local model; without this a second InferenceService could silently
