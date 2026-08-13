@@ -4,8 +4,7 @@
 # exists in gitops/ or ansible/), so this owns the full
 # spec.identityProviders list wholesale rather than trying to merge into
 # an existing one. mappingMethod: add lets a Keycloak login attach to an
-# OpenShift User pre-created by the console_favorites_provisioning
-# CronJob instead of creating a duplicate (see that role's README).
+# already-existing OpenShift User instead of creating a duplicate.
 apiVersion: config.openshift.io/v1
 kind: OAuth
 metadata:

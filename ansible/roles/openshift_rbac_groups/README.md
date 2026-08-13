@@ -10,7 +10,7 @@ already exist and be labeled): `-d0` applies the cluster-wide
 `ClusterRoleBinding` (`admin` -> `cluster-admin`, no namespace
 dependency); `-d1` applies the namespace-scoped `RoleBinding`s.
 
-## Why this needs no active reconciliation, unlike `console_favorites_provisioning`
+## Why this needs no active reconciliation
 
 OpenShift OAuth already synchronizes `Group` membership from the ID
 token's `groups` claim on every login (`mappingMethod: add`,
@@ -18,10 +18,7 @@ token's `groups` claim on every login (`mappingMethod: add`,
 name works the moment both the `Group` (login-time-synced) and the
 binding (this role) exist; neither needs to be created in a particular
 order relative to the other, and GitOps already re-applies the binding
-set whenever the namespace/group set changes. Contrast
-`ansible/roles/console_favorites_provisioning`, which genuinely needs a
-running process because Console favorites require a pre-created OpenShift
-`User` (and its UID) ahead of a user's first login.
+set whenever the namespace/group set changes.
 
 ## Discovering the managed-namespace list, not duplicating it
 

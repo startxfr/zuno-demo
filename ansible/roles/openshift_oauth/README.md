@@ -21,11 +21,8 @@ existing one - see `gitops/charts/openshift-oauth/templates/oauth.yaml`'s
 inline comment.
 
 `mappingMethod: add` (not the OpenShift default `claim`) is required so a
-user's first Keycloak login attaches to an OpenShift `User` object the
-`console_favorites_provisioning` CronJob (`ansible/roles/
-console_favorites_provisioning`) may have already pre-created, instead of
-creating a duplicate - see that role's README for why favorites can't be
-seeded without pre-creating the `User`.
+user's first Keycloak login attaches to an already-existing OpenShift
+`User` object instead of creating a duplicate.
 
 ## Two ExternalSecrets, one Vault path
 

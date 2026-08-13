@@ -1,6 +1,6 @@
 # ADR-0320: Pre-provision OpenShift users, RBAC and Console favorites via Keycloak
 
-- **Status:** Implemented - see `gitops/charts/openshift-oauth/`, `gitops/charts/openshift-rbac-groups/`, `gitops/charts/console-favorites-provisioning/`, `gitops/charts/keycloak/files/realm-zuno.json`. Note: the console-favorites JSON templates are still `_UNVERIFIED_PLACEHOLDER` pending capture from a live Console session.
+- **Status:** Superseded by [ADR-0332](0332-remove-console-favorites-provisioning.md) for the Console favorites provisioning component; the Keycloak realm changes, OpenShift OAuth configuration and static RBAC bindings remain in effect - see `gitops/charts/openshift-oauth/`, `gitops/charts/openshift-rbac-groups/`, `gitops/charts/keycloak/files/realm-zuno.json`.
 - **Target:** v0
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

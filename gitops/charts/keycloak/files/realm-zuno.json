@@ -653,19 +653,6 @@
                 "value": "${vault.demo_personas_password}",
                 "temporary": false
             }]
-        },
-        {
-            "username": "service-account-console-favorites-provisioner",
-            "enabled": true,
-            "serviceAccountClientId": "console-favorites-provisioner",
-            "clientRoles": {
-                "realm-management": [
-                    "view-users",
-                    "manage-users",
-                    "query-groups",
-                    "query-users"
-                ]
-            }
         }
     ],
     "clients": [{
@@ -918,20 +905,6 @@
                 }
             }],
             "secret": "${vault.openshift_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "console-favorites-provisioner",
-            "name": "Console favorites provisioner service account (ADR-0320)",
-            "description": "Non-interactive client the console_favorites_provisioning CronJob authenticates as to call the Keycloak Admin REST API - never used for a browser login flow",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": false,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
-            "serviceAccountsEnabled": true,
-            "secret": "${vault.console_favorites_provisioner_client_secret}",
             "clientAuthenticatorType": "client-secret"
         }
     ],

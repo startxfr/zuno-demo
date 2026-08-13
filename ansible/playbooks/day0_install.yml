@@ -23,7 +23,6 @@
       - kiali
       - keycloak
       - openshift_oauth
-      - console_favorites_provisioning
       - smtp
       - nfd
       - nvidia_gpu
