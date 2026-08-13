@@ -3,9 +3,17 @@ Gateway RHOAI's own DataScienceCluster requires to exist in openshift-ingress
 before it will reconcile kserve.modelsAsService ("the specified Gateway must
 exist before enabling MaaS platform reconcile"). Modeled directly on the
 already-working data-science-gateway RHOAI provisions for itself (same
-ClusterIP+Route+service-ca pattern) - reuses its GatewayClass rather than
-standing up a second Istio control plane, since maas-controller only checks
-that a Gateway named maas-default-gateway exists, not which class backs it.
+ClusterIP+Route+service-ca pattern).
+
+gatewayClassName is "istio", not "data-science-gateway-class": the latter is
+a GatewayClass RHOAI is meant to provision itself once kserve.modelsAsService
+reconciles cleanly - VERIFIED live, 2026-08-13, it does not exist on this
+cluster (`oc get gatewayclass` only shows istio/istio-remote). maas-controller
+only checks that a Gateway named maas-default-gateway exists, not which class
+backs it, so this reuses the Istio Gateway API controller the service-mesh
+component (zuno-mesh) already runs, rather than waiting on RHOAI's own
+class to appear. Revisit if a future RHOAI build provisions
+data-science-gateway-class on its own.
 */ -}}
 {{- if .Values.maasGateway.enabled }}
 apiVersion: v1
@@ -37,7 +45,7 @@ metadata:
     # the Gateway -> Authorino EnvoyFilter automatically.
     security.opendatahub.io/authorino-tls-bootstrap: "true"
 spec:
-  gatewayClassName: data-science-gateway-class
+  gatewayClassName: istio
   infrastructure:
     parametersRef:
       group: ""
