@@ -16,6 +16,9 @@ spec:
     helm:
       releaseName: zuno-openshift-ai-d1
       values: |
+        cluster-ods:
+          DSCInitialization:
+            enabled: true
         dataScienceCluster:
           enabled: true
         maasGateway:
