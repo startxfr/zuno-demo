@@ -94,8 +94,6 @@ platformNamespaces:
       trainer/ray/dashboard/mlflowoperator all broke under a custom
       applicationsNamespace on RHOAI 3.5 EA2). Left in place, empty of RHOAI
       operands, pending a follow-up decision on removal/repurposing.
-    # opendatahub.io/application-namespace: "true" removed - no longer
-    # accurate, see redhat-ods-applications below.
     allowedFromNamespaces: []
     extraLabels:
       istio-injection: enabled
@@ -191,13 +189,8 @@ platformNamespaces:
     # directly (confirmed live during mlflow-operator crash debugging) -
     # kube-apiserver must reach it synchronously.
     allowApiServerWebhooks: true
-    # opendatahub.io/application-namespace: "true" deliberately NOT set here
-    # - RHOAI's DSCInitialization controller applies that label itself when
-    # it reconciles, same as it would for any namespace it's pointed at.
-    # Pre-creating the namespace here only adds our own governance layer on
-    # top, same pattern already proven safe for 18+ hours with
-    # zuno-ai-platform.
     extraLabels:
+      opendatahub.io/application-namespace: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
     resourceQuota:
