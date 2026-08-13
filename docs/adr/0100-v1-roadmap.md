@@ -23,9 +23,10 @@ Persist workflow checkpoints so document-generation jobs survive browser disconn
 
 Reduce latency and cost without leaking cross-user or cross-classification content.
 
-### ADR-0105: Automate monthly knowledge ingestion
+<a id="adr-0105-automate-monthly-knowledge-ingestion"></a>
+### ADR-0105: Automate source-specific knowledge ingestion
 
-Run scheduled ingestion monthly while retaining manual refresh support and source-specific freshness controls.
+Run scheduled ingestion according to each source's freshness objective rather than one global monthly cadence. Technical web/Confluence knowledge must be refreshable at least weekly, operational Salesforce knowledge is expected to refresh on an hours-scale cadence, and immutable legacy sources may be loaded on demand. Retain manual refresh support.
 
 ### ADR-0106: Enforce OKF bundle signing and validation
 
@@ -41,7 +42,7 @@ Use OpenShift AI evaluation capabilities where appropriate to compare candidate 
 
 ### ADR-0109: Implement source freshness and trust scoring
 
-Use provenance/freshness metadata to rank knowledge and signal stale content.
+Use provenance, `source_modified_at`, `indexed_at` and source/domain freshness policy to rank knowledge, signal stale content and trigger a live MCP/API read when an indexed answer is not fresh enough for the requested operation.
 
 ### ADR-0110: Automate document ACL synchronization
 

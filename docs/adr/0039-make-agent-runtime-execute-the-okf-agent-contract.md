@@ -33,6 +33,10 @@ A v0 acceptance test must prove that changing an agent definition changes allowe
 - Scope note on "GraphFactory": v0 has exactly one graph shape (Tekos's retrieve/tool_call/reason/respond LangGraph workflow, `app/graph/build.py`), so there is no graph-shape *selection* to implement yet - what this ADR requires (prompts/tools/RAG/classification coming from the OKF contract) is fully satisfied by the registry, documented in `build.py`'s module docstring as where a second graph shape would be added. Platform-ceiling enforcement is the MCP Gateway's job (ADR-0036), not duplicated here - this runtime's own `allowed_tools` check is a local fail-fast, not the authoritative enforcement point.
 - Mandatory acceptance test: `components/agent-runtime/tests/test_registry.py`'s `test_changing_the_bundle_changes_resolved_behavior_with_no_code_change` loads a temporary fixture bundle entirely independent of Tekos's own, edits only its task file's `allowed_tools`, reloads via a fresh `AgentRegistry`, and asserts the resolved tool list changed.
 
+## Evolution (2026-08-13)
+
+ADR-0333 replaces backend-oriented "RAG collections" in the durable agent contract with logical knowledge-domain identifiers such as `knowledge.tech` or `knowledge.sales`. Agent Runtime resolves the active task's `allowed_knowledge`, asks the knowledge policy/router for an authorized provider and never embeds PostgreSQL database, schema, collection or service endpoint names in the agent bundle.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 
 ## Related ADRs

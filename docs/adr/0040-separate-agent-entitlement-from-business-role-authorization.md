@@ -33,6 +33,10 @@ Migrate Keycloak realm fixtures and policy tests. Add tests for users with entit
 - Frontend tile visibility (`components/agent-frontend/internal/portal`) was never itself authorization and remains only a UX signal. Server-side enforcement is now in two places: `components/agent-bff/main.go`'s `chatHandler` rejects a call with `403` unless the validated token's `groups` claim contains `agent_<AGENT_NAME>` (new check), and `components/mcp-gateway/app/policy.py`'s existing `user_group_rights` factor continues to enforce the business-role groups against `policies/tools/tool-policy.yaml`'s `allowed_groups`, unchanged.
 - New tests in `evaluations/tekos/security_checks.py`: `entitlement_without_business_role_denied_confluence` (persona `tekos-entitlement-only-user-01`: `agent_tekos` only, no business role - MCP Gateway must still deny `search_confluence` with 403) and `business_role_without_entitlement_denied_by_bff` (persona `consultant-role-only-user-01`: `consultant` only, no `agent_tekos` - the BFF must deny the call with 403 before it reaches the Agent Runtime).
 
+## Evolution (2026-08-13)
+
+ADR-0340 retains this two-dimensional identity model and adds `cdp` as a business role for project-management capabilities. Existing `consultant` maps to the technical population and `board` remains the direction-level role. No separate AI-profile identity store is introduced; role-to-capability matrices are documentation/views derived from Keycloak groups, OKF declarations and platform policies.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 
 ## Related ADRs

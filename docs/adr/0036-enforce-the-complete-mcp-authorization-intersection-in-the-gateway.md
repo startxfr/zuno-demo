@@ -37,6 +37,10 @@ Add policy decision traces and negative tests for each independent factor of the
 - Consequence: `evaluations/tekos/scenarios.yaml` scenario 18 previously exercised `get_customer` succeeding via a direct-to-gateway call unconnected to any agent context. With agent_declaration now enforced, that call is correctly denied (no v0 agent declares `get_customer`) - scenario 18 was changed to assert this denial (`mcp_gateway_denied`, `403`) as correct v0 behavior, not a regression.
 - Two new negative tests cover the ADR-0040 entitlement/business-role split using this same enforcement path (`entitlement_without_business_role_denied_confluence`, `business_role_without_entitlement_denied_by_bff`); this ADR's own acceptance coverage is scenarios 12/13/18 plus direct `policy.py` unit checks (agent_declaration denial, task_rights denial, unknown agent denial, missing-declaration denial).
 
+## Evolution (2026-08-13)
+
+ADR-0335 preserves this gateway as the authoritative tool-policy enforcement point but removes the remaining routing coupling between logical tool names and hard-coded downstream handlers. Authorization is evaluated on stable logical capabilities; a separate binding registry resolves an authorized capability to the physical MCP server/API implementation. The current hard-coded routing in `components/mcp-gateway/app/downstream.py` is therefore transitional implementation debt, not part of the durable contract.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 
 ## Related ADRs

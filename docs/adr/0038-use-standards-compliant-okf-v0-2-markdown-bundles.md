@@ -34,6 +34,10 @@ Create a migration tool or validation step that rejects the legacy pseudo-OKF fo
 - The old `agent.okf.yaml` files are deleted, not merely superseded - there is no fallback path reading the old format, so a stray legacy file would be invisible to every loader (`LoadAll`/`AgentRegistry`/`AgentDeclarationStore` all glob for `agent.okf.md` specifically).
 - No secrets or sensitive runtime values are placed in these bundles - they carry only descriptive/config metadata already public in this repository.
 
+## Evolution (2026-08-13)
+
+ADR-0333 and ADR-0334 extend the Zuno OKF contract with logical knowledge-domain declarations and task-level `allowed_knowledge`. OKF remains the declarative catalogue of what an agent/task may use; no parallel `AIProfile` or capability-bundle configuration is introduced. Physical vector databases, services and endpoints remain outside OKF and are resolved through platform bindings.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 
 ## Related ADRs
