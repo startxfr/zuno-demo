@@ -1,0 +1,199 @@
+---
+# Deep openshift-ai diagnosis: explains WHY the install chain is blocked by
+# recording blocked_findings entries (see ansible/tasks/record_blocked_finding.yml)
+# for the Subscription -> InstallPlan -> CSV chain, every False
+# DataScienceCluster condition, and the ADR-0343 known prerequisites.
+# Strictly read-only, never fails - included from install.yml/reconcile.yml
+# wait rescues, where the wait's own fail carries the abort.
+
+# --- Subscription -> InstallPlan -> CSV chain ------------------------------
+- name: "openshift_ai | diagnose: look up the Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+  register: _oai_diag_sub
+
+- name: "openshift_ai | diagnose: record missing Subscription"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Subscription/rhods-operator (redhat-ods-operator)"
+      state: "NotFound"
+      cause: "The zuno-openshift-ai-d0 Application never created the Subscription"
+      solution: "Re-apply the d0 Application"
+      auto_fix: "make d0 reconcile openshift-ai"
+  when: (_oai_diag_sub.resources | default([]) | length) == 0
+
+- name: "openshift_ai | diagnose: record unhealthy catalog sources"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Subscription/rhods-operator (redhat-ods-operator)"
+      state: "CatalogSourcesUnhealthy=True"
+      cause: "{{ item.message | default('catalog source unhealthy - no message') }}"
+      solution: "Check `oc get pods -n openshift-marketplace` and the CatalogSource this Subscription points at"
+      auto_fix: "manual only - cluster catalog issue, reconcile cannot fix it"
+  loop: >-
+    {{ (_oai_diag_sub.resources | default([], true) | first | default({})).get('status', {}).get('conditions', [])
+       | selectattr('type', 'equalto', 'CatalogSourcesUnhealthy')
+       | selectattr('status', 'equalto', 'True') | list }}
+  loop_control:
+    label: "{{ item.type | default('CatalogSourcesUnhealthy') }}"
+  when: (_oai_diag_sub.resources | default([]) | length) > 0
+
+- name: "openshift_ai | diagnose: record pending InstallPlan approval"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Subscription/rhods-operator (redhat-ods-operator)"
+      state: "{{ _oai_diag_sub.resources[0].status.state | default('InstallPlanPending') }}"
+      cause: "installPlanApproval is Manual (deliberate - pins the EA2 build) and no InstallPlan has been approved"
+      solution: "Approve the InstallPlan whose CSV matches the pinned startingCSV {{ _oai_diag_sub.resources[0].spec.startingCSV | default('(unset)') }}"
+      auto_fix: "make d0 reconcile openshift-ai"
+  when:
+    - (_oai_diag_sub.resources | default([]) | length) > 0
+    - >-
+      (_oai_diag_sub.resources[0].status.state | default('') == 'UpgradePending') or
+      (_oai_diag_sub.resources[0].status.conditions | default([])
+       | selectattr('type', 'equalto', 'InstallPlanPending')
+       | selectattr('status', 'equalto', 'True') | list | length) > 0
+
+- name: "openshift_ai | diagnose: look up the referenced InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _oai_diag_sub.resources[0].status.installPlanRef.name }}"
+    namespace: redhat-ods-operator
+  register: _oai_diag_ip
+  when:
+    - (_oai_diag_sub.resources | default([]) | length) > 0
+    - (_oai_diag_sub.resources[0].status.installPlanRef.name | default('')) | length > 0
+
+- name: "openshift_ai | diagnose: record CSV drift on the InstallPlan"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "InstallPlan/{{ _oai_diag_ip.resources[0].metadata.name }} (redhat-ods-operator)"
+      state: "CSV drift: targets {{ _oai_diag_ip.resources[0].spec.clusterServiceVersionNames }}"
+      cause: "The InstallPlan targets a different CSV than the pinned startingCSV {{ _oai_diag_sub.resources[0].spec.startingCSV | default('(unset)') }}"
+      solution: "Investigate and approve manually, or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv"
+      auto_fix: "manual only - reconcile refuses to approve drifted InstallPlans"
+  when:
+    - (_oai_diag_ip.resources | default([]) | length) > 0
+    - _oai_diag_ip.resources[0].spec.clusterServiceVersionNames != [_oai_diag_sub.resources[0].spec.startingCSV]
+
+- name: "openshift_ai | diagnose: record unapproved or failed InstallPlan"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "InstallPlan/{{ _oai_diag_ip.resources[0].metadata.name }} (redhat-ods-operator)"
+      state: "phase={{ _oai_diag_ip.resources[0].status.phase | default('unknown') }}, approved={{ _oai_diag_ip.resources[0].spec.approved | default(false) }}"
+      cause: >-
+        {{ (_oai_diag_ip.resources[0].status.conditions | default([{}]))[0].message
+           | default('Manual installPlanApproval; nothing approved the plan yet') }}
+      solution: "Approve the InstallPlan pinned to {{ _oai_diag_sub.resources[0].spec.startingCSV | default('(unset)') }}"
+      auto_fix: "make d0 reconcile openshift-ai"
+  when:
+    - (_oai_diag_ip.resources | default([]) | length) > 0
+    - _oai_diag_ip.resources[0].spec.clusterServiceVersionNames == [_oai_diag_sub.resources[0].spec.startingCSV]
+    - >-
+      (not (_oai_diag_ip.resources[0].spec.approved | default(false))) or
+      (_oai_diag_ip.resources[0].status.phase | default('') in ['Failed', 'RequiresApproval'])
+
+- name: "openshift_ai | diagnose: look up the CSV"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    name: "{{ _oai_diag_sub.resources[0].status.currentCSV | default(_oai_diag_sub.resources[0].spec.startingCSV) }}"
+    namespace: redhat-ods-operator
+  register: _oai_diag_csv
+  when:
+    - (_oai_diag_sub.resources | default([]) | length) > 0
+    - (_oai_diag_sub.resources[0].status.currentCSV | default(_oai_diag_sub.resources[0].spec.startingCSV | default(''))) | length > 0
+
+- name: "openshift_ai | diagnose: record CSV not Succeeded"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "ClusterServiceVersion/{{ _oai_diag_csv.resources[0].metadata.name }} (redhat-ods-operator)"
+      state: "phase={{ _oai_diag_csv.resources[0].status.phase | default('unknown') }} ({{ _oai_diag_csv.resources[0].status.reason | default('no reason') }})"
+      cause: "{{ _oai_diag_csv.resources[0].status.message | default('operator CSV has not reached Succeeded') }}"
+      solution: "Inspect `oc describe csv {{ _oai_diag_csv.resources[0].metadata.name }} -n redhat-ods-operator` and the operator pod logs"
+      auto_fix: "make d0 reconcile openshift-ai"
+  when:
+    - (_oai_diag_csv.resources | default([]) | length) > 0
+    - (_oai_diag_csv.resources[0].status.phase | default('')) != 'Succeeded'
+
+# --- DataScienceCluster conditions (ADR-0343 solution map) ------------------
+- name: "openshift_ai | diagnose: look up the DataScienceCluster"
+  kubernetes.core.k8s_info:
+    # v2 = the CRD's storage version, same reasoning as precheck.yml/install.yml.
+    api_version: datasciencecluster.opendatahub.io/v2
+    kind: DataScienceCluster
+    name: zuno-dsc
+  register: _oai_diag_dsc
+
+- name: "openshift_ai | diagnose: record every False DataScienceCluster condition"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    # ADR-0343: the 4 root causes that kept zuno-dsc at Ready=False, mapped
+    # to their condition types so the summary names the known fix directly.
+    _oai_dsc_solutions:
+      MaaSPrerequisitesAvailable: "Authorino TLS and/or user-workload-monitoring prerequisite (ADR-0343); UWM is restored by `make d0 reconcile openshift-ai`, the Authorino TLS values live on the connectivity-link Application - `make d0 reconcile connectivity-link`"
+      ModelsAsServiceReady: "maas-db-config Secret / MaaS DB connectivity (ADR-0343); check the ExternalSecret and Vault path zuno/maas/postgresql-app"
+      RayReady: "Istio sidecar vs SCC conflict (ADR-0343); verify service-mesh's neverInjectSelector is live - `make d0 reconcile service-mesh`"
+    blocked_finding:
+      component: openshift-ai
+      resource: "DataScienceCluster/zuno-dsc condition {{ item.type | default('?') }}"
+      state: "{{ item.type | default('?') }}=False (phase={{ _oai_diag_dsc.resources[0].status.phase | default('unknown') }})"
+      cause: "{{ item.message | default('no condition message') }}"
+      solution: "{{ _oai_dsc_solutions[item.type | default('')] | default('See the condition message; usually fixed by a reconcile re-sync') }}"
+      auto_fix: "make d0 reconcile openshift-ai"
+  loop: >-
+    {{ (_oai_diag_dsc.resources | default([], true) | first | default({})).get('status', {}).get('conditions', [])
+       | selectattr('status', 'equalto', 'False') | list }}
+  loop_control:
+    label: "{{ item.type | default('?') }}"
+  when: (_oai_diag_dsc.resources | default([]) | length) > 0
+
+# --- ADR-0343 direct prerequisite checks -----------------------------------
+- name: "openshift_ai | diagnose: look up the ADR-0343 prerequisite objects"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: "{{ item.kind }}"
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace }}"
+  register: _oai_diag_prereqs
+  loop:
+    - { kind: Secret, name: maas-db-config, namespace: redhat-ods-applications }
+    - { kind: ConfigMap, name: cluster-monitoring-config, namespace: openshift-monitoring }
+    - { kind: ConfigMap, name: istio-ca-root-cert, namespace: openshift-ingress }
+  loop_control:
+    label: "{{ item.kind }}/{{ item.name }}"
+
+- name: "openshift_ai | diagnose: record missing ADR-0343 prerequisites"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    _oai_prereq_solutions:
+      maas-db-config: "Check the ExternalSecret in redhat-ods-applications and Vault path zuno/maas/postgresql-app; ensure `make d0 install postgresql` ran (ADR-0343)"
+      cluster-monitoring-config: "Re-apply the zuno-openshift-ai-d0 Application (the ConfigMap is ArgoCD-owned since ADR-0343)"
+      istio-ca-root-cert: "Reconcile re-copies it from zuno-ai-run; if it is absent there too, run `make d0 reconcile service-mesh` first"
+    blocked_finding:
+      component: openshift-ai
+      resource: "{{ item.item.kind }}/{{ item.item.name }} ({{ item.item.namespace }})"
+      state: "NotFound"
+      cause: "ADR-0343 prerequisite for the DataScienceCluster is missing"
+      solution: "{{ _oai_prereq_solutions[item.item.name] }}"
+      auto_fix: "make d0 reconcile openshift-ai"
+  loop: "{{ _oai_diag_prereqs.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.kind }}/{{ item.item.name }}"
+  when: (item.resources | default([]) | length) == 0

@@ -46,6 +46,10 @@
     - name: Generate the state-report file
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
 
+    - name: Initialize blocked-resource tracking
+      ansible.builtin.set_fact:
+        blocked_findings: []
+
     - name: Run Day 0 component state checks
       ansible.builtin.include_role:
         name: "{{ item }}"
@@ -57,3 +61,11 @@
     - name: Display the state report
       ansible.builtin.debug:
         msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"
+
+    # Check stays non-failing ("NOT installed" is a reportable outcome, not an
+    # error) but now also explains WHY each blocked component is stuck and how
+    # to fix it (auto-fix: make d0 reconcile <component>).
+    - name: Summarize blocked resources (report only, never fails)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/report_blocked_findings.yml"
+      vars:
+        blocked_report_fail: false

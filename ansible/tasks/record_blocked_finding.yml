@@ -1,0 +1,20 @@
+---
+# Appends one blocked-resource finding to the play-wide accumulator fact
+# `blocked_findings` (initialized to [] by the day0_* playbooks and summarized
+# at the end of the run by report_blocked_findings.yml). Never fails.
+#
+# Input: `blocked_finding` (dict) with keys:
+#   component  dash form, e.g. "openshift-ai" (drives the AUTO-FIX command)
+#   resource   "Kind/name (namespace)"
+#   state      observed state, e.g. "sync=OutOfSync, health=Degraded"
+#   cause      why it is blocked (condition/health message)
+#   solution   what fixes it
+#   auto_fix   usually "make d0 reconcile <component>"; or "manual only - ..."
+#
+# IMPORTANT: only ever append to `blocked_findings` through this file, and
+# never pass `blocked_findings` itself as an include/role parameter - include
+# params have higher precedence than set_fact facts and would silently shadow
+# the accumulator for the rest of the run.
+- name: "blocked | record finding for {{ blocked_finding.component | default('unknown') }}: {{ blocked_finding.resource | default('unknown resource') }}"
+  ansible.builtin.set_fact:
+    blocked_findings: "{{ (blocked_findings | default([])) + [blocked_finding] }}"

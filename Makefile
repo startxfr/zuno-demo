@@ -9,7 +9,7 @@ EXTRA_VARS ?=
 # platform) sequencing, replacing the former precheck/prepare/configure/
 # install/check interface outright.
 DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets keycloak openshift-oauth redis postgresql mariadb service-mesh tempo mesh-monitoring kiali smtp nfd nvidia-gpu observability connectivity-link lws custom-metrics-autoscaler jobset kueue openshift-ai
-DAY0_VERBS := check install uninstall all
+DAY0_VERBS := check install uninstall reconcile all
 
 # Day 1 has two different valid component sets depending on the verb:
 # "build" only knows how to build the 5 named image groups (mcp, rag,
@@ -46,6 +46,7 @@ help:
 	  '  make day0|d0 check [component]      Check one/all Day 0 components'"'"' install state' \
 	  '  make day0|d0 install [component]    Install one/all Day 0 prerequisites' \
 	  '  make day0|d0 uninstall [component]  Uninstall one/all Day 0 prerequisites (reverse order)' \
+	  '  make day0|d0 reconcile [component]  Diagnose blocked resources and apply known remediations automatically' \
 	  '  make day0|d0 all [component]        check + install, in order' \
 	  '' \
 	  '  make day1|d1 check [component]      Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
@@ -79,6 +80,7 @@ if [[ -z "$$verb" ]]; then \
     '  check       Check one/all Day 0 components'"'"' install state' \
     '  install     Install one/all Day 0 prerequisites' \
     '  uninstall   Uninstall one/all Day 0 prerequisites (reverse order)' \
+    '  reconcile   Diagnose blocked resources and apply known remediations automatically' \
     '  all         check + install, in order' \
     '' \
     'Components (optional, default: all):' \
@@ -95,6 +97,7 @@ case "$$verb" in \
   check) run_one check ;; \
   install) run_one install ;; \
   uninstall) run_one uninstall ;; \
+  reconcile) run_one reconcile ;; \
   all) run_one check && run_one install ;; \
 esac
 endef

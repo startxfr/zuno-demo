@@ -40,17 +40,52 @@
     state: present
     definition: "{{ _gitops_app_definition }}"
 
-- name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy"
-  kubernetes.core.k8s_info:
+# Reconcile passes gitops_app_refresh: true to force ArgoCD to re-evaluate a
+# stuck app - re-applying an unchanged manifest alone doesn't trigger a
+# refresh. Default false so install behavior is unchanged.
+- name: "gitops | request a hard refresh of {{ gitops_app_name }}"
+  kubernetes.core.k8s:
+    state: patched
     api_version: argoproj.io/v1alpha1
     kind: Application
     namespace: openshift-gitops
     name: "{{ gitops_app_name }}"
-  register: _gitops_app_status
-  until: >-
-    (_gitops_app_status.resources | length > 0) and
-    (_gitops_app_status.resources[0].status.sync.status | default('') == 'Synced') and
-    (_gitops_app_status.resources[0].status.health.status | default('') == 'Healthy')
-  retries: "{{ gitops_app_wait_retries | default(30) }}"
-  delay: "{{ gitops_app_wait_delay | default(10) }}"
+    definition:
+      metadata:
+        annotations:
+          argocd.argoproj.io/refresh: "hard"
+  when: gitops_app_refresh | default(false) | bool
+
+- name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy, diagnosing blocked resources on timeout"
   when: gitops_app_wait | default(true) | bool
+  block:
+    - name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+        name: "{{ gitops_app_name }}"
+      register: _gitops_app_status
+      until: >-
+        (_gitops_app_status.resources | length > 0) and
+        (_gitops_app_status.resources[0].status.sync.status | default('') == 'Synced') and
+        (_gitops_app_status.resources[0].status.health.status | default('') == 'Healthy')
+      retries: "{{ gitops_app_wait_retries | default(30) }}"
+      delay: "{{ gitops_app_wait_delay | default(10) }}"
+  rescue:
+    - name: "gitops | {{ gitops_app_name }} wait timed out - diagnosing blocked resources"
+      ansible.builtin.debug:
+        msg: >-
+          Application {{ gitops_app_name }} did not reach Synced/Healthy -
+          collecting blocked-resource findings.
+
+    - name: "gitops | diagnose {{ gitops_app_name }}"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/diagnose_gitops_app.yml"
+
+    - name: "gitops | fail: {{ gitops_app_name }} is blocked"
+      ansible.builtin.fail:
+        msg: >-
+          Application {{ gitops_app_name }} did not reach Synced/Healthy within
+          {{ gitops_app_wait_retries | default(30) }}x{{ gitops_app_wait_delay | default(10) }}s.
+          The blocked resources were recorded and are summarized at the end of
+          the run. Auto-fix: `make d0 reconcile {{ gitops_component_name }}`.

@@ -1,0 +1,137 @@
+---
+# Explains WHY an ArgoCD Application is not Synced/Healthy by recording one
+# blocked_findings entry per observable cause (see record_blocked_finding.yml
+# for the schema). Works for ANY component's Application - included by
+# apply_gitops_app.yml's wait rescue and by check_gitops_app_state.yml.
+#
+# Inputs: gitops_app_name (required); gitops_component_name (dash form,
+# derived from the app name when the caller - e.g. precheck via
+# check_gitops_app_state.yml - only knows the app name).
+#
+# MUST stay strictly read-only and never fail: this runs inside
+# `make d0 check`, whose contract is to always report and exit 0.
+- name: "diagnose | derive the component name for {{ gitops_app_name }}"
+  ansible.builtin.set_fact:
+    _diag_component: >-
+      {{ gitops_component_name
+         | default(gitops_app_name | regex_replace('^zuno-', '') | regex_replace('-d[01]$', '')) }}
+
+- name: "diagnose | look up Application {{ gitops_app_name }}"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ gitops_app_name }}"
+  register: _diag_app
+
+- name: "diagnose | record: Application {{ gitops_app_name }} missing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ _diag_component }}"
+      resource: "Application/{{ gitops_app_name }} (openshift-gitops)"
+      state: "NotFound"
+      cause: "The Application manifest was never applied to the cluster (Applications are Ansible-applied, not git-synced - ADR-0311)"
+      solution: "Re-apply gitops/apps/{{ _diag_component }}/ via install or reconcile"
+      auto_fix: "make d0 reconcile {{ _diag_component }}"
+  when: (_diag_app.resources | default([]) | length) == 0
+
+# Everything below reads the live Application status once.
+- name: "diagnose | extract the Application status"
+  ansible.builtin.set_fact:
+    _diag_status: "{{ _diag_app.resources[0].status | default({}) }}"
+  when: (_diag_app.resources | default([]) | length) > 0
+
+- name: "diagnose | record app-level error conditions (ComparisonError/SyncError/InvalidSpecError...)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ _diag_component }}"
+      resource: "Application/{{ gitops_app_name }} (openshift-gitops)"
+      state: "condition {{ item.type }}"
+      cause: "{{ item.message | default('no condition message') }}"
+      solution: "Fix the Application source/spec error above, then re-sync"
+      auto_fix: "make d0 reconcile {{ _diag_component }}"
+  loop: "{{ (_diag_status.conditions | default([])) | selectattr('type', 'search', 'Error') | list }}"
+  loop_control:
+    label: "{{ item.type }}"
+  when: (_diag_app.resources | default([]) | length) > 0
+
+- name: "diagnose | record failed sync operation"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ _diag_component }}"
+      resource: "Application/{{ gitops_app_name }} (openshift-gitops)"
+      state: "sync operation {{ _diag_status.operationState.phase }}"
+      cause: "{{ _diag_status.operationState.message | default('no operation message') }}"
+      solution: "Resolve the sync error above, then retry the sync"
+      auto_fix: "make d0 reconcile {{ _diag_component }}"
+  when:
+    - (_diag_app.resources | default([]) | length) > 0
+    - (_diag_status.operationState.phase | default('')) in ['Failed', 'Error']
+
+# Per-resource detail: every managed resource that is not Synced+Healthy.
+# Capped at 10 (Applications can own 100+ resources) with a "...and N more"
+# marker so the end-of-run summary stays scannable.
+- name: "diagnose | collect per-resource blocked entries"
+  ansible.builtin.set_fact:
+    _diag_blocked_resources: >-
+      {{ (_diag_status.resources | default([]))
+         | rejectattr('status', 'undefined')
+         | selectattr('status', 'ne', 'Synced') | list
+         + (_diag_status.resources | default([]))
+         | selectattr('health.status', 'defined')
+         | rejectattr('health.status', 'in', ['Healthy'])
+         | list }}
+  when: (_diag_app.resources | default([]) | length) > 0
+
+- name: "diagnose | record per-resource blocked entries"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ _diag_component }}"
+      resource: "{{ item.kind | default('?') }}/{{ item.name | default('?') }} ({{ item.namespace | default('cluster-scoped') }})"
+      state: "sync={{ item.status | default('n/a') }}, health={{ item.health.status | default('n/a') }}"
+      cause: "{{ item.health.message | default('no health message reported') }}"
+      solution: "Inspect with `oc get {{ item.kind | default('?') | lower }} {{ item.name | default('?') }}{{ (' -n ' + item.namespace) if item.namespace is defined else '' }}`; usually fixed by a re-sync/re-apply"
+      auto_fix: "make d0 reconcile {{ _diag_component }}"
+  loop: "{{ (_diag_blocked_resources | default([]) | unique)[:10] }}"
+  loop_control:
+    label: "{{ item.kind | default('?') }}/{{ item.name | default('?') }}"
+  when: (_diag_app.resources | default([]) | length) > 0
+
+- name: "diagnose | record the per-resource truncation marker"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ _diag_component }}"
+      resource: "Application/{{ gitops_app_name }} (openshift-gitops)"
+      state: "{{ (_diag_blocked_resources | unique | length) - 10 }} more blocked resource(s) not listed"
+      cause: "Per-resource findings are capped at 10 per Application"
+      solution: "Inspect the full list with `oc describe application {{ gitops_app_name }} -n openshift-gitops`"
+      auto_fix: "make d0 reconcile {{ _diag_component }}"
+  when:
+    - (_diag_app.resources | default([]) | length) > 0
+    - (_diag_blocked_resources | default([]) | unique | length) > 10
+
+# Catch-all: app not Synced+Healthy but nothing above matched - e.g. stuck
+# Progressing while every managed resource looks fine (real case: the
+# ADR-0312 Lua Subscription health check keeps the Subscription - and so the
+# app - Progressing until OLM sets status.installedCSV).
+- name: "diagnose | record app blocked with no resource-level detail"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ _diag_component }}"
+      resource: "Application/{{ gitops_app_name }} (openshift-gitops)"
+      state: "sync={{ _diag_status.sync.status | default('n/a') }}, health={{ _diag_status.health.status | default('n/a') }}"
+      cause: "{{ _diag_status.health.message | default(_diag_status.operationState.message | default('no health message - the app is still progressing (a Subscription waiting on OLM, an operator still rolling out...)')) }}"
+      solution: "Give the rollout time or force a re-sync; inspect with `oc describe application {{ gitops_app_name }} -n openshift-gitops`"
+      auto_fix: "make d0 reconcile {{ _diag_component }}"
+  when:
+    - (_diag_app.resources | default([]) | length) > 0
+    - (_diag_status.sync.status | default('') != 'Synced') or (_diag_status.health.status | default('') != 'Healthy')
+    - (_diag_blocked_resources | default([]) | length) == 0
+    - ((_diag_status.conditions | default([])) | selectattr('type', 'search', 'Error') | list | length) == 0
+    - (_diag_status.operationState.phase | default('')) not in ['Failed', 'Error']

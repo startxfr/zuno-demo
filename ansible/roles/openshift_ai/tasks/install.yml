@@ -1,49 +1,6 @@
 ---
-- name: "openshift_ai | discover the operator's published channels (ADR-0048)"
-  kubernetes.core.k8s_info:
-    api_version: packages.operators.coreos.com/v1
-    kind: PackageManifest
-    namespace: openshift-marketplace
-    name: rhods-operator
-  register: _openshift_ai_pkg
-
-- name: "openshift_ai | fail if the package manifest is unavailable"
-  ansible.builtin.fail:
-    msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d0 check openshift-ai' first."
-  when: (_openshift_ai_pkg.resources | default([]) | length) == 0
-
-# Prefers a literal 'beta' channel (ADR-0002: target OpenShift AI 3.5 EA2,
-# published under 'beta' rather than a '3.5'-named channel), falling back
-# to whatever 3.5-family channel is actually published, rather than a
-# hardcoded guess (exact channel naming isn't standardized across catalogs).
-- name: "openshift_ai | select the beta channel if published, else the 3.5-family channel actually published by this cluster's catalog"
-  ansible.builtin.set_fact:
-    _openshift_ai_channel: >-
-      {{
-        'beta'
-        if ('beta' in (_openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list))
-        else (
-          ((_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | map(attribute='name') | list)[0])
-          if (_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | list | length) > 0
-          else (_openshift_ai_pkg.resources[0].status.defaultChannel | default(''))
-        )
-      }}
-
-- name: "openshift_ai | fail with a clear diagnostic if no usable channel was found"
-  ansible.builtin.fail:
-    msg: >-
-      No OpenShift AI 3.5-family channel published in this cluster's
-      catalog, and no defaultChannel to fall back to. Published channels:
-      {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }}.
-      Update ansible/roles/openshift_ai/tasks/install.yml's channel
-      selection if this catalog uses a different naming convention.
-  when: _openshift_ai_channel | length == 0
-
-- name: "openshift_ai | discovered channel summary (ADR-0048)"
-  ansible.builtin.debug:
-    msg: >-
-      Selected rhods-operator channel: {{ _openshift_ai_channel }}
-      (all published channels: {{ _openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list }})
+- name: "openshift_ai | discover the operator channel (ADR-0048)"
+  ansible.builtin.include_tasks: discover_channel.yml
 
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -83,18 +40,30 @@
 # exact CSV the Subscription itself was configured to pin to (checked
 # below), never anything else - that preserves the "don't drift past the
 # pinned build" property Manual exists for.
-- name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan"
-  kubernetes.core.k8s_info:
-    api_version: operators.coreos.com/v1alpha1
-    kind: Subscription
-    name: rhods-operator
-    namespace: redhat-ods-operator
-  register: _openshift_ai_subscription
-  until: >-
-    (_openshift_ai_subscription.resources | default([]) | length) > 0 and
-    (_openshift_ai_subscription.resources[0].status.installPlanRef.name | default('')) | length > 0
-  retries: 30
-  delay: 10
+- name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan, diagnosing blocked resources on timeout"
+  block:
+    - name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan"
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        name: rhods-operator
+        namespace: redhat-ods-operator
+      register: _openshift_ai_subscription
+      until: >-
+        (_openshift_ai_subscription.resources | default([]) | length) > 0 and
+        (_openshift_ai_subscription.resources[0].status.installPlanRef.name | default('')) | length > 0
+      retries: 30
+      delay: 10
+  rescue:
+    - name: "openshift_ai | diagnose the blocked Subscription/InstallPlan stage"
+      ansible.builtin.include_tasks: diagnose.yml
+
+    - name: "openshift_ai | fail: blocked at the Subscription/InstallPlan stage"
+      ansible.builtin.fail:
+        msg: >-
+          The rhods-operator Subscription never referenced a pending
+          InstallPlan. The blocked resources were recorded and are summarized
+          at the end of the run. Auto-fix: `make d0 reconcile openshift-ai`.
 
 - name: "openshift_ai | look up the pending InstallPlan"
   kubernetes.core.k8s_info:
@@ -103,6 +72,18 @@
     name: "{{ _openshift_ai_subscription.resources[0].status.installPlanRef.name }}"
     namespace: redhat-ods-operator
   register: _openshift_ai_installplan
+
+- name: "openshift_ai | record the CSV-drift finding before failing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "InstallPlan/{{ _openshift_ai_installplan.resources[0].metadata.name }} (redhat-ods-operator)"
+      state: "CSV drift: targets {{ _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames }}"
+      cause: "The InstallPlan targets a different CSV than the pinned startingCSV {{ _openshift_ai_subscription.resources[0].spec.startingCSV }}"
+      solution: "Investigate and approve manually, or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv"
+      auto_fix: "manual only - reconcile refuses to approve drifted InstallPlans"
+  when: _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames != [_openshift_ai_subscription.resources[0].spec.startingCSV]
 
 - name: "openshift_ai | fail loudly if the pending InstallPlan targets a different CSV than the pinned startingCSV"
   ansible.builtin.fail:
@@ -167,6 +148,18 @@
     namespace: "{{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }}"
   register: _openshift_ai_istio_ca_root_cert
 
+- name: "openshift_ai | record the missing istio-ca-root-cert finding before failing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "ConfigMap/istio-ca-root-cert ({{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }})"
+      state: "NotFound"
+      cause: "cert-manager-istio-csr has not distributed the CA root ConfigMap into the source namespace yet - service_mesh is not installed or not reconciled"
+      solution: "Install/reconcile the service-mesh component first, then re-run openshift-ai"
+      auto_fix: "make d0 reconcile service-mesh"
+  when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
+
 - name: "openshift_ai | fail loudly if istio-ca-root-cert isn't available to copy yet"
   ansible.builtin.fail:
     msg: >-
@@ -204,18 +197,31 @@
 
 # ArgoCD has no health logic for DataScienceCluster - it reports Healthy
 # as soon as synced, not once status.phase is actually Ready.
-- name: "openshift_ai | wait for the DataScienceCluster to report Ready"
-  kubernetes.core.k8s_info:
-    # v2, not v1: v2 is the CRD's storage version (VERIFIED live,
-    # 2026-08-12/13 - same reasoning as precheck.yml's DataScienceCluster
-    # lookup and this chart's own templates/datasciencecluster.yaml, which
-    # already renders the CR at v2).
-    api_version: datasciencecluster.opendatahub.io/v2
-    kind: DataScienceCluster
-    name: zuno-dsc
-  register: _openshift_ai_dsc
-  until: >-
-    (_openshift_ai_dsc.resources | default([]) | length) > 0 and
-    (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
-  retries: 60
-  delay: 20
+- name: "openshift_ai | wait for the DataScienceCluster to report Ready, diagnosing blocked resources on timeout"
+  block:
+    - name: "openshift_ai | wait for the DataScienceCluster to report Ready"
+      kubernetes.core.k8s_info:
+        # v2, not v1: v2 is the CRD's storage version (VERIFIED live,
+        # 2026-08-12/13 - same reasoning as precheck.yml's DataScienceCluster
+        # lookup and this chart's own templates/datasciencecluster.yaml, which
+        # already renders the CR at v2).
+        api_version: datasciencecluster.opendatahub.io/v2
+        kind: DataScienceCluster
+        name: zuno-dsc
+      register: _openshift_ai_dsc
+      until: >-
+        (_openshift_ai_dsc.resources | default([]) | length) > 0 and
+        (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
+      retries: 60
+      delay: 20
+  rescue:
+    - name: "openshift_ai | diagnose the blocked DataScienceCluster"
+      ansible.builtin.include_tasks: diagnose.yml
+
+    - name: "openshift_ai | fail: DataScienceCluster is blocked"
+      ansible.builtin.fail:
+        msg: >-
+          DataScienceCluster zuno-dsc did not report phase Ready within
+          60x20s. Its False conditions and missing ADR-0343 prerequisites
+          were recorded and are summarized at the end of the run. Auto-fix:
+          `make d0 reconcile openshift-ai`.

@@ -1,0 +1,39 @@
+---
+# Prints the end-of-run summary of every blocked-resource finding accumulated
+# in `blocked_findings` (see record_blocked_finding.yml), one compact
+# RESOURCE/STATE/CAUSE/SOLUTION/AUTO-FIX entry per finding, then fails the
+# play when anything was blocked - unless `blocked_report_fail: false`
+# (day0_check.yml: "blocked" is a reportable outcome there, not an error).
+- name: "blocked | summary: no blocked resources"
+  ansible.builtin.debug:
+    msg: "All resources Synced/Healthy - nothing blocked."
+  when: (blocked_findings | default([])) | length == 0
+
+- name: "blocked | summary: {{ blocked_findings | default([]) | length }} blocked resource(s)"
+  ansible.builtin.debug:
+    msg: "{{ ['BLOCKED RESOURCES (' + (blocked_findings | length | string) + '):'] + _blocked_summary_lines }}"
+  vars:
+    _blocked_summary_lines: >-
+      {%- set lines = [] -%}
+      {%- for f in blocked_findings -%}
+      {%- set _ = lines.append('[' + (f.component | default('?')) + '] ' + (f.resource | default('unknown resource'))) -%}
+      {%- set _ = lines.append('  STATE:    ' + (f.state | default('unknown'))) -%}
+      {%- set _ = lines.append('  CAUSE:    ' + (f.cause | default('no message reported'))) -%}
+      {%- set _ = lines.append('  SOLUTION: ' + (f.solution | default('inspect the resource'))) -%}
+      {%- set _ = lines.append('  AUTO-FIX: ' + (f.auto_fix | default('make d0 reconcile ' + (f.component | default('all'))))) -%}
+      {%- endfor -%}
+      {{ lines }}
+  when: (blocked_findings | default([])) | length > 0
+
+- name: "blocked | fail because resources are blocked"
+  ansible.builtin.fail:
+    msg: >-
+      {{ blocked_findings | length }} resource(s) are blocked across
+      component(s) {{ blocked_findings | map(attribute='component') | unique | join(', ') }}.
+      See the BLOCKED RESOURCES summary above for the cause and solution of
+      each. Auto-fix:
+      {{ blocked_findings | map(attribute='component') | unique
+         | map('regex_replace', '^(.*)$', 'make d0 reconcile \1') | join('; ') }}.
+  when:
+    - blocked_report_fail | default(true) | bool
+    - (blocked_findings | default([])) | length > 0

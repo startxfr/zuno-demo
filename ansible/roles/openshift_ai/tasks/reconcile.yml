@@ -1,0 +1,218 @@
+---
+# Auto-remediation for blocked openshift-ai resources (`make d0 reconcile
+# openshift-ai`). Only idempotent, ADR-documented, state-restoring actions:
+#   - approve the pending InstallPlan, but ONLY when it targets the pinned
+#     startingCSV (preserves the Manual-approval pin - never approves drift)
+#   - re-copy istio-ca-root-cert into openshift-ingress
+#   - re-apply both Applications with an ArgoCD hard refresh (re-applying is
+#     the baseline remediation - Applications are Ansible-applied, not
+#     git-synced, ADR-0311/0343 - and the refresh forces ArgoCD to
+#     re-evaluate a stuck app; this also restores the ArgoCD-owned UWM
+#     cluster-monitoring-config)
+#   - verify the maas-db-config Secret and re-wait for the
+#     DataScienceCluster, recording findings instead of raw errors
+# Optional, default OFF (side-effect safety): delete CrashLoopBackOff pods
+# in redhat-ods-applications with -e openshift_ai_reconcile_restart_pods=true.
+- name: "openshift_ai | reconcile: discover the operator channel (ADR-0048)"
+  ansible.builtin.include_tasks: discover_channel.yml
+
+# --- InstallPlan approval ---------------------------------------------------
+- name: "openshift_ai | reconcile: look up the Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+  register: _openshift_ai_subscription
+
+- name: "openshift_ai | reconcile: look up the referenced InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _openshift_ai_subscription.resources[0].status.installPlanRef.name }}"
+    namespace: redhat-ods-operator
+  register: _openshift_ai_installplan
+  when:
+    - (_openshift_ai_subscription.resources | default([]) | length) > 0
+    - (_openshift_ai_subscription.resources[0].status.installPlanRef.name | default('')) | length > 0
+
+- name: "openshift_ai | reconcile: record CSV drift instead of approving it"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "InstallPlan/{{ _openshift_ai_installplan.resources[0].metadata.name }} (redhat-ods-operator)"
+      state: "CSV drift: targets {{ _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames }}"
+      cause: "The InstallPlan targets a different CSV than the pinned startingCSV {{ _openshift_ai_subscription.resources[0].spec.startingCSV }}"
+      solution: "Investigate and approve manually, or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv"
+      auto_fix: "manual only - reconcile refuses to approve drifted InstallPlans"
+  when:
+    - (_openshift_ai_installplan.resources | default([]) | length) > 0
+    - _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames != [_openshift_ai_subscription.resources[0].spec.startingCSV]
+
+- name: "openshift_ai | reconcile: approve the pending pinned InstallPlan"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _openshift_ai_installplan.resources[0].metadata.name }}"
+    namespace: redhat-ods-operator
+    definition:
+      spec:
+        approved: true
+  when:
+    - (_openshift_ai_installplan.resources | default([]) | length) > 0
+    - _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames == [_openshift_ai_subscription.resources[0].spec.startingCSV]
+    - not (_openshift_ai_installplan.resources[0].spec.approved | default(false))
+
+# --- istio-ca-root-cert re-copy (ADR-0343 / install.yml rationale) ----------
+- name: "openshift_ai | reconcile: look up istio-ca-root-cert from an already-meshed namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: istio-ca-root-cert
+    namespace: "{{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }}"
+  register: _openshift_ai_istio_ca_root_cert
+
+- name: "openshift_ai | reconcile: record the missing istio-ca-root-cert source instead of failing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "ConfigMap/istio-ca-root-cert ({{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }})"
+      state: "NotFound"
+      cause: "cert-manager-istio-csr has not distributed the CA root ConfigMap into the source namespace - service_mesh is not installed or not reconciled"
+      solution: "Reconcile the service-mesh component first, then re-run this reconcile"
+      auto_fix: "make d0 reconcile service-mesh"
+  when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
+
+- name: "openshift_ai | reconcile: re-copy istio-ca-root-cert into openshift-ingress"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: istio-ca-root-cert
+        namespace: openshift-ingress
+      data: "{{ _openshift_ai_istio_ca_root_cert.resources[0].data }}"
+  when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) > 0
+
+# --- Re-apply both Applications with a hard refresh -------------------------
+- name: "openshift_ai | reconcile: re-apply the openshift-ai GitOps Application (d0: operator) and wait for Synced/Healthy"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-ai"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+    gitops_app_extra_helm_values:
+      cluster-ods:
+        project:
+          enabled: true
+        operator:
+          enabled: true
+          subscription:
+            operator:
+              channel: "{{ _openshift_ai_channel }}"
+      userWorkloadMonitoring:
+        enabled: true
+    gitops_app_refresh: true
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 20
+
+- name: "openshift_ai | reconcile: re-apply the openshift-ai GitOps Application (d1: DataScienceCluster) and wait for Synced/Healthy"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openshift-ai"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_refresh: true
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 20
+
+# --- maas-db-config verification (fix lives in Vault/postgresql) ------------
+- name: "openshift_ai | reconcile: verify the maas-db-config Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: maas-db-config
+    namespace: redhat-ods-applications
+  register: _openshift_ai_maas_db_secret
+
+- name: "openshift_ai | reconcile: fetch the maas-db ExternalSecret conditions for the cause"
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1
+    kind: ExternalSecret
+    name: maas-db-config
+    namespace: redhat-ods-applications
+  register: _openshift_ai_maas_db_es
+  when: (_openshift_ai_maas_db_secret.resources | default([]) | length) == 0
+
+- name: "openshift_ai | reconcile: record the missing maas-db-config Secret"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Secret/maas-db-config (redhat-ods-applications)"
+      state: "NotFound"
+      cause: >-
+        {{ ((_openshift_ai_maas_db_es.resources | default([], true) | first | default({}))
+            .get('status', {}).get('conditions', [{}]) | last | default({})).get('message',
+           'ExternalSecret not found either - the d1 Application has not created it') }}
+      solution: "Check Vault path zuno/maas/postgresql-app and `make d0 check postgresql`/`external-secrets` (ADR-0343)"
+      auto_fix: "manual only - the fix lives in Vault/postgresql, not in this role"
+  when: (_openshift_ai_maas_db_secret.resources | default([]) | length) == 0
+
+# --- Optional pod restart (default OFF: side-effect safety - Deployments
+# recreate deleted pods, but reconcile stays state-restoring-only unless the
+# operator explicitly opts in) ------------------------------------------------
+- name: "openshift_ai | reconcile: list pods in redhat-ods-applications (opt-in restart)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: redhat-ods-applications
+  register: _openshift_ai_pods
+  when: openshift_ai_reconcile_restart_pods | default(false) | bool
+
+- name: "openshift_ai | reconcile: delete CrashLoopBackOff pods in redhat-ods-applications (opt-in)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Pod
+    name: "{{ item.metadata.name }}"
+    namespace: redhat-ods-applications
+  loop: "{{ _openshift_ai_pods.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name | default('?') }}"
+  when:
+    - openshift_ai_reconcile_restart_pods | default(false) | bool
+    - >-
+      (item.status.containerStatuses | default([])
+       | map(attribute='state.waiting.reason', default='')
+       | select('equalto', 'CrashLoopBackOff') | list | length) > 0
+
+# --- Final readiness ---------------------------------------------------------
+- name: "openshift_ai | reconcile: wait for the DataScienceCluster to report Ready, diagnosing on timeout"
+  block:
+    - name: "openshift_ai | reconcile: wait for the DataScienceCluster to report Ready"
+      kubernetes.core.k8s_info:
+        api_version: datasciencecluster.opendatahub.io/v2
+        kind: DataScienceCluster
+        name: zuno-dsc
+      register: _openshift_ai_dsc
+      until: >-
+        (_openshift_ai_dsc.resources | default([]) | length) > 0 and
+        (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
+      retries: 60
+      delay: 20
+  rescue:
+    - name: "openshift_ai | reconcile: diagnose the still-blocked DataScienceCluster"
+      ansible.builtin.include_tasks: diagnose.yml
+
+    - name: "openshift_ai | reconcile: fail - the DataScienceCluster is still blocked after remediation"
+      ansible.builtin.fail:
+        msg: >-
+          DataScienceCluster zuno-dsc is still not Ready after the automatic
+          remediations. The remaining blocked resources were recorded and are
+          summarized at the end of the run - they need one of the manual
+          solutions listed there.

@@ -59,5 +59,16 @@
         and (_openshift_ai_dsc_lookup.resources[0].status.phase | default('')) == 'Ready'
       }}
 
+# Deep diagnosis so `make d0 check` explains WHY openshift-ai is not
+# installed (DSC conditions, InstallPlan approval, ADR-0343 prereqs) - the
+# generic per-Application diagnosis can't see a not-Ready DataScienceCluster
+# behind two Synced/Healthy apps. Read-only, never fails; skipped outside
+# the day0 playbooks (blocked_findings only initialized there).
+- name: "openshift_ai | diagnose why the component is not installed"
+  ansible.builtin.include_tasks: diagnose.yml
+  when:
+    - not (_state_is_installed | bool)
+    - blocked_findings is defined
+
 - name: "openshift_ai | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
