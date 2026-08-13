@@ -1,6 +1,6 @@
 # ADR-0328: Separate the OpenShift AI control plane from AI build and run workload namespaces
 
-- **Status:** To be implemented
+- **Status:** Superseded by [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) for `applicationsNamespace`; the build/run workload-namespace split (`zuno-ai-build`/`zuno-ai-run`) remains in effect
 - **Target:** v0
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team

@@ -110,9 +110,10 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0325](0325-complete-the-openshift-ai-maas-governance-plane-integration.md) | v1 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v1 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v1 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
-| [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | To be implemented | Separate the OpenShift AI control plane from AI build and run workload namespaces |
+| [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | Superseded by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
 | [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0/v1 | Partially implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
+| [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | v0 | Implemented | Revert OpenShift AI to the default applications namespace |
 
 ## Standard clauses
 

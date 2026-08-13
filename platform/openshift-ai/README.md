@@ -73,33 +73,39 @@ ways: it also means *not* installing operators nothing here uses.
   `managementState: Unmanaged` - ADR-0321 fixes that so `trainingoperator`
   has a supported queue-management path once distributed training runs
   actually exist. See `ansible/roles/kueue`.
-- **`trainer` (Kubeflow Trainer v2) and `ray`** - **`managementState:
-  Removed`, not Managed, as of 2026-08-13.** Both were enabled ahead of any
-  consumer like the rest of this list, but verified live against a real
-  cluster to be genuinely broken under this repository's custom
-  `applicationsNamespace: zuno-ai-platform` (ADR-0328): `trainer`'s
-  `ClusterTrainingRuntime` fails validation because RHOAI's own bundled
+- **`trainer` (Kubeflow Trainer v2), `ray`, `dashboard` and
+  `mlflowoperator`** - briefly `managementState: Removed` (the first three)
+  as of 2026-08-13, now back to `Managed` per **ADR-0331**. All four were
+  verified live against a real cluster to be broken under this repository's
+  then-custom `applicationsNamespace: zuno-ai-platform` (ADR-0328), each for
+  the same reason: RHOAI 3.5 EA2's bundled manifests hardcode
+  `redhat-ods-applications` rather than deriving it from
+  `DSCInitialization.spec.applicationsNamespace`. `trainer`'s
+  `ClusterTrainingRuntime` failed validation because RHOAI's own bundled
   `ValidatingWebhookConfiguration` hardcodes
-  `kubeflow-trainer-controller-manager.redhat-ods-applications.svc`
-  regardless of the configured applications namespace (confirmed unchanged
-  after a full operator uninstall/reinstall - not stale state, baked into
-  the RHOAI 3.5 EA2 trainer-module bundle), and `ray`'s `kuberay-operator`
-  pod is rejected by every SCC on the cluster in `zuno-ai-platform` (RHOAI's
-  namespace-specific SCC/RBAC bindings for Ray appear to only exist for the
-  product's default namespace). Same precedent as ADR-0047 disabling KServe
-  Serverless mode because it "would never have reached Ready on a real
-  cluster." Nothing in this repository schedules a distributed training or
-  Ray run yet - revisit alongside ADR-0301/ADR-0302 (v3 LoRA/PEFT and
-  dataset-to-model MLOps pipelines, the actual future consumers), once
-  RHOAI ships a fix or this repo stops using a custom
-  `applicationsNamespace`.
-- **`dashboard`** - also `managementState: Removed` as of 2026-08-13, same
-  underlying EA2 limitation (its observability/Perses reconciliation
-  doesn't derive watched namespaces from
-  `DSCInitialization.spec.monitoring.namespace` either - fails with
-  "unknown namespace for the cache" for `zuno-monitoring`, confirmed on a
-  freshly-reinstalled operator). Nothing in this repository links to or
-  depends on the RHOAI console UI - Zuno has its own `agent-frontend`.
+  `kubeflow-trainer-controller-manager.redhat-ods-applications.svc`;
+  `ray`'s `kuberay-operator` pod was rejected by every SCC on the cluster
+  (RHOAI's namespace-specific SCC/RBAC bindings for Ray only exist for the
+  product's default namespace); `dashboard`'s observability/Perses
+  reconciliation didn't derive watched namespaces from
+  `DSCInitialization.spec.monitoring.namespace` either (failed with
+  "unknown namespace for the cache"); `mlflow-operator-controller-manager`
+  (the pod whose CrashLoopBackOff surfaced this bug class) ran
+  `--namespace=redhat-ods-applications` unconditionally with a generated
+  `ClusterRole` that granted no list/watch on `Secret`/`ServiceAccount`/
+  `ConfigMap`/`Deployment`/`Job`/`CronJob`/`Service`/`PersistentVolumeClaim`/
+  `ServiceMonitor` anywhere, so its controller-runtime cache never synced.
+  Same precedent as ADR-0047 disabling KServe Serverless mode because it
+  "would never have reached Ready on a real cluster" - except this time,
+  with four independently-broken components, ADR-0331 reverted
+  `applicationsNamespace` itself back to the RHOAI default
+  (`redhat-ods-applications`) rather than disabling each component one by
+  one. Nothing in this repository schedules a distributed training or Ray
+  run yet, and nothing links to the RHOAI console UI (Zuno has its own
+  `agent-frontend`) - but all four are now `Managed` and expected healthy.
+  Revisit a custom `applicationsNamespace` (restoring ADR-0328's original
+  intent) alongside ADR-0301/ADR-0302 (v3 LoRA/PEFT and dataset-to-model
+  MLOps pipelines) once RHOAI ships a fix.
 - **MaaS** (Models-as-a-Service policy routing) - the underlying platform
   plumbing (`kserve.modelsAsService.managementState: Managed` and the
   `maas-default-gateway` this chart's own `templates/maas-gateway.yaml`
