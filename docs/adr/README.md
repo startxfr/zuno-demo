@@ -6,6 +6,8 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 
 **Renumbering note (2026-08-13):** the roadmap reorganization moved open decisions into the v1 stream. ADR-0026 -> ADR-0113, ADR-0049 -> ADR-0114, ADR-0051 -> ADR-0115 (unimplemented 00xx records), and ADR-0207 -> ADR-0116, ADR-0210 -> ADR-0117 (promoted from v2 as concretely implementable). The old numbers are retired; each moved record carries a `Renumbered:` line.
 
+## version 0
+
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0001](0001-use-a-monorepo-for-the-zuno-agent-platform.md) | v0 | Implemented | Use a monorepo for the Zuno agent platform |
@@ -61,6 +63,11 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0/v1 | Implemented | Repository review change-set index |
 | [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | v0 | Implemented | Restructure deployment into Day 0 / Day 1 sequencing |
+
+## version 0.1
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
 | [ADR-0101](0100-v1-roadmap.md#adr-0101-provide-ha-for-shared-agent-platform-services) | v1 | Proposed | Provide HA for shared agent platform services |
 | [ADR-0102](0100-v1-roadmap.md#adr-0102-target-999-percent-platform-availability) | v1 | Proposed | Target 99.9 percent platform availability |
 | [ADR-0103](0100-v1-roadmap.md#adr-0103-persist-resumable-long-running-agent-workflows) | v1 | Proposed | Persist resumable long-running agent workflows |
@@ -78,6 +85,11 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v1 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v1 | To be implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v1 | To be implemented | Implement Confluence as the first real external MCP integration |
+
+## version 0.2
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
 | [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v2 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v2 | To be implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v2 | To be implemented | Enforce knowledge authorization as policy intersection |
@@ -86,6 +98,11 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v2 | To be implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v2 | To be implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v2 | To be implemented | Introduce project-scoped agent memory |
+
+## version 0.3
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
 | [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v3 | To be implemented | Introduce LoRA and PEFT model customization |
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v3 | To be implemented | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) | v3 | Proposed | Support dynamic LoRA adapter loading |
@@ -120,6 +137,11 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v3 | To be implemented | Extend business-role authorization with CDP and scoped capabilities |
 | [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v3 | To be implemented | Support multiple agent graph shapes in Agent Runtime |
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | v1 | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
+
+## version 0.4
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
 | [ADR-0401](0400-v4-roadmap.md#adr-0401-introduce-agent-to-agent-communication) | v4 | Proposed | Introduce agent-to-agent communication |
 | [ADR-0402](0400-v4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol) | v4 | Proposed | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0400-v4-roadmap.md#adr-0403-propagate-user-identity-across-agent-to-agent-calls) | v4 | Proposed | Propagate user identity across agent-to-agent calls |
