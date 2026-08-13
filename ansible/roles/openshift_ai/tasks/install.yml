@@ -151,7 +151,12 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
     gitops_app_extra_helm_values:
+      cluster-ods:
+        DSCInitialization:
+          enabled: true
       dataScienceCluster:
+        enabled: true
+      maasGateway:
         enabled: true
       # DSCInitialization: enabled: true and maasGateway: enabled: true
       # already come from application-d1.yaml's own static values - not
