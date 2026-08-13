@@ -144,23 +144,66 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
+# Istio's gateway-controller auto-deploys an Istio proxy Deployment/pod for
+# maas-default-gateway into openshift-ingress (Gateway API resource, not
+# owned by this chart's own sync). That pod needs the istio-ca-root-cert
+# ConfigMap to mount its CA trust bundle. cert-manager-istio-csr (this
+# platform's Istio CA, service_mesh component) only distributes that
+# ConfigMap into namespaces matching its
+# --configmap-namespace-selector=istio-injection=enabled (VERIFIED live,
+# 2026-08-13) - openshift-ingress isn't one of them, and deliberately not
+# labeled that way: that exact label is also what
+# istio-sidecar-injector-zuno-mesh's sidecar-injection webhook selects on,
+# so labeling it would silently start auto-injecting Istio sidecars into
+# every future pod there, including the cluster's default HAProxy router
+# pods - too broad a blast radius just to fix one Gateway's cert mount.
+# Copying the ConfigMap in directly instead is safe to do unconditionally on
+# every install run, not just once: VERIFIED live, the CA root itself
+# (Vault-generated via ansible/roles/vault's unseal-configure script, which
+# only ever runs `pki/root/generate/internal` once and is idempotent after)
+# is valid 10 years and has no automated rotation anywhere in this repo or
+# on the cluster, so this copy can't go stale the way a labeled/
+# auto-distributed copy's absence would otherwise force us to track.
+- name: "openshift_ai | look up istio-ca-root-cert from an already-meshed namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: istio-ca-root-cert
+    namespace: "{{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }}"
+  register: _openshift_ai_istio_ca_root_cert
+
+- name: "openshift_ai | fail loudly if istio-ca-root-cert isn't available to copy yet"
+  ansible.builtin.fail:
+    msg: >-
+      ConfigMap istio-ca-root-cert not found in namespace
+      {{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }} -
+      the service_mesh Day 0 component (and cert-manager-istio-csr within
+      it) must be installed and have reconciled that namespace before
+      openshift_ai's maas-default-gateway Istio proxy pod can start. Run
+      `make d0 check service-mesh` first.
+  when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
+
+- name: "openshift_ai | copy istio-ca-root-cert into openshift-ingress for the maas-default-gateway Istio proxy pod"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: istio-ca-root-cert
+        namespace: openshift-ingress
+      data: "{{ _openshift_ai_istio_ca_root_cert.resources[0].data }}"
+
+
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d1: DataScienceCluster)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "openshift-ai"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
-    gitops_app_extra_helm_values:
-      cluster-ods:
-        DSCInitialization:
-          enabled: true
-      dataScienceCluster:
-        enabled: true
-      maasGateway:
-        enabled: true
-      # DSCInitialization: enabled: true and maasGateway: enabled: true
-      # already come from application-d1.yaml's own static values - not
-      # repeated here, single source of truth.
+    # No gitops_app_extra_helm_values: DSCInitialization, dataScienceCluster
+    # and maasGateway are all already enabled in application-d1.yaml's own
+    # static values - single source of truth, nothing to override here.
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
