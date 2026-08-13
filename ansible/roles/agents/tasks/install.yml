@@ -1,15 +1,10 @@
 ---
-# agent-bff/agent-frontend are images built by the separate "agent" Day 1
-# build component (make day1 build agent) - its name doesn't match this
-# run-component's own name ("agents"), so `make day1 all agents` (or plain
-# `install`) would otherwise never trigger it, leaving these Deployments
-# in permanent ImagePullBackOff/"authentication required" on a fresh
-# cluster. Ensuring it here keeps `make day1 install agents`
-# self-sufficient, same principle as ansible/tasks/apply_gitops_app.yml's
-# single-component installs. apply_openshift_build.yml (which this role
-# calls) is idempotent - a ConfigChange trigger only rebuilds on a real
-# BuildConfig diff, so this costs a status check, not a rebuild, once the
-# image already exists.
+# agent-bff/agent-frontend are images built by the separate "agent" Day 1 build
+# component; its name doesn't match this run-component's own name ("agents"),
+# so `make day1 install agents` would otherwise never trigger it, leaving these
+# Deployments in permanent ImagePullBackOff on a fresh cluster. Ensuring it here
+# keeps the install self-sufficient (apply_openshift_build.yml documents the
+# idempotency guarantee - it's a status check, not a rebuild, once the image exists).
 - name: "agents | ensure the agent-bff/agent-frontend images are built"
   ansible.builtin.include_role:
     name: agent_build

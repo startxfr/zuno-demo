@@ -1,6 +1,4 @@
-{{- /*
-Fails the render if the operator is enabled without a discovered channel/catalog source.
-*/ -}}
+{{- /* Fails the render if the operator is enabled without a discovered channel/catalog source. */ -}}
 {{- if .Values.operator.enabled -}}
 {{- if not .Values.operator.subscription.operator.channel -}}
 {{- fail "operator.subscription.operator.channel must be set via gitops_app_extra_helm_values (ADR-0048)" -}}

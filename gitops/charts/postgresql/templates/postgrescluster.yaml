@@ -129,9 +129,8 @@ spec:
       databases:
         - {{ .Values.ragTechDatabase.name }}
 
-  # Runs once at bootstrap against the "postgres" database, not the app
-  # database, regardless of spec.users[].databases; init.sql explicitly
-  # `\connect`s to {{ .Values.cluster.database }} first.
+  # Runs once at bootstrap against "postgres", not the app database - see
+  # templates/configmap-init-sql.yaml's `\connect` comment for why.
   databaseInitSQL:
     name: {{ .Values.cluster.name }}-init-sql
     key: init.sql

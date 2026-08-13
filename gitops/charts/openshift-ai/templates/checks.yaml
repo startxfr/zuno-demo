@@ -1,7 +1,4 @@
-{{- /*
-Fails the render if the operator is enabled without a discovered channel.
-Renders no resource otherwise.
-*/ -}}
+{{- /* Fails the render if the operator is enabled without a discovered channel. */ -}}
 {{- if (index .Values "cluster-ods" "operator" "enabled") -}}
 {{- if not (index .Values "cluster-ods" "operator" "subscription" "operator" "channel") -}}
 {{- fail "cluster-ods.operator.subscription.operator.channel must be set via gitops_app_extra_helm_values (ADR-0048)" -}}

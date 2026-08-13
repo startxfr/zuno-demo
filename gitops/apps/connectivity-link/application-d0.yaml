@@ -12,8 +12,8 @@ metadata:
   name: zuno-connectivity-link-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # orders this ahead of `openshift_ai` in day0_install.yml instead.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible orders this
+    # ahead of `openshift_ai` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-197"
 spec:
   project: zuno

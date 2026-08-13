@@ -1,6 +1,5 @@
 ---
-# Tekos's frontend + BFF. Depends on the agents namespace and the tekos-frontend
-# OIDC client from keycloak; Ansible applies `agents` before `api`.
+# Tekos's frontend + BFF. Depends on the tekos-frontend OIDC client from keycloak.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

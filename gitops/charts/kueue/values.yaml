@@ -1,20 +1,17 @@
 # project.enabled renders the dedicated Namespace, via the vendored startx
 # `project` chart; operator.enabled renders the OperatorGroup/Subscription,
-# via the vendored startx `operator` chart. kueue-operator's CSV only
-# supports the AllNamespaces install mode (OwnNamespace/SingleNamespace/
-# MultiNamespace all `"supported": false`, confirmed against a live
-# cluster) - unlike gitops/charts/custom-metrics-autoscaler's OwnNamespace
-# shape, this dedicated namespace hosts its own AllNamespaces-mode
-# OperatorGroup (operator.operatorGroup.target: "all-ns" below), not a
-# namespace-scoped one. Deliberately NOT sharing openshift-operators (the
-# original shape, same as gitops/charts/jobset/lws): that put Kueue's
-# webhook Service selector (`control-plane: controller-manager`, the
-# generic kubebuilder convention label) in the same namespace as other
-# operators' pods carrying that same label (kuadrant, external-secrets,
-# limitador), so the webhook Service's Endpoints round-robinned across
-# those unrelated pods too and admission calls intermittently got
-# "connection refused", leaving zuno-kueue-d1 stuck OutOfSync. A dedicated
-# namespace makes that collision structurally impossible.
+# via the vendored startx `operator` chart. kueue-operator's CSV only supports
+# the AllNamespaces install mode (confirmed live), so this dedicated namespace
+# hosts its own AllNamespaces-mode OperatorGroup (operator.operatorGroup.target:
+# "all-ns" below), unlike gitops/charts/custom-metrics-autoscaler's
+# OwnNamespace shape. Deliberately NOT sharing openshift-operators (the
+# original shape, same as jobset/lws): that put Kueue's webhook Service
+# selector (`control-plane: controller-manager`, the generic kubebuilder
+# label) in collision with other operators' pods carrying the same label
+# (kuadrant, external-secrets, limitador) - Endpoints round-robinned across
+# them, causing intermittent "connection refused" admission failures and
+# leaving zuno-kueue-d1 stuck OutOfSync. A dedicated namespace makes that
+# collision structurally impossible.
 #
 # Confirmed against a live cluster (redhat-operators catalog): the
 # package is named "kueue-operator", channels "stable-v1.3"/"stable-v1.4"
@@ -54,10 +51,9 @@ operator:
     name: kueue-operator
     namespace: openshift-kueue-operator
     operator:
-      # Must be set explicitly, same name as subscription.name: the
-      # vendored `operator` chart's own values.yaml gives this a
-      # non-empty default ("codeready-workspaces") that wins the merge
-      # and silently suppresses the fallback to subscription.name.
+      # Must be set explicitly, same name as subscription.name: the vendored
+      # `operator` chart defaults this to "codeready-workspaces", silently
+      # suppressing the fallback to subscription.name.
       name: kueue-operator
       channel: ""
       installPlanApproval: Automatic  # startx chart defaults to Manual

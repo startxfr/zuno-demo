@@ -1,7 +1,6 @@
 ---
-# Reverse of install.yml: delete -d1 first (avoids ArgoCD fighting a CR
-# deletion), then remove_operator.yml (needs the Subscription to still
-# exist) before -d0's own delete.
+# Reverse of install.yml: delete -d1 first (avoids ArgoCD fighting a CR deletion),
+# then remove_operator.yml (needs the Subscription) before -d0's own delete.
 - name: "nvidia_gpu | delete the nvidia-gpu GitOps Application (d1: ClusterPolicy)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

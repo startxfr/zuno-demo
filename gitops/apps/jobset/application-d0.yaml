@@ -1,25 +1,18 @@
 ---
 # JobSet operator install (ADR-0318); the JobSetOperator operand CR is a
-# separate Application (application-d1.yaml) applied after this one is
-# healthy. Dedicated namespace (openshift-jobset-operator)
-# with an OwnNamespace-scoped OperatorGroup, not the originally shared
-# openshift-operators namespace (which relies on OLM's own
-# AllNamespaces-mode global-operators OperatorGroup there). CONFIRMED
-# against a live cluster: job-set's CSV only supports
-# OwnNamespace/SingleNamespace, not AllNamespaces - subscribing via the
-# shared namespace put the CSV into Failed phase (reason
-# UnsupportedOperatorGroup, message "AllNamespaces InstallModeType not
-# supported, cannot configure to watch all namespaces"), which is what
-# showed as "Job Set Operator" Failed in Installed Operators. See
-# gitops/charts/jobset/values.yaml for the full detail.
+# separate Application (application-d1.yaml) applied after this one is healthy.
+# Dedicated OwnNamespace-scoped namespace (openshift-jobset-operator), not the
+# originally shared openshift-operators - job-set's CSV only supports
+# OwnNamespace/SingleNamespace, not AllNamespaces (confirmed live; see
+# gitops/charts/jobset/values.yaml for the full incident detail).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-jobset-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # orders this ahead of `openshift_ai` in day0_install.yml instead.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible orders this
+    # ahead of `openshift_ai` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-191"
 spec:
   project: zuno
@@ -38,8 +31,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-jobset-operator
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

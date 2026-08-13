@@ -489,13 +489,11 @@
     and zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# Only seeded when both key fields are real - no placeholder fallback,
-# since the ExternalSecret that reads it only renders under the same
-# condition (mariadb role's backups.s3.enabled). Property names are
-# camelCase (accessKeyId/secretAccessKey), matching
+# Same "seeded only when real" rule as postgresql/backup-s3 above (mariadb
+# role's backups.s3.enabled). Property names are camelCase here
+# (accessKeyId/secretAccessKey), matching
 # gitops/charts/mariadb/templates/externalsecret-backup-s3.yaml's
-# remoteRef.property - unlike postgresql/backup-s3's snake_case
-# access_key/secret_key above.
+# remoteRef.property - unlike postgresql/backup-s3's snake_case above.
 - name: "vault | seed the MariaDB backup S3 credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

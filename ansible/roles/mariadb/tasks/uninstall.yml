@@ -1,12 +1,8 @@
 ---
-# Reverse of install.yml. The Subscription name is runtime-discovered, not
-# a fixed constant, so it's rediscovered here by listing.
-#
-# Order matters: delete -d1 (the MariaDB/PhysicalBackup operand) first so
-# ArgoCD isn't fighting a CR deletion its own Application still desires,
-# then run remove_operator.yml (needs the Subscription to still exist)
-# before -d0's own delete, to avoid racing ArgoCD's cascade prune of the
-# same Subscription.
+# Reverse of install.yml. Subscription name is runtime-discovered (listed below),
+# not a fixed constant. Order: delete -d1 (MariaDB/PhysicalBackup operand) first
+# so ArgoCD isn't fighting a CR deletion, then remove_operator.yml (needs the
+# Subscription to still exist) before -d0's own delete.
 - name: "mariadb | delete the mariadb ArgoCD Application (d1: MariaDB/PhysicalBackup)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

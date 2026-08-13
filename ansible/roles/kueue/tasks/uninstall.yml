@@ -1,36 +1,21 @@
 ---
-# Reverse of install.yml: delete d1 (operand CR + queue resources) first,
-# then remove_operator.yml (needs the Subscription to still exist) before
-# d0's own delete.
+# Reverse of install.yml: delete d1 (operand CR + queue resources) first, then
+# remove_operator.yml (needs the Subscription to still exist) before d0's delete.
 #
-# Before deleting the d1 Application itself, delete the queue resources
-# (ClusterQueue/LocalQueue/ResourceFlavor, sync-wave 21) directly, while
-# the Kueue operand (sync-wave 20, same Application) is still alive. This
-# avoids a self-inflicted deadlock: ArgoCD's Application-level
-# resources-finalizer cascade delete does not reliably honor sync-wave
-# order, so deleting the whole zuno-kueue-d1 Application in one shot can
-# tear down the operand CR - and with it the kueue-controller-manager
-# Deployment and kueue-webhook-service Service it owns - before the queue
-# resources finish deleting. Those queue resources then get stuck forever:
-# ArgoCD can't read/diff them without the (now-gone) CRD conversion
-# webhook, and their `kueue.x-k8s.io/resource-in-use` finalizer can only
-# be cleared by the (now-dead) kueue-controller-manager. Deleting them
-# here first, in dependency order (LocalQueue before ClusterQueue before
-# ResourceFlavor - a ClusterQueue references its ResourceFlavor, a
-# LocalQueue references its ClusterQueue), lets the still-running operand
-# clear that finalizer normally, so the d1 Application delete below only
-# ever has to prune the operand CR itself.
+# Queue resources (ClusterQueue/LocalQueue/ResourceFlavor) are deleted directly
+# here, before the d1 Application, while the Kueue operand is still alive. This
+# avoids a deadlock: ArgoCD's cascade delete doesn't reliably honor sync-wave
+# order, so deleting the whole Application in one shot can tear down the operand
+# (and its webhook Service) before the queue resources finish deleting - and
+# their `resource-in-use` finalizer can then only be cleared by the now-dead
+# controller. Deleting in dependency order here (LocalQueue before ClusterQueue
+# before ResourceFlavor) lets the still-running operand clear that finalizer
+# normally, so the d1 delete below only has to prune the operand CR itself.
 #
-# api_version v1beta2 (the CRDs' storage version, not the deprecated
-# v1beta1 queue-resources.yaml applies) - same reasoning as
-# precheck.yml's ClusterQueue lookup: a request at the storage version
-# needs no conversion webhook round-trip. Names/namespace hardcoded to
-# match gitops/charts/kueue/values.yaml's queueResources defaults
-# (default/default/default in zuno-ai-build), same as precheck.yml
-# hardcoding the operand CR name "cluster" - this role has no
-# defaults/main.yml to source them from. `state: absent` is a no-op if
-# the resource is already gone, so this is safe whether or not
-# queueResources was ever enabled.
+# api_version v1beta2 is the CRDs' storage version (avoids a conversion-webhook
+# round-trip, same reasoning as precheck.yml). Names/namespace are hardcoded to
+# match gitops/charts/kueue/values.yaml's queueResources defaults (this role has
+# no defaults/main.yml); `state: absent` is a safe no-op if never enabled.
 - name: "kueue | delete the default LocalQueue (queue resources, before the operand)"
   kubernetes.core.k8s:
     state: absent

@@ -1,25 +1,19 @@
 ---
 # Red Hat build of Kueue Operator install (ADR-0321). Dedicated namespace
-# (openshift-kueue-operator), unlike gitops/charts/jobset/lws which share
-# openshift-operators: kueue-operator's CSV only supports the
-# AllNamespaces install mode (confirmed against a live cluster's
-# PackageManifest), but sharing openshift-operators put its webhook
-# Service selector (`control-plane: controller-manager`) in collision with
-# other operators' pods carrying that same generic label there
-# (kuadrant, external-secrets, limitador) - Kubernetes round-robinned
-# webhook calls across all of them, causing intermittent "connection
-# refused" admission failures and leaving zuno-kueue-d1 stuck OutOfSync.
-# A dedicated namespace with its own AllNamespaces-mode OperatorGroup
-# (operator.operatorGroup.target: "all-ns") removes that collision
-# structurally.
+# (openshift-kueue-operator) with its own AllNamespaces-mode OperatorGroup,
+# unlike gitops/charts/jobset/lws which share openshift-operators: sharing it
+# here put Kueue's webhook Service selector in collision with other operators'
+# pods carrying the same generic label, causing intermittent admission failures
+# (confirmed live; see gitops/charts/kueue/values.yaml for the full incident
+# detail).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-kueue-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # orders this ahead of `openshift_ai` in day0_install.yml instead.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible orders this
+    # ahead of `openshift_ai` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-189"
 spec:
   project: zuno
@@ -38,8 +32,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-kueue-operator
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

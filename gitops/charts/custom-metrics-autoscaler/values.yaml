@@ -52,10 +52,9 @@ operator:
     name: openshift-custom-metrics-autoscaler-operator
     namespace: openshift-keda
     operator:
-      # Must be set explicitly, same name as subscription.name: the
-      # vendored `operator` chart's own values.yaml gives this a
-      # non-empty default ("codeready-workspaces") that wins the merge
-      # and silently suppresses the fallback to subscription.name.
+      # Must be set explicitly, same name as subscription.name: the vendored
+      # `operator` chart defaults this to "codeready-workspaces", silently
+      # suppressing the fallback to subscription.name.
       name: openshift-custom-metrics-autoscaler-operator
       channel: ""
       installPlanApproval: Automatic  # startx chart defaults to Manual

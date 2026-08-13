@@ -1,6 +1,6 @@
 ---
 # Vault-backed ClusterIssuer (not the operator itself, see application-d0.yaml).
-# Infrastructure only for now; no Route/service consumes it yet.
+# Consumed by keycloak's Ingress and connectivity-link's Certificate.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

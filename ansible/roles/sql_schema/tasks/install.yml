@@ -1,16 +1,9 @@
 ---
-# mcp-sales-db is an image built by the separate "mcp" Day 1 build
-# component (make day1 build mcp, which also builds mcp-gateway) - its
-# name doesn't match this run-component's own name ("sql-schema"), so
-# `make day1 all sql-schema` (or plain `install`) would otherwise never
-# trigger it, leaving the sales-db MCP server Deployment in permanent
-# ImagePullBackOff/"authentication required" on a fresh cluster. Ensuring
-# it here keeps `make day1 install sql-schema` self-sufficient, same
-# principle as ansible/tasks/apply_gitops_app.yml's single-component
-# installs. apply_openshift_build.yml (which this role calls) is
-# idempotent - a ConfigChange trigger only rebuilds on a real BuildConfig
-# diff, so this costs a status check, not a rebuild, once the image
-# already exists.
+# mcp-sales-db is built by the separate "mcp" Day 1 build component; its name
+# doesn't match this run-component's own name ("sql-schema") - same
+# name-mismatch self-sufficiency pattern as ansible/roles/agents/tasks/install.yml
+# (see there for the full rationale and apply_openshift_build.yml's idempotency
+# guarantee).
 - name: "sql_schema | ensure the mcp-sales-db image is built"
   ansible.builtin.include_role:
     name: mcp_build

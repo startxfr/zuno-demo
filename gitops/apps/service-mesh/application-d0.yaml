@@ -9,8 +9,8 @@ metadata:
   name: zuno-service-mesh-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # applies this after `postgresql` instead (ansible/playbooks/day0_install.yml).
+    # Sync-wave only matters for the root App-of-Apps path; Ansible applies this
+    # after `postgresql` instead (day0_install.yml).
     argocd.argoproj.io/sync-wave: "-172"
 spec:
   project: zuno

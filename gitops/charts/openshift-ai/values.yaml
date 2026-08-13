@@ -88,28 +88,20 @@ cluster-ods:
         managementState: Managed
         namespace: redhat-ods-monitoring
 
-  # Superseded by the top-level dataScienceCluster key below (rendered by
-  # this chart's own templates/datasciencecluster.yaml, not the vendored
-  # one): the vendored template hardcodes apiVersion v1 and has no support
-  # for metadata.labels or a spec.applicationsNamespace field, both needed
-  # for RHOAI 3.5's v2 CRD. Hardcoded false (not toggled by
-  # application-d1.yaml/Ansible) so the vendored template never also
-  # renders a second DataScienceCluster object.
+  # Superseded by the top-level dataScienceCluster key below, rendered by this
+  # chart's own templates/datasciencecluster.yaml instead (see that file for
+  # why the vendored template can't be used). Hardcoded false, not toggled by
+  # Ansible, so the vendored template never also renders a second CR.
   DataScienceCluster:
     enabled: false
 
-# Not part of the vendored startx `cluster-ods` chart - rendered by this
-# chart's own templates/datasciencecluster.yaml (see the
-# cluster-ods.DataScienceCluster comment above for why the vendored
-# template can't be used: no apiVersion v2, no metadata.labels, no
-# spec.applicationsNamespace). Spec deliberately overridden in full, not
-# startx's default: uses kserve RawDeployment rather than Serverless, which
-# would require the Service Mesh, Serverless and cert-manager operators
-# this repo doesn't install. applicationsNamespace here matches
-# cluster-ods.DSCInitialization's applicationsNamespace above
-# (redhat-ods-applications, ADR-0331 - reverted from the custom
-# zuno-ai-platform ADR-0328 originally called for): both must agree since
-# they describe the same operand namespace.
+# Rendered by templates/datasciencecluster.yaml, not the vendored chart (see
+# that file's comment for why). Spec deliberately overridden in full: uses
+# kserve RawDeployment rather than Serverless, which would require the Service
+# Mesh, Serverless and cert-manager operators this repo doesn't install.
+# applicationsNamespace here must match cluster-ods.DSCInitialization's above
+# (redhat-ods-applications, ADR-0331 - reverted from ADR-0328's custom
+# zuno-ai-platform namespace) since they describe the same operand namespace.
 dataScienceCluster:
   enabled: false
   name: zuno-dsc

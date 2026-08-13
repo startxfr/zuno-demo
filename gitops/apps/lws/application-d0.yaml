@@ -1,26 +1,19 @@
 ---
-# LeaderWorkerSet operator install (ADR-0317). No singleton operand CR -
-# see application-d1.yaml. Dedicated namespace (openshift-lws-operator)
-# with an OwnNamespace-scoped OperatorGroup, not the originally shared
-# openshift-operators namespace (which relies on OLM's own
-# AllNamespaces-mode global-operators OperatorGroup there). CONFIRMED
-# against a live cluster: leader-worker-set's CSV only supports
-# OwnNamespace, not AllNamespaces - subscribing via the shared namespace
-# put the CSV into Failed phase (reason UnsupportedOperatorGroup, message
-# "AllNamespaces InstallModeType not supported, cannot configure to watch
-# all namespaces"), which is what showed as "Red Hat build of Leader
-# Worker Set" Failed in Installed Operators. This is the *opposite*
-# install-mode problem from connectivity-link (whose CSV only supports
-# AllNamespaces, not OwnNamespace) - see
-# gitops/charts/lws/values.yaml for the full detail.
+# LeaderWorkerSet operator install (ADR-0317). No singleton operand CR - see
+# application-d1.yaml. Dedicated OwnNamespace-scoped namespace
+# (openshift-lws-operator), not the originally shared openshift-operators -
+# leader-worker-set's CSV only supports OwnNamespace, not AllNamespaces
+# (confirmed live). This is the *opposite* install-mode problem from
+# connectivity-link (AllNamespaces-only); see gitops/charts/lws/values.yaml
+# for the full incident detail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zuno-lws-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # orders this ahead of `openshift_ai` in day0_install.yml instead.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible orders this
+    # ahead of `openshift_ai` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-195"
 spec:
   project: zuno
@@ -39,8 +32,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-lws-operator
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:

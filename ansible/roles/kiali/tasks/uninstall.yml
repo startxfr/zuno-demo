@@ -1,8 +1,7 @@
 ---
-# Reverse of install.yml: delete -d1 first (avoids ArgoCD fighting a CR
-# deletion - this also cascades the Kiali operator's auto-created Route),
-# then remove_operator.yml (needs the Subscription to still exist) before
-# -d0's own delete.
+# Reverse of install.yml: delete -d1 first (avoids ArgoCD fighting a CR deletion;
+# also cascades the operator's auto-created Route), then remove_operator.yml
+# before -d0's own delete.
 - name: "kiali | delete the kiali GitOps Application (d1: Kiali CR instance)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

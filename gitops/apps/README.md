@@ -111,8 +111,8 @@ installs the operator (plus its own singleton `CertManager` config CR,
 the same "meta-operator needs a CR to actually deploy pods" pattern as
 `external_secrets`' `OperatorConfig`); `-d1` applies a `ClusterIssuer`
 backed by a `pki/` secrets engine `ansible/roles/vault` prepares (see that
-role's README). Infrastructure only for now - no existing Route/service
-consumes this issuer yet.
+role's README). Consumed by `keycloak`'s Ingress and `connectivity-link`'s
+Certificate.
 
 **Vendored startx charts**: `nfd`, `nvidia-gpu`, `openshift-ai`,
 `cert-manager`, `keycloak`, `postgresql`, `connectivity-link`, `lws`,

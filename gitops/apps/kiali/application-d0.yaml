@@ -7,8 +7,7 @@ metadata:
   name: zuno-kiali-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # ignores it.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-162"
 spec:
   project: zuno
@@ -27,8 +26,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-kiali-operator
   ignoreDifferences:
-    # OLM rewrites this annotation at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
     - group: operators.coreos.com
       kind: OperatorGroup
       jsonPointers:
@@ -38,5 +36,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      # Namespace isn't created elsewhere, so CreateNamespace is required here.
-      - CreateNamespace=true
+      - CreateNamespace=true # namespace isn't created elsewhere

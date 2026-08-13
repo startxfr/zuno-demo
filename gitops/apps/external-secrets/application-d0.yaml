@@ -8,8 +8,8 @@ metadata:
   name: zuno-external-secrets-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # applies this after `vault` is initialized/unsealed instead.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible applies this
+    # after `vault` is initialized/unsealed instead.
     argocd.argoproj.io/sync-wave: "-201"
 spec:
   project: zuno

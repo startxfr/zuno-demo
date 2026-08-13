@@ -144,26 +144,17 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
-# Istio's gateway-controller auto-deploys an Istio proxy Deployment/pod for
-# maas-default-gateway into openshift-ingress (Gateway API resource, not
-# owned by this chart's own sync). That pod needs the istio-ca-root-cert
-# ConfigMap to mount its CA trust bundle. cert-manager-istio-csr (this
-# platform's Istio CA, service_mesh component) only distributes that
-# ConfigMap into namespaces matching its
-# --configmap-namespace-selector=istio-injection=enabled (VERIFIED live,
-# 2026-08-13) - openshift-ingress isn't one of them, and deliberately not
-# labeled that way: that exact label is also what
-# istio-sidecar-injector-zuno-mesh's sidecar-injection webhook selects on,
-# so labeling it would silently start auto-injecting Istio sidecars into
-# every future pod there, including the cluster's default HAProxy router
-# pods - too broad a blast radius just to fix one Gateway's cert mount.
-# Copying the ConfigMap in directly instead is safe to do unconditionally on
-# every install run, not just once: VERIFIED live, the CA root itself
-# (Vault-generated via ansible/roles/vault's unseal-configure script, which
-# only ever runs `pki/root/generate/internal` once and is idempotent after)
-# is valid 10 years and has no automated rotation anywhere in this repo or
-# on the cluster, so this copy can't go stale the way a labeled/
-# auto-distributed copy's absence would otherwise force us to track.
+# Istio's gateway-controller auto-deploys a proxy pod for maas-default-gateway
+# into openshift-ingress; that pod needs the istio-ca-root-cert ConfigMap for
+# its CA trust bundle. cert-manager-istio-csr only distributes that ConfigMap
+# into namespaces labeled istio-injection=enabled (VERIFIED live, 2026-08-13),
+# and openshift-ingress is deliberately NOT labeled that way: that same label
+# is what the sidecar-injection webhook selects on, so labeling it would start
+# auto-injecting Istio sidecars into every pod there, including the default
+# HAProxy router pods. Copying the ConfigMap in directly is safe to do
+# unconditionally on every run: the CA root (Vault-generated, idempotent) is
+# valid 10 years with no automated rotation anywhere in this repo, so the copy
+# can't go stale.
 - name: "openshift_ai | look up istio-ca-root-cert from an already-meshed namespace"
   kubernetes.core.k8s_info:
     api_version: v1

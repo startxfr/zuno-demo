@@ -8,8 +8,7 @@ metadata:
   name: zuno-smtp-d0
   namespace: openshift-gitops
   annotations:
-    # Sync-wave order only matters for the root App-of-Apps path; Ansible
-    # ignores it.
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-180"
 spec:
   project: zuno
