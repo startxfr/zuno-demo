@@ -80,5 +80,7 @@
         enabled: true
       kuadrant:
         enabled: true
+        authorinoTls:
+          enabled: true
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15

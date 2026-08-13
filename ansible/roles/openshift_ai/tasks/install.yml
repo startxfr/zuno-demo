@@ -65,6 +65,8 @@
         # InstallPlan-approval steps below), which application-d0.yaml's own
         # DSCInitialization: enabled: false already reflects. It's enabled
         # in application-d1.yaml instead, applied further down.
+      userWorkloadMonitoring:
+        enabled: true
     # Don't wait here: the Subscription below is installPlanApproval:
     # Manual (gitops/charts/openshift-ai/values.yaml - deliberate, so
     # Automatic can't silently advance past the pinned EA2 build), and
@@ -141,6 +143,8 @@
           subscription:
             operator:
               channel: "{{ _openshift_ai_channel }}"
+      userWorkloadMonitoring:
+        enabled: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
