@@ -117,6 +117,7 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v3 | To be implemented | Extend business-role authorization with CDP and scoped capabilities |
 | [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v3 | To be implemented | Support multiple agent graph shapes in Agent Runtime |
+| [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | v1 | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
 | [ADR-0401](0400-v4-roadmap.md#adr-0401-introduce-agent-to-agent-communication) | v4 | Proposed | Introduce agent-to-agent communication |
 | [ADR-0402](0400-v4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol) | v4 | Proposed | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0400-v4-roadmap.md#adr-0403-propagate-user-identity-across-agent-to-agent-calls) | v4 | Proposed | Propagate user identity across agent-to-agent calls |

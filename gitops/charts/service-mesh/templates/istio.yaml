@@ -37,6 +37,31 @@ spec:
     pilot:
       env:
         ENABLE_CA_SERVER: "false"
+    # redhat-ods-applications is namespace-injected (istio-injection: enabled,
+    # gitops/charts/namespaces), but these two RHOAI-managed workloads are
+    # rejected by EVERY SCC once istio's init containers (proxy uid
+    # 1001419999, the namespace range's last uid) are injected: RHOAI's own
+    # run-as-ray-user SCC pins uid 1000 for kuberay, and
+    # openshift-ai-localmodel-scc does the same for the localmodelnode agent
+    # - the mixed-uid pod satisfies neither (VERIFIED live, 2026-08-13:
+    # kuberay-operator ReplicaSet and kserve-localmodelnode-agent DaemonSet
+    # both FailedCreate with "unable to validate against any security context
+    # constraint", leaving DataScienceCluster's RayReady False at 0/1).
+    # RHOAI owns those pod templates, so a per-pod inject=false annotation
+    # isn't available - excluded here at the injector instead. Deliberately
+    # NOT excluding maas-api-key-cleanup (its istio-proxy init fails its
+    # startup probe every CronJob run): those pods reach the maas database in
+    # mTLS-enforced zuno-data, so pulling them out of the mesh would trade a
+    # probe failure for a connection failure - revisit via the probe
+    # threshold above instead.
+    sidecarInjectorWebhook:
+      neverInjectSelector:
+        - matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - kuberay
+                - kserve-localmodelnode-agent
     telemetry:
       v2:
         prometheus:

@@ -35,6 +35,11 @@ spec:
           # Placeholder auto-substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
+        # maas-db-config Secret in redhat-ods-applications (MaaS database
+        # prerequisite, sync-wave -5 like maasGateway) - see
+        # templates/externalsecret-maas-db.yaml.
+        maasDb:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator

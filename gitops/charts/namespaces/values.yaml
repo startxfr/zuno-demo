@@ -59,10 +59,14 @@ platformNamespaces:
       store.
     # postgresql: sales-db-mcp (cross-ns). vault: ESO's ClusterSecretStore
     # controller. keycloak: dedicated postgres database, ADR-0315.
+    # redhat-ods-applications: maas-api's dedicated maas database on
+    # zuno-postgresql (MaaS prerequisite - see
+    # gitops/charts/openshift-ai/templates/externalsecret-maas-db.yaml).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-vault
       - zuno-auth
+      - redhat-ods-applications
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:

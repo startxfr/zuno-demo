@@ -231,3 +231,35 @@ maasGateway:
   # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
   clusterBaseDomain: apps.mycluster.example.com
 
+# Second chart-local MaaS prerequisite (same pattern as maasGateway above):
+# DataScienceCluster's ModelsAsServiceReady condition requires a Secret
+# named maas-db-config (key DB_CONNECTION_URL) in redhat-ods-applications.
+# Rendered by templates/externalsecret-maas-db.yaml from the same Vault
+# credential (zuno/maas/postgresql-app) that gitops/charts/postgresql's
+# templates/externalsecret-maas.yaml feeds to PGO for the dedicated maas
+# database/role on zuno-postgresql. False by default, opted in by
+# gitops/apps/openshift-ai/application-d1.yaml alongside DataScienceCluster.
+maasDb:
+  enabled: false
+  vaultPath: maas/postgresql-app
+  secretStoreName: vault-backend
+  refreshInterval: 1h
+  # zuno-postgresql-primary, not -pgbouncer: pgBouncer runs in transaction
+  # pooling mode (gitops/charts/postgresql values pgBouncer.poolMode), which
+  # breaks session-level features (prepared statements) a Go pgx-based API
+  # may rely on. Revisit once maas-api's driver behavior is confirmed.
+  host: zuno-postgresql-primary.zuno-data.svc
+  port: 5432
+  database: maas
+  targetNamespace: redhat-ods-applications
+
+# Third chart-local MaaS prerequisite: ModelsAsServiceReady also requires
+# User Workload Monitoring (ConfigMap cluster-monitoring-config in
+# openshift-monitoring with enableUserWorkload: true) for its
+# showback/FinOps usage views. Rendered by
+# templates/cluster-monitoring-config.yaml; false by default, opted in by
+# gitops/apps/openshift-ai/application-d0.yaml (cluster-level prerequisite,
+# d0 like the operator install itself).
+userWorkloadMonitoring:
+  enabled: false
+

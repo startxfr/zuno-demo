@@ -1,0 +1,30 @@
+{{- /*
+Enables OpenShift User Workload Monitoring, the third MaaS prerequisite
+(DataScienceCluster's ModelsAsServiceReady: "User Workload Monitoring not
+configured: ConfigMap 'cluster-monitoring-config' not found in
+'openshift-monitoring'. Showback/FinOps usage views will not work").
+
+This ConfigMap configures the ENTIRE cluster monitoring stack, not just UWM
+- deliberately kept to the single enableUserWorkload key so ArgoCD ownership
+of it can't fight any future manual Prometheus/Alertmanager tuning beyond
+that. If broader cluster-monitoring config is ever needed, it must be merged
+into this same object (the name is fixed by the cluster-monitoring-operator).
+
+Rendered from the d0 Application (cluster-level prerequisite, like the
+operator install itself) - gitops/apps/openshift-ai/application-d0.yaml opts
+in via userWorkloadMonitoring.enabled. No sync-wave needed: nothing else in
+this chart orders against it, and the cluster-monitoring-operator picks it
+up whenever it lands.
+*/ -}}
+{{- if .Values.userWorkloadMonitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+data:
+  config.yaml: |
+    enableUserWorkload: true
+{{- end }}

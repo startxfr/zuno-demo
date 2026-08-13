@@ -31,6 +31,11 @@ spec:
           # enabled in application-d1.yaml instead, once that's true.
           DSCInitialization:
             enabled: false
+        # User Workload Monitoring, a MaaS/showback prerequisite - cluster-level
+        # like the operator install itself, hence d0 not d1. See
+        # templates/cluster-monitoring-config.yaml.
+        userWorkloadMonitoring:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator

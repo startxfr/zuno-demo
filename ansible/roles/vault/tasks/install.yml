@@ -335,6 +335,18 @@
         username: ragtech
         password: "{{ zuno_admin_rag_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      maas/postgresql-app:
+        # Dedicated database/role for RHOAI's Models-as-a-Service API
+        # (maas-api API-key/subscription store - the DataScienceCluster's
+        # ModelsAsServiceReady condition requires a maas-db-config Secret in
+        # redhat-ods-applications). Letters/digits-only password matters
+        # doubly here: it is interpolated un-encoded into the
+        # DB_CONNECTION_URL postgresql:// URI by
+        # gitops/charts/openshift-ai/templates/externalsecret-maas-db.yaml.
+        # Same naming constraint as postgresql/app above.
+        username: maas
+        password: "{{ zuno_admin_maas_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret"
   kubernetes.core.k8s_exec:

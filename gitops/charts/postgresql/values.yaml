@@ -126,3 +126,15 @@ ragTechDatabase:
   name: rag-tech
   owner: ragtech
   vaultPath: rag/postgresql-app
+
+# Dedicated database/role for RHOAI's Models-as-a-Service API (maas-api
+# API-key/subscription store) - same isolation rationale and "bring your
+# own password" mechanism as keycloakDatabase above, via
+# templates/externalsecret-maas.yaml. The consumer-side Secret
+# (maas-db-config in redhat-ods-applications) is rendered independently by
+# gitops/charts/openshift-ai/templates/externalsecret-maas-db.yaml from the
+# same Vault path, since secretKeyRef can't cross namespaces.
+maasDatabase:
+  name: maas
+  owner: maas
+  vaultPath: maas/postgresql-app
