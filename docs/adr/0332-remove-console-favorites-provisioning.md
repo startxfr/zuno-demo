@@ -1,6 +1,6 @@
 # ADR-0332: Remove Console favorites provisioning
 
-- **Status:** Implemented
+- **Status:** Deprecated
 - **Target:** v0
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
