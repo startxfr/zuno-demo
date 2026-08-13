@@ -14,6 +14,12 @@ backs it, so this reuses the Istio Gateway API controller the service-mesh
 component (zuno-mesh) already runs, rather than waiting on RHOAI's own
 class to appear. Revisit if a future RHOAI build provisions
 data-science-gateway-class on its own.
+
+Deployed via application-d1.yaml, alongside DataScienceCluster (not
+application-d0.yaml): sync-wave -5 here, DataScienceCluster has no explicit
+wave (defaults to 0), DSCInitialization is -10 - this Gateway still lands
+before DataScienceCluster reconciles, without needing a separate Application
+phase for it.
 */ -}}
 {{- if .Values.maasGateway.enabled }}
 apiVersion: v1
@@ -21,6 +27,8 @@ kind: ConfigMap
 metadata:
   name: maas-gateway-config
   namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
 data:
   service: |
     metadata:
@@ -40,6 +48,7 @@ metadata:
     app.kubernetes.io/component: gateway
     opendatahub.io/managed: "false"
   annotations:
+    argocd.argoproj.io/sync-wave: "-5"
     opendatahub.io/managed: "false"
     # Read by the RHOAI/ODH platform layer (not maas-controller itself) to wire
     # the Gateway -> Authorino EnvoyFilter automatically.
@@ -78,11 +87,20 @@ kind: Route
 metadata:
   name: maas-gateway-route
   namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   host: maas.{{ .Values.maasGateway.clusterBaseDomain }}
   to:
     kind: Service
-    name: maas-default-gateway-data-science-gateway-class
+    # Not maas-default-gateway-data-science-gateway-class (that was the old
+    # data-science-gateway-class naming pattern): Istio's Gateway API
+    # controller auto-deploys a Service named identically to the Gateway
+    # object itself for gatewayClassName: istio. Not yet verified against a
+    # live reconcile of this specific Gateway - confirm the real Service
+    # name once applied (`oc get svc -n openshift-ingress`) and correct this
+    # if Istio's actual behavior differs.
+    name: maas-default-gateway
     weight: 100
   port:
     targetPort: 443

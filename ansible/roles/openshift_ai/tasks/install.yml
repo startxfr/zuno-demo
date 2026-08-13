@@ -60,18 +60,11 @@
           subscription:
             operator:
               channel: "{{ _openshift_ai_channel }}"
-        # VERIFIED live, 2026-08-13: this was never enabled, so the
-        # chart's own DSCInitialization (values.yaml's
-        # cluster-ods.DSCInitialization.spec, applicationsNamespace:
-        # zuno-ai-platform - ADR-0328) never rendered/applied, and the
-        # rhods-operator fell back to auto-creating its own default
-        # (applicationsNamespace: redhat-ods-applications) the moment it
-        # first reconciled - exactly the failure mode this chart's values.yaml
-        # comment already warned about. Must land in this d0 apply (sync-wave
-        # -199, alongside project/operator) so it's Applied before d1's
-        # DataScienceCluster (sync-wave -198) ever gets created.
-        DSCInitialization:
-          enabled: true
+        # DSCInitialization is NOT enabled here (or in the re-apply below) -
+        # it needs the Subscription actually approved/reconciled first (the
+        # InstallPlan-approval steps below), which application-d0.yaml's own
+        # DSCInitialization: enabled: false already reflects. It's enabled
+        # in application-d1.yaml instead, applied further down.
     # Don't wait here: the Subscription below is installPlanApproval:
     # Manual (gitops/charts/openshift-ai/values.yaml - deliberate, so
     # Automatic can't silently advance past the pinned EA2 build), and
@@ -148,9 +141,6 @@
           subscription:
             operator:
               channel: "{{ _openshift_ai_channel }}"
-        # See the identical block's comment in the first d0 apply above.
-        DSCInitialization:
-          enabled: false
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
@@ -163,9 +153,9 @@
     gitops_app_extra_helm_values:
       dataScienceCluster:
         enabled: true
-      cluster-ods:
-        DSCInitialization:
-          enabled: true
+      # DSCInitialization: enabled: true and maasGateway: enabled: true
+      # already come from application-d1.yaml's own static values - not
+      # repeated here, single source of truth.
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 20
 
