@@ -66,12 +66,18 @@ MAKE_COMMAND_RE = re.compile(r"\bmake[ \t]+(d0|d1)[ \t]+(\S+)(?:[ \t]+(\S+))?")
 OPENSHIFT_VERSION_RE = re.compile(r"OpenShift(?: Container Platform)? (\d+\.\d+)\b")
 OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 
-# Roadmap container files (0100/0200/0300) hold embedded ADR-0101.. /
-# ADR-0201.. / ADR-0301.. entries, each individually indexed via an
-# anchor link into the container - the container file itself is not a
-# numbered ADR and has no row of its own, by docs/adr/README.md's own
-# convention (see its ADR-0101.. rows).
-ADR_INDEX_EXCLUDED_FILES = {"0100-v1-roadmap.md", "0200-v2-roadmap.md", "0300-v3-roadmap.md"}
+# Roadmap container files (0100/0200/0300/0400) hold embedded/promoted
+# ADR-0101.. / ADR-0201.. / ADR-0301.. / ADR-0401.. entries, each
+# individually indexed via its own row or an anchor link into the
+# container - the container file itself is not a numbered ADR and has no
+# row of its own, by docs/adr/README.md's own convention (see its
+# ADR-0101.. rows).
+ADR_INDEX_EXCLUDED_FILES = {
+    "0100-v1-roadmap.md",
+    "0200-v2-roadmap.md",
+    "0300-v3-roadmap.md",
+    "0400-v4-roadmap.md",
+}
 
 
 @dataclass

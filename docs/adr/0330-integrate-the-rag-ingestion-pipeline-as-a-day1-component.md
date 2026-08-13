@@ -175,9 +175,9 @@ same caution `ansible/roles/mariadb` carries for its own CR).
 
 ## Evolution (2026-08-13)
 
-This ADR is now the **first physical implementation of `knowledge.tech`**, not the definition of RAG architecture for every agent. ADR-0333 defines the logical domain contract; ADR-0338 generalizes the reusable ingestion/retrieval platform to `knowledge.sales`, `knowledge.adv` and `knowledge.sxa-legacy` with independent bindings, storage credentials and lifecycle.
+This ADR is now the **first physical implementation of `knowledge.tech`**, not the definition of RAG architecture for every agent. ADR-0202 defines the logical domain contract; ADR-0204 generalizes the reusable ingestion/retrieval platform to `knowledge.sales`, `knowledge.adv` and `knowledge.sxa-legacy` with independent bindings, storage credentials and lifecycle.
 
-For technical ingestion, Red Hat web documentation and Confluence must share a normalized `technology` key so they can be filtered as one technology/version corpus while preserving `source`, `source_type`, ACL and provenance. Normal technical reads should use `knowledge.tech`; direct Confluence MCP access is reserved for freshness-sensitive live reads and authorized write actions per ADR-0336.
+For technical ingestion, Red Hat web documentation and Confluence must share a normalized `technology` key so they can be filtered as one technology/version corpus while preserving `source`, `source_type`, ACL and provenance. Normal technical reads should use `knowledge.tech`; direct Confluence MCP access is reserved for freshness-sensitive live reads and authorized write actions per ADR-0205.
 
 The current demo mapping that places `confluence-archi-*` groups under `/board` is transitional. ADR-0340 reserves `board` for Direction; architecture/build/run are technical skill scopes, not executive business roles. Technical Confluence ACL groups should therefore be attached to authorized technical/CDP users without using `board` as a proxy for architect status.
 
@@ -194,7 +194,7 @@ Alternatives, Consequences, Migration/evolution and Acceptance criteria.
 - [ADR-0315](0315-dedicated-keycloak-postgresql-database.md) - Dedicated Keycloak database/role on the shared PostgreSQL cluster
 - [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) - Separate the OpenShift AI control plane from AI build and run workload namespaces
 - [ADR-0105](0100-v1-roadmap.md#adr-0105-automate-source-specific-knowledge-ingestion) - Automate source-specific knowledge ingestion
-- [ADR-0333](0333-introduce-logical-knowledge-domains.md) - Introduce logical knowledge domains
-- [ADR-0336](0336-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) - Prefer indexed knowledge for read and live tools for freshness and write
-- [ADR-0338](0338-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) - Generalize the RAG platform to multiple isolated knowledge domains
+- [ADR-0202](0202-introduce-logical-knowledge-domains.md) - Introduce logical knowledge domains
+- [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) - Prefer indexed knowledge for read and live tools for freshness and write
+- [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) - Generalize the RAG platform to multiple isolated knowledge domains
 - [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) - Extend business-role authorization with CDP and scoped capabilities

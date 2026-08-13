@@ -36,7 +36,7 @@ Create a migration tool or validation step that rejects the legacy pseudo-OKF fo
 
 ## Evolution (2026-08-13)
 
-ADR-0333 and ADR-0334 extend the Zuno OKF contract with logical knowledge-domain declarations and task-level `allowed_knowledge`. OKF remains the declarative catalogue of what an agent/task may use; no parallel `AIProfile` or capability-bundle configuration is introduced. Physical vector databases, services and endpoints remain outside OKF and are resolved through platform bindings.
+ADR-0202 and ADR-0203 extend the Zuno OKF contract with logical knowledge-domain declarations and task-level `allowed_knowledge`. OKF remains the declarative catalogue of what an agent/task may use; no parallel `AIProfile` or capability-bundle configuration is introduced. Physical vector databases, services and endpoints remain outside OKF and are resolved through platform bindings.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 

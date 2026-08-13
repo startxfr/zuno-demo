@@ -1,7 +1,7 @@
-# ADR-0334: Enforce knowledge authorization as policy intersection
+# ADR-0203: Enforce knowledge authorization as policy intersection
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -13,7 +13,7 @@ With several domains, an entitled agent must not automatically gain every RAG co
 
 ## Decision
 
-Extend the Zuno OKF task contract with `zuno.allowed_knowledge`, containing only logical knowledge-domain identifiers from ADR-0333.
+Extend the Zuno OKF task contract with `zuno.allowed_knowledge`, containing only logical knowledge-domain identifiers from ADR-0202.
 
 Enforce knowledge access as a fail-closed intersection:
 
@@ -28,7 +28,7 @@ allowed knowledge =
 
 An agent declaration is the ceiling formed by the knowledge domains declared across its approved OKF contract. A task may narrow that set but never widen it.
 
-Introduce a GitOps-managed knowledge policy, analogous to `policies/tools/tool-policy.yaml`, mapping logical domains to allowed business roles, classification constraints and optional source/sub-domain restrictions. The policy references logical domains; physical backend endpoints belong to ADR-0338 bindings.
+Introduce a GitOps-managed knowledge policy, analogous to `policies/tools/tool-policy.yaml`, mapping logical domains to allowed business roles, classification constraints and optional source/sub-domain restrictions. The policy references logical domains; physical backend endpoints belong to ADR-0204 bindings.
 
 Agent entitlement (`agent_tekos`, `agent_comage`, ...) remains orthogonal per ADR-0040. Frontend visibility and agent entitlement do not imply knowledge-domain authorization.
 
@@ -66,4 +66,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)
 - [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md)
 - [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md)
-- [ADR-0333](0333-introduce-logical-knowledge-domains.md)
+- [ADR-0202](0202-introduce-logical-knowledge-domains.md)

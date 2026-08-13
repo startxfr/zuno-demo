@@ -1,7 +1,7 @@
-# ADR-0335: Decouple logical tool capabilities from physical backend bindings
+# ADR-0207: Decouple logical tool capabilities from physical backend bindings
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -65,4 +65,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md)
 - [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)
 - [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md)
-- [ADR-0339](0339-standardize-enterprise-tool-authentication-and-delegation.md)
+- [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)

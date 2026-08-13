@@ -1,7 +1,7 @@
 # ADR-0340: Extend business-role authorization with CDP and scoped capabilities
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v3
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -80,6 +80,6 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 - [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md)
 - [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md)
-- [ADR-0334](0334-enforce-knowledge-authorization-as-policy-intersection.md)
-- [ADR-0335](0335-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
-- [ADR-0339](0339-standardize-enterprise-tool-authentication-and-delegation.md)
+- [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
+- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)

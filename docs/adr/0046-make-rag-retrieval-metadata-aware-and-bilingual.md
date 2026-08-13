@@ -36,7 +36,7 @@ Add test corpora containing conflicting versions and bilingual content; acceptan
 
 ## Evolution (2026-08-13)
 
-ADR-0333/ADR-0338 generalize this metadata contract beyond Tekos. Every indexed chunk must additionally carry a logical `domain`; technical content uses a normalized `technology` key shared by official web documentation and Confluence, with `product`, `version` and optional `skill_scope` as refinements. Operational-source corpora also distinguish `source_modified_at` from `indexed_at` so ADR-0336 freshness policy can decide when a live MCP/API read is required. Domain-specific fields such as `deal_type` or `project_type` remain metadata extensions, not new physical RAG contracts.
+ADR-0202/ADR-0204 generalize this metadata contract beyond Tekos. Every indexed chunk must additionally carry a logical `domain`; technical content uses a normalized `technology` key shared by official web documentation and Confluence, with `product`, `version` and optional `skill_scope` as refinements. Operational-source corpora also distinguish `source_modified_at` from `indexed_at` so ADR-0205 freshness policy can decide when a live MCP/API read is required. Domain-specific fields such as `deal_type` or `project_type` remain metadata extensions, not new physical RAG contracts.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 

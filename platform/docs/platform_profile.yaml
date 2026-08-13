@@ -35,7 +35,7 @@ capabilities:
     note: >-
       kserve.modelsAsService and the maas-default-gateway are active;
       Zuno's own MaaS policy-router layer (ADR-0049) and governance plane
-      (ADR-0325) remain v1 - nothing routes through a MaaS policy layer yet.
+      (ADR-0201) remain v2 - nothing routes through a MaaS policy layer yet.
   kueue:
     status: v0-active
     note: >-

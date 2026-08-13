@@ -1,7 +1,7 @@
 # ADR-0327: Define the AIAgent CRD reconciliation contract before implementing the operator
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 - **Refines:** [ADR-0026](0026-provide-an-aiagent-kubernetes-crd-and-operator.md)

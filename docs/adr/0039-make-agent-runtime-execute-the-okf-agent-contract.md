@@ -35,7 +35,9 @@ A v0 acceptance test must prove that changing an agent definition changes allowe
 
 ## Evolution (2026-08-13)
 
-ADR-0333 replaces backend-oriented "RAG collections" in the durable agent contract with logical knowledge-domain identifiers such as `knowledge.tech` or `knowledge.sales`. Agent Runtime resolves the active task's `allowed_knowledge`, asks the knowledge policy/router for an authorized provider and never embeds PostgreSQL database, schema, collection or service endpoint names in the agent bundle.
+ADR-0202 replaces backend-oriented "RAG collections" in the durable agent contract with logical knowledge-domain identifiers such as `knowledge.tech` or `knowledge.sales`. Agent Runtime resolves the active task's `allowed_knowledge`, asks the knowledge policy/router for an authorized provider and never embeds PostgreSQL database, schema, collection or service endpoint names in the agent bundle.
+
+ADR-0342 fills the graph-shape-selection gap this ADR explicitly scoped out above: `GraphFactory` grows real selection logic across multiple LangGraph workflow shapes, keyed off `AgentDefinition`, with Arkos as the second shape proving the mechanism.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 
@@ -47,3 +49,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md)
 - [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
 - [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md)
+- [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md)

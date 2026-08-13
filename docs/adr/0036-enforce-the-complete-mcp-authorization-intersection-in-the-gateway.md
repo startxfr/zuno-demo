@@ -39,7 +39,7 @@ Add policy decision traces and negative tests for each independent factor of the
 
 ## Evolution (2026-08-13)
 
-ADR-0335 preserves this gateway as the authoritative tool-policy enforcement point but removes the remaining routing coupling between logical tool names and hard-coded downstream handlers. Authorization is evaluated on stable logical capabilities; a separate binding registry resolves an authorized capability to the physical MCP server/API implementation. The current hard-coded routing in `components/mcp-gateway/app/downstream.py` is therefore transitional implementation debt, not part of the durable contract.
+ADR-0207 preserves this gateway as the authoritative tool-policy enforcement point but removes the remaining routing coupling between logical tool names and hard-coded downstream handlers. Authorization is evaluated on stable logical capabilities; a separate binding registry resolves an authorized capability to the physical MCP server/API implementation. The current hard-coded routing in `components/mcp-gateway/app/downstream.py` is therefore transitional implementation debt, not part of the durable contract.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 

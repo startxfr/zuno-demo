@@ -11,6 +11,6 @@ Use PostgreSQL for shared persistent state and pgvector/hybrid search, with logi
 
 ## Evolution (2026-08-13)
 
-ADR-0338 refines "logical separation by agent/corpus" into separation by **logical knowledge domain**. `knowledge.tech`, `knowledge.sales`, `knowledge.adv` and `knowledge.sxa-legacy` may share the same PostgreSQL operator/cluster and reusable RAG services, while keeping independently bindable databases/schemas, credentials, policies and lifecycle. Agent definitions must not depend on those physical storage choices.
+ADR-0204 refines "logical separation by agent/corpus" into separation by **logical knowledge domain**. `knowledge.tech`, `knowledge.sales`, `knowledge.adv` and `knowledge.sxa-legacy` may share the same PostgreSQL operator/cluster and reusable RAG services, while keeping independently bindable databases/schemas, credentials, policies and lifecycle. Agent definitions must not depend on those physical storage choices.
 
 See [Standard clauses](README.md#standard-clauses) for Context, Alternatives, Consequences, Security/Operational considerations, Migration/evolution and Related ADRs.

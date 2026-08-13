@@ -793,7 +793,7 @@ unless the component, Operator or Custom Resource explicitly imposes another nam
 - ADR-0320 - Pre-provision OpenShift users, RBAC and console favorites via Keycloak
 - ADR-0321 - Delegate Kueue lifecycle to the Red Hat build of Kueue Operator
 - ADR-0322 - Migrate from Llama Stack configuration to OpenShift AI OGX
-- ADR-0325 - Complete the OpenShift AI MaaS governance plane integration
+- ADR-0201 - Complete the OpenShift AI MaaS governance plane integration
 - ADR-0329 - Consolidate agent workloads into the shared zuno-ai-run namespace, retiring the namespace-per-agent isolation model
 
 ## Review evidence

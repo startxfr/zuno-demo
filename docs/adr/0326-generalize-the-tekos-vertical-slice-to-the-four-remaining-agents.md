@@ -1,7 +1,7 @@
 # ADR-0326: Generalize the Tekos vertical slice to the four remaining agents
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 
@@ -26,7 +26,7 @@ All agent-specific behavior must remain under each agent's OKF bundle, policies,
 
 ### Recommended implementation sequence
 
-1. **Arkos as the second vertical slice.** It proves a materially different workflow: delegated Drive/Docs access, live Jira/Confluence actions where authorized, structured long-form document generation, advanced model-routing/cost policy and reuse of `knowledge.tech`. Direct agent-to-agent delegation remains governed by the v2 A2A roadmap (ADR-0201/ADR-0202) unless that roadmap is separately changed.
+1. **Arkos as the second vertical slice.** It proves a materially different workflow: delegated Drive/Docs access, live Jira/Confluence actions where authorized, structured long-form document generation, advanced model-routing/cost policy and reuse of `knowledge.tech`. Direct agent-to-agent delegation remains governed by the v4 A2A roadmap (ADR-0401/ADR-0402) unless that roadmap is separately changed.
 2. **Comage as the third vertical slice.** It proves the indexed-read/live-action pattern: semantic reads prefer `knowledge.sales`, freshness-sensitive reads and writes use Salesforce MCP, historical questions may use `knowledge.sxa-legacy`, and personal Google Workspace actions preserve delegated user identity.
 3. **Advantage and Finage after the cross-domain authorization boundary is proven.** Advantage proves the independent `knowledge.adv` domain backed by Aramis. Finage proves that a role can receive only finance-appropriate domain/tool capabilities. Neither restricted view may rely on prompt instructions or client-side filtering.
 
@@ -89,13 +89,13 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0031](0031-formalize-tekos-as-the-v0-vertical-slice.md)
 - [ADR-0035](0035-prevent-restricted-internal-context-from-reaching-external-models.md)
 - [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md)
-- [ADR-0201](0200-v2-roadmap.md#adr-0201-introduce-agent-to-agent-communication)
-- [ADR-0202](0200-v2-roadmap.md#adr-0202-adopt-a2a-as-the-inter-agent-protocol)
-- [ADR-0333](0333-introduce-logical-knowledge-domains.md)
-- [ADR-0334](0334-enforce-knowledge-authorization-as-policy-intersection.md)
-- [ADR-0335](0335-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
-- [ADR-0336](0336-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
-- [ADR-0337](0337-separate-current-salesforce-knowledge-from-legacy-sxa.md)
-- [ADR-0338](0338-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
-- [ADR-0339](0339-standardize-enterprise-tool-authentication-and-delegation.md)
+- [ADR-0202](0202-introduce-logical-knowledge-domains.md)
+- [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
+- [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
+- [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
+- [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
+- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)
 - [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md)
+- [ADR-0401](0400-v4-roadmap.md#adr-0401-introduce-agent-to-agent-communication)
+- [ADR-0402](0400-v4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol)

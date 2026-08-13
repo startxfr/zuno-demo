@@ -1,7 +1,7 @@
-# ADR-0338: Generalize the RAG platform to multiple isolated knowledge domains
+# ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -51,7 +51,7 @@ Deployment/configuration becomes domain-aware and needs independent health/fresh
 
 ## Security considerations
 
-Credentials are domain-specific. Cross-domain queries require explicit multi-domain authorization from ADR-0334 and are performed by the routing layer, not by granting one database user access to every corpus. C3 domains such as unreviewed SXA legacy must be isolatable on stronger physical boundaries without contract changes.
+Credentials are domain-specific. Cross-domain queries require explicit multi-domain authorization from ADR-0203 and are performed by the routing layer, not by granting one database user access to every corpus. C3 domains such as unreviewed SXA legacy must be isolatable on stronger physical boundaries without contract changes.
 
 ## Operational considerations
 
@@ -73,5 +73,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md)
 - [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md)
 - [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
-- [ADR-0333](0333-introduce-logical-knowledge-domains.md)
-- [ADR-0334](0334-enforce-knowledge-authorization-as-policy-intersection.md)
+- [ADR-0202](0202-introduce-logical-knowledge-domains.md)
+- [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)

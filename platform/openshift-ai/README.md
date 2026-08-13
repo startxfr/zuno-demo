@@ -134,8 +134,8 @@ ways: it also means *not* installing operators nothing here uses.
   `Authorino` CR directly - its `Kuadrant` CR has no override field for
   this on the installed CRD version - reusing the Vault-backed
   `vault-issuer` `ClusterIssuer` Keycloak already consumes.
-  What's still v1 is the *policy* layer: ADR-0049 ("Zuno as MaaS policy
-  router") and ADR-0325 (completing the MaaS governance plane -
+  What's still v2 is the *policy* layer: ADR-0049 ("Zuno as MaaS policy
+  router") and ADR-0201 (completing the MaaS governance plane -
   subscriptions, auth policy, usage observability) remain "To be
   implemented" - nothing in the current build routes application traffic
   through a MaaS policy layer yet, even though the gateway/serving/

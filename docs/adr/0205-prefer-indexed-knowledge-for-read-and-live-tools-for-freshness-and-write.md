@@ -1,7 +1,7 @@
-# ADR-0336: Prefer indexed knowledge for read and live tools for freshness and write
+# ADR-0205: Prefer indexed knowledge for read and live tools for freshness and write
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -63,5 +63,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md)
 - [ADR-0105](0100-v1-roadmap.md#adr-0105-automate-source-specific-knowledge-ingestion)
 - [ADR-0109](0100-v1-roadmap.md#adr-0109-implement-source-freshness-and-trust-scoring)
-- [ADR-0333](0333-introduce-logical-knowledge-domains.md)
-- [ADR-0335](0335-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0202](0202-introduce-logical-knowledge-domains.md)
+- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)

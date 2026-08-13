@@ -1,7 +1,7 @@
-# ADR-0333: Introduce logical knowledge domains
+# ADR-0202: Introduce logical knowledge domains
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -63,7 +63,7 @@ The platform gains an explicit distinction between **DataSource** (for example C
 
 ## Security considerations
 
-A logical domain does not grant access. Authorization is defined separately by ADR-0334 and document-level ACL/classification remains mandatory. Sensitive sources must fail closed when ACL/classification metadata is missing.
+A logical domain does not grant access. Authorization is defined separately by ADR-0203 and document-level ACL/classification remains mandatory. Sensitive sources must fail closed when ACL/classification metadata is missing.
 
 ## Operational considerations
 
@@ -85,5 +85,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md)
 - [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md)
 - [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
-- [ADR-0334](0334-enforce-knowledge-authorization-as-policy-intersection.md)
-- [ADR-0338](0338-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
+- [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
+- [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)

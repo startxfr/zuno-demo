@@ -74,15 +74,16 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0110](0100-v1-roadmap.md#adr-0110-automate-document-acl-synchronization) | v1 | Proposed | Automate document ACL synchronization |
 | [ADR-0111](0100-v1-roadmap.md#adr-0111-strengthen-secnumcloud-oriented-security-controls) | v1 | Proposed | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0100-v1-roadmap.md#adr-0112-implement-production-grade-backup-and-recovery) | v1 | Proposed | Implement production-grade backup and recovery |
-| [ADR-0201](0200-v2-roadmap.md#adr-0201-introduce-agent-to-agent-communication) | v2 | Proposed | Introduce agent-to-agent communication |
-| [ADR-0202](0200-v2-roadmap.md#adr-0202-adopt-a2a-as-the-inter-agent-protocol) | v2 | Proposed | Adopt A2A as the inter-agent protocol |
-| [ADR-0203](0200-v2-roadmap.md#adr-0203-propagate-user-identity-across-agent-to-agent-calls) | v2 | Proposed | Propagate user identity across agent-to-agent calls |
-| [ADR-0204](0200-v2-roadmap.md#adr-0204-introduce-controlled-shared-agent-memory) | v2 | Proposed | Introduce controlled shared agent memory |
-| [ADR-0205](0200-v2-roadmap.md#adr-0205-expose-agent-delegation-traces-to-users) | v2 | Proposed | Expose agent delegation traces to users |
-| [ADR-0206](0200-v2-roadmap.md#adr-0206-limit-recursive-agent-delegation) | v2 | Proposed | Limit recursive agent delegation |
-| [ADR-0207](0200-v2-roadmap.md#adr-0207-add-specialized-task-oriented-frontend-views) | v2 | Proposed | Add specialized task-oriented frontend views |
-| [ADR-0208](0200-v2-roadmap.md#adr-0208-automate-removal-of-inaccessible-private-rag-content) | v2 | Proposed | Automate removal of inaccessible private RAG content |
-| [ADR-0209](0200-v2-roadmap.md#adr-0209-introduce-advanced-human-approval-workflows) | v2 | Proposed | Introduce advanced human approval workflows |
+| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v2 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
+| [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v2 | To be implemented | Introduce logical knowledge domains |
+| [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v2 | To be implemented | Enforce knowledge authorization as policy intersection |
+| [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v2 | To be implemented | Generalize the RAG platform to multiple isolated knowledge domains |
+| [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | v2 | To be implemented | Prefer indexed knowledge for read and live tools for freshness and write |
+| [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v2 | To be implemented | Separate current Salesforce knowledge from legacy SXA |
+| [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v2 | To be implemented | Decouple logical tool capabilities from physical backend bindings |
+| [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v2 | To be implemented | Standardize enterprise tool authentication and delegation |
+| [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v2 | To be implemented | Introduce project-scoped agent memory |
+| [ADR-0210](0210-implement-confluence-as-the-first-real-external-mcp-integration.md) | v2 | To be implemented | Implement Confluence as the first real external MCP integration |
 | [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v3 | To be implemented | Introduce LoRA and PEFT model customization |
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v3 | To be implemented | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) | v3 | Proposed | Support dynamic LoRA adapter loading |
@@ -107,14 +108,24 @@ Most ADRs below carry only a title, status/target/date, and their unique Decisio
 | [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0/v1 | To be implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
 | [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | Implemented | Establish canonical generated and validated platform documentation |
 | [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
-| [ADR-0325](0325-complete-the-openshift-ai-maas-governance-plane-integration.md) | v1 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
-| [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v1 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
-| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v1 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
+| [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v3 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
+| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v3 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | Superseded by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
 | [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0/v1 | Partially implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
 | [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | v0 | Implemented | Revert OpenShift AI to the default applications namespace |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
+| [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v3 | To be implemented | Extend business-role authorization with CDP and scoped capabilities |
+| [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v3 | To be implemented | Support multiple agent graph shapes in Agent Runtime |
+| [ADR-0401](0400-v4-roadmap.md#adr-0401-introduce-agent-to-agent-communication) | v4 | Proposed | Introduce agent-to-agent communication |
+| [ADR-0402](0400-v4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol) | v4 | Proposed | Adopt A2A as the inter-agent protocol |
+| [ADR-0403](0400-v4-roadmap.md#adr-0403-propagate-user-identity-across-agent-to-agent-calls) | v4 | Proposed | Propagate user identity across agent-to-agent calls |
+| [ADR-0404](0400-v4-roadmap.md#adr-0404-introduce-controlled-shared-agent-memory) | v4 | Proposed | Introduce controlled shared agent memory |
+| [ADR-0405](0400-v4-roadmap.md#adr-0405-expose-agent-delegation-traces-to-users) | v4 | Proposed | Expose agent delegation traces to users |
+| [ADR-0406](0400-v4-roadmap.md#adr-0406-limit-recursive-agent-delegation) | v4 | Proposed | Limit recursive agent delegation |
+| [ADR-0407](0400-v4-roadmap.md#adr-0407-add-specialized-task-oriented-frontend-views) | v4 | Proposed | Add specialized task-oriented frontend views |
+| [ADR-0408](0400-v4-roadmap.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) | v4 | Proposed | Automate removal of inaccessible private RAG content |
+| [ADR-0409](0400-v4-roadmap.md#adr-0409-introduce-advanced-human-approval-workflows) | v4 | Proposed | Introduce advanced human approval workflows |
 
 ## Standard clauses
 

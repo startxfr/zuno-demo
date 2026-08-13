@@ -1,7 +1,7 @@
-# ADR-0339: Standardize enterprise tool authentication and delegation
+# ADR-0208: Standardize enterprise tool authentication and delegation
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -52,4 +52,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0014](0014-use-delegated-google-oauth-for-google-workspace-access.md)
 - [ADR-0024](0024-use-vault-for-application-secrets.md)
 - [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md)
-- [ADR-0335](0335-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
+- [ADR-0207](0207-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
