@@ -1,7 +1,7 @@
 # ADR-0050: Abstract the RAG backend and integrate OpenShift AI OGX
 
 - **Status:** Superseded by ADR-0322
-- **Target:** v1
+- **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
 - **Superseded:** 2026-08-11 by [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md)

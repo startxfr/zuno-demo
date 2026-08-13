@@ -1,7 +1,7 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
 - **Status:** To be implemented
-- **Target:** v2
+- **Target:** v0.2
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 
@@ -51,7 +51,7 @@ OpenShift AI MaaS
     +--> approved external model provider when lifecycle and policy permit
 ```
 
-### Required v1 implementation
+### Required v0.1 implementation
 
 1. **Publish local models through MaaS** using the current supported model-reference mechanism and verify OpenAI-compatible access through the MaaS gateway.
 2. **Define group-based subscriptions** aligned with Zuno/Keycloak personas and model entitlements rather than embedding model credentials in agent workloads.

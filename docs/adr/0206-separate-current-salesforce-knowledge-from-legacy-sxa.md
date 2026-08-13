@@ -1,7 +1,7 @@
 # ADR-0206: Separate current Salesforce knowledge from legacy SXA
 
 - **Status:** To be implemented
-- **Target:** v2
+- **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 

@@ -1,7 +1,7 @@
 # ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
 - **Status:** To be implemented
-- **Target:** v2
+- **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 

@@ -1,7 +1,7 @@
 # ADR-0326: Generalize the Tekos vertical slice to the four remaining agents
 
 - **Status:** To be implemented
-- **Target:** v3
+- **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 
@@ -20,13 +20,13 @@ The four remaining agents exercise complementary integration risks and now consu
 
 ## Decision
 
-Implement the four remaining agents in v1 as **declarative instances of the same shared platform**, not as independent application forks.
+Implement the four remaining agents in v0.1 as **declarative instances of the same shared platform**, not as independent application forks.
 
 All agent-specific behavior must remain under each agent's OKF bundle, policies, prompts, **logical knowledge-domain references**, logical tool capabilities, tests and deployment parameters. Physical RAG databases, MCP server endpoints and API credentials are platform bindings and must not be embedded in agent definitions. Changes to shared Python/Go services are allowed only when they implement a reusable platform capability required by more than one agent or a formally accepted generic extension.
 
 ### Recommended implementation sequence
 
-1. **Arkos as the second vertical slice.** It proves a materially different workflow: delegated Drive/Docs access, live Jira/Confluence actions where authorized, structured long-form document generation, advanced model-routing/cost policy and reuse of `knowledge.tech`. Direct agent-to-agent delegation remains governed by the v4 A2A roadmap (ADR-0401/ADR-0402) unless that roadmap is separately changed.
+1. **Arkos as the second vertical slice.** It proves a materially different workflow: delegated Drive/Docs access, live Jira/Confluence actions where authorized, structured long-form document generation, advanced model-routing/cost policy and reuse of `knowledge.tech`. Direct agent-to-agent delegation remains governed by the v0.4 A2A roadmap (ADR-0401/ADR-0402) unless that roadmap is separately changed.
 2. **Comage as the third vertical slice.** It proves the indexed-read/live-action pattern: semantic reads prefer `knowledge.sales`, freshness-sensitive reads and writes use Salesforce MCP, historical questions may use `knowledge.sxa-legacy`, and personal Google Workspace actions preserve delegated user identity.
 3. **Advantage and Finage after the cross-domain authorization boundary is proven.** Advantage proves the independent `knowledge.adv` domain backed by Aramis. Finage proves that a role can receive only finance-appropriate domain/tool capabilities. Neither restricted view may rely on prompt instructions or client-side filtering.
 
@@ -46,7 +46,7 @@ Each agent becomes `active` only when it has:
 
 ## Consequences
 
-v1 becomes the release that proves Zuno is a platform rather than a Tekos-specific implementation. Shared-runtime defects will surface earlier because the agents exercise different identity, tool, data and model-routing paths.
+v0.1 becomes the release that proves Zuno is a platform rather than a Tekos-specific implementation. Shared-runtime defects will surface earlier because the agents exercise different identity, tool, data and model-routing paths.
 
 The sequence intentionally delays Advantage/Finage until the commercial-data boundary is robust enough to prove least privilege using server-side tools/query contracts.
 
@@ -62,7 +62,7 @@ Agent expansion must not widen the generic platform permissions.
 
 ## Operational considerations
 
-The acceptance pipeline should expose readiness independently per agent. A failure in an optional v1 agent must be diagnosable without hiding the health of the shared runtime.
+The acceptance pipeline should expose readiness independently per agent. A failure in an optional v0.1 agent must be diagnosable without hiding the health of the shared runtime.
 
 Evaluation fixtures must use synthetic/anonymized commercial and document data appropriate for the public repository.
 
@@ -97,5 +97,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
 - [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)
 - [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md)
-- [ADR-0401](0400-v4-roadmap.md#adr-0401-introduce-agent-to-agent-communication)
-- [ADR-0402](0400-v4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol)
+- [ADR-0401](0400-v0.4-roadmap.md#adr-0401-introduce-agent-to-agent-communication)
+- [ADR-0402](0400-v0.4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol)

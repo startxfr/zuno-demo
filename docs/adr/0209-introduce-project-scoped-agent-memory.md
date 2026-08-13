@@ -1,7 +1,7 @@
 # ADR-0209: Introduce project-scoped agent memory
 
 - **Status:** To be implemented
-- **Target:** v2
+- **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 
@@ -30,7 +30,7 @@ Retrieval combines the current conversation context with `knowledge.project` and
 
 Retrieved project memory content feeds ADR-0034's effective-classification aggregation exactly like RAG documents and tool results do today, monotonic-escalation-only, never downgraded.
 
-This ADR is the v2, project-isolated building block. ADR-0404 ("introduce controlled shared agent memory," v4, currently an unwritten placeholder) is left to define any later cross-project sharing/promotion; `knowledge.project` as decided here has no cross-project sharing.
+This ADR is the v0.2, project-isolated building block. ADR-0404 ("introduce controlled shared agent memory," v0.4, currently an unwritten placeholder) is left to define any later cross-project sharing/promotion; `knowledge.project` as decided here has no cross-project sharing.
 
 ## Consequences
 
@@ -71,4 +71,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
 - [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
 - [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
-- [ADR-0404](0400-v4-roadmap.md#adr-0404-introduce-controlled-shared-agent-memory)
+- [ADR-0404](0400-v0.4-roadmap.md#adr-0404-introduce-controlled-shared-agent-memory)

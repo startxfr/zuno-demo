@@ -1,7 +1,7 @@
 # ADR-0042: Use opaque browser sessions with server-side token storage
 
 - **Status:** Implemented - see `components/agent-frontend/internal/session/{session,store}.go`, `gitops/charts/redis/`, `ansible/roles/redis/`.
-- **Target:** v1
+- **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
 

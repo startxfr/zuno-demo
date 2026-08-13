@@ -1,7 +1,7 @@
 # ADR-0322: Migrate from Llama Stack configuration to the OpenShift AI OGX Operator
 
 - **Status:** To be implemented
-- **Target:** v0/v1
+- **Target:** v0/v0.1
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) and [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) for OGX product mapping and implementation lifecycle
@@ -69,7 +69,7 @@ KServe / vLLM / llm-d / approved external models
 - preserve the current custom RAG provider and existing Tekos behavior during migration;
 - preserve LangChain/LangGraph as an optional orchestration implementation behind the Agent Runtime, not as a competing platform operator.
 
-### v1 integration scope
+### v0.1 integration scope
 
 - implement the OGX-backed RAG provider behind the stable Zuno retrieval contract;
 - use the existing PostgreSQL/pgvector platform as the preferred durable remote vector store where the current OpenShift AI support/lifecycle is acceptable;

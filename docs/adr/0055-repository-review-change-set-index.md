@@ -1,7 +1,7 @@
 # ADR-0055: Repository review change-set index
 
 - **Status:** Implemented (statuses below are tracked live in [README.md](README.md), not duplicated here)
-- **Target:** v0/v1
+- **Target:** v0/v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
 

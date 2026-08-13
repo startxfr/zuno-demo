@@ -1,10 +1,10 @@
 # ADR-0116: Decouple logical tool capabilities from physical backend bindings
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v0.1
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
-- **Renumbered:** formerly ADR-0207, promoted from the v2 stream to v1 (2026-08-13 roadmap reorganization)
+- **Renumbered:** formerly ADR-0207, promoted from the v0.2 stream to v0.1 (2026-08-13 roadmap reorganization)
 
 ## Context
 

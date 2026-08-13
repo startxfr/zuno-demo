@@ -1,10 +1,10 @@
 # ADR-0117: Implement Confluence as the first real external MCP integration
 
 - **Status:** To be implemented
-- **Target:** v1
+- **Target:** v0.1
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
-- **Renumbered:** formerly ADR-0210, promoted from the v2 stream to v1 (2026-08-13 roadmap reorganization)
+- **Renumbered:** formerly ADR-0210, promoted from the v0.2 stream to v0.1 (2026-08-13 roadmap reorganization)
 
 ## Context
 
@@ -37,7 +37,7 @@ Traces distinguish indexed-knowledge answers from live-Confluence-verified answe
 ## Acceptance criteria
 
 - `confluence.page.search`/`read`/`create`/`update` execute against real Confluence Cloud through the MCP Gateway, not the demo handler.
-- A task can retrieve `knowledge.tech` context, then separately read a live Confluence page and write/update it, in one exercised chain (extended to `knowledge.project` once ADR-0209 lands in v2).
+- A task can retrieve `knowledge.tech` context, then separately read a live Confluence page and write/update it, in one exercised chain (extended to `knowledge.project` once ADR-0209 lands in v0.2).
 - Agent Runtime and OKF task definitions contain no Confluence server URL, credential, or vendor-specific tool name - only the four logical capability IDs.
 - `mcp-gateway/app/downstream.py` resolves these capabilities via binding data, not a new hardcoded tool-name entry.
 - An end-to-end acceptance test covers the full chain; the demo-mode Confluence handler is removed once the real implementation passes it.

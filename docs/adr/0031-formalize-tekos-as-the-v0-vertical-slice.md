@@ -11,11 +11,11 @@ The repository currently describes five agents as the platform catalog, but only
 
 ## Decision
 
-Define v0 as a Tekos-first vertical slice. The other four agents remain part of the catalog and architecture contract, but their full business implementations move to v1. v0 must prove the generic platform path end to end: authenticated frontend, BFF, Agent Runtime, RAG, MCP, model routing, streaming, citations, evaluation and policy enforcement.
+Define v0 as a Tekos-first vertical slice. The other four agents remain part of the catalog and architecture contract, but their full business implementations move to v0.1. v0 must prove the generic platform path end to end: authenticated frontend, BFF, Agent Runtime, RAG, MCP, model routing, streaming, citations, evaluation and policy enforcement.
 
 ## Consequences
 
-The v0 milestone becomes achievable and testable within the stated MVP constraint. Documentation must distinguish catalog presence from functional readiness. v1 becomes the release that makes all five initial agents business-functional.
+The v0 milestone becomes achievable and testable within the stated MVP constraint. Documentation must distinguish catalog presence from functional readiness. v0.1 becomes the release that makes all five initial agents business-functional.
 
 ## Security considerations
 

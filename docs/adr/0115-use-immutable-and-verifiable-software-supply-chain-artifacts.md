@@ -1,10 +1,10 @@
 # ADR-0115: Use immutable and verifiable software supply chain artifacts
 
 - **Status:** Partially implemented
-- **Target:** v1
+- **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
-- **Renumbered:** formerly ADR-0051, retargeted v0 -> v1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
+- **Renumbered:** formerly ADR-0051, retargeted v0 -> v0.1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
 - **Last reviewed:** 2026-08-12
 
 ## Context

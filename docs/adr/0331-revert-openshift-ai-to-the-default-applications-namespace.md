@@ -132,5 +132,5 @@ evidence.
 
 - [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) - superseded by this ADR for `applicationsNamespace`; its build/run workload-namespace split remains in effect
 - [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) - Manage the complete OpenShift AI prerequisite lifecycle (same precedent: disable what "would never have reached Ready on a real cluster")
-- [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) - v3 consumer of `trainer`/`ray`, the trigger to revisit a custom `applicationsNamespace` once RHOAI ships a fix
-- [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) - v3 consumer of `mlflowoperator`, same revisit trigger
+- [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) - v0.3 consumer of `trainer`/`ray`, the trigger to revisit a custom `applicationsNamespace` once RHOAI ships a fix
+- [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) - v0.3 consumer of `mlflowoperator`, same revisit trigger

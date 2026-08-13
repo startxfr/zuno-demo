@@ -1,7 +1,7 @@
 # ADR-0343: Complete the MaaS and Ray prerequisites on the DataScienceCluster
 
 - **Status:** Implemented
-- **Target:** v1
+- **Target:** v0.1
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 

@@ -1,7 +1,7 @@
 # ADR-0340: Extend business-role authorization with CDP and scoped capabilities
 
 - **Status:** To be implemented
-- **Target:** v3
+- **Target:** v0.3
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 

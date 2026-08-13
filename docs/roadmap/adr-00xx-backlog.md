@@ -1,16 +1,16 @@
-# ADR v1-Stream Implementation Backlog
+# ADR v0.1-Stream Implementation Backlog
 
 Status scan of ADR-0001 – ADR-0056 (2026-08-13): 50 implemented, 3 superseded
 (ADR-0018, ADR-0023, ADR-0050 — replaced by ADR-0322/ADR-0329), 3 open.
 
-**Reorganized 2026-08-13:** the open decisions were renumbered into the v1
+**Reorganized 2026-08-13:** the open decisions were renumbered into the v0.1
 stream (ADR-0026 → ADR-0113, ADR-0049 → ADR-0114, ADR-0051 → ADR-0115), and
-two v2 decisions were promoted as concretely implementable (ADR-0207 →
+two v0.2 decisions were promoted as concretely implementable (ADR-0207 →
 ADR-0116, ADR-0210 → ADR-0117). Items below are ordered by readiness.
 
 ## 1. ADR-0115 — Immutable and verifiable supply chain artifacts (partially implemented)
 
-Formerly ADR-0051 (v0), retargeted v1. All remaining gaps reduce to one blocker:
+Formerly ADR-0051 (v0), retargeted v0.1. All remaining gaps reduce to one blocker:
 no real end-to-end build → publish → sign cycle has run against GitHub Actions + Quay (gap 7).
 
 1. Run `.github/workflows/build-publish.yml` with real Quay/GitHub credentials to produce one signed release (gap 7).
@@ -21,14 +21,14 @@ no real end-to-end build → publish → sign cycle has run against GitHub Actio
 
 ## 2. ADR-0116 — Decouple logical tool capabilities from backend bindings (to be implemented)
 
-Formerly ADR-0207, promoted from v2. Replace `mcp-gateway/app/downstream.py`'s
+Formerly ADR-0207, promoted from v0.2. Replace `mcp-gateway/app/downstream.py`'s
 hard-coded tool-name routing with a platform binding registry resolving stable
 `<domain>.<resource>.<verb>` capability IDs; a contained gateway refactor and the
 prerequisite for ADR-0117.
 
 ## 3. ADR-0117 — Implement Confluence as the first real external MCP integration (to be implemented)
 
-Formerly ADR-0210, promoted from v2. Build a real MCP server in
+Formerly ADR-0210, promoted from v0.2. Build a real MCP server in
 `components/mcp-servers/confluence/` mirroring the existing sales-db server; the
 `zuno/confluence/technical` Vault credential is already wired. First real consumer
 of ADR-0116's binding layer.

@@ -1,14 +1,14 @@
 # ADR-0301: Introduce LoRA and PEFT model customization
 
 - **Status:** To be implemented
-- **Target:** v3
+- **Target:** v0.3
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team
 
 ## Decision
 
-Promote this decision from a one-line v3-roadmap entry
-(`0300-v3-roadmap.md`) to a full record, since `ansible/roles/mlops`
+Promote this decision from a one-line v0.3-roadmap entry
+(`0300-v0.3-roadmap.md`) to a full record, since `ansible/roles/mlops`
 (ADR-0056's `run` component list) needs a real design to scaffold
 against rather than staying a registered-but-empty contract. This ADR
 adds the capability to customize a deployed base model with LoRA/PEFT
@@ -97,5 +97,5 @@ Consequences, Migration/evolution and Acceptance criteria.
 - [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) - Use immutable and verifiable software supply chain artifacts (precedent for versioned/registered artifacts)
 - [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) - Restructure deployment into Day 0 / Day 1 sequencing (`mlops` run component)
 - [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) - Build dataset-to-model MLOps pipelines (produces the adapters this ADR serves)
-- [ADR-0303](0300-v3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) - Support dynamic LoRA adapter loading (later, out of this ADR's scope)
+- [ADR-0303](0300-v0.3-roadmap.md#adr-0303-support-dynamic-lora-adapter-loading) - Support dynamic LoRA adapter loading (later, out of this ADR's scope)
 - [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) - Generalize the Tekos vertical slice to the four remaining agents (Comage, the starting candidate)

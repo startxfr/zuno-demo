@@ -1,14 +1,14 @@
 # ADR-0327: Define the AIAgent CRD reconciliation contract before implementing the operator
 
 - **Status:** To be implemented
-- **Target:** v3
+- **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 - **Refines:** [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md)
 
 ## Context
 
-ADR-0113 proposes an `AIAgent` Kubernetes CRD and operator for v1, but intentionally deferred implementation while Tekos was the only functional vertical slice. ADR-0326 now expands the platform to four additional agents, which creates enough repeated lifecycle behavior to justify a controller if the reconciliation boundary is kept narrow.
+ADR-0113 proposes an `AIAgent` Kubernetes CRD and operator for v0.1, but intentionally deferred implementation while Tekos was the only functional vertical slice. ADR-0326 now expands the platform to four additional agents, which creates enough repeated lifecycle behavior to justify a controller if the reconciliation boundary is kept narrow.
 
 Without a precise contract, an operator could accidentally duplicate Argo CD, embed OKF business behavior in a CRD, own shared platform services, or become a privileged controller that weakens existing namespace/identity boundaries.
 
