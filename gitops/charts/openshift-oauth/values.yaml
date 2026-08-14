@@ -6,6 +6,44 @@ oauth:
   clientId: openshift
   realm: zuno
 
+  # ADR-0346: name of a ConfigMap in openshift-config holding the ingress
+  # router CA under key "ca.crt", wired into the OpenID IDP's openID.ca so
+  # the oauth-server pod trusts the Keycloak route (served by the default
+  # router cert, which is NOT in the pod's system trust - the
+  # authentication operator degrades with "x509: certificate signed by
+  # unknown authority" otherwise). The ConfigMap itself is
+  # cluster-specific, so Helm can't render it:
+  # ansible/roles/openshift_oauth/tasks/install.yml copies it from
+  # openshift-config-managed/default-ingress-cert (key ca-bundle.crt)
+  # before applying the d1 Application. Empty string (default) omits the
+  # openID.ca stanza entirely, keeping pre-ADR-0346 rendering unchanged.
+  openidCaConfigMap: ""
+
+  # ADR-0346: htpasswd IDP originating from the external startx
+  # cluster-auth chart that also runs on the demo cluster. This chart only
+  # REFERENCES the startx-managed Secret in openshift-config (never
+  # creates it), so the gate defaults off: enabling it on a cluster
+  # without that Secret means the IDP is silently not honored.
+  htpasswd:
+    enabled: false
+    name: startx-htpasswd_auth
+    secretName: startx-htpasswd-htpasswd-auth
+
+  # ADR-0346: startx-branded login/error/provider-selection templates,
+  # again referencing startx-managed Secrets in openshift-config. Off by
+  # default for the same missing-Secret reason as htpasswd above.
+  templates:
+    enabled: false
+    login: startx-login-template
+    error: startx-errors-template
+    providerSelection: startx-providers-template
+
+  # ADR-0346: null (default) omits spec.tokenConfig entirely; the demo
+  # cluster's d1 Application sets 86400 (24h), matching the startx
+  # cluster-auth chart it absorbs.
+  tokenConfig:
+    accessTokenMaxAgeSeconds: null
+
 # Literal placeholder - gitops/apps/openshift-oauth/application-d1.yaml's
 # inline values carry the literal string "apps.mycluster.example.com",
 # which ansible/tasks/apply_gitops_app.yml text-replaces with the real

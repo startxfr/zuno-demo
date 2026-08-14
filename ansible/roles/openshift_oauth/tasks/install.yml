@@ -10,6 +10,58 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-openshift-oauth-d0"
 
+# ADR-0346: the oauth-server pod must trust the CA of the cert serving
+# https://keycloak.<domain> (the default ingress router cert - NOT in the
+# pod's system trust, hence the live "x509: certificate signed by unknown
+# authority" degradation this fixes). The canonical on-cluster source is
+# ConfigMap default-ingress-cert in openshift-config-managed (key
+# ca-bundle.crt), maintained by the ingress operator; openID.ca requires
+# a ConfigMap in openshift-config with key ca.crt, so this copies +
+# re-keys it. Cluster-specific data - can't be rendered by Helm. Safe to
+# copy unconditionally on every run (same reasoning as openshift_ai's
+# istio-ca-root-cert copy): re-running install/reconcile refreshes it if
+# the router cert ever rotates. Ordered before the d1 Application so the
+# ConfigMap exists when the OAuth CR starts referencing it.
+- name: "openshift_oauth | look up the ingress router CA (default-ingress-cert in openshift-config-managed)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: default-ingress-cert
+    namespace: openshift-config-managed
+  register: _openshift_oauth_router_ca
+
+- name: "openshift_oauth | record the missing router-CA finding before failing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-oauth
+      resource: "ConfigMap/default-ingress-cert (openshift-config-managed)"
+      state: "NotFound"
+      cause: "the ingress operator has not published the default router CA - not a healthy OpenShift cluster"
+      solution: "Verify the ingress clusteroperator is Available (`oc get co ingress`), then re-run"
+      auto_fix: "make d0 reconcile openshift-oauth"
+  when: (_openshift_oauth_router_ca.resources | default([]) | length) == 0
+
+- name: "openshift_oauth | fail loudly if the router CA isn't available to copy"
+  ansible.builtin.fail:
+    msg: >-
+      ConfigMap default-ingress-cert not found in openshift-config-managed -
+      every healthy OpenShift cluster's ingress operator publishes it;
+      check `oc get co ingress` before re-running.
+  when: (_openshift_oauth_router_ca.resources | default([]) | length) == 0
+
+- name: "openshift_oauth | copy the router CA into openshift-config as default-ingress-cert (key ca.crt) for openID.ca"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: default-ingress-cert
+        namespace: openshift-config
+      data:
+        ca.crt: "{{ _openshift_oauth_router_ca.resources[0].data['ca-bundle.crt'] }}"
+
 - name: "openshift_oauth | apply the openshift-oauth GitOps Application (d1: cluster OAuth singleton)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:

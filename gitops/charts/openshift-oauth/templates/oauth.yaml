@@ -1,10 +1,13 @@
 {{- if .Values.oauth.enabled }}
-# ADR-0320: this is the only identity provider configured anywhere in
-# this repository today (confirmed: no other `kind: OAuth` resource
-# exists in gitops/ or ansible/), so this owns the full
-# spec.identityProviders list wholesale rather than trying to merge into
-# an existing one. mappingMethod: add lets a Keycloak login attach to an
-# already-existing OpenShift User instead of creating a duplicate.
+# ADR-0320 / ADR-0346: this chart is the single intended owner of the
+# cluster OAuth singleton's full spec, including the settings absorbed
+# from the external startx cluster-auth chart (htpasswd IDP, login
+# templates, tokenConfig) - exactly one ArgoCD Application may manage
+# OAuth/cluster, or the two self-heal-fight over it (see ADR-0346).
+# The OpenID IDP stays FIRST in identityProviders (list order is the
+# login-page provider order). mappingMethod: add lets a Keycloak login
+# attach to an already-existing OpenShift User instead of creating a
+# duplicate; the htpasswd IDP keeps startx's mappingMethod: claim.
 apiVersion: config.openshift.io/v1
 kind: OAuth
 metadata:
@@ -20,10 +23,35 @@ spec:
         clientID: {{ .Values.oauth.clientId }}
         clientSecret:
           name: openshift-client-secret
+{{- if .Values.oauth.openidCaConfigMap }}
+        ca:
+          name: {{ .Values.oauth.openidCaConfigMap }}
+{{- end }}
         claims:
           preferredUsername: ["preferred_username"]
           name: ["name"]
           email: ["email"]
           groups: ["groups"]
         issuer: "https://keycloak.{{ .Values.clusterBaseDomain }}/realms/{{ .Values.oauth.realm }}"
+{{- if .Values.oauth.htpasswd.enabled }}
+    - name: {{ .Values.oauth.htpasswd.name }}
+      mappingMethod: claim
+      type: HTPasswd
+      htpasswd:
+        fileData:
+          name: {{ .Values.oauth.htpasswd.secretName }}
+{{- end }}
+{{- if .Values.oauth.templates.enabled }}
+  templates:
+    login:
+      name: {{ .Values.oauth.templates.login }}
+    error:
+      name: {{ .Values.oauth.templates.error }}
+    providerSelection:
+      name: {{ .Values.oauth.templates.providerSelection }}
+{{- end }}
+{{- if .Values.oauth.tokenConfig.accessTokenMaxAgeSeconds }}
+  tokenConfig:
+    accessTokenMaxAgeSeconds: {{ .Values.oauth.tokenConfig.accessTokenMaxAgeSeconds }}
+{{- end }}
 {{- end }}
