@@ -31,3 +31,23 @@ dbSecretName: rag-service-db-credentials
 # OpenAI-compatible embeddings endpoint - see README "Embedding backend".
 embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings
 embeddingModelName: bge-small-en-v1.5
+
+# ADR-0322 v0.1 integration scope: opt in to the OGX-backed RAG provider
+# prototype (app/ogx_provider.py) instead of the default pgvector+full-text
+# hybrid search (app/search.py) - see that module's docstring. False by
+# default; the pgvector provider is unaffected either way. Only meaningful
+# once gitops/charts/openshift-ai's ogxServer value is also enabled and its
+# provider-parity tests (components/rag-service/tests/test_provider_parity.py)
+# have been run against a live OGXServer - see the WP-06 brief's operator
+# follow-up.
+ogxProvider:
+  enabled: false
+  # Placeholder, not yet verified against a live reconcile (no OGXServer
+  # exists on the test cluster yet - see ogxserver.yaml's own comment):
+  # assumes the operator names the Service after the OGXServer object
+  # (gitops/charts/openshift-ai's ogxServer.name) in its namespace, on
+  # network.port's default. Confirm both (`oc get svc -n
+  # redhat-ods-applications` and `ogxserver.spec.network.port`'s applied
+  # default) once ogxServer.enabled is turned on, and correct this.
+  baseUrl: http://zuno-ogx.redhat-ods-applications.svc:8321
+  vectorStoreId: ""

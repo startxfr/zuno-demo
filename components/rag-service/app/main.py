@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-from app import db
+from app import db, ogx_provider
 from app.schemas import SearchRequest, SearchResponse
 from app.search import hybrid_search
 from app.telemetry import init_telemetry, search_span
@@ -56,20 +56,36 @@ async def readyz():
 
 @app.post("/v1/search", response_model=SearchResponse)
 async def search(payload: SearchRequest) -> SearchResponse:
-    if db.get_pool() is None:
+    # ADR-0322: RAG_PROVIDER=ogx is the only way this branch is ever taken
+    # (see app/ogx_provider.py's module docstring) - the pgvector+full-text
+    # provider below is untouched and remains the default. The database
+    # pool is only required by the pgvector path.
+    use_ogx = ogx_provider.should_use_ogx()
+    if not use_ogx and db.get_pool() is None:
         raise HTTPException(status_code=503, detail="database not connected")
     with search_span(payload.query, payload.top_k) as call:
+        call.provider = "ogx" if use_ogx else "pgvector"
         try:
-            result = await hybrid_search(
-                payload.query,
-                payload.top_k,
-                product=payload.product,
-                version=payload.version,
-                language=payload.language,
-                caller_groups=payload.caller_groups,
-            )
+            if use_ogx:
+                result = await ogx_provider.ogx_search(
+                    payload.query,
+                    payload.top_k,
+                    product=payload.product,
+                    version=payload.version,
+                    language=payload.language,
+                    caller_groups=payload.caller_groups,
+                )
+            else:
+                result = await hybrid_search(
+                    payload.query,
+                    payload.top_k,
+                    product=payload.product,
+                    version=payload.version,
+                    language=payload.language,
+                    caller_groups=payload.caller_groups,
+                )
         except Exception as exc:
-            logger.error("search failed for query=%r: %s", payload.query, exc)
+            logger.error("search failed for query=%r (provider=%s): %s", payload.query, call.provider, exc)
             raise HTTPException(status_code=500, detail=f"search failed: {exc}") from exc
         call.result_count = len(result.get("results", []))
     return SearchResponse(**result)

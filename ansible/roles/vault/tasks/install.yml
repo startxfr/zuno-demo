@@ -352,6 +352,16 @@
         username: agentcheckpoints
         password: "{{ zuno_admin_agent_runtime_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      ogx/postgresql-app:
+        # Dedicated database/role for the OGX-backed RAG provider
+        # prototype's remote::pgvector vector I/O provider (ADR-0322 v0.1
+        # integration scope) - keeps its schema/lifecycle isolated from
+        # every other database on this cluster, same rationale as
+        # keycloak/postgresql-app above. Same naming constraint as
+        # postgresql/app above.
+        username: ogxserver
+        password: "{{ zuno_admin_ogx_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"

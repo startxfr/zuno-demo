@@ -849,3 +849,65 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   scope is fully closed, but the matrix still tracks `gap` rows owned by
   WP-12 (HA/PDB), WP-13 (backup) and WP-26 (binding auth-mode
   enforcement), plus several live-cluster-only verification items.
+
+- 2026-08-14 (ADR-0322, roadmap WP-06): OGX migration + RAG provider
+  parity, Parts A and B. **Part A** turned out to be mostly already done:
+  `gitops/charts/openshift-ai/values.yaml`'s `dataScienceCluster.spec`
+  already had `ogx.managementState: Managed` and the deprecated Llama
+  Stack component already set to `Removed` (commit `cb827edd`, ADR-0343's
+  RHOAI 3.5 EA2 pin work, predating ADR-0322's own authoring by a day) -
+  confirmed live via `oc get datasciencecluster zuno-dsc`: `status.
+  conditions` already carries `type: OGXReady, status: "True"`. Closed the
+  gap between "Removed" and the ADR's literal "absent from the rendered
+  DataScienceCluster" by deleting the key entirely (not just its value) -
+  residual risk (whether the operator treats an omitted managementState
+  identically to explicit Removed) is flagged as an operator verification
+  step, not assumed. `ansible/roles/openshift_ai/tasks/precheck.yml`'s Day
+  1 OGX check was upgraded from diagnostic-only to a real readiness gate
+  on the `OGXReady` condition - the CRD-schema gap that check's own
+  comment had flagged as blocking this (`status.components.ogx` not
+  existing yet) closed between when that comment was written and now, per
+  `oc explain`. Corrected two stale docs describing OGX as an informal
+  capability grouping rather than the discrete `DataScienceCluster`
+  component: `docs/architecture/physical-architecture.md` (was citing
+  ADR-0328's `zuno-ai-platform` placement, superseded by ADR-0331 - RHOAI
+  operands actually live in `redhat-ods-applications`/
+  `rhoai-model-registries`) and `components/rag-service/app/{config,
+  embeddings}.py`'s docstrings (were crediting ADR-0018 for the embedding
+  backend, which ADR-0322 supersedes for OGX specifically).
+  **Part B** added `components/rag-service/app/ogx_provider.py`, an
+  OGX-backed retrieval provider prototype behind the exact same
+  `(query, top_k, product, version, language, caller_groups) ->
+  {results, vector_search_used}` contract `app/search.py:hybrid_search`
+  already implements - same additive/opt-in shape as `ai-gateway`'s MaaS
+  adapter (WP-03): `RAG_PROVIDER=ogx` (default `pgvector`, unaffected)
+  gates it, chart value `ogxProvider.enabled`. Verified via `oc explain`
+  that `spec.components.ogx: Managed` on this cluster only installs the
+  OGX Operator/controller - the actual data-plane API is a separate
+  namespaced `OGXServer` CR (`ogxservers.ogx.io/v1beta1`) nothing has
+  created yet, so this adapter has never run against a live OGX endpoint.
+  Added a schema-correct (via `oc explain ogxserver.spec...`, every field
+  checked) but not-yet-applied `OGXServer` manifest at `gitops/charts/
+  openshift-ai/templates/ogxserver.yaml` (disabled by default) wired to
+  this repo's existing PostgreSQL/pgvector (`remote::pgvector` provider, a
+  new dedicated `ogx`/`ogxserver` database via the same Vault/PGO
+  "bring-your-own-password" pattern WP-08's checkpoint database used) and
+  existing KServe/vLLM (`remote::vllm` provider, `distribution.name:
+  remote-vllm`) rather than inventing new infrastructure. Because OGX's
+  own metadata-filter wire format isn't verified against a live endpoint,
+  the adapter deliberately does NOT push product/version/ACL filters down
+  to OGX - it over-fetches and re-applies the identical fail-closed
+  filter semantics `app/search.py:_filter_clause` enforces in SQL, in
+  Python, as defense in depth (same posture ADR-0322 requires of OGX's
+  own ABAC relative to Zuno's authorization boundary). `tests/
+  test_provider_parity.py` proves both providers' row-mapping functions
+  agree on classification/language/product/version/staleness/citation
+  fields for the same logical document, and that each provider's response
+  validates against the same `SearchResponse` schema - real
+  retrieval-quality parity against a shared indexed corpus needs a live
+  OGXServer, so it's an operator follow-up, not proven here.
+  ADR-0322 stays Partially implemented: DSC migration/health-check/docs
+  (Part A) and the provider/parity-test scaffolding (Part B) are repo-done,
+  but live DSC reconciliation with the key removed and an actual
+  OGX-backed corpus proof both need cluster access this session doesn't
+  have.

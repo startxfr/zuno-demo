@@ -28,9 +28,9 @@ PG_POOL_MAX_SIZE = int(os.getenv("PG_POOL_MAX_SIZE", "10"))
 DOCUMENT_EMBEDDINGS_TABLE = os.getenv("DOCUMENT_EMBEDDINGS_TABLE", "document_embeddings")
 
 # OpenAI-compatible embeddings endpoint (e.g. a KServe/vLLM embedding
-# InferenceService, or an OpenShift AI embedding runtime per ADR-0018's OGX
-# definition). If unreachable, hybrid search degrades gracefully to
-# full-text-search-only (see app/search.py).
+# InferenceService, or any other OpenAI-compatible embedding runtime). If
+# unreachable, hybrid search degrades gracefully to full-text-search-only
+# (see app/search.py).
 EMBEDDING_SERVICE_URL = os.getenv(
     "EMBEDDING_SERVICE_URL",
     "http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings",

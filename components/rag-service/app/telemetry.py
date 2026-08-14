@@ -90,8 +90,12 @@ def search_span(query: str, top_k: int) -> Iterator["SearchRecorder"]:
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", recorder.outcome)
             span.set_attribute("zuno.result_count", recorder.result_count)
+            # ADR-0322 Operational considerations: "Provider selection must
+            # be observable so traces identify whether a request used
+            # native pgvector retrieval or OGX-backed retrieval."
+            span.set_attribute("zuno.provider", recorder.provider)
             if _search_counter is not None:
-                _search_counter.add(1, {"outcome": recorder.outcome})
+                _search_counter.add(1, {"outcome": recorder.outcome, "provider": recorder.provider})
             if _result_count_histogram is not None and recorder.outcome == "ok":
                 _result_count_histogram.record(recorder.result_count)
 
@@ -100,3 +104,4 @@ class SearchRecorder:
     def __init__(self) -> None:
         self.outcome = "unknown"
         self.result_count = 0
+        self.provider = "pgvector"

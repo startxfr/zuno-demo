@@ -58,6 +58,17 @@ spec:
               value: {{ .Values.embeddingServiceUrl | quote }}
             - name: EMBEDDING_MODEL_NAME
               value: {{ .Values.embeddingModelName | quote }}
+            {{- if .Values.ogxProvider.enabled }}
+            # ADR-0322: opts /v1/search into app/ogx_provider.py instead of
+            # the default pgvector+full-text provider - see values.yaml's
+            # ogxProvider comment.
+            - name: RAG_PROVIDER
+              value: "ogx"
+            - name: OGX_BASE_URL
+              value: {{ .Values.ogxProvider.baseUrl | quote }}
+            - name: OGX_VECTOR_STORE_ID
+              value: {{ .Values.ogxProvider.vectorStoreId | quote }}
+            {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

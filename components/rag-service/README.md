@@ -12,8 +12,9 @@ Implementation: FastAPI (Python 3.11), `asyncpg`. Deployed by
 
 `app/telemetry.py` initializes an OTLP tracer/meter at startup and wraps
 `POST /v1/search` in a `rag_search` span (query length, `top_k`, latency,
-outcome) plus the `zuno.rag_searches` counter and
-`zuno.rag_result_count` histogram.
+outcome, and `zuno.provider` - `pgvector` or `ogx`, see "OGX-backed
+provider prototype" below) plus the `zuno.rag_searches` counter
+(labeled `outcome`/`provider`) and `zuno.rag_result_count` histogram.
 
 ## HTTP API contract
 
@@ -165,12 +166,53 @@ The query text is embedded via an OpenAI-compatible `POST
 {EMBEDDING_SERVICE_URL}/v1/embeddings` call (default:
 `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings`,
 override via env) - this assumes an embedding model is served through
-OpenShift AI's KServe/vLLM serving path (ADR-0322's OGX Operator activation), or
-any other OpenAI-compatible embeddings endpoint. **Degradation:** if that
+OpenShift AI's KServe/vLLM serving path, or any other OpenAI-compatible
+embeddings endpoint. This is independent of the OGX Operator (ADR-0322,
+see "OGX-backed provider prototype" below) - OGX is a separate, optional
+retrieval provider, not the mechanism this default pgvector provider uses
+to reach its embedding model. **Degradation:** if that
 endpoint is unreachable or errors, this service logs a warning and falls
 back to full-text-search only rather than failing the request - the
 top-level RAG capability stays available even before an embedding model is
 deployed.
+
+## OGX-backed provider prototype (ADR-0322)
+
+`RAG_PROVIDER=ogx` (chart value `ogxProvider.enabled`, default `false`)
+routes `POST /v1/search` to `app/ogx_provider.py` instead of the
+pgvector+full-text hybrid search above. This is a **prototype, not a
+default**: ADR-0322 requires provider-parity tests to pass before any
+task switches from the custom provider to OGX by default, and the
+default stays `pgvector` regardless of this flag's existence.
+
+It targets the Red Hat OpenShift AI OGX Operator's data-plane API - a
+separate `OGXServer` custom resource
+(`gitops/charts/openshift-ai/templates/ogxserver.yaml`, also disabled by
+default) the operator does not create on its own, configured against
+this repository's existing PostgreSQL/pgvector platform as OGX's remote
+vector I/O provider and the existing KServe/vLLM stack as its remote
+inference provider. As of this WP, no `OGXServer` instance has been
+applied to the test cluster (`spec.components.ogx.managementState:
+Managed` only installs the OGX Operator/controller - confirmed live,
+2026-08-14), so `app/ogx_provider.py` has never been exercised against a
+real OGX endpoint; its HTTP request/response mapping follows the
+documented OpenAI Vector Stores search API shape OGX advertises
+compatibility with, not a verified wire capture.
+
+Because the exact server-side metadata filter grammar isn't verified
+either, this adapter does not push product/version/ACL filters down to
+OGX - it over-fetches and applies the identical fail-closed
+product/version/ACL-group checks `app/search.py:_filter_clause` enforces
+in SQL, in Python, on the `attributes` each result carries. See that
+module's docstring for the full rationale.
+
+`tests/test_ogx_provider.py` and `tests/test_provider_parity.py` (below)
+cover the selection gate, the filter/mapping logic, and structural
+parity between the two providers' output against the shared
+`SearchResponse` schema - all without a live database or OGX endpoint.
+Real retrieval-quality parity against a shared indexed corpus is a
+residual operator action (see the WP-06 roadmap brief), not something
+proven here.
 
 ## Database credentials
 
@@ -197,12 +239,20 @@ docker run -p 8080:8080 \
 `tests/test_search_filters.py` covers ADR-0046's pure retrieval-metadata
 logic (the filter-clause builder, staleness check, and the post-fusion
 language-boost/staleness-penalty adjustment) without needing a live
-database:
+database. `tests/test_ogx_provider.py` covers the OGX provider prototype's
+selection gate, filter, and response-mapping logic (HTTP layer mocked -
+see "OGX-backed provider prototype" above). `tests/test_provider_parity.py`
+covers ADR-0322's provider-parity acceptance bar: the same logical
+document's metadata/classification/staleness/citation fields come back
+identical from both providers' row-mapping functions, and each provider's
+response validates against the shared `SearchResponse` schema:
 
 ```bash
 cd components/rag-service
 pip install -r requirements.txt
 python3 tests/test_search_filters.py
+python3 tests/test_ogx_provider.py
+python3 tests/test_provider_parity.py
 ```
 
 `hybrid_search` and the full `POST /v1/search` HTTP path were additionally

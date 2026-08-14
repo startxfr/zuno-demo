@@ -1,11 +1,13 @@
 """OpenAI-compatible embedding client.
 
 Assumes an embedding model is served behind an OpenAI-compatible
-`POST /v1/embeddings` endpoint (a KServe/vLLM `InferenceService`, or
-another OpenShift AI-native embedding runtime per ADR-0018's OGX
-definition) -- see `EMBEDDING_SERVICE_URL` in app/config.py. This is a
-best-effort dependency: if it is unreachable, `search.py` falls back to
-full-text-search only rather than failing the whole request.
+`POST /v1/embeddings` endpoint (a KServe/vLLM `InferenceService`, or any
+other OpenAI-compatible embedding runtime) -- see `EMBEDDING_SERVICE_URL`
+in app/config.py. Independent of the OGX Operator (ADR-0322, supersedes
+ADR-0018 for OGX product mapping) - see app/ogx_provider.py for that
+separate, optional retrieval provider. This is a best-effort dependency:
+if it is unreachable, `search.py` falls back to full-text-search only
+rather than failing the whole request.
 """
 
 from __future__ import annotations

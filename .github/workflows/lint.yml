@@ -165,6 +165,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_search_filters.py
+          python3 tests/test_ogx_provider.py
+          python3 tests/test_provider_parity.py
 
   ansible:
     runs-on: ubuntu-latest

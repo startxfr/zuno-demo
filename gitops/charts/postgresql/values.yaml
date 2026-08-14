@@ -150,3 +150,22 @@ checkpointDatabase:
   name: agent-checkpoints
   owner: agentcheckpoints
   vaultPath: agent-runtime/postgresql-app
+
+# Dedicated database/role for the OGX-backed RAG provider prototype's
+# remote::pgvector vector I/O provider (ADR-0322 v0.1 integration scope) -
+# isolated from every other database on this cluster for the same reason
+# checkpointDatabase/ragTechDatabase are, and deliberately separate from
+# the document_embeddings table rag-service's own pgvector provider reads
+# (app/search.py) rather than a shared credential onto the same schema:
+# ADR-0322's acceptance criteria call for OGX to *index* a controlled test
+# corpus, not read the existing table directly, so its rows/schema are not
+# expected to be identical. The consumer-side Secret (in
+# redhat-ods-applications, labeled ogx.io/watch: "true" per the OGXServer
+# CRD, confirmed via `oc explain ogxserver.spec.providers.vectorIo.remote.
+# pgvector.password` against the live test cluster) is rendered
+# independently by gitops/charts/openshift-ai/templates/ogxserver.yaml from
+# the same Vault path, since secretKeyRef can't cross namespaces.
+ogxDatabase:
+  name: ogx
+  owner: ogxserver
+  vaultPath: ogx/postgresql-app

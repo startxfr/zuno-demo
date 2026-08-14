@@ -1,0 +1,86 @@
+{{- /*
+ADR-0322 v0.1 integration scope. See values.yaml's ogxServer comment for
+the full placement/distribution/storage rationale - summarized here:
+this stands up the OGX Operator's actual data-plane API (a separate
+OGXServer CR the operator itself does not create), configured against the
+existing PostgreSQL/pgvector platform as its remote vector I/O provider
+and the existing KServe/vLLM stack as its remote inference provider. Both
+provider shapes and every field below are confirmed real via `oc explain
+ogxserver.spec...` against the live test cluster, 2026-08-14 - no
+OGXServer instance itself has been applied/verified live yet (`oc get
+ogxserver -A` returns no resources today), so this is a schema-correct,
+not yet cluster-verified, manifest. Disabled by default.
+*/ -}}
+{{- if .Values.ogxServer.enabled }}
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: ogx-pgvector-password
+  namespace: {{ .Values.ogxServer.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  refreshInterval: {{ .Values.ogxServer.credentials.refreshInterval }}
+  secretStoreRef:
+    name: {{ .Values.ogxServer.credentials.secretStoreName }}
+    kind: ClusterSecretStore
+  target:
+    name: ogx-pgvector-password
+    template:
+      # The OGXServer CRD identifies a watchable Secret by this label
+      # (`oc explain ogxserver.spec.providers.vectorIo.remote.pgvector.password`:
+      # "The Secret must be in the same namespace as the OGXServer and
+      # must have the label ogx.io/watch: \"true\"").
+      metadata:
+        labels:
+          ogx.io/watch: "true"
+  data:
+    - secretKey: password
+      remoteRef:
+        key: {{ .Values.ogxServer.credentials.vaultPath }}
+        property: password
+---
+apiVersion: ogx.io/v1beta1
+kind: OGXServer
+metadata:
+  name: {{ .Values.ogxServer.name }}
+  namespace: {{ .Values.ogxServer.namespace }}
+  labels:
+    app.kubernetes.io/name: ogxserver
+    app.kubernetes.io/component: rag-provider-prototype
+  annotations:
+    # After the operator/webhook (wave -5 above and DataScienceCluster's
+    # own default wave 0) - the pgvector password Secret must exist first.
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  distribution:
+    name: {{ .Values.ogxServer.distribution }}
+  storage:
+    sql:
+      type: sqlite
+  providers:
+    vectorIo:
+      remote:
+        pgvector:
+          - id: zuno-pgvector
+            host: {{ .Values.ogxServer.pgvector.host }}
+            port: {{ .Values.ogxServer.pgvector.port }}
+            db: {{ .Values.ogxServer.pgvector.database }}
+            user: {{ .Values.ogxServer.pgvector.user }}
+            distanceMetric: COSINE
+            password:
+              name: ogx-pgvector-password
+              key: password
+    inference:
+      remote:
+        vllm:
+          - id: zuno-vllm
+            endpoint: {{ .Values.ogxServer.vllmEndpoint }}
+  network:
+    externalAccess:
+      enabled: false
+  workload:
+    replicas: {{ .Values.ogxServer.replicas }}
+{{- end }}

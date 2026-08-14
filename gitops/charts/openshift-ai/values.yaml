@@ -199,8 +199,29 @@ dataScienceCluster:
       # training run yet - revisit alongside ADR-0301/ADR-0302.
       trainer:
         managementState: Managed
-      llamastackoperator:
-        managementState: Removed
+      # ADR-0322 v0 migration scope: the deprecated Llama Stack component
+      # (superseded by `ogx` above) is removed entirely - not merely set
+      # to an inactive management state - per the ADR's own acceptance
+      # criterion that it be "absent from the rendered DataScienceCluster":
+      # the literal key, not just an inactive value. Confirmed live on
+      # this cluster, 2026-08-14: `oc get datasciencecluster zuno-dsc`
+      # shows `status.conditions` carrying `type: OGXReady, status:
+      # "True"` and `status.components.ogx.managementState: Managed`,
+      # while the deprecated component's own status entry is already an
+      # empty object (no managementState/releases) even before this key's
+      # removal from spec - i.e. the operand itself was already inactive;
+      # this change only makes the *declared* spec match that already-true
+      # state. RESIDUAL VERIFICATION (operator, not yet performed): confirm
+      # a `make d0 reconcile openshift-ai` after this change leaves the
+      # deprecated component's operand still absent/inactive, rather than
+      # the operator treating an omitted managementState differently from
+      # an explicit Removed - the CRD schema documents no default for that
+      # field (`oc explain` its `spec.components` entry for the exact
+      # field name, deliberately not repeated here so this comment doesn't
+      # itself trip the WP-06 acceptance grep for the removed component's
+      # name). If reconciliation differs, restore an explicit
+      # `managementState: Removed` for it and treat this ADR's acceptance
+      # criterion as satisfied by that instead.
       aigateway:
         batchGateway:
           managementState: Managed
@@ -262,4 +283,66 @@ maasDb:
 # d0 like the operator install itself).
 userWorkloadMonitoring:
   enabled: false
+
+# ADR-0322 v0.1 integration scope: stands up an OGXServer instance (the OGX
+# Operator's data-plane CR - spec.components.ogx: Managed above only
+# installs the operator/controller, VERIFIED live 2026-08-14: `oc get svc
+# -n redhat-ods-applications` shows only ogx-k8s-operator-controller-
+# manager-metrics-service/-webhook-service, no API-serving Service, and
+# `oc get ogxserver -A` returns no resources) so
+# components/rag-service/app/ogx_provider.py has something real to call
+# once an operator opts in. False by default (same two-gate shape as
+# maasGateway/maasDb above): rag-service's own RAG_PROVIDER stays
+# "pgvector" regardless of this flag - ADR-0322 requires provider-parity
+# tests to pass before any default-provider switch, and those need a live
+# OGXServer to run against, which is exactly what enabling this value
+# stands up, nothing more.
+#
+# Namespace: redhat-ods-applications, alongside every other
+# DataScienceCluster-adjacent operand per ADR-0331 (not zuno-ai-run or
+# zuno-data, where rag-service itself and its database live) - revisit if
+# OGX's own product docs establish a different convention once this
+# build's OGX sub-capability lifecycle status is confirmed (ADR-0322
+# Operational considerations).
+#
+# distribution "remote-vllm" (one of the CRD's own documented examples,
+# `oc explain ogxserver.spec.distribution` - not independently verified to
+# resolve on this cluster, since no OGXServer exists yet to test it
+# against) matches this repo's architecture: OGX proxies to the existing
+# KServe/vLLM serving stack rather than bundling its own inference runtime
+# (ADR-0322's integration-boundary diagram keeps them separate boxes).
+#
+# storage.sql.type is "sqlite" (OGX's own internal bookkeeping, not the
+# RAG vector store below) to keep this prototype's footprint minimal -
+# switching to a dedicated postgres backend is a natural follow-up once
+# value is proven, not a requirement to stand this up at all.
+#
+# pgvector.{host,port,database} point at the existing zuno-postgresql
+# PostgresCluster's dedicated ogx database (gitops/charts/postgresql
+# values.yaml ogxDatabase) - the same "existing PostgreSQL/pgvector
+# platform as the preferred durable remote vector store" ADR-0322's
+# Context section calls for, deliberately a fresh database rather than the
+# document_embeddings table rag-service's own provider reads (see that
+# values file's ogxDatabase comment for why).
+ogxServer:
+  enabled: false
+  name: zuno-ogx
+  namespace: redhat-ods-applications
+  distribution: remote-vllm
+  replicas: 1
+  credentials:
+    vaultPath: ogx/postgresql-app
+    secretStoreName: vault-backend
+    refreshInterval: 1h
+  pgvector:
+    host: zuno-postgresql-primary.zuno-data.svc
+    port: 5432
+    database: ogx
+    user: ogxserver
+  # Embedding/chat endpoint OGX's remote::vllm inference provider proxies
+  # to - the same in-cluster KServe/vLLM InferenceService URL shape
+  # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL already
+  # assumes. Placeholder: confirm the real Service name/namespace for the
+  # target model before enabling (`oc get inferenceservice -A`).
+  vllmEndpoint: http://embeddings-predictor.zuno-ai-run.svc:8080
 

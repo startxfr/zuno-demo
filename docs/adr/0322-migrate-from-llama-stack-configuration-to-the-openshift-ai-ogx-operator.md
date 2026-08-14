@@ -1,6 +1,6 @@
 # ADR-0322: Migrate from Llama Stack configuration to the OpenShift AI OGX Operator
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (DSC migration, health checks, OGX provider and parity tests merged; live reconciliation and corpus proof pending, roadmap WP-06)
 - **Target:** v0/v0.1
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

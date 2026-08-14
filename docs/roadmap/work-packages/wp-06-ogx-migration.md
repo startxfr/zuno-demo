@@ -1,6 +1,6 @@
 # WP-06: OGX migration and RAG provider parity
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-14 - Part A: `llamastackoperator` removed from the rendered `DataScienceCluster`, `ogx.managementState: Managed` confirmed live and already reconciling, Day 1 `OGXReady` condition check tightened from diagnostic-only to a real readiness gate, stale OGX/namespace docs corrected; Part B: `components/rag-service/app/ogx_provider.py` OGX-backed retrieval provider prototype behind the existing contract, `OGXServer` gitops manifest schema-verified via `oc explain` but not yet applied, provider-parity tests merged. ADR-0322 stays Partially implemented until the operator follow-up below runs.)
 - **ADRs:** ADR-0322 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** — (WP-21 benefits from the provider abstraction but does not hard-depend)

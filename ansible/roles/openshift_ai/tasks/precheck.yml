@@ -29,25 +29,38 @@
     name: zuno-dsc
   register: _openshift_ai_dsc_lookup
 
-# ADR-0322 v0 Day 1 health check: report OGX component reconciliation
-# without gating overall install state on it. VERIFIED GAP (2026-08-11,
-# live cluster): `oc explain datasciencecluster.status.components` on the
-# cluster this was written against does not expose an `ogx` field at all
-# yet (only `llamastackoperator`) - the installed rhods-operator CRD
-# version predates the OGX Operator. Making this a hard gate on
-# _state_is_installed would make the whole role permanently report "not
-# installed" on any such cluster, even once every other component is
-# healthy. Report it as a separate diagnostic line instead; tighten this
-# into a real readiness assertion once `ogx` is confirmed present in the
-# installed CRD's schema.
-- name: "openshift_ai | report OGX component status (diagnostic only, see comment above)"
+# ADR-0322 v0 Day 1 health check: prove the OGX component is reconciled,
+# not just declared. VERIFIED CLOSED (2026-08-14, live cluster): the gap
+# this comment used to describe (`oc explain
+# datasciencecluster.status.components` not exposing an `ogx` field, on an
+# rhods-operator build that predated the OGX Operator) no longer applies -
+# `oc explain datasciencecluster.status.components.ogx` and `oc explain
+# datasciencecluster.status.conditions` both confirm the installed v2 CRD
+# reports a dedicated `OGXReady` condition, and the live zuno-dsc carries
+# `type: OGXReady, status: "True"` alongside `status.components.ogx:
+# {managementState: Managed, releases: [...]}`. Gate on the condition (the
+# reconciliation-outcome signal) rather than status.components.ogx's
+# managementState (which only echoes the spec) - same reasoning as using
+# status.phase for the overall DSC gate below. A False OGXReady condition
+# is also picked up generically by diagnose.yml's "record every False
+# DataScienceCluster condition" loop, so no diagnose.yml change is needed.
+- name: "openshift_ai | check OGX component readiness (ADR-0322)"
+  ansible.builtin.set_fact:
+    _openshift_ai_ogx_ready: >-
+      {{
+        ((_openshift_ai_dsc_lookup.resources | default([], true) | first | default({})).get('status', {}).get('conditions', [])
+         | selectattr('type', 'equalto', 'OGXReady')
+         | selectattr('status', 'equalto', 'True') | list | length) > 0
+      }}
+
+- name: "openshift_ai | report OGX component status"
   ansible.builtin.debug:
     msg: >-
       OGX component status:
-      {{ (_openshift_ai_dsc_lookup.resources[0].status.components.ogx
-          | default('absent from status.components - CRD does not expose ogx yet, or DSC not reconciled'))
+      {{ (_openshift_ai_dsc_lookup.resources[0].status.components.ogx | default('no status.components.ogx yet'))
          if (_openshift_ai_dsc_lookup.resources | default([]) | length) > 0
-         else 'DataScienceCluster does not exist yet' }}
+         else 'DataScienceCluster does not exist yet' }},
+      OGXReady={{ _openshift_ai_ogx_ready }}
 
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
@@ -57,6 +70,7 @@
         and _state_check_result
         and (_openshift_ai_dsc_lookup.resources | default([]) | length) > 0
         and (_openshift_ai_dsc_lookup.resources[0].status.phase | default('')) == 'Ready'
+        and (_openshift_ai_ogx_ready | bool)
       }}
 
 # Deep diagnosis so `make d0 check` explains WHY openshift-ai is not

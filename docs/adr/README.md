@@ -126,7 +126,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0319](0319-target-openshift-4-22.md) | v0 | Implemented | Target OpenShift 4.22 |
 | [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md) | v0 | Superseded by ADR-0332 (Deprecated) | Pre-provision OpenShift users, RBAC and Console favorites via Keycloak |
 | [ADR-0321](0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md) | v0 | Implemented | Delegate Kueue lifecycle to the Red Hat build of Kueue Operator |
-| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0/v0.1 | To be implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
+| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0/v0.1 | Partially implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
 | [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | Implemented | Establish canonical generated and validated platform documentation |
 | [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v0.3 | To be implemented | Generalize the Tekos vertical slice to the four remaining agents |
