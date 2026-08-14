@@ -38,6 +38,12 @@ CHECKPOINT_PGPORT = os.getenv("CHECKPOINT_PGPORT", "5432")
 CHECKPOINT_PGDATABASE = os.getenv("CHECKPOINT_PGDATABASE", "")
 CHECKPOINT_PGUSER = os.getenv("CHECKPOINT_PGUSER", "")
 CHECKPOINT_PGPASSWORD = os.getenv("CHECKPOINT_PGPASSWORD", "")
+# Incident 2026-08-14: omitting sslmode left psycopg on its libpq default
+# (`prefer`), which retries a second, plaintext connection attempt after any
+# TLS failure - PGO's PgBouncer rejects that plaintext attempt with
+# "FATAL: SSL required", masking the real error (a missing database) behind
+# a misleading one. Same convention as rag_ingestion.py's PGSSLMODE.
+CHECKPOINT_PGSSLMODE = os.getenv("CHECKPOINT_PGSSLMODE", "require")
 
 
 def _checkpoint_conninfo() -> Optional[str]:
@@ -47,7 +53,7 @@ def _checkpoint_conninfo() -> Optional[str]:
         return None
     return (
         f"host={CHECKPOINT_PGHOST} port={CHECKPOINT_PGPORT} dbname={CHECKPOINT_PGDATABASE} "
-        f"user={CHECKPOINT_PGUSER} password={CHECKPOINT_PGPASSWORD}"
+        f"user={CHECKPOINT_PGUSER} password={CHECKPOINT_PGPASSWORD} sslmode={CHECKPOINT_PGSSLMODE}"
     )
 
 

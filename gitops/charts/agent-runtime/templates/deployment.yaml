@@ -65,6 +65,8 @@ spec:
               value: {{ .Values.checkpointDb.port | quote }}
             - name: CHECKPOINT_PGDATABASE
               value: {{ .Values.checkpointDb.database | quote }}
+            - name: CHECKPOINT_PGSSLMODE
+              value: {{ .Values.checkpointDb.sslmode | quote }}
             - name: CHECKPOINT_PGUSER
               valueFrom:
                 secretKeyRef:

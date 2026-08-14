@@ -13,6 +13,11 @@ connection is exercised by `main.py`'s own `_checkpoint_conninfo()`/
 this sandbox does not have (see main.py's own docstring for why MemorySaver
 is the explicit, supported default here, not a test-only shortcut).
 
+`_checkpoint_conninfo()`'s own string-building logic (no live DB needed)
+*is* covered directly below - added after the 2026-08-14 incident where a
+missing `sslmode` in that string produced a misleading "SSL required" error
+masking the real "database does not exist" failure.
+
 Run directly:
 
     cd components/agent-runtime && python3 tests/test_checkpointing.py
@@ -34,9 +39,10 @@ os.environ.setdefault("AGENTS_DIR", str(_REPO_ROOT / "agents"))
 
 from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
 
+import app.main as main_module  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
 from app.graph.build import build_graph  # noqa: E402
-from app.main import _resolve_run_id  # noqa: E402
+from app.main import _checkpoint_conninfo, _resolve_run_id  # noqa: E402
 from app.schemas import ChatRequest  # noqa: E402
 
 
@@ -149,12 +155,77 @@ async def test_resumed_state_actually_carries_forward() -> None:
     assert (tuple_.checkpoint.get("channel_values") or {}).get("user_sub") == "alice"
 
 
+async def test_checkpoint_conninfo_is_none_when_unconfigured() -> None:
+    """Incident 2026-08-14 regression: unset CHECKPOINT_PG* must fall back
+    to MemorySaver, never produce a partial/broken conninfo string."""
+    saved = (
+        main_module.CHECKPOINT_PGHOST,
+        main_module.CHECKPOINT_PGDATABASE,
+        main_module.CHECKPOINT_PGUSER,
+        main_module.CHECKPOINT_PGPASSWORD,
+    )
+    try:
+        main_module.CHECKPOINT_PGHOST = ""
+        main_module.CHECKPOINT_PGDATABASE = "agent-checkpoints"
+        main_module.CHECKPOINT_PGUSER = "agentcheckpoints"
+        main_module.CHECKPOINT_PGPASSWORD = "secret"
+        assert _checkpoint_conninfo() is None
+    finally:
+        (
+            main_module.CHECKPOINT_PGHOST,
+            main_module.CHECKPOINT_PGDATABASE,
+            main_module.CHECKPOINT_PGUSER,
+            main_module.CHECKPOINT_PGPASSWORD,
+        ) = saved
+
+
+async def test_checkpoint_conninfo_includes_sslmode_and_dbname() -> None:
+    """Incident 2026-08-14 regression: the conninfo string handed to
+    AsyncPostgresSaver.from_conn_string must carry sslmode explicitly - its
+    absence let psycopg fall back to a plaintext attempt that PGO's
+    PgBouncer rejected with a misleading "SSL required" error, masking the
+    real "database does not exist" failure."""
+    saved = (
+        main_module.CHECKPOINT_PGHOST,
+        main_module.CHECKPOINT_PGPORT,
+        main_module.CHECKPOINT_PGDATABASE,
+        main_module.CHECKPOINT_PGUSER,
+        main_module.CHECKPOINT_PGPASSWORD,
+        main_module.CHECKPOINT_PGSSLMODE,
+    )
+    try:
+        main_module.CHECKPOINT_PGHOST = "zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local"
+        main_module.CHECKPOINT_PGPORT = "5432"
+        main_module.CHECKPOINT_PGDATABASE = "agent-checkpoints"
+        main_module.CHECKPOINT_PGUSER = "agentcheckpoints"
+        main_module.CHECKPOINT_PGPASSWORD = "secret"
+        main_module.CHECKPOINT_PGSSLMODE = "require"
+
+        conninfo = _checkpoint_conninfo()
+
+        assert conninfo is not None
+        assert "sslmode=require" in conninfo
+        assert "dbname=agent-checkpoints" in conninfo
+        assert "host=zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local" in conninfo
+    finally:
+        (
+            main_module.CHECKPOINT_PGHOST,
+            main_module.CHECKPOINT_PGPORT,
+            main_module.CHECKPOINT_PGDATABASE,
+            main_module.CHECKPOINT_PGUSER,
+            main_module.CHECKPOINT_PGPASSWORD,
+            main_module.CHECKPOINT_PGSSLMODE,
+        ) = saved
+
+
 TESTS = [
     test_no_run_id_mints_a_fresh_one_every_time,
     test_resuming_an_unknown_run_id_is_a_404,
     test_resuming_your_own_run_id_after_a_checkpoint_succeeds,
     test_resuming_someone_elses_run_id_is_refused,
     test_resumed_state_actually_carries_forward,
+    test_checkpoint_conninfo_is_none_when_unconfigured,
+    test_checkpoint_conninfo_includes_sslmode_and_dbname,
 ]
 
 

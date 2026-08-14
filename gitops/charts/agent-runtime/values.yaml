@@ -52,9 +52,13 @@ aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 
 # ADR-0103: LangGraph PostgreSQL checkpointer, for resumable workflow runs.
 # Unset/empty CHECKPOINT_PG* falls back to in-memory checkpointing (not
-# resumable across restarts) - see app/main.py's own fallback logic; this
-# is additive infrastructure, not a hard dependency the Deployment must
-# wait on.
+# resumable across restarts) - see app/main.py's own fallback logic. Once
+# CHECKPOINT_PG* IS configured (as it is here), the Postgres path is a hard
+# dependency: lifespan fails startup on any connection error rather than
+# silently degrading to MemorySaver, so a Postgres outage loudly crash-loops
+# the pod instead of quietly losing run resumability - confirmed as the
+# intended behavior after the 2026-08-14 incident (missing database), which
+# this dependency correctly surfaced as a crash rather than masking it.
 checkpointDb:
   # PGO's own PgBouncer Service in front of the shared zuno-postgresql
   # PostgresCluster - same pooled-connection convention as
@@ -62,6 +66,11 @@ checkpointDb:
   host: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
   port: "5432"
   database: agent-checkpoints
+  # PGO's PgBouncer requires TLS; explicit sslmode avoids psycopg's default
+  # `prefer` behavior of silently retrying a plaintext connection after any
+  # TLS failure, which produced a misleading "SSL required" error masking
+  # the 2026-08-14 incident's real cause (a missing database).
+  sslmode: require
   credentials:
     vaultPath: agent-runtime/postgresql-app
     secretName: agent-runtime-checkpoint-credentials
