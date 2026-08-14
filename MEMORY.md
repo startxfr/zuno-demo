@@ -1038,3 +1038,47 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   mechanism is real and repo-provable, but a failover drill and a real
   30-day SLO measurement both need cluster access this session doesn't
   have.
+
+- 2026-08-14 (ADR-0112, roadmap WP-13): promoted the stub and closed the
+  last v0.1 evaluation/ops WP. PostgreSQL backups turned out to already
+  be fully configured and actively running - `oc get postgrescluster
+  zuno-postgresql -n zuno-data -o jsonpath='{.status.pgbackrest}'` showed
+  a real completed `full` backup (pgBackRest repo1, local PVC, weekly
+  full + daily differential, already trivially inside the 24h RPO
+  objective). The only real gap was a Day 1 recency check, added to
+  `ansible/roles/postgresql/tasks/precheck.yml` (diagnostic only - never
+  gates install state, since a freshly provisioned cluster legitimately
+  has no backup yet).
+  Vault's storage backend is `file`, not Raft/integrated storage - there
+  is no `vault operator raft snapshot` API to call. Verified via `oc get
+  volumesnapshotclass` (found `csi-aws-vsc`, driver `ebs.csi.aws.com`,
+  matching the PVC's own `gp3-csi` provisioner) and `oc explain
+  volumesnapshot.spec` that a CSI VolumeSnapshot of the data PVC is a
+  real, available mechanism instead. Added `gitops/charts/vault/
+  templates/cronjob-backup.yaml` (disabled by default): a CronJob using
+  `bitnami/kubectl`'s in-cluster auth (simpler and more robust than
+  hand-rolling curl+REST calls) to create a timestamped VolumeSnapshot
+  daily and prune to the newest N, plus least-privilege RBAC scoped only
+  to `volumesnapshots` in `zuno-vault`. Caught a real bug while writing
+  it: `readOnlyRootFilesystem: true` breaks kubectl's default discovery
+  cache write to `$HOME/.kube` - fixed with `HOME=/tmp` + an emptyDir,
+  same pattern already used elsewhere in this repo for exactly this
+  class of problem.
+  For both roles' new ansible Jinja2 (backup-age computation): verified
+  correctness with standalone `ansible-playbook` runs against
+  synthetic/real-shaped data *before* landing, not just `--syntax-check`
+  (which only validates YAML/module structure, not template expressions)
+  - this caught two real bugs pre-merge: a `when:` conditional on a
+  truthy dict (modern Ansible requires a strict boolean, needs `| length
+  > 0`) and `now(utc=true)` already returning a datetime object (piping
+  it through `to_datetime()`, which expects a string, crashed).
+  `docs/platform/backup-recovery.md` documents per-service RPO/RTO
+  objectives (<=24h / <=4h) and the tested-procedure runbook: PostgreSQL
+  restore-to-a-scratch-cluster via `spec.dataSource.postgresCluster`
+  (confirmed real via `oc explain` - PGO restores by creating a *new*
+  cluster from an existing one's pgBackRest repo, never destructively in
+  place), Vault restore via a new PVC sourced from the chosen
+  VolumeSnapshot, and GitOps config needing no separate backup at all
+  (Git/GitHub already is the backup, ADR-0022/0004). ADR-0112 stays
+  Partially implemented: both restore drills are named, unexecuted
+  operator follow-up.

@@ -22,6 +22,58 @@
     name: zuno-postgresql
   register: _postgresql_cluster_lookup
 
+# ADR-0112 (roadmap WP-13): "make d1 check paths assert last-backup
+# recency for their components." Diagnostic only, never gates
+# _state_is_installed below - a freshly-provisioned cluster legitimately
+# has no completed scheduled backup yet (the first one fires on
+# gitops/charts/postgresql values.yaml's own schedule, not at install
+# time), so treating a missing/stale backup as "not installed" would be
+# a false negative on day one, same reasoning as the OGX/LMEvalJob
+# diagnostics elsewhere in this role family. RPO objective is <=24h
+# (ADR-0112) - `status.pgbackrest.scheduledBackups[]` shape confirmed
+# live, 2026-08-14 (`oc get postgrescluster zuno-postgresql -n zuno-data
+# -o jsonpath='{.status.pgbackrest}'` shows a real completed `full`
+# backup for repo1).
+- name: "postgresql | list successful scheduled backups"
+  ansible.builtin.set_fact:
+    _postgresql_successful_backups: >-
+      {{
+        ((_postgresql_cluster_lookup.resources | default([], true) | first | default({}))
+         .get('status', {}).get('pgbackrest', {}).get('scheduledBackups', []))
+        | selectattr('succeeded', 'defined')
+        | selectattr('succeeded', 'greaterthan', 0)
+        | list
+      }}
+
+- name: "postgresql | find the most recent successful scheduled backup"
+  ansible.builtin.set_fact:
+    _postgresql_last_backup: "{{ (_postgresql_successful_backups | sort(attribute='completionTime') | last) if _postgresql_successful_backups else {} }}"
+
+- name: "postgresql | compute backup age in seconds"
+  ansible.builtin.set_fact:
+    _postgresql_last_backup_age_seconds: "{{ (now(utc=true) - (_postgresql_last_backup.completionTime | to_datetime('%Y-%m-%dT%H:%M:%SZ'))).total_seconds() | int }}"
+  when: _postgresql_last_backup | length > 0
+
+- name: "postgresql | report no completed scheduled backup found yet"
+  ansible.builtin.debug:
+    msg: >-
+      No completed scheduled backup found yet - expected on a freshly
+      provisioned cluster before the first scheduled run; investigate
+      (`oc get postgrescluster zuno-postgresql -n zuno-data -o
+      jsonpath='{.status.pgbackrest}'`) if this persists past the
+      configured schedule.
+  when: _postgresql_last_backup | length == 0
+
+- name: "postgresql | report backup recency (RPO <= 24h, ADR-0112)"
+  ansible.builtin.debug:
+    msg: >-
+      Last successful backup: type={{ _postgresql_last_backup.type | default('?') }}
+      completed={{ _postgresql_last_backup.completionTime | default('?') }}
+      ({{ _postgresql_last_backup_age_seconds }}s ago) -
+      {{ 'within the 24h RPO objective.' if (_postgresql_last_backup_age_seconds | int) <= 86400
+         else 'STALE: exceeds the 24h RPO objective (ADR-0112), investigate.' }}
+  when: _postgresql_last_backup | length > 0
+
 - name: "postgresql | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

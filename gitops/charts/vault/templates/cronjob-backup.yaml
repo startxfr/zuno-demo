@@ -1,0 +1,152 @@
+{{- /*
+ADR-0112 (roadmap WP-13). See values.yaml's backup comment for why this
+is a CSI VolumeSnapshot (not `vault operator raft snapshot` - the file
+storage backend has no such API) and for the live-cluster verification
+of every field used below. Disabled by default.
+*/ -}}
+{{- if .Values.backup.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: backup
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+automountServiceAccountToken: true
+---
+# Least privilege: only the VolumeSnapshot resources this Job creates/
+# prunes, only in this namespace - no access to Vault's own data, Secrets,
+# or any other resource type.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: backup
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+rules:
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: backup
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-backup
+subjects:
+  - kind: ServiceAccount
+    name: vault-backup
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: vault
+            app.kubernetes.io/component: backup
+        spec:
+          serviceAccountName: vault-backup
+          restartPolicy: Never
+          priorityClassName: zuno-platform-weak
+          automountServiceAccountToken: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: snapshot
+              image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+              env:
+                - name: NAMESPACE
+                  value: {{ .Release.Namespace | quote }}
+                - name: PVC_NAME
+                  value: {{ .Values.backup.pvcName | quote }}
+                - name: SNAPSHOT_CLASS
+                  value: {{ .Values.backup.volumeSnapshotClassName | quote }}
+                - name: RETENTION_COUNT
+                  value: {{ .Values.backup.retentionCount | quote }}
+                # kubectl writes its discovery cache under $HOME/.kube by
+                # default - readOnlyRootFilesystem below needs somewhere
+                # writable to point it at.
+                - name: HOME
+                  value: /tmp
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              command:
+                - /bin/bash
+                - -ceu
+                - |
+                  TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+                  NAME="vault-data-${TIMESTAMP}"
+                  echo "Creating VolumeSnapshot ${NAME} of PVC ${PVC_NAME} (class ${SNAPSHOT_CLASS})"
+                  cat <<EOF | kubectl -n "${NAMESPACE}" apply -f -
+                  apiVersion: snapshot.storage.k8s.io/v1
+                  kind: VolumeSnapshot
+                  metadata:
+                    name: ${NAME}
+                    labels:
+                      app.kubernetes.io/name: vault
+                      app.kubernetes.io/component: backup
+                  spec:
+                    volumeSnapshotClassName: ${SNAPSHOT_CLASS}
+                    source:
+                      persistentVolumeClaimName: ${PVC_NAME}
+                  EOF
+
+                  echo "Pruning to the newest ${RETENTION_COUNT} snapshot(s)"
+                  kubectl -n "${NAMESPACE}" get volumesnapshot \
+                    -l app.kubernetes.io/component=backup,app.kubernetes.io/name=vault \
+                    -o jsonpath='{range .items[*]}{.metadata.creationTimestamp}{"\t"}{.metadata.name}{"\n"}{end}' \
+                    | sort -r \
+                    | tail -n "+$(( RETENTION_COUNT + 1 ))" \
+                    | cut -f2 \
+                    | xargs --no-run-if-empty -n1 kubectl -n "${NAMESPACE}" delete volumesnapshot
+                  echo "Done."
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

@@ -45,6 +45,66 @@
     _vault_status: "{{ _vault_status_raw.stdout | default('{}') | from_json }}"
   when: _vault_status_raw is defined and _vault_status_raw.stdout is defined
 
+# ADR-0112 (roadmap WP-13): "make d0 check paths assert last-backup
+# recency for their components." Diagnostic only, never gates
+# _state_is_installed below - templates/cronjob-backup.yaml's
+# backup.enabled defaults to false, and even once enabled a freshly
+# provisioned cluster has no completed snapshot before the first
+# scheduled run - same reasoning as the PostgreSQL backup diagnostic in
+# ansible/roles/postgresql/tasks/precheck.yml, whose age-computation
+# approach this mirrors (verified via a standalone ansible-playbook run
+# against the real now(utc=true)/to_datetime behavior, not assumed).
+- name: "vault | look up backup VolumeSnapshots"
+  kubernetes.core.k8s_info:
+    api_version: snapshot.storage.k8s.io/v1
+    kind: VolumeSnapshot
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "app.kubernetes.io/component=backup"
+  register: _vault_snapshots_lookup
+  ignore_errors: true  # CRD may not exist on a cluster with no CSI snapshot support
+
+- name: "vault | find the most recent ready VolumeSnapshot"
+  ansible.builtin.set_fact:
+    _vault_ready_snapshots: >-
+      {{
+        (_vault_snapshots_lookup.resources | default([]))
+        | selectattr('status', 'defined')
+        | selectattr('status.readyToUse', 'defined')
+        | selectattr('status.readyToUse', 'equalto', true)
+        | list
+      }}
+
+- name: "vault | find the most recent ready snapshot"
+  ansible.builtin.set_fact:
+    _vault_last_snapshot: "{{ (_vault_ready_snapshots | sort(attribute='metadata.creationTimestamp') | last) if _vault_ready_snapshots else {} }}"
+
+- name: "vault | compute snapshot age in seconds"
+  ansible.builtin.set_fact:
+    _vault_last_snapshot_age_seconds: "{{ (now(utc=true) - (_vault_last_snapshot.metadata.creationTimestamp | to_datetime('%Y-%m-%dT%H:%M:%SZ'))).total_seconds() | int }}"
+  when: _vault_last_snapshot | length > 0
+
+- name: "vault | report no ready backup snapshot found yet"
+  ansible.builtin.debug:
+    msg: >-
+      No ready VolumeSnapshot backup found - expected if
+      gitops/charts/vault's backup.enabled is still false, or on a
+      freshly enabled backup before the first scheduled run. Investigate
+      (`oc get volumesnapshot -n zuno-vault`) if backups are expected to
+      be active.
+  when: _vault_last_snapshot | length == 0
+
+- name: "vault | report backup recency (RPO <= 24h, ADR-0112)"
+  ansible.builtin.debug:
+    msg: >-
+      Last ready backup snapshot: {{ _vault_last_snapshot.metadata.name | default('?') }}
+      created={{ _vault_last_snapshot.metadata.creationTimestamp | default('?') }}
+      ({{ _vault_last_snapshot_age_seconds }}s ago) -
+      {{ 'within the 24h RPO objective.' if (_vault_last_snapshot_age_seconds | int) <= 86400
+         else 'STALE: exceeds the 24h RPO objective (ADR-0112), investigate.' }}
+  when: _vault_last_snapshot | length > 0
+
 - name: "vault | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

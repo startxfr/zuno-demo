@@ -1,6 +1,6 @@
 # WP-13: Backup and recovery (promotes ADR-0112)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-14 - ADR-0112 promoted to a full record. PostgreSQL backups turned out to already be fully configured and actively running (pgBackRest repo1 local PVC, full weekly + differential daily, confirmed live via a real completed backup) - only the Day 1 recency check was missing, added to `ansible/roles/postgresql/tasks/precheck.yml` (diagnostic only). Vault's `file` storage backend has no `raft snapshot` API, so `gitops/charts/vault/templates/cronjob-backup.yaml` (disabled by default) creates scheduled CSI VolumeSnapshots instead - schema and VolumeSnapshotClass availability confirmed via `oc explain`/`oc get volumesnapshotclass` against the live cluster; a matching recency check was added to `ansible/roles/vault/tasks/precheck.yml`. Both new ansible Jinja2 expressions were verified correct with a standalone `ansible-playbook` run against real/synthetic data before landing, catching two real bugs (a non-boolean conditional, a `now(utc=true)` datetime-vs-string mismatch) pre-merge. `docs/platform/backup-recovery.md` documents per-service RPO/RTO objectives and the tested-procedure runbook (PostgreSQL restore-to-scratch-cluster via `dataSource.postgresCluster`, Vault restore-from-snapshot). ADR-0112 stays Partially implemented pending the restore drill below.)
 - **ADRs:** ADR-0112 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Estimated files touched:** ~6

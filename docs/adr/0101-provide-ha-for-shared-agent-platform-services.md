@@ -30,4 +30,4 @@ Acceptance criteria and Review evidence.
 - [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md)
 - [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md)
 - [ADR-0102](0102-target-99-9-percent-platform-availability.md)
-- [ADR-0112](0100-v0.1-roadmap.md#adr-0112-implement-production-grade-backup-and-recovery) (still a stub - recovery is this ADR's counterpart, WP-13)
+- [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) (recovery is this ADR's counterpart)

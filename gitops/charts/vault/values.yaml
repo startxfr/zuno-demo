@@ -48,3 +48,34 @@ vault:
     enabled: true
   injector:
     enabled: false
+
+# ADR-0112 (roadmap WP-13): scheduled snapshot of Vault's data PVC
+# (templates/cronjob-backup.yaml), rendered by this chart's own -d1
+# Application, false by default alongside every other switch in this
+# repo's optional-resource pattern. Vault's storage backend here is
+# "file" (standalone.config above), not Raft/integrated storage, so
+# there is no `vault operator raft snapshot` API to call - the storage
+# backend's own snapshot mechanism for a plain filesystem PVC is a CSI
+# VolumeSnapshot of the volume itself. Confirmed real and available on
+# the live test cluster, 2026-08-14: `oc get volumesnapshotclass` shows
+# `csi-aws-vsc` (driver ebs.csi.aws.com, matching gp3-csi's own
+# provisioner) and `oc explain volumesnapshot.spec` confirms the schema
+# used below.
+backup:
+  enabled: false
+  schedule: "0 4 * * *"  # daily 04:00 - RPO <= 24h (ADR-0112)
+  retentionCount: 7
+  volumeSnapshotClassName: csi-aws-vsc
+  # releaseName is forced to "zuno-vault" (gitops/apps/vault/application-d1.yaml)
+  # specifically so this name stays predictable - confirmed live via
+  # `oc get pvc -n zuno-vault` (Bitnami/HashiCorp chart's own
+  # "data-<release>-0" StatefulSet PVC naming convention).
+  pvcName: data-zuno-vault-0
+  image:
+    # kubectl's in-cluster auth (ServiceAccount token/CA auto-detected)
+    # is simpler and more robust here than hand-rolling curl+REST calls -
+    # same "don't reinvent what a well-known tool already does correctly"
+    # reasoning as reusing gate_checks.py logic elsewhere in this
+    # roadmap. Fully qualified, pinned tag (ADR-0115).
+    repository: docker.io/bitnami/kubectl
+    tag: "1.31"
