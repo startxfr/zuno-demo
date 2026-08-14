@@ -16,9 +16,7 @@ fail closed, scheduled with each domain's refresh.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Keep private vector
-indexes aligned with current source authorization and remove inaccessible
-content."
+Stub (from `docs/adr/0100-v0.1-roadmap.md`): keep private vector indexes aligned with current source authorization and remove inaccessible content.
 
 Related: ADR-0046 (`acl_groups` metadata + retrieval filter), ADR-0330
 (Confluence `acl_groups` tagging from `requiredGroups`), ADR-0105/WP-22

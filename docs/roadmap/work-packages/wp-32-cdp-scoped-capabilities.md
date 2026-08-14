@@ -20,21 +20,19 @@ matrix as derived documentation, and migrate ADR-0330's temporary
 
 Primary: [docs/adr/0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md](../../adr/0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md)
 
-Acceptance criteria (verbatim):
-
-> - Keycloak contains a `cdp` business role without changing agent-entitlement semantics.
-> - A technical user can update only their own Workday profile when granted `self.update`.
-> - A CDP can read authorized staff profiles with `any.read` but cannot update them without a separate write capability.
-> - A role cannot use a capability absent from the active agent/task OKF declaration.
-> - No independent AI-profile store is required.
+Acceptance criteria: Keycloak gets a `cdp` business role without changing
+agent-entitlement semantics; self vs. any read/write scoping is enforced
+(technical self-updates only, CDP gets self.read + any.read but no
+any.update); a role cannot use a capability absent from the active
+agent/task OKF declaration; no independent AI-profile store is required.
 
 Body constraints: role mapping technical→`consultant`, project manager→new
 `cdp`, sales→`sales`, ADV→`adv`, direction→`board`, finance→`finance`;
 `architecture`/`build`/`run` are skill/data scopes, not business roles; the
-access-intent table "must be encoded in the authoritative policy files
-before it becomes effective" — the matrix doc is derived output, never an
-authorization source; `*.self.*`/`*.any.*` ownership checks are server-side
-from validated identity claims, never prompt text.
+access-intent table must be encoded in the policy files to take effect —
+the matrix doc is derived output, never an authorization source;
+`*.self.*`/`*.any.*` ownership checks are server-side from validated
+identity claims, never prompt text.
 
 ## Preconditions (verify before starting)
 

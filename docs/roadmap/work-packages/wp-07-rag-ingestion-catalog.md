@@ -29,9 +29,9 @@ Remaining work recorded by the ADR:
 - HTTP-verified confirmation of every `CONFIRM`-marked `redhat[]` entry
   (`docs.redhat.com` returned HTTP 403 to the authoring environment);
 - the KFP recurring-run activation in
-  `ansible/roles/rag_ingestion/tasks/install.yml` is explicitly
-  "UNVERIFIED against a live cluster" (Route-naming assumption,
-  "latest version is index 0" assumption, recurring-run payload shape);
+  `ansible/roles/rag_ingestion/tasks/install.yml` is flagged unverified
+  against a live cluster (Route-naming assumption, "latest version is
+  index 0" assumption, recurring-run payload shape);
 - the `DataSciencePipelinesApplication` CR status-condition shape used by
   `make d1 check rag-ingestion` is flagged inline as unconfirmed.
 

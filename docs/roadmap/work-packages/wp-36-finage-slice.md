@@ -19,12 +19,11 @@ scenarios — completing ADR-0326's four-agent generalization.
 ## ADR references
 
 [docs/adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md](../../adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
-— Finage bullet (verbatim): "Finage proves finance-scoped knowledge/tool
-access without inheriting broad Sales/ADV access." Completion bullets
-(verbatim): "Arkos, Comage, Advantage and Finage move from
-`status: placeholder` to active only after their complete common acceptance
-pattern passes." / "All five agents meet the evaluation/security gates
-required by existing ADRs."
+— Finage must prove finance-scoped knowledge/tool access without
+inheriting broad Sales/ADV access. Completion requires: Arkos, Comage,
+Advantage and Finage move from `status: placeholder` to active only after
+their complete common acceptance pattern passes, and all five agents meet
+the evaluation/security gates required by existing ADRs.
 
 ## Preconditions
 

@@ -19,8 +19,8 @@ bundles.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Verify signatures and
-schema/policy validity before promoting agent definitions."
+Stub origin (`docs/adr/0100-v0.1-roadmap.md`): verify signatures and
+schema/policy validity before promoting agent definitions.
 
 Related: ADR-0038 (OKF bundle format), ADR-0039 (runtime executes the OKF
 contract), ADR-0022 (GitOps-managed definitions), ADR-0115/WP-04 (cosign

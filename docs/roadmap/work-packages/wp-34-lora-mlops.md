@@ -24,29 +24,24 @@ ServingRuntime with native multi-LoRA, statically selected in
 ## ADR references
 
 - [docs/adr/0302-build-dataset-to-model-mlops-pipelines.md](../../adr/0302-build-dataset-to-model-mlops-pipelines.md)
-  — numbered points 1–7. Key bindings: KFP on the existing
+  — numbered points 1–7; KFP runs on the existing
   `DataSciencePipelinesApplication`/aipipelines component (ADR-0330's
-  pattern); `ansible/roles/mlops` = day1-run role mirroring
-  `ansible/roles/rag_ingestion`; new `ansible/roles/mlops_build` mirroring
-  `rag_ingestion_build` via `ansible/tasks/apply_openshift_build.yml`;
-  source at `components/mlops/`; datasets from `evaluations/<agent>/`
-  transcripts + `document_embeddings`; S3 staging per ADR-0330; eval gate =
-  target agent's 20 scenarios at 75% reusing
-  `evaluations/<agent>/run_acceptance_gate.py`; registry push to the
+  pattern); datasets come from `evaluations/<agent>/` transcripts +
+  `document_embeddings`, S3-staged per ADR-0330; the eval gate is the
+  target agent's 20 scenarios at 75% via
+  `evaluations/<agent>/run_acceptance_gate.py`; registry push targets the
   OpenShift AI Model Registry (`modelregistry.registriesNamespace:
-  zuno-ai-build`, already Managed); **promotion is a human-reviewed GitOps
+  zuno-ai-build`, already Managed). **Promotion is a human-reviewed GitOps
   PR updating `gitops/charts/models/values.yaml` — the pipeline never
-  pushes to serving.**
+  pushes to serving.** (Component/role naming and mirroring are in Part A
+  below.)
 - [docs/adr/0301-introduce-lora-and-peft-model-customization.md](../../adr/0301-introduce-lora-and-peft-model-customization.md)
-  — numbered points 1–5. Key bindings: vLLM native multi-LoRA
-  (`--enable-lora`, `--lora-modules`) on the existing `vllm-runtime`
-  ServingRuntime in `gitops/charts/models` — additive, NOT a second
-  InferenceService per adapter; adapter selection static in values (dynamic
-  = ADR-0303/WP-39); adapters referenced by registry name/version per
-  ADR-0115 conventions; classification propagates to the adapter artifact
-  (ADR-0034) and constrains which serving path may load it (ADR-0021);
-  first candidate: Comage; rollback = edit values + ArgoCD sync; adapter
-  health joins `make d1 check models`.
+  — numbered points 1–5; vLLM native multi-LoRA is additive on the existing
+  `vllm-runtime` ServingRuntime, NOT a second InferenceService per adapter;
+  adapter selection is static in values (dynamic selection is
+  ADR-0303/WP-39); adapters referenced by registry name/version per
+  ADR-0115; first candidate is Comage; rollback = edit values + ArgoCD
+  sync. (Values/flag wiring and classification gating are in Part B below.)
 
 ## Preconditions (verify before starting)
 

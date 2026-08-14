@@ -20,12 +20,7 @@ carrying subject + capability + binding + mode — never token material.
 
 Primary: [docs/adr/0208-standardize-enterprise-tool-authentication-and-delegation.md](../../adr/0208-standardize-enterprise-tool-authentication-and-delegation.md)
 
-Acceptance criteria (verbatim):
-
-> - Drive/Gmail/Calendar/Meet calls execute with the user's delegated Google identity.
-> - Removing a user's Google permission prevents access even when Zuno still allows the logical capability.
-> - Backend bindings declare authentication mode explicitly.
-> - No OKF document or RAG chunk contains downstream credentials/tokens.
+Acceptance criteria: Drive/Gmail/Calendar/Meet calls execute with the user's delegated Google identity; removing a user's Google permission prevents access even when Zuno still allows the logical capability; backend bindings declare authentication mode explicitly; no OKF document or RAG chunk contains downstream credentials/tokens.
 
 Body constraints: mode is "explicit config, never inferred from the tool
 name"; where service identity is unavoidable, server-side filters apply from

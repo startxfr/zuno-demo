@@ -21,19 +21,9 @@ that always distinguish indexed vs live vs both.
 ## ADR references
 
 - [docs/adr/0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md](../../adr/0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
-- ADR-0109 stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Use
-  provenance, `source_modified_at`, `indexed_at` and source/domain freshness
-  policy to rank knowledge, signal stale content and trigger a live MCP/API
-  read when an indexed answer is not fresh enough for the requested
-  operation."
+- ADR-0109 stub (from `docs/adr/0100-v0.1-roadmap.md`): rank knowledge using provenance, `source_modified_at`, `indexed_at` and source/domain freshness policy; signal stale content; trigger a live MCP/API read when an indexed answer isn't fresh enough for the requested operation.
 
-ADR-0205 acceptance criteria (verbatim):
-
-> - A normal sales semantic question can be answered from `knowledge.sales` without a live Salesforce call.
-> - A question explicitly asking for the current value of a mutable Salesforce field can trigger live verification.
-> - Every Salesforce mutation goes through a write capability, never through RAG.
-> - Technical Confluence content can be answered from `knowledge.tech`; an authorized live Confluence action can still read/update the source page.
-> - Traces show whether a response used indexed knowledge, live verification, or both.
+ADR-0205 acceptance criteria: a normal sales semantic question is answered from `knowledge.sales` without a live Salesforce call; a question explicitly asking for the current value of a mutable Salesforce field can trigger live verification; every Salesforce mutation goes through a write capability, never through RAG; technical Confluence content is answered from `knowledge.tech`, while an authorized live Confluence action can still read/update the source page; traces show whether a response used indexed knowledge, live verification, or both.
 
 ADR-0205 body constraints: chunks must record at least `source_modified_at`,
 `indexed_at`, `stale_after`; freshness policy is per domain/source/operation,

@@ -23,14 +23,7 @@ stricter outer policy.
 Primary: [docs/adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md](../../adr/0201-complete-the-openshift-ai-maas-governance-plane-integration.md)
 (read its full "Required v0.1 implementation" numbered list — items 1–8).
 
-Acceptance criteria (verbatim):
-
-> - At least one local Zuno model is published and consumable through MaaS.
-> - At least two identity groups demonstrate different `MaaSSubscription`/model access.
-> - `MaaSAuthPolicy` enforcement is proven by positive and negative tests.
-> - A Zuno Agent Runtime request traverses Zuno policy routing and MaaS end to end.
-> - Usage metrics can be correlated with a Zuno request trace.
-> - External-model egress, if enabled, is explicitly marked optional according to its OpenShift AI lifecycle and is blocked for classifications/policies that disallow it.
+Acceptance criteria: at least one local Zuno model is published and consumable through MaaS; at least two identity groups demonstrate different `MaaSSubscription`/model access; `MaaSAuthPolicy` enforcement is proven by positive and negative tests; a Zuno Agent Runtime request traverses Zuno policy routing and MaaS end to end; usage metrics can be correlated with a Zuno request trace; external-model egress, if enabled, is explicitly marked optional per its OpenShift AI lifecycle and is blocked for classifications/policies that disallow it.
 
 Named resources: `DataScienceCluster.spec.components.kserve.modelsAsService.managementState`,
 `maas-default-gateway`, `MaaSModelRef`, `MaaSSubscription`, `MaaSAuthPolicy`;

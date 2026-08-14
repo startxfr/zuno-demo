@@ -1,5 +1,25 @@
 # Physical Architecture
 
-The MVP targets OpenShift 4.22 on AWS IPI. Every active agent's frontend/BFF deploys into the single shared `zuno-ai-run` namespace (ADR-0329, supersedes ADR-0023's namespace-per-agent model; only `tekos` is active in v0) alongside the Agent Runtime, AI Gateway and MCP Gateway. `zuno-ai-build` hosts in-cluster image builds via native `BuildConfig`/`ImageStream`, so a compromised or misbehaving build cannot directly reach running workloads (ADR-0056). RHOAI's own shared control-plane operands - KServe, the OGX Operator (the actual Red Hat OpenShift AI OGX Operator, activated as the discrete `DataScienceCluster` component `spec.components.ogx`, not an informal grouping of capabilities; ADR-0322) and AI Gateway among them - run in RHOAI's default `redhat-ods-applications` namespace, with Model Registry in its own `rhoai-model-registries` namespace; ADR-0331 reverted ADR-0328's earlier custom `zuno-ai-platform` placement for these operands after four of them failed under it, so `zuno-ai-platform` is currently empty of RHOAI operands (its `gitops/charts/namespaces` entry is kept pending a follow-up decision to repurpose or remove it). Platform services each get a dedicated namespace: `zuno-auth` (Keycloak), `zuno-vault` (Vault, External Secrets Operator), `zuno-data` (PostgreSQL), `zuno-monitoring` (observability), `zuno-mesh` (Istio control plane). Istio sidecar injection is enabled on `zuno-ai-run`, `zuno-ai-platform` and `zuno-ai-build` for mesh-wide mTLS. OpenShift AI manages local model serving on GPU workers. PostgreSQL, Keycloak, Vault, cert-manager, External Secrets Operator, the service mesh and observability are explicit Day 0 prerequisites (`make day0|d0 install`).
+The MVP targets OpenShift 4.22 on AWS IPI. Namespace layout:
+
+- `zuno-ai-run` — every active agent's frontend/BFF (only `tekos` in v0)
+  plus Agent Runtime, AI Gateway, MCP Gateway.
+- `zuno-ai-build` — in-cluster image builds via `BuildConfig`/
+  `ImageStream`, isolated from running workloads.
+- `redhat-ods-applications` — RHOAI's own control-plane operands (KServe,
+  the OGX Operator, AI Gateway); `rhoai-model-registries` — Model
+  Registry. `zuno-ai-platform` is currently unused (a prior custom
+  placement for these operands was reverted; the namespace entry is kept
+  pending a decision to repurpose or remove it — see docs/adr/ for why).
+- `zuno-auth` (Keycloak), `zuno-vault` (Vault, External Secrets
+  Operator), `zuno-data` (PostgreSQL), `zuno-monitoring` (observability),
+  `zuno-mesh` (Istio control plane) — one dedicated namespace per
+  platform service.
+
+Istio sidecar injection is enabled on `zuno-ai-run`, `zuno-ai-platform`
+and `zuno-ai-build` for mesh-wide mTLS. OpenShift AI manages local model
+serving on GPU workers. PostgreSQL, Keycloak, Vault, cert-manager,
+External Secrets Operator, the service mesh and observability are
+explicit Day 0 prerequisites (`make day0|d0 install`).
 
 Detailed node sizing and resource requests are refined during implementation and captured in `docs/platform/configuration.md` and the `gitops/charts/*/values.yaml` deployment manifests.

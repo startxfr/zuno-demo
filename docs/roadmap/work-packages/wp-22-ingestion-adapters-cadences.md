@@ -18,16 +18,8 @@ on-demand legacy, manual refresh retained).
 
 ## ADR references
 
-- [docs/adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md](../../adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
-  — source-adapter mapping (verbatim): "web + Confluence → tech; Salesforce
-  → sales; Aramis → adv; validated SQL dump → sxa-legacy" over "one generic
-  ingestion framework".
-- ADR-0105 stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Run
-  scheduled ingestion according to each source's freshness objective rather
-  than one global monthly cadence. Technical web/Confluence knowledge must
-  be refreshable at least weekly, operational Salesforce knowledge is
-  expected to refresh on an hours-scale cadence, and immutable legacy
-  sources may be loaded on demand. Retain manual refresh support."
+- [docs/adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md](../../adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) — source-adapter mapping: web + Confluence → tech, Salesforce → sales, Aramis → adv, validated SQL dump → sxa-legacy, all through one generic ingestion framework.
+- ADR-0105 stub (from `docs/adr/0100-v0.1-roadmap.md`): ingestion runs per each source's freshness objective instead of one global monthly cadence — weekly minimum for tech (web/Confluence), hours-scale for sales (Salesforce), on-demand for immutable legacy sources — manual refresh retained.
 
 ## Preconditions (verify before starting)
 

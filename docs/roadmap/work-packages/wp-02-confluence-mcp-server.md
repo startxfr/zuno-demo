@@ -14,22 +14,15 @@
 
 Build the first real external MCP integration: a Confluence MCP server in
 `components/mcp-servers/confluence/` implementing the four ADR-0116
-capabilities, resolved through WP-01's binding registry, replacing the
-demo-mode handler. Repo work lands everything except the live Confluence
-Cloud verification, which is an operator step.
+capabilities via WP-01's binding registry, replacing the demo-mode
+handler. Repo work lands everything except live Confluence Cloud
+verification (an operator step).
 
 ## ADR references
 
 Primary: [docs/adr/0117-implement-confluence-as-the-first-real-external-mcp-integration.md](../../adr/0117-implement-confluence-as-the-first-real-external-mcp-integration.md)
 
-Acceptance criteria (verbatim from the ADR):
-
-> - `confluence.page.search`/`read`/`create`/`update` execute against real Confluence Cloud through the MCP Gateway, not the demo handler.
-> - A task can retrieve `knowledge.tech` context, then separately read a live Confluence page and write/update it, in one exercised chain (extended to `knowledge.project` once ADR-0209 lands in v0.2).
-> - Agent Runtime and OKF task definitions contain no Confluence server URL, credential, or vendor-specific tool name - only the four logical capability IDs.
-> - `mcp-gateway/app/downstream.py` resolves these capabilities via binding data, not a new hardcoded tool-name entry.
-> - An end-to-end acceptance test covers the full chain; the demo-mode Confluence handler is removed once the real implementation passes it.
-> - `docs/adr/0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md`'s status line is updated in place to record Confluence as migrated, once this ADR's acceptance criteria are met (procedural follow-up, not part of this ADR's own decision).
+Acceptance criteria: the four `confluence.page.*` capabilities execute against real Confluence Cloud through the gateway, not the demo handler; a task chains a `knowledge.tech` read with a live Confluence read/write (`knowledge.project` later, per ADR-0209); Agent Runtime/OKF carry no Confluence URL, credential, or vendor tool name — only the four logical IDs; an end-to-end test covers the full chain, and the demo handler is removed once it passes. ADR-0043's status line updates once criteria are met (procedural — see Post-operator repo follow-up below).
 
 Key decisions binding this WP: authentication mode is `service-identity`
 (ADR-0208) using the `zuno/confluence/technical` Vault credential (email +

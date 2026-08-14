@@ -24,27 +24,11 @@ Primary:
 - [docs/adr/0202-introduce-logical-knowledge-domains.md](../../adr/0202-introduce-logical-knowledge-domains.md)
 - [docs/adr/0203-enforce-knowledge-authorization-as-policy-intersection.md](../../adr/0203-enforce-knowledge-authorization-as-policy-intersection.md)
 
-ADR-0202 acceptance criteria (verbatim):
+ADR-0202 acceptance criteria: agent/task defs reference `knowledge.tech`, `knowledge.sales`, `knowledge.sxa-legacy`, `knowledge.adv` without physical endpoint/DB identifiers; one canonical `technology` filters web + Confluence chunks; validation rejects unknown domain refs; no new profile store duplicates Keycloak roles or OKF capabilities.
 
-> - Agent/task definitions can reference `knowledge.tech`, `knowledge.sales`, `knowledge.sxa-legacy` and `knowledge.adv` without physical endpoint/database identifiers.
-> - A technical query can filter one canonical `technology` across both official web and Confluence chunks.
-> - Repository validation rejects an unknown logical knowledge-domain reference.
-> - No new user/persona profile store duplicates Keycloak business roles or OKF capability declarations.
+ADR-0203 acceptance criteria: `allowed_knowledge` is declared independently of `allowed_tools`; `knowledge.sales` doesn't grant `knowledge.sxa-legacy` without both agent ceiling and platform/user policy allowing it; entitlement without the required role is denied, and the reverse stays denied via the existing BFF/agent boundary; ACL-restricted chunks stay invisible when groups don't intersect `acl_groups`.
 
-ADR-0203 acceptance criteria (verbatim):
-
-> - An OKF task can declare `allowed_knowledge` independently from `allowed_tools`.
-> - A task that declares `knowledge.sales` cannot retrieve `knowledge.sxa-legacy` unless both the agent ceiling and platform/user policy also allow it.
-> - A user with agent entitlement but without the required business role is denied.
-> - A user with the business role but without agent entitlement remains denied by the existing BFF/agent boundary.
-> - ACL-restricted chunks remain invisible to callers whose groups do not intersect `acl_groups`.
-
-Key constraints from the ADR bodies: descriptors "must not contain physical
-database names, service endpoints, secrets or credentials"; the intersection
-is agent declaration ∩ task `allowed_knowledge` ∩ user business-role rights
-∩ document ACL/classification ∩ platform knowledge policy, fail closed on
-every missing factor; the agent declaration is a ceiling a task may narrow
-but never widen.
+Key constraints: descriptors carry no physical DB names/endpoints/secrets; the intersection is agent declaration ∩ task `allowed_knowledge` ∩ user business-role rights ∩ document ACL/classification ∩ platform knowledge policy, fail closed on any missing factor; the agent declaration is a ceiling a task may narrow but never widen.
 
 ## Preconditions (verify before starting)
 

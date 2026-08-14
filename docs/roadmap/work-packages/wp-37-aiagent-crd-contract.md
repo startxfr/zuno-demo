@@ -24,18 +24,16 @@ Primary: [docs/adr/0327-define-the-aiagent-crd-reconciliation-contract-before-im
 (read fully — the ownership model, CRD contract and "operator must NOT"
 lists are the specification).
 
-Acceptance criteria (verbatim):
-
-> - The CRD schema is validated against at least Tekos plus Arkos or Comage before implementation is declared complete.
-> - Creating an `AIAgent` CR through GitOps produces the expected per-agent frontend/BFF/configuration resources without modifying shared platform services.
-> - Deleting/suspending an `AIAgent` has a defined, safe lifecycle that does not delete shared data or secrets unexpectedly.
-> - Cross-namespace references and inline secret material are rejected.
-> - `status.conditions` provides useful readiness/error state consumed by `make check`.
-> - Existing plain-manifest agents can be migrated incrementally without a flag day.
-
-(Bullets 2, 3 and 5 are only fully dischargeable by WP-38's controller; this
-WP delivers the contract + static validation that make them testable, and
-bullets 1, 4 and 6's design.)
+Acceptance criteria: the CRD schema validates against at least Tekos plus
+Arkos or Comage; a GitOps-created `AIAgent` CR produces the expected
+per-agent frontend/BFF/configuration resources without touching shared
+platform services; delete/suspend has a defined, safe lifecycle that never
+unexpectedly deletes shared data or secrets; cross-namespace references and
+inline secret material are rejected; `status.conditions` gives `make check`
+useful readiness/error state; plain-manifest agents migrate incrementally,
+no flag day. (Resource-generation, lifecycle and status are only fully
+dischargeable by WP-38's controller; this WP delivers the contract, static
+validation, and the schema/rejection/migration design.)
 
 Spec contents per the ADR: references/selectors for agent name/namespace
 intent, OKF bundle/source reference, frontend/BFF deployment profile + image

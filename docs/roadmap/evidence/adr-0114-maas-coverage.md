@@ -15,16 +15,16 @@ once verified), or `verify-on-cluster` (cannot be proven from the repository
 
 | Current `components/ai-gateway` capability | Status | Notes |
 |---|---|---|
-| Classification eligibility (C1/C2/C3 routing, `app/routing.py`) | `keep-in-zuno` | ADR-0114 Security considerations: "Zuno classification/source restrictions always remain a stricter outer policy." MaaS authorization is never sufficient permission to externalize C2/C3 data — proven by `test_maas_adapter_never_widens_c3_local_only_eligibility` in [test_maas_adapter.py](../../../components/ai-gateway/tests/test_maas_adapter.py). |
+| Classification eligibility (C1/C2/C3 routing, `app/routing.py`) | `keep-in-zuno` | MaaS authorization is never sufficient to externalize C2/C3 data — proven by `test_maas_adapter_never_widens_c3_local_only_eligibility` in [test_maas_adapter.py](../../../components/ai-gateway/tests/test_maas_adapter.py). |
 | `X-Zuno-Local-Only` source-level restriction (ADR-0035) | `keep-in-zuno` | Independent of classification; unaffected by which transport reaches a candidate. |
-| Provider fallback ordering (`_invoke_with_fallback`, `_stream_completion`) | `keep-in-zuno` | Zuno-specific fallback chain; MaaS's own subscription/quota model is a different concern (model *access*, not Zuno's classification-driven candidate ordering). |
+| Provider fallback ordering (`_invoke_with_fallback`, `_stream_completion`) | `keep-in-zuno` | Zuno-specific fallback chain; MaaS's subscription/quota model governs model *access*, not candidate ordering. |
 | OpenAI-compatible request/response contract (`app/schemas.py`) | `keep-in-zuno` | Agent Runtime depends on this shape (ADR-0009); unaffected by the adapter. |
-| Direct model access to local KServe/vLLM predictor Services | `delegate-to-maas` (candidate) | MaaS's `modelsAsService` publishes local models through a governed gateway (ADR-0201) instead of a raw Service URL — the adapter prototype (`components/ai-gateway/app/maas_adapter.py`) proves the transport swap is mechanically trivial (same `ChatOpenAI` client, different `base_url`) but does not itself prove MaaS parity. |
-| Group-based model access / subscriptions | `delegate-to-maas` (candidate) | Zuno has no equivalent today; `MaaSSubscription` (ADR-0201) is additive capability, not a replacement of something Zuno currently does. |
-| Usage/cost telemetry (`app/telemetry.py`, ADR-0029) | `verify-on-cluster` | Needs confirmation that MaaS usage metrics can be correlated with a Zuno request trace (ADR-0201 acceptance bullet) without losing today's per-request cost estimation. |
-| External-provider (OpenAI/Gemini/Anthropic/Mistral) direct API access | `keep-in-zuno` (for now) | ADR-0114: "approved external providers use MaaS external-model capabilities *when supported*." No `via_maas: true` entry ships in `platform/ai-gateway/provider-routing.yaml` yet — external egress stays on the direct path until the operator confirms MaaS's external-model lifecycle is acceptable (ADR-0201 bullet 7). |
-| Streaming (SSE) behavior | `verify-on-cluster` | The adapter reuses `ChatOpenAI.astream`, so streaming mechanics are unaffected in principle; needs a live MaaS endpoint to confirm SSE compatibility end to end. |
-| API-key lifecycle for programmatic clients | `verify-on-cluster` | ADR-0201 bullet 4; not exercised by this repo-only prototype. |
+| Direct model access to local KServe/vLLM predictor Services | `delegate-to-maas` (candidate) | MaaS's `modelsAsService` publishes local models through a governed gateway instead of a raw Service URL. The prototype (`components/ai-gateway/app/maas_adapter.py`) proves the transport swap is mechanically trivial (same `ChatOpenAI` client, different `base_url`) but not MaaS parity. |
+| Group-based model access / subscriptions | `delegate-to-maas` (candidate) | Zuno has no equivalent today; `MaaSSubscription` is additive, not a replacement. |
+| Usage/cost telemetry (`app/telemetry.py`, ADR-0029) | `verify-on-cluster` | Needs confirmation MaaS usage metrics correlate with a Zuno request trace without losing today's per-request cost estimation. |
+| External-provider (OpenAI/Gemini/Anthropic/Mistral) direct API access | `keep-in-zuno` (for now) | No `via_maas: true` entry ships in `platform/ai-gateway/provider-routing.yaml` yet — external egress stays on the direct path until the operator confirms MaaS's external-model lifecycle is acceptable. |
+| Streaming (SSE) behavior | `verify-on-cluster` | The adapter reuses `ChatOpenAI.astream`; needs a live MaaS endpoint to confirm SSE compatibility end to end. |
+| API-key lifecycle for programmatic clients | `verify-on-cluster` | Not exercised by this repo-only prototype. |
 
 ## What the repo prototype proves today
 

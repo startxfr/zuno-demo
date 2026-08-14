@@ -20,13 +20,7 @@ SQL), C3-by-default classification, and versioned snapshot discipline.
 
 Primary: [docs/adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md](../../adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
 
-Acceptance criteria (verbatim):
-
-> - Current Salesforce records never become indistinguishable from SXA legacy records in metadata/citations.
-> - An authorized semantic question can search SXA schema plus historical data through `knowledge.sxa-legacy`.
-> - Exact aggregations can use deterministic structured-query capabilities without arbitrary SQL execution.
-> - Users without explicit Sales/Direction legacy authorization cannot retrieve SXA chunks or structured query results.
-> - Salesforce writes never target the SXA database.
+Acceptance criteria: Salesforce records never become indistinguishable from SXA legacy records in metadata/citations; an authorized semantic question can search SXA schema plus historical data through `knowledge.sxa-legacy`; exact aggregations use deterministic structured-query capabilities, never arbitrary SQL; users without explicit Sales/Direction legacy authorization cannot retrieve SXA chunks or structured-query results; Salesforce writes never target the SXA database.
 
 Key constraints from the ADR body: `knowledge.sxa-legacy` has two semantic
 layers (schema knowledge; authorized historical records with lineage to

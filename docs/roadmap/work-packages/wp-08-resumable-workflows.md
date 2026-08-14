@@ -18,9 +18,9 @@ and service restarts, proven by tests that kill and resume a run.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Persist workflow
-checkpoints so document-generation jobs survive browser disconnects and
-service restarts."
+Stub origin (`docs/adr/0100-v0.1-roadmap.md`): persist workflow checkpoints
+so document-generation jobs survive browser disconnects and service
+restarts.
 
 Related: ADR-0039 (runtime executes OKF contract), ADR-0015 (PostgreSQL
 platform), ADR-0045 (SSE streaming — reconnect semantics), ADR-0209 (session

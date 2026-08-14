@@ -23,16 +23,14 @@ exists), and the full 20-scenario evaluation gate.
 ## ADR references
 
 - [docs/adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md](../../adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
-  — read the "mandatory common completion pattern" list in full; Arkos
-  bullet (verbatim): "Arkos proves delegated Drive/Docs access,
-  `knowledge.tech` reuse and live Jira/Confluence actions without physical
-  endpoint coupling."
+  — read the "mandatory common completion pattern" list in full; Arkos must
+  prove delegated Drive/Docs access, `knowledge.tech` reuse, and live
+  Jira/Confluence actions without physical endpoint coupling.
 - [docs/adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md](../../adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md)
-  — Arkos bullets (verbatim): "Arkos runs a real task end to end through its
-  own graph shape." / "Tekos and Arkos both successfully retrieve
-  `knowledge.project` content for the same `project_id` (ADR-0209's
-  acceptance scenario), each through its own graph shape and its own task
-  prompts/capabilities."
+  — Arkos runs a real task end to end through its own graph shape; Tekos and
+  Arkos both retrieve `knowledge.project` content for the same `project_id`
+  (ADR-0209's acceptance scenario) each through its own shape and task
+  prompts/capabilities.
 - [docs/adr/0209-introduce-project-scoped-agent-memory.md](../../adr/0209-introduce-project-scoped-agent-memory.md)
   — the cross-agent `demo-001` acceptance bullet closes here.
 

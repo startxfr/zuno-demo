@@ -28,16 +28,7 @@ plane behind it.
 
 Primary: [docs/adr/0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md](../../adr/0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md)
 
-Operational requirement (verbatim): "Prototype the MaaS adapter behind the
-existing OpenAI-compatible model client and compare feature coverage before
-removing current gateway capabilities."
-
-Consequence (verbatim): "Migration requires a stable adapter so Agent Runtime
-is not tied directly to changing MaaS APIs during EA/TP stages."
-
-Security (verbatim): "Zuno classification/source restrictions always remain a
-stricter outer policy. MaaS authorization must not be treated as sufficient
-permission to externalize C2/C3 data."
+Consequence: a stable adapter keeps Agent Runtime decoupled from changing MaaS APIs during EA/TP. Security: Zuno's classification/source restrictions remain the stricter outer policy — MaaS authorization is never sufficient permission to externalize C2/C3 data.
 
 Acceptance criteria: Standard clauses (docs/adr/README.md#standard-clauses) —
 merged via review, docs updated, component tests demonstrate the behavior,

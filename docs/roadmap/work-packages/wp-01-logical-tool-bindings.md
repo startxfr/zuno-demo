@@ -22,20 +22,7 @@ physical MCP server requires only binding configuration.
 
 Primary: [docs/adr/0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md](../../adr/0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
 
-Acceptance criteria (verbatim from the ADR):
-
-> - Agent/task OKF contains no MCP Service DNS names or URLs.
-> - Changing the physical server for a logical capability requires only binding/deployment configuration, not agent/runtime behavior changes.
-> - MCP Gateway no longer requires hard-coded per-tool routing sets in `downstream.py`.
-> - Unknown logical capability or missing binding returns a deterministic denial/error without contacting an arbitrary backend.
-
-Operational (verbatim): "Traces must record both the logical capability and
-resolved backend binding. Health checks validate that every enabled policy
-capability has exactly one valid active binding for the environment."
-
-Migration (verbatim): "existing names such as `search_confluence`,
-`list_drive_files`, `read_gmail` and `get_customer` may be maintained as
-explicit aliases, but new agent contracts use canonical logical IDs."
+Acceptance criteria: OKF carries no MCP Service DNS/URLs; swapping a capability's backend needs only binding config, not agent/runtime changes; the gateway drops hard-coded per-tool routing sets; an unknown or unbound capability denies deterministically without contacting a backend. Traces also record the logical capability and resolved binding; health checks confirm every enabled policy capability resolves to exactly one active binding. Legacy names (`search_confluence`, `list_drive_files`, `read_gmail`, `get_customer`) may stay as aliases; new agent contracts use canonical logical IDs.
 
 ## Preconditions (verify before starting)
 

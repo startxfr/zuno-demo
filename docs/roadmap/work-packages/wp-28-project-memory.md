@@ -23,14 +23,7 @@ project-membership table enforced fail closed at retrieval.
 Primary: [docs/adr/0209-introduce-project-scoped-agent-memory.md](../../adr/0209-introduce-project-scoped-agent-memory.md)
 (read fully — it is the most detailed v0.2 ADR).
 
-Acceptance criteria (verbatim):
-
-> - With Tekos, a user states project `demo-001` facts (OpenShift 4.22, AWS, three clusters, C2 local-only); the session ends.
-> - A new session for `demo-001` lets Tekos retrieve these facts without the user repeating them.
-> - Arkos, in the same or a later session, retrieves the same permitted `demo-001` facts through the identical `knowledge.project` contract, with different task prompts/capabilities than Tekos.
-> - A user without `demo-001` project membership cannot retrieve any of its memories, structured state, or semantic chunks.
-> - Raw conversation turns are not persisted into `knowledge.project` unless they pass through the extraction step.
-> - Automated unit tests cover the extraction step's fact/decision identification and the project-membership fail-closed check; an end-to-end acceptance test exercises the full scenario above.
+Acceptance criteria: with Tekos, a user states project `demo-001` facts (OpenShift 4.22, AWS, three clusters, C2 local-only) and the session ends; a new `demo-001` session lets Tekos retrieve these facts without the user repeating them; Arkos, in the same or a later session, retrieves the same permitted `demo-001` facts through the identical `knowledge.project` contract with different task prompts/capabilities than Tekos; a user without `demo-001` project membership cannot retrieve any of its memories, structured state, or semantic chunks; raw conversation turns are not persisted into `knowledge.project` unless they pass through the extraction step; unit tests cover the extraction step's fact/decision identification and the membership fail-closed check, plus an end-to-end acceptance test for the full scenario above.
 
 Key body constraints: `project_id` propagates following the ADR-0032/0033
 identity pattern; extends ADR-0054's BFF OpenAPI contract with a new

@@ -18,8 +18,8 @@ across user-authorization or classification boundaries.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Reduce latency and
-cost without leaking cross-user or cross-classification content."
+Stub origin (`docs/adr/0100-v0.1-roadmap.md`): reduce latency and cost
+without leaking cross-user or cross-classification content.
 
 Related: ADR-0021 (C1/C2/C3 routing), ADR-0034 (effective classification),
 ADR-0035 (external-model restrictions), ADR-0029 (cost instrumentation).

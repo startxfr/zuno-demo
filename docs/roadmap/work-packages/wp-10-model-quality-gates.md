@@ -19,9 +19,7 @@ candidate local-model comparison. GPU/cluster execution is the operator part.
 
 ## ADR references
 
-Stubs (verbatim, from `docs/adr/0100-v0.1-roadmap.md`):
-- ADR-0107: "Block promotion when model or agent regression breaches agreed thresholds."
-- ADR-0108: "Use OpenShift AI evaluation capabilities where appropriate to compare candidate local models."
+Stub origins (`docs/adr/0100-v0.1-roadmap.md`): ADR-0107 blocks promotion when model/agent regression breaches agreed thresholds; ADR-0108 uses OpenShift AI evaluation capabilities to compare candidate local models.
 
 Related: ADR-0027 (20 acceptance scenarios), ADR-0028 (75% threshold),
 ADR-0053 (make check as acceptance/security gate), ADR-0019 (OpenShift AI

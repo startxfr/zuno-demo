@@ -20,9 +20,7 @@ below.
 - **Indicator**: ratio of successful HTTP responses to total HTTP
   responses at the BFF boundary (`agent-bff`, ADR-0054's OpenAPI
   contract), per agent. "Successful" = any response with status `< 500`
-  (a 4xx is a client/authorization outcome, not a platform availability
-  failure - matches the same reasoning ADR-0053's security-negative
-  checks use to distinguish "correctly rejected" from "broken").
+  (a 4xx is a client/authorization outcome, not an availability failure).
 - **Objective**: 99.9% success ratio, measured over a rolling 30-day
   window.
 - **Error budget**: 0.1% of requests, i.e. ~43 minutes of full downtime
@@ -33,10 +31,8 @@ below.
     alert per the standard SRE burn-rate pattern), investigate before
     the next release.
   - **Budget exhausted**: freeze non-critical chart/config changes to
-    the agent path until the next 30-day window opens or the incident
-    causing the burn is resolved - the same "don't make it worse while
-    it's already on fire" posture ADR-0053's mandatory (100%)
-    security-check layer encodes for a different failure class.
+    the agent path until the next 30-day window opens or the burn's
+    root cause is resolved.
 
 ## Measurement query
 
@@ -55,41 +51,23 @@ rules below use the standard 1h/5m and 6h/30m burn-rate window pairs
 recommended for a 99.9% SLO, not the raw 30d window directly - see
 `gitops/charts/observability/templates/prometheusrule-slo.yaml`.)
 
-## Current gap (honest status, not glossed over)
+## Current gap
 
-Two prerequisites are missing before the query above can return real
-data:
+Two prerequisites are missing before the query above returns real data:
 
-1. **`agent-bff` does not yet emit `zuno_bff_requests_total`** (or any
-   HTTP request-count/status metric). Confirmed by inspection,
-   2026-08-14 - no `otel`/metrics import exists in
-   `components/agent-bff`. Adding it is Go application instrumentation
-   work, out of this WP's chart/docs scope; tracked as a residual item
-   below, not silently assumed done.
-2. **The shared OTel Collector's metrics pipeline does not yet reach a
-   Prometheus-queryable backend.** Before this WP,
-   `gitops/charts/observability/templates/opentelemetrycollector.yaml`
-   exported metrics only to `debug` (stdout logging) - every metric any
-   service in this repo already emits (e.g. rag-service's
-   `zuno.rag_searches`, ai-gateway's cache-outcome counters) was
-   therefore never actually queryable via PromQL, independent of
-   ADR-0102. This WP adds a `prometheus` exporter to that pipeline
-   (standard OTel Collector Contrib exporter, exposes `:8889/metrics`)
-   so a Prometheus-compatible scraper *can* reach collected metrics -
-   but confirming that OpenShift's User Workload Monitoring Prometheus
-   (or another scraper) actually discovers and scrapes that endpoint
-   (a `ServiceMonitor`/`PodMonitor` targeting whatever Service name the
-   OpenTelemetryCollector operator creates for the new exporter port)
-   is unverified against a live cluster and deliberately not guessed at
-   here - see "Operator follow-up" below.
+1. **`agent-bff` does not emit `zuno_bff_requests_total`** (or any HTTP
+   request-count/status metric) yet — no metrics instrumentation exists
+   there today.
+2. **The shared OTel Collector's metrics pipeline doesn't reach a
+   Prometheus-queryable backend.** It exported only to `debug` (stdout) -
+   this WP added a `prometheus` exporter
+   (`gitops/charts/observability/templates/opentelemetrycollector.yaml`,
+   `:8889/metrics`), but whether a `ServiceMonitor`/`PodMonitor` actually
+   scrapes it is unverified against a live cluster.
 
-The PrometheusRule alerting rules below are schema-correct and shipped
-(`gitops/charts/observability/templates/prometheusrule-slo.yaml`,
-disabled by default alongside the rest of that chart) so they are ready
-to evaluate the moment both gaps close - they will not error if the
-underlying metric doesn't exist yet, they simply won't fire (Prometheus
-evaluates an expression against absent data as "no series", not an
-error).
+The PrometheusRule alerting rules below are shipped and schema-correct
+(disabled by default) — they simply won't fire until both gaps close;
+Prometheus treats a missing metric as "no series", not an error.
 
 ## Alerting rules
 

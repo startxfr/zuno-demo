@@ -15,9 +15,9 @@ existing hardening checker so the new controls are enforced in CI.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Harden deployment,
-supply chain, identity, network and data controls toward SecNumCloud-oriented
-expectations."
+Stub origin (`docs/adr/0100-v0.1-roadmap.md`): harden deployment, supply
+chain, identity, network and data controls toward SecNumCloud-oriented
+expectations.
 
 Related: ADR-0052 (restricted-SCC/SecNumCloud objectives — the v0 baseline
 this increments), ADR-0115 (supply chain), ADR-0037 (network/workload

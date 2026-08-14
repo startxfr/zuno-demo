@@ -11,33 +11,28 @@
 ## Goal
 
 Extend the Agent Runtime so `GraphFactory` selects among multiple named
-LangGraph workflow shapes from the `AgentDefinition`, and replace the
+LangGraph workflow shapes from the `AgentDefinition`, replacing the
 hardcoded `/v1/agents/tekos/chat` route with generic per-agent dispatch that
-fails fast at startup on unknown/misconfigured shape references. Arkos's
-actual shape + task bundle land in WP-31; this WP builds and proves the
-mechanism (with a test-only second shape).
+fails fast on unknown/misconfigured shapes. Arkos's actual shape + task
+bundle land in WP-31; this WP builds and proves the mechanism (with a
+test-only second shape).
 
 ## ADR references
 
 Primary: [docs/adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md](../../adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md)
 
-Acceptance criteria (verbatim):
+Acceptance criteria (satisfied by the Repo-changes steps below): shape
+selection from `AgentDefinition` alone with no hardcoded per-agent route;
+Arkos runs end to end on its own shape; Tekos/Arkos share
+`knowledge.project` retrieval for the same `project_id` (ADR-0209's
+scenario) through their own shapes and prompts/capabilities; switching a
+shape is config-only; unit and end-to-end tests prove all of the above.
 
-> - `GraphFactory` builds/selects at least two distinct graph shapes (Tekos's existing one, plus Arkos's) from `AgentDefinition` alone, with no per-agent hardcoded route in `app/main.py` beyond generic dispatch.
-> - Arkos runs a real task end to end through its own graph shape.
-> - Tekos and Arkos both successfully retrieve `knowledge.project` content for the same `project_id` (ADR-0209's acceptance scenario), each through its own graph shape and its own task prompts/capabilities.
-> - Changing which graph shape an agent uses is a configuration/registration change, not a runtime code change to the other agent's path.
-> - Unit tests cover graph-shape resolution/selection; an end-to-end test exercises both Tekos's and Arkos's graphs against the same running Agent Runtime instance.
-
-(The Arkos-specific bullets are discharged by WP-31; this WP owns the
-mechanism bullets: shape selection, generic dispatch, config-only change,
-unit tests.)
-
-Body constraints: each shape is a distinct named workflow module mirroring
-`app/graph/build.py`; startup validation confirms every registered agent
-resolves to exactly one known shape, failing loudly (consistent with
-`AgentRegistry` fail-fast); tracing records which shape served a request;
-platform-ceiling enforcement from ADR-0039 must not be bypassed.
+Body constraints: each shape is a distinct named module mirroring
+`app/graph/build.py`; startup validation fails loudly (per `AgentRegistry`
+fail-fast) if any agent doesn't resolve to exactly one known shape; tracing
+records the serving shape; ADR-0039's platform-ceiling enforcement must not
+be bypassed.
 
 ## Preconditions (verify before starting)
 

@@ -20,35 +20,27 @@ already configures two pgBackRest repos:
 
 - **repo1** (always active): a local PVC (`backups.storageSize`, default
   500Gi), full backup weekly (`0 2 * * 0`) and differential backup daily
-  (`0 2 * * 1-6`), 4 full backups retained (`repo1-retention-full: "4"`).
-  A differential backup captures every change since the last full backup,
-  so worst-case data loss between any two scheduled backups is well
-  inside the 24h RPO objective.
+  (`0 2 * * 1-6`), 4 full backups retained (`repo1-retention-full: "4"`) —
+  worst-case data loss is well inside the 24h RPO objective.
 - **repo2** (opt-in, `backups.s3.enabled`, default `false`): off-cluster
   S3, full backup weekly (`0 3 * * 0`). Bucket/region/endpoint are chart
-  values; credentials are never inline (`backups.s3.secretName`, synced
-  by Vault/ExternalSecrets, same pattern as every other credential in
-  this chart).
+  values; credentials are synced by Vault/ExternalSecrets
+  (`backups.s3.secretName`), never inline.
 
-Confirmed live, 2026-08-14: `oc get postgrescluster zuno-postgresql -n
-zuno-data -o jsonpath='{.status.pgbackrest}'` shows a real completed
-`full` backup for repo1 (`scheduledBackups[0].succeeded: 1`) — this
-mechanism is not just configured, it is actively running on the test
-cluster. `ansible/roles/postgresql/tasks/precheck.yml` now reports the
-most recent successful backup's age against the 24h RPO objective on
-every `make d0 check postgresql` / `make d1 check` (diagnostic only,
-never blocks the install-state result — a freshly provisioned cluster
-legitimately has no backup yet).
+Confirmed live, 2026-08-14: repo1 has a real completed `full` backup
+(`oc get postgrescluster zuno-postgresql -n zuno-data -o
+jsonpath='{.status.pgbackrest}'`, `scheduledBackups[0].succeeded: 1`).
+`ansible/roles/postgresql/tasks/precheck.yml` reports the most recent
+backup's age against the 24h RPO objective on every `make d0 check
+postgresql` / `make d1 check` (diagnostic only — a freshly provisioned
+cluster legitimately has no backup yet).
 
 ### Restore procedure (point-in-time, to a scratch cluster/namespace)
 
 PGO restores by creating a **new** `PostgresCluster` whose
 `spec.dataSource.postgresCluster` pre-populates its data directory from
-an existing cluster's pgBackRest repo (confirmed via `oc explain
-postgrescluster.spec.dataSource.postgresCluster` against the live test
-cluster) — never by restoring destructively in place onto the live
-cluster, so a drill never risks the production data it's rehearsing
-recovery for.
+an existing cluster's pgBackRest repo — never destructively in place on
+the live cluster.
 
 1. Create a scratch namespace (e.g. `zuno-data-restore-drill`) with the
    same governance as `zuno-data` (`gitops/charts/namespaces`).
@@ -88,21 +80,16 @@ corrections needed, right here.
 
 ### Backup mechanism
 
-Vault's storage backend here is `file` (`gitops/charts/vault/values.yaml`'s
-`standalone.config`), not Raft/integrated storage — there is no `vault
-operator raft snapshot` API to call. The storage backend's own snapshot
-mechanism for a plain filesystem PVC is a Kubernetes CSI `VolumeSnapshot`
-of the volume itself. `gitops/charts/vault/templates/cronjob-backup.yaml`
-(disabled by default, `backup.enabled`) creates a timestamped
+Vault's storage backend is `file` (`gitops/charts/vault/values.yaml`'s
+`standalone.config`), not Raft — there is no `vault operator raft
+snapshot` API. Instead, `gitops/charts/vault/templates/cronjob-backup.yaml`
+(disabled by default, `backup.enabled`) creates a timestamped CSI
 `VolumeSnapshot` of the `data-zuno-vault-0` PVC daily and prunes to the
-newest N (`backup.retentionCount`, default 7). Confirmed real and
-available on the live test cluster, 2026-08-14: `oc get
-volumesnapshotclass` shows `csi-aws-vsc` (driver `ebs.csi.aws.com`,
-matching the PVC's own `gp3-csi` storage class provisioner) and `oc
-explain volumesnapshot.spec` confirms the schema used.
-`ansible/roles/vault/tasks/precheck.yml` reports the most recent ready
-snapshot's age against the 24h RPO objective, same diagnostic-only
-pattern as PostgreSQL's check.
+newest N (`backup.retentionCount`, default 7). Confirmed live,
+2026-08-14: `csi-aws-vsc` (driver `ebs.csi.aws.com`) matches the PVC's
+`gp3-csi` provisioner. `ansible/roles/vault/tasks/precheck.yml` reports
+the most recent ready snapshot's age against the 24h RPO objective, same
+diagnostic-only pattern as PostgreSQL's check.
 
 ### Restore procedure
 

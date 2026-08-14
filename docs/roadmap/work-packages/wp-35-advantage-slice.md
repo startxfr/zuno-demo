@@ -21,9 +21,9 @@ provably NOT inheriting Comage/Sales capabilities.
 ## ADR references
 
 [docs/adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md](../../adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
-— Advantage bullet (verbatim): "Advantage proves `knowledge.adv` from Aramis
-and cannot inherit broader Comage/Sales capabilities implicitly." Plus the
-mandatory common completion pattern (as in WP-31/WP-33).
+— Advantage must prove `knowledge.adv` from Aramis and must not inherit
+broader Comage/Sales capabilities implicitly, plus the mandatory common
+completion pattern (as in WP-31/WP-33).
 
 ## Preconditions
 

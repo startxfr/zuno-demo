@@ -22,12 +22,7 @@ all behind the unchanged retrieval contract.
 
 Primary: [docs/adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md](../../adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
 
-Acceptance criteria (verbatim):
-
-> - At least two domains can run on the same reusable RAG code without sharing database credentials.
-> - Moving one domain to a different backend requires changing only knowledge binding/deployment configuration.
-> - Agent OKF and knowledge policy contain no physical database/service endpoints.
-> - Cross-domain retrieval occurs only when the active task is authorized for every requested domain.
+Acceptance criteria: at least two domains run on the same reusable RAG code without sharing database credentials; moving a domain to a different backend needs only knowledge binding/deployment config; agent OKF and knowledge policy contain no physical database/service endpoints; cross-domain retrieval occurs only when the active task is authorized for every requested domain.
 
 Initial bindings from the ADR (left side stable contract, right side
 environment binding data): `knowledge.tech -> rag-tech`,

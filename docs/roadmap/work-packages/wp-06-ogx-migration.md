@@ -23,18 +23,9 @@ provider as default until parity is proven.
 
 Primary: [docs/adr/0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md](../../adr/0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md)
 
-Acceptance criteria (verbatim from the ADR):
+Acceptance criteria: `llamastackoperator` is absent from the rendered `DataScienceCluster`; `spec.components.ogx.managementState: Managed` renders and reconciles; existing Tekos tests pass without the OGX provider; an OGX-backed RAG proof indexes/queries a controlled test corpus through PostgreSQL/pgvector; provider-parity tests prove metadata/ACL/classification/citation behavior before any default-provider migration.
 
-> - `llamastackoperator` is absent from the rendered `DataScienceCluster`.
-> - `spec.components.ogx.managementState: Managed` is rendered and reconciles successfully.
-> - Existing Tekos tests continue to pass without requiring the OGX provider.
-> - An OGX-backed RAG proof can index/query a controlled test corpus through PostgreSQL/pgvector.
-> - Provider-parity tests prove metadata/ACL/classification/citation behavior before default-provider migration.
-
-Security (verbatim): any OGX-backed retrieval path must preserve
-"initiating-user identity; source ACL and group filters; data
-classification; provenance and citations; external-model egress
-restrictions."
+Security: any OGX-backed retrieval path preserves initiating-user identity, source ACL/group filters, data classification, provenance/citations, and external-model egress restrictions.
 
 ## Preconditions (verify before starting)
 

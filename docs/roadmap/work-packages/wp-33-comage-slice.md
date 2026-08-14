@@ -23,10 +23,10 @@ explicit `knowledge.sxa-legacy` access, delegated Google Workspace.
 ## ADR references
 
 - [docs/adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md](../../adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
-  — Comage bullet (verbatim): "Comage proves `knowledge.sales` preferred
-  reads, live Salesforce freshness/write actions, delegated Google Workspace
-  access and explicit legacy SXA access." Plus the mandatory common
-  completion pattern (same as WP-31).
+  — Comage must prove `knowledge.sales` preferred reads, live Salesforce
+  freshness/write actions, delegated Google Workspace access and explicit
+  legacy SXA access, plus the mandatory common completion pattern (same as
+  WP-31).
 - ADR-0205/ADR-0206 (the routing/separation this slice must exercise for
   real), ADR-0340 (sales role scoping).
 

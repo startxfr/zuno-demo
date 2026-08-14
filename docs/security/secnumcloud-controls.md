@@ -11,7 +11,7 @@ against a live deployment, not re-derivable from the repo alone),
 | Control | Status | Mechanism |
 |---|---|---|
 | Non-root, no privilege escalation, all capabilities dropped, seccomp `RuntimeDefault`, read-only root filesystem, dedicated ServiceAccount, no auto-mounted SA token unless needed | `enforced-in-ci` | `platform/security/check_workload_hardening.py` (ADR-0052), run in `.github/workflows/lint.yml`'s `helm` job |
-| Every first-party Deployment chart is covered by the checker above | `enforced-in-ci` | `check_workload_hardening.py`'s `DEPLOYMENT_CHARTS` list - must be updated whenever a new chart is added (a real gap this WP found and closed: `mcp-confluence`, added by ADR-0117, was missing) |
+| Every first-party Deployment chart is covered by the checker above | `enforced-in-ci` | `check_workload_hardening.py`'s `DEPLOYMENT_CHARTS` list - must be updated whenever a new chart is added |
 | Deployed pods actually run under OpenShift's restricted SCC as claimed | `gap` | no live cluster verification exists in this repository's tooling |
 
 ## Supply chain
@@ -39,7 +39,7 @@ against a live deployment, not re-derivable from the repo alone),
 |---|---|---|
 | Every `zuno-ai-run` workload has its own precise, least-privilege NetworkPolicy (no namespace-wide same-namespace trust) | `enforced-in-ci` | `check_workload_hardening.py`'s `check_networkpolicies`, one call per workload chart |
 | Platform namespaces (`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-monitoring`, `zuno-ai-platform`, `zuno-ai-build`, `zuno-mesh`) get a default-deny-other-namespaces baseline with explicit allow-lists | `enforced-in-ci` | `gitops/charts/namespaces/templates/networkpolicy-platform.yaml` |
-| `zuno-ai-run` is excluded from the platform baseline (a namespace-wide same-namespace allow would defeat per-workload isolation, e.g. `mcp-sales-db`) | `enforced-in-ci` (2026-08-14) | `skipNetworkPolicy: true` on the `zuno-ai-run` entry in `gitops/charts/namespaces/values.yaml` - **a real gap this WP found and closed**: the entry was present in `platformNamespaces` and silently receiving the same all-ports/same-namespace-allowed policy every other platform namespace gets, contradicting this file's own prose comment and ADR-0037/ADR-0052's stated design; confirmed via `helm template --set policy.enabled=true` before and after the fix |
+| `zuno-ai-run` is excluded from the platform baseline (a namespace-wide same-namespace allow would defeat per-workload isolation, e.g. `mcp-sales-db`) | `enforced-in-ci` (2026-08-14) | `skipNetworkPolicy: true` on the `zuno-ai-run` entry in `gitops/charts/namespaces/values.yaml`, confirmed via `helm template --set policy.enabled=true` |
 | MCP servers require a workload-identity token in addition to NetworkPolicy | `enforced-in-ci` (tested) | `X-Zuno-Gateway-Token` middleware, every `components/mcp-servers/*/server.py` (ADR-0037); each server's `tests/test_mcp_protocol.py` |
 | Deployed NetworkPolicies actually block traffic as rendered (not just as authored) | `gap` | no live cluster verification exists in this repository's tooling |
 
@@ -47,7 +47,7 @@ against a live deployment, not re-derivable from the repo alone),
 
 | Control | Status | Mechanism |
 |---|---|---|
-| No literal secret value (as opposed to `secretKeyRef`) is ever committed in a rendered chart manifest | `enforced-in-ci` (2026-08-14) | `check_workload_hardening.py`'s `check_no_hardcoded_secret_values` - new this WP, one of the two concrete "secrets-mount hardening" checks the promoted ADR-0111 Decision calls for |
+| No literal secret value (as opposed to `secretKeyRef`) is ever committed in a rendered chart manifest | `enforced-in-ci` (2026-08-14) | `check_workload_hardening.py`'s `check_no_hardcoded_secret_values` |
 | Every credential is sourced from Vault via an ExternalSecret, never hardcoded | `enforced-in-ci` (spot-checked, no full-repo scanner yet) | `ansible/roles/vault`; every chart's `templates/externalsecret*.yaml` |
 | Data classification (C1/C2/C3) is computed from the complete context and never silently downgraded | `enforced-in-ci` (tested) | `policies/data-classification/`; ADR-0034; per-service classification tests |
 | Restricted-context (C2/C3, `external_model_policy.allow_context: false`) sources never reach an external model | `enforced-in-ci` (tested) | ADR-0035; `app/routing.py`'s `local_only` gate, `X-Zuno-Local-Only` propagation |

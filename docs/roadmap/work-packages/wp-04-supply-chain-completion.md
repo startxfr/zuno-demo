@@ -22,17 +22,9 @@ operator release; stage 3 pins the repo to the real artifacts it produced.
 Primary: [docs/adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md](../../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md)
 (read the whole "Implementation state" section — it is the authoritative gap list).
 
-Completion criteria (verbatim from the ADR):
+Completion criteria: (1) ADR-0324 removes stale/non-buildable entries and the build inventory gets a mandatory path-validation gate; (2) every deployable first-party image publishes with a SHA/semantic immutable reference and chart values drop `latest`; (3) `check_no_latest_tags.py` is blocking in CI; (4) release GitOps manifests use a reviewed tag/commit, preferably image digests; (5) first-party Dockerfile base images are version/digest pinned per the release policy; (6) signature verification is exercised in trusted promotion/deployment; (7) at least one real release proves source→build→SBOM→scan→signature→immutable GitOps reference→deployment traceability.
 
-> - ADR-0324 removes stale/non-buildable entries and the build inventory has a mandatory path-validation gate;
-> - every deployable first-party image is published with a SHA/semantic immutable reference and chart values no longer contain `latest`;
-> - `check_no_latest_tags.py` is blocking in CI;
-> - release GitOps manifests use a reviewed tag/commit and preferably image digests;
-> - first-party Dockerfile base images are version/digest pinned according to the release policy;
-> - signature verification is exercised as part of trusted promotion/deployment;
-> - at least one real release proves source -> build -> SBOM -> scan -> signature -> immutable GitOps reference -> deployment traceability.
-
-The first and fifth bullets are already closed (gaps 1 and 5 in the ADR).
+Bullets 1 and 5 are already closed (gaps 1 and 5 in the ADR).
 
 ## Preconditions (verify before starting)
 
