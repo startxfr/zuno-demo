@@ -1,6 +1,6 @@
 # WP-02: Real Confluence MCP server
 
-- **State:** Not started
+- **State:** Operator pending (2026-08-14 — repo work merged: real MCP server, binding registry wiring, policy entries, chart, build/deploy plumbing, protocol tests. Awaiting real Confluence Cloud credentials + e2e verification; ADR-0043's status-line follow-up is deferred with it, per this brief's Post-operator repo follow-up section.)
 - **ADRs:** ADR-0117 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-01 (merged)
 - **Blocks:** WP-25

@@ -83,6 +83,43 @@ tools:
     external_model_policy:
       allow_context: false
 
+  # ADR-0117: real Confluence Cloud access (components/mcp-servers/confluence),
+  # replacing the search_confluence demo handler above's mapping. read/create/
+  # update never had a pre-ADR-0116 legacy name, so `tool` equals `capability`
+  # for these three - each is its own policy-intersection entry (ADR-0011),
+  # so a task declaring only confluence.page.search/read can never reach
+  # confluence.page.create/update, satisfying ADR-0117's "read access never
+  # implies write access".
+  - tool: confluence.page.read
+    capability: confluence.page.read
+    mcp_server: confluence
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+    external_model_policy:
+      allow_context: false
+
+  - tool: confluence.page.create
+    capability: confluence.page.create
+    mcp_server: confluence
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+    external_model_policy:
+      allow_context: false
+
+  - tool: confluence.page.update
+    capability: confluence.page.update
+    mcp_server: confluence
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+    external_model_policy:
+      allow_context: false
+
   - tool: list_drive_files
     capability: drive.document.search
     mcp_server: google-workspace

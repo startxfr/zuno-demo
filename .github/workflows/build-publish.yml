@@ -62,6 +62,9 @@ jobs:
           - name: mcp-sales-db
             dockerfile: components/mcp-servers/sales-db/Dockerfile
             context: components/mcp-servers/sales-db
+          - name: mcp-confluence
+            dockerfile: components/mcp-servers/confluence/Dockerfile
+            context: components/mcp-servers/confluence
     steps:
       - uses: actions/checkout@v4
 

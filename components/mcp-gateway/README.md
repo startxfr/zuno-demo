@@ -39,8 +39,10 @@ classification, latency, and a precise outcome - `allowed`, `denied`,
   ```json
   {
     "tool": "search_confluence",
+    "capability": "confluence.page.search",
+    "binding": "confluence",
     "request_id": "…",
-    "mcp_server": "confluence-demo",
+    "mcp_server": "confluence",
     "duration_ms": 12.3,
     "external_model_policy": { "allow_context": false },
     "result": { "...": "tool-specific payload" }
@@ -77,8 +79,9 @@ land in the image/mount after this pod already started.
 
 | Tool | Downstream |
 |---|---|
-| `get_customer`, `list_open_opportunities`, `get_quote` | proxied to the sales-db MCP server (see Assumption below) |
-| `search_confluence`, `list_drive_files`, `read_gmail`, `web_search`, `send_technical_report_email` | demo-mode handlers in `app/handlers/` - see each file's docstring for exactly what changes to call the real API |
+| `get_customer`, `list_open_opportunities`, `get_quote` | proxied to the sales-db MCP server (see below) |
+| `confluence.page.search` (alias `search_confluence`), `confluence.page.read`, `confluence.page.create`, `confluence.page.update` | proxied to the confluence MCP server (ADR-0117, see below) |
+| `list_drive_files`, `read_gmail`, `web_search`, `send_technical_report_email` | demo-mode handlers in `app/handlers/` - see each file's docstring for exactly what changes to call the real API |
 
 Routing (ADR-0116): the caller's tool name (canonical
 `<domain>.<resource>.<verb>` capability ID, or a legacy alias kept during
@@ -110,14 +113,34 @@ this module's own docstring anticipated before the migration: "only
 sales-db entries' `endpoint` block in the ADR-0116 binding registry
 rather than a module-level constant.
 
-The four other MCP servers named in `tool-policy.yaml`'s `mcp_server`
-field (`confluence`, `google-workspace`, `lucidchart`, `web-search`) have
-no real implementation yet - `components/mcp-servers/<name>/` is a
-one-line README each - so there is nothing to migrate for them; their
-traffic is still served by this gateway's own `app/handlers/*.py`
-demo-mode functions. "Migrate servers incrementally" (ADR-0043's
-Operational considerations) means sales-db is the first and, as of this
-change, only real migration.
+The three other MCP servers named in `tool-policy.yaml`'s `mcp_server`
+field (`google-workspace`, `lucidchart`, `web-search`) have no real
+implementation yet - `components/mcp-servers/<name>/` is a one-line
+README each - so there is nothing to migrate for them; their traffic is
+still served by this gateway's own `app/handlers/*.py` demo-mode
+functions. `confluence` was the second real migration (ADR-0117, see
+below); "migrate servers incrementally" (ADR-0043's Operational
+considerations) is exactly this pattern repeating per integration.
+
+## Confluence MCP server: first real external integration (ADR-0117)
+
+`components/mcp-servers/confluence` speaks the same real MCP protocol as
+sales-db above, but fronts a real *external* API (Confluence Cloud) rather
+than an internal database - Zuno's first working example of the full
+target chain: Agent Runtime -> this gateway -> logical capability ->
+backend binding -> real MCP server -> external API. Replaces
+`app/handlers/confluence.py`'s demo-mode handler (deleted); the four
+capabilities ADR-0116 already named (`confluence.page.search/read/create/
+update`) route through `_invoke_streamable_http` exactly like sales-db's
+tools, resolved via their `platform/bindings/tools/tool-bindings.yaml`
+entries (`endpoint.default: http://confluence-mcp.zuno-ai-run.svc:8000`).
+
+Authentication mode is `service-identity` (ADR-0208): the server itself
+holds one shared Confluence technical identity (`zuno/confluence/
+technical` in Vault - email + API token); this gateway's own ADR-0011
+policy intersection is what authorizes the *caller*, before that shared
+identity is ever used - see `components/mcp-servers/confluence/README.md`
+for the full reasoning.
 
 **Verified against the real SDK, not just this module's own code**: a
 tool function's structured-content result gets wrapped by the SDK as
@@ -178,10 +201,13 @@ docker run -p 8080:8080 \
 ```
 
 Configuration is entirely through environment variables - see
-`app/auth.py`, `app/policy.py` and `app/downstream.py` for the full list
-and their defaults. No secret is ever hardcoded (ADR-0024); this service
-does not currently need a Vault-backed credential of its own (JWT
-validation only needs the public JWKS endpoint), but downstream API keys
-for the real (non-demo) Confluence/Drive/Gmail/web-search integrations
-would follow the same `zuno/providers/<name>` + `ExternalSecret`
-pattern used by `ansible/roles/llm` once those integrations are built.
+`app/auth.py`, `app/policy.py`, `app/bindings.py` and `app/downstream.py`
+for the full list and their defaults. No secret is ever hardcoded
+(ADR-0024); this gateway itself does not need a Vault-backed credential of
+its own (JWT validation only needs the public JWKS endpoint) and never
+sees downstream API keys - those live only in the backend MCP server that
+owns each integration (e.g. `components/mcp-servers/confluence`'s own
+`zuno/confluence/technical` secret). The remaining demo-mode integrations
+(Drive/Gmail/web-search) would follow the same real-MCP-server pattern
+sales-db and confluence already established, with credentials via the
+same `zuno/<provider>/...` + `ExternalSecret` convention.

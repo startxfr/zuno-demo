@@ -14,7 +14,29 @@
   vars:
     gitops_app_name: "zuno-mcp-d1"
 
+- name: "mcp | save the d1 check result"
+  ansible.builtin.set_fact:
+    _mcp_d1_installed: "{{ _state_check_result }}"
+
+# ADR-0117: the confluence MCP server, applied by install.yml above under
+# this same run component - see its own comment there.
+- name: "mcp | check the confluence MCP server Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mcp-confluence-d0"
+
+- name: "mcp | save the confluence d0 check result"
+  ansible.builtin.set_fact:
+    _mcp_confluence_d0_installed: "{{ _state_check_result }}"
+
+- name: "mcp | check the confluence MCP server Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mcp-confluence-d1"
+
 - name: "mcp | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:
-    _state_is_installed: "{{ _mcp_d0_installed and _state_check_result }}"
+    _state_is_installed: >-
+      {{ _mcp_d0_installed and _mcp_d1_installed and
+         _mcp_confluence_d0_installed and _state_check_result }}

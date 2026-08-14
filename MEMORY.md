@@ -709,3 +709,27 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   `RELEASING.md` documents the exact stage 4/5 sequence using these
   tools. Neither closes any ADR-0115 gap by itself - all remaining gaps
   (2, 3, 4, 6) still block on gap 7, the real credentialed release run.
+
+- 2026-08-14 (ADR-0117, roadmap WP-02): built Zuno's first real external
+  MCP integration. `components/mcp-servers/confluence/` is a real MCP
+  server (same shape as sales-db: official `mcp` SDK, streamable-HTTP,
+  mounted at `/mcp`) implementing the four ADR-0116 capabilities
+  (`confluence.page.search/read/create/update`) against the real
+  Confluence Cloud REST API - HTTP Basic Auth (email + API token from
+  `zuno/confluence/technical`), `service-identity` mode (ADR-0208).
+  `platform/bindings/tools/tool-bindings.yaml` now routes all four
+  capabilities to it (streamable-http, `endpoint.default:
+  http://confluence-mcp.zuno-ai-run.svc:8000`); the demo-mode
+  `components/mcp-gateway/app/handlers/confluence.py` handler is deleted.
+  New chart `gitops/charts/mcp-confluence/` (mirrors mcp-sales-db) and
+  `gitops/apps/mcp-confluence/`, applied by `ansible/roles/mcp` alongside
+  the gateway itself (name-mismatch pattern, like `sql_schema` does for
+  mcp-sales-db); image builds via `ansible/roles/mcp_build` and
+  `.github/workflows/build-publish.yml`'s matrix. `policies/tools/
+  tool-policy.yaml` gained three new entries (read/create/update, C2,
+  consultant+board, `allow_context: false`) alongside the existing
+  `search_confluence` entry. Protocol-tested against a mocked Confluence
+  API (`components/mcp-servers/confluence/tests/test_mcp_protocol.py`);
+  real end-to-end verification against a live Confluence Cloud tenant
+  remains an operator step (WP-02), and ADR-0043's status-line update
+  ("confluence... migrated") is deferred until then.

@@ -1,7 +1,7 @@
 ---
-# Builds both MCP images: the gateway and the sales-db tool server.
-# Confluence/Drive/Gmail/web-search handlers live inside mcp-gateway itself,
-# not as separate images.
+# Builds all three MCP images: the gateway, the sales-db tool server, and
+# the confluence tool server (ADR-0117). Drive/Gmail/web-search handlers
+# still live inside mcp-gateway itself, not as separate images.
 - name: "mcp_build | build mcp-gateway"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:
@@ -15,3 +15,10 @@
     build_image_name: mcp-sales-db
     build_dockerfile_path: Dockerfile
     build_context_dir: components/mcp-servers/sales-db
+
+- name: "mcp_build | build mcp-confluence"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: mcp-confluence
+    build_dockerfile_path: Dockerfile
+    build_context_dir: components/mcp-servers/confluence

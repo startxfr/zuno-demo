@@ -23,7 +23,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
 from app.bindings import Binding
-from app.handlers import confluence, drive, email_report, gmail, web_search
+from app.handlers import drive, email_report, gmail, web_search
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
@@ -48,7 +48,6 @@ MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 # by the binding's `handler` field - not a per-tool routing set; which tool
 # reaches which handler is the registry's decision, not this module's).
 IN_PROCESS_HANDLERS = {
-    "confluence": confluence.handle,
     "drive": drive.handle,
     "gmail": gmail.handle,
     "web_search": web_search.handle,

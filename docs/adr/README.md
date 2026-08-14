@@ -86,7 +86,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Partially implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.1 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v0.1 | Implemented | Decouple logical tool capabilities from physical backend bindings |
-| [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v0.1 | To be implemented | Implement Confluence as the first real external MCP integration |
+| [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v0.1 | Partially implemented | Implement Confluence as the first real external MCP integration |
 
 ## version 0.2
 

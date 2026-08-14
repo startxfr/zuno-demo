@@ -14,3 +14,23 @@
     gitops_component_name: "mcp"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
+# ADR-0117: the confluence MCP server - also no Day0 prerequisite (no
+# schema/operator), same shape as the gateway itself above. Deployed under
+# this same "mcp" Day1 run component since gitops/apps/mcp-confluence's
+# name doesn't match this role's own name - same name-mismatch
+# self-sufficiency pattern ansible/roles/sql_schema/tasks/install.yml uses
+# for gitops/apps/mcp-sales-db.
+- name: "mcp | apply the confluence MCP server GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp-confluence"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "mcp | apply the confluence MCP server GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp-confluence"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"

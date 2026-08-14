@@ -72,15 +72,46 @@ bindings:
       path: /mcp
     provider_tool: get_quote
 
-  # --- demo-mode in-process handlers (replaced by real servers as their
-  #     integrations land: confluence -> ADR-0117/WP-02) ---
+  # --- confluence: real MCP server (ADR-0117), streamable-HTTP transport ---
   - capability: confluence.page.search
     aliases: [search_confluence]
     backend: confluence
-    transport: in-process
-    handler: confluence
-    provider_tool: search_confluence
+    transport: streamable-http
+    endpoint:
+      env: CONFLUENCE_MCP_URL
+      default: "http://confluence-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: search_pages
 
+  - capability: confluence.page.read
+    backend: confluence
+    transport: streamable-http
+    endpoint:
+      env: CONFLUENCE_MCP_URL
+      default: "http://confluence-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: read_page
+
+  - capability: confluence.page.create
+    backend: confluence
+    transport: streamable-http
+    endpoint:
+      env: CONFLUENCE_MCP_URL
+      default: "http://confluence-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: create_page
+
+  - capability: confluence.page.update
+    backend: confluence
+    transport: streamable-http
+    endpoint:
+      env: CONFLUENCE_MCP_URL
+      default: "http://confluence-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: update_page
+
+  # --- demo-mode in-process handlers (replaced by real servers as their
+  #     integrations land) ---
   - capability: drive.document.search
     aliases: [list_drive_files]
     backend: google-workspace

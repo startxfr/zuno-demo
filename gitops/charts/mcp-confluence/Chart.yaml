@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-confluence
+description: Real Confluence Cloud MCP server (ADR-0117) - search, read, create, update pages.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
