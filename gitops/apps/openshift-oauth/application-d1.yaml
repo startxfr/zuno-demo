@@ -21,10 +21,11 @@ spec:
       values: |
         oauth:
           enabled: true
-          # ADR-0346: created by ansible/roles/openshift_oauth/tasks/install.yml
-          # from openshift-config-managed/default-ingress-cert before this
-          # Application is applied.
-          openidCaConfigMap: default-ingress-cert
+          # ADR-0347: created by ansible/roles/openshift_oauth/tasks/install.yml
+          # by bundling Secret keycloak-tls's ca.crt (zuno-auth, the Vault PKI
+          # root that actually signs the Keycloak route per ADR-0316) with the
+          # default ingress router CA, before this Application is applied.
+          openidCaConfigMap: keycloak-serving-ca
           # ADR-0346: the startx-* Secrets these reference are managed by the
           # external startx cluster-auth chart already present on the demo
           # cluster - they are prerequisites, not resources of this chart.
@@ -34,6 +35,12 @@ spec:
             enabled: true
           tokenConfig:
             accessTokenMaxAgeSeconds: 86400
+        # ADR-0347: cluster-wide complement to oauth.openidCaConfigMap above -
+        # trusts the same Vault PKI root via proxy/cluster.spec.trustedCA.
+        # ConfigMap created by the same Ansible task as oauth.openidCaConfigMap.
+        clusterTrustedCA:
+          enabled: true
+          configMapName: user-ca-bundle
         # Literal placeholder - ansible/tasks/apply_gitops_app.yml replaces
         # this exact string with the real discovered domain before
         # applying (same mechanism gitops/apps/keycloak/application-d1.yaml

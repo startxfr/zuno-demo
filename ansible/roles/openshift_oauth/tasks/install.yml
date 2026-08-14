@@ -10,18 +10,21 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-openshift-oauth-d0"
 
-# ADR-0346: the oauth-server pod must trust the CA of the cert serving
-# https://keycloak.<domain> (the default ingress router cert - NOT in the
-# pod's system trust, hence the live "x509: certificate signed by unknown
-# authority" degradation this fixes). The canonical on-cluster source is
-# ConfigMap default-ingress-cert in openshift-config-managed (key
-# ca-bundle.crt), maintained by the ingress operator; openID.ca requires
-# a ConfigMap in openshift-config with key ca.crt, so this copies +
-# re-keys it. Cluster-specific data - can't be rendered by Helm. Safe to
-# copy unconditionally on every run (same reasoning as openshift_ai's
-# istio-ca-root-cert copy): re-running install/reconcile refreshes it if
-# the router cert ever rotates. Ordered before the d1 Application so the
-# ConfigMap exists when the OAuth CR starts referencing it.
+# ADR-0347 (corrects ADR-0346): the oauth-server pod must trust the CA of
+# the cert actually serving https://keycloak.<domain>. ADR-0346 assumed
+# that was the default ingress router cert; it isn't - since ADR-0316 the
+# keycloak chart's Ingress carries cert-manager.io/cluster-issuer:
+# vault-issuer, so the live cert is issued by Vault's `pki/` mount, root
+# CN=zuno-demo.internal (verified live with openssl s_client: the router
+# CA fails to verify the chain, keycloak-tls's ca.crt succeeds). This
+# block now looks up BOTH candidate CAs and bundles them into
+# keycloak-serving-ca so openID.ca stays correct whichever ingress path
+# is active (the router CA also covers the ingress.operatorManaged
+# fallback in gitops/charts/keycloak). Cluster-specific data - can't be
+# rendered by Helm. Safe to copy unconditionally on every run: re-running
+# install/reconcile refreshes it if either cert is ever rotated. Ordered
+# before the d1 Application so the ConfigMap exists when the OAuth CR
+# starts referencing it.
 - name: "openshift_oauth | look up the ingress router CA (default-ingress-cert in openshift-config-managed)"
   kubernetes.core.k8s_info:
     api_version: v1
@@ -50,17 +53,90 @@
       check `oc get co ingress` before re-running.
   when: (_openshift_oauth_router_ca.resources | default([]) | length) == 0
 
-- name: "openshift_oauth | copy the router CA into openshift-config as default-ingress-cert (key ca.crt) for openID.ca"
+# ADR-0347: the actual trust anchor for the live Keycloak route - the
+# cert-manager-issued Secret behind Ingress "zuno" (zuno-auth), ADR-0316.
+- name: "openshift_oauth | look up the Keycloak serving CA (keycloak-tls in zuno-auth)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: keycloak-tls
+    namespace: zuno-auth
+  register: _openshift_oauth_keycloak_ca
+
+- name: "openshift_oauth | record the missing keycloak-tls finding before failing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-oauth
+      resource: "Secret/keycloak-tls (zuno-auth)"
+      state: "NotFound"
+      cause: "cert-manager has not yet issued the keycloak Ingress certificate (ADR-0316) - keycloak is not installed or not reconciled"
+      solution: "Verify the vault-issuer ClusterIssuer is Ready and the keycloak Ingress exists, then re-run"
+      auto_fix: "make d0 reconcile keycloak"
+  when: >-
+    (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
+    or 'ca.crt' not in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))
+
+- name: "openshift_oauth | fail loudly if the Keycloak serving CA isn't available to copy"
+  ansible.builtin.fail:
+    msg: >-
+      Secret keycloak-tls (zuno-auth) not found or missing key ca.crt -
+      cert-manager's vault-issuer must have issued the keycloak Ingress
+      certificate first; check `make d0 check keycloak` before re-running.
+  when: >-
+    (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
+    or 'ca.crt' not in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))
+
+- name: "openshift_oauth | copy the Keycloak + router CAs into openshift-config as keycloak-serving-ca (key ca.crt) for openID.ca"
   kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: default-ingress-cert
+        name: keycloak-serving-ca
         namespace: openshift-config
       data:
-        ca.crt: "{{ _openshift_oauth_router_ca.resources[0].data['ca-bundle.crt'] }}"
+        ca.crt: >-
+          {{ (_openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode)
+             + "\n"
+             + (_openshift_oauth_router_ca.resources[0].data['ca-bundle.crt']) }}
+
+# ADR-0347: cluster-wide complement to openID.ca above (defense in depth) -
+# proxy/cluster.spec.trustedCA is consumed by every operator whose
+# trusted-ca-bundle ConfigMap carries the CNO injection label
+# config.openshift.io/inject-trusted-cabundle: "true" (confirmed live:
+# openshift-authentication-operator's already does), so this makes the
+# Vault PKI root trusted cluster-wide, not just by this one IDP. Only the
+# Vault root is needed here (system trust already covers everything else);
+# key MUST be ca-bundle.crt - the key OpenShift's proxy/trustedCA
+# convention requires, different from openID.ca's ca.crt above. The
+# Proxy/cluster PATCH itself (spec.trustedCA.name) is Helm-templated and
+# GitOps-applied (gitops/charts/openshift-oauth/templates/
+# cluster-trusted-ca.yaml) since the ConfigMap *name* isn't
+# cluster-specific - only this ConfigMap's data-write belongs in Ansible.
+- name: "openshift_oauth | copy the Vault PKI root into openshift-config as user-ca-bundle (key ca-bundle.crt) for cluster-wide trust"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: user-ca-bundle
+        namespace: openshift-config
+      data:
+        ca-bundle.crt: "{{ _openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode }}"
+
+# ADR-0347: removes the ADR-0346 artifact this superseded - nothing else
+# references the old name, and keeping it around would be misleading
+# (it holds the router CA under a name that now sounds authoritative).
+- name: "openshift_oauth | remove the legacy default-ingress-cert ConfigMap superseded by ADR-0347"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: default-ingress-cert
+    namespace: openshift-config
 
 - name: "openshift_oauth | apply the openshift-oauth GitOps Application (d1: cluster OAuth singleton)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

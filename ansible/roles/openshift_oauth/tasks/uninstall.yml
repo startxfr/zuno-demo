@@ -5,13 +5,25 @@
   vars:
     gitops_app_name: "zuno-openshift-oauth-d1"
 
-# ADR-0346: the router-CA copy install.yml created for openID.ca.
-- name: "openshift_oauth | delete the copied router CA ConfigMap from openshift-config"
+# ADR-0347: the two CA ConfigMaps install.yml creates in openshift-config.
+# Deleting user-ca-bundle un-claims proxy/cluster.spec.trustedCA's target,
+# but doesn't unset the field itself - low risk either way, since an empty
+# Proxy spec is the operator's own normal default state (unlike OAuth/
+# cluster, whose empty-spec default breaks all non-kubeadmin login).
+- name: "openshift_oauth | delete the copied Keycloak/router CA ConfigMap from openshift-config"
   kubernetes.core.k8s:
     state: absent
     api_version: v1
     kind: ConfigMap
-    name: default-ingress-cert
+    name: keycloak-serving-ca
+    namespace: openshift-config
+
+- name: "openshift_oauth | delete the copied cluster-wide trust ConfigMap from openshift-config"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: user-ca-bundle
     namespace: openshift-config
 
 - name: "openshift_oauth | delete the openshift-oauth GitOps Application (d0: ExternalSecret)"

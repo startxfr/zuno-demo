@@ -6,16 +6,17 @@ oauth:
   clientId: openshift
   realm: zuno
 
-  # ADR-0346: name of a ConfigMap in openshift-config holding the ingress
-  # router CA under key "ca.crt", wired into the OpenID IDP's openID.ca so
-  # the oauth-server pod trusts the Keycloak route (served by the default
-  # router cert, which is NOT in the pod's system trust - the
-  # authentication operator degrades with "x509: certificate signed by
-  # unknown authority" otherwise). The ConfigMap itself is
-  # cluster-specific, so Helm can't render it:
-  # ansible/roles/openshift_oauth/tasks/install.yml copies it from
-  # openshift-config-managed/default-ingress-cert (key ca-bundle.crt)
-  # before applying the d1 Application. Empty string (default) omits the
+  # ADR-0347 (corrects ADR-0346): name of a ConfigMap in openshift-config
+  # bundling the CAs able to verify the Keycloak route, wired into the
+  # OpenID IDP's openID.ca so the oauth-server pod trusts it. The route's
+  # actual serving cert is issued by cert-manager's vault-issuer
+  # (ADR-0316), NOT the default ingress router cert ADR-0346 originally
+  # assumed - verified live (openssl s_client) that only the Vault PKI
+  # root chain verifies. The ConfigMap is cluster-specific, so Helm can't
+  # render it: ansible/roles/openshift_oauth/tasks/install.yml bundles it
+  # from Secret keycloak-tls (zuno-auth, the Vault-issued cert's CA) plus
+  # the router CA (covering the ingress.operatorManaged fallback) before
+  # applying the d1 Application. Empty string (default) omits the
   # openID.ca stanza entirely, keeping pre-ADR-0346 rendering unchanged.
   openidCaConfigMap: ""
 
@@ -43,6 +44,22 @@ oauth:
   # cluster-auth chart it absorbs.
   tokenConfig:
     accessTokenMaxAgeSeconds: null
+
+# ADR-0347: cluster-wide complement to oauth.openidCaConfigMap above
+# (defense in depth, same CA reachable two ways). NOT nested under oauth:
+# because proxy/cluster.spec.trustedCA is a cluster-wide setting in
+# principle - it's consumed by every operator whose trusted-ca-bundle
+# ConfigMap carries the CNO injection label
+# config.openshift.io/inject-trusted-cabundle: "true" (confirmed live:
+# openshift-authentication-operator's already does) - but OAuth's OpenID
+# IDP is the only current consumer, so it lives in this chart rather than
+# a dedicated one. The ConfigMap data is cluster-specific and created by
+# ansible/roles/openshift_oauth/tasks/install.yml, same as
+# oauth.openidCaConfigMap; only the reference (this chart's
+# templates/cluster-trusted-ca.yaml) is Helm-rendered. Off by default.
+clusterTrustedCA:
+  enabled: false
+  configMapName: user-ca-bundle
 
 # Literal placeholder - gitops/apps/openshift-oauth/application-d1.yaml's
 # inline values carry the literal string "apps.mycluster.example.com",

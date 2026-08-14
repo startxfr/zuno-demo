@@ -9,13 +9,16 @@ description: >-
   ExternalSecret from gitops/charts/keycloak's own, reading the same
   Vault path into a different namespace, same pattern documented in
   ansible/roles/keycloak/README.md for the Postgres secret crossing
-  zuno-data -> zuno-auth). ADR-0346: the OpenID IDP now trusts the
-  ingress router CA via openID.ca (ConfigMap copied into
-  openshift-config by ansible/roles/openshift_oauth), and the chart
+  zuno-data -> zuno-auth). ADR-0346/0347: the OpenID IDP trusts the
+  Vault PKI root that actually signs the cert-manager-issued Keycloak
+  route (ADR-0316) via openID.ca, bundled with the router CA as a
+  fallback (ConfigMaps copied into openshift-config by
+  ansible/roles/openshift_oauth); a Proxy/cluster patch adds the same
+  Vault root to cluster-wide trust as defense in depth. The chart also
   absorbs the startx cluster-auth settings (htpasswd IDP, login
   templates, tokenConfig) as values-gated blocks referencing the
   startx-managed Secrets - this chart is the single intended owner of
   the OAuth/cluster singleton's full spec.
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "0.1.0"

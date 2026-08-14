@@ -141,7 +141,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | v0.1 | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
 | [ADR-0344](0344-track-blocked-resources-and-add-a-day-0-reconcile-verb.md) | v0.1 | Implemented | Track blocked resources and add a Day 0 reconcile verb |
 | [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) | v0.1 | Implemented | Make self-generated Vault credentials idempotent across ansible re-runs |
-| [ADR-0346](0346-trust-the-ingress-router-ca-and-absorb-the-startx-cluster-auth-oauth-settings.md) | v0.1 | Implemented | Trust the ingress router CA and absorb the startx cluster-auth OAuth settings |
+| [ADR-0346](0346-trust-the-ingress-router-ca-and-absorb-the-startx-cluster-auth-oauth-settings.md) | v0.1 | Implemented (CA source corrected by ADR-0347) | Trust the ingress router CA and absorb the startx cluster-auth OAuth settings |
+| [ADR-0347](0347-trust-the-vault-pki-root-for-the-oauth-openid-idp.md) | v0.1 | Implemented | Trust the Vault PKI root for the OAuth OpenID IDP |
 
 ## version 0.4
 

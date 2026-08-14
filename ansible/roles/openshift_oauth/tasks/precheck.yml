@@ -21,18 +21,27 @@
     name: cluster
   register: _openshift_oauth_lookup
 
-# ADR-0346: without this copy the OpenID IDP's openID.ca reference is not
-# honored and the authentication operator degrades, so it is part of
-# "installed". The htpasswd IDP and template Secrets are deliberately NOT
-# checked: they are optional gated features referencing startx-managed
-# resources this repo does not own.
-- name: "openshift_oauth | look up the copied router CA ConfigMap"
+# ADR-0347: without these copies the OpenID IDP's openID.ca reference (and
+# the cluster-wide proxy trust that complements it) are not honored and
+# the authentication operator degrades, so both count toward "installed".
+# The htpasswd IDP and template Secrets are deliberately NOT checked: they
+# are optional gated features referencing startx-managed resources this
+# repo does not own.
+- name: "openshift_oauth | look up the copied Keycloak/router CA ConfigMap"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: ConfigMap
-    name: default-ingress-cert
+    name: keycloak-serving-ca
     namespace: openshift-config
   register: _openshift_oauth_ca_lookup
+
+- name: "openshift_oauth | look up the copied cluster-wide trust ConfigMap"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: user-ca-bundle
+    namespace: openshift-config
+  register: _openshift_oauth_trust_bundle_lookup
 
 - name: "openshift_oauth | compute install state"
   ansible.builtin.set_fact:
@@ -44,6 +53,7 @@
         and (_openshift_oauth_lookup.resources[0].spec.identityProviders
              | default([]) | selectattr('name', 'equalto', 'openshift') | list | length) > 0
         and (_openshift_oauth_ca_lookup.resources | default([]) | length) > 0
+        and (_openshift_oauth_trust_bundle_lookup.resources | default([]) | length) > 0
       }}
 
 - name: "openshift_oauth | record install state"

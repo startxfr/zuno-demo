@@ -1,0 +1,20 @@
+{{- if .Values.clusterTrustedCA.enabled }}
+# ADR-0347: unlike templates/oauth.yaml, this is a PARTIAL PATCH, not
+# wholesale ownership - Proxy/cluster carries other operator-managed
+# fields (httpProxy, httpsProxy, noProxy, status, ...) this chart must
+# never touch. kubernetes.core.k8s (Ansible) and ArgoCD's default apply
+# both merge only the fields a manifest declares, leaving fields owned by
+# other managers alone - safe here since proxy/cluster.spec.trustedCA.name
+# was confirmed empty/unclaimed on the demo cluster before this landed.
+# Complements (does not replace) the scoped oauth.openidCaConfigMap fix
+# in templates/oauth.yaml: same Vault PKI root, trusted two ways.
+apiVersion: config.openshift.io/v1
+kind: Proxy
+metadata:
+  name: cluster
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  trustedCA:
+    name: {{ .Values.clusterTrustedCA.configMapName }}
+{{- end }}

@@ -1,6 +1,6 @@
 # ADR-0346: Trust the ingress router CA and absorb the startx cluster-auth OAuth settings
 
-- **Status:** Implemented
+- **Status:** Implemented (CA source corrected by [ADR-0347](0347-trust-the-vault-pki-root-for-the-oauth-openid-idp.md) - the assumed trust anchor was wrong; the htpasswd/templates/tokenConfig absorption below is unaffected)
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

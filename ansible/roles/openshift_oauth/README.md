@@ -1,15 +1,16 @@
 # openshift_oauth
 
 Applies the `gitops/apps/openshift-oauth` ArgoCD Application pair
-(ADR-0320, ADR-0346), whose chart (`gitops/charts/openshift-oauth`)
-renders the cluster `OAuth`/`cluster` singleton (`config.openshift.io/v1`)
-plus the `ExternalSecret` that syncs its Vault-seeded OIDC client secret
-into `openshift-config`. A Day 0 component (ADR-0056), ordered after
-`keycloak` (the "openshift" client and its secret must exist first): `-d0`
-applies the `ExternalSecret`; the role then copies the ingress router CA
-into `openshift-config` (see below); `-d1` applies the `OAuth` singleton
-itself, which references both the Secret `-d0` creates and that CA
-ConfigMap.
+(ADR-0320, ADR-0346, ADR-0347), whose chart (`gitops/charts/openshift-oauth`)
+renders the cluster `OAuth`/`cluster` singleton (`config.openshift.io/v1`),
+a `Proxy`/`cluster` trust patch, plus the `ExternalSecret` that syncs its
+Vault-seeded OIDC client secret into `openshift-config`. A Day 0 component
+(ADR-0056), ordered after `keycloak` (the "openshift" client and its
+secret, plus its cert-manager-issued TLS cert, must exist first): `-d0`
+applies the `ExternalSecret`; the role then copies two CA ConfigMaps into
+`openshift-config` (see below); `-d1` applies the `OAuth` singleton and
+the `Proxy` trust patch, which reference the Secret `-d0` creates and
+those CA ConfigMaps respectively.
 
 ## Why this chart owns the whole `OAuth` spec
 
@@ -29,25 +30,47 @@ inline comment.
 user's first Keycloak login attaches to an already-existing OpenShift
 `User` object instead of creating a duplicate.
 
-## The router-CA copy (ADR-0346)
+## The Keycloak serving-CA copy (ADR-0346, corrected by ADR-0347)
 
 The OpenID IDP's issuer `https://keycloak.<domain>/realms/zuno` is served
-by the cluster's default ingress router certificate, which the
-oauth-server pod does not trust - without a trust anchor the
-authentication operator degrades with
-`OAuthServerConfigObservationDegraded: ... x509: certificate signed by
-unknown authority` (observed live, 2026-08-14). The fix is
-`openID.ca`, which must reference a ConfigMap in `openshift-config` with
-key `ca.crt`. That data is cluster-specific, so Helm can't render it:
-`tasks/install.yml` copies it from
-`openshift-config-managed/default-ingress-cert` (key `ca-bundle.crt`,
-maintained by the ingress operator) into
-`openshift-config/default-ingress-cert`, re-keyed to `ca.crt` - same
-pattern as `openshift_ai`'s `istio-ca-root-cert` copy. The copy runs
-unconditionally on every install/reconcile (idempotent `state: present`),
-so a rotated router cert is healed by `make d0 reconcile
-openshift-oauth`; `uninstall.yml` deletes it and `precheck.yml` requires
-it for the component to count as installed.
+by the `zuno` Ingress in `zuno-auth` (ADR-0316: cert-manager, cluster-issuer
+`vault-issuer`, TLS Secret `keycloak-tls`), whose certificate is signed by
+Vault's `pki/` mount, root `CN=zuno-demo.internal` - **not** the cluster's
+default ingress router certificate. ADR-0346 originally assumed the latter
+and wired `openID.ca` to a copy of the router CA; the authentication
+operator stayed degraded with `OAuthServerConfigObservationDegraded: ...
+x509: certificate signed by unknown authority` even after that landed.
+ADR-0347 corrected the source (verified live with `openssl s_client`: the
+router CA fails to verify the live chain, `keycloak-tls`'s `ca.crt`
+succeeds) and added a cluster-wide complement:
+
+- **`keycloak-serving-ca`** (`openshift-config`, key `ca.crt`): bundles
+  `keycloak-tls`'s `ca.crt` (`zuno-auth` - the actual trust anchor) with the
+  router CA (covers the `ingress.operatorManaged` fallback in
+  `gitops/charts/keycloak`). Wired into `openID.ca` on the OpenID IDP only.
+- **`user-ca-bundle`** (`openshift-config`, key `ca-bundle.crt` - the key
+  name OpenShift's `proxy.spec.trustedCA` convention requires, different
+  from `openID.ca`'s `ca.crt`): just the Vault PKI root, referenced by
+  `Proxy/cluster.spec.trustedCA` (`templates/cluster-trusted-ca.yaml`).
+  Defense in depth, not conceptually OAuth-specific - it's consumed by
+  every operator whose `trusted-ca-bundle` ConfigMap carries the CNO
+  injection label `config.openshift.io/inject-trusted-cabundle: "true"`
+  (confirmed live: `openshift-authentication-operator`'s already does) -
+  but OAuth's OpenID IDP is the only current consumer, so it lives here
+  rather than in a dedicated component. Unlike the `OAuth`/`cluster`
+  template, `templates/cluster-trusted-ca.yaml` is a **partial patch**
+  (only `spec.trustedCA`), not wholesale ownership - `Proxy`/`cluster`
+  carries other operator-managed fields this chart must never touch.
+
+Both ConfigMaps hold cluster-specific data, so Helm can't render them:
+`tasks/install.yml` looks up `keycloak-tls` and the router CA once and
+writes both ConfigMaps from it (same look-up/blocked-finding(ADR-0344)/
+copy pattern as `openshift_ai`'s `istio-ca-root-cert` copy), then removes
+the superseded `default-ingress-cert` ConfigMap ADR-0346 left behind. Both
+copies run unconditionally on every install/reconcile, so a rotated
+Keycloak cert or regenerated Vault root is healed by `make d0 reconcile
+openshift-oauth`; `uninstall.yml` deletes both and `precheck.yml` requires
+both for the component to count as installed.
 
 ## Referenced startx Secrets (never created here)
 
