@@ -83,7 +83,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0111](0100-v0.1-roadmap.md#adr-0111-strengthen-secnumcloud-oriented-security-controls) | v0.1 | Proposed | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0100-v0.1-roadmap.md#adr-0112-implement-production-grade-backup-and-recovery) | v0.1 | Proposed | Implement production-grade backup and recovery |
 | [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
-| [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | To be implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
+| [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Partially implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.1 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v0.1 | Implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v0.1 | To be implemented | Implement Confluence as the first real external MCP integration |

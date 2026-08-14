@@ -675,3 +675,18 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   gateway image (repo-root build context) and reloads via
   `/admin/reload-policy`. Tests: `components/mcp-gateway/tests/
   test_bindings.py` plus the migrated streamable-HTTP transport test.
+
+- 2026-08-14 (ADR-0114, roadmap WP-03): `components/ai-gateway` gained a
+  MaaS adapter prototype (`app/maas_adapter.py`) behind the existing
+  OpenAI-compatible `ChatOpenAI` client, per ADR-0114's "prototype before
+  removing current gateway capabilities" requirement. Additive and
+  two-gated: a provider only routes through it when its
+  `platform/ai-gateway/provider-routing.yaml` entry sets `via_maas: true`
+  AND the chart's `maasAdapter.enabled` is true (default false, no shipped
+  provider opts in). Classification eligibility (`app/routing.py`) is
+  evaluated identically either way and always runs first - the adapter
+  changes transport, never eligibility (proven by a security-negative test
+  in `components/ai-gateway/tests/test_maas_adapter.py`). Feature-coverage
+  comparison tracked in `docs/roadmap/evidence/adr-0114-maas-coverage.md`;
+  live MaaS verification and any cutover decision remain an operator step
+  (WP-27).

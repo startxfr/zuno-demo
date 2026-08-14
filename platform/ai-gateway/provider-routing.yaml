@@ -28,6 +28,19 @@
 # `api_key_env` names the environment variable this provider's API key is
 # read from at runtime (populated by an ExternalSecret -- see
 # ansible/roles/vault/tasks/install.yml -- never a literal value here).
+#
+# `via_maas` (optional, default false; ADR-0114): opts this provider into
+# the OpenShift AI MaaS adapter prototype (components/ai-gateway/app/
+# maas_adapter.py) instead of this gateway's direct client, when the
+# gateway's own MAAS_ADAPTER_ENABLED switch is also on (chart value
+# `maasAdapter.enabled`, default false - this file alone never turns the
+# adapter on). Classification eligibility above is evaluated identically
+# either way; `via_maas` changes transport, never eligibility. No entry
+# below sets it yet - the prototype ships disabled until the operator
+# comparison in docs/roadmap/evidence/adr-0114-maas-coverage.md concludes.
+# `maas_model_ref` (optional): overrides `model` for the MaaS-published
+# model reference name, when it differs from the serving runtime's own
+# internal model name.
 
 providers:
   - name: local

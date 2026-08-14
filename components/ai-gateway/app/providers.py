@@ -3,6 +3,15 @@ components/agent-runtime's ModelRouter.chat_model_for() as part of
 ADR-0009's split; the factory logic itself is unchanged. This module never
 sees a hardcoded key: it only reads `os.environ` variable *names* declared
 in the routing file, never a literal secret value (ADR-0024).
+
+ADR-0114: a candidate whose provider-routing.yaml entry opts in
+(`via_maas: true`) AND the global `MAAS_ADAPTER_ENABLED` switch is on is
+built by app/maas_adapter.py instead of the direct client below - checked
+first, before any candidate.kind branch, so it applies uniformly to the
+local candidate or a SaaS one. This check runs strictly AFTER
+app/routing.py's classification-eligibility filtering already happened
+(candidates_for() is called before chat_model_for() in app/main.py) - the
+MaaS adapter can change transport, never eligibility.
 """
 
 from __future__ import annotations
@@ -12,6 +21,7 @@ from typing import Any, Dict
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
+from app import maas_adapter
 from app.routing import ProviderCandidate
 
 
@@ -20,6 +30,9 @@ class ProviderFactoryError(RuntimeError):
 
 
 def chat_model_for(candidate: ProviderCandidate, cfg: Dict[str, Any]) -> BaseChatModel:
+    if maas_adapter.should_use_maas(cfg):
+        return maas_adapter.chat_model_via_maas(cfg)
+
     if candidate.kind == "local":
         from langchain_openai import ChatOpenAI
 

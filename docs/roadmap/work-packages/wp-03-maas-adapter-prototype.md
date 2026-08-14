@@ -1,6 +1,6 @@
 # WP-03: MaaS adapter prototype in the AI Gateway
 
-- **State:** Not started
+- **State:** Operator pending (2026-08-14 — repo work merged: adapter, chart wiring, tests, coverage doc; awaiting live MaaS comparison per the Operator/human follow-up section below)
 - **ADRs:** ADR-0114 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-27

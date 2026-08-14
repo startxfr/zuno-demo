@@ -30,3 +30,17 @@ providerSecrets:
   gemini: llm-provider-gemini
   anthropic: llm-provider-anthropic
   mistral: llm-provider-mistral
+
+# ADR-0114: MaaS adapter prototype (components/ai-gateway/app/
+# maas_adapter.py). Disabled by default - flipping `enabled` alone changes
+# nothing, since no provider in platform/ai-gateway/provider-routing.yaml
+# opts in (`via_maas: true`) yet; both the global switch here and the
+# per-provider opt-in must be true for a request to actually route through
+# MaaS. `endpoint` is OpenShift AI MaaS's OpenAI-compatible model-access
+# endpoint (`maas-default-gateway`, ADR-0201); `secretName` is the
+# ExternalSecret-managed key, optional so the Deployment still comes up
+# before it exists.
+maasAdapter:
+  enabled: false
+  endpoint: ""
+  secretName: llm-provider-maas

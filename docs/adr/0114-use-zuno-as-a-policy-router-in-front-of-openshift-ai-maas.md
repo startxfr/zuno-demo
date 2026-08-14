@@ -1,6 +1,6 @@
 # ADR-0114: Use Zuno as a policy router in front of OpenShift AI MaaS
 
-- **Status:** To be implemented
+- **Status:** Partially implemented - MaaS adapter prototype and coverage comparison merged (`components/ai-gateway/app/maas_adapter.py`, `docs/roadmap/evidence/adr-0114-maas-coverage.md`); live MaaS verification and cutover decision pending (WP-27)
 - **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

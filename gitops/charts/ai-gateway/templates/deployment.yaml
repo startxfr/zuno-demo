@@ -70,6 +70,21 @@ spec:
                   name: {{ .Values.providerSecrets.mistral }}
                   key: api_key
                   optional: true
+            # ADR-0114: MaaS adapter prototype, default off - see
+            # components/ai-gateway/app/maas_adapter.py and
+            # platform/ai-gateway/provider-routing.yaml's `via_maas` field.
+            - name: MAAS_ADAPTER_ENABLED
+              value: {{ .Values.maasAdapter.enabled | quote }}
+            - name: MAAS_GATEWAY_ENDPOINT
+              value: {{ .Values.maasAdapter.endpoint | quote }}
+            - name: MAAS_GATEWAY_API_KEY_ENV
+              value: "MAAS_GATEWAY_API_KEY"
+            - name: MAAS_GATEWAY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.maasAdapter.secretName }}
+                  key: api_key
+                  optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:
