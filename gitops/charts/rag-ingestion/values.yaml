@@ -13,7 +13,11 @@ serviceAccount:
 
 externalSecrets:
   enabled: true
-  refreshPolicy: Periodic
+  # No refreshPolicy: that is an ESO >= v0.16 external-secrets.io/v1
+  # field; this cluster's ESO v0.11 serves only v1alpha1/v1beta1, whose
+  # schema has no such field (incident 2026-08-14 - the whole
+  # zuno-rag-ingestion-d1 sync failed on "could not find version v1").
+  # Periodic refresh is what refreshInterval alone already does.
   refreshInterval: 1h
   storeRef:
     kind: ClusterSecretStore
