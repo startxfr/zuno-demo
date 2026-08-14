@@ -74,6 +74,10 @@ Policy tests cover positive and negative combinations for each new role/scope. T
 - A role cannot use a capability absent from the active agent/task OKF declaration.
 - No independent AI-profile store is required.
 
+## Evolution (2026-08-14)
+
+ADR-0349 advances one element of this decision ahead of its v0.3 target: the `confluence-archi-*` subgroups and their membership move from `board` to `consultant`, so `board` consistently means Direction. The `cdp` role and the capability-scope model remain at v0.3.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Migration/evolution and Review evidence.
 
 ## Related ADRs

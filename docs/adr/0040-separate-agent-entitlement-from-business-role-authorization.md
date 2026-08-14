@@ -37,6 +37,10 @@ Migrate Keycloak realm fixtures and policy tests. Add tests for users with entit
 
 ADR-0340 retains this two-dimensional identity model and adds `cdp` as a business role for project-management capabilities. Existing `consultant` maps to the technical population and `board` remains the direction-level role. No separate AI-profile identity store is introduced; role-to-capability matrices are documentation/views derived from Keycloak groups, OKF declarations and platform policies.
 
+## Evolution (2026-08-14)
+
+ADR-0349 keeps both dimensions and their semantics but redefines the membership matrix (renamed personas, new `sale-*`/`recrut-*` users, `agent_soursage`/`agent_cognos` entitlement groups, a `recrut` business role) and relocates the `confluence-archi-*` ACL subgroups from `board` to `consultant`. The two negative-test fixture personas defined by this ADR are preserved unchanged.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Acceptance criteria and Review evidence.
 
 ## Related ADRs
