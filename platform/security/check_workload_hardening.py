@@ -219,7 +219,17 @@ def check_keycloak_availability(findings: Findings) -> None:
     templates for why the operator needs one authored rather than
     providing its own).
     """
-    docs = _helm_template("keycloak", {"keycloak.enabled": "true"})
+    # operator.enabled too: the PDB template is additionally gated on it
+    # (owned by the d0 Application, not d1 - see that template's comment).
+    # channel/source.name are runtime-discovered by Ansible; checks.yaml
+    # fails the render if they're empty while operator.enabled, so give
+    # placeholder values - only the PDB's presence matters here.
+    docs = _helm_template("keycloak", {
+        "keycloak.enabled": "true",
+        "operator.enabled": "true",
+        "operator.subscription.operator.channel": "check",
+        "operator.subscription.operator.source.name": "check",
+    })
     kc = next((d for d in docs if d.get("kind") == "Keycloak"), None)
     pdbs = [d for d in docs if d.get("kind") == "PodDisruptionBudget"]
     findings.check("keycloak: PodDisruptionBudget rendered", len(pdbs) > 0, f"found {len(pdbs)}")
@@ -231,11 +241,16 @@ def check_keycloak_availability(findings: Findings) -> None:
 
 
 def check_postgresql_availability(findings: Findings) -> None:
-    """PGO already auto-manages replicas>=2 and a PodDisruptionBudget for
-    both the instance set and pgBouncer (confirmed live, 2026-08-14 - see
-    templates/postgrescluster.yaml's own comments) - this only needed to
-    confirm the one gap ADR-0101/WP-12 closed: topologySpreadConstraints
-    on both.
+    """PGO already auto-manages replicas>=2, a PodDisruptionBudget AND
+    default topologySpreadConstraints (hostname + zone, ScheduleAnyway)
+    for both the instance set and pgBouncer. ADR-0101/WP-12 originally
+    added an explicit topologySpreadConstraints block on top; REVERTED
+    2026-08-14 - the duplicate zone key made every SSA patch invalid and
+    broke PGO reconciliation outright (incident note in ADR-0101's
+    status and templates/postgrescluster.yaml's comments). The chart must
+    therefore render the field ABSENT, delegating spread to PGO's own
+    injected defaults - asserting absence keeps the incident from being
+    silently reintroduced.
     """
     docs = _helm_template("postgresql", {"postgresCluster.enabled": "true"})
     cluster = next((d for d in docs if d.get("kind") == "PostgresCluster"), None)
@@ -244,13 +259,13 @@ def check_postgresql_availability(findings: Findings) -> None:
         return
     instances = cluster.get("spec", {}).get("instances", [{}])[0]
     findings.check(
-        "postgresql/instance1: topologySpreadConstraints present",
-        len(instances.get("topologySpreadConstraints", [])) > 0,
+        "postgresql/instance1: no explicit topologySpreadConstraints (PGO injects its own; ADR-0101 incident)",
+        len(instances.get("topologySpreadConstraints", [])) == 0,
     )
     pgbouncer = cluster.get("spec", {}).get("proxy", {}).get("pgBouncer", {})
     findings.check(
-        "postgresql/pgBouncer: topologySpreadConstraints present",
-        len(pgbouncer.get("topologySpreadConstraints", [])) > 0,
+        "postgresql/pgBouncer: no explicit topologySpreadConstraints (PGO injects its own; ADR-0101 incident)",
+        len(pgbouncer.get("topologySpreadConstraints", [])) == 0,
     )
 
 
