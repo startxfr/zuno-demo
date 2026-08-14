@@ -148,6 +148,7 @@ ragTechDatabase:
 maasDatabase:
   name: maas
   owner: maas
+  vaultPath: maas/postgresql-app
 
 # Dedicated database/role for the Agent Runtime's LangGraph checkpointer
 # (ADR-0103) - resumable workflow state, isolated from every other
