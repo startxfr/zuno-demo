@@ -1,6 +1,6 @@
 # WP-21: Multi-domain RAG platform core
 
-- **State:** Not started
+- **State:** Operator pending (2026-08-15 — repo work merged: `platform/bindings/knowledge/bindings.yaml` + README, rag-service per-domain pool registry (`app/bindings.py`, `app/db.py`) with fan-out/merged-RRF search and ≥1-pool readyz, `knowledge.tech → rag-tech` repoint (schema `rag`, repo-root image build baking the bindings), three new PGO databases/roles (`rag-sales`/`rag-sxa-legacy`/`rag-adv`) + ExternalSecrets + init-sql GRANTs + Vault seeds, per-domain chart ExternalSecrets/env/schema-apply Jobs (new domains ship `enabled: false` until the operator provisions Vault + databases). Awaiting the operator follow-up below: chart sync, one-time GRANTs, per-domain schema-apply incl. the rag-tech cutover, `make d1 check rag`, two live domains with distinct credentials.)
 - **ADRs:** ADR-0204 part 1 (To be implemented -> Partially implemented; Implemented together with WP-22)
 - **Depends on:** WP-20 (merged)
 - **Blocks:** WP-22, WP-23, WP-24, WP-25, WP-28

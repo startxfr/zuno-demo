@@ -127,16 +127,21 @@ spec:
             name: {{ .Values.backups.s3.secretName }}
 {{- end }}
 
-  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and five
+  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and eight
   # further dedicated databases/roles - Keycloak (ADR-0315), the
   # rag-ingestion pipeline's rag-tech corpus/index database, RHOAI's
   # Models-as-a-Service maas database, the Agent Runtime's LangGraph
-  # checkpoint database (ADR-0103), and the OGX-backed RAG provider
-  # prototype's vector I/O database (ADR-0322) - each adopting the password
+  # checkpoint database (ADR-0103), the OGX-backed RAG provider
+  # prototype's vector I/O database (ADR-0322), and one database per
+  # additional logical knowledge domain (ADR-0204: rag-sales,
+  # rag-sxa-legacy, rag-adv) - each adopting the password
   # already seeded into its own pguser Secret by
   # templates/externalsecret.yaml / templates/externalsecret-keycloak.yaml /
   # templates/externalsecret-ragtech.yaml / templates/externalsecret-maas.yaml /
-  # templates/externalsecret-checkpoint.yaml / templates/externalsecret-ogx.yaml
+  # templates/externalsecret-checkpoint.yaml / templates/externalsecret-ogx.yaml /
+  # templates/externalsecret-ragsales.yaml /
+  # templates/externalsecret-ragsxalegacy.yaml /
+  # templates/externalsecret-ragadv.yaml
   # ("bring your own password") rather than generating its own.
   users:
     - name: {{ .Values.cluster.owner }}
@@ -157,6 +162,15 @@ spec:
     - name: {{ .Values.ogxDatabase.owner }}
       databases:
         - {{ .Values.ogxDatabase.name }}
+    - name: {{ .Values.ragSalesDatabase.owner }}
+      databases:
+        - {{ .Values.ragSalesDatabase.name }}
+    - name: {{ .Values.ragSxaLegacyDatabase.owner }}
+      databases:
+        - {{ .Values.ragSxaLegacyDatabase.name }}
+    - name: {{ .Values.ragAdvDatabase.owner }}
+      databases:
+        - {{ .Values.ragAdvDatabase.name }}
 
   # Runs once at bootstrap against "postgres", not the app database - see
   # templates/configmap-init-sql.yaml's `\connect` comment for why.

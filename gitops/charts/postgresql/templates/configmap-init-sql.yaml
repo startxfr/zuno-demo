@@ -50,4 +50,13 @@ data:
 
     \connect {{ .Values.ogxDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.ogxDatabase.owner }};
+
+    \connect {{ .Values.ragSalesDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.ragSalesDatabase.owner }};
+
+    \connect {{ .Values.ragSxaLegacyDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.ragSxaLegacyDatabase.owner }};
+
+    \connect {{ .Values.ragAdvDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.ragAdvDatabase.owner }};
 {{- end }}

@@ -362,6 +362,27 @@
         username: ogxserver
         password: "{{ zuno_admin_ogx_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      rag-sales/postgresql-app:
+        # Dedicated database/role per additional logical knowledge domain
+        # (ADR-0204, WP-21) - cross-domain isolation is credential-enforced,
+        # so each domain gets its own role owning only its own database,
+        # never a shared credential. Same rationale and naming constraint
+        # as rag/postgresql-app (knowledge.tech's rag-tech) above.
+        username: ragsales
+        password: "{{ zuno_admin_rag_sales_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      rag-sxa-legacy/postgresql-app:
+        # knowledge.sxa-legacy's rag-sxa-legacy database - see
+        # rag-sales/postgresql-app above.
+        username: ragsxalegacy
+        password: "{{ zuno_admin_rag_sxa_legacy_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      rag-adv/postgresql-app:
+        # knowledge.adv's rag-adv database - see rag-sales/postgresql-app
+        # above.
+        username: ragadv
+        password: "{{ zuno_admin_rag_adv_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"

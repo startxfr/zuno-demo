@@ -199,45 +199,67 @@ async def hybrid_search(
     domains: Optional[List[str]] = None,
     technology: Optional[str] = None,
 ) -> Dict[str, Any]:
-    pool = get_pool()
-    if pool is None:
-        raise RuntimeError("database pool not initialized")
+    """ADR-0204 (WP-21): domains selects which per-domain database pool(s)
+    (app/bindings.py's KnowledgeBindingRegistry, app/db.py's pool registry)
+    to fan out to and merge results from - never "all pools", since that
+    would silently include content the caller was never authorized for
+    (Agent Runtime's app/knowledge.py:evaluate_knowledge() already computed
+    the authorized set; this is defense in depth around it, not a second
+    opinion). An absent/empty domains list defaults to knowledge.tech only
+    - the sole domain this service ever served before ADR-0204, preserving
+    every pre-existing caller's behavior unchanged.
 
+    A domain with no live pool (down, or its ExternalSecret not yet
+    populated) fails the whole call (RuntimeError) rather than silently
+    returning partial results from whichever domains happen to be up -
+    "no silent partial results" applies to domain availability the same
+    way ADR-0205 later applies it to freshness/source substitution.
+    """
     caller_groups = caller_groups or []
+    effective_domains = list(domains) if domains else ["knowledge.tech"]
     top_k = max(1, min(top_k, config.MAX_TOP_K))
     fetch_n = max(top_k * 4, 20)  # over-fetch each ranked list before fusion
 
-    filter_sql, filter_params = _filter_clause(3, product, version, caller_groups, domains, technology)
+    filter_sql, filter_params = _filter_clause(3, product, version, caller_groups, effective_domains, technology)
 
     vector_used = False
-    vector_rows: List[Any] = []
-    text_rows: List[Any] = []
-
-    async with pool.acquire() as conn:
-        embedding = await embed_query(query)
-        if embedding is not None:
-            try:
-                vector_rows = await conn.fetch(_vector_query(filter_sql), embedding, fetch_n, *filter_params)
-                vector_used = True
-            except Exception as exc:
-                logger.warning("pgvector similarity query failed, continuing text-only: %s", exc)
-                vector_rows = []
-
-        text_rows = await conn.fetch(_text_query(filter_sql), query, fetch_n, *filter_params)
-
-    # Reciprocal rank fusion across the two ranked lists.
     fused: Dict[str, float] = {}
     docs_by_id: Dict[str, Dict[str, Any]] = {}
 
-    for rank, row in enumerate(vector_rows, start=1):
-        doc = _row_to_doc(row)
-        docs_by_id[doc["id"]] = doc
-        fused[doc["id"]] = fused.get(doc["id"], 0.0) + 1.0 / (_RRF_K + rank)
+    def _accumulate(rows: List[Any]) -> None:
+        # Ranked WITHIN this one source list (a single domain's vector or
+        # text results) - standard multi-list RRF fuses contributions from
+        # each source's own rank position, never a position in some
+        # concatenation of multiple domains' result sets (which would
+        # unfairly penalize every domain queried after the first).
+        for rank, row in enumerate(rows, start=1):
+            doc = _row_to_doc(row)
+            docs_by_id.setdefault(doc["id"], doc)
+            fused[doc["id"]] = fused.get(doc["id"], 0.0) + 1.0 / (_RRF_K + rank)
 
-    for rank, row in enumerate(text_rows, start=1):
-        doc = _row_to_doc(row)
-        docs_by_id.setdefault(doc["id"], doc)
-        fused[doc["id"]] = fused.get(doc["id"], 0.0) + 1.0 / (_RRF_K + rank)
+    embedding = await embed_query(query)
+
+    for domain in effective_domains:
+        pool = get_pool(domain)
+        if pool is None:
+            # "No silent partial results": a caller asking for N domains
+            # gets either all N or a clear failure, never a quietly
+            # incomplete answer that looks the same as "nothing matched" -
+            # the same posture the pre-ADR-0204 single pool already had
+            # (it simply had nothing to be partial about).
+            raise RuntimeError(f"no live database pool for requested domain '{domain}'")
+
+        async with pool.acquire() as conn:
+            if embedding is not None:
+                try:
+                    domain_vector_rows = await conn.fetch(_vector_query(filter_sql), embedding, fetch_n, *filter_params)
+                    _accumulate(domain_vector_rows)
+                    vector_used = True
+                except Exception as exc:
+                    logger.warning("pgvector similarity query failed for domain '%s', continuing text-only: %s", domain, exc)
+
+            domain_text_rows = await conn.fetch(_text_query(filter_sql), query, fetch_n, *filter_params)
+            _accumulate(domain_text_rows)
 
     _apply_soft_adjustments(fused, docs_by_id, language)
 

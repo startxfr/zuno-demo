@@ -58,7 +58,7 @@ jobs:
             context: .
           - name: rag-service
             dockerfile: components/rag-service/Dockerfile
-            context: components/rag-service
+            context: .
           - name: mcp-sales-db
             dockerfile: components/mcp-servers/sales-db/Dockerfile
             context: components/mcp-servers/sales-db

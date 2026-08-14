@@ -1,18 +1,29 @@
-"""asyncpg connection pool lifecycle."""
+"""ADR-0204 (WP-21) per-domain asyncpg connection pool registry: one pool
+per knowledge domain, resolved through app/bindings.py's
+KnowledgeBindingRegistry rather than a single fixed database. Connect is
+eager (attempted for every configured domain at startup) but a single
+domain's failure is never fatal to the others - the same graceful-
+degradation posture the pre-ADR-0204 single pool already had (this service
+must not crash-loop just because one domain's database isn't reachable
+yet, e.g. before an operator has run that domain's schema-apply).
+"""
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
+import os
+from typing import Dict, Optional
 
 import asyncpg
 
 from app import config
+from app.bindings import KnowledgeBinding, KnowledgeBindingRegistry
 
 logger = logging.getLogger("rag_service.db")
 
-_pool: Optional[asyncpg.Pool] = None
+_pools: Dict[str, asyncpg.Pool] = {}
+_pool_errors: Dict[str, str] = {}
 
 
 async def _init_connection(conn: asyncpg.Connection) -> None:
@@ -29,46 +40,99 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
     )
 
 
-async def connect() -> None:
-    global _pool
-    if _pool is not None:
+async def _connect_one(binding: KnowledgeBinding) -> None:
+    user = os.getenv(binding.pguser_env, "")
+    password = os.getenv(binding.pgpassword_env, "")
+    if not user or not password:
+        msg = (
+            f"{binding.pguser_env}/{binding.pgpassword_env} not set - "
+            f"domain '{binding.domain}' will report not-ready until its "
+            "ExternalSecret-populated credentials are present"
+        )
+        logger.warning(msg)
+        _pool_errors[binding.domain] = msg
         return
+
     try:
-        _pool = await asyncpg.create_pool(
+        pool = await asyncpg.create_pool(
             host=config.PGHOST,
             port=config.PGPORT,
-            database=config.PGDATABASE,
-            user=config.PGUSER,
-            password=config.PGPASSWORD,
+            database=binding.database_name,
+            user=user,
+            password=password,
             min_size=config.PG_POOL_MIN_SIZE,
             max_size=config.PG_POOL_MAX_SIZE,
             init=_init_connection,
+            server_settings={"search_path": binding.schema},
         )
-        logger.info("connected to PostgreSQL at %s:%s/%s", config.PGHOST, config.PGPORT, config.PGDATABASE)
+        _pools[binding.domain] = pool
+        _pool_errors.pop(binding.domain, None)
+        logger.info(
+            "connected to PostgreSQL for domain %s at %s:%s/%s (schema=%s)",
+            binding.domain, config.PGHOST, config.PGPORT, binding.database_name, binding.schema,
+        )
     except Exception as exc:
-        logger.error("failed to connect to PostgreSQL: %s", exc)
-        _pool = None
-        raise
+        msg = f"failed to connect for domain '{binding.domain}': {exc}"
+        logger.error(msg)
+        _pool_errors[binding.domain] = msg
 
 
-async def disconnect() -> None:
-    global _pool
-    if _pool is not None:
-        await _pool.close()
-        _pool = None
+async def connect_all(registry: KnowledgeBindingRegistry) -> None:
+    """Attempts a connection for every domain the registry resolves.
+    Never raises - a domain with no live pool is simply absent from
+    get_pool()'s results (fail closed at query time, not startup time,
+    matching the pre-ADR-0204 "don't crash-loop the pod" posture)."""
+    if registry.load_error:
+        logger.error("knowledge bindings unavailable, no domain pools can be created: %s", registry.load_error)
+        return
+    for domain in registry.domains():
+        binding = registry.resolve(domain)
+        if binding is not None:
+            await _connect_one(binding)
 
 
-def get_pool() -> Optional[asyncpg.Pool]:
-    return _pool
+async def disconnect_all() -> None:
+    for domain, pool in list(_pools.items()):
+        await pool.close()
+        _pools.pop(domain, None)
 
 
-async def ping() -> bool:
-    if _pool is None:
+def get_pool(domain: str) -> Optional[asyncpg.Pool]:
+    return _pools.get(domain)
+
+
+def ready_domains() -> Dict[str, str]:
+    """Domain -> live/error status, for /readyz reporting."""
+    status: Dict[str, str] = {domain: "ready" for domain in _pools}
+    status.update({domain: f"not-ready: {err}" for domain, err in _pool_errors.items()})
+    return status
+
+
+def any_ready() -> bool:
+    return bool(_pools)
+
+
+async def ping(domain: str) -> bool:
+    pool = _pools.get(domain)
+    if pool is None:
         return False
     try:
-        async with _pool.acquire() as conn:
+        async with pool.acquire() as conn:
             await conn.execute("SELECT 1")
         return True
     except Exception as exc:
-        logger.warning("PostgreSQL ping failed: %s", exc)
+        logger.warning("PostgreSQL ping failed for domain %s: %s", domain, exc)
         return False
+
+
+async def ping_any() -> bool:
+    """True as soon as any one domain's pool answers a live query - the
+    multi-domain equivalent of the pre-ADR-0204 single ping(), and the
+    /readyz semantics this service keeps: ready means "at least one
+    configured domain can actually serve a query", not "every domain is
+    up" (a domain whose schema-apply hasn't run yet must not take the
+    whole pod out of rotation)."""
+    for domain in list(_pools.keys()):
+        if await ping(domain):
+            return True
+    return False

@@ -51,18 +51,28 @@ spec:
               value: {{ .Values.pg.host | quote }}
             - name: PGPORT
               value: {{ .Values.pg.port | quote }}
-            - name: PGDATABASE
-              value: {{ .Values.pg.database | quote }}
-            - name: PGUSER
+            {{- range .Values.knowledgeDomains }}
+            {{- if .enabled }}
+            # ADR-0204 (WP-21): per-domain credential pair read by
+            # app/db.py's pool registry via app/bindings.py's
+            # credential_env_prefix contract. optional: a domain whose
+            # Secret hasn't synced yet must report not-ready (fail closed
+            # in the app), not block the whole pod from starting -
+            # the same posture as db.py's non-fatal per-domain connect.
+            - name: {{ .envPrefix }}_PGUSER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.dbSecretName }}
+                  name: {{ .secretName }}
                   key: username
-            - name: PGPASSWORD
+                  optional: true
+            - name: {{ .envPrefix }}_PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.dbSecretName }}
+                  name: {{ .secretName }}
                   key: password
+                  optional: true
+            {{- end }}
+            {{- end }}
             - name: EMBEDDING_SERVICE_URL
               value: {{ .Values.embeddingServiceUrl | quote }}
             - name: EMBEDDING_MODEL_NAME

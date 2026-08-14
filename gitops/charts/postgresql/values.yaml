@@ -176,3 +176,28 @@ ogxDatabase:
   name: ogx
   owner: ogxserver
   vaultPath: ogx/postgresql-app
+
+# Dedicated database/role per additional logical knowledge domain
+# (ADR-0204, WP-21) - knowledge.sales / knowledge.sxa-legacy /
+# knowledge.adv, each resolved from
+# platform/bindings/knowledge/bindings.yaml by rag-service's per-domain
+# pool registry. Same "bring your own password" mechanism and the same
+# hyphenated-database-name / alphanumeric-owner constraints as
+# ragTechDatabase above (rag-tech is knowledge.tech's database and already
+# exists there). Cross-domain isolation is credential-enforced: each
+# domain's role owns only its own database, so domain A's connection
+# cannot read domain B (ADR-0204 acceptance) - never a shared superuser.
+ragSalesDatabase:
+  name: rag-sales
+  owner: ragsales
+  vaultPath: rag-sales/postgresql-app
+
+ragSxaLegacyDatabase:
+  name: rag-sxa-legacy
+  owner: ragsxalegacy
+  vaultPath: rag-sxa-legacy/postgresql-app
+
+ragAdvDatabase:
+  name: rag-adv
+  owner: ragadv
+  vaultPath: rag-adv/postgresql-app

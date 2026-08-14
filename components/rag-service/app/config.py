@@ -1,9 +1,15 @@
 """Environment-driven configuration. No secret is ever hardcoded (ADR-0024)
 -- database credentials arrive as individual env vars mapped from the
 Kubernetes Secret populated by the ExternalSecret this service's chart
-registers against `secret/zuno/postgresql/app` (the same `zunoapp`
-credential the vault role already generates -- see
-ansible/roles/vault/tasks/configure.yml).
+registers.
+
+ADR-0204 (WP-21): host/port are shared across every knowledge domain - one
+PostgresCluster, many databases (see app/bindings.py's
+KnowledgeBindingRegistry) - only the database identity and credentials
+differ per domain, read via each binding's own
+`<PREFIX>_PGUSER`/`<PREFIX>_PGPASSWORD` env vars at pool-connect time
+(app/db.py), never a single fixed PGDATABASE/PGUSER/PGPASSWORD set as
+before this ADR.
 """
 
 from __future__ import annotations
@@ -16,9 +22,6 @@ import os
 # convention - see ansible/roles/postgresql/README.md).
 PGHOST = os.getenv("PGHOST", "zuno-postgresql-primary.zuno-data.svc")
 PGPORT = int(os.getenv("PGPORT", "5432"))
-PGDATABASE = os.getenv("PGDATABASE", "zuno")
-PGUSER = os.getenv("PGUSER", "zunoapp")
-PGPASSWORD = os.getenv("PGPASSWORD", "")
 PG_POOL_MIN_SIZE = int(os.getenv("PG_POOL_MIN_SIZE", "1"))
 PG_POOL_MAX_SIZE = int(os.getenv("PG_POOL_MAX_SIZE", "10"))
 

@@ -41,13 +41,76 @@ resources:
 
 # zuno-postgresql-pgbouncer is PGO's auto-created PgBouncer Service in front
 # of the zuno-postgresql PostgresCluster (no plain "postgresql" Service).
+# Host/port are shared across every knowledge domain - one PostgresCluster,
+# many databases (ADR-0204).
 pg:
   host: zuno-postgresql-pgbouncer.zuno-data.svc
   port: 5432
-  database: zuno
 
-# Secret populated by the ExternalSecret in templates/externalsecret-db.yaml.
-dbSecretName: rag-service-db-credentials
+# ADR-0204 (WP-21): one entry per logical knowledge domain this deployment
+# serves. The in-image authority for domain -> database resolution is
+# platform/bindings/knowledge/bindings.yaml (app/bindings.py); the entries
+# here are that registry's deploy-side counterpart, rendering per domain:
+# an ExternalSecret (templates/externalsecret-db.yaml) resolving the
+# domain's own Vault credential, the <envPrefix>_PGUSER/<envPrefix>_
+# PGPASSWORD env pair on the Deployment (the credential_env_prefix
+# contract), and a schema-apply Job (templates/job-schema-apply.yaml).
+# Drift between here and bindings.yaml fails closed: the pool either has
+# no credentials or credentials the database rejects, so the domain
+# reports not-ready and every query against it is refused.
+#
+# enabled: false ships a domain dark: no ExternalSecret, no env pair, no
+# schema-apply Job - the in-image binding still exists and the domain
+# simply reports not-ready (fail closed). The three new ADR-0204 domains
+# start dark because their Vault credentials and databases only exist
+# after the operator has re-run `make d1 install vault` (seeds
+# rag-sales/rag-sxa-legacy/rag-adv postgresql-app credentials) and synced
+# gitops/charts/postgresql (creates the databases + the one-time manual
+# GRANT its configmap-init-sql.yaml header documents) - see the WP-21
+# brief's operator follow-up.
+#
+# seed: whether the schema-apply Job also loads data/rag/fixtures/seed.sql
+# - tech only: the seed rows are technical-documentation fixtures and
+# belong to no other domain (loading them elsewhere would recreate the
+# cross-domain mixing ADR-0204 exists to end).
+knowledgeDomains:
+  # knowledge.tech - repointed by WP-21 from the legacy shared "zuno"
+  # database to rag-tech, the database rag-ingestion has written to since
+  # ADR-0330 (the two finally agree). Its schema-apply Job against
+  # rag-tech IS the cutover: first sync after this change creates the
+  # rag schema/tables and loads the seed fixtures there.
+  - domain: tech
+    enabled: true
+    database: rag-tech
+    schema: rag
+    envPrefix: RAGTECH
+    vaultPath: rag/postgresql-app
+    secretName: rag-service-db-ragtech
+    seed: true
+  - domain: sales
+    enabled: false
+    database: rag-sales
+    schema: rag
+    envPrefix: RAGSALES
+    vaultPath: rag-sales/postgresql-app
+    secretName: rag-service-db-ragsales
+    seed: false
+  - domain: sxa-legacy
+    enabled: false
+    database: rag-sxa-legacy
+    schema: rag
+    envPrefix: RAGSXALEGACY
+    vaultPath: rag-sxa-legacy/postgresql-app
+    secretName: rag-service-db-ragsxalegacy
+    seed: false
+  - domain: adv
+    enabled: false
+    database: rag-adv
+    schema: rag
+    envPrefix: RAGADV
+    vaultPath: rag-adv/postgresql-app
+    secretName: rag-service-db-ragadv
+    seed: false
 
 # OpenAI-compatible embeddings endpoint - see README "Embedding backend".
 embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings

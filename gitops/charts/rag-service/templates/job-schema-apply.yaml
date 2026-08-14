@@ -1,19 +1,32 @@
-# ArgoCD Sync hook Job at wave 41: applies the RAG metadata schema + seed
-# fixtures after the credentials ExternalSecret (tracked resource, wave 40)
-# and before the Deployment (wave 45) within the same Sync phase. NOT a
-# PreSync hook - the Sync phase only starts after every PreSync hook
-# succeeds, so a PreSync consumer of a Sync-phase Secret deadlocks forever
-# (incident 2026-08-14, see ADR-0313's incident note).
-# `hook-delete-policy: BeforeHookCreation` deletes the previous run's Job
-# since Jobs are immutable.
-#
-# The SQL/fixtures ConfigMap (zuno-rag-schema) is generated and applied by
-# ansible/roles/rag, not by this chart.
+{{- /* ADR-0204 (WP-21): one schema-apply Job per enabled knowledge
+domain, each against that domain's own database with that domain's own
+credential. ArgoCD Sync hook at wave 41: after the credentials
+ExternalSecrets (tracked resources, wave 40) and before the Deployment
+(wave 45) within the same Sync phase. NOT a PreSync hook - the Sync phase
+only starts after every PreSync hook succeeds, so a PreSync consumer of a
+Sync-phase Secret deadlocks forever (incident 2026-08-14, see ADR-0313's
+incident note). `hook-delete-policy: BeforeHookCreation` deletes the
+previous run's Job since Jobs are immutable.
+
+CREATE SCHEMA IF NOT EXISTS + PGOPTIONS search_path put every object in
+the domain's schema (bindings.yaml's database.schema, "rag"): the domain
+role owns its whole database (PGO spec.users), so schema creation needs
+no public-schema GRANT - sidestepping the post-bootstrap GRANT incident
+gitops/charts/postgresql/templates/configmap-init-sql.yaml documents for
+objects in "public" (that GRANT is still required for anything else that
+lands there).
+
+The SQL/fixtures ConfigMap (zuno-rag-schema) is generated and applied by
+ansible/roles/rag, not by this chart. seed.sql is loaded only where the
+domain entry says so (tech - the fixtures are technical-documentation
+rows and belong to no other domain). */}}
+{{- range .Values.knowledgeDomains }}
+{{- if .enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: zuno-rag-schema-apply
-  namespace: {{ .Values.namespace }}
+  name: zuno-rag-schema-apply-{{ .domain }}
+  namespace: {{ $.Values.namespace }}
   labels:
     app.kubernetes.io/name: rag-service
     zuno.io/managed-by: argocd
@@ -38,30 +51,36 @@ spec:
             - psql
           env:
             - name: PGHOST
-              value: {{ .Values.pg.host | quote }}
+              value: {{ $.Values.pg.host | quote }}
             - name: PGPORT
-              value: {{ .Values.pg.port | quote }}
+              value: {{ $.Values.pg.port | quote }}
             - name: PGDATABASE
-              value: {{ .Values.pg.database | quote }}
+              value: {{ .database | quote }}
+            - name: PGOPTIONS
+              value: "-c search_path={{ .schema }}"
             - name: PGUSER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.dbSecretName }}
+                  name: {{ .secretName }}
                   key: username
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.dbSecretName }}
+                  name: {{ .secretName }}
                   key: password
           args:
             - -v
             - ON_ERROR_STOP=1
+            - -c
+            - CREATE SCHEMA IF NOT EXISTS {{ .schema }};
             - -f
             - /sql/003_rag_metadata.sql
             - -f
             - /sql/004_rag_chunking.sql
+            {{- if .seed }}
             - -f
             - /sql/seed.sql
+            {{- end }}
           volumeMounts:
             - name: sql
               mountPath: /sql
@@ -69,3 +88,6 @@ spec:
         - name: sql
           configMap:
             name: zuno-rag-schema
+---
+{{- end }}
+{{- end }}

@@ -1,6 +1,6 @@
 # ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (multi-domain retrieval core, bindings and per-domain databases merged; source adapters (WP-22) and live provisioning pending)
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

@@ -4,5 +4,7 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:
     build_image_name: rag-service
-    build_dockerfile_path: Dockerfile
-    build_context_dir: components/rag-service
+    # ADR-0204/WP-21: repo-root context, same reason agent-runtime/mcp-gateway
+    # use it - this image now bakes in platform/bindings/knowledge/bindings.yaml.
+    build_dockerfile_path: components/rag-service/Dockerfile
+    build_context_dir: "."

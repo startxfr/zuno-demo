@@ -187,21 +187,25 @@ parity against a shared indexed corpus remains a residual operator action
 
 ## Database credentials
 
-Sourced from individual `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`
-env vars, populated from the same `zunoapp` Vault-backed Secret the
-`vault` role already generates at `zuno/postgresql/app` (see
-`ansible/roles/vault/tasks/install.yml`), delivered via an
-`ExternalSecret` registered by this service's chart
-(`gitops/charts/rag-service/templates/externalsecret-db.yaml`). No
+`PGHOST`/`PGPORT` are shared (one PGO cluster); everything else is
+per-domain (ADR-0204, WP-21): each knowledge domain in
+`platform/bindings/knowledge/bindings.yaml` names the database/schema it
+lives in and a `credential_env_prefix`, and `app/db.py`'s pool registry
+reads that domain's own `<PREFIX>_PGUSER`/`<PREFIX>_PGPASSWORD` env pair
+(e.g. `RAGTECH_PGUSER`) - populated from that domain's own Vault-backed
+Secret, seeded by `ansible/roles/vault/tasks/install.yml` and delivered
+via the per-domain `ExternalSecret`s this service's chart registers
+(`gitops/charts/rag-service/templates/externalsecret-db.yaml`). Never a
+shared superuser: cross-domain isolation is credential-enforced. No
 credential is ever hardcoded.
 
 ## Local development
 
 ```bash
-cd components/rag-service
-docker build -t zuno/rag-service:local .
+# Repo root - the image bakes in platform/bindings/knowledge/bindings.yaml.
+docker build -f components/rag-service/Dockerfile -t zuno/rag-service:local .
 docker run -p 8080:8080 \
-  -e PGHOST=localhost -e PGUSER=zunoapp -e PGPASSWORD=... -e PGDATABASE=zuno \
+  -e PGHOST=localhost -e RAGTECH_PGUSER=ragtech -e RAGTECH_PGPASSWORD=... \
   zuno/rag-service:local
 ```
 

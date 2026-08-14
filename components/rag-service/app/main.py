@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from app import db, ogx_provider
+from app.bindings import KnowledgeBindingRegistry
 from app.schemas import SearchRequest, SearchResponse
 from app.search import hybrid_search
 from app.telemetry import init_telemetry, search_span
@@ -21,17 +22,21 @@ logger = logging.getLogger("rag_service")
 
 init_telemetry("rag-service")  # ADR-0029: traces/metrics to the shared OTel Collector
 
+# ADR-0204 (WP-21): loaded once at import time, same as mcp-gateway's
+# module-level PolicyStore/BindingRegistry - a load failure is recorded
+# (load_error) and surfaced via /readyz, never raised here.
+_knowledge_bindings = KnowledgeBindingRegistry()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        await db.connect()
-    except Exception as exc:
-        # Do not crash-loop the pod: /readyz will report not-ready and
-        # /v1/search will return a clear 503 until the database is reachable.
-        logger.error("startup: database connection failed, will report not-ready: %s", exc)
+    # Eager per-domain connect: every domain the registry resolves gets a
+    # connection attempt, but one domain's failure never blocks another's
+    # (see app/db.py:connect_all) - do not crash-loop the pod just because
+    # one domain's database/ExternalSecret isn't ready yet.
+    await db.connect_all(_knowledge_bindings)
     yield
-    await db.disconnect()
+    await db.disconnect_all()
 
 
 app = FastAPI(
@@ -49,20 +54,30 @@ async def healthz():
 
 @app.get("/readyz")
 async def readyz():
-    if await db.ping():
-        return JSONResponse({"status": "ready"})
-    return JSONResponse({"status": "not-ready", "reason": "database unreachable"}, status_code=503)
+    # ADR-0204: ready as soon as any one domain can serve a query - a
+    # domain still waiting on its schema-apply/ExternalSecret must not
+    # take rag-service out of rotation for every other domain that's fine.
+    if await db.ping_any():
+        return JSONResponse({"status": "ready", "domains": db.ready_domains()})
+    return JSONResponse(
+        {"status": "not-ready", "reason": "no domain database reachable", "domains": db.ready_domains()},
+        status_code=503,
+    )
 
 
 @app.post("/v1/search", response_model=SearchResponse)
 async def search(payload: SearchRequest) -> SearchResponse:
     # ADR-0322: RAG_PROVIDER=ogx is the only way this branch is ever taken
     # (see app/ogx_provider.py's module docstring) - the pgvector+full-text
-    # provider below is untouched and remains the default. The database
-    # pool is only required by the pgvector path.
+    # provider below is untouched and remains the default. A database pool
+    # is only required by the pgvector path - and only a service-wide 503
+    # here (no domain at all is reachable); a specific requested domain
+    # being down while others are up surfaces as hybrid_search's own
+    # RuntimeError below (500, not 503 - this service IS ready, that one
+    # domain just is not).
     use_ogx = ogx_provider.should_use_ogx()
-    if not use_ogx and db.get_pool() is None:
-        raise HTTPException(status_code=503, detail="database not connected")
+    if not use_ogx and not db.any_ready():
+        raise HTTPException(status_code=503, detail="no domain database connected")
     with search_span(payload.query, payload.top_k) as call:
         call.provider = "ogx" if use_ogx else "pgvector"
         try:

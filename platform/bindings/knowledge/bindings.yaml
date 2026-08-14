@@ -1,0 +1,79 @@
+# Bindings: knowledge - backend-binding registry (ADR-0204).
+#
+# Resolves an *authorized* logical knowledge domain (ADR-0202,
+# knowledge/<domain>/domain.yaml) to the physical PostgreSQL database that
+# serves it. Platform-controlled configuration only - never supplied by an
+# agent, task or caller. Agent Runtime authorizes (ADR-0203's full
+# intersection, components/agent-runtime/app/knowledge.py:evaluate_knowledge())
+# BEFORE rag-service is ever asked to resolve or query anything registered
+# here; this file only tells rag-service WHERE to look once a domain is
+# already authorized - the same "authorize first, resolve after" ordering
+# ADR-0116's tool-binding registry uses.
+#
+# The stable contract consumed by OKF tasks and the knowledge policy is the
+# logical domain ID (`knowledge.<name>`). Everything else in an entry -
+# database name/schema, credential env-var prefix, the ingestion source
+# this domain's content comes from - is binding data that may change
+# without touching any agent definition or policy file (ADR-0204's core
+# property, mirroring ADR-0116).
+#
+# Schema per entry:
+#   domain:               the logical knowledge-domain ID (knowledge.<name>),
+#                          unique key - must match a knowledge/<name>/domain.yaml.
+#   database:
+#     name:                PostgreSQL database name on the shared PGO cluster
+#                          (gitops/charts/postgresql's <domain>Database.name).
+#                          Not a secret - used directly as the connection's
+#                          dbname.
+#     schema:               PostgreSQL schema within that database
+#                          (server_settings.search_path at connect time).
+#     credential_env_prefix: prefix rag-service's per-domain pool registry
+#                          reads credentials from: <PREFIX>_PGUSER,
+#                          <PREFIX>_PGPASSWORD - populated by the matching
+#                          ExternalSecret in gitops/charts/rag-service, never
+#                          a secret value here. Host/port are shared across
+#                          every domain (the same PGO cluster, see
+#                          app/config.py's PGHOST/PGPORT) - only the
+#                          database identity and credentials differ.
+#   ingestion_config_ref:  pointer to the rag-ingestion source config this
+#                          domain's content comes from (documentation only;
+#                          WP-22 owns the actual adapter wiring).
+#
+# An unknown domain, a domain without exactly one entry here, or a
+# malformed entry fails closed: rag-service refuses to query that domain
+# without contacting any database, and startup/readiness reports which
+# domains it could not resolve a live pool for.
+
+bindings:
+  # WP-21 repoints knowledge.tech from the legacy shared "zuno" database
+  # (rag-service's pre-ADR-0204 default) to rag-tech, the database
+  # rag-ingestion has written to since ADR-0330 - the two finally agree.
+  # Operator follow-up: schema-apply + a one-time content cutover/seed on
+  # rag-tech before live tech retrieval is fully restored (see WP-21 brief).
+  - domain: knowledge.tech
+    database:
+      name: rag-tech
+      schema: rag
+      credential_env_prefix: RAGTECH
+    ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.tech"
+
+  - domain: knowledge.sales
+    database:
+      name: rag-sales
+      schema: rag
+      credential_env_prefix: RAGSALES
+    ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.sales"
+
+  - domain: knowledge.sxa-legacy
+    database:
+      name: rag-sxa-legacy
+      schema: rag
+      credential_env_prefix: RAGSXALEGACY
+    ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.sxa-legacy"
+
+  - domain: knowledge.adv
+    database:
+      name: rag-adv
+      schema: rag
+      credential_env_prefix: RAGADV
+    ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.adv"
