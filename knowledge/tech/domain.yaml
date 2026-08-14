@@ -1,0 +1,54 @@
+# Knowledge domain: tech (ADR-0202)
+#
+# Technical product knowledge from official web documentation and internal
+# Confluence. NO physical database names, service endpoints, secrets or
+# credentials belong in this file - see platform/bindings/knowledge/bindings.yaml
+# (ADR-0204, WP-21) for the physical binding.
+
+id: knowledge.tech
+title: Technical product knowledge
+description: >-
+  Official Red Hat/partner product documentation and internal Confluence
+  content (architecture, build, run) for the technologies Zuno agents
+  support. The one domain where two independent source systems must agree
+  on a shared vocabulary so a query can combine them (ADR-0202).
+
+taxonomy:
+  source_classes:
+    - product-doc     # official web documentation (ADR-0330 ingestion)
+    - confluence       # internal Confluence spaces (ADR-0117)
+
+  # Canonical cross-source `technology` vocabulary (ADR-0202 acceptance
+  # criterion: "a technical query can filter one canonical `technology`
+  # across both official web and Confluence chunks"). This is the set
+  # already exercised by ADR-0330's ingestion sources today; extending it
+  # to a new technology means adding both a product-doc source and a
+  # confluence source under the same value here, never inventing a
+  # per-source-only name.
+  technology_vocabulary:
+    - satellite
+    - openshift
+    - openshift-ai
+    - keycloak
+
+freshness:
+  # Realized as per-source KFP recurring-run schedules in
+  # gitops/charts/rag-ingestion/values.yaml (WP-22 / ADR-0105); this is the
+  # objective the schedule must satisfy, not the schedule itself.
+  objective: weekly
+  rationale: >-
+    Product documentation and Confluence architecture/build/run content
+    change on a documentation-release cadence, not continuously.
+
+classification:
+  default_by_source_type:
+    product-doc: C1
+    confluence: C2   # ADR-0035: business-sensitive internal content
+
+policy_ref: policies/knowledge/knowledge-policy.yaml
+
+related_adrs:
+  - ADR-0046   # metadata-aware, bilingual RAG retrieval
+  - ADR-0117   # Confluence as first real external MCP integration
+  - ADR-0330   # rag-ingestion as a Day 1 component
+  - ADR-0204   # multi-domain RAG platform generalization (WP-21)

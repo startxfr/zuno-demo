@@ -1,0 +1,48 @@
+# Knowledge domain: sales (ADR-0202)
+#
+# Current sales knowledge asynchronously ingested from Salesforce. NO
+# physical database names, service endpoints, secrets or credentials belong
+# in this file - see platform/bindings/knowledge/bindings.yaml (ADR-0204,
+# WP-21) for the physical binding.
+
+id: knowledge.sales
+title: Current Salesforce sales knowledge
+description: >-
+  Current, actively-maintained sales/CRM knowledge sourced from Salesforce
+  (opportunities, quotes, customers, activity history). Distinct from
+  `knowledge.sxa-legacy`: this domain never serves historical/legacy
+  SXA-derived data, and the reverse (ADR-0206).
+
+taxonomy:
+  source_classes:
+    - salesforce   # WP-22 fetch-salesforce adapter
+
+  deal_types:
+    - architecture
+    - build
+    - run
+    - training
+    - staffing
+    - market
+    - mixed
+
+freshness:
+  # Realized as a KFP recurring-run schedule (WP-22 / ADR-0105); this is
+  # the objective, not the concrete cron expression.
+  objective: hours-scale
+  rationale: >-
+    Salesforce records (opportunity status, quote state) change during a
+    business day; a weekly cadence would make the domain stale for its own
+    purpose.
+
+classification:
+  default_by_source_type:
+    salesforce: C2   # business-sensitive (policies/data-classification/classification.yaml)
+
+policy_ref: policies/knowledge/knowledge-policy.yaml
+
+related_adrs:
+  - ADR-0017   # sales data through controlled MCP tools
+  - ADR-0206   # separate current Salesforce knowledge from legacy SXA
+  - ADR-0205   # prefer indexed knowledge for read, live tools for write/freshness
+  - ADR-0204   # multi-domain RAG platform generalization (WP-21)

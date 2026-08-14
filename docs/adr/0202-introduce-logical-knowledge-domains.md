@@ -1,6 +1,6 @@
 # ADR-0202: Introduce logical knowledge domains
 
-- **Status:** To be implemented
+- **Status:** Implemented - see `knowledge/`, `platform/docs/check_knowledge_refs.py`.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

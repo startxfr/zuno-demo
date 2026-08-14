@@ -1,0 +1,207 @@
+# Chunk metadata schema (ADR-0202) - the common contract every indexed
+# knowledge-domain chunk carries, plus each domain's own extensions.
+#
+# This file is declarative documentation + validation input for
+# `platform/docs/check_knowledge_refs.py` - it does not itself enforce
+# anything at query time. Field names here are the vocabulary ingestion
+# writers (components/rag-ingestion) and retrieval readers
+# (components/rag-service) must agree on; see WP-22 for where the writers
+# land and WP-24 for where `stale_after`/`source_modified_at`/`indexed_at`
+# become load-bearing for ranking.
+#
+# `required: true` means every chunk in every domain must carry the field.
+# A field with a `domains:` restriction only applies to those domains.
+
+common:
+  - name: domain
+    type: string
+    required: true
+    description: >-
+      The logical knowledge-domain ID this chunk belongs to
+      (knowledge.tech | knowledge.sales | knowledge.sxa-legacy |
+      knowledge.adv). Rows written before ADR-0202 landed have no `domain`
+      key and are treated as knowledge.tech by convention (WP-20/WP-21).
+
+  - name: source
+    type: string
+    required: true
+    description: >-
+      Stable identifier/URL of the originating document within its source
+      system (Confluence page, product-doc URL, Salesforce record, SXA
+      dump row, Aramis project). Unique per document within a domain.
+
+  - name: source_type
+    type: string
+    required: true
+    description: >-
+      The kind of source system that produced this chunk (e.g.
+      product-doc, confluence, salesforce, sxa-dump, aramis).
+
+  - name: language
+    type: string
+    required: true
+    description: ISO 639-1 language code of the chunk content (e.g. en, fr).
+
+  - name: classification
+    type: string
+    required: true
+    enum: [C1, C2, C3]
+    description: >-
+      Data classification per policies/data-classification/classification.yaml.
+      Missing/untrusted classification metadata must fail closed
+      (ADR-0202 Security considerations) - never defaulted to a lower level.
+
+  - name: acl_groups
+    type: array
+    items: string
+    required: false
+    description: >-
+      Keycloak business-role groups authorized to see this chunk. An empty
+      or absent value means the chunk is unrestricted within its domain's
+      policy-allowed groups (components/rag-service/app/search.py's `?|`
+      filter).
+
+  - name: provenance
+    type: string
+    required: true
+    description: >-
+      Where this chunk's content came from (source URL, or a fixture
+      marker for synthetic demo data per ADR-0025).
+
+  - name: source_modified_at
+    type: string
+    format: date-time
+    required: false
+    description: >-
+      When the source system last modified the underlying document.
+      Distinct from `indexed_at` - conflating the two was the ADR-0205 gap
+      this field exists to close. Enforced for operational domains by
+      WP-24; immutable legacy sources (knowledge.sxa-legacy) are exempt.
+
+  - name: indexed_at
+    type: string
+    format: date-time
+    required: false
+    description: >-
+      When Zuno's ingestion pipeline indexed this chunk. Enforced for
+      operational domains by WP-24.
+
+  - name: stale_after
+    type: string
+    format: date-time
+    required: false
+    description: >-
+      The point past which this chunk should be treated as stale for
+      ranking/trust-scoring purposes (WP-24 / ADR-0205), derived from the
+      owning domain's freshness objective
+      (`knowledge/<domain>/domain.yaml`'s `freshness:` block).
+
+domains:
+  tech:
+    - name: technology
+      type: string
+      required: true
+      description: >-
+        The one canonical cross-source technology key official web
+        documentation and Confluence both use (ADR-0202). See
+        knowledge/tech/domain.yaml for the current vocabulary.
+    - name: product
+      type: string
+      required: false
+      description: Source-specific product identifier (e.g. a doc-site product slug).
+    - name: version
+      type: string
+      required: false
+      description: Product/documentation version this chunk applies to.
+    - name: skill_scope
+      type: string
+      required: false
+      enum: [architecture, build, run]
+      description: Optional narrower scope within the technology.
+
+  sales:
+    - name: deal_type
+      type: string
+      required: false
+      enum: [architecture, build, run, training, staffing, market, mixed]
+    - name: customer
+      type: string
+      required: false
+    - name: opportunity
+      type: string
+      required: false
+    - name: business_unit
+      type: string
+      required: false
+    - name: status
+      type: string
+      required: false
+    - name: year
+      type: integer
+      required: false
+
+  sxa-legacy:
+    - name: schema
+      type: string
+      required: false
+    - name: table
+      type: string
+      required: false
+    - name: column
+      type: string
+      required: false
+    - name: relationship
+      type: string
+      required: false
+    - name: record_type
+      type: string
+      required: false
+    - name: date
+      type: string
+      format: date
+      required: false
+    - name: customer
+      type: string
+      required: false
+    - name: project
+      type: string
+      required: false
+    - name: snapshot_id
+      type: string
+      required: true
+      description: >-
+        Identifies the versioned dump snapshot this row was imported from
+        (ADR-0206) - never overwritten in place; a re-import creates a new
+        snapshot_id.
+    - name: import_timestamp
+      type: string
+      format: date-time
+      required: true
+    - name: checksum
+      type: string
+      required: true
+      description: SHA-256 checksum of the source dump file this row came from.
+
+  adv:
+    - name: project_type
+      type: string
+      required: false
+    - name: project
+      type: string
+      required: false
+    - name: customer
+      type: string
+      required: false
+    - name: status
+      type: string
+      required: false
+    - name: owner
+      type: string
+      required: false
+    - name: business_unit
+      type: string
+      required: false
+    - name: date
+      type: string
+      format: date
+      required: false

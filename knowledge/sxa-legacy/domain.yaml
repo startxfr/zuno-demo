@@ -1,0 +1,55 @@
+# Knowledge domain: sxa-legacy (ADR-0202)
+#
+# Historical SXA schema/data imported from a legacy SQL dump snapshot. NO
+# physical database names, service endpoints, secrets or credentials belong
+# in this file - see platform/bindings/knowledge/bindings.yaml (ADR-0204,
+# WP-21) for the physical binding.
+
+id: knowledge.sxa-legacy
+title: Legacy SXA historical knowledge
+description: >-
+  Historical schema/data imported from an approved legacy SXA SQL dump
+  snapshot (ADR-0016, ADR-0025). Immutable between imports: a re-import
+  creates a new versioned snapshot rather than mutating indexed content in
+  place. Distinct from `knowledge.sales`, which never serves this domain's
+  content and vice versa (ADR-0206). Restricted to Sales and Direction
+  business roles by default (policies/knowledge/knowledge-policy.yaml).
+
+taxonomy:
+  source_classes:
+    - sxa-dump   # WP-22 load-sxa-dump adapter; WP-23 snapshot discipline
+
+  # Historical schema/data taxonomy (ADR-0202): the legacy SXA relational
+  # model rather than a document taxonomy.
+  record_dimensions:
+    - schema
+    - table
+    - column
+    - relationship
+    - record_type
+    - date
+    - customer
+    - project
+
+freshness:
+  # No scheduled cadence: this domain only changes when the operator loads
+  # a new approved dump snapshot (WP-22's on-demand path), never on a
+  # recurring schedule.
+  objective: on-demand
+  rationale: >-
+    The source is a point-in-time dump snapshot, not a live system - there
+    is nothing to poll on a schedule.
+
+classification:
+  default_by_source_type:
+    sxa-dump: C3   # sales-history/financial-adjacent legacy data, C3 by default
+
+exempt_from_freshness_enforcement: true   # immutable source (WP-24 / ADR-0205)
+
+policy_ref: policies/knowledge/knowledge-policy.yaml
+
+related_adrs:
+  - ADR-0016   # migrate the legacy SXA schema to PostgreSQL
+  - ADR-0025   # keep sensitive/real commercial data outside the public repo
+  - ADR-0206   # separate current Salesforce knowledge from legacy SXA
+  - ADR-0204   # multi-domain RAG platform generalization (WP-21)

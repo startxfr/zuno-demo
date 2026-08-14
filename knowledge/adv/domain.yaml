@@ -1,0 +1,35 @@
+# Knowledge domain: adv (ADR-0202)
+#
+# ADV/project knowledge asynchronously ingested from Aramis. NO physical
+# database names, service endpoints, secrets or credentials belong in this
+# file - see platform/bindings/knowledge/bindings.yaml (ADR-0204, WP-21)
+# for the physical binding.
+
+id: knowledge.adv
+title: ADV project knowledge
+description: >-
+  Project/delivery knowledge asynchronously ingested from Aramis (project
+  status, ownership, business-unit, delivery history).
+
+taxonomy:
+  source_classes:
+    - aramis   # WP-22 fetch-aramis adapter
+
+freshness:
+  # Realized as a KFP recurring-run schedule (WP-22 / ADR-0105); this is
+  # the objective, not the concrete cron expression.
+  objective: configurable
+  rationale: >-
+    Aramis project state changes at a pace between tech's documentation
+    cadence and sales' hours-scale cadence; the exact schedule is a
+    per-deployment operational choice, not a fixed platform decision.
+
+classification:
+  default_by_source_type:
+    aramis: C2   # business-sensitive (policies/data-classification/classification.yaml)
+
+policy_ref: policies/knowledge/knowledge-policy.yaml
+
+related_adrs:
+  - ADR-0204   # multi-domain RAG platform generalization (WP-21)
+  - ADR-0205   # prefer indexed knowledge for read, live tools for write/freshness

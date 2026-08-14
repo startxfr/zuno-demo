@@ -1,6 +1,6 @@
 # WP-20: Logical knowledge domains and the knowledge policy
 
-- **State:** Not started
+- **State:** In progress (2026-08-15 — Part A merged: `knowledge/` domain descriptors (tech/sales/sxa-legacy/adv) + `knowledge/metadata-schema.yaml` + `platform/docs/check_knowledge_refs.py`, wired blocking in `.github/workflows/lint.yml`. ADR-0202 now Implemented. Part B (ADR-0203 knowledge policy + enforcement) still pending.)
 - **ADRs:** ADR-0202, ADR-0203 (To be implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-21, WP-22, WP-23, WP-24, WP-25, WP-28, and all Phase 3 agent slices
