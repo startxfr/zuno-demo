@@ -58,7 +58,13 @@ PHYSICAL_IDENTIFIER_RE = re.compile(
     re.IGNORECASE,
 )
 
-KNOWLEDGE_REF_RE = re.compile(r"\bknowledge\.[a-z][a-z0-9_-]*\b")
+# Excludes source-file references like `app/knowledge.py` (a "/" right
+# before "knowledge" means a path component, not a domain reference) and
+# common non-domain file extensions immediately after the dot - no real
+# domain id collides with any of these.
+KNOWLEDGE_REF_RE = re.compile(
+    r"(?<![\w/])knowledge\.(?!py\b|md\b|yaml\b|yml\b|json\b|sql\b)[a-z][a-z0-9_-]*\b"
+)
 
 
 @dataclass

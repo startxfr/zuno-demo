@@ -38,9 +38,14 @@ def test_tekos_loads_from_the_real_bundle() -> None:
     assert tekos.preferred_classification == "C1"
     assert tekos.rag_top_k == 5
     assert set(tekos.declared_tools()) == {"search_confluence", "web_search", "list_drive_files"}
+    # ADR-0203: declared_knowledge() is the union of every task's own
+    # allowed_knowledge, mirroring declared_tools() exactly - there is no
+    # separate agent-level field.
+    assert set(tekos.declared_knowledge()) == {"knowledge.tech"}
 
     task = tekos.tasks["answer-technical-question"]
     assert task.allowed_tools == ["search_confluence", "web_search"]
+    assert task.allowed_knowledge == ["knowledge.tech"]
     assert task.prompt and "Tekos" in task.prompt
 
 

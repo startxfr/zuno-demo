@@ -2,8 +2,9 @@
 # components/mcp-gateway/Dockerfile - this image bakes in the OKF v0.2
 # Markdown bundles (ADR-0038, agents/<name>/agent.okf.md + tasks/*.md +
 # prompts/*.md) that app/registry.py's AgentRegistry (ADR-0039) loads at
-# startup, so an agent-definition edit ships as an ordinary redeploy of
-# this runtime:
+# startup, plus policies/knowledge/knowledge-policy.yaml (ADR-0203) that
+# app/knowledge.py's KnowledgePolicyStore loads at startup - both ship as
+# an ordinary redeploy of this runtime:
 #
 #   docker build -f components/agent-runtime/Dockerfile -t zuno/agent-runtime:local .
 FROM python:3.11-slim AS base
@@ -29,6 +30,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY components/agent-runtime/app ./app
 COPY agents ./agents
+# ADR-0203: knowledge-domain policy, same graceful-degradation posture as
+# mcp-gateway's policy files if this is ever absent at build time - see
+# app/knowledge.py's KnowledgePolicyStore.
+COPY policies/knowledge ./policies/knowledge
 # ADR-0106: the same digest/verify logic build-publish.yml's signing job
 # and platform/supply-chain/verify_signatures.py use - imported by
 # app/registry.py as `app._sign_okf_bundle`, never duplicated, so the
@@ -38,6 +43,7 @@ COPY platform/supply-chain/sign_okf_bundle.py ./app/_sign_okf_bundle.py
 ENV AGENTS_DIR=/app/agents \
     ZUNO_REQUIRE_SIGNED_BUNDLES=false \
     ZUNO_OKF_SIGNATURES_DIR=/app/okf-signatures \
+    KNOWLEDGE_POLICY_PATH=/app/policies/knowledge/knowledge-policy.yaml \
     PYTHONUNBUFFERED=1
 
 # No provider-routing config or provider API keys here anymore (ADR-0009

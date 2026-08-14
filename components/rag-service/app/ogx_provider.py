@@ -103,15 +103,29 @@ def should_use_ogx() -> bool:
     return enabled()
 
 
-def _passes_filters(attributes: Dict[str, Any], product: Optional[str], version: Optional[str], caller_groups: List[str]) -> bool:
+def _passes_filters(
+    attributes: Dict[str, Any],
+    product: Optional[str],
+    version: Optional[str],
+    caller_groups: List[str],
+    domains: Optional[List[str]] = None,
+    technology: Optional[str] = None,
+) -> bool:
     """The exact semantics of app/search.py:_filter_clause, applied to a
     plain dict instead of a SQL WHERE clause - see that function's
-    docstring for the ACL fail-closed rationale.
+    docstring for the ACL fail-closed rationale and the ADR-0202/ADR-0203
+    domain/technology additions.
     """
     if product and attributes.get("product") != product:
         return False
     if version and attributes.get("version") != version:
         return False
+    if technology and attributes.get("technology") != technology:
+        return False
+    if domains:
+        doc_domain = attributes.get("domain", "knowledge.tech")
+        if doc_domain not in domains:
+            return False
 
     acl_groups = attributes.get("acl_groups")
     if acl_groups:
@@ -150,6 +164,8 @@ def _row_to_result(row: Dict[str, Any]) -> Dict[str, Any]:
         "product": attributes.get("product"),
         "version": attributes.get("version"),
         "stale": _is_stale(attributes),
+        # ADR-0202: same untagged-row default as app/search.py:_row_to_doc.
+        "domain": attributes.get("domain", "knowledge.tech"),
         "_attributes": attributes,  # internal only, stripped before return
     }
 
@@ -161,6 +177,8 @@ async def ogx_search(
     version: Optional[str] = None,
     language: Optional[str] = None,
     caller_groups: Optional[List[str]] = None,
+    domains: Optional[List[str]] = None,
+    technology: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Same signature/return shape as app/search.py:hybrid_search - see
     that function's docstring and this module's docstring for the contract
@@ -202,7 +220,7 @@ async def ogx_search(
     filtered = []
     for row in rows:
         doc = _row_to_result(row)
-        if not _passes_filters(doc.pop("_attributes"), product, version, caller_groups):
+        if not _passes_filters(doc.pop("_attributes"), product, version, caller_groups, domains, technology):
             continue
         filtered.append(doc)
         if len(filtered) >= top_k:

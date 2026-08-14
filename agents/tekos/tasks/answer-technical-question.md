@@ -6,6 +6,8 @@ zuno:
   allowed_tools:
     - search_confluence
     - web_search
+  allowed_knowledge:
+    - knowledge.tech
 ---
 
 # Answer a technical question

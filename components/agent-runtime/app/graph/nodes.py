@@ -14,6 +14,7 @@ from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
 from app.graph.state import AgentState
+from app.knowledge import KnowledgePolicyStore, evaluate_knowledge
 from app.registry import AgentRegistry
 
 logger = logging.getLogger("agent_runtime.graph")
@@ -77,6 +78,7 @@ def _escalate(current: str, candidate: str) -> str:
 
 
 _model_router = ModelRouter()
+_knowledge_store = KnowledgePolicyStore()
 
 # ADR-0046: "Similarity alone can return an incorrect OpenShift version
 # even when the user names a version" - these deterministic pre-ranking
@@ -127,9 +129,37 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     replacing the previous fixed C1 baseline - rag-service didn't carry
     per-document classification metadata before this ADR, so every
     retrieved doc really was C1 by construction; that's no longer true.
+
+    ADR-0203: before calling rag-service at all, evaluates the fail-closed
+    knowledge-domain intersection (agent ceiling x this task's own
+    allowed_knowledge x caller groups x knowledge-policy.yaml) and only
+    retrieves from the domains that pass. If nothing is authorized, this
+    skips the rag-service call entirely rather than making an unscoped
+    request - the same "no widening" posture tool_call_node already applies
+    to search_confluence, one layer up (a full policy-evaluation function
+    here, not just a local declaration check, since there is no MCP Gateway
+    between this runtime and rag-service to enforce it centrally).
     """
     product, version = _extract_product_version(state["message"])
     language = _detect_language(state["message"])
+    caller_groups = state.get("groups", [])
+
+    decision = evaluate_knowledge(
+        store=_knowledge_store,
+        agent_declared=_TEKOS.declared_knowledge(),
+        task_allowed=_ANSWER_TASK.allowed_knowledge,
+        caller_groups=caller_groups,
+    )
+    if not decision.authorized_domains:
+        logger.warning(
+            "no knowledge domain authorized for this call, skipping retrieval: %s", decision.denied
+        )
+        return {
+            "retrieved_docs": [],
+            "effective_classification": TEKOS_BASE_CLASSIFICATION,
+            "errors": state.get("errors", []) + [f"retrieve: no authorized knowledge domain ({decision.denied})"],
+        }
+
     try:
         docs = await search(
             query=state["message"],
@@ -137,7 +167,8 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             product=product,
             version=version,
             language=language,
-            caller_groups=state.get("groups", []),
+            caller_groups=caller_groups,
+            domains=decision.authorized_domains,
         )
     except RagClientError as exc:
         logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)

@@ -1,0 +1,89 @@
+# Policy: knowledge - RAG knowledge-domain authorization data (ADR-0203,
+# ADR-0202).
+#
+# This file is the authoritative, GitOps-managed platform-policy layer the
+# Agent Runtime loads at startup and re-reads on reload, analogous to how
+# policies/tools/tool-policy.yaml governs MCP tool calls (ADR-0011). ADR-0203
+# requires ALL of the following to agree before a knowledge domain may be
+# retrieved from:
+#
+#   allowed = agent_declaration ∩ task_allowed_knowledge ∩ user_group_rights ∩ document_acl_classification ∩ platform_knowledge_policy
+#
+# Where each factor comes from:
+#   1. agent_declaration       - the union of every task an agent bundle
+#                                 declares (agents/<agent>/tasks/*.md's
+#                                 zuno.allowed_knowledge) - the ceiling no
+#                                 single task can widen. Derived, not a
+#                                 separate agent-level field - see
+#                                 agents/tekos/agent.okf.md's body prose and
+#                                 components/agent-runtime/app/registry.py:
+#                                 AgentDefinition.declared_knowledge().
+#   2. task_allowed_knowledge  - the specific OKF task's own
+#                                 zuno.allowed_knowledge list
+#                                 (agents/<agent>/tasks/<task>.md) - may
+#                                 narrow, never widen, the agent's ceiling.
+#   3. user_group_rights       - the calling user's Keycloak `groups` claim
+#                                 (JWT issued by the `zuno` realm, ADR-0012/
+#                                 ADR-0013) must intersect this entry's
+#                                 `allowed_groups`.
+#   4. document_acl_classification - per-chunk `acl_groups`/`classification`
+#                                 metadata, enforced independently by
+#                                 components/rag-service/app/search.py's
+#                                 existing `?|` filter - this file does not
+#                                 duplicate that check, only the domain-level
+#                                 gate above it.
+#   5. platform_knowledge_policy - THIS FILE: the domain must be listed
+#                                 below and the caller's groups must appear
+#                                 in its `allowed_groups`.
+#
+# All five must independently permit retrieval. Any single "no" is a "no" -
+# there is no override. The Agent Runtime must fail closed (skip retrieval
+# for that domain, never widen to a different one) if this file fails to
+# load, if a requested domain is absent from it, or if the caller's `groups`
+# claim cannot be validated against the realm's JWKS (see
+# platform/identity/README.md).
+#
+# Schema per domain entry (keyed by the knowledge/<domain>/domain.yaml id):
+#   allowed_groups:      list of Keycloak `zuno` realm group names (see
+#                         platform/identity/README.md) permitted to retrieve
+#                         from this domain, subject to the other four
+#                         factors above still applying.
+#   min_classification:  optional informational reference to the domain's
+#                         default classification floor (see the matching
+#                         knowledge/<domain>/domain.yaml's `classification`
+#                         block). Actual enforcement stays chunk-level
+#                         (factor 4 above); this field does not itself gate
+#                         anything yet (WP-24 wires classification-aware
+#                         freshness/trust scoring on top of it).
+#   source_restrictions: optional list of `source_type` values this entry
+#                         further restricts retrieval to, for a domain that
+#                         mixes multiple source types.
+
+domains:
+  knowledge.tech:
+    allowed_groups:
+      - consultant
+      - board
+
+  knowledge.sales:
+    allowed_groups:
+      - sales
+      - adv
+      - board
+    min_classification: C2
+
+  knowledge.sxa-legacy:
+    # WP-23 (ADR-0206) narrows this further with deterministic query
+    # capabilities and snapshot discipline. "Direction" (ADR-0206's stated
+    # business role) maps to the existing `board` Keycloak group - no
+    # separate `direction` group exists in the realm.
+    allowed_groups:
+      - sales
+      - board
+    min_classification: C3
+
+  knowledge.adv:
+    allowed_groups:
+      - adv
+      - board
+    min_classification: C2

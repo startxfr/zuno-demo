@@ -74,6 +74,8 @@ async def search(payload: SearchRequest) -> SearchResponse:
                     version=payload.version,
                     language=payload.language,
                     caller_groups=payload.caller_groups,
+                    domains=payload.domains,
+                    technology=payload.technology,
                 )
             else:
                 result = await hybrid_search(
@@ -83,6 +85,8 @@ async def search(payload: SearchRequest) -> SearchResponse:
                     version=payload.version,
                     language=payload.language,
                     caller_groups=payload.caller_groups,
+                    domains=payload.domains,
+                    technology=payload.technology,
                 )
         except Exception as exc:
             logger.error("search failed for query=%r (provider=%s): %s", payload.query, call.provider, exc)

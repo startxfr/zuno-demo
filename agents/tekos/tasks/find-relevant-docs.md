@@ -5,6 +5,8 @@ title: Find relevant documentation
 zuno:
   allowed_tools:
     - search_confluence
+  allowed_knowledge:
+    - knowledge.tech
 ---
 
 # Find relevant documentation

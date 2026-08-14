@@ -646,3 +646,30 @@ under `docs/adr/`.
   Vault restore via a new PVC from the snapshot, GitOps config needing no
   separate backup (git is the backup). ADR-0112 stays Partially
   implemented — both restore drills are unexecuted operator follow-up.
+
+### Dated entries (roadmap work packages, v0.2)
+
+- **2026-08-15 (ADR-0202/ADR-0203, WP-20)**: introduced the four logical
+  knowledge-domain identifiers (`knowledge.tech`, `knowledge.sales`,
+  `knowledge.sxa-legacy`, `knowledge.adv`) as a declarative repo contract:
+  `knowledge/<domain>/domain.yaml` (taxonomy, freshness objective,
+  classification defaults — no physical DB/endpoint/secret) +
+  `knowledge/metadata-schema.yaml` + `platform/docs/check_knowledge_refs.py`
+  (wired blocking in CI, validates descriptors and rejects any
+  `knowledge.*` reference under `agents/`/`policies/` not declared there).
+  `policies/knowledge/knowledge-policy.yaml` maps each domain to allowed
+  Keycloak groups, analogous to `policies/tools/tool-policy.yaml`. New
+  `zuno.allowed_knowledge` OKF task field, declared on Tekos's
+  `answer-technical-question`/`find-relevant-docs` tasks
+  (`knowledge.tech`); the agent-level ceiling is a derived union
+  (`AgentDefinition.declared_knowledge()`), mirroring `declared_tools()` —
+  no separate agent-level field. `components/agent-runtime/app/
+  knowledge.py` (`KnowledgePolicyStore` + `evaluate_knowledge()`) enforces
+  the fail-closed ADR-0203 intersection (agent ceiling ∩ task
+  `allowed_knowledge` ∩ caller groups ∩ policy) in `retrieve_node` before
+  every rag-service call, skipping retrieval entirely when nothing is
+  authorized. rag-service gained an additive `domains`/`technology` filter
+  (`app/search.py`, `app/ogx_provider.py` in lockstep for parity) as
+  defense in depth; untagged legacy rows default to `knowledge.tech`. Both
+  ADRs fully repo-provable — no operator follow-up. Physical bindings/
+  per-domain databases are WP-21; `stale_after` enforcement is WP-24.

@@ -23,6 +23,19 @@ class SearchRequest(BaseModel):
     # no groups - only ACL-unrestricted documents are returned (fail
     # closed, never fail open).
     caller_groups: List[str] = Field(default_factory=list)
+    # ADR-0203: defense in depth. The caller (Agent Runtime) has already
+    # evaluated the full agent/task/group/policy intersection
+    # (app/knowledge.py:evaluate_knowledge()) and sends only the domains it
+    # authorized; this service applies the list as an additional filter
+    # rather than trusting the caller alone. Additive/optional: omitted or
+    # empty means no domain filtering (pre-ADR-0202 rows have no `domain`
+    # metadata key and are treated as knowledge.tech - see
+    # app/search.py:_filter_clause).
+    domains: List[str] = Field(default_factory=list)
+    # ADR-0202: the one canonical cross-source key official web
+    # documentation and Confluence chunks both use for knowledge.tech - a
+    # hard filter like product/version, not a ranking preference.
+    technology: Optional[str] = None
 
 
 class SearchResult(BaseModel):
@@ -39,6 +52,12 @@ class SearchResult(BaseModel):
     product: Optional[str] = None
     version: Optional[str] = None
     stale: bool = False
+    # ADR-0202 Operational considerations: "each retrieved item must expose
+    # domain/source/provenance/freshness metadata in traces and citations".
+    # Untagged legacy rows default to knowledge.tech (see
+    # app/search.py:_row_to_doc), the same convention the domain filter
+    # itself uses.
+    domain: str = "knowledge.tech"
 
 
 class SearchResponse(BaseModel):

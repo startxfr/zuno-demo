@@ -66,6 +66,10 @@ class TaskDefinition:
     title: str
     description: str
     allowed_tools: List[str]
+    # ADR-0203: logical knowledge-domain IDs (knowledge/<domain>/domain.yaml)
+    # this task may retrieve from - declared independently of allowed_tools,
+    # same ceiling/narrowing semantics.
+    allowed_knowledge: List[str] = field(default_factory=list)
     prompt: Optional[str] = None
 
 
@@ -87,6 +91,20 @@ class AgentDefinition:
                 if tool not in tools:
                     tools.append(tool)
         return tools
+
+    def declared_knowledge(self) -> List[str]:
+        """Union of every task's allowed_knowledge - ADR-0203 factor 1
+        (agent declaration): the knowledge-domain ceiling no task can widen.
+        Mirrors declared_tools() exactly; there is no separate agent-level
+        `zuno.allowed_knowledge` field, by the same design choice (see
+        agents/tekos/agent.okf.md's body prose).
+        """
+        domains: List[str] = []
+        for task in self.tasks.values():
+            for domain in task.allowed_knowledge:
+                if domain not in domains:
+                    domains.append(domain)
+        return domains
 
 
 class AgentRegistry:
@@ -197,6 +215,7 @@ class AgentRegistry:
             title=frontmatter.get("title", task_name),
             description=body,
             allowed_tools=list(zuno.get("allowed_tools", [])),
+            allowed_knowledge=list(zuno.get("allowed_knowledge", [])),
             prompt=prompt,
         )
 

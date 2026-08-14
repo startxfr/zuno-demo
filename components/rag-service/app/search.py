@@ -42,7 +42,14 @@ _LANGUAGE_BOOST = 0.01
 _STALE_PENALTY_FACTOR = 0.5
 
 
-def _filter_clause(start_index: int, product: Optional[str], version: Optional[str], caller_groups: List[str]) -> Tuple[str, List[Any]]:
+def _filter_clause(
+    start_index: int,
+    product: Optional[str],
+    version: Optional[str],
+    caller_groups: List[str],
+    domains: Optional[List[str]] = None,
+    technology: Optional[str] = None,
+) -> Tuple[str, List[Any]]:
     """Builds an " AND ..." SQL fragment applied identically to both the
     vector and full-text candidate queries: ADR-0046's deterministic
     product/version filters when the caller supplied them, plus mandatory
@@ -52,6 +59,19 @@ def _filter_clause(start_index: int, product: Optional[str], version: Optional[s
     matching caller group is never returned (fail closed, not fail open).
     Every value is a bound asyncpg positional parameter, never
     string-interpolated - the SQL text itself contains no caller input.
+
+    ADR-0203: domains is defense in depth - the caller (Agent Runtime) has
+    already evaluated the full knowledge-domain policy intersection and
+    sends only what it authorized. Additive/optional: an empty/absent list
+    applies no domain clause at all (pre-ADR-0202 rows carry no `domain`
+    metadata key; once a caller does send domains, such untagged rows are
+    treated as knowledge.tech - the same default app/schemas.py:SearchResult
+    and _row_to_doc below use, so a domain-scoped query still sees legacy
+    tech content instead of silently losing it).
+
+    ADR-0202: technology is a hard filter (like product/version), not a
+    ranking preference - the one canonical cross-source key that lets a
+    query combine official web documentation and Confluence chunks.
     """
     clauses = []
     params: List[Any] = []
@@ -64,6 +84,17 @@ def _filter_clause(start_index: int, product: Optional[str], version: Optional[s
     if version:
         clauses.append(f"metadata ->> 'version' = ${idx}")
         params.append(version)
+        idx += 1
+    if technology:
+        clauses.append(f"metadata ->> 'technology' = ${idx}")
+        params.append(technology)
+        idx += 1
+    if domains:
+        clauses.append(
+            f"((metadata ? 'domain' AND metadata ->> 'domain' = ANY(${idx}::text[])) "
+            f"OR (NOT (metadata ? 'domain') AND 'knowledge.tech' = ANY(${idx}::text[])))"
+        )
+        params.append(domains)
         idx += 1
 
     # A document with no acl_groups key, an empty array, or a null value is
@@ -136,6 +167,11 @@ def _row_to_doc(row) -> Dict[str, Any]:
         "product": metadata.get("product"),
         "version": metadata.get("version"),
         "stale": _is_stale(metadata),
+        # ADR-0202: untagged legacy rows default to knowledge.tech - the
+        # same convention _filter_clause's domain clause above uses, so a
+        # domain-scoped query and this default never disagree about what a
+        # tagless row belongs to.
+        "domain": metadata.get("domain", "knowledge.tech"),
     }
 
 
@@ -160,6 +196,8 @@ async def hybrid_search(
     version: Optional[str] = None,
     language: Optional[str] = None,
     caller_groups: Optional[List[str]] = None,
+    domains: Optional[List[str]] = None,
+    technology: Optional[str] = None,
 ) -> Dict[str, Any]:
     pool = get_pool()
     if pool is None:
@@ -169,7 +207,7 @@ async def hybrid_search(
     top_k = max(1, min(top_k, config.MAX_TOP_K))
     fetch_n = max(top_k * 4, 20)  # over-fetch each ranked list before fusion
 
-    filter_sql, filter_params = _filter_clause(3, product, version, caller_groups)
+    filter_sql, filter_params = _filter_clause(3, product, version, caller_groups, domains, technology)
 
     vector_used = False
     vector_rows: List[Any] = []
@@ -220,6 +258,7 @@ async def hybrid_search(
                 "product": doc["product"],
                 "version": doc["version"],
                 "stale": doc["stale"],
+                "domain": doc["domain"],
             }
         )
 

@@ -24,6 +24,8 @@ async def search(
     version: Optional[str] = None,
     language: Optional[str] = None,
     caller_groups: Optional[List[str]] = None,
+    domains: Optional[List[str]] = None,
+    technology: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """ADR-0046: product/version are deterministic pre-ranking filters
     (set by app/graph/nodes.py:_extract_product_version when the user's
@@ -32,6 +34,15 @@ async def search(
     documents server-side (fail closed - see that service's own
     app/search.py) rather than this client trusting the response already
     excluded everything the caller can't see.
+
+    ADR-0203: domains is the set of knowledge domains
+    app/knowledge.py:evaluate_knowledge() already authorized for this call -
+    rag-service applies it as defense in depth (its own filter, on top of
+    the authorization decision already made here); never sent empty when a
+    domain-aware call is intended, since an absent/empty list means "no
+    domain filtering" server-side (ADR-0202 acceptance: one canonical
+    `technology` filters web + Confluence chunks - a hard filter like
+    product/version, forwarded the same way).
     """
     body: Dict[str, Any] = {"query": query, "top_k": top_k, "caller_groups": caller_groups or []}
     if product:
@@ -40,6 +51,10 @@ async def search(
         body["version"] = version
     if language:
         body["language"] = language
+    if domains:
+        body["domains"] = domains
+    if technology:
+        body["technology"] = technology
 
     try:
         async with httpx.AsyncClient(timeout=RAG_TIMEOUT_SECONDS) as client:

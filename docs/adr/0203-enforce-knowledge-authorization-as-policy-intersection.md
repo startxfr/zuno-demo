@@ -1,6 +1,6 @@
 # ADR-0203: Enforce knowledge authorization as policy intersection
 
-- **Status:** To be implemented
+- **Status:** Implemented - see `policies/knowledge/`, `components/rag-service/app/search.py`.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

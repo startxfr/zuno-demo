@@ -59,3 +59,11 @@ Conforms to `platform/okf/schema/zuno-okf-v0.2.schema.json` (ADR-0005,
 ADR-0006, ADR-0038). Task detail lives in `tasks/*.md`, linked by name from
 `zuno.tasks` above; the system prompt for the primary task lives in
 `prompts/answer-technical-question.md`.
+
+Tekos has no agent-level `zuno.allowed_knowledge` field (ADR-0203): like its
+tool ceiling, its knowledge-domain ceiling is derived as the union of every
+task's own `zuno.allowed_knowledge`
+(`components/agent-runtime/app/registry.py:AgentDefinition.declared_knowledge()`,
+mirroring `declared_tools()`) rather than declared separately here - today
+that union is `[knowledge.tech]`, from `tasks/answer-technical-question.md`
+and `tasks/find-relevant-docs.md`.

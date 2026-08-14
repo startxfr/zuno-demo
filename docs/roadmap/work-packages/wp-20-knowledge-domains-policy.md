@@ -1,6 +1,6 @@
 # WP-20: Logical knowledge domains and the knowledge policy
 
-- **State:** In progress (2026-08-15 — Part A merged: `knowledge/` domain descriptors (tech/sales/sxa-legacy/adv) + `knowledge/metadata-schema.yaml` + `platform/docs/check_knowledge_refs.py`, wired blocking in `.github/workflows/lint.yml`. ADR-0202 now Implemented. Part B (ADR-0203 knowledge policy + enforcement) still pending.)
+- **State:** Done (2026-08-15 — Part A merged: `knowledge/` domain descriptors (tech/sales/sxa-legacy/adv) + `knowledge/metadata-schema.yaml` + `platform/docs/check_knowledge_refs.py`, wired blocking in `.github/workflows/lint.yml`. Part B merged: `policies/knowledge/knowledge-policy.yaml` + README; `zuno.allowed_knowledge` added to the task OKF schema and declared on Tekos's `answer-technical-question`/`find-relevant-docs` tasks (`knowledge.tech`); `components/agent-runtime/app/knowledge.py` (`KnowledgePolicyStore` + `evaluate_knowledge()`) enforces the fail-closed ADR-0203 intersection in `retrieve_node` before every rag-service call; rag-service gained an additive `domains`/`technology` filter in `app/search.py`/`app/ogx_provider.py`/`app/schemas.py` as defense in depth (parity maintained between both providers). Both ADR-0202 and ADR-0203 now Implemented.)
 - **ADRs:** ADR-0202, ADR-0203 (To be implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-21, WP-22, WP-23, WP-24, WP-25, WP-28, and all Phase 3 agent slices

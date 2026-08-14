@@ -23,7 +23,7 @@
       "minLength": 1
     },
     "zuno": {
-      "description": "[ZUNO EXT] Tool-authorization declaration for this task.",
+      "description": "[ZUNO EXT] Tool-authorization and knowledge-authorization declarations for this task.",
       "type": "object",
       "additionalProperties": false,
       "required": ["allowed_tools"],
@@ -43,6 +43,15 @@
               "web_search",
               "send_technical_report_email"
             ]
+          },
+          "uniqueItems": true
+        },
+        "allowed_knowledge": {
+          "description": "Logical knowledge-domain IDs (knowledge/<domain>/domain.yaml, ADR-0202) this task may retrieve from. Declared independently of allowed_tools (ADR-0203). Effective authorization is the intersection of this list with the agent's declared-knowledge ceiling (the union of every task's allowed_knowledge - see components/agent-runtime/app/registry.py:AgentDefinition.declared_knowledge()), the caller's group rights and policies/knowledge/knowledge-policy.yaml - this field is a ceiling, not a grant on its own. Optional/omitted for tasks that never call RAG retrieval.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^knowledge\\.[a-z][a-z0-9_-]*$"
           },
           "uniqueItems": true
         }
