@@ -1,6 +1,6 @@
 # WP-05: OKF bundle signing and validation (promotes ADR-0106)
 
-- **State:** Not started
+- **State:** Operator pending (2026-08-14 — repo work merged: sign_okf_bundle.py, validate_okf_bundle.py, agent-runtime registry enforcement + Dockerfile cosign install, CI wiring, ansible check task, full test coverage. Awaiting WP-04 stage 2 credentials to produce the first real signed bundle, then flipping ZUNO_REQUIRE_SIGNED_BUNDLES on.)
 - **ADRs:** ADR-0106 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-04 stage 1 (merged)
 - **Blocks:** —

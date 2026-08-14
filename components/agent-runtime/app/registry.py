@@ -7,22 +7,33 @@ in app/graph/nodes.py. Onboarding a sixth agent should mainly mean adding a
 new bundle under agents/<name>/, not changing this module.
 
 Schema validation here checks *shape* (required keys, matches directory
-name) rather than a cryptographic signature - "loads, validates and caches
-signed OKF bundles" per the ADR text is aspirational for a future signing
-pipeline (see ADR-0038's Security considerations on provenance); this is the
-v0 slice of that requirement.
+name). ADR-0106 (2026-08-14) is the signing pipeline "loads, validates and
+caches signed OKF bundles" was aspirational for: when
+`ZUNO_REQUIRE_SIGNED_BUNDLES` is enabled, a bundle additionally needs a
+verifiable signature (`app/_sign_okf_bundle.py`, baked in from
+`platform/supply-chain/sign_okf_bundle.py` - the exact same digest/verify
+code CI uses, never duplicated, so the runtime can never disagree with CI
+about what a bundle's digest is). Default OFF: no bundle has a real cosign
+signature yet (WP-04 stage 2's credentialed CI run hasn't happened), so
+requiring one today would refuse to start at all.
 """
 
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
 
+logger = logging.getLogger("agent_runtime.registry")
+
 AGENTS_DIR = os.getenv("AGENTS_DIR", "/app/agents")
+REQUIRE_SIGNED_BUNDLES = os.getenv("ZUNO_REQUIRE_SIGNED_BUNDLES", "false").strip().lower() == "true"
+OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 
 
 class OkfError(Exception):
@@ -79,10 +90,28 @@ class AgentDefinition:
 
 
 class AgentRegistry:
-    def __init__(self, agents_dir: str = AGENTS_DIR):
+    def __init__(
+        self,
+        agents_dir: str = AGENTS_DIR,
+        require_signed_bundles: bool = REQUIRE_SIGNED_BUNDLES,
+        signatures_dir: str = OKF_SIGNATURES_DIR,
+    ):
         self._agents_dir = Path(agents_dir)
+        self._require_signed = require_signed_bundles
+        self._signatures_dir = Path(signatures_dir)
         self._agents: Dict[str, AgentDefinition] = {}
         self.load_errors: List[str] = []
+
+        if self._require_signed and shutil.which("cosign") is None:
+            # Fail closed and loud at construction time, not per-agent: a
+            # deployment that asks for enforcement but cannot possibly
+            # verify anything is a fatal misconfiguration (ADR-0106 fail-
+            # closed requirement), not a partial/degraded load.
+            raise OkfError(
+                "ZUNO_REQUIRE_SIGNED_BUNDLES is true but no 'cosign' binary is on PATH - "
+                "cannot verify any bundle signature"
+            )
+
         self._load_all()
 
     def _load_all(self) -> None:
@@ -98,7 +127,35 @@ class AgentRegistry:
             except OkfError as exc:
                 self.load_errors.append(str(exc))
 
+    def _verify_signature(self, name: str, agent_dir: Path) -> None:
+        """ADR-0106: only called when signature enforcement is on. Requires
+        a `{name}.sig`/`{name}.pem` pair in the signatures directory (the
+        exact output shape `platform/supply-chain/sign_okf_bundle.py sign`
+        produces) and a successful `cosign verify-blob` against a freshly
+        recomputed digest - the same verification path
+        `verify_signatures.py`/CI would run, imported rather than
+        duplicated (app/_sign_okf_bundle.py, baked in by the Dockerfile -
+        imported here rather than at module top level so every normal,
+        enforcement-off run - the default, including every local test -
+        never needs that file to exist outside the built image)."""
+        from app import _sign_okf_bundle  # noqa: PLC0415 - see docstring
+
+        sig_path = self._signatures_dir / f"{name}.sig"
+        cert_path = self._signatures_dir / f"{name}.pem"
+        if not sig_path.is_file() or not cert_path.is_file():
+            raise OkfError(
+                f"agents/{name}: signature enforcement is on but no signature found at "
+                f"{sig_path}/{cert_path}"
+            )
+        try:
+            _sign_okf_bundle.verify_bundle(agent_dir, sig_path, cert_path)
+        except _sign_okf_bundle.BundleError as exc:
+            raise OkfError(f"agents/{name}: signature verification failed: {exc}") from exc
+
     def _load_agent(self, name: str, index_path: Path) -> AgentDefinition:
+        if self._require_signed:
+            self._verify_signature(name, index_path.parent)
+
         frontmatter, _ = _split_frontmatter(index_path)
         if frontmatter.get("okf_version") != "v0.2" or frontmatter.get("type") != "agent":
             raise OkfError(f"{index_path}: expected okf_version v0.2 / type agent")

@@ -10,13 +10,34 @@ FROM python:3.11-slim AS base
 
 WORKDIR /app
 
+# ADR-0106: keyless cosign verify-blob, used by app/_sign_okf_bundle.py
+# (baked in below) only when ZUNO_REQUIRE_SIGNED_BUNDLES=true (default
+# false - see app/registry.py). Pinned to the same major release
+# .github/workflows/build-publish.yml's sigstore/cosign-installer@v3
+# currently resolves; bump both together. verify-blob needs no network
+# egress beyond Rekor/Fulcio's public endpoints, already reachable from
+# any pod with normal internet access.
+ARG COSIGN_VERSION=v2.4.1
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -sSL -o /usr/local/bin/cosign \
+       "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64" \
+    && chmod +x /usr/local/bin/cosign \
+    && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 COPY components/agent-runtime/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY components/agent-runtime/app ./app
 COPY agents ./agents
+# ADR-0106: the same digest/verify logic build-publish.yml's signing job
+# and platform/supply-chain/verify_signatures.py use - imported by
+# app/registry.py as `app._sign_okf_bundle`, never duplicated, so the
+# runtime can never disagree with CI about what a bundle's digest is.
+COPY platform/supply-chain/sign_okf_bundle.py ./app/_sign_okf_bundle.py
 
 ENV AGENTS_DIR=/app/agents \
+    ZUNO_REQUIRE_SIGNED_BUNDLES=false \
+    ZUNO_OKF_SIGNATURES_DIR=/app/okf-signatures \
     PYTHONUNBUFFERED=1
 
 # No provider-routing config or provider API keys here anymore (ADR-0009

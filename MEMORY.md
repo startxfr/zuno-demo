@@ -733,3 +733,25 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   real end-to-end verification against a live Confluence Cloud tenant
   remains an operator step (WP-02), and ADR-0043's status-line update
   ("confluence... migrated") is deferred until then.
+
+- 2026-08-14 (ADR-0106, roadmap WP-05): OKF agent bundles (`agents/<name>/`)
+  now have a full signing/validation pipeline. `platform/supply-chain/
+  sign_okf_bundle.py` computes a deterministic sha256 digest over a bundle
+  tree (sorted relative-path:content-hash pairs) and signs/verifies it
+  with keyless `cosign sign-blob`/`verify-blob` (same GitHub OIDC identity
+  as ADR-0115's image signing), wired as a new `sign-okf-bundles` job in
+  `build-publish.yml` (one signature per agent, uploaded as a build
+  artifact - never committed to git). `platform/supply-chain/
+  validate_okf_bundle.py` checks schema (OKF structure) and policy
+  validity (every declared tool resolves against `tool-policy.yaml`,
+  feature-detecting a future `knowledge-policy.yaml`) with no signature
+  needed - wired into `lint.yml` as a hard gate and into `ansible/roles/
+  agents`' Day 1 check. `components/agent-runtime/app/registry.py` gained
+  `ZUNO_REQUIRE_SIGNED_BUNDLES` (default false) - when enabled, refuses
+  any bundle without a verified signature and refuses to even start if no
+  `cosign` binary is present; imports `sign_okf_bundle.py`'s digest/verify
+  logic directly (baked into the image at `app/_sign_okf_bundle.py` by the
+  Dockerfile, which now also installs `cosign`) rather than duplicating
+  it. No bundle has a real signature yet (needs WP-04 stage 2's
+  credentialed CI run), so ADR-0106 stays Partially implemented and the
+  flag stays off.

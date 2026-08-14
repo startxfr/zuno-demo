@@ -129,3 +129,33 @@ jobs:
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}
           DIGEST: ${{ steps.build.outputs.digest }}
+
+  # ADR-0106: sign every OKF agent bundle (agents/<agent>/) with the same
+  # keyless GitHub OIDC identity as the image signing above, over a
+  # canonical bundle digest rather than an OCI image (an OKF bundle is a
+  # directory of Markdown/YAML, not a container) - see
+  # platform/supply-chain/sign_okf_bundle.py's own docstring.
+  sign-okf-bundles:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # cosign keyless signing (Sigstore/Fulcio via OIDC)
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [tekos, comage, advantage, finage, arkos]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign the ${{ matrix.agent }} OKF bundle (keyless)
+        run: |
+          python3 platform/supply-chain/sign_okf_bundle.py sign "agents/${{ matrix.agent }}" \
+            --output-dir "okf-signatures/${{ matrix.agent }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: okf-signature-${{ matrix.agent }}
+          path: okf-signatures/${{ matrix.agent }}

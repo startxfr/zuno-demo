@@ -92,6 +92,56 @@ Optional digests are recorded in an append-only audit ledger,
 python3 platform/supply-chain/pin_release.py --manifest <path> [--dry-run]
 ```
 
+## sign_okf_bundle.py / validate_okf_bundle.py (ADR-0106, WP-05)
+
+OKF agent bundle signing and validation (`agents/<agent>/`), the same
+keyless-Cosign convention as `verify_signatures.py` above, applied to a
+directory of Markdown/YAML instead of an OCI image.
+
+`sign_okf_bundle.py` computes a canonical sha256 digest over a bundle tree
+(sorted `relative_path:content_hash` pairs, independent of filesystem
+iteration order) and signs/verifies it with `cosign sign-blob`/
+`verify-blob`:
+
+```bash
+python3 platform/supply-chain/sign_okf_bundle.py digest agents/tekos
+python3 platform/supply-chain/sign_okf_bundle.py sign agents/tekos --output-dir /tmp/sigs
+python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \
+    --signature /tmp/sigs/tekos.sig --certificate /tmp/sigs/tekos.pem
+```
+
+`sign` needs a real GitHub Actions OIDC run (Sigstore Fulcio/Rekor) and
+cannot succeed locally, same honest limitation as `build-publish.yml`'s
+image signing; `verify` needs only the bundle plus its signature/
+certificate files, no credentials. Wired into `build-publish.yml` as a
+`sign-okf-bundles` job (one signature per agent, uploaded as a build
+artifact - bundle signatures are never committed to git, since bundle
+content changes on every commit that touches `agents/`).
+
+`validate_okf_bundle.py` checks the other two ADR-0106 dimensions -
+schema validity (OKF structure) and policy validity (every declared tool
+resolves against `policies/tools/tool-policy.yaml`, feature-detecting
+`policies/knowledge/knowledge-policy.yaml` once it exists) - entirely from
+the checked-out repo, no signature needed:
+
+```bash
+python3 platform/supply-chain/validate_okf_bundle.py [agents/<name> ...]
+```
+
+Wired into `.github/workflows/lint.yml` as a **hard gate** (unlike the two
+signature-related checks above): schema/policy validity needs nothing a
+PR doesn't already have, so there is no honest reason to leave it
+non-blocking. Also run by `ansible/roles/agents`' Day 1 check
+(`make d1 check agents`).
+
+The Agent Runtime (`components/agent-runtime/app/registry.py`) enforces
+signature verification at startup when `ZUNO_REQUIRE_SIGNED_BUNDLES=true`
+(default `false` - no bundle has a real signature yet), importing
+`sign_okf_bundle.py`'s digest/verify logic directly (baked into the image
+at `app/_sign_okf_bundle.py` by `components/agent-runtime/Dockerfile`,
+which also installs the `cosign` binary) rather than duplicating it, so
+the runtime can never disagree with CI about what a bundle's digest is.
+
 Regression-tested (`tests/test_pin_release.py`, run against a throwaway
 copy of the real chart files - never the repository's own state) because,
 unlike its read-only siblings above, this script mutates chart files.

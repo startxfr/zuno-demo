@@ -38,6 +38,17 @@ jobs:
         continue-on-error: true
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
+      # ADR-0106: schema/policy validity (dimensions 2-3 of the ADR's three
+      # checks) is verifiable on every PR with no signature needed, so this
+      # is a hard gate like check_build_matrix.py above - unlike signature
+      # verification (dimension 1), which has nothing to check at PR time
+      # (bundle signatures are release/CI artifacts, never committed to
+      # git) and is instead enforced at deployment time: the Day 1 agents
+      # check (ansible/roles/agents) and the Agent Runtime registry
+      # startup, gated by ZUNO_REQUIRE_SIGNED_BUNDLES once a real signed
+      # bundle exists (see platform/supply-chain/sign_okf_bundle.py).
+      - name: Validate OKF bundle schema and policy references (ADR-0106)
+        run: python3 platform/supply-chain/validate_okf_bundle.py
       - name: Validate canonical platform documentation (ADR-0323)
         run: python3 platform/docs/check_docs.py
       - name: Lint OpenAPI contracts (ADR-0054)
@@ -115,6 +126,7 @@ jobs:
           python3 tests/test_registry.py
           python3 tests/test_retrieve_metadata.py
           python3 tests/test_auth.py
+          python3 tests/test_bundle_signing.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |
@@ -132,6 +144,9 @@ jobs:
         run: |
           pip install pyyaml
           python3 tests/test_pin_release.py
+      - name: supply-chain sign_okf_bundle.py tests (ADR-0106)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_sign_okf_bundle.py
       - name: sales-db MCP server tests
         working-directory: components/mcp-servers/sales-db
         run: |
