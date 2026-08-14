@@ -1,0 +1,80 @@
+{{- /*
+ADR-0102 (roadmap WP-12). See docs/platform/slo.md for the full SLO
+definition, the metric this depends on (zuno_bff_requests_total, not yet
+emitted - see that doc's "Current gap" section), and the burn-rate
+multiplier derivation. Schema confirmed via `oc explain
+prometheusrule.spec.groups.rules` against the live test cluster
+(monitoring.coreos.com/v1, already installed - part of OpenShift's
+built-in Prometheus Operator, not something this chart installs).
+Referencing an absent metric evaluates to "no series", not an error, so
+this is safe to enable ahead of the metric existing.
+*/ -}}
+{{- if .Values.alerting.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zuno-agent-path-slo
+  namespace: zuno-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  groups:
+    - name: zuno-agent-path-availability-slo
+      rules:
+        # Standard Google SRE multi-window, multi-burn-rate alerting
+        # (https://sre.google/workbook/alerting-on-slos/) for a 99.9%
+        # (0.001 error-budget) SLO. Fast: 14.4x sustained burn exhausts a
+        # 30-day budget in ~2 days - pages. Slow: 6x sustained burn
+        # exhausts it in ~5 days - tickets, does not page.
+        - alert: AgentPathErrorBudgetBurnFast
+          expr: >-
+            (
+              sum(rate(zuno_bff_requests_total{code=~"5.."}[1h]))
+              /
+              sum(rate(zuno_bff_requests_total[1h]))
+              > (14.4 * 0.001)
+            )
+            and
+            (
+              sum(rate(zuno_bff_requests_total{code=~"5.."}[5m]))
+              /
+              sum(rate(zuno_bff_requests_total[5m]))
+              > (14.4 * 0.001)
+            )
+          for: 2m
+          labels:
+            severity: page
+            adr: ADR-0102
+          annotations:
+            summary: "Agent path error budget burning fast (>14.4x sustainable rate)"
+            description: >-
+              The user-facing agent path (frontend -> BFF -> Agent Runtime
+              -> AI Gateway -> model) is burning its 99.9% monthly error
+              budget fast enough to exhaust it in ~2 days if sustained.
+              See docs/platform/slo.md.
+        - alert: AgentPathErrorBudgetBurnSlow
+          expr: >-
+            (
+              sum(rate(zuno_bff_requests_total{code=~"5.."}[6h]))
+              /
+              sum(rate(zuno_bff_requests_total[6h]))
+              > (6 * 0.001)
+            )
+            and
+            (
+              sum(rate(zuno_bff_requests_total{code=~"5.."}[30m]))
+              /
+              sum(rate(zuno_bff_requests_total[30m]))
+              > (6 * 0.001)
+            )
+          for: 15m
+          labels:
+            severity: ticket
+            adr: ADR-0102
+          annotations:
+            summary: "Agent path error budget burning (>6x sustainable rate)"
+            description: >-
+              The user-facing agent path is burning its 99.9% monthly
+              error budget fast enough to exhaust it in ~5 days if
+              sustained. See docs/platform/slo.md.
+{{- end }}

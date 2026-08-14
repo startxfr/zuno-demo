@@ -12,6 +12,28 @@ namespace: zuno-auth
 # match.
 keycloakCRName: zuno
 
+# ADR-0101 (roadmap WP-12): the HA-capable shape. The Keycloak Operator
+# does not auto-create a PodDisruptionBudget (unlike PGO/Bitnami's redis
+# chart, confirmed by its CRD - `oc explain keycloak.spec` has no pdb
+# field), so templates/poddisruptionbudget.yaml hand-authors one. `spec.
+# scheduling.topologySpreadConstraints` IS a real Keycloak CR field
+# (`oc explain keycloak.spec.scheduling.topologySpreadConstraints`,
+# confirmed against the live test cluster) and is set directly on the CR
+# in templates/keycloak.yaml. `spec.instances` above stays at its current
+# demo-grade 1 deliberately - see the poddisruptionbudget/deployment
+# values comment precedent in the other in-scope charts for why (safe at
+# any instance count; raising it is an environment override paired with
+# the operator's failover drill).
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
 # OpenShift apps wildcard domain. Every per-agent client redirect URI in
 # files/realm-zuno.json is templated against this - override for the real
 # cluster before go-live; the checked-in default only works for the example

@@ -39,6 +39,17 @@ postgresVersion: 18
 # bundles pgvector and supports TimescaleDB; templates/postgrescluster.yaml
 # omits spec.image entirely.
 
+# ADR-0101 (roadmap WP-12): applied to both spec.instances and
+# spec.proxy.pgBouncer in templates/postgrescluster.yaml - replicas/PDB
+# were already HA-shaped (PGO auto-manages both), this was the one
+# remaining gap. See that template's own comments for the live-cluster
+# confirmation.
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
 cluster:
   name: zuno-postgresql
   instances: 3  # HA: 1 primary + 2 async replicas, PGO/Patroni auto-failover

@@ -21,6 +21,15 @@ spec:
       serviceAccountName: agent-runtime
       priorityClassName: zuno-workload-default
       automountServiceAccountToken: false
+      {{- if .Values.topologySpreadConstraints.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
+          topologyKey: {{ .Values.topologySpreadConstraints.topologyKey }}
+          whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-runtime
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         seccompProfile:

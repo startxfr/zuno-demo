@@ -173,6 +173,87 @@ def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
                 )
 
 
+# ADR-0101 (roadmap WP-12): the four charts with a raw Deployment PodSpec
+# whose availability shape (PodDisruptionBudget, topologySpreadConstraints,
+# probes) this repo directly authors and controls. Deliberately a
+# separate, narrower list than DEPLOYMENT_CHARTS above (which also covers
+# mcp-sales-db/mcp-confluence/tekos/models) - WP-12's own authoritative
+# scope list names only these four as "runtime/gateways"; the others were
+# never given the mechanism and checking them here would just be a
+# self-inflicted permanent failure, not a real regression.
+AVAILABILITY_CHARTS = ["agent-runtime", "ai-gateway", "mcp-gateway", "rag-service"]
+
+
+def check_availability(chart: str, findings: Findings) -> None:
+    docs = _helm_template(chart)
+    deployments = [d for d in docs if d.get("kind") == "Deployment"]
+    pdbs = [d for d in docs if d.get("kind") == "PodDisruptionBudget"]
+
+    findings.check(f"{chart}: PodDisruptionBudget rendered", len(pdbs) > 0, f"found {len(pdbs)}")
+
+    for dep in deployments:
+        dep_name = dep["metadata"]["name"]
+        pod_spec = _pod_spec_of(dep)
+        findings.check(
+            f"{chart}/{dep_name}: topologySpreadConstraints present",
+            len(pod_spec.get("topologySpreadConstraints", [])) > 0,
+        )
+        for container in pod_spec.get("containers", []):
+            cname = container["name"]
+            findings.check(
+                f"{chart}/{dep_name}/{cname}: livenessProbe present",
+                "livenessProbe" in container,
+            )
+            findings.check(
+                f"{chart}/{dep_name}/{cname}: readinessProbe present",
+                "readinessProbe" in container,
+            )
+
+
+def check_keycloak_availability(findings: Findings) -> None:
+    """Separate from check_keycloak_partial below: the Keycloak Operator's
+    CR has no raw Deployment PodSpec to inspect the way
+    check_availability does - this checks the CR's own
+    spec.scheduling.topologySpreadConstraints field and the hand-authored
+    PodDisruptionBudget alongside it (ADR-0101/WP-12, see that chart's own
+    templates for why the operator needs one authored rather than
+    providing its own).
+    """
+    docs = _helm_template("keycloak", {"keycloak.enabled": "true"})
+    kc = next((d for d in docs if d.get("kind") == "Keycloak"), None)
+    pdbs = [d for d in docs if d.get("kind") == "PodDisruptionBudget"]
+    findings.check("keycloak: PodDisruptionBudget rendered", len(pdbs) > 0, f"found {len(pdbs)}")
+    if kc is not None:
+        findings.check(
+            "keycloak: spec.scheduling.topologySpreadConstraints present",
+            len(kc.get("spec", {}).get("scheduling", {}).get("topologySpreadConstraints", [])) > 0,
+        )
+
+
+def check_postgresql_availability(findings: Findings) -> None:
+    """PGO already auto-manages replicas>=2 and a PodDisruptionBudget for
+    both the instance set and pgBouncer (confirmed live, 2026-08-14 - see
+    templates/postgrescluster.yaml's own comments) - this only needed to
+    confirm the one gap ADR-0101/WP-12 closed: topologySpreadConstraints
+    on both.
+    """
+    docs = _helm_template("postgresql", {"postgresCluster.enabled": "true"})
+    cluster = next((d for d in docs if d.get("kind") == "PostgresCluster"), None)
+    findings.check("postgresql: PostgresCluster rendered", cluster is not None)
+    if cluster is None:
+        return
+    instances = cluster.get("spec", {}).get("instances", [{}])[0]
+    findings.check(
+        "postgresql/instance1: topologySpreadConstraints present",
+        len(instances.get("topologySpreadConstraints", [])) > 0,
+    )
+    pgbouncer = cluster.get("spec", {}).get("proxy", {}).get("pgBouncer", {})
+    findings.check(
+        "postgresql/pgBouncer: topologySpreadConstraints present",
+        len(pgbouncer.get("topologySpreadConstraints", [])) > 0,
+    )
+
+
 def check_networkpolicies(chart: str, findings: Findings, set_values: Dict[str, str] | None = None) -> None:
     docs = _helm_template(chart, set_values)
     policies = [d for d in docs if d.get("kind") == "NetworkPolicy"]
@@ -240,6 +321,12 @@ def main() -> int:
 
     check_keycloak_partial(findings)
     check_models_partial(findings)
+
+    # ADR-0101 (roadmap WP-12).
+    for chart in AVAILABILITY_CHARTS:
+        check_availability(chart, findings)
+    check_keycloak_availability(findings)
+    check_postgresql_availability(findings)
 
     passed = [r for r in findings.results if r.passed]
     failed = [r for r in findings.results if not r.passed]

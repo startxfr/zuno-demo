@@ -987,3 +987,54 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   implemented: a real GPU cluster LM-Eval run and one exercised
   blocked/passing promotion both need cluster access this session
   doesn't have.
+
+- 2026-08-14 (ADR-0101 + ADR-0102, roadmap WP-12): promoted both stubs
+  and gave every shared platform service the HA-capable shape. Live
+  cluster checks first (`oc get pdb -n zuno-data`/`zuno-auth`, `oc get
+  pods --show-labels`) turned up a big surprise: PostgreSQL (PGO) and
+  Redis (Bitnami) were ALREADY replica/PDB-complete by their own operator/
+  chart defaults - `zuno-postgresql` already runs 3 instances + 2
+  pgBouncer replicas with PGO auto-managed PDBs on both, Redis's master
+  already gets a PDB from Bitnami's own `master.pdb.create: true`
+  default. The only real gap on either was `topologySpreadConstraints`
+  (added to both PostgreSQL instance/pgBouncer blocks; skipped for Redis,
+  a genuinely single-pod-by-design standalone architecture where spread
+  isn't meaningful). For agent-runtime/ai-gateway/mcp-gateway/rag-service
+  (structurally identical charts) added a hand-authored PodDisruptionBudget
+  template and a topologySpreadConstraints block on the Deployment pod
+  spec - `whenUnsatisfiable: ScheduleAnyway` (soft) so it's a no-op degrade
+  on a single-node/single-zone cluster, never a scheduling blocker. For
+  Keycloak (no native PDB support in its Operator CRD, confirmed via
+  `oc explain keycloak.spec`) hand-authored a PDB targeting the operator's
+  own pod labels and set the real `spec.scheduling.topologySpreadConstraints`
+  field on the CR (confirmed via `oc explain` against the live cluster).
+  Every chart's actual replica count / CR instance count was deliberately
+  left at its current demo-scale value (1) - the brief's own "don't
+  change the demo footprint unless asked" boundary - so this WP ships the
+  *mechanism*, not a live topology change; raising replicas is bundled
+  with the operator's own failover drill below. `check_workload_hardening.py`
+  gained availability checks (PDB + topologySpreadConstraints + probes
+  for the four uniform charts, plus dedicated Keycloak/PostgreSQL checks;
+  116/116 passing).
+  For ADR-0102: `docs/platform/slo.md` defines the 99.9% monthly SLO
+  (BFF-boundary success ratio), a standard Google SRE multi-window
+  burn-rate error-budget policy, and ships two PrometheusRule alerts
+  (`gitops/charts/observability/templates/prometheusrule-slo.yaml`,
+  schema confirmed via `oc explain prometheusrule.spec.groups.rules`,
+  disabled by default). Investigating what the query would actually run
+  against surfaced a real, previously-invisible gap: the shared OTel
+  Collector's metrics pipeline exported only to `debug` (stdout) -
+  *every* metric any service in this repo already emits (rag-service's
+  `zuno.rag_searches`, ai-gateway's cache counters, etc.) was never
+  actually reaching a Prometheus-queryable backend, entirely independent
+  of ADR-0102. Added a standard `prometheus` exporter
+  (`opentelemetrycollector.yaml`) to close that - but did NOT add a
+  ServiceMonitor (which Service/port the operator creates for it is
+  unverified) or retrofit `agent-bff` with the actual
+  `zuno_bff_requests_total` metric the SLO query needs (no HTTP metrics
+  instrumentation exists there at all today) - both are named,
+  un-glossed-over residual items in slo.md's own "Current gap" section,
+  not silently assumed. Both ADRs stay Partially implemented: the
+  mechanism is real and repo-provable, but a failover drill and a real
+  30-day SLO measurement both need cluster access this session doesn't
+  have.

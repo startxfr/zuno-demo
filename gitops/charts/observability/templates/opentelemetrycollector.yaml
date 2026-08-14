@@ -28,6 +28,20 @@ spec:
         endpoint: tempo-tempo.zuno-monitoring.svc.cluster.local:4317
         tls:
           insecure: true
+      # ADR-0102 (roadmap WP-12): before this, every metric any service in
+      # this repo emits (rag-service's zuno.rag_searches, ai-gateway's
+      # cache-outcome counters, etc.) reached only `debug` (stdout
+      # logging) - never a Prometheus-queryable backend, independent of
+      # the BFF-level SLO metric docs/platform/slo.md describes. Standard
+      # OTel Collector Contrib exporter, exposes a Prometheus-format
+      # scrape endpoint on :8889. Whether OpenShift's User Workload
+      # Monitoring Prometheus (or another scraper) actually discovers it
+      # - which Service/port the operator creates for this listener - is
+      # unverified against a live cluster; see slo.md's "Operator
+      # follow-up" for the ServiceMonitor/PodMonitor step this enables
+      # but does not itself perform.
+      prometheus:
+        endpoint: 0.0.0.0:8889
     service:
       pipelines:
         traces:
@@ -37,5 +51,5 @@ spec:
         metrics:
           receivers: [otlp]
           processors: [batch]
-          exporters: [debug]
+          exporters: [debug, prometheus]
 {{- end }}

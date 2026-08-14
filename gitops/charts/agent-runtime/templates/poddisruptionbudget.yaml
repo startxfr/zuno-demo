@@ -1,0 +1,19 @@
+{{- /*
+ADR-0101 (roadmap WP-12). See values.yaml's podDisruptionBudget comment
+for why this is safe at any replica count, including today's default of 1.
+*/ -}}
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agent-runtime
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: agent-runtime
+    zuno.io/managed-by: argocd
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-runtime
+{{- end }}

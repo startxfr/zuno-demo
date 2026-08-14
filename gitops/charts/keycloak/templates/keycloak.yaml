@@ -22,6 +22,21 @@ metadata:
     argocd.argoproj.io/sync-wave: "-15"
 spec:
   instances: 1
+  {{- if .Values.topologySpreadConstraints.enabled }}
+  # ADR-0101 (roadmap WP-12): real field, confirmed via
+  # `oc explain keycloak.spec.scheduling.topologySpreadConstraints`
+  # against the live test cluster. Soft constraint (ScheduleAnyway) - a
+  # no-op at instances: 1, takes effect once instances is raised.
+  scheduling:
+    topologySpreadConstraints:
+      - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
+        topologyKey: {{ .Values.topologySpreadConstraints.topologyKey }}
+        whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/managed-by: keycloak-operator
+            app.kubernetes.io/instance: {{ .Values.keycloakCRName }}
+  {{- end }}
   hostname:
     hostname: "keycloak.{{ .Values.clusterBaseDomain }}"
     # Pins hostname validation to this one Route rather than relying on the

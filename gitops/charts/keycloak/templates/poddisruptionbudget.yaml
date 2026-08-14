@@ -1,0 +1,24 @@
+{{- /*
+ADR-0101 (roadmap WP-12). The Keycloak Operator does not auto-create a
+PodDisruptionBudget - hand-authored here, targeting the same pod labels
+the operator itself applies to the StatefulSet it manages (confirmed
+live, 2026-08-14: `oc get pods -n zuno-auth --show-labels` shows
+app.kubernetes.io/managed-by=keycloak-operator,
+app.kubernetes.io/instance=<keycloakCRName> on the server pod).
+*/ -}}
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.keycloakCRName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ .Values.keycloakCRName }}
+    zuno.io/managed-by: argocd
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/managed-by: keycloak-operator
+      app.kubernetes.io/instance: {{ .Values.keycloakCRName }}
+{{- end }}

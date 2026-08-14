@@ -10,6 +10,27 @@ image:
 
 replicas: 1
 
+# ADR-0101 (roadmap WP-12): the HA-capable shape - a PodDisruptionBudget
+# (templates/poddisruptionbudget.yaml) and topology spread across nodes,
+# both correct and safe at any replica count including the current
+# demo-scale replicas: 1 above (a PDB with minAvailable 1 simply protects
+# the sole pod from voluntary eviction; whenUnsatisfiable ScheduleAnyway
+# makes the spread constraint a soft preference, never a scheduling
+# blocker on a single-node/single-zone cluster). replicas itself is left
+# at the current demo footprint deliberately - raising it to the >=2
+# ADR-0101 describes is an environment-specific override, paired with the
+# operator's failover drill (see that ADR's Operator follow-up), not a
+# silent default change here.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
 resources:
   requests:
     cpu: 100m
