@@ -20,8 +20,16 @@ spec:
       releaseName: zuno-openshift-ai-d0
       values: |
         cluster-ods:
+          # Deliberately disabled: zuno-namespaces-d0 (gitops/charts/namespaces,
+          # ADR-0331) already owns/manages Namespace/redhat-ods-operator with
+          # equivalent-or-better governance (resourceQuota/limitRange/labels).
+          # Enabling this too made ArgoCD report the Namespace as shared
+          # between both Applications. syncOptions.CreateNamespace=true below
+          # stays as a harmless, untracked fallback if the namespace is ever
+          # missing. Kept toggleable (not deleted) in case this chart is ever
+          # deployed without the namespaces component.
           project:
-            enabled: true
+            enabled: false
           operator:
             enabled: true
           # DSCInitialization stays disabled here: it needs the Subscription

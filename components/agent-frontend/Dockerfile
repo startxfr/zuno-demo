@@ -18,7 +18,7 @@ RUN npm ci
 COPY components/agent-frontend/web/ ./
 RUN npm run build
 
-FROM golang:1.22 AS build
+FROM golang:1.24 AS build
 WORKDIR /src
 COPY components/agent-frontend/go.mod ./
 RUN go mod download

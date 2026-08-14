@@ -193,7 +193,7 @@ docker build -f components/agent-frontend/Dockerfile -t zuno/agent-frontend:dev 
 ```
 
 The `Dockerfile` has three stages: a `node:20-alpine` stage builds `web/`
-(`npm ci && npm run build`), a `golang:1.22` stage builds the server, and a
+(`npm ci && npm run build`), a `golang:1.24` stage builds the server, and a
 UBI9-minimal runtime stage copies both outputs. `go build ./...` (server)
 and `npm run build` (web, verified against a locally-fetched Node 20
 toolchain, tsc + vite both clean) were both run successfully in this
