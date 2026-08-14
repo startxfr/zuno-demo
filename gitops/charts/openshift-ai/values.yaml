@@ -1,7 +1,11 @@
 # Thin wrapper around the startx `cluster-ods` chart (vendored as a Helm
-# dependency). Shared by two ArgoCD Applications: project + operator
-# (zuno-openshift-ai-d0) render the Namespace/OperatorGroup/Subscription,
-# dataScienceCluster.enabled (zuno-openshift-ai-d1) renders the CR.
+# dependency). Shared by two ArgoCD Applications: operator
+# (zuno-openshift-ai-d0) renders the OperatorGroup/Subscription,
+# dataScienceCluster.enabled (zuno-openshift-ai-d1) renders the CR. project
+# stays available but disabled by zuno-openshift-ai-d0's own Application/
+# Ansible values - zuno-namespaces-d0 (gitops/charts/namespaces, ADR-0331) is
+# the sole owner of Namespace/redhat-ods-operator; enabling both here and
+# there made ArgoCD report it as shared between the two Applications.
 cluster-ods:
   context: &context
     scope: zuno

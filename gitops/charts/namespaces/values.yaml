@@ -172,11 +172,13 @@ platformNamespaces:
     description: >-
       rhods-operator's own controller-manager, OLM Subscription and
       OperatorGroup (ADR-0047) - installs/reconciles DataScienceCluster and
-      DSCInitialization elsewhere. Already created today by
-      gitops/charts/openshift-ai's vendored project block
-      (CreateNamespace=true); adding it here is additive, not conflicting -
-      that sync option is a no-op once the namespace exists, and it isn't a
-      tracked/pruned resource of that Application either way.
+      DSCInitialization elsewhere. zuno-namespaces-d0 is this namespace's
+      sole owner: gitops/charts/openshift-ai's vendored project block is
+      explicitly disabled (see gitops/apps/openshift-ai/application-d0.yaml)
+      because enabling it there too made ArgoCD report Namespace/
+      redhat-ods-operator as shared between zuno-openshift-ai-d0 and this
+      Application. That Application keeps syncOptions.CreateNamespace=true
+      as a harmless, untracked fallback only.
     allowedFromNamespaces: []
     # ASSUMPTION, not verified against a live cluster: rhods-operator
     # commonly ships a ValidatingWebhookConfiguration for its own CRs

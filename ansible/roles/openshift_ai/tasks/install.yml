@@ -10,8 +10,14 @@
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
       cluster-ods:
+        # Deliberately disabled: zuno-namespaces-d0 already owns/manages
+        # Namespace/redhat-ods-operator (ADR-0331) - see
+        # gitops/apps/openshift-ai/application-d0.yaml's matching comment.
+        # apply_gitops_app.yml REPLACES spec.source.helm.values wholesale
+        # with this block, so that file's own value alone has no effect here
+        # - both must stay in sync.
         project:
-          enabled: true
+          enabled: false
         operator:
           enabled: true
           subscription:
@@ -117,8 +123,9 @@
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
       cluster-ods:
+        # Same reasoning as the initial apply above - keep in sync.
         project:
-          enabled: true
+          enabled: false
         operator:
           enabled: true
           subscription:
