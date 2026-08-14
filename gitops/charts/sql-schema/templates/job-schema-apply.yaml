@@ -1,8 +1,10 @@
-# ArgoCD PreSync hook Job; runs before the sales-db MCP server is synced.
+# ArgoCD Sync hook Job at wave 10: runs after the credentials
+# ExternalSecret (tracked resource, wave 0) within the same Sync phase.
+# NOT a PreSync hook - the Sync phase only starts after every PreSync hook
+# succeeds, so a PreSync consumer of a Sync-phase Secret deadlocks forever
+# (incident 2026-08-14, see ADR-0313's incident note).
 # `hook-delete-policy: BeforeHookCreation` deletes the previous run's Job
-# since Jobs are immutable. The credentials Secret arrives one wave earlier
-# in the same PreSync phase (templates/externalsecret.yaml, wave -1) - it
-# must NOT be a Sync-phase resource, that deadlocked (incident 2026-08-14).
+# since Jobs are immutable.
 #
 # The SQL/fixtures ConfigMap (zuno-sxa-schema) is generated and applied by
 # ansible/roles/sql_schema, not by this chart.
@@ -15,7 +17,8 @@ metadata:
     app.kubernetes.io/name: sql-schema
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "10"
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 2

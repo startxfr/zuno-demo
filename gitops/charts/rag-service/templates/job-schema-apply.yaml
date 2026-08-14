@@ -1,9 +1,11 @@
-# ArgoCD PreSync hook Job; applies the RAG metadata schema + seed fixtures
-# before the rest of this chart syncs. `hook-delete-policy:
-# BeforeHookCreation` deletes the previous run's Job since Jobs are
-# immutable. The credentials Secret arrives one wave earlier in the same
-# PreSync phase (templates/externalsecret-db.yaml, wave -1) - it must NOT
-# be a Sync-phase resource, that deadlocks (incident 2026-08-14).
+# ArgoCD Sync hook Job at wave 41: applies the RAG metadata schema + seed
+# fixtures after the credentials ExternalSecret (tracked resource, wave 40)
+# and before the Deployment (wave 45) within the same Sync phase. NOT a
+# PreSync hook - the Sync phase only starts after every PreSync hook
+# succeeds, so a PreSync consumer of a Sync-phase Secret deadlocks forever
+# (incident 2026-08-14, see ADR-0313's incident note).
+# `hook-delete-policy: BeforeHookCreation` deletes the previous run's Job
+# since Jobs are immutable.
 #
 # The SQL/fixtures ConfigMap (zuno-rag-schema) is generated and applied by
 # ansible/roles/rag, not by this chart.
@@ -16,7 +18,8 @@ metadata:
     app.kubernetes.io/name: rag-service
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "41"
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 2
