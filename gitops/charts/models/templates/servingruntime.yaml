@@ -23,6 +23,11 @@ spec:
         - --model=/mnt/models
         - --served-model-name={{ .Values.modelId }}
         - --max-model-len=8192
+        # vLLM defaults to 8000; must match the containerPort below, which
+        # the readiness probe, Service and NetworkPolicy all assume is
+        # 8080 - verified on-cluster: without this, vLLM serves on 8000
+        # while everything else probes 8080, so the pod never goes Ready.
+        - --port=8080
       ports:
         - containerPort: 8080
           protocol: TCP

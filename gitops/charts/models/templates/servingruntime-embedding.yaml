@@ -25,6 +25,10 @@ spec:
         - --model=/mnt/models
         - --served-model-name={{ .Values.embeddingModel.modelId }}
         - --task=embed
+        # See templates/servingruntime.yaml's --port comment: vLLM
+        # defaults to 8000, but containerPort/readiness/Service/
+        # NetworkPolicy all assume 8080.
+        - --port=8080
       ports:
         - containerPort: 8080
           protocol: TCP
