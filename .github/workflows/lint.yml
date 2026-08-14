@@ -167,6 +167,11 @@ jobs:
           python3 tests/test_search_filters.py
           python3 tests/test_ogx_provider.py
           python3 tests/test_provider_parity.py
+      - name: rag-ingestion tooling tests (ADR-0330)
+        working-directory: components/rag-ingestion/tooling
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_verify_catalog.py
 
   ansible:
     runs-on: ubuntu-latest

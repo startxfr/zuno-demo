@@ -147,6 +147,31 @@ keys and page-tree `directories` (demo placeholders remain), and the
 actual HTTP-verified confirmation of every `CONFIRM`-marked `redhat[]`
 entry.
 
+## Catalog completion tooling (2026-08-14, roadmap WP-07)
+
+`components/rag-ingestion/tooling/verify_catalog.py` (new) HTTP-verifies
+every enabled `redhat[]` entry's `documentationUrl` and reports `OK` /
+`REDIRECT(final-url)` / `FAIL` per entry, designed for an operator to run
+from a network that can reach `docs.redhat.com` (still HTTP 403 from the
+environment this repo is developed in) and hand the report back for a
+mechanical `values.yaml` update. Every non-Satellite `redhat[]` entry now
+carries an explicit, greppable `# CONFIRM` trailing comment on its
+`documentationUrl` line (32 entries - the 2 Satellite entries stay
+unmarked, per their "confirmed, given directly" status above) so that
+follow-up update is unambiguous per entry. The `confluence[]` block's
+demo placeholders (`spaces: ["ARCH"]`, `directories: [...]`) now carry an
+explicit `# operator-supplied: replace demo placeholders` marker in both
+`values.yaml` and `values.schema.json` (`spaces`/`directories`
+`description` fields) - still placeholders, no real space key invented.
+`ansible/roles/rag_ingestion/tasks/install.yml`'s KFP recurring-run
+`rescue:` block now enumerates its three UNVERIFIED assumptions (Route
+naming, version-list ordering, recurring-run payload shape) individually
+and greppably (`WP-07-UNVERIFIED-ASSUMPTION`) instead of a single generic
+failure message, so a real cluster run's log output names exactly which
+assumption to check. None of this required live cluster/network access
+this environment doesn't have, so the ADR's status stays Partially
+implemented - the operator steps above remain the path to `Implemented`.
+
 ## Security considerations
 
 Confluence ACL enforcement is entirely metadata-driven at query time

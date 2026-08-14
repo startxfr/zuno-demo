@@ -1,6 +1,6 @@
 # WP-07: rag-ingestion catalog and source completion
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-14 - `components/rag-ingestion/tooling/verify_catalog.py` HTTP-verification tool + tests added; every non-Satellite `redhat[]` entry now carries an explicit `# CONFIRM` marker; Confluence `spaces`/`directories` placeholders marked `# operator-supplied` in `values.yaml` and `values.schema.json` (no real space key invented); `install.yml`'s KFP recurring-run `rescue:` block now names its three UNVERIFIED assumptions individually. ADR-0330 stays Partially implemented - operator follow-up below unchanged.)
 - **ADRs:** ADR-0330 (Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-22

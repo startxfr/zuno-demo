@@ -1,2 +1,6 @@
 kfp>=2.14.3,<3
 kfp-kubernetes>=2.14.3,<3
+
+# verify_catalog.py (ADR-0330, roadmap WP-07)
+requests>=2.32,<3
+PyYAML>=6,<7

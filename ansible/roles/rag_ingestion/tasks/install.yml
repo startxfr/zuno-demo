@@ -178,11 +178,40 @@
           (409 = already exists, treated as success).
       when: _rag_ingestion_pipeline_version_id != ''
   rescue:
+    # ADR-0330/roadmap WP-07: enumerate the three concrete UNVERIFIED
+    # assumptions this block depends on (not just "see the task output
+    # above") so a real cluster run produces actionable evidence - each
+    # line below is independently greppable
+    # (`grep "WP-07-UNVERIFIED-ASSUMPTION" <log>`) and names exactly what
+    # to check on the target cluster.
     - name: "rag_ingestion | recurring-run activation failed - not fatal"
       ansible.builtin.debug:
         msg: >-
-          KFP recurring-run activation failed (see the task output above).
-          This does not block the rest of the install - create the
-          schedule manually via the OpenShift AI dashboard instead, or
-          re-run `make d1 install rag-ingestion` after correcting the
-          issue.
+          KFP recurring-run activation failed (see the task output above
+          for the actual HTTP error). This does not block the rest of the
+          install - create the schedule manually via the OpenShift AI
+          dashboard instead, or correct the issue below and re-run
+          `make d1 install rag-ingestion`.
+
+          Possible causes (unverified assumptions this block depends on -
+          check each against the target cluster):
+          WP-07-UNVERIFIED-ASSUMPTION(1/3) Route naming: assumed the DSPA
+          API server Route is named "ds-pipeline-{{ rag_ingestion_dspa_name | default('rag-dspa') }}".
+          Confirm with `oc get route -n zuno-ai-build | grep ds-pipeline`
+          and correct the `name:` field in the "look up the rag-dspa API
+          server Route" task above if it differs.
+          WP-07-UNVERIFIED-ASSUMPTION(2/3) Version ordering: assumed
+          `/apis/v2beta1/pipelines/<id>/versions` returns the newest
+          version first (index 0). Confirm by inspecting the JSON body in
+          the "list versions for the resolved pipeline" task's output
+          above (each entry's `created_at`) and, if index 0 is not
+          newest, sort explicitly by `created_at` in the "resolve the
+          latest pipeline_version_id" task instead of taking `| first`.
+          WP-07-UNVERIFIED-ASSUMPTION(3/3) Recurring-run payload shape:
+          assumed the v2beta1 `/apis/v2beta1/recurringruns` POST body
+          field names (`pipeline_version_reference`, `trigger.
+          cron_schedule.cron`, `mode: ENABLE`, `no_catchup`) match this
+          DSPA's exact KFP API version. Confirm from the HTTP error body
+          in the task output above (a 400 naming the invalid/missing
+          field is the strongest signal) and correct the `body:` block in
+          the "create or update the recurring run" task above.

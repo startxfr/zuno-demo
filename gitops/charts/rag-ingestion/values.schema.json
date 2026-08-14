@@ -46,8 +46,16 @@
           "name": {"type": "string"},
           "type": {"enum": ["cloud", "datacenter"]},
           "baseUrl": {"type": "string", "minLength": 1},
-          "spaces": {"type": "array", "items": {"type": "string"}},
-          "directories": {"type": "array", "items": {"type": "string"}},
+          "spaces": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "operator-supplied: replace demo placeholders with real Confluence Cloud space keys for this environment."
+          },
+          "directories": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "operator-supplied: replace demo placeholders with real page-tree paths for this environment."
+          },
           "requiredGroups": {"type": "array", "items": {"type": "string"}}
         }
       }

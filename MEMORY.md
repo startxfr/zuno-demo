@@ -911,3 +911,38 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   but live DSC reconciliation with the key removed and an actual
   OGX-backed corpus proof both need cluster access this session doesn't
   have.
+
+- 2026-08-14 (ADR-0330, roadmap WP-07): rag-ingestion catalog completion -
+  the repo-side prep ADR-0330 left open. New
+  `components/rag-ingestion/tooling/verify_catalog.py` HTTP-verifies every
+  `redhat[]` entry's `documentationUrl` (HEAD, falling back to GET on
+  405/501) and reports `OK`/`REDIRECT(final-url)`/`FAIL` - meant to run
+  from a network that can reach `docs.redhat.com` (still HTTP 403 here).
+  Its own tests (`tooling/tests/test_verify_catalog.py`, 9 cases) are
+  rag-ingestion's first committed test file - the ADR's earlier claim of
+  "fixture-driven tests" was ad hoc/uncommitted, so `python3 -m pytest
+  components/rag-ingestion/ -q` (the WP-07 brief's own acceptance check)
+  previously exited 5 ("no tests collected") regardless of correctness;
+  it now actually exercises something. Marked all 32 non-Satellite
+  `redhat[]` entries with an explicit trailing `# CONFIRM` comment (a
+  small script-driven text edit, one per entry's `documentationUrl` line,
+  verified 1:1 against the parsed YAML count before writing) so a
+  follow-up mechanical pass can find and drop them per the ADR's own
+  "drop CONFIRM markers on OK" instruction - previously only one MTC
+  entry had the word "CONFIRM" anywhere in the file. Confluence
+  `spaces:`/`directories:` demo placeholders now carry an explicit
+  `# operator-supplied: replace demo placeholders` marker in both
+  `values.yaml` and `values.schema.json`'s new `description` fields - no
+  real Confluence space key exists anywhere in this repo, none invented.
+  `ansible/roles/rag_ingestion/tasks/install.yml`'s KFP recurring-run
+  `rescue:` block previously gave one generic failure message; now
+  enumerates its three UNVERIFIED assumptions (Route naming, "version
+  index 0 is newest", recurring-run payload field names) individually
+  and greppably (`WP-07-UNVERIFIED-ASSUMPTION`) so a real cluster run's
+  log names exactly which one to check - caught and fixed a real dead-code
+  bug in `verify_catalog.py` along the way (a trailing fallback return
+  after the HEAD/GET loop that could never execute, since GET's own
+  result always returns directly). ADR-0330 stays Partially implemented -
+  live HTTP verification, real Confluence credentials, and the KFP/DSPA
+  assumption checks all still need operator/cluster access this session
+  doesn't have.
