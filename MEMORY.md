@@ -946,3 +946,44 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   live HTTP verification, real Confluence credentials, and the KFP/DSPA
   assumption checks all still need operator/cluster access this session
   doesn't have.
+
+- 2026-08-14 (ADR-0107 + ADR-0108, roadmap WP-10): promoted both stubs to
+  full records and built the model/agent promotion quality gate.
+  `evaluations/quality_gate.py` invokes an agent's existing
+  `evaluations/<agent>/run_acceptance_gate.py` as a subprocess (its own
+  directory-relative-import requirement) and parses the JSON summary it
+  already prints, but re-derives the PASS/FAIL decision itself using a
+  threshold read from a new `evaluations/<agent>/gate_config.yaml`
+  (seeded for tekos at 0.75) instead of trusting that script's own
+  hardcoded `SCENARIO_THRESHOLD` constant - closes ADR-0107's literal
+  "thresholds are data, not code" requirement without touching
+  `run_acceptance_gate.py` (still `make check`'s own unrelated ADR-0053
+  entrypoint). security_checks/gate_checks stay 100% mandatory regardless
+  of the configured threshold - proven by a test where a perfect scenario
+  rate still fails the gate on a security regression. An agent with no
+  `gate_config.yaml` fails closed. Added a `quality-gate` job to
+  `lint.yml` with a hand-rolled `git diff`-based path filter (no new
+  third-party Action) that only smoke-checks agents whose
+  `evaluations/<agent>/` directory changed - deliberately does NOT claim
+  a real PASS/FAIL verdict from a GitHub-hosted runner, since
+  `run_scenarios.py`/`security_checks.py` need a live cluster this
+  workflow file's own top comment says it never has; it blocks only on
+  exit code 2 (a genuine wiring/config defect), not on exit 1 (a correct
+  "can't reach a cluster from here" result) - the real verdict is the
+  operator follow-up below.
+  For ADR-0108: confirmed via `oc explain lmevaljob.spec...` against the
+  live test cluster that `LMEvalJob` (`trustyai.opendatahub.io/v1alpha1`)
+  is real and that the DSC's `trustyai` component (which provides it) is
+  already `managementState: Managed` with `eval.lmeval` configured - no
+  DSC change needed, only the missing job *instances*. Added
+  `gitops/charts/openshift-ai/templates/lmevaljob.yaml`, one CR per
+  `lmEval.jobs[]` values entry, disabled by default with an empty job
+  list (opt-in per candidate model, per ADR-0108's "complements - never
+  replaces" framing). `ansible/roles/models/tasks/precheck.yml` now
+  reports any LMEvalJob's `status.state`/`results` via `make d1 check
+  models`, diagnostic only - never gates the models component's own
+  install-state, since these are one-shot benchmarking runs, not a
+  component this role owns the lifecycle of. Both ADRs stay Partially
+  implemented: a real GPU cluster LM-Eval run and one exercised
+  blocked/passing promotion both need cluster access this session
+  doesn't have.

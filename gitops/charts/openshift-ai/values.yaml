@@ -346,3 +346,34 @@ ogxServer:
   # target model before enabling (`oc get inferenceservice -A`).
   vllmEndpoint: http://embeddings-predictor.zuno-ai-run.svc:8080
 
+# ADR-0108 (roadmap WP-10): LM-Eval candidate local-model comparison.
+# Rendered by templates/lmevaljob.yaml, one LMEvalJob CR
+# (trustyai.opendatahub.io/v1alpha1, confirmed via `oc explain lmevaljob`
+# against the live test cluster) per lmEval.jobs[] entry. The DSC
+# component that provides LM-Eval (trustyai, `components.trustyai.eval.
+# lmeval` above) is already managementState: Managed - this only adds the
+# job *instances*, which nothing creates automatically. Disabled by
+# default with an empty job list: benchmarking is opt-in per candidate
+# model, never automatic (ADR-0108: "complements - never replaces - the
+# per-agent ADR-0027 acceptance suites"). Continuous/scheduled
+# benchmarking across models is WP-40 (ADR-0305), explicitly out of scope
+# here - this is a manually-declared, one-shot comparison job per entry.
+lmEval:
+  enabled: false
+  namespace: zuno-ai-run
+  # Example shape (model: local-completions matches this repo's KServe/
+  # vLLM-served candidates, same base_url convention as
+  # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL):
+  #   jobs:
+  #     - name: qwen25-7b-instruct-mmlu
+  #       model: local-completions
+  #       modelArgs:
+  #         - name: base_url
+  #           value: http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1/completions
+  #         - name: model
+  #           value: qwen2.5-7b-instruct
+  #       taskNames: [mmlu]
+  #       allowOnline: false
+  #       allowCodeExecution: false
+  jobs: []
+

@@ -14,6 +14,44 @@
   vars:
     gitops_app_name: "zuno-models-d1"
 
+# ADR-0108/roadmap WP-10: report any LMEvalJob results (candidate
+# local-model comparison, gitops/charts/openshift-ai/templates/
+# lmevaljob.yaml) so `make d1 check models` surfaces them without a
+# separate command. Diagnostic only, never gates _state_is_installed
+# below - LM-Eval jobs are one-shot, per-candidate benchmarking runs
+# (ADR-0108: "complements - never replaces - the per-agent ADR-0027
+# acceptance suites"), not a component this role installs or owns the
+# lifecycle of. CRD may not exist yet if trustyai hasn't reconciled,
+# hence ignore_errors rather than failing the whole check.
+- name: "models | look up LMEvalJob resources (ADR-0108 candidate model comparison)"
+  kubernetes.core.k8s_info:
+    api_version: trustyai.opendatahub.io/v1alpha1
+    kind: LMEvalJob
+    namespace: "{{ models_lmeval_namespace | default('zuno-ai-run') }}"
+  register: _models_lmevaljobs
+  ignore_errors: true
+
+- name: "models | report LMEvalJob results"
+  ansible.builtin.debug:
+    msg: >-
+      LMEvalJob {{ item.metadata.name }}: state={{ item.status.state | default('unknown') }}
+      reason={{ item.status.reason | default('unknown') }}
+      {{ ('results=' + (item.status.results | default('(none yet)')))
+         if (item.status.state | default('')) == 'Complete' else '' }}
+  loop: "{{ _models_lmevaljobs.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name | default('?') }}"
+  when: (_models_lmevaljobs.resources | default([]) | length) > 0
+
+- name: "models | note absence of LMEvalJob resources"
+  ansible.builtin.debug:
+    msg: >-
+      No LMEvalJob resources found in
+      {{ models_lmeval_namespace | default('zuno-ai-run') }} - no
+      candidate model comparison has been run yet (ADR-0108, opt-in via
+      gitops/charts/openshift-ai's lmEval.jobs values).
+  when: (_models_lmevaljobs.resources | default([]) | length) == 0
+
 - name: "models | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:

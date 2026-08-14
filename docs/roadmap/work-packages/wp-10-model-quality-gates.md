@@ -1,6 +1,6 @@
 # WP-10: Model quality gates and LM-Eval (promotes ADR-0107 + ADR-0108)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-14 - ADR-0107/0108 promoted to full records; `evaluations/quality_gate.py` config-driven promotion gate + `evaluations/tekos/gate_config.yaml` (0.75 threshold, data not code) + path-filtered CI wiring (`quality-gate` job in lint.yml, blocks only on a wiring/config defect - a real live-cluster verdict is an operator action, see below); `LMEvalJob` manifests in `gitops/charts/openshift-ai/templates/lmevaljob.yaml` (schema-verified via `oc explain`, disabled by default, `trustyai` DSC component already `Managed`); `ansible/roles/models/tasks/precheck.yml` reports LMEvalJob results via `make d1 check models`. Both ADRs stay Partially implemented pending the GPU cluster runs below.)
 - **ADRs:** ADR-0107, ADR-0108 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-34 (eval gate reuse), WP-40

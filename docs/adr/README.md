@@ -76,8 +76,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0104](0104-introduce-controlled-semantic-caching.md) | v0.1 | Implemented | Introduce controlled semantic caching |
 | [ADR-0105](0100-v0.1-roadmap.md#adr-0105-automate-monthly-knowledge-ingestion) | v0.1 | Proposed | Automate monthly knowledge ingestion |
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v0.1 | Partially implemented | Enforce OKF bundle signing and validation |
-| [ADR-0107](0100-v0.1-roadmap.md#adr-0107-introduce-automated-model-quality-gates) | v0.1 | Proposed | Introduce automated model quality gates |
-| [ADR-0108](0100-v0.1-roadmap.md#adr-0108-automate-model-evaluation-with-lm-eval) | v0.1 | Proposed | Automate model evaluation with LM-Eval |
+| [ADR-0107](0107-introduce-automated-model-quality-gates.md) | v0.1 | Partially implemented | Introduce automated model quality gates |
+| [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Partially implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0100-v0.1-roadmap.md#adr-0109-implement-source-freshness-and-trust-scoring) | v0.1 | Proposed | Implement source freshness and trust scoring |
 | [ADR-0110](0100-v0.1-roadmap.md#adr-0110-automate-document-acl-synchronization) | v0.1 | Proposed | Automate document ACL synchronization |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |

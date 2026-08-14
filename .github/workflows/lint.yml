@@ -172,6 +172,74 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_verify_catalog.py
+      - name: evaluations quality gate tests (ADR-0107)
+        working-directory: evaluations
+        run: |
+          pip install pyyaml httpx
+          python3 tests/test_quality_gate.py
+
+  quality-gate:
+    # ADR-0107 (roadmap WP-10): a real PASS/FAIL quality verdict needs a
+    # live cluster (evaluations/<agent>/run_scenarios.py and
+    # security_checks.py make real HTTP calls this GitHub-hosted runner
+    # cannot reach - the whole reason this file's own top comment says
+    # "no live cluster, registry or credentials"), so this job does not
+    # claim to render one. What IS genuinely repo-executable and worth
+    # blocking on: the gate *mechanism* itself is not broken (config
+    # missing/malformed, quality_gate.py crashing) for any agent whose
+    # evaluations/<agent>/ directory changed in this PR - see
+    # quality_gate.py's own module docstring for the full design
+    # rationale and the WP-10 brief's "Operator follow-up" for where the
+    # real live verdict is exercised instead.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Determine which evaluations/<agent>/ directories changed (path filter)
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then
+            echo "no comparable base commit - checking every agent instead of diffing"
+            changed_files=$(git ls-files evaluations/)
+          else
+            changed_files=$(git diff --name-only "$base" HEAD -- evaluations/)
+          fi
+          agents=$(echo "$changed_files" | grep -oE '^evaluations/[^/]+/' | sed 's#evaluations/##; s#/##' | sort -u | tr '\n' ' ')
+          echo "Changed evaluations/ subdirectories: ${agents:-<none>}"
+          echo "agents=$agents" >> "$GITHUB_OUTPUT"
+      - name: Quality gate wiring smoke check
+        if: steps.changed.outputs.agents != ''
+        run: |
+          pip install pyyaml httpx
+          set +e
+          exit_status=0
+          for agent in ${{ steps.changed.outputs.agents }}; do
+            if [ ! -f "evaluations/$agent/gate_config.yaml" ]; then
+              echo "skip $agent: no gate_config.yaml yet (not wired to ADR-0107)"
+              continue
+            fi
+            if [ -f "evaluations/$agent/requirements.txt" ]; then
+              pip install -r "evaluations/$agent/requirements.txt"
+            fi
+            python3 evaluations/quality_gate.py --agent "$agent" --candidate ci-smoke-test
+            code=$?
+            if [ "$code" -eq 2 ]; then
+              echo "::error::quality gate wiring broken for agent=$agent (exit 2 = config/wiring defect, not a scenario-rate result)"
+              exit_status=1
+            else
+              echo "quality gate ran to completion for agent=$agent (exit $code) - a real PASS/FAIL verdict needs a live cluster (see the WP-10 roadmap brief's operator follow-up); this job only blocks on a wiring/config defect (exit 2)"
+            fi
+          done
+          exit $exit_status
 
   ansible:
     runs-on: ubuntu-latest

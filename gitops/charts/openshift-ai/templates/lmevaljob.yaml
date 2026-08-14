@@ -1,0 +1,39 @@
+{{- /*
+ADR-0108 (roadmap WP-10). See values.yaml's lmEval comment for the full
+rationale. Every field below is confirmed real via `oc explain
+lmevaljob.spec...` against the live test cluster, 2026-08-14 - no
+LMEvalJob instance itself has been applied/verified live yet (`oc get
+lmevaljob -A` returns no resources today, and lmEval.jobs is empty by
+default), so this is a schema-correct, not yet cluster-verified,
+template. Disabled by default; renders nothing with an empty job list
+even if enabled.
+*/ -}}
+{{- if .Values.lmEval.enabled }}
+{{- range .Values.lmEval.jobs }}
+---
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: LMEvalJob
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.lmEval.namespace }}
+  labels:
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: model-quality-gate
+spec:
+  model: {{ .model }}
+  modelArgs:
+    {{- toYaml .modelArgs | nindent 4 }}
+  taskList:
+    taskNames:
+      {{- toYaml .taskNames | nindent 6 }}
+  allowOnline: {{ .allowOnline | default false }}
+  allowCodeExecution: {{ .allowCodeExecution | default false }}
+  # Operator-managed PVC, no size override - the CRD's own default
+  # applies. Switch to outputs.oci if results need to leave the cluster
+  # (e.g. for evaluations/quality_gate.py to read via CI rather than a
+  # Day 1 check - see ansible/roles/models/tasks/ for the read path this
+  # WP added).
+  outputs:
+    pvcManaged: {}
+{{- end }}
+{{- end }}
