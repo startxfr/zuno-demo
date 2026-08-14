@@ -29,6 +29,33 @@ resources:
 minReplicas: 1
 maxReplicas: 1
 
+# Predownloads the chat model into a PVC (via a PreSync Job) instead of
+# storageUri: hf://, which downloads straight into the GPU node's
+# ephemeral root disk on every pod (re)start. Verified on-cluster: the
+# node's 75GB root volume can't hold the CUDA vLLM image (17.67GB) + a
+# fresh ~15GB hf:// download + NVIDIA driver build artifacts (~7GB) at
+# once - kubelet evicted the pod for ephemeral-storage pressure on first
+# real deploy. A PVC survives pod restarts and isn't bounded by node disk
+# size.
+modelStorage:
+  size: 30Gi
+  storageClassName: gp3-csi
+  # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
+  # PVC's first consumer) and the predictor must land in the same zone, or
+  # the predictor's mount fails with a volume node-affinity conflict once
+  # the PVC is bound elsewhere. This demo's GPU nodes currently span two
+  # zones (verified on-cluster: one g6.2xlarge in eu-west-2a, one
+  # g6.4xlarge in eu-west-2b) - pin both to whichever zone has the GPU
+  # node you want this model on. Adding more GPU nodes for this model
+  # later must keep them in this same zone, or this needs per-zone
+  # PVCs/affinity instead of one shared value.
+  zone: eu-west-2b
+  # Pinned to the odh-kserve-storage-initializer image this cluster's own
+  # KServe controller already generates for the hf:// init container
+  # (read off the live InferenceService's generated pod spec) - unlike
+  # image.vllm (ADR-0048), this is not (yet) discovered at deploy time.
+  initializerImage: registry.redhat.io/rhoai/odh-kserve-storage-initializer-rhel9@sha256:166184c520c7821bacbedd05736938b58edc9cc2edc6071bfbc1105a4316aef5
+
 # Additive second model: text embeddings for rag-ingestion (see
 # gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and
 # rag-service's query-side embedding calls. inferenceServiceName is
@@ -53,16 +80,20 @@ embeddingModel:
   # embedding task (--task embed), not chat.
   modelId: BAAI/bge-small-en-v1.5
   dimensions: 384
-  # No GPU request, unlike the 7B chat model above: bge-small-en-v1.5 is
-  # a ~130MB encoder model, cheap enough to run on CPU and avoid
-  # contending with the chat model for the cluster's one GPU.
+  # GPU request: the discovered/pinned image.vllm is a CUDA-only vLLM
+  # build (ADR-0048 prefers the "cuda"-named template), which crashes
+  # with "Failed to infer device type" when scheduled without a GPU -
+  # verified on-cluster. bge-small-en-v1.5 is a ~130MB encoder model, so
+  # this shares the chat model's GPU node rather than needing its own.
   resources:
     requests:
       cpu: "500m"
       memory: 1Gi
+      nvidia.com/gpu: "1"
     limits:
       cpu: "1"
       memory: 2Gi
+      nvidia.com/gpu: "1"
   minReplicas: 1
   maxReplicas: 1
 

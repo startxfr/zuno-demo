@@ -1,5 +1,10 @@
-# Model weights are pulled from Hugging Face at pod start (hf://), no
-# offline/mirrored cache; first pull (~15GB) dominates cold-start latency.
+# Model weights are predownloaded once into a PVC (templates/pvc-model.yaml
+# + templates/job-model-download.yaml) rather than pulled from Hugging Face
+# on every pod (re)start: the GPU node's ephemeral root disk can't hold the
+# CUDA vLLM image + a fresh ~15GB hf:// download + NVIDIA driver build
+# artifacts at once (verified on-cluster: kubelet evicted the pod for
+# ephemeral-storage pressure). storageUri: pvc:// makes KServe mount the
+# PVC directly - no storage-initializer/download step at pod start.
 apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
@@ -15,10 +20,15 @@ spec:
   predictor:
     minReplicas: {{ .Values.minReplicas }}
     maxReplicas: {{ .Values.maxReplicas }}
+    # Must match job-model-download.yaml's nodeSelector: the PVC (RWO,
+    # single-AZ EBS) binds in whichever zone that Job's pod lands in - see
+    # values.yaml's modelStorage comment.
+    nodeSelector:
+      topology.kubernetes.io/zone: {{ .Values.modelStorage.zone }}
     model:
       modelFormat:
         name: vLLM
       runtime: {{ .Values.servingRuntimeName }}
-      storageUri: "hf://{{ .Values.modelId }}"
+      storageUri: "pvc://{{ .Values.inferenceServiceName }}-model/model"
       resources:
         {{- toYaml .Values.resources | nindent 8 }}

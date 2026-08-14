@@ -1,0 +1,62 @@
+# One-time download of {{ .Values.modelId }} into the PVC pvc-model.yaml
+# creates (WaitForFirstConsumer binds it once this Job's pod is scheduled -
+# see that file's comment for why they share a sync-wave). Reuses the exact
+# odh-kserve-storage-initializer image/args/env KServe's own hf:// init
+# container already uses on this cluster (verified against the live
+# InferenceService's generated pod spec), so this is a plain one-off run of
+# the same download path, not a new one. hook-delete-policy:
+# BeforeHookCreation because Jobs are immutable - ArgoCD deletes the
+# previous run's Job before creating this sync's. Re-downloads are cheap
+# once the PVC is warm: huggingface_hub skips files already complete on
+# disk from a prior run. nodeSelector pins this to modelStorage.zone so the
+# PVC binds in the same zone the predictor (templates/inferenceservice.yaml,
+# same nodeSelector) needs it in - see values.yaml's modelStorage comment.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.inferenceServiceName }}-model-download
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        topology.kubernetes.io/zone: {{ .Values.modelStorage.zone }}
+      containers:
+        - name: storage-initializer
+          image: {{ .Values.modelStorage.initializerImage }}
+          args:
+            - "hf://{{ .Values.modelId }}"
+            - /mnt/pvc/model
+          env:
+            - name: HF_HUB_ENABLE_HF_TRANSFER
+              value: "1"
+            - name: HF_XET_HIGH_PERFORMANCE
+              value: "1"
+            - name: HF_XET_NUM_CONCURRENT_RANGE_GETS
+              value: "8"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: 100Mi
+            limits:
+              cpu: "1"
+              memory: 24Gi
+          volumeMounts:
+            - name: model-pvc
+              mountPath: /mnt/pvc
+      volumes:
+        - name: model-pvc
+          persistentVolumeClaim:
+            claimName: {{ .Values.inferenceServiceName }}-model

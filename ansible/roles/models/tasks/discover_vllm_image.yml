@@ -1,12 +1,13 @@
 ---
 # Selects the vLLM image OpenShift AI actually publishes (a Template in
-# zuno-ai-build), matched by name since RHOAI's label taxonomy isn't
+# redhat-ods-applications, RHOAI's applicationsNamespace since the
+# ADR-0331 revert), matched by name since RHOAI's label taxonomy isn't
 # verified.
 - name: "models | discover the vLLM serving-runtime Templates OpenShift AI published (ADR-0048)"
   kubernetes.core.k8s_info:
     api_version: template.openshift.io/v1
     kind: Template
-    namespace: zuno-ai-build
+    namespace: redhat-ods-applications
   register: _models_ods_templates
   when: models_vllm_image_override is not defined
 
@@ -25,7 +26,7 @@
   ansible.builtin.fail:
     msg: >-
       No Template with "vllm" in its name was found in
-      zuno-ai-build - this OpenShift AI installation may not
+      redhat-ods-applications - this OpenShift AI installation may not
       have the vLLM serving runtime available yet, or publishes it under a
       different naming convention. Templates found in that namespace:
       {{ _models_ods_templates.resources | default([]) | map(attribute='metadata.name') | list }}.
@@ -37,18 +38,49 @@
     - models_vllm_image_override is not defined
     - (_models_vllm_templates | default([]) | length) == 0
 
+# The models chart requests nvidia.com/gpu (gitops/charts/models/values.yaml),
+# so among the vllm-named templates prefer the CUDA-flavored one rather than
+# picking whichever sorts first (e.g. the CPU runtime).
+- name: "models | prefer the CUDA-flavored vLLM template"
+  ansible.builtin.set_fact:
+    _models_vllm_cuda_templates: >-
+      {{
+        _models_vllm_templates
+        | selectattr('metadata.name', 'search', 'cuda', ignorecase=True)
+        | list
+      }}
+  when:
+    - models_vllm_image_override is not defined
+    - (_models_vllm_templates | default([]) | length) > 0
+
+- name: "models | fail with a clear diagnostic if no CUDA-flavored vLLM template was published"
+  ansible.builtin.fail:
+    msg: >-
+      vLLM Templates were found in redhat-ods-applications, but none
+      named "cuda" - this model deployment requests an nvidia.com/gpu
+      runtime. vLLM templates found:
+      {{ _models_vllm_templates | map(attribute='metadata.name') | list }}.
+      To bypass discovery and pin an explicitly known-good image, rerun
+      with -e models_vllm_image_override=<registry>/<image>:<tag> (ADR-0048
+      Security considerations: this is an explicit, conscious override,
+      never a silent fallback).
+  when:
+    - models_vllm_image_override is not defined
+    - (_models_vllm_templates | default([]) | length) > 0
+    - (_models_vllm_cuda_templates | default([]) | length) == 0
+
 # Handles both a literal image and a ${PARAM_NAME} reference resolved
 # against the Template's own top-level `parameters` list.
 - name: "models | extract the ServingRuntime/ClusterServingRuntime object from the selected template"
   ansible.builtin.set_fact:
-    _models_selected_template: "{{ _models_vllm_templates[0] }}"
+    _models_selected_template: "{{ _models_vllm_cuda_templates[0] }}"
     _models_runtime_object: >-
       {{
-        (_models_vllm_templates[0].objects
+        (_models_vllm_cuda_templates[0].objects
           | selectattr('kind', 'in', ['ServingRuntime', 'ClusterServingRuntime'])
           | list
           | first)
-        if (_models_vllm_templates[0].objects | selectattr('kind', 'in', ['ServingRuntime', 'ClusterServingRuntime']) | list | length) > 0
+        if (_models_vllm_cuda_templates[0].objects | selectattr('kind', 'in', ['ServingRuntime', 'ClusterServingRuntime']) | list | length) > 0
         else {}
       }}
   when: models_vllm_image_override is not defined
@@ -57,7 +89,7 @@
   ansible.builtin.fail:
     msg: >-
       Template {{ _models_selected_template.metadata.name }} in
-      zuno-ai-build has no ServingRuntime or
+      redhat-ods-applications has no ServingRuntime or
       ClusterServingRuntime object among its objects - cannot discover an
       image from it. Object kinds present:
       {{ _models_selected_template.objects | default([]) | map(attribute='kind') | list }}.
@@ -121,5 +153,5 @@
         if models_vllm_image_override is defined
         else 'vLLM serving-runtime image: ' ~ _models_discovered_vllm_image ~
              ' (discovered from Template ' ~ _models_selected_template.metadata.name ~
-             ' in zuno-ai-build)'
+             ' in redhat-ods-applications)'
       }}
