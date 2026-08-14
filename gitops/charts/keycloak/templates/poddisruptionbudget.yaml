@@ -5,8 +5,14 @@ the operator itself applies to the StatefulSet it manages (confirmed
 live, 2026-08-14: `oc get pods -n zuno-auth --show-labels` shows
 app.kubernetes.io/managed-by=keycloak-operator,
 app.kubernetes.io/instance=<keycloakCRName> on the server pod).
+
+Also gated on operator.enabled (true only for the d0 Application), not
+keycloak.enabled: this keeps the PDB owned by zuno-keycloak-d0 alone, so it
+isn't rendered by both d0 and d1 into the same zuno-auth namespace (ArgoCD
+was reporting PodDisruptionBudget/zuno as shared between the two
+Applications before this guard was added).
 */ -}}
-{{- if .Values.podDisruptionBudget.enabled }}
+{{- if and .Values.operator.enabled .Values.podDisruptionBudget.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
