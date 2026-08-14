@@ -76,8 +76,8 @@ embeddingModel:
   inferenceServiceName: embeddings
   # BAAI/bge-small-en-v1.5, 384-dim: matches rag-service's existing
   # embeddingModelName default (gitops/charts/rag-service/values.yaml) -
-  # same reasoning as the endpoint name above. Served via vLLM's
-  # embedding task (--task embed), not chat.
+  # same reasoning as the endpoint name above. Served via vLLM's pooling
+  # runner (--runner=pooling --convert=embed), not chat.
   modelId: BAAI/bge-small-en-v1.5
   dimensions: 384
   # GPU request: the discovered/pinned image.vllm is a CUDA-only vLLM
@@ -85,14 +85,19 @@ embeddingModel:
   # with "Failed to infer device type" when scheduled without a GPU -
   # verified on-cluster. bge-small-en-v1.5 is a ~130MB encoder model, so
   # this shares the chat model's GPU node rather than needing its own.
+  # memory: the old 1Gi/2Gi sizing was set back when this ran CPU-only;
+  # with a GPU it runs vLLM's full torch.compile + CUDA-graph-capture
+  # pipeline like the chat model, whose fixed overhead OOMKilled the
+  # container at a 2Gi limit (verified on-cluster, exit 137) despite the
+  # model itself being tiny.
   resources:
     requests:
       cpu: "500m"
-      memory: 1Gi
+      memory: 2Gi
       nvidia.com/gpu: "1"
     limits:
       cpu: "1"
-      memory: 2Gi
+      memory: 4Gi
       nvidia.com/gpu: "1"
   minReplicas: 1
   maxReplicas: 1
