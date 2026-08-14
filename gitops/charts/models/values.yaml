@@ -29,26 +29,26 @@ resources:
 minReplicas: 1
 maxReplicas: 1
 
-# Predownloads the chat model into a PVC (via a PreSync Job) instead of
-# storageUri: hf://, which downloads straight into the GPU node's
-# ephemeral root disk on every pod (re)start. Verified on-cluster: the
-# node's 75GB root volume can't hold the CUDA vLLM image (17.67GB) + a
+# Predownloads the chat model into a PVC (via templates/job-model-download.yaml)
+# instead of storageUri: hf://, which downloads straight into the GPU
+# node's ephemeral root disk on every pod (re)start. Verified on-cluster:
+# the node's 75GB root volume can't hold the CUDA vLLM image (17.67GB) + a
 # fresh ~15GB hf:// download + NVIDIA driver build artifacts (~7GB) at
 # once - kubelet evicted the pod for ephemeral-storage pressure on first
 # real deploy. A PVC survives pod restarts and isn't bounded by node disk
 # size.
 modelStorage:
   size: 30Gi
-  storageClassName: gp3-csi
-  # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
-  # PVC's first consumer) and the predictor must land in the same zone, or
-  # the predictor's mount fails with a volume node-affinity conflict once
-  # the PVC is bound elsewhere. This demo's GPU nodes currently span two
-  # zones (verified on-cluster: one g6.2xlarge in eu-west-2a, one
-  # g6.4xlarge in eu-west-2b) - pin both to whichever zone has the GPU
-  # node you want this model on. Adding more GPU nodes for this model
-  # later must keep them in this same zone, or this needs per-zone
-  # PVCs/affinity instead of one shared value.
+  # templates/storageclass-model.yaml creates a dedicated, single-AZ,
+  # Immediate-binding StorageClass pinned to this zone (not the cluster's
+  # default gp3-csi - see that file's comment for why). The download Job
+  # and the predictor (templates/inferenceservice.yaml) share this same
+  # zone value. This demo's GPU nodes currently span two zones (verified
+  # on-cluster: one g6.2xlarge in eu-west-2a, one g6.4xlarge in
+  # eu-west-2b) - pin this to whichever zone has the GPU node you want
+  # this model on. Adding more GPU nodes for this model later must keep
+  # them in this same zone, or this needs per-zone StorageClasses/PVCs
+  # instead of one shared value.
   zone: eu-west-2b
   # Pinned to the odh-kserve-storage-initializer image this cluster's own
   # KServe controller already generates for the hf:// init container

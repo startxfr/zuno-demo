@@ -58,26 +58,35 @@ ephemeral root disk on every pod (re)start. Verified on-cluster: the node's
 75GB root volume can't hold the CUDA vLLM image (17.67GB) + a fresh ~15GB
 `hf://` download + NVIDIA driver build artifacts (~7GB) at once - kubelet
 evicted the pod for ephemeral-storage pressure on the first real deploy.
+`templates/inferenceservice.yaml`'s `storageUri: pvc://...` then has KServe
+mount that PVC directly, with no download/storage-initializer step at pod
+start.
 
-The download Job is an ArgoCD `PreSync` hook (`hook-delete-policy:
-BeforeHookCreation`, since Jobs are immutable - each sync deletes the
-previous run's Job and recreates it; re-downloads are cheap once the PVC is
-warm, since `huggingface_hub` skips files already complete on disk). The
-PVC is also a `PreSync` hook, same sync-wave as the Job: `gp3-csi` is
-`WaitForFirstConsumer`, so it only binds once the Job's pod (its first
-consumer) is scheduled - putting the PVC in an earlier wave than its only
-consumer would deadlock ArgoCD waiting for a "Bound" health state nothing
-can reach yet. `templates/inferenceservice.yaml`'s `storageUri: pvc://...`
-then has KServe mount that PVC directly, with no
-download/storage-initializer step at pod start.
+The PVC and the download Job are both plain sync-wave resources, not ArgoCD
+`PreSync` hooks - an earlier version of this made them hooks sharing a wave
+(the PVC's `WaitForFirstConsumer` binding needs a consumer scheduled in the
+same wave to avoid an "waiting to bind" deadlock), which turned out to make
+ArgoCD delete and recreate the PVC - and its ~15GB downloaded model - on
+every resync (verified on-cluster). `templates/storageclass-model.yaml`
+fixes this at the root: a dedicated StorageClass with
+`volumeBindingMode: Immediate` (binds as soon as the PVC is created, no
+consumer pod required) and `allowedTopologies` pinned to
+`modelStorage.zone`, and `reclaimPolicy: Retain` so an accidental PVC
+deletion doesn't also silently discard the cached model. With Immediate
+binding, the PVC and Job are just normal, stable, sync-wave-ordered
+resources (PVC wave -20, Job wave -15, before the ServingRuntime's -5) -
+ArgoCD leaves the Job alone once applied (no diff, no reapply attempt); a
+genuine change to the Job's spec needs a manual `oc delete job` first,
+since Jobs are immutable.
 
 Both the Job and the `InferenceService`'s predictor carry the same
-`nodeSelector: topology.kubernetes.io/zone: {{ .Values.modelStorage.zone }}`:
-`gp3-csi` is single-AZ (EBS), so the PVC only mounts on nodes in the zone it
-bound in. This demo's GPU nodes currently span two zones (verified
-on-cluster) - `values.yaml`'s `modelStorage.zone` pins both to the same one.
-Adding more GPU nodes for this model must keep them in that zone, or this
-needs per-zone PVCs/affinity instead of one shared value.
+`nodeSelector: topology.kubernetes.io/zone: {{ .Values.modelStorage.zone }}`,
+matching the StorageClass's `allowedTopologies`: EBS is single-AZ, so the
+PVC only mounts on nodes in the zone it bound in. This demo's GPU nodes
+currently span two zones (verified on-cluster) - `values.yaml`'s
+`modelStorage.zone` pins all three to the same one. Adding more GPU nodes
+for this model must keep them in that zone, or this needs per-zone
+StorageClasses/PVCs instead of one shared value.
 
 ## Second model: embeddings
 

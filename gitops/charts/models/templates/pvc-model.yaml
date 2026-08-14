@@ -1,11 +1,10 @@
 # Backs the chat model's storageUri: pvc:// (templates/inferenceservice.yaml)
 # instead of the GPU node's ephemeral disk - see values.yaml's modelStorage
-# comment. A PreSync hook, same sync-wave as job-model-download.yaml's
-# PreSync hook: gp3-csi is WaitForFirstConsumer, so this PVC only binds once
-# the download Job's pod (which mounts it) is scheduled - putting the PVC in
-# an earlier wave than its only consumer would deadlock ArgoCD waiting for
-# a health state ("Bound") nothing can reach yet. No hook-delete-policy: this
-# must survive every sync, not be recreated like the Job.
+# comment. Uses storageclass-model.yaml's dedicated, Immediate-binding,
+# zone-pinned StorageClass rather than the cluster's WaitForFirstConsumer
+# gp3-csi default - see that file's comment for why: a normal sync-wave
+# resource here (not an ArgoCD hook) is what lets this PVC - and the ~15GB
+# model on it - survive every resync untouched.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -14,12 +13,11 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/hook: PreSync
     argocd.argoproj.io/sync-wave: "-20"
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ .Values.modelStorage.storageClassName }}
+  storageClassName: {{ .Values.inferenceServiceName }}-model
   resources:
     requests:
       storage: {{ .Values.modelStorage.size }}

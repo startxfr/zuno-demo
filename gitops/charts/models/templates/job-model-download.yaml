@@ -1,16 +1,17 @@
-# One-time download of {{ .Values.modelId }} into the PVC pvc-model.yaml
-# creates (WaitForFirstConsumer binds it once this Job's pod is scheduled -
-# see that file's comment for why they share a sync-wave). Reuses the exact
-# odh-kserve-storage-initializer image/args/env KServe's own hf:// init
-# container already uses on this cluster (verified against the live
-# InferenceService's generated pod spec), so this is a plain one-off run of
-# the same download path, not a new one. hook-delete-policy:
-# BeforeHookCreation because Jobs are immutable - ArgoCD deletes the
-# previous run's Job before creating this sync's. Re-downloads are cheap
-# once the PVC is warm: huggingface_hub skips files already complete on
-# disk from a prior run. nodeSelector pins this to modelStorage.zone so the
-# PVC binds in the same zone the predictor (templates/inferenceservice.yaml,
-# same nodeSelector) needs it in - see values.yaml's modelStorage comment.
+# One-time download of {{ .Values.modelId }} into pvc-model.yaml's PVC.
+# Reuses the exact odh-kserve-storage-initializer image/args/env KServe's
+# own hf:// init container already uses on this cluster (verified against
+# the live InferenceService's generated pod spec), so this is a plain
+# one-off run of the same download path, not a new one. A normal sync-wave
+# resource, not an ArgoCD hook - see pvc-model.yaml/storageclass-model.yaml
+# for why: hook-based Job+PVC pairing caused ArgoCD to delete and recreate
+# the PVC (and its downloaded model) on every resync. As a normal resource,
+# ArgoCD leaves this Job alone once applied (no diff = no reapply attempt,
+# and Jobs are immutable so a genuine spec change would need a manual
+# `oc delete job` first - acceptable for a run-once download). nodeSelector
+# pins this to modelStorage.zone, matching the StorageClass's
+# allowedTopologies and the predictor's own nodeSelector (same value) - see
+# values.yaml's modelStorage comment.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -19,9 +20,7 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-    argocd.argoproj.io/sync-wave: "-20"
+    argocd.argoproj.io/sync-wave: "-15"
 spec:
   backoffLimit: 2
   template:
