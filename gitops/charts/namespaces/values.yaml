@@ -67,6 +67,13 @@ platformNamespaces:
       - zuno-vault
       - zuno-auth
       - redhat-ods-applications
+    # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
+    # lives here and is called synchronously by the API server on every
+    # MariaDB/Grant/User write - confirmed live 2026-08-14: without this,
+    # the webhook call timed out ("context deadline exceeded") and the
+    # MariaDB CR sat in Degraded forever, same failure class as ESO's
+    # secretstore-validate webhook above.
+    allowApiServerWebhooks: true
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
