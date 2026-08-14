@@ -16,7 +16,7 @@
 - name: "openshift-build | ensure the zuno-ai-build namespace and its default-deny-ingress NetworkPolicy baseline"
   kubernetes.core.k8s:
     state: present
-    definition: "{{ item }}"
+    definition: "{{ def }}"
   loop:
     - apiVersion: v1
       kind: Namespace
@@ -41,7 +41,8 @@
         policyTypes:
           - Ingress
   loop_control:
-    label: "{{ item.kind }}/{{ item.metadata.name }}"
+    loop_var: "def"
+    label: "{{ def.kind }}/{{ def.metadata.name }}"
 
 # Grants cross-namespace image-pull access to the namespaces that run these
 # images. Applied here, not by the Day 0 namespaces role, since zuno-ai-build
@@ -53,14 +54,14 @@
       apiVersion: rbac.authorization.k8s.io/v1
       kind: RoleBinding
       metadata:
-        name: "zuno-ai-build-image-puller-{{ item }}"
+        name: "zuno-ai-build-image-puller-{{ rbname }}"
         namespace: zuno-ai-build
         labels:
           zuno.io/managed-by: zuno-ansible
       subjects:
         - kind: Group
           apiGroup: rbac.authorization.k8s.io
-          name: "system:serviceaccounts:{{ item }}"
+          name: "system:serviceaccounts:{{ rbname }}"
       roleRef:
         kind: ClusterRole
         name: system:image-puller
@@ -68,6 +69,8 @@
   loop:
     - zuno-ai-run
     - zuno-data
+  loop_control:
+    loop_var: "rbname"
 
 - name: "openshift-build | apply the ImageStream: {{ build_image_name }}"
   kubernetes.core.k8s:
