@@ -8,6 +8,12 @@ stream (ADR-0026 → ADR-0113, ADR-0049 → ADR-0114, ADR-0051 → ADR-0115), an
 two v0.2 decisions were promoted as concretely implementable (ADR-0207 →
 ADR-0116, ADR-0210 → ADR-0117). Items below are ordered by readiness.
 
+**Superseded for sequencing (2026-08-13):** execution sequencing and
+work-package decomposition for all open v0.1/v0.2/v0.3 ADRs are now owned by
+the [v0.1 – v0.3 implementation roadmap](v0.1-v0.3-implementation-roadmap.md)
+(this file's items map to WP-04, WP-01/WP-02 and WP-38 there). This backlog
+is kept as cited history and is no longer updated.
+
 ## 1. ADR-0115 — Immutable and verifiable supply chain artifacts (partially implemented)
 
 Formerly ADR-0051 (v0), retargeted v0.1. All remaining gaps reduce to one blocker:

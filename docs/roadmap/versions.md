@@ -8,10 +8,20 @@ Seven-day internal vertical slice and five-agent demo, prioritizing Tekos as the
 
 Industrialization: HA shared services, resumable workflows, automated ingestion/evaluation, stronger signing, source freshness, ACL synchronization and SecNumCloud-oriented hardening.
 
+Open ADRs: 0101–0117 plus 0322/0330 — execution plan in the [v0.1 – v0.3 implementation roadmap](v0.1-v0.3-implementation-roadmap.md) (Phase 1).
+
 ## v0.2
 
-Multi-agent and UX evolution: A2A, delegation traceability, recursive delegation controls, specialized task UI and richer approval workflows.
+Knowledge governance: logical knowledge domains, knowledge authorization as policy intersection, multi-domain RAG generalization, indexed-vs-live routing, Salesforce/SXA-legacy separation, standardized tool authentication and project-scoped agent memory, plus MaaS governance-plane completion.
+
+Open ADRs: 0201–0209 — execution plan in the [v0.1 – v0.3 implementation roadmap](v0.1-v0.3-implementation-roadmap.md) (Phase 2).
 
 ## v0.3
 
-Optimization: LoRA/PEFT, dataset-to-model pipelines, dynamic adapters, automated benchmark-driven routing and self-service agent onboarding.
+Multi-agent rollout and optimization: the four remaining agent slices (Arkos, Comage, Advantage, Finage), multiple agent graph shapes, CDP/scoped capabilities, the AIAgent CRD/operator, LoRA/PEFT with dataset-to-model pipelines, dynamic adapters, benchmark-driven routing and self-service agent onboarding.
+
+Open ADRs: 0301–0309, 0326, 0327, 0340, 0342 — execution plan in the [v0.1 – v0.3 implementation roadmap](v0.1-v0.3-implementation-roadmap.md) (Phase 3).
+
+## v0.4
+
+Agent-to-agent evolution (ADR-0401 – ADR-0409): A2A protocol adoption, identity propagation across agent calls, controlled shared memory, delegation traceability and limits, specialized task-oriented frontend views, automated removal of inaccessible private RAG content and advanced human approval workflows.

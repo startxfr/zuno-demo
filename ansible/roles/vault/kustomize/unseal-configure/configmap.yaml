@@ -69,8 +69,15 @@ data:
     # tls.hosts without a commonName (SANs only) unless the
     # cert-manager.io/common-name annotation is set, which Vault rejects
     # outright unless this is set - same issue as pki/roles/istio below.
+    # Bare "svc" (not just svc.cluster.local) is included for the same
+    # reason pki/roles/istio below needs it - VERIFIED live, 2026-08-13:
+    # Authorino's authorino-server-tls Certificate requests the short-form
+    # in-cluster SAN (authorino-authorino-authorization.kuadrant-system.svc),
+    # which svc.cluster.local's allow_subdomains doesn't cover, so Vault
+    # rejected the sign request with "subject alternate name ... not
+    # allowed by this role" and the Certificate never issued.
     vault write pki/roles/cert-manager \
-      allowed_domains="zuno-demo.internal,svc.cluster.local,${CLUSTER_BASE_DOMAIN}" \
+      allowed_domains="zuno-demo.internal,svc.cluster.local,svc,${CLUSTER_BASE_DOMAIN}" \
       allow_subdomains=true \
       allow_bare_domains=true \
       require_cn=false \

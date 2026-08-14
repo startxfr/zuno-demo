@@ -326,6 +326,17 @@ Roadmap is represented in two complementary forms:
 
 The roadmap must include platform/OpenShift AI, backend, frontend, OKF/agents, data/RAG, security, observability, testing, documentation and operations, with effort expressed in person-days and parallelism for two contributors.
 
+2026-08-14: execution of the open v0.1/v0.2/v0.3 ADRs is decomposed into
+work packages in `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`, one
+self-contained brief per WP under `docs/roadmap/work-packages/` (written for
+standalone execution by a lower-capability model). Conventions: WP state
+machine `Not started -> Repo work in review -> Repo work merged -> Operator
+pending -> Done`; ADR status strings live only in `docs/adr/README.md` and
+ADR bodies (checked by `platform/docs/check_docs.py`) — the roadmap tracks
+WP state only; stub ADRs are promoted to full files (Step 0 of their brief)
+before implementation; every brief separates model-executable repo changes
+from operator/cluster steps.
+
 ## 14. Explicitly deferred capabilities
 
 Main v2 candidates:

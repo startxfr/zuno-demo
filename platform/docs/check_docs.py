@@ -73,10 +73,10 @@ OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 # row of its own, by docs/adr/README.md's own convention (see its
 # ADR-0101.. rows).
 ADR_INDEX_EXCLUDED_FILES = {
-    "0100-v1-roadmap.md",
-    "0200-v2-roadmap.md",
-    "0300-v3-roadmap.md",
-    "0400-v4-roadmap.md",
+    "0100-v0.1-roadmap.md",
+    "0200-v0.2-roadmap.md",
+    "0300-v0.3-roadmap.md",
+    "0400-v0.4-roadmap.md",
 }
 
 
@@ -136,6 +136,22 @@ def check_make_commands() -> List[Finding]:
     return findings
 
 
+def _normalize_adr_status(text: str) -> str:
+    # Markdown links compare as their label ("Superseded by
+    # [ADR-0332](0332-...md)" == "Superseded by ADR-0332").
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    # A superseded status may scope what remains in effect (ADR-0320,
+    # ADR-0328); only the "Superseded by ADR-NNNN" phrase must match.
+    superseded = re.match(r"Superseded by ADR-\d{4}", text)
+    if superseded:
+        return superseded.group(0)
+    # Strip " - see `...`" elaborations and trailing parenthetical
+    # explanations (e.g. ADR-0055) - only the status phrase itself must
+    # match, not any evidence pointer appended to it.
+    text = text.split(" - ", 1)[0]
+    return text.split("(", 1)[0].strip()
+
+
 def check_adr_index() -> List[Finding]:
     findings: List[Finding] = []
     index_text = ADR_README_PATH.read_text()
@@ -153,17 +169,13 @@ def check_adr_index() -> List[Finding]:
         status_match = re.search(r"\*\*Status:\*\*\s*(.+)", body)
         if not status_match:
             continue
-        # Strip a trailing parenthetical explanation (e.g. ADR-0055's
-        # "Implemented (statuses below are tracked live in README.md...)")
-        # before comparing - only the status word/phrase itself must
-        # match, not any elaboration appended to it.
-        body_status = status_match.group(1).split("(")[0].strip()
+        body_status = _normalize_adr_status(status_match.group(1))
 
         row_cells = [c.strip() for c in row_match.group(0).split("|")]
         # row_match captures from the link onward: "[ADR-NNNN](file.md) | Target | Status | Decision"
         if len(row_cells) < 3:
             continue
-        row_status = row_cells[2]
+        row_status = _normalize_adr_status(row_cells[2])
         if row_status != body_status:
             findings.append(Finding(
                 "adr_index",

@@ -4,6 +4,8 @@ ADRs are immutable decision records. When a decision changes, a new ADR supersed
 
 Most ADRs below carry only a title, status/target/date, and their unique Decision text - the boilerplate clauses every ADR used to repeat (Context, Alternatives, Consequences, Security/Operational considerations, Acceptance criteria, Review evidence, Migration) now live once in [Standard clauses](#standard-clauses) and apply unless a specific ADR overrides them inline.
 
+Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0.1 – v0.3 implementation roadmap](../roadmap/v0.1-v0.3-implementation-roadmap.md); this index remains the sole authority for ADR status.
+
 **Renumbering note (2026-08-13):** the roadmap reorganization moved open decisions into the v0.1 stream. ADR-0026 -> ADR-0113, ADR-0049 -> ADR-0114, ADR-0051 -> ADR-0115 (unimplemented 00xx records), and ADR-0207 -> ADR-0116, ADR-0210 -> ADR-0117 (promoted from v0.2 as concretely implementable). The old numbers are retired; each moved record carries a `Renumbered:` line.
 
 ## version 0
