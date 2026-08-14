@@ -19,17 +19,17 @@
       - vault
       - cert_manager
       - external_secrets
+      - smtp
+      - openshift_oauth
       - redis
       - observability
-      - postgresql
-      - mariadb
       - service_mesh
-      - tempo
       - mesh_monitoring
       - kiali
+      - postgresql
+      - mariadb
+      - tempo
       - keycloak
-      - openshift_oauth
-      - smtp
       - nfd
       - nvidia_gpu
       - connectivity_link

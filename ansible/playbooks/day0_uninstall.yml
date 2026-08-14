@@ -15,17 +15,17 @@
       - connectivity_link
       - nvidia_gpu
       - nfd
-      - smtp
-      - openshift_oauth
       - keycloak
-      - kiali
-      - mesh_monitoring
       - tempo
-      - service_mesh
       - mariadb
       - postgresql
+      - kiali
+      - mesh_monitoring
+      - service_mesh
       - observability
       - redis
+      - openshift_oauth
+      - smtp
       - external_secrets
       - cert_manager
       - vault

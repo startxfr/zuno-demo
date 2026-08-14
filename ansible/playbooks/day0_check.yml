@@ -14,8 +14,36 @@
       - vault
       - cert_manager
       - external_secrets
+      - smtp
+      - openshift_oauth
       - redis
       - observability
+      - service_mesh
+      - mesh_monitoring
+      - kiali
+      - postgresql
+      - mariadb
+      - tempo
+      - keycloak
+      - nfd
+      - nvidia_gpu
+      - connectivity_link
+      - lws
+      - custom_metrics_autoscaler
+      - jobset
+      - kueue
+      - openshift_ai
+      - argocd
+      - admin_context
+      - namespaces
+      - openshift_rbac_groups
+      - vault
+      - cert_manager
+      - external_secrets
+      - redis
+      - observability
+      - postgresql
+      - mariadb
       - keycloak
       - openshift_oauth
       - postgresql
