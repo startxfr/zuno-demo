@@ -51,7 +51,7 @@ help:
 	  '' \
 	  '  make day1|d1 check [component]      Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
 	  '  make day1|d1 build [component]      Build one/all Day 1 component images' \
-	  '  make day1|d1 install [component]    Install/deploy one/all Day 1 components' \
+	  '  make day1|d1 install [component]    Install/deploy one/all Day 1 components (no component: builds first)' \
 	  '  make day1|d1 uninstall [component]  Uninstall one/all Day 1 components (reverse order)' \
 	  '  make day1|d1 all [component]        check + build + install, whichever apply to the component' \
 	  '' \
@@ -114,7 +114,12 @@ d0: $(if $(DAY_VERB),credentials-check)
 # sets (most visibly: "agent" builds, "agents" runs - singular vs plural,
 # a real name, not a typo), so `make d1 all <component>` runs whichever of
 # check/build/install actually apply to that specific component instead
-# of assuming one shared list.
+# of assuming one shared list. `install` with no component (component
+# defaults to "all") also runs build first, same as `all` does - a named
+# single-component install (`make d1 install rag`) does not, build/install
+# stay separate verbs there (incident 2026-08-14: `make d1 install rag`
+# deployed a Deployment whose image had never been built, permanent
+# ImagePullBackOff - "install everything" must never do that).
 define DAY1_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
@@ -126,7 +131,7 @@ if [[ -z "$$verb" ]]; then \
     '' \
     '  check       Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
     '  build       Build one/all Day 1 component images' \
-    '  install     Install/deploy one/all Day 1 components' \
+    '  install     Install/deploy one/all Day 1 components (no component: builds first)' \
     '  uninstall   Uninstall one/all Day 1 components (reverse order)' \
     '  all         check + build + install, whichever apply to the component' \
     '' \
@@ -154,6 +159,7 @@ case "$$verb" in \
     run_build ;; \
   install) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 install component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    if [[ "$$component" == "all" ]]; then run_build || exit $$?; fi; \
     run_install ;; \
   uninstall) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 uninstall component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
