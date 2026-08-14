@@ -39,16 +39,16 @@ maxReplicas: 1
 # size.
 modelStorage:
   size: 30Gi
-  # templates/storageclass-model.yaml creates a dedicated, single-AZ,
-  # Immediate-binding StorageClass pinned to this zone (not the cluster's
-  # default gp3-csi - see that file's comment for why). The download Job
-  # and the predictor (templates/inferenceservice.yaml) share this same
-  # zone value. This demo's GPU nodes currently span two zones (verified
-  # on-cluster: one g6.2xlarge in eu-west-2a, one g6.4xlarge in
-  # eu-west-2b) - pin this to whichever zone has the GPU node you want
-  # this model on. Adding more GPU nodes for this model later must keep
-  # them in this same zone, or this needs per-zone StorageClasses/PVCs
-  # instead of one shared value.
+  storageClassName: gp3-csi
+  # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
+  # PVC's first consumer) and the predictor must land in the same zone, or
+  # the predictor's mount fails with a volume node-affinity conflict once
+  # the PVC is bound elsewhere. This demo's GPU nodes currently span two
+  # zones (verified on-cluster: one g6.2xlarge in eu-west-2a, one
+  # g6.4xlarge in eu-west-2b) - pin both to whichever zone has the GPU
+  # node you want this model on. Adding more GPU nodes for this model
+  # later must keep them in this same zone, or this needs per-zone
+  # PVCs/affinity instead of one shared value.
   zone: eu-west-2b
   # Pinned to the odh-kserve-storage-initializer image this cluster's own
   # KServe controller already generates for the hf:// init container

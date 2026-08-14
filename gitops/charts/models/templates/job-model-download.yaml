@@ -1,17 +1,16 @@
-# One-time download of {{ .Values.modelId }} into pvc-model.yaml's PVC.
-# Reuses the exact odh-kserve-storage-initializer image/args/env KServe's
-# own hf:// init container already uses on this cluster (verified against
-# the live InferenceService's generated pod spec), so this is a plain
-# one-off run of the same download path, not a new one. A normal sync-wave
-# resource, not an ArgoCD hook - see pvc-model.yaml/storageclass-model.yaml
-# for why: hook-based Job+PVC pairing caused ArgoCD to delete and recreate
-# the PVC (and its downloaded model) on every resync. As a normal resource,
-# ArgoCD leaves this Job alone once applied (no diff = no reapply attempt,
-# and Jobs are immutable so a genuine spec change would need a manual
-# `oc delete job` first - acceptable for a run-once download). nodeSelector
-# pins this to modelStorage.zone, matching the StorageClass's
-# allowedTopologies and the predictor's own nodeSelector (same value) - see
-# values.yaml's modelStorage comment.
+# One-time download of {{ .Values.modelId }} into pvc-model.yaml's PVC
+# (gp3-csi, WaitForFirstConsumer - this Job's pod is that first consumer,
+# which is why this must stay one sync-wave after the PVC's). Reuses the
+# exact odh-kserve-storage-initializer image/args/env KServe's own hf://
+# init container already uses on this cluster (verified against the live
+# InferenceService's generated pod spec), so this is a plain one-off run of
+# the same download path, not a new one. A normal sync-wave resource, not
+# an ArgoCD hook - see pvc-model.yaml for why. ArgoCD leaves this Job alone
+# once applied (no diff = no reapply attempt, and Jobs are immutable so a
+# genuine spec change would need a manual `oc delete job` first - acceptable
+# for a run-once download). nodeSelector pins this to modelStorage.zone,
+# matching the predictor's own nodeSelector (same value) - see values.yaml's
+# modelStorage comment for why gp3-csi being single-AZ makes that matter.
 apiVersion: batch/v1
 kind: Job
 metadata:

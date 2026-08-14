@@ -1,10 +1,14 @@
 # Backs the chat model's storageUri: pvc:// (templates/inferenceservice.yaml)
 # instead of the GPU node's ephemeral disk - see values.yaml's modelStorage
-# comment. Uses storageclass-model.yaml's dedicated, Immediate-binding,
-# zone-pinned StorageClass rather than the cluster's WaitForFirstConsumer
-# gp3-csi default - see that file's comment for why: a normal sync-wave
-# resource here (not an ArgoCD hook) is what lets this PVC - and the ~15GB
-# model on it - survive every resync untouched.
+# comment. A normal sync-wave resource (not an ArgoCD PreSync hook, unlike
+# an earlier version of this chart): verified on-cluster, making the PVC a
+# hook so it could share a sync-wave with job-model-download.yaml (its
+# first consumer, needed since gp3-csi is WaitForFirstConsumer) caused
+# ArgoCD to delete and recreate the PVC - and its ~15GB downloaded model -
+# on every resync. As a plain resource one wave ahead of the Job (-20 vs
+# -15), it binds via WaitForFirstConsumer once the Job's pod is scheduled,
+# same as before, but ArgoCD only touches this object when its own spec
+# actually changes.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -17,7 +21,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ .Values.inferenceServiceName }}-model
+  storageClassName: {{ .Values.modelStorage.storageClassName }}
   resources:
     requests:
       storage: {{ .Values.modelStorage.size }}
