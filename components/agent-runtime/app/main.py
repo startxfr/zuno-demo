@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
-from typing import Any, AsyncIterator, Dict
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Dict, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.auth import CallerIdentity, validate_token
-from app.graph.build import tekos_graph
+from app.graph.build import build_graph
 from app.schemas import ChatRequest, ChatResponse
 from app.telemetry import init_telemetry
 
@@ -25,6 +28,53 @@ logger = logging.getLogger("agent_runtime")
 
 init_telemetry("agent-runtime")  # ADR-0029: traces/metrics to the shared OTel Collector
 
+# ADR-0103: separate PG* variables (never a single combined DSN env var),
+# same convention as components/mcp-servers/sales-db/server.py's
+# _conninfo() - a hand-built "key=value" conninfo string never needs
+# percent-encoding a generated password that might contain
+# URI-special characters, unlike a postgresql:// URI would.
+CHECKPOINT_PGHOST = os.getenv("CHECKPOINT_PGHOST", "")
+CHECKPOINT_PGPORT = os.getenv("CHECKPOINT_PGPORT", "5432")
+CHECKPOINT_PGDATABASE = os.getenv("CHECKPOINT_PGDATABASE", "")
+CHECKPOINT_PGUSER = os.getenv("CHECKPOINT_PGUSER", "")
+CHECKPOINT_PGPASSWORD = os.getenv("CHECKPOINT_PGPASSWORD", "")
+
+
+def _checkpoint_conninfo() -> Optional[str]:
+    """None when unconfigured - the caller falls back to MemorySaver (the
+    default for tests/local dev, per ADR-0103's explicit requirement)."""
+    if not (CHECKPOINT_PGHOST and CHECKPOINT_PGDATABASE and CHECKPOINT_PGUSER and CHECKPOINT_PGPASSWORD):
+        return None
+    return (
+        f"host={CHECKPOINT_PGHOST} port={CHECKPOINT_PGPORT} dbname={CHECKPOINT_PGDATABASE} "
+        f"user={CHECKPOINT_PGUSER} password={CHECKPOINT_PGPASSWORD}"
+    )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """ADR-0103: builds the Tekos graph once at startup against either a
+    persistent Postgres checkpointer (CHECKPOINT_PG* configured) or an
+    in-memory one (default) - stored on `app.state`, not a module-level
+    constant, since a Postgres-backed checkpointer needs a live async
+    connection that can't be opened before the event loop exists.
+    """
+    conninfo = _checkpoint_conninfo()
+    if conninfo is None:
+        logger.info("CHECKPOINT_PG* not fully configured - using in-memory checkpointing (not resumable across restarts)")
+        app.state.tekos_graph = build_graph(MemorySaver())
+        yield
+        return
+
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+    async with AsyncPostgresSaver.from_conn_string(conninfo) as checkpointer:
+        await checkpointer.setup()  # idempotent - creates the checkpoint tables on first run
+        app.state.tekos_graph = build_graph(checkpointer)
+        logger.info("Postgres-backed checkpointing enabled at %s:%s/%s", CHECKPOINT_PGHOST, CHECKPOINT_PGPORT, CHECKPOINT_PGDATABASE)
+        yield
+
+
 app = FastAPI(
     title="Zuno Agent Runtime",
     version="0.1.0",
@@ -32,6 +82,7 @@ app = FastAPI(
         "Shared LangGraph-based orchestration runtime (ADR-0009, ADR-0018). "
         "v0 implements the Tekos technical-consultant workflow."
     ),
+    lifespan=lifespan,
 )
 
 
@@ -87,6 +138,39 @@ def _initial_state(payload: ChatRequest, identity: CallerIdentity) -> Dict[str, 
     }
 
 
+async def _resolve_run_id(graph, payload: ChatRequest, identity: CallerIdentity) -> str:
+    """ADR-0103: mints a new run_id when the caller isn't resuming anything,
+    or validates a resume attempt against the checkpoint the run_id
+    actually points at.
+
+    Fail closed on resume: a run_id that doesn't resolve to any existing
+    checkpoint is treated as a resume attempt against unknown/expired
+    state (404) rather than silently starting a fresh run under the
+    caller-supplied id - and a checkpoint whose stored `user_sub` differs
+    from the validated caller's own subject is refused (403), regardless
+    of what run_id.user_sub the checkpoint's *content* claims, this is
+    exactly the re-enforced-authorization property ADR-0103's Decision
+    text requires.
+    """
+    if payload.run_id is None:
+        return str(uuid.uuid4())
+
+    config = {"configurable": {"thread_id": payload.run_id}}
+    tuple_ = await graph.checkpointer.aget_tuple(config)
+    if tuple_ is None:
+        raise HTTPException(status_code=404, detail=f"no workflow run found for run_id '{payload.run_id}'")
+
+    stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
+    if stored_sub != identity.sub:
+        logger.warning(
+            "refused to resume run_id=%s: checkpoint belongs to a different subject",
+            payload.run_id,
+        )
+        raise HTTPException(status_code=403, detail="this workflow run belongs to a different user")
+
+    return payload.run_id
+
+
 @app.post("/v1/agents/tekos/chat")
 async def tekos_chat(
     payload: ChatRequest,
@@ -96,13 +180,16 @@ async def tekos_chat(
     """Synchronous JSON response, or SSE token streaming when the caller
     sends `Accept: text/event-stream`.
     """
+    graph = request.app.state.tekos_graph
     accept = request.headers.get("accept", "")
     initial_state = _initial_state(payload, identity)
     request_id = _request_id(request)
+    run_id = await _resolve_run_id(graph, payload, identity)
+    config = {"configurable": {"thread_id": run_id}}
 
     if "text/event-stream" in accept:
         return StreamingResponse(
-            _stream_chat(initial_state, request_id),
+            _stream_chat(graph, initial_state, config, request_id, run_id),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -112,7 +199,7 @@ async def tekos_chat(
         )
 
     try:
-        final_state = await tekos_graph.ainvoke(initial_state)
+        final_state = await graph.ainvoke(initial_state, config=config)
     except Exception as exc:
         logger.error("graph execution failed for session=%s request_id=%s: %s", payload.session_id, request_id, exc)
         raise HTTPException(status_code=500, detail=f"agent workflow failed: {exc}") from exc
@@ -120,6 +207,7 @@ async def tekos_chat(
     return ChatResponse(
         reply=final_state.get("reply", ""),
         citations=final_state.get("citations", []),
+        run_id=run_id,
     )
 
 
@@ -136,19 +224,22 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
 _TOOL_NODES = {"tool_call": "search_confluence"}
 
 
-async def _stream_chat(initial_state: Dict[str, Any], request_id: str) -> AsyncIterator[str]:
+async def _stream_chat(
+    graph, initial_state: Dict[str, Any], config: Dict[str, Any], request_id: str, run_id: str
+) -> AsyncIterator[str]:
     """Streams token deltas from the `reason` node's underlying chat model
     via LangGraph's `astream_events` (v2), which surfaces
     `on_chat_model_stream` events for any model call nested inside a node
     -- no need to restructure the node itself for streaming to work. Also
     surfaces `tool` events (start/end of `_TOOL_NODES` entries) and a
-    `start` event carrying request_id, per ADR-0045.
+    `start` event carrying request_id and run_id (ADR-0045, ADR-0103) -
+    the frontend needs run_id to resume this exact workflow later.
     """
-    yield _sse("start", {"request_id": request_id})
+    yield _sse("start", {"request_id": request_id, "run_id": run_id})
 
     citations: Any = []
     try:
-        async for event in tekos_graph.astream_events(initial_state, version="v2"):
+        async for event in graph.astream_events(initial_state, config=config, version="v2"):
             kind = event.get("event")
             name = event.get("name")
             if kind == "on_chat_model_stream":

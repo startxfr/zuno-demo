@@ -755,3 +755,33 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   it. No bundle has a real signature yet (needs WP-04 stage 2's
   credentialed CI run), so ADR-0106 stays Partially implemented and the
   flag stays off.
+
+- 2026-08-14 (ADR-0103, roadmap WP-08): Agent Runtime workflows are now
+  resumable. `app/graph/build.py`'s `build_graph()` takes an explicit
+  checkpointer (LangGraph's `BaseCheckpointSaver`) instead of compiling
+  once at import time; `app/main.py`'s new ASGI lifespan builds the graph
+  at startup against `AsyncPostgresSaver` when `CHECKPOINT_PGHOST/PORT/
+  DATABASE/USER/PASSWORD` are all set, else falls back to `MemorySaver`
+  (default, not resumable across restarts - the documented default for
+  tests/local dev). `POST /v1/agents/tekos/chat` gained an optional
+  `run_id` request field / mandatory `run_id` response field
+  (`app/schemas.py`); `_resolve_run_id` mints a fresh run_id when absent,
+  and on resume re-fetches the checkpoint's stored `user_sub` and refuses
+  (403) if it differs from the validated caller's own token subject -
+  ADR-0103's "resumption re-enforces authorization" requirement - and 404s
+  an unknown/expired run_id. Dedicated `agent-checkpoints` database/role on
+  the shared `zuno-postgresql` PGO cluster
+  (`gitops/charts/postgresql`'s `checkpointDatabase`, confirmed the
+  hyphenated-name pattern already works against the real cluster
+  alongside `rag-tech`), seeded via `ansible/roles/vault`'s existing
+  self-generated-credentials block (`agent-runtime/postgresql-app`).
+  Pinned `langgraph-checkpoint-postgres==2.0.25` (the last release
+  compatible with the already-pinned `langgraph==0.2.39`'s
+  `langgraph-checkpoint<3.0.0` constraint - a newer
+  langgraph-checkpoint-postgres pulls in langgraph-checkpoint>=4.0.0 and
+  conflicts). Tested against `MemorySaver` (same `BaseCheckpointSaver`
+  interface as `AsyncPostgresSaver`, so the real production logic is
+  proven without needing a live Postgres) in
+  `components/agent-runtime/tests/test_checkpointing.py`, including the
+  cross-subject-resume security-negative. Repo-provable end to end, so
+  ADR-0103 is fully Implemented (no operator step required).

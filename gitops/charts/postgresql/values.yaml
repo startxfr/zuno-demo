@@ -137,4 +137,16 @@ ragTechDatabase:
 maasDatabase:
   name: maas
   owner: maas
-  vaultPath: maas/postgresql-app
+
+# Dedicated database/role for the Agent Runtime's LangGraph checkpointer
+# (ADR-0103) - resumable workflow state, isolated from every other
+# database on this cluster for the same reason ragTechDatabase/
+# maasDatabase are. The hyphenated database name mirrors ragTechDatabase's
+# "rag-tech" - confirmed working against the real zuno-postgresql
+# PostgresCluster on 2026-08-14 (`oc get postgrescluster zuno-postgresql
+# -n zuno-data -o jsonpath='{.spec.users}'` shows "rag-tech" already
+# reconciled), so this is no longer an unverified assumption.
+checkpointDatabase:
+  name: agent-checkpoints
+  owner: agentcheckpoints
+  vaultPath: agent-runtime/postgresql-app

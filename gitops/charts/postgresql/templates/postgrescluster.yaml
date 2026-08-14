@@ -111,13 +111,15 @@ spec:
             name: {{ .Values.backups.s3.secretName }}
 {{- end }}
 
-  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and three
+  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and four
   # further dedicated databases/roles - Keycloak (ADR-0315), the
-  # rag-ingestion pipeline's rag-tech corpus/index database, and RHOAI's
-  # Models-as-a-Service maas database - each adopting the password already
+  # rag-ingestion pipeline's rag-tech corpus/index database, RHOAI's
+  # Models-as-a-Service maas database, and the Agent Runtime's LangGraph
+  # checkpoint database (ADR-0103) - each adopting the password already
   # seeded into its own pguser Secret by templates/externalsecret.yaml /
   # templates/externalsecret-keycloak.yaml /
-  # templates/externalsecret-ragtech.yaml / templates/externalsecret-maas.yaml
+  # templates/externalsecret-ragtech.yaml / templates/externalsecret-maas.yaml /
+  # templates/externalsecret-checkpoint.yaml
   # ("bring your own password") rather than generating its own.
   users:
     - name: {{ .Values.cluster.owner }}
@@ -132,6 +134,9 @@ spec:
     - name: {{ .Values.maasDatabase.owner }}
       databases:
         - {{ .Values.maasDatabase.name }}
+    - name: {{ .Values.checkpointDatabase.owner }}
+      databases:
+        - {{ .Values.checkpointDatabase.name }}
 
   # Runs once at bootstrap against "postgres", not the app database - see
   # templates/configmap-init-sql.yaml's `\connect` comment for why.

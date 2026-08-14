@@ -127,6 +127,7 @@ jobs:
           python3 tests/test_retrieve_metadata.py
           python3 tests/test_auth.py
           python3 tests/test_bundle_signing.py
+          python3 tests/test_checkpointing.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |

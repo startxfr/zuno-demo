@@ -29,7 +29,9 @@ layer's own GitOps apps, listed in that file).
 - **Request body:** `user_sub` is informational/correlation only (ADR-0033) -
   the authoritative subject, groups and bearer token used for every
   downstream classification/tool/model call always come from the validated
-  token, never from this field.
+  token, never from this field. `run_id` (ADR-0103, optional) resumes a
+  prior workflow run from its last checkpoint instead of starting a new one
+  - omit it to start fresh.
   ```json
   { "session_id": "abc123", "user_sub": "f47ac10b-58cc-...", "message": "How do I size an InferenceService for an L4 GPU?" }
   ```
@@ -40,17 +42,26 @@ layer's own GitOps apps, listed in that file).
     "citations": [
       { "source": "https://docs.redhat.com/...", "title": "vLLM ServingRuntime" },
       { "source": "https://confluence.example.internal/wiki/spaces/TECH/pages/123456789", "title": "OpenShift AI 3.5 EA2 - Model Serving Runbook" }
-    ]
+    ],
+    "run_id": "3fae9c2e-..."
   }
   ```
+  Pass `run_id` back as the request's `run_id` field on a later call
+  (browser disconnect, explicit "continue" action) to resume this exact
+  workflow from its last checkpoint (ADR-0103). Resuming a `run_id` whose
+  checkpoint belongs to a different validated subject than the caller's own
+  token is refused (`403`) - re-enforced on every resume, not just checked
+  once when the run started; an unknown/expired `run_id` is `404`.
 - **Streaming:** send `Accept: text/event-stream` on the same request to
   receive Server-Sent Events instead (ADR-0045 - relayed unmodified all the
   way to the browser by `components/agent-bff` and
   `components/agent-frontend`, see their own READMEs):
-  - `event: start` - `{"request_id": "..."}`, the first frame, echoing the
-    `X-Zuno-Request-Id` header this request arrived with (or a freshly
-    minted one if it arrived without one - see `app/main.py:_request_id`)
-    so every hop's logs for this turn share one correlatable ID.
+  - `event: start` - `{"request_id": "...", "run_id": "..."}`, the first
+    frame: `request_id` echoes the `X-Zuno-Request-Id` header this request
+    arrived with (or a freshly minted one if it arrived without one - see
+    `app/main.py:_request_id`) so every hop's logs for this turn share one
+    correlatable ID; `run_id` (ADR-0103) is this workflow's checkpoint
+    thread id, to pass back on a later request to resume it.
   - `event: tool` - `{"name": "search_confluence", "status": "started"|"finished"}`,
     emitted around `tool_call_node` actually running (only when the
     conditional edge routes through it - see "The Tekos workflow" below).
@@ -73,6 +84,10 @@ layer's own GitOps apps, listed in that file).
   judged to need a second, redundant latency scenario under ADR-0027's
   fixed 20-scenario count.
 - **Response `401`:** missing/invalid/expired JWT.
+- **Response `403`:** `run_id` was supplied but its checkpoint belongs to a
+  different subject than the validated caller (ADR-0103).
+- **Response `404`:** `run_id` was supplied but no checkpoint exists for it
+  (unknown or expired).
 - **Response `500`:** unhandled graph failure (see `errors` accumulated in
   graph state via logs - not currently surfaced in the HTTP response body
   beyond the summary message).
@@ -82,7 +97,12 @@ layer's own GitOps apps, listed in that file).
 Both always `200` for this service today - it holds no required external
 state at startup beyond what individual node calls handle defensively
 per-request (retrieve/tool_call/reason each degrade gracefully rather than
-crash the whole request - see `app/graph/nodes.py`).
+crash the whole request - see `app/graph/nodes.py`). This holds even with
+Postgres-backed checkpointing (ADR-0103): the app's ASGI lifespan (`app/
+main.py:lifespan`) must finish building the Tekos graph - Postgres
+connection included, when configured - before FastAPI serves any request
+at all, so by the time either endpoint can be reached the graph is already
+ready; there is no separate "checkpointer connected" state to report.
 
 ## The Tekos workflow (LangGraph)
 
@@ -194,7 +214,15 @@ no-live-cluster, run-directly convention:
 cd components/agent-runtime
 python3 tests/test_registry.py
 python3 tests/test_retrieve_metadata.py
+python3 tests/test_checkpointing.py
 ```
+
+`test_checkpointing.py` (ADR-0103) proves `_resolve_run_id`'s resume/
+authorization logic and `build_graph`'s checkpointer wiring against a
+`MemorySaver` - it implements the exact same `BaseCheckpointSaver`
+interface `AsyncPostgresSaver` does (`aget_tuple`, checkpoint shape with
+`channel_values`), so this exercises the real production logic without
+needing a live Postgres instance.
 
 ## Identity propagation
 
@@ -213,6 +241,7 @@ its `groups`/`sub` claims are carried through `AgentState` so the
 | `MCP_GATEWAY_URL` | `http://mcp-gateway.zuno-ai-run.svc:8080` | tool_call node |
 | `AI_GATEWAY_URL` | `http://ai-gateway.zuno-ai-run.svc:8080` | reason node's `ModelRouter` (ADR-0009) |
 | `AGENTS_DIR` | `/app/agents` | Directory of `<name>/agent.okf.md` OKF bundles (ADR-0038) `app/registry.py`'s `AgentRegistry` loads at import time (ADR-0039) |
+| `CHECKPOINT_PGHOST` / `CHECKPOINT_PGPORT` / `CHECKPOINT_PGDATABASE` / `CHECKPOINT_PGUSER` / `CHECKPOINT_PGPASSWORD` | unset | ADR-0103 LangGraph checkpointer DSN (separate vars, never a combined URI - see `app/main.py:_checkpoint_conninfo`). All four of host/database/user/password must be set or the app falls back to in-memory checkpointing (not resumable across restarts) - the documented default for local dev and every test. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces (ADR-0029) |
 
 ## Observability (ADR-0029)

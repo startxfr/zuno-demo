@@ -1,6 +1,6 @@
 # WP-08: Resumable long-running workflows (promotes ADR-0103)
 
-- **State:** Not started
+- **State:** Done (2026-08-14 — repo-provable, no operator step required)
 - **ADRs:** ADR-0103 (Proposed -> To be implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** —

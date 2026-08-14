@@ -46,6 +46,28 @@ spec:
               value: {{ .Values.mcpGatewayUrl | quote }}
             - name: AI_GATEWAY_URL
               value: {{ .Values.aiGatewayUrl | quote }}
+            # ADR-0103: resumable-workflow checkpointing, optional -
+            # secretKeyRef optional: true so the Deployment still comes up
+            # before the ExternalSecret has synced, exactly like
+            # gitops/charts/mcp-sales-db's own db credentials.
+            - name: CHECKPOINT_PGHOST
+              value: {{ .Values.checkpointDb.host | quote }}
+            - name: CHECKPOINT_PGPORT
+              value: {{ .Values.checkpointDb.port | quote }}
+            - name: CHECKPOINT_PGDATABASE
+              value: {{ .Values.checkpointDb.database | quote }}
+            - name: CHECKPOINT_PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.checkpointDb.credentials.secretName }}
+                  key: username
+                  optional: true
+            - name: CHECKPOINT_PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.checkpointDb.credentials.secretName }}
+                  key: password
+                  optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

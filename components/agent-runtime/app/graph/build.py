@@ -10,17 +10,28 @@ contract rather than code) is satisfied by app/graph/nodes.py resolving
 those values from app/registry.py's AgentRegistry at import time. A second
 agent's graph shape would add a second build function here plus a
 selector keyed on AgentDefinition.name.
+
+ADR-0103: `build_graph` now takes an explicit `checkpointer` (any
+`BaseCheckpointSaver` - `MemorySaver` for the in-memory default, or an
+`AsyncPostgresSaver` for persistent, resumable runs) instead of compiling
+once at import time. A Postgres-backed checkpointer needs a live async
+connection, which cannot be opened at plain module-import time (no event
+loop yet) - so the compiled graph is now built during app startup
+(app/main.py's lifespan) and stored on `app.state`, not as a module-level
+constant.
 """
 
 from __future__ import annotations
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from app.graph.nodes import reason_node, respond_node, retrieve_node, should_call_tools, tool_call_node
 from app.graph.state import AgentState
 
 
-def build_graph():
+def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     graph = StateGraph(AgentState)
 
     graph.add_node("retrieve", retrieve_node)
@@ -38,10 +49,8 @@ def build_graph():
     graph.add_edge("reason", "respond")
     graph.add_edge("respond", END)
 
-    return graph.compile()
-
-
-# Compiled once at import time; LangGraph's compiled graph is safe to reuse
-# concurrently across requests (per-invocation state is passed explicitly,
-# not held on the graph object).
-tekos_graph = build_graph()
+    # Compiled once per checkpointer (at app startup, or once per test); the
+    # compiled graph is safe to reuse concurrently across requests -
+    # per-invocation state is passed explicitly via `config`, never held on
+    # the graph object itself.
+    return graph.compile(checkpointer=checkpointer)
