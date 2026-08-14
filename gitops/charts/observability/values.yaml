@@ -57,8 +57,9 @@ collector:
 # (docs/platform/slo.md, templates/prometheusrule-slo.yaml). Schema-
 # correct and safe to enable independent of whether the underlying
 # zuno_bff_requests_total metric exists yet (a PrometheusRule referencing
-# an absent metric evaluates to "no series", not an error) - default
-# false alongside every other switch in this chart, tracks collector's
-# own enablement since the alerts are meaningless without it.
+# an absent metric evaluates to "no series", not an error) - defaults true
+# since it's meant to always render once its real gate, collector.enabled,
+# is true (see templates/prometheusrule-slo.yaml's `and`), tracking
+# collector's own enablement since the alerts are meaningless without it.
 alerting:
   enabled: true

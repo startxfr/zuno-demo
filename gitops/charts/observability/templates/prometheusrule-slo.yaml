@@ -8,8 +8,14 @@ prometheusrule.spec.groups.rules` against the live test cluster
 built-in Prometheus Operator, not something this chart installs).
 Referencing an absent metric evaluates to "no series", not an error, so
 this is safe to enable ahead of the metric existing.
+
+Also gated on collector.enabled (true only for the d1 Application), not
+just alerting.enabled: this keeps the rule owned by zuno-observability-d1
+alone, so it isn't rendered by both d0 and d1 into the same zuno-monitoring
+namespace (ArgoCD was reporting PrometheusRule/zuno-agent-path-slo as
+shared between the two Applications before this guard was added).
 */ -}}
-{{- if .Values.alerting.enabled }}
+{{- if and .Values.collector.enabled .Values.alerting.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
