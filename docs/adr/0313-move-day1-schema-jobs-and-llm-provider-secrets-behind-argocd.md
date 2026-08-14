@@ -1,6 +1,6 @@
 # ADR-0313: Move Day 1 schema Jobs and LLM provider secret seeding behind ArgoCD/Vault
 
-- **Status:** Implemented
+- **Status:** Implemented. Incident 2026-08-14: moving the credentials ExternalSecrets into the charts as plain Sync-phase resources deadlocked the first fresh install of `zuno-mcp-sales-db-d0` - the schema-apply Job is a PreSync hook consuming the Secret via `secretKeyRef`, and ArgoCD only starts the Sync phase after every PreSync hook succeeds, so the ExternalSecret was never applied and the hook pod sat in `CreateContainerConfigError` forever (`backoffLimit` never triggers on that state, and the Job had no `activeDeadlineSeconds`). Fixed by making the ExternalSecret a PreSync hook at `sync-wave: "-1"` (one wave before the Job, persisting between syncs) in both `gitops/charts/sql-schema` and `gitops/charts/rag-service` (same latent shape, dormant only because its Secret predated this migration), plus `activeDeadlineSeconds: 300` on both Jobs so a future stall fails the sync visibly.
 - **Target:** v0
 - **Date:** 2026-08-09
 - **Decision owners:** Zuno Demo architecture team

@@ -88,4 +88,8 @@
           Application {{ gitops_app_name }} did not reach Synced/Healthy within
           {{ gitops_app_wait_retries | default(30) }}x{{ gitops_app_wait_delay | default(10) }}s.
           The blocked resources were recorded and are summarized at the end of
-          the run. Auto-fix: `make d0 reconcile {{ gitops_component_name }}`.
+          the run. Remediation: fix the blocked resources above, then re-run
+          the same `make {{ gitops_app_phase }} install <component>` command
+          (idempotent). If a sync operation is stuck mid-flight, terminate it
+          first: `oc patch application {{ gitops_app_name }} -n openshift-gitops
+          --type=json -p '[{"op":"remove","path":"/operation"}]'`.

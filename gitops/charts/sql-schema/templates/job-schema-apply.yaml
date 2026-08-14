@@ -1,6 +1,8 @@
 # ArgoCD PreSync hook Job; runs before the sales-db MCP server is synced.
 # `hook-delete-policy: BeforeHookCreation` deletes the previous run's Job
-# since Jobs are immutable.
+# since Jobs are immutable. The credentials Secret arrives one wave earlier
+# in the same PreSync phase (templates/externalsecret.yaml, wave -1) - it
+# must NOT be a Sync-phase resource, that deadlocked (incident 2026-08-14).
 #
 # The SQL/fixtures ConfigMap (zuno-sxa-schema) is generated and applied by
 # ansible/roles/sql_schema, not by this chart.
@@ -17,6 +19,10 @@ metadata:
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 2
+  # psql over 3 small files takes seconds; without a deadline a pod stuck in
+  # CreateContainerConfigError (not a pod *failure*, so backoffLimit never
+  # triggers) hangs the whole sync operation forever - incident 2026-08-14.
+  activeDeadlineSeconds: 300
   template:
     spec:
       restartPolicy: Never

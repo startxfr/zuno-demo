@@ -1,7 +1,9 @@
 # ArgoCD PreSync hook Job; applies the RAG metadata schema + seed fixtures
 # before the rest of this chart syncs. `hook-delete-policy:
 # BeforeHookCreation` deletes the previous run's Job since Jobs are
-# immutable.
+# immutable. The credentials Secret arrives one wave earlier in the same
+# PreSync phase (templates/externalsecret-db.yaml, wave -1) - it must NOT
+# be a Sync-phase resource, that deadlocks (incident 2026-08-14).
 #
 # The SQL/fixtures ConfigMap (zuno-rag-schema) is generated and applied by
 # ansible/roles/rag, not by this chart.
@@ -18,6 +20,10 @@ metadata:
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 2
+  # psql over 3 small files takes seconds; without a deadline a pod stuck in
+  # CreateContainerConfigError (not a pod *failure*, so backoffLimit never
+  # triggers) hangs the whole sync operation forever - incident 2026-08-14.
+  activeDeadlineSeconds: 300
   template:
     spec:
       restartPolicy: Never
