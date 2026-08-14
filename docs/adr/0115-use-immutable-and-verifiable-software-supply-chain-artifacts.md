@@ -40,21 +40,31 @@ The release workflow must reconcile source revision, image digest, chart values 
 the remaining five reduce to one real blocker (gap 7, a credentialed
 GitHub Actions + Quay run) plus its three direct downstream consequences.
 
+**2026-08-14 (WP-04 stage 1, docs/roadmap/work-packages/wp-04-supply-chain-completion.md):**
+the tooling for gaps 2, 3, 4 and 6 is now built and CI-wired, so what
+remains for every one of them is purely gap 7 (the credentialed release
+run) plus running that tooling against its output - no further scripting.
+Nothing below moved to resolved by this addition alone: with no real
+release yet, `verify_signatures.py` correctly finds nothing to verify and
+`pin_release.py` has no real manifest to apply.
+
 ### Implemented foundations
 
 - `.github/workflows/build-publish.yml` builds first-party images, publishes SHA-based tags, generates SPDX SBOMs, scans HIGH/CRITICAL vulnerabilities with Trivy, signs images with keyless Cosign through GitHub OIDC and attests the SBOM.
 - `.github/workflows/lint.yml` executes the immutable-image policy check together with OpenAPI, Helm, workload hardening, Go, Python and Ansible validation.
 - `platform/supply-chain/check_no_latest_tags.py` correctly scans chart values and fails when a deployable image uses `latest` or an empty tag.
-- `RELEASING.md` documents the intended transition from moving Git refs/image tags to reviewed release references.
+- `RELEASING.md` documents the intended transition from moving Git refs/image tags to reviewed release references, now including the exact `pin_release.py`/`verify_signatures.py` steps (2026-08-14).
+- `platform/supply-chain/verify_signatures.py` (2026-08-14): `cosign verify`-based signature check against `build-publish.yml`'s exact keyless GitHub OIDC identity, scoped to immutable-tagged first-party images; wired into `lint.yml` non-blocking (mirrors `check_no_latest_tags.py`'s own convention, for the same reason - see gap 6).
+- `platform/supply-chain/pin_release.py` (2026-08-14): mechanically rewrites chart `tag` fields from a release manifest, refusing to run unless the manifest covers exactly the current gap-2 field set; regression-tested (`platform/supply-chain/tests/test_pin_release.py`) against a throwaway copy of the real chart files, never the repository's own state.
 
 ### Gaps preventing `Implemented` status
 
 1. ~~The build inventory is stale.~~ **Resolved by ADR-0324** (2026-08-11, same review cycle as this gap list, which wasn't updated at the time): the `postgresql-pgvector` matrix entry is gone from `.github/workflows/build-publish.yml`, and `platform/supply-chain/check_build_matrix.py` passes (7/7 matrix entries valid, every first-party Dockerfile tracked).
-2. **Deployable charts still use `tag: latest`.** `check_no_latest_tags.py` reports 8 fields across 7 charts as of 2026-08-12: `agent-runtime`, `ai-gateway`, `mcp-gateway`, `mcp-sales-db`, `rag-service`, `tekos` (`image.tag`), plus `rag-ingestion` (`images.ingestion.tag`, `images.compiler.tag`, added by ADR-0330 after this gap list was first written). **Genuinely blocked on gap 7**: pinning these to a real immutable reference now, before any real build-publish-sign cycle has run, would mean writing a tag that doesn't exist in the registry - the honest fix is a real release, not a placeholder SHA.
+2. **Deployable charts still use `tag: latest`.** `check_no_latest_tags.py` reports 8 fields across 7 charts as of 2026-08-12: `agent-runtime`, `ai-gateway`, `mcp-gateway`, `mcp-sales-db`, `rag-service`, `tekos` (`image.tag`), plus `rag-ingestion` (`images.ingestion.tag`, `images.compiler.tag`, added by ADR-0330 after this gap list was first written). **Genuinely blocked on gap 7**: pinning these to a real immutable reference now, before any real build-publish-sign cycle has run, would mean writing a tag that doesn't exist in the registry - the honest fix is a real release, not a placeholder SHA. `pin_release.py` (2026-08-14) makes applying the fix mechanical once gap 7 produces a real manifest - see RELEASING.md step 4.
 3. **The immutable-tag policy is non-blocking.** `lint.yml` still sets `continue-on-error: true` for `check_no_latest_tags.py`. Deliberately left non-blocking until gap 2 is actually closed - flipping it now would just make every merge fail on the still-open `latest` references above, not surface new information.
 4. **GitOps still tracks moving Git refs.** Argo CD Applications continue to use `targetRevision: main`; deployment state is therefore not yet tied to a reviewed release revision. Same dependency as gap 2: there is no reviewed release tag to point at until gap 7 produces one.
 5. ~~Two first-party Dockerfiles still inherit moving base images.~~ **Resolved 2026-08-12**: `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` now pin `registry.access.redhat.com/ubi9/ubi-minimal` by digest (`sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221`, version 9.8, confirmed live via `skopeo inspect` against the real Red Hat registry) rather than `:latest`. This gap was independent of the others - it depends on Red Hat's registry, not this repository's own release pipeline.
-6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. Blocked on gap 7 (nothing has been signed for real yet to verify against).
+6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. `verify_signatures.py` (2026-08-14) is the verification gate itself, CI-wired non-blocking; it still finds nothing to verify because gap 7 means nothing has been signed for real yet - the remaining blocker is gap 7 alone, not building the check.
 7. **The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.** The workflow is authored, but repository evidence does not yet prove a successful publication/promotion cycle with real credentials and registry artifacts. **This is the actual blocker for gaps 2, 3, 4 and 6** - they are one connected release-and-promote step, not four independent fixes, and need real Quay/GitHub Actions credentials to close for real rather than being faked with placeholder tags.
 
 ### Completion criteria

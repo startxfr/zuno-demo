@@ -690,3 +690,22 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   comparison tracked in `docs/roadmap/evidence/adr-0114-maas-coverage.md`;
   live MaaS verification and any cutover decision remain an operator step
   (WP-27).
+
+- 2026-08-14 (ADR-0115 stage 1, roadmap WP-04): added the two remaining
+  supply-chain tools needed once a real release exists.
+  `platform/supply-chain/verify_signatures.py` runs `cosign verify`
+  against every immutable-tagged first-party image reference
+  (`quay.io/zuno-demo/...`), checking the exact `build-publish.yml`
+  keyless GitHub OIDC identity signed it - currently finds nothing to
+  verify (every chart is still `tag: latest`) and passes trivially, by
+  design. `platform/supply-chain/pin_release.py` mechanically rewrites
+  chart `tag` fields from an operator-authored release manifest
+  (text-level edits, so existing `values.yaml` comments survive; refuses
+  to run unless the manifest covers exactly the current
+  `check_no_latest_tags.py` gap set), with a regression suite
+  (`tests/test_pin_release.py`) exercised against a throwaway copy of the
+  real chart files. Both are wired into `.github/workflows/lint.yml`
+  `continue-on-error: true`, same convention as `check_no_latest_tags.py`.
+  `RELEASING.md` documents the exact stage 4/5 sequence using these
+  tools. Neither closes any ADR-0115 gap by itself - all remaining gaps
+  (2, 3, 4, 6) still block on gap 7, the real credentialed release run.

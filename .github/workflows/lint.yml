@@ -19,6 +19,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyyaml openapi-spec-validator
+      - uses: sigstore/cosign-installer@v3
       # ADR-0115 - known-failing today (6 charts still use tag: latest,
       # pending the build-publish.yml pipeline actually publishing
       # immutable tags for them to reference) - see
@@ -26,6 +27,14 @@ jobs:
       # that reason; report only.
       - name: Reject non-immutable image tags (ADR-0115)
         run: python3 platform/supply-chain/check_no_latest_tags.py
+        continue-on-error: true
+      # ADR-0115 stage 1 (WP-04): passes trivially today (nothing
+      # immutable-tagged to verify yet - see the script's own docstring)
+      # and needs `cosign` + real registry network access to mean anything
+      # once a release exists, so it stays non-blocking alongside the
+      # check above until that release lands (RELEASING.md step 5).
+      - name: Verify first-party image signatures (ADR-0115)
+        run: python3 platform/supply-chain/verify_signatures.py
         continue-on-error: true
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
@@ -118,6 +127,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_maas_adapter.py
+      - name: supply-chain pin_release.py tests (ADR-0115)
+        working-directory: platform/supply-chain
+        run: |
+          pip install pyyaml
+          python3 tests/test_pin_release.py
       - name: sales-db MCP server tests
         working-directory: components/mcp-servers/sales-db
         run: |

@@ -1,6 +1,6 @@
 # WP-04: Supply-chain completion (three stages)
 
-- **State:** Not started
+- **State:** Operator pending (2026-08-14 — stage 1 merged: verify_signatures.py, pin_release.py + tests, RELEASING.md and README updated. Awaiting stage 2, the operator's real Quay+GHA release, before stage 3 can run.)
 - **ADRs:** ADR-0115 (Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-05; also gates the "immutable tags from day one" rule for every later chart

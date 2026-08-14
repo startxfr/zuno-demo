@@ -24,10 +24,32 @@ tag for from here.
 4. Bump each `gitops/charts/*/values.yaml`'s `image.tag` (or
    `.repository`, if also moving off the in-cluster registry placeholder
    coordinates - see each chart's own comment) to `v0.1.0` in a follow-up
-   commit/PR. `platform/supply-chain/check_no_latest_tags.py` (wired into
+   commit/PR. Do this mechanically with
+   `platform/supply-chain/pin_release.py --manifest <manifest.yaml>`
+   (`--dry-run` first to preview) rather than hand-editing every chart:
+   write a manifest listing every `chart_values`/`path`/`tag` (and,
+   optionally, `digest` - recorded for audit in
+   `platform/supply-chain/pinned-releases.yaml`, not embedded in
+   `values.yaml`, since no chart template renders a digest today) pair
+   from the images `build-publish.yml` just published; see the script's
+   own docstring for the exact manifest schema. It refuses to run unless
+   the manifest covers *exactly* the fields
+   `platform/supply-chain/check_no_latest_tags.py` currently reports - a
+   stale or incomplete manifest fails loudly rather than partially
+   applying. It only ever rewrites `tag` fields, preserving every existing
+   comment; repointing `.repository` to `quay.io/...` (if you choose to)
+   is still a manual, reviewed edit per chart.
+   `platform/supply-chain/check_no_latest_tags.py` (wired into
    `.github/workflows/lint.yml`) will start passing once every chart's
    `tag: latest` is replaced this way.
-5. Bump `gitops/apps/*/application.yaml`'s `targetRevision: main` to
+5. Once the pinned images exist, run
+   `platform/supply-chain/verify_signatures.py` to confirm each
+   immutable-tagged first-party image verifies against the expected
+   `build-publish.yml` keyless GitHub OIDC identity before treating the
+   release as trusted. This becomes a meaningful, non-trivial check only
+   once step 4 has replaced at least one `latest` tag - see the script's
+   own docstring for why it correctly passes trivially before that.
+6. Bump `gitops/apps/*/application.yaml`'s `targetRevision: main` to
    `targetRevision: v0.1.0` in the same PR - this is the point ADR-0115's
    "production-like Argo CD applications must deploy a reviewed Git
    revision/tag" actually takes effect, and not before. Also bump
@@ -35,11 +57,11 @@ tag for from here.
    though Ansible no longer applies it (ADR-0311): it stays a working,
    up-to-date example for the documented pure-GitOps bootstrap path
    (`docs/platform/installation.md`).
-6. Merge, then `make day0|d0 configure` / `make day1|d1 configure|run`
+7. Merge, then `make day0|d0 configure` / `make day1|d1 configure|run`
    (or let ArgoCD's automated sync pick it up) to roll the cluster onto
    the pinned revision.
 
-Subsequent releases repeat steps 1-6 with the next tag. `gitops/apps/vault/application-d1.yaml`
+Subsequent releases repeat steps 1-7 with the next tag. `gitops/apps/vault/application-d1.yaml`
 already tracks a pinned upstream chart version (`targetRevision: "0.28.1"`,
 a third-party chart release, not this repository's own) - the same
 pattern this process brings to every other Application.
