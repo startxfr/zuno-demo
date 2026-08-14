@@ -1,36 +1,31 @@
 # redis
 
-Applies the `gitops/apps/redis` ArgoCD Application pair (ADR-0042), whose
-chart (`gitops/charts/redis`) wraps the upstream `bitnami/redis` chart -
-same "vendor a public Helm chart, no operator" pattern
-`ansible/roles/vault` already established for a stateful backing service
-with no OLM operator commonly available on this platform. A Day 0
-component (ADR-0056): `-d0` is a no-op (no operator to install, same
-shape as `zuno-vault-d0`); `-d1` applies the real chart - standalone
-architecture, 1Gi persistence, demo scale (this is a session cache, not
-the platform's durable data store - that's PostgreSQL/pgvector,
-ADR-0015).
+Applies the `gitops/apps/redis` ArgoCD Application pair, whose chart
+(`gitops/charts/redis`) wraps the upstream `bitnami/redis` chart (no OLM
+operator available, same pattern as `ansible/roles/vault`). A Day 0
+component: `-d0` is a no-op (no operator to install, same shape as
+`zuno-vault-d0`); `-d1` applies the real chart - standalone architecture,
+1Gi persistence, demo scale (a session cache, not the platform's durable
+data store - that's PostgreSQL/pgvector).
 
 ## Why this exists
 
-ADR-0042 moves `components/agent-frontend`'s browser session from a
-signed-but-unencrypted cookie (carrying the raw access/ID token) to an
-opaque session-ID cookie resolved against a server-side store - this is
-that store. See `components/agent-frontend/internal/session/store.go`
-for the client side (AES-256-GCM encryption at rest, on top of Redis's
-own storage - Redis itself has no awareness of token contents).
+This is the server-side store backing `components/agent-frontend`'s
+opaque session-ID browser cookie. See
+`components/agent-frontend/internal/session/store.go` for the client side
+(AES-256-GCM encryption at rest, on top of Redis's own storage - Redis
+itself has no awareness of token contents).
 
 ## Network boundary
 
 `gitops/charts/redis/values.yaml` disables `bitnami/redis`'s own default
-`NetworkPolicy` (its default ingress rule has no `from` selector - it
-would allow traffic from anywhere in the cluster, punching a hole through
-`zuno-auth`'s existing default-deny-other-namespaces baseline rather than
-respecting it) in favor of a hand-authored one
+`NetworkPolicy` (its default ingress rule has no `from` selector, which
+would punch a hole through `zuno-auth`'s existing
+default-deny-other-namespaces baseline) in favor of a hand-authored one
 (`templates/networkpolicy.yaml`) scoped to `app.kubernetes.io/component:
 frontend` pods in any namespace carrying the `zuno.io/agent` label - the
-same least-privilege bar `gitops/charts/mcp-sales-db` already sets for a
-comparable security-relevant backing service.
+same least-privilege bar `gitops/charts/mcp-sales-db` sets for a
+comparable backing service.
 
 ## Secret
 
@@ -38,20 +33,17 @@ comparable security-relevant backing service.
 `ansible/roles/vault/tasks/install.yml`) is synced by this chart's own
 `templates/externalsecret.yaml` into the `zuno-redis-auth` Secret
 `bitnami/redis`'s `auth.existingSecret`/`existingSecretPasswordKey`
-values point at - never a literal password in Git, per ADR-0024.
+values point at - never a literal password in Git.
 
 ## Day 0 ordering
 
 Positioned right after `external_secrets` (`ansible/playbooks/
-day0_install.yml`/`day0_check.yml`), not right after `vault` as originally
-documented here - **VERIFIED live, 2026-08-12**: this chart's own
-`templates/externalsecret.yaml` creates an `external-secrets.io/v1beta1
-ExternalSecret`, so the External Secrets Operator's CRD must already be
-registered on the cluster before ArgoCD can sync `zuno-redis-d1`, or the
-sync fails outright (`could not find version "v1beta1" of
-external-secrets.io/ExternalSecret`) - the original "vault is the only
-real dependency" reasoning missed this. `vault` (the secret's source) and
-`namespaces` (owner of `zuno-auth`) still matter too, but `external_secrets`
-(the CRD provider) is the binding constraint on ordering. Still well ahead
-of the agent workload charts (`tekos`, applied Day 1) that actually
-consume it.
+day0_install.yml`/`day0_check.yml`), not right after `vault`: this
+chart's own `templates/externalsecret.yaml` creates an
+`external-secrets.io/v1beta1 ExternalSecret`, so the External Secrets
+Operator's CRD must already be registered on the cluster before ArgoCD
+can sync `zuno-redis-d1`, or the sync fails outright (`could not find
+version "v1beta1" of external-secrets.io/ExternalSecret`). `vault` (the
+secret's source) and `namespaces` (owner of `zuno-auth`) still matter
+too, but `external_secrets` (the CRD provider) is the binding constraint
+on ordering.

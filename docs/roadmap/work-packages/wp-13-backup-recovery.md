@@ -16,9 +16,8 @@ drill on a real cluster is the operator part.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0100-v0.1-roadmap.md`): "Define backup,
-restore and recovery objectives for PostgreSQL, configuration and critical
-state."
+Stub origin (`docs/adr/0100-v0.1-roadmap.md`): define backup, restore and
+recovery objectives for PostgreSQL, configuration and critical state.
 
 Related: ADR-0015 (PostgreSQL platform), ADR-0024 (Vault), ADR-0022 (Git as
 config source — GitOps state needs no separate backup, record that

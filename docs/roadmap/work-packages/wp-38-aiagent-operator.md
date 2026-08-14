@@ -17,8 +17,7 @@ Promote stub ADR-0308 and implement the AIAgent operator: a controller
 reconciling `AIAgent` CRs into the per-agent resources the WP-37 contract
 enumerates (frontend/BFF Deployments/Services/Routes, OKF ConfigMap/
 reference, NetworkPolicy/ServiceAccount/RBAC, optional binding objects,
-status conditions), within the contract's hard boundaries. This finally
-discharges ADR-0113's long-deferred CRD/operator decision.
+status conditions), within the contract's hard boundaries.
 
 ## ADR references
 
@@ -26,13 +25,12 @@ discharges ADR-0113's long-deferred CRD/operator decision.
   more lifecycle, policy and deployment reconciliation around agent
   definitions."
 - [docs/adr/0327-...md](../../adr/0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md)
-  — remaining acceptance bullets discharged here (verbatim):
-  "Creating an `AIAgent` CR through GitOps produces the expected per-agent
-  frontend/BFF/configuration resources without modifying shared platform
-  services." / "Deleting/suspending an `AIAgent` has a defined, safe
-  lifecycle that does not delete shared data or secrets unexpectedly." /
-  "Existing plain-manifest agents can be migrated incrementally without a
-  flag day."
+  — the remaining acceptance bullets discharged here: a GitOps-created
+  `AIAgent` CR produces the expected per-agent frontend/BFF/configuration
+  resources without modifying shared platform services; delete/suspend has
+  a defined, safe lifecycle that doesn't unexpectedly delete shared data or
+  secrets; existing plain-manifest agents migrate incrementally, no flag
+  day.
 - [docs/adr/0113-provide-an-aiagent-kubernetes-crd-and-operator.md](../../adr/0113-provide-an-aiagent-kubernetes-crd-and-operator.md)
   — the original decision this implements.
 

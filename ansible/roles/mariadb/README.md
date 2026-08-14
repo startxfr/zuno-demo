@@ -16,13 +16,13 @@ namespace (already created by the `namespaces` role).
   `MariaDB` CR are actually Synced+Healthy/Ready, setting
   `mariadb_state_installed` and a line in the shared `/tmp` state report.
 - `install.yml` - looks up the `mariadb-operator` `PackageManifest`
-  directly by name (ADR-0048: channel/catalog are still discovered from
-  the live cluster, not hardcoded, same as `ansible/roles/jobset`),
-  preferring a `stable` channel and falling back to `defaultChannel` (this
-  package only ever publishes `alpha`, so it always falls back), then
-  applies `gitops/apps/mariadb/application-d0.yaml` with that selection
-  injected via `gitops_app_extra_helm_values`. Once `-d0` is
-  Synced+Healthy, soft-reads `ansible/confidential.yml` for
+  directly by name (channel/catalog are discovered from the live
+  cluster, not hardcoded, same as `ansible/roles/jobset`), preferring a
+  `stable` channel and falling back to `defaultChannel` (this package
+  only ever publishes `alpha`, so it always falls back), then applies
+  `gitops/apps/mariadb/application-d0.yaml` with that selection injected
+  via `gitops_app_extra_helm_values`. Once `-d0` is Synced+Healthy,
+  soft-reads `ansible/confidential.yml` for
   `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}`
   (same optional shape as `ansible/roles/postgresql`'s S3 repo2) and
   applies `application-d1.yaml`, then waits for the `mariadb-operator`
@@ -33,36 +33,31 @@ namespace (already created by the `namespaces` role).
 
 ## Why not the Enterprise operator
 
-This component originally targeted the certified `mariadb-enterprise-operator`
-listing, matching a manifest supplied for this component. Deployed against
-a live cluster, its controller-manager pod failed `ImagePullBackOff`:
-its CSV's `containerImage` is `docker.mariadb.com/mariadb-enterprise-operator@...`
-- MariaDB Corporation's own authenticated registry - and the CSV carries
-`operators.openshift.io/valid-subscription: ["MariaDB Enterprise"]`, i.e.
-it requires a paid MariaDB Enterprise credential this cluster doesn't have.
-The `mariadb-operator` community listing is the same upstream project
-(confirmed field-for-field identical `MariaDB`/`PhysicalBackup` CRD shapes
-against both packages' `alm-examples`, just under `k8s.mariadb.com` instead
-of `enterprise.mariadb.com`), with a public image
-(`ghcr.io/mariadb-operator/mariadb-operator-helm`) and no subscription
-requirement.
+This component uses the open-source `mariadb-operator` community listing,
+not the paid `mariadb-enterprise-operator` certified listing: its CSV
+requires `operators.openshift.io/valid-subscription: ["MariaDB
+Enterprise"]` and pulls from MariaDB Corporation's own authenticated
+registry (`docker.mariadb.com/mariadb-enterprise-operator@...`), which
+fails `ImagePullBackOff` without a paid credential. The community
+listing is the same upstream project - `MariaDB`/`PhysicalBackup` CRD
+shapes are identical between both packages' `alm-examples`, just under
+`k8s.mariadb.com` instead of `enterprise.mariadb.com` - with a public
+image (`ghcr.io/mariadb-operator/mariadb-operator-helm`) and no
+subscription requirement.
 
 ## Namespace and OperatorGroup
 
-Unlike `jobset`/`lws`/`kueue` (each with their own dedicated namespace) or
-the Enterprise-operator version of this component (which used a dedicated,
-namespace-scoped `OperatorGroup` in `zuno-data`), `mariadb-operator` is
-subscribed into the shared `openshift-operators` namespace with no
-dedicated `OperatorGroup` - same Pattern B shape as `ansible/roles/postgresql`.
-Confirmed against a live cluster's `PackageManifest`: this package's CSV
-supports every install mode (`OwnNamespace`/`SingleNamespace`/
-`MultiNamespace`/`AllNamespaces` all `true`), so `AllNamespaces` via the
-shared namespace's default global `OperatorGroup` is safe, and avoids the
-`MultipleOperatorGroupsFound` conflict a dedicated OperatorGroup in
-`zuno-data` previously hit on a live cluster (an unrelated, pre-existing
-stray `OperatorGroup` there, most likely left over from an earlier manual
-console install attempt - not something this role manages, delete manually
-with `oc delete operatorgroup <name> -n zuno-data` once confirmed unneeded).
+Unlike `jobset`/`lws`/`kueue` (each with their own dedicated namespace),
+`mariadb-operator` is subscribed into the shared `openshift-operators`
+namespace with no dedicated `OperatorGroup` - same Pattern B shape as
+`ansible/roles/postgresql`. This package's CSV supports every install
+mode (`OwnNamespace`/`SingleNamespace`/`MultiNamespace`/`AllNamespaces`
+all `true`), so `AllNamespaces` via the shared namespace's default
+global `OperatorGroup` is safe. If a stray `OperatorGroup` already
+exists in `zuno-data` (e.g. left over from a manual console install), it
+can conflict with `MultipleOperatorGroupsFound` - not something this
+role manages, delete it manually with `oc delete operatorgroup <name>
+-n zuno-data` once confirmed unneeded.
 
 ## Why an activation CR
 
@@ -77,27 +72,21 @@ activation/config singleton CR" shape `gitops/charts/jobset`'s
 `JobSetOperator` and `gitops/charts/kueue`'s `Kueue` CR already use in this
 repo.
 
-## Confirmed against a live cluster (api.demo222.startx.fr, 2026-08-12)
+## Operand status once installed
 
-- The `mariadb-operator` controller-manager Deployment is indeed named
-  `mariadb-operator` in `zuno-data` (`install.yml`'s wait step). The
-  `MariadbOperator` activation CR also brings up two sibling Deployments,
-  `mariadb-operator-cert-controller` and `mariadb-operator-webhook`, not
-  waited on directly - `MariaDB` CR reconciliation itself blocks (via a
-  validating webhook call) until the webhook Deployment has real endpoints,
-  so `install.yml`'s existing "wait for controller-manager Available, then
-  wait for MariaDB Ready" order is sufficient; the webhook race resolves on
-  its own within the `MariaDB` CR wait's retry budget.
-- The `MariaDB` CR does report a `status.conditions[]` entry of
-  `type: Ready` (`status: "True"` once healthy) - the
-  `install.yml`/`precheck.yml` assumption was correct.
-- `status.currentPrimary`/`status.tls.*` are also populated
-  (`mariadb-0` as primary, an auto-generated CA/server/client cert chain) -
-  not currently read by this role, but available if needed later.
-- The `PhysicalBackup` CR's `spec.storage.s3` shape has *not* been
-  exercised live yet (no S3 credentials configured in
-  `ansible/confidential.yml` on this cluster) - still only confirmed
-  against the community operator's `alm-examples`.
+- The `mariadb-operator` controller-manager Deployment is named
+  `mariadb-operator` in `zuno-data`. The `MariadbOperator` activation CR
+  also brings up `mariadb-operator-cert-controller` and
+  `mariadb-operator-webhook` - `MariaDB` CR reconciliation blocks on the
+  webhook via a validating webhook call, so `install.yml`'s "wait for
+  controller-manager Available, then wait for MariaDB Ready" order is
+  sufficient.
+- The `MariaDB` CR reports `status.conditions[]` with `type: Ready`
+  (`status: "True"` once healthy), plus `status.currentPrimary`/
+  `status.tls.*` (`mariadb-0` as primary, an auto-generated
+  CA/server/client cert chain) - not currently read by this role.
+- The `PhysicalBackup` CR's `spec.storage.s3` shape is unexercised
+  without real S3 credentials in `ansible/confidential.yml`.
 
 ## Vault must be (re-)seeded before the first install
 
@@ -117,14 +106,14 @@ seed just the new path without touching anything else, run a scoped
 `vault kv put zuno/mariadb/root password=<random>` directly against the
 `zuno-vault-0` pod instead.
 
-Separately: if ArgoCD's automated sync already exhausted its retry budget
-(5 attempts) against a real failure, fixing the underlying cause (e.g. the
-Vault seed above) is not by itself enough to make it retry - a plain
-`argocd.argoproj.io/refresh=hard` annotation alone did not trigger a new
-sync attempt either. A fresh sync operation had to be triggered explicitly
-(`oc patch application <name> -n openshift-gitops --type merge -p
+Separately: if ArgoCD's automated sync already exhausted its retry
+budget (5 attempts), a plain `argocd.argoproj.io/refresh=hard`
+annotation does not by itself trigger a new sync attempt - fixing the
+underlying cause (e.g. the Vault seed above) needs a fresh sync
+operation triggered explicitly (`oc patch application <name> -n
+openshift-gitops --type merge -p
 '{"operation":{"sync":{"revision":"HEAD","prune":true}}}'`, what the
-`argocd` CLI's `app sync` does under the hood) before `-d1` proceeded.
+`argocd` CLI's `app sync` does under the hood).
 
 Run `make d0 check mariadb` → `make d0 install mariadb` again after any of
 the above to pick up wherever it left off.

@@ -1,27 +1,27 @@
 # MCP server: confluence
 
-Zuno's first real external MCP integration (ADR-0117). Real, live access to
-Confluence Cloud through the four capabilities ADR-0116 already named:
+Zuno's first real external MCP integration. Real, live access to
+Confluence Cloud through the four capabilities already named:
 `confluence.page.search`, `confluence.page.read`, `confluence.page.create`,
 `confluence.page.update` - exposed here as `search_pages`, `read_page`,
 `create_page`, `update_page` (the MCP Gateway's binding registry,
 `platform/bindings/tools/tool-bindings.yaml`, maps the logical capability
-ID to whichever tool name this server actually exposes, per ADR-0116).
+ID to whichever tool name this server actually exposes).
 
-Transport (ADR-0043): a real, standards-compliant MCP server - the
+Transport: a real, standards-compliant MCP server - the
 official `mcp` Python SDK's `MCPServer`, streamable-HTTP transport, mounted
 at `POST /mcp` - same shape as `components/mcp-servers/sales-db`. The
 gateway remains the trust boundary; this server does not re-validate the
-caller's end-user JWT, since the gateway's ADR-0011 policy intersection
-already happened before this server is ever reached.
+caller's end-user JWT, since the gateway's policy intersection already
+happened before this server is ever reached.
 
-**ADR-0037**: network location (`gitops/charts/mcp-confluence`'s
+Network location (`gitops/charts/mcp-confluence`'s
 `NetworkPolicy`, restricting ingress to the gateway's pods specifically)
 is not the only control. Every `POST /mcp` call must also carry
 `X-Zuno-Gateway-Token`, a shared secret only the gateway holds (same
 pattern as sales-db).
 
-**ADR-0208 authentication mode: `service-identity`.** Every call to
+**Authentication mode: `service-identity`.** Every call to
 Confluence uses one shared technical identity - email + API token, HTTP
 Basic Auth (the standard Atlassian Cloud REST API convention, matching
 `components/rag-ingestion`'s own `_confluence_auth`) - sourced from an
@@ -29,11 +29,10 @@ Basic Auth (the standard Atlassian Cloud REST API convention, matching
 `token` keys, seeded by `ansible/roles/vault/tasks/install.yml`). This
 server has no per-user Confluence identity to check; the MCP Gateway's
 `policy.evaluate()` authorizes the caller's agent/task/role/classification
-*before* this shared identity is ever used, which is what ADR-0208
-requires of a `service-identity` binding.
+*before* this shared identity is ever used.
 
-**Retrieval behavior (ADR-0205)**: normal technical questions are answered
-from `knowledge.tech` (ADR-0330's already-ingested Confluence content),
+**Retrieval behavior**: normal technical questions are answered
+from `knowledge.tech` (already-ingested Confluence content),
 unchanged by this server. These live tools are for freshness-sensitive
 reads and any write - not a second, parallel read path for ordinary
 questions.

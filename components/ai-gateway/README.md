@@ -1,10 +1,10 @@
 # ai-gateway
 
-Shared AI Inference Gateway (ADR-0009): resolves classification-eligible
-providers (ADR-0021), tries them in fallback order (ADR-0020), and exposes
-an OpenAI-compatible API - the single place inference routing/fallback
-logic lives, kept separate from `components/agent-runtime`'s orchestration
-(state, LangGraph workflow, tool/RAG invocation), per ADR-0009's decision.
+Shared AI Inference Gateway: resolves classification-eligible providers,
+tries them in fallback order, and exposes an OpenAI-compatible API - the
+single place inference routing/fallback logic lives, kept separate from
+`components/agent-runtime`'s orchestration (state, LangGraph workflow,
+tool/RAG invocation).
 
 Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
 `ansible/roles/llm` via `gitops/apps/ai-gateway/application-d1.yaml` ->
@@ -12,17 +12,11 @@ Implementation: FastAPI (Python 3.11), stateless, no database. Deployed by
 
 ## Why this exists as a separate service
 
-Before this, routing/fallback/classification-eligibility lived inside
-`components/agent-runtime`'s `ModelRouter`, which is what ADR-0009 was
-tracked as "Accepted, not Implemented" for. Extracting it here means:
-
-- `agent-runtime` no longer holds any provider API key or the routing
-  config - it only knows this gateway's URL (`AI_GATEWAY_URL`).
-- Routing/fallback/classification policy changes (which provider is
-  eligible for which classification, fallback order, model names) are a
-  redeploy of *this* service, not `agent-runtime`.
-- A future second agent can reuse this gateway without re-implementing
-  provider fallback.
+`agent-runtime` no longer holds any provider API key or the routing
+config - it only knows this gateway's URL (`AI_GATEWAY_URL`).
+Routing/fallback/classification policy changes (which provider is
+eligible for which classification, fallback order, model names) are a
+redeploy of *this* service, not `agent-runtime`.
 
 ## HTTP API contract
 
@@ -35,13 +29,11 @@ Zuno-specific response field:
   against the realm's JWKS; this gateway does not do group-based
   authorization, only authenticated-caller verification).
 - **Header:** `X-Zuno-Data-Classification: C1|C2|C3` (optional, default
-  `C1`) - the primary input that selects the provider/fallback chain
-  (ADR-0021). **`model` in the request body is accepted for wire-format
-  compatibility but ignored for v0** - routing never looks at it; a future
-  version could let a specific value pin/override the classification-driven
-  decision (not built, tracked as follow-up, not a v0 requirement).
-- **Header:** `X-Zuno-Local-Only: true|false` (optional, default `false`,
-  ADR-0035) - a source-level restriction independent of classification:
+  `C1`) - the primary input that selects the provider/fallback chain.
+  **`model` in the request body is accepted for wire-format
+  compatibility but ignored for v0** - routing never looks at it.
+- **Header:** `X-Zuno-Local-Only: true|false` (optional, default `false`) -
+  a source-level restriction independent of classification:
   when `true`, candidates are filtered to local providers only regardless
   of what the declared classification's own SaaS-eligibility would
   otherwise permit. Set by the Agent Runtime when a contributing source
@@ -79,7 +71,7 @@ Zuno-specific response field:
   for provider attribution on a streaming call instead.
 - **Response `422`:** the classification header is not `C1`/`C2`/`C3`, or
   no provider in `platform/ai-gateway/provider-routing.yaml` is eligible
-  for the requested classification (ADR-0021 fail-closed).
+  for the requested classification (fail-closed).
 - **Response `401`:** missing/invalid/expired JWT.
 - **Response `502`:** every eligible provider failed (non-streaming path
   only - see below for the streaming failure shape).
@@ -97,43 +89,32 @@ Re-reads `provider-routing.yaml` from disk without a pod restart (mirrors
 ## Streaming and fallback
 
 Non-streaming requests try every eligible provider in order until one
-succeeds (`app/main.py:_invoke_with_fallback`, moved from the old
-`ModelRouter.invoke_with_fallback`'s loop). Streaming requests fall back
-the same way **only before the first token of a candidate has been sent**
-(`app/main.py:_stream_completion`): once a provider has streamed any
-content to the caller, a subsequent failure from that same provider ends
-the response with a `finish_reason: "error"` chunk rather than silently
-retrying - a client that already has partial output from provider A
-cannot be seamlessly handed a fresh answer from provider B mid-response.
-This is the fallback boundary the pre-refactor
-`ModelRouter.streaming_model_for()` docstring described but never actually
-wired up; it's implemented for real here.
+succeeds (`app/main.py:_invoke_with_fallback`). Streaming requests fall
+back the same way **only before the first token of a candidate has been
+sent** (`app/main.py:_stream_completion`): once a provider has streamed
+any content to the caller, a subsequent failure from that same provider
+ends the response with a `finish_reason: "error"` chunk rather than
+silently retrying.
 
 ## Why `agent-runtime`'s streaming needs no code changes
 
 `components/agent-runtime`'s `reason_node` still just calls
-`ChatOpenAI(...).ainvoke()`/relies on LangGraph's `astream_events` exactly
-as before this split - only the `base_url` changed, from a specific
-provider to this gateway. LangChain's OpenAI integration decides whether
-to request `stream: true` from its target based on the surrounding
-callback/streaming context, so the SSE-vs-plain-JSON choice at this
-gateway's boundary is driven transparently by how `agent-runtime` is
-invoking its client, not by anything `agent-runtime` has to configure
-explicitly. This is the same implicit-streaming reliance the original
-(pre-split) code already depended on - moving the HTTP destination doesn't
-change that assumption, it was carried over as-is.
+`ChatOpenAI(...).ainvoke()` / relies on LangGraph's `astream_events` -
+only the `base_url` changed, from a specific provider to this gateway.
+LangChain's OpenAI integration decides whether to request `stream: true`
+based on the surrounding callback/streaming context, so the
+SSE-vs-plain-JSON choice at this gateway's boundary is driven
+transparently by how `agent-runtime` invokes its client.
 
 ## Budgets and quotas: not implemented
 
-ADR-0009's decision text names "budgets, quotas" alongside routing and
-fallback. Nothing in this repository tracks spend or enforces a usage
-ceiling anywhere - this gateway *measures* cost (`zuno.model_cost_usd`
-OTel metric, `app/telemetry.py`) but does not enforce a limit. Confirmed
-out of scope for this build: adding a real budget/quota mechanism (e.g. a
-per-classification or per-provider request/token ceiling, likely enforced
-here and backed by Vault or a ConfigMap for the limits) is future work.
+Nothing in this repository tracks spend or enforces a usage ceiling
+anywhere - this gateway *measures* cost (`zuno.model_cost_usd` OTel
+metric, `app/telemetry.py`) but does not enforce a limit. A real
+budget/quota mechanism (e.g. a per-classification or per-provider
+request/token ceiling) is future work.
 
-## Semantic caching (ADR-0104)
+## Semantic caching
 
 `app/semantic_cache.py` is an opt-in cache for non-streaming
 `/v1/chat/completions` responses, stored in the existing platform Redis
@@ -152,16 +133,15 @@ embedding `InferenceService` `components/rag-service` uses,
 hyperplanes (SimHash-style locality-sensitive hashing) rather than
 matched on exact prompt text - cosine-similar prompts land in the same
 bucket with high probability. Cache infrastructure failures (Redis or the
-embedding service unreachable) fail open: the request proceeds uncached,
-exactly as if caching were disabled - this is a latency/cost optimization,
-never a correctness or security control, and the routing/eligibility
-check in `app/routing.py` always runs before any cache lookup regardless.
-Streaming responses are never cached (kept simple for this first version).
+embedding service unreachable) fail open: the request proceeds uncached.
+This is a latency/cost optimization, never a correctness or security
+control - the routing/eligibility check in `app/routing.py` always runs
+before any cache lookup regardless. Streaming responses are never cached.
 
 Hit/miss/unavailable outcomes are recorded on the `zuno.semantic_cache_lookups`
 metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`).
 
-## Configuration (env vars, no hardcoded secrets - ADR-0024)
+## Configuration (env vars, no hardcoded secrets)
 
 | Var | Default | Purpose |
 |---|---|---|
@@ -169,21 +149,21 @@ metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`
 | `PROVIDER_ROUTING_PATH` | `/app/config/provider-routing.yaml` | routing config (ConfigMap-mounted, not baked into the image) |
 | `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `zuno/providers/<name>` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces/metrics (ADR-0029) |
-| `SEMANTIC_CACHE_ENABLED` | `false` | ADR-0104 global cache switch (chart value `semanticCache.enabled`) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces/metrics |
+| `SEMANTIC_CACHE_ENABLED` | `false` | global cache switch (chart value `semanticCache.enabled`) |
 | `SEMANTIC_CACHE_TTL_SECONDS` | `3600` | cache entry TTL |
 | `EMBEDDING_SERVICE_URL` | `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings` | shared embedding `InferenceService` the cache buckets prompts against |
-| `REDIS_ADDR` / `REDIS_PASSWORD` | `zuno-redis-master.zuno-auth.svc.cluster.local:6379` / unset | shared platform Redis (ADR-0104 cache backend) |
+| `REDIS_ADDR` / `REDIS_PASSWORD` | `zuno-redis-master.zuno-auth.svc.cluster.local:6379` / unset | shared platform Redis (cache backend) |
 
-## Observability (ADR-0029)
+## Observability
 
 `app/telemetry.py` wraps every provider attempt (streaming or not) in a
 `model_call` span (provider, model, classification, latency, outcome) and,
 when the model response exposes `usage_metadata`, records prompt/completion
 token counts plus an estimated USD cost (`zuno.model_tokens` /
-`zuno.model_cost_usd` metrics). Streaming calls only record latency/outcome
-- LangChain does not reliably surface `usage_metadata` mid-stream across
-all providers, and guessing would produce a misleading cost figure.
+`zuno.model_cost_usd` metrics). Streaming calls only record
+latency/outcome, since LangChain doesn't reliably surface
+`usage_metadata` mid-stream.
 
 ## Local development
 

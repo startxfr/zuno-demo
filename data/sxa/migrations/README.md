@@ -3,18 +3,16 @@
 ## What this is, and what it is not
 
 This directory (together with `data/sxa/schema/` and `data/sxa/fixtures/`)
-implements ADR-0016 ("Migrate the legacy SXA schema to PostgreSQL"). It is a
-**from-scratch, PostgreSQL-native schema** for the sales-operations domain
-described in `MEMORY.md` section 10 ("SXA commercial database - source-derived
-schema memory"), not a literal migration of a real database dump.
+is a **from-scratch, PostgreSQL-native schema** for the sales-operations
+domain described in `MEMORY.md` section 10, not a literal migration of a
+real database dump.
 
-There is no legacy MySQL dump in this repository, and there never should be
-one (ADR-0025: "keep sensitive and real commercial data outside the public
-repository"). The only source material available to this track was a prose
+There is no legacy MySQL dump in this repository, and there never should
+be one. The only source material available to this track was a prose
 description, in `MEMORY.md`, of a legacy phpMyAdmin schema export for MySQL
 5.0.95 - table names, key columns, the commercial state-machine flow, and a
 list of known MySQL-specific constructs that needed modernizing. That
-description was treated as a **migration source**, per ADR-0016, and used to
+description was treated as a **migration source** and used to
 design a native target schema; it was not imported, transpiled, or
 mechanically converted.
 
@@ -29,9 +27,8 @@ this schema is future work - out of scope for this v0 demo.
   calls) and their status lookup tables.
 - `data/sxa/schema/002_pgvector.sql` - the `document_embeddings` table used
   by the RAG service (Track D), unrelated to the SXA domain itself but
-  co-located here because it shares the same PostgreSQL instance (ADR-0015).
-- `data/sxa/fixtures/seed.sql` - synthetic demo data, safe to commit
-  (ADR-0025).
+  co-located here because it shares the same PostgreSQL instance.
+- `data/sxa/fixtures/seed.sql` - synthetic demo data, safe to commit.
 
 `ansible/roles/sql_schema` applies these files, in order, against the
 Crunchy Postgres Operator (PGO)-managed cluster provisioned by
@@ -67,7 +64,7 @@ The legacy `user` table's `login`/password model is not carried forward.
 `users.username` is the stable natural key every `owner_username` /
 `actor_username` column references; `users.keycloak_subject` is the join
 point to the identity provider once Keycloak-issued tokens are propagated to
-this layer (ADR-0012, ADR-0013). No password hash of any kind exists in this
+this layer. No password hash of any kind exists in this
 schema - authentication is Keycloak's job, not this database's.
 
 ## MySQL -> PostgreSQL construct changes
@@ -92,4 +89,3 @@ business data (5 fictional companies, 5 fictional contacts, a handful of
 opportunities/quotes/orders/invoices and their line items) plus reference
 data. Every company and person name is invented for this demo; nothing in
 this file is derived from, or resembles, a real customer, contact or deal.
-See ADR-0025.

@@ -19,9 +19,7 @@ operator part.
 
 ## ADR references
 
-Stubs (verbatim, from `docs/adr/0100-v0.1-roadmap.md`):
-- ADR-0101: "Run shared runtime, gateway, identity, data and observability services with production-oriented availability."
-- ADR-0102: "Adopt 99.9 percent as the industrialized service objective."
+Stub origins (`docs/adr/0100-v0.1-roadmap.md`): ADR-0101 runs shared runtime, gateway, identity, data and observability services with production-oriented availability; ADR-0102 adopts 99.9% as the industrialized service objective.
 
 Related: ADR-0015 (PostgreSQL platform), ADR-0012 (Keycloak), ADR-0029
 (observability instrumentation), ADR-0112/WP-13 (recovery is the

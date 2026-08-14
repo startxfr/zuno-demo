@@ -1,12 +1,11 @@
 # kueue
 
-Applies the `gitops/apps/kueue` ArgoCD Application pair (ADR-0321), whose
+Applies the `gitops/apps/kueue` ArgoCD Application pair, whose
 chart (`gitops/charts/kueue`) installs the Red Hat build of Kueue Operator
 (OLM `Subscription`, channel/catalog discovered from the cluster's own
-`PackageManifest` at apply time - ADR-0048, same pattern as
-`ansible/roles/jobset`) into its own dedicated `openshift-kueue-operator`
-namespace. A Day 0 component (ADR-0056) with all three verbs: `check`
-verifies both Applications are
+`PackageManifest` at apply time, same pattern as `ansible/roles/jobset`)
+into its own dedicated `openshift-kueue-operator` namespace. A Day 0
+component with all three verbs: `check` verifies both Applications are
 Synced+Healthy plus the singleton `Kueue` operand CR and default
 `ClusterQueue` exist; `install` discovers the package/channel and applies
 `-d0` (`Subscription` only) then `-d1` (the `Kueue` operand CR and the
@@ -17,57 +16,43 @@ both down in reverse order plus the OLM-owned CRDs/CSV/Subscription
 ## Why this role exists, and why (unlike jobset) it has real d1 content
 
 `gitops/charts/openshift-ai/values.yaml`'s `DataScienceCluster` declares
-`kueue.defaultClusterQueueName`/`defaultLocalQueueName: default` but,
-before ADR-0321, never installed a dedicated operator or set
-`managementState: Unmanaged` - so those queue names referred to nothing.
+`kueue.defaultClusterQueueName`/`defaultLocalQueueName: default`, which
+needs a dedicated operator with `managementState: Unmanaged` to back it -
 Red Hat OpenShift AI 3.5 documents the Red Hat build of Kueue Operator as
 the supported way to own Kueue lifecycle (`Unmanaged` lets RHOAI defer to
 it instead of an embedded, unsupported-for-this-purpose path).
 
-Unlike `ansible/roles/jobset` (operator only, no operand CR - individual
-`JobSet` objects are created later by consumers), the `kueue-operator`
-package ships a singleton `Kueue` CR (`kueue.openshift.io/v1`, named
-`cluster`) that the operator watches to actually deploy its managed
-controller - same "meta-operator needs a CR to actually deploy pods" shape
-as `ansible/roles/custom_metrics_autoscaler`'s `KedaController`. Without
-it, the operator installs but nothing runs. `templates/kueue-operand.yaml`
-renders that CR; `templates/queue-resources.yaml` renders the default
+Unlike `ansible/roles/jobset` (operator only, no operand CR), the
+`kueue-operator` package ships a singleton `Kueue` CR
+(`kueue.openshift.io/v1`, named `cluster`) that the operator watches to
+actually deploy its managed controller - without it, the operator
+installs but nothing runs. `templates/kueue-operand.yaml` renders that
+CR; `templates/queue-resources.yaml` renders the default
 `ResourceFlavor`/`ClusterQueue`/`LocalQueue` Zuno's `DataScienceCluster`
 config already assumes exist, gated separately (`queueResources.enabled`)
-so operator installation and Zuno's own quota policy stay decoupled per
-ADR-0321's Decision.
+so operator installation and Zuno's own quota policy stay decoupled.
 
-No GPU `ResourceFlavor`/quota exists yet - ADR-0321's Operational
-considerations call this out explicitly as required "before distributed
+No GPU `ResourceFlavor`/quota exists yet - required "before distributed
 training or queued model workloads are enabled," and none exist in this
-repository yet (same "prerequisite ahead of any consumer" shape as
-ADR-0317/ADR-0318).
+repository yet (same "prerequisite ahead of any consumer" shape used
+elsewhere for `nfd`/Custom Metrics Autoscaler/JobSet).
 
 ## Package name and install mode
 
 `kueue-operator` (checked in as `gitops/charts/kueue/values.yaml`'s
 `subscription.name`/`subscription.operator.name`), channels
-`stable-v1.3`/`stable-v1.4` (default `stable-v1.4`), confirmed against a
-live cluster's `redhat-operators` catalog - including that its CSV only
-supports the `AllNamespaces` install mode. This originally subscribed
-into the shared `openshift-operators` namespace the same way
-`ansible/roles/jobset`/`ansible/roles/lws` originally did, but that
-namespace's webhook Service selector (`control-plane:
-controller-manager`, the generic kubebuilder convention label) collided
-with other operators' pods carrying that same label there - so Kueue now
-uses a dedicated `openshift-kueue-operator` namespace with its own
-`AllNamespaces`-mode `OperatorGroup` instead (`AllNamespaces` because
-that's the only mode Kueue's CSV supports).
+`stable-v1.3`/`stable-v1.4` (default `stable-v1.4`). Its CSV only
+supports the `AllNamespaces` install mode, so Kueue uses a dedicated
+`openshift-kueue-operator` namespace with its own `AllNamespaces`-mode
+`OperatorGroup`, rather than the shared `openshift-operators` namespace
+`ansible/roles/jobset`/`ansible/roles/lws` use - the shared namespace's
+webhook Service selector (`control-plane: controller-manager`, the
+generic kubebuilder convention label) collides with other operators'
+pods carrying that same label there.
 
-`ansible/roles/jobset`/`ansible/roles/lws` separately hit a *different*,
-unrelated real-cluster failure and were also moved to dedicated
-namespaces - but with an `OwnNamespace`-scoped `OperatorGroup`
-(`ansible/roles/custom_metrics_autoscaler`'s shape), not
-`AllNamespaces`: their CSVs only support `OwnNamespace`, confirmed
-against a live cluster's `PackageManifest`. Don't copy Kueue's
-`AllNamespaces` target for a new operator without checking its own
-`PackageManifest.status.channels[].currentCSVDesc.installModes` first -
-this repository has now hit both directions of this mismatch on live
+Before subscribing a new operator into a shared namespace, check its own
+`PackageManifest.status.channels[].currentCSVDesc.installModes` first:
+this repository has hit both directions of this mismatch on live
 clusters (Kueue needs `AllNamespaces` only; JobSet/LWS/Keycloak need
 `OwnNamespace` only; `connectivity-link`/`external_secrets` need
 `AllNamespaces` only).
@@ -87,13 +72,10 @@ immediately before `openshift_ai` (after `jobset`), and `Makefile`'s
 default "all" run) installs it in that position, ahead of the
 `DataScienceCluster` that consumes `kueue.managementState: Unmanaged`.
 
-## Known gap versus ADR-0321's acceptance criteria wording
+## No `make d1 check` path
 
-ADR-0321's acceptance criteria say "`make d1 check` validates OpenShift
-AI/Kueue integration" - but `openshift-ai` (and now `kueue`) are
-`DAY0_COMPONENTS` entries in this repository's actual `Makefile`, not
-`DAY1_RUN_COMPONENTS`; there is no `make d1 check` path for either. The
-integration check this criterion asks for is implemented instead inside
-this role's own Day 0 `precheck.yml` (the diagnostic `DataScienceCluster`
-`kueue.managementState` lookup) - called out here rather than silently
-reinterpreting the ADR's text.
+`openshift_ai` and `kueue` are `DAY0_COMPONENTS`, not
+`DAY1_RUN_COMPONENTS` - there is no `make d1 check` path for either. The
+OpenShift AI/Kueue integration check instead lives in this role's own
+Day 0 `precheck.yml` (the diagnostic `DataScienceCluster`
+`kueue.managementState` lookup).

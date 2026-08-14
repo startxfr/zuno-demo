@@ -6,7 +6,7 @@ Referenced by `gitops/apps/service-mesh/application-d0.yaml`
 `istioCsr.enabled` + `istiocni.enabled` + `istio.enabled`: the Vault-backed
 mesh CA via `cert-manager-istio-csr`, the `IstioCNI`, and the `Istio` control
 plane) - see `gitops/apps/README.md` - same `-d0`/`-d1` operator/operand
-split as `cert-manager` (ADR-0312).
+split as `cert-manager`.
 
 ## Why `cluster-istio` is a dependency at all, and why it only renders a `Subscription`
 
@@ -17,17 +17,16 @@ chart (`alias:startx`, same convention as `openshift-ai`/`nvidia-gpu`/
 `keycloak`/`postgresql`/`nfd`/`cert-manager`) purely for its vendored
 `operator` subchart (`cluster-istio.operatorIstio`), which renders nothing
 beyond a plain `Subscription`/`OperatorGroup` pair driven entirely by
-values - nothing in it is OSSM-2-specific. `cluster-istio`'s own top-level
-templates (`serviceMeshControlPlane.yaml`, `serviceMeshMember.yaml`) **are**
+values. `cluster-istio`'s own top-level templates
+(`serviceMeshControlPlane.yaml`, `serviceMeshMember.yaml`) are
 Maistra/OSSM-2-specific and are never rendered here (`cluster-istio.istio.*`
-stays untouched, at the vendored chart's own `enabled: false` default).
-
-`operatorGroup.enabled: false`: unlike the OSSM 2 setup, the Subscription
-installs into `openshift-operators`, which already carries OpenShift's own
-global `AllNamespaces` `OperatorGroup` - creating a second one there would
-make OLM reject the Subscription (`TooManyOperatorGroups`). `project`/
-`projectOperator` stay disabled too - OSSM 3 needs no dedicated operator
-namespace the way OSSM 2's `istio-operators` did.
+stays at its default `enabled: false`). `operatorGroup.enabled: false`: the
+Subscription installs into
+`openshift-operators`, which already carries OpenShift's own global
+`AllNamespaces` `OperatorGroup` - creating a second one there would make
+OLM reject the Subscription (`TooManyOperatorGroups`). `project`/
+`projectOperator` stay disabled too, since OSSM 3 needs no dedicated
+operator namespace.
 
 ## Why the `Istio`/`IstioCNI` control plane is hand-authored, not vendored
 
@@ -53,11 +52,8 @@ rather than trusting the hardcoded values blindly.
 CA-delegation mechanism and the `cert-manager-istio-csr` chart version
 (`0.16.0`) are asserted from general Sail Operator/istio-csr documentation,
 **not verified** against a live cluster. Confirm both hold for the actual
-installed CSV before relying on them.
-
-`IstioCNI` is required on OpenShift with the Sail Operator (unlike legacy
-Maistra, which manages the CNI plugin as part of the control plane install)
-- not independently verified either.
+installed CSV before relying on them. `IstioCNI` is likewise required on
+OpenShift with the Sail Operator, but not independently verified.
 
 **Infrastructure + mTLS rollout is staged, not immediate.** This chart only
 brings the mesh control plane up; it does not create

@@ -3,11 +3,11 @@
 Controlled deterministic access to the migrated SXA sales database, including validated state transitions.
 
 Three tools, each a parameterized, read-only query against the schema in
-`data/sxa/schema/001_init.sql` - never LLM-constructed SQL (ADR-0017):
+`data/sxa/schema/001_init.sql` - never LLM-constructed SQL:
 `get_customer(customer_id)`, `list_open_opportunities(owner?)`,
 `get_quote(quote_id)`.
 
-Transport (ADR-0043): a real, standards-compliant MCP server - the
+Transport: a real, standards-compliant MCP server - the
 official `mcp` Python SDK's `MCPServer`, streamable-HTTP transport,
 mounted at `POST /mcp` (real `initialize` handshake, `tools/list`,
 `tools/call` - not a hand-rolled JSON-RPC-shaped endpoint). The only
@@ -17,10 +17,10 @@ matched and verified end-to-end against this server's real ASGI app (see
 `tests/test_mcp_protocol.py` and `components/mcp-gateway/tests/
 test_downstream_sales_db.py`). The gateway remains the trust boundary;
 this server does not re-validate the caller's end-user JWT, and doesn't
-need to - the gateway's ADR-0011 policy intersection already happened
-before this server is ever reached.
+need to - the gateway's policy intersection already happened before this
+server is ever reached.
 
-**ADR-0037**: network location (`gitops/charts/mcp-sales-db`'s
+Network location (`gitops/charts/mcp-sales-db`'s
 `NetworkPolicy`, restricting ingress to the gateway's pods specifically -
 not even other same-namespace `zuno-ai-run` workloads like `agent-runtime` may
 reach this server directly) is not the only control. Every `POST /mcp`
@@ -40,7 +40,7 @@ namespace ever changes.
 
 DB credentials (`PGUSER`/`PGPASSWORD`) come from an `ExternalSecret`
 resolving `zuno/postgresql/app` (seeded by `ansible/roles/vault`) -
-never hardcoded, per ADR-0024. See `server.py`, `Dockerfile`,
+never hardcoded. See `server.py`, `Dockerfile`,
 `requirements.txt`. Deployed alongside the rest of the data layer by
 `ansible/roles/sql_schema`'s GitOps Application, in the `zuno-ai-run`
 namespace (matching `components/mcp-gateway`'s `salesDbMcpUrl` assumption:

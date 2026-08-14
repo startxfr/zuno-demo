@@ -7,207 +7,134 @@ install and other cluster-scoped resources - `<app>-d0`) and
 service itself - `<app>-d1`). The matching Ansible role applies both
 manifests directly (`-d0` first, then `-d1` once `-d0` is Synced+Healthy)
 during `make day0|d0 install <component>` / `make day1|d1 install
-<component>` (ADR-0056; see `ansible/tasks/apply_gitops_app.yml`) - this is
-the only mechanism `make day0|d0`/`day1|d1` uses to reconcile these
-Applications, so a single component can always be installed without a full
-sync.
+<component>` (see `ansible/tasks/apply_gitops_app.yml`) - the only
+mechanism `make day0|d0`/`day1|d1` uses to reconcile these Applications.
 
 Most components have real content on only one side - a component with no
 OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
-`models`, `rag`) has an empty `-d0`. The empty side points at
-`gitops/charts/noop` (see that chart's README) rather than being omitted,
-so the `-d0`/`-d1` naming convention is uniform and visible across every
-component directory. `mcp-sales-db` and `namespaces` have real content on
+`models`, `rag`) has an empty `-d0`, pointing at `gitops/charts/noop` (see
+that chart's README). `mcp-sales-db` and `namespaces` have real content on
 *both* sides: `mcp-sales-db`'s `-d0` (`gitops/charts/sql-schema`) is a
-schema/fixtures prerequisite, not an operator, but the same "prerequisites
-before the live service" ordering the `-d0`/`-d1` split provides for every
-other component fits it too (ADR-0313). `namespaces`' `-d0` (Namespace
-objects) and `-d1` (ResourceQuota/NetworkPolicy) are the one component pair
-that also spans the *macro* Day 0/Day 1 split (`day0_install.yml` and
-`day1_install.yml` respectively, not just Day 0's own internal ordering) -
-see `ansible/roles/namespaces/README.md` for why.
+schema/fixtures prerequisite, not an operator. `namespaces`' `-d0`
+(Namespace objects) and `-d1` (ResourceQuota/NetworkPolicy) also span the
+*macro* Day 0/Day 1 split (`day0_install.yml` and `day1_install.yml`
+respectively) - see `ansible/roles/namespaces/README.md`.
 
 Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
-`default` project - a dedicated `AppProject` (`ansible/roles/argocd/
-kustomize/appproject/appproject.yaml`) applied by the `argocd` role's own
-`install.yml`, once it has installed the operator that owns the
-`AppProject` CRD and waited for that CRD to be Established.
-Keeping every zuno-* Application on a named, scoped project - rather than
-whatever else on the cluster shares `default` - makes its RBAC/permissions
-an explicit, auditable grant instead of an implicit one.
+`default` project - a dedicated `AppProject`
+(`ansible/roles/argocd/kustomize/appproject/appproject.yaml`) applied by
+the `argocd` role's `install.yml` once the `AppProject` CRD is
+Established.
 
 The root App-of-Apps (`gitops/root-app-of-apps.yaml`), which recurses over
 this directory and manages every `application-d0.yaml`/`application-d1.yaml`
-it finds as a child Application, is no longer applied by Ansible (ADR-0311,
-superseding the "Bootstrap architecture" addendum in
-docs/adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md).
-It is kept in the repository only as a documented example of a
-pure-GitOps, Ansible-free bootstrap - see `docs/platform/installation.md`.
-That path loses the `-d0`-before-`-d1` ordering guarantee Ansible provides
-by applying the two Applications sequentially: ArgoCD has no native
-dependency between two separate `Application` objects, only `sync-wave`
-ordering *within* one Application's own resource graph. The `sync-wave`
-annotations each `-d0`/`-d1` pair still carries are therefore cosmetic
-documentation of intent on that path, consistent with ADR-0311's existing
-"non-operational" framing of the root App-of-Apps.
+as a child Application, is no longer applied by Ansible - it is kept only
+as a documented example of a pure-GitOps, Ansible-free bootstrap (see
+`docs/platform/installation.md`). That path loses the `-d0`-before-`-d1`
+ordering guarantee Ansible provides, since ArgoCD has no native dependency
+between two separate `Application` objects; the `sync-wave` annotations
+each `-d0`/`-d1` pair carries are cosmetic on that path.
 
 Each `Application.spec.source` points either at an upstream Helm chart
-(`repoURL` + `chart` + `targetRevision`) for well-known third-party software
-(Keycloak Operator, Crunchy Postgres Operator, vLLM/KServe runtimes, External Secrets
-Operator config), or at `gitops/charts/<component>` in this repository for
+(`repoURL` + `chart` + `targetRevision`) for well-known third-party
+software, or at `gitops/charts/<component>` in this repository for
 Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).
 
-Not every component has an Application here. `argocd` is the sole remaining
+Not every component has an Application here. `argocd` is the sole
 exception - it installs itself and creates the `AppProject` (`zuno`) every
-`Application.spec.project` here references, a bootstrap chicken-and-egg no
-`Application` can resolve, so it still applies raw manifests directly via
-`ansible/tasks/apply_kustomize.yml` (ADR-0310). `admin_context` used to be
-in this bucket too, for the same reason, but the Day 0 sequence now runs
-`argocd` before it, so the `AppProject` is always already in place by the
-time `admin_context` registers its own Applications - see `admin-context`
-in the table below and ADR-0314. `vault`'s imperative unseal is likewise a
-one-shot/imperative action rather than a standing installed component, and
-stays outside this directory for the same reason - it calls Vault's own API
-and captures generated secret material at runtime, which no combination of
-ArgoCD/Helm can express. `mlops` is out of scope for v0 (ADR-0301/0302 are
-v3).
+`Application.spec.project` references, so it applies raw manifests
+directly via `ansible/tasks/apply_kustomize.yml`. `admin_context` avoids
+this since Day 0 now runs `argocd` first - see `admin-context` in the
+table below. `vault`'s imperative unseal is a one-shot action, not a
+standing component. `mlops` is out of scope for v0.
 
 `sql_schema`'s and `rag`'s one-shot SQL `Job`s (schema/fixtures applies
-against PostgreSQL) *are* covered here as of ADR-0313, unlike `vault`'s
-unseal: each is an ArgoCD `PreSync` hook Job templated into the consuming
-chart (`gitops/charts/sql-schema`'s `-d0` "prerequisites" Application for
+against PostgreSQL) are covered here too, unlike `vault`'s unseal: each is
+an ArgoCD `PreSync` hook Job templated into the consuming chart
+(`gitops/charts/sql-schema`'s `-d0` "prerequisites" Application for
 `mcp-sales-db`; `gitops/charts/rag-service`'s own `-d1` Application for
-`rag`), with `hook-delete-policy: BeforeHookCreation` reproducing the
-delete-then-recreate idiom Ansible previously did by hand (Jobs are
-immutable). Only the static SQL/fixtures `ConfigMap` generation
+`rag`), with `hook-delete-policy: BeforeHookCreation` (Jobs are immutable).
+Only the static SQL/fixtures `ConfigMap` generation
 (`ansible/roles/{sql_schema,rag}/kustomize/schema/`, plain
-`configMapGenerator`s reading `data/{sxa,rag}/`) stays Ansible-applied -
-these Jobs are not "standing installed components" any more than before,
-but ArgoCD's resource-hook mechanism can express a one-shot, blocking,
-re-run-on-every-sync action just as well as Ansible's own
-delete/create/wait tasks could, without leaving it outside GitOps.
+`configMapGenerator`s reading `data/{sxa,rag}/`) stays Ansible-applied.
 
 `nfd`, `nvidia_gpu`, `openshift_ai`, `external_secrets`, `smtp` and
-`observability` used to be in an exception bucket like `argocd`'s above -
-either an OLM `Subscription` + operator-managed CR, or (for `smtp`) a
-static kustomize manifest, was judged to have no meaningful "chart" to
-template through ArgoCD. ADR-0312 (and its later `-d0`/`-d1` extension)
-reversed that: each now has its own `-d0`/`-d1` Application pair backed by
+`observability` each have their own `-d0`/`-d1` Application pair backed by
 one chart with `operator.enabled`/`<operand>.enabled`-style Helm value
-toggles (see `gitops/charts/README` per-chart docs) controlling which half
-renders. The Subscription's health is gated by a custom ArgoCD health
-check for `operators.coreos.com/Subscription` -
-`ansible/roles/argocd/tasks/apply_resource_health_checks.yml` - which the
-including role's `install.yml` waits on before applying `-d1`. `zuno-ai-run`'s
-`Namespace`, its RHOAI dashboard label and its GPU `ResourceQuota` (formerly
-duplicated across `openshift_ai`'s and `external_secrets`' own kustomize)
-are owned by `gitops/charts/namespaces` instead, closing that
-double-ownership.
+toggles (see `gitops/charts/README` per-chart docs). The Subscription's
+health is gated by a custom ArgoCD health check for
+`operators.coreos.com/Subscription`
+(`ansible/roles/argocd/tasks/apply_resource_health_checks.yml`) that the
+including role's `install.yml` waits on before applying `-d1`.
+`zuno-ai-run`'s `Namespace`, RHOAI dashboard label and GPU `ResourceQuota`
+are owned by `gitops/charts/namespaces` instead.
 
-`cert-manager` is a brand-new Day 0 component (not a conversion of an
-existing kustomize path) following the exact same `-d0`/`-d1` shape: `-d0`
-installs the operator (plus its own singleton `CertManager` config CR,
-the same "meta-operator needs a CR to actually deploy pods" pattern as
-`external_secrets`' `OperatorConfig`); `-d1` applies a `ClusterIssuer`
-backed by a `pki/` secrets engine `ansible/roles/vault` prepares (see that
-role's README). Consumed by `keycloak`'s Ingress and `connectivity-link`'s
-Certificate.
+`cert-manager` follows the same `-d0`/`-d1` shape: `-d0` installs the
+operator (plus its own singleton `CertManager` config CR); `-d1` applies a
+`ClusterIssuer` backed by a `pki/` secrets engine `ansible/roles/vault`
+prepares (see that role's README). Consumed by `keycloak`'s Ingress and
+`connectivity-link`'s Certificate.
 
 **Vendored startx charts**: `nfd`, `nvidia-gpu`, `openshift-ai`,
 `cert-manager`, `keycloak`, `postgresql`, `connectivity-link`, `lws`,
 `jobset`, `kueue`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
 `mesh-monitoring`, `observability` and `tempo` vendor a chart from the
 [startx `helm-repository`](https://helm-repository.readthedocs.io) as a
-Helm `dependencies:` entry (same pattern `gitops/charts/vault` already used
-for `hashicorp/vault`), instead of hand-authoring their own Namespace/
-OperatorGroup/Subscription boilerplate - `helm dependency update` vendors
-the chart's `.tgz` (gitignored, resolved at render time) and pins its
-version in a committed `Chart.lock`. Only the genuinely Zuno-specific
-content (the `CertManager`/`ClusterIssuer` CRs, the Keycloak CR/RealmImport/
+Helm `dependencies:` entry, rather than hand-authoring their own
+Namespace/OperatorGroup/Subscription. `helm dependency update` vendors the
+chart's `.tgz` (gitignored, resolved at render time) and pins its version
+in a committed `Chart.lock`. Only Zuno-specific content (the
+`CertManager`/`ClusterIssuer` CRs, the Keycloak CR/RealmImport/
 ExternalSecrets, the PostgresCluster/pgvector wiring, the discovered
-`ClusterPolicy`/`DataScienceCluster` specs, the various operand CRs -
+`ClusterPolicy`/`DataScienceCluster` specs, and operand CRs like
 `Kuadrant`/`KedaController`/`Kiali`/`OSSMConsole`/`MonitoringStack`/
 `OpenTelemetryCollector`/`TempoMonolithic`/`OperatorConfig`/
-`ClusterSecretStore`) stays as local templates in these charts.
+`ClusterSecretStore`) stays as local templates.
+
 `nfd`/`nvidia-gpu`/`openshift-ai`/`cert-manager` use that component's
 matching `cluster-xxx` chart (`cluster-nfd`/`cluster-gpu`/`cluster-ods`/
-`cluster-certmanager`), which already bundles startx's own
-`project`+`operator` dependencies; every other chart in that list instead
-depends directly on the generic `operator` chart (plus `project` when a
-dedicated Namespace is needed) since no matching `cluster-xxx` bundle is
-known to exist for any of those operators (ADR-0317) - see each chart's
-`Chart.yaml`/`values.yaml` for the specific reasoning. `connectivity-link`/
-`external-secrets` subscribe into the shared `openshift-operators`
-namespace (`AllNamespaces`, no `project`/`OperatorGroup` dependency -
-relies on OLM's own global OperatorGroup there); `connectivity-link`
-still depends on `project` for its Kuadrant operand namespace
-(`kuadrant-system`) on the `-d1` side. `jobset`/`kueue`/`lws` originally
-shared that same `openshift-operators` namespace too, but all three now
-depend on both `project` and `operator` for their own dedicated
-`openshift-{jobset,kueue,lws}-operator` namespace + `OperatorGroup` -
-each for a *different*, CSV-specific reason confirmed against a live
-cluster's `PackageManifest`, not the same fix copy-pasted three times:
-`kueue`'s CSV only supports `AllNamespaces` (moved after a real-cluster
-webhook Service selector collision in the shared namespace - multiple
-kubebuilder-scaffolded operators there carry the same generic
-`control-plane: controller-manager` label; see
-`gitops/charts/kueue/values.yaml` for that incident), while `jobset`'s
-and `lws`'s CSVs only support `OwnNamespace` (subscribing them via the
-shared namespace's implicit `AllNamespaces` OperatorGroup instead put
-both CSVs into `Failed` phase - reason `UnsupportedOperatorGroup`,
-message "AllNamespaces InstallModeType not supported" - which is what
-showed as "Job Set Operator"/"Red Hat build of Leader Worker Set" Failed
-in Installed Operators; see `gitops/charts/jobset/values.yaml`/
-`gitops/charts/lws/values.yaml`). `kueue`'s own `-d1` is real content,
-not a no-op: its singleton `Kueue` operand CR plus the default
-`ResourceFlavor`/`ClusterQueue`/`LocalQueue` (ADR-0321). `jobset`'s `-d1`
-is likewise real content now: a minimal, cluster-scoped `JobSetOperator`
-operand CR (`managementState: Managed`) - see
-`gitops/charts/jobset/values.yaml`. `lws` still has no operand CR at all,
-so its `-d1` points at `gitops/charts/noop` instead.
-`custom-metrics-autoscaler`/`kiali`/`mesh-monitoring`/
-`observability`/`tempo` depend on both `project` and `operator` for a
-dedicated operator namespace + `OperatorGroup` too. `vault` was evaluated
-against `cluster-vault`
-and deliberately NOT migrated: its own `project` dependency isn't needed
-(`zuno-data` is already created by `gitops/charts/namespaces`), and
-adopting it would force an unrelated, unreviewed `hashicorp/vault` chart
-version jump (0.28.1 → 1.21.2) for no offsetting benefit.
+`cluster-certmanager`), which bundles startx's own `project`+`operator`
+dependencies; every other chart depends directly on the generic `operator`
+chart (plus `project` when a dedicated Namespace is needed) - see each
+chart's `Chart.yaml`/`values.yaml`. `connectivity-link`/`external-secrets`
+subscribe into the shared `openshift-operators` namespace (`AllNamespaces`,
+no `project`/`OperatorGroup`); `connectivity-link` still depends on
+`project` for its Kuadrant operand namespace (`kuadrant-system`).
+`jobset`/`kueue`/`lws`/`custom-metrics-autoscaler`/`kiali`/
+`mesh-monitoring`/`observability`/`tempo` each depend on both `project`
+and `operator` for their own dedicated operator namespace + `OperatorGroup`
+(`openshift-{jobset,kueue,lws}-operator` for the first three): `kueue`'s
+CSV only supports `AllNamespaces`, while `jobset`'s and `lws`'s CSVs only
+support `OwnNamespace` (see the table below for each chart's `-d1`
+content). `vault` was evaluated against `cluster-vault` and not migrated:
+its `project` dependency isn't
+needed (`zuno-data` already exists via `gitops/charts/namespaces`), and
+adopting it would force an unrelated `hashicorp/vault` chart version jump
+(0.28.1 → 1.21.2).
 
 **`Namespace` resources on the `-d0` side**: every chart that declares its
 own `Namespace` (the operator's dedicated namespace, or - for
-`cert-manager`/`external-secrets` - a second namespace beyond it, or -
-for `namespaces` - the whole set of platform/agent namespaces) renders it
-as an ArgoCD `PreSync` hook (`argocd.argoproj.io/hook: PreSync`), not a
-`sync-wave`'d resource. A hook runs in its own phase, entirely before the
-normal Sync phase, so its existence relative to everything else in the
-same chart (`OperatorGroup`/`Subscription`/`ResourceQuota`/...) is
-guaranteed - `sync-wave` only orders resources *within* the same Sync
-phase, not against a separate namespace-creation concern. No
-`hook-delete-policy` is set, so the `Namespace` persists across
-re-syncs and is only removed when the Application itself is deleted.
+`cert-manager`/`external-secrets` - a second namespace, or - for
+`namespaces` - the whole set of platform/agent namespaces) renders it as
+an ArgoCD `PreSync` hook (`argocd.argoproj.io/hook: PreSync`) rather than
+a `sync-wave`'d resource, guaranteeing it exists before everything else in
+the chart. No `hook-delete-policy` is set, so the `Namespace` persists
+across re-syncs and is only removed when the Application itself is
+deleted.
 
 Independently, every `-d0` Application's `syncOptions.CreateNamespace` is
-`true` whenever its own `spec.destination.namespace` isn't already
-guaranteed to exist some other way (a dedicated operator namespace no
-earlier `day0_components` role creates - `cert-manager`, `external-secrets`,
-`nfd`, `nvidia-gpu`, `openshift-ai`, `observability`, and `namespaces`
-itself for `zuno-ai-run`) - `false` (the default) everywhere else,
-including every `-d0` whose destination is created by `gitops/charts/
-namespaces` ahead of it in `day0_components` (`keycloak`, `postgresql`,
-`smtp`) and every no-op `-d0` (`destination.namespace: openshift-gitops`,
-which always exists). Where both apply to the same namespace (e.g.
-`cert-manager-operator`), they're deliberately redundant safeguards, not
-alternatives.
+`true` whenever its `spec.destination.namespace` isn't already guaranteed
+to exist some other way (`cert-manager`, `external-secrets`, `nfd`,
+`nvidia-gpu`, `openshift-ai`, `observability`, and `namespaces` itself for
+`zuno-ai-run`) - `false` everywhere else. Where both apply to the same
+namespace (e.g. `cert-manager-operator`), they're deliberately redundant
+safeguards.
 
-`keycloak` and `postgresql` were never in the exception bucket above -
-their operand (`Keycloak`+`KeycloakRealmImport`, `PostgresCluster`) was
-always declarative here - but their operator `Subscription` (+
-`OperatorGroup` for `keycloak`) was, the same split `postgresql`'s own
-image build docs call out. ADR-0312 folded those in too, as a follow-up
-once the health-check mechanism existed, later split into their own
-`-d0`/`-d1` pairs the same way as the six components above.
+`keycloak` and `postgresql` each have their own `-d0`/`-d1` pair the same
+way as the six components above: their operand (`Keycloak`+
+`KeycloakRealmImport`, `PostgresCluster`) is declarative here, and their
+operator `Subscription` (+ `OperatorGroup` for `keycloak`) is too.
 
 Directories present:
 
@@ -252,15 +179,12 @@ the real cluster's apps wildcard domain, auto-discovered from
 `zuno/platform/cluster-domain` (see
 `ansible/tasks/resolve_cluster_base_domain.yml` and
 `ansible/roles/vault/tasks/install.yml`) - no manual edit needed before a
-real deployment. Because `gitops_app_extra_helm_values` (ADR-0048) replaces
+real deployment. Because `gitops_app_extra_helm_values` replaces
 `spec.source.helm.values` wholesale rather than merging with it, any role
 that both needs this substitution *and* sets extra Helm values (currently
-`keycloak`'s `-d1` apply) must re-supply `clusterBaseDomain` itself from the
-already-resolved `cluster_base_domain` fact - see that role's
+`keycloak`'s `-d1` apply) must re-supply `clusterBaseDomain` itself from
+the already-resolved `cluster_base_domain` fact - see that role's
 `tasks/install.yml`. `ansible/roles/external_secrets` also exposes that
 Vault value as a `zuno-cluster-domain` Secret in `zuno-ai-run` for any
 service that wants it as a live runtime value rather than a
-Helm-render-time one (not yet consumed by any service - the value only
-reaches K8s manifest spec fields like a Route's `spec.host` or the Keycloak
-CR's `spec.hostname.hostname` through the Ansible/Helm path, since those
-fields have no `secretKeyRef`-style mechanism to source from a Secret).
+Helm-render-time one (not yet consumed by any service).

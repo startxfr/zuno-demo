@@ -20,10 +20,10 @@ configuration, subject to classification routing.
 Stub (verbatim, from `docs/adr/0300-v0.3-roadmap.md`): "Share base models
 while selecting approved task/agent adapters dynamically."
 
-Boundaries set by neighbors: ADR-0301 explicitly separated dynamic selection
-"so it can be delayed/rejected without unwinding 0301's serving mechanism";
-ADR-0304/WP-40 owns *policy-optimized* choice — this WP is mechanism only
-(declared adapter per agent/task honored per request), not optimization.
+Boundaries: ADR-0301 split off dynamic selection so it could be
+delayed/rejected without unwinding 0301's serving mechanism; ADR-0304/WP-40
+owns *policy-optimized* choice — this WP is mechanism only (declared
+adapter per agent/task honored per request), not optimization.
 
 ## Preconditions
 

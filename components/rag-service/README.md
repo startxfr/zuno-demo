@@ -36,18 +36,15 @@ Request:
 All four new fields are optional:
 
 - **`product`/`version`** - deterministic pre-ranking filters (exact match
-  against the row's `metadata->>'product'`/`metadata->>'version'`),
-  applied *before* ranking, not as a re-rank/boost - set these when the
-  caller already knows the user named a specific product/version (Agent
-  Runtime's `app/graph/nodes.py:_extract_product_version` does this for
-  Tekos).
+  against `metadata->>'product'`/`metadata->>'version'`), applied before
+  ranking. Agent Runtime's `app/graph/nodes.py:_extract_product_version`
+  sets these for Tekos.
 - **`language`** - a soft ranking preference (small score boost for
   matching-language rows), not a hard filter.
 - **`caller_groups`** - the caller's JWT groups, forwarded so this service
   can enforce ACL-restricted documents itself (see "Access control and
-  classification" below) rather than trusting the caller to have already
-  filtered. Omitted/empty means "no groups" - ACL-restricted documents are
-  excluded, not included (fail closed).
+  classification" below). Omitted/empty means "no groups" -
+  ACL-restricted documents are excluded, not included (fail closed).
 
 Response `200`:
 
@@ -82,31 +79,25 @@ Every result now carries `classification`/`language`/`product`/`version`/
 `data/rag/schema/003_rag_metadata.sql` for the exact field convention).
 Callers are expected to use `classification` to escalate their own
 effective classification (Agent Runtime's `retrieve_node` does this, same
-pattern it already used for Confluence tool results) rather than trusting
-a document is C1 just because it came from RAG. `stale` (computed from
-`metadata.stale_after`, if present) doesn't exclude a result - it's
-surfaced so the caller can down-weight or flag it - but this service does
-apply a fixed rank penalty (`app/search.py:_STALE_PENALTY_FACTOR`) so a
-stale document doesn't outrank a fresher one on relevance alone.
+pattern it already used for Confluence tool results). `stale` (from
+`metadata.stale_after`, if present) doesn't exclude a result but does
+apply a fixed rank penalty (`app/search.py:_STALE_PENALTY_FACTOR`).
 
 **Access control**: a document tagged with `metadata.acl_groups` (a JSON
-array of group names) is only ever returned to a caller whose
-`caller_groups` intersects it - enforced as a SQL predicate applied to
-*both* the vector and full-text candidate queries
-(`app/search.py:_filter_clause`), not a post-hoc filter on the response,
-and not optional: even a request with no `caller_groups` at all still
-applies the ACL predicate (excluding every ACL-restricted document, never
-including one by default). A document with no `acl_groups` key, an empty
+array of group names) is only returned to a caller whose `caller_groups`
+intersects it, enforced as a SQL predicate (`app/search.py:_filter_clause`),
+not a post-hoc filter. Even a request with no `caller_groups` still
+applies the predicate (fail closed: excludes every ACL-restricted
+document by default). A document with no `acl_groups` key, an empty
 array, or a null value is unrestricted.
 
 **Bilingual full-text search**: `data/rag/schema/003_rag_metadata.sql`
 adds a generated `content_tsv` column whose PostgreSQL text-search
 configuration (`english` vs `french`) is chosen per row from
-`metadata.language`, replacing the previous hardcoded
-`to_tsvector('english', ...)` expression. The query side matches against
-an English-or-French `tsquery` OR'd together, so a mixed or ambiguous
-query still matches rows in either language - `language` in the request
-is what actually prefers one over the other in ranking.
+`metadata.language`. The query side matches against an English-or-French
+`tsquery` OR'd together, so a mixed or ambiguous query still matches rows
+in either language; `language` in the request is what prefers one over
+the other in ranking.
 
 ### `GET /healthz` / `GET /readyz`
 
@@ -122,10 +113,10 @@ extends it with `data/rag/schema/003_rag_metadata.sql`). It assumes:
 ```
 document_embeddings(
   id          <pk>,
-  source      text,        -- canonical URL or document identifier, used as the citation source, UNIQUE (one row per source document, no chunking pipeline yet)
+  source      text,        -- canonical URL or document identifier, used as the citation source, UNIQUE
   title       text,
   content     text,
-  embedding   vector,       -- pgvector column, dimensionality matching EMBEDDING_MODEL_NAME; nullable (a row can be full-text-searchable before a live embedding model has backfilled it)
+  embedding   vector,       -- pgvector column, dimensionality matching EMBEDDING_MODEL_NAME; nullable
   metadata    jsonb,        -- retrieval metadata: product/version/language/source_type/classification/acl_groups/last_modified/stale_after/provenance - see 003_rag_metadata.sql's header comment for the exact convention
   content_tsv tsvector      -- generated column: bilingual (metadata.language-aware) full-text search vector
 )
@@ -149,28 +140,21 @@ reciprocal rank fusion (RRF, k=60):
 
 Both candidate queries apply the same deterministic product/version
 filter and mandatory ACL predicate (`app/search.py:_filter_clause`)
-before `LIMIT`, so filtering never distorts the fusion by only narrowing
-one of the two ranked lists.
-
-RRF avoids needing the two scores (cosine similarity vs. `ts_rank_cd`) to
-be on a comparable scale - each list only contributes rank position, not
-its literal score, to the fused ranking.
+before `LIMIT`. Each list contributes only rank position, not its
+literal score, to the fused ranking.
 
 ## Embedding backend
 
 The query text is embedded via an OpenAI-compatible `POST
 {EMBEDDING_SERVICE_URL}/v1/embeddings` call (default:
 `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings`,
-override via env) - this assumes an embedding model is served through
-OpenShift AI's KServe/vLLM serving path, or any other OpenAI-compatible
-embeddings endpoint. This is independent of the OGX Operator (see
-"OGX-backed provider prototype" below) - OGX is a separate, optional
-retrieval provider, not the mechanism this default pgvector provider uses
-to reach its embedding model. **Degradation:** if that
-endpoint is unreachable or errors, this service logs a warning and falls
-back to full-text-search only rather than failing the request - the
-top-level RAG capability stays available even before an embedding model is
-deployed.
+override via env), assuming an embedding model served through OpenShift
+AI's KServe/vLLM serving path, or any other OpenAI-compatible embeddings
+endpoint. This is independent of the OGX Operator (see "OGX-backed
+provider prototype" below). **Degradation:** if that endpoint is
+unreachable or errors, this service logs a warning and falls back to
+full-text-search only rather than failing the request - the top-level RAG
+capability stays available even before an embedding model is deployed.
 
 ## OGX-backed provider prototype
 
@@ -178,35 +162,28 @@ deployed.
 routes `POST /v1/search` to `app/ogx_provider.py` instead of the
 pgvector+full-text hybrid search above. This is a **prototype, not a
 default**: provider-parity tests must pass before any task switches from
-the custom provider to OGX by default, and the default stays `pgvector`
-regardless of this flag's existence.
+the custom provider to OGX by default.
 
 It targets the Red Hat OpenShift AI OGX Operator's data-plane API - a
 separate `OGXServer` custom resource
 (`gitops/charts/openshift-ai/templates/ogxserver.yaml`, also disabled by
-default) the operator does not create on its own, configured against
-this repository's existing PostgreSQL/pgvector platform as OGX's remote
-vector I/O provider and the existing KServe/vLLM stack as its remote
-inference provider. No `OGXServer` instance has been applied to the test
-cluster (`spec.components.ogx.managementState: Managed` only installs the
-OGX Operator/controller), so `app/ogx_provider.py` has never been
-exercised against a real OGX endpoint; its HTTP request/response mapping
-follows the documented OpenAI Vector Stores search API shape OGX
-advertises compatibility with, not a verified wire capture.
-
-Because the exact server-side metadata filter grammar isn't verified
-either, this adapter does not push product/version/ACL filters down to
-OGX - it over-fetches and applies the identical fail-closed
-product/version/ACL-group checks `app/search.py:_filter_clause` enforces
-in SQL, in Python, on the `attributes` each result carries.
+default) configured against this repo's PostgreSQL/pgvector as OGX's
+vector I/O provider and the KServe/vLLM stack as its inference provider.
+No `OGXServer` instance has been applied to the test cluster, so
+`app/ogx_provider.py` has never been exercised against a real OGX
+endpoint; its request/response mapping follows the documented OpenAI
+Vector Stores search API shape OGX advertises, not a verified wire
+capture. It also does not push product/version/ACL filters down to OGX -
+it over-fetches and applies the identical fail-closed product/version/
+ACL-group checks `app/search.py:_filter_clause` enforces in SQL, in
+Python, on the `attributes` each result carries.
 
 `tests/test_ogx_provider.py` and `tests/test_provider_parity.py` (below)
-cover the selection gate, the filter/mapping logic, and structural
-parity between the two providers' output against the shared
-`SearchResponse` schema - all without a live database or OGX endpoint.
-Real retrieval-quality parity against a shared indexed corpus is a
-residual operator action (see the WP-06 roadmap brief), not something
-proven here.
+cover the selection gate, filter/mapping logic, and structural parity
+between the two providers' output against the shared `SearchResponse`
+schema, without a live database or OGX endpoint. Real retrieval-quality
+parity against a shared indexed corpus remains a residual operator action
+(see the WP-06 roadmap brief).
 
 ## Database credentials
 
@@ -253,13 +230,12 @@ python3 tests/test_provider_parity.py
 verified once, ad hoc, against a real `pgvector/pgvector:pg16` container -
 applying `data/rag/schema/003_rag_metadata.sql` and
 `data/rag/fixtures/seed.sql`, then exercising the version filter, ACL
-enforcement (both the deny and the allow case), the bilingual French
-boost, and the staleness penalty against real rows. This caught a genuine
-latent bug: `app/db.py`'s asyncpg pool never registered a `jsonb` type
-codec, so `metadata` came back as a raw string and
-`app/search.py:_row_to_doc`'s `dict(row["metadata"])` would have raised on
-the first real request against a live database. Fixed by registering a
-`jsonb` codec in `db.py`'s new `_init_connection`. This ad hoc
-verification isn't a standing, repeatable test (no fixture container is
-wired into any `make` target) - `tests/test_search_filters.py` above is
-what actually runs repeatably.
+enforcement (deny and allow cases), the bilingual French boost, and the
+staleness penalty against real rows. This caught a genuine bug:
+`app/db.py`'s asyncpg pool never registered a `jsonb` type codec, so
+`metadata` came back as a raw string and `app/search.py:_row_to_doc`'s
+`dict(row["metadata"])` would have raised on the first real request
+against a live database - fixed by registering a `jsonb` codec in
+`db.py`'s new `_init_connection`. This isn't a standing, repeatable test
+(no fixture container is wired into any `make` target) -
+`tests/test_search_filters.py` above is what runs repeatably.
