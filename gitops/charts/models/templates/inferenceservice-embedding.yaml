@@ -16,6 +16,24 @@ spec:
   predictor:
     minReplicas: {{ .Values.embeddingModel.minReplicas }}
     maxReplicas: {{ .Values.embeddingModel.maxReplicas }}
+    # Both models request one GPU each, and the cluster's two GPU nodes sit
+    # in different zones (topology.kubernetes.io/zone). The chat model's
+    # predictor is hard-pinned to modelStorage.zone (its PVC is single-AZ),
+    # but this one has no such constraint, so without this anti-affinity it
+    # can land on the *same* node the chat model needs, using up that
+    # node's only GPU while the other zone's GPU sits idle and unreachable
+    # to the chat model (verified on-cluster - the chat model's pod stayed
+    # Pending with "Insufficient nvidia.com/gpu" on its one allowed node
+    # while this one held it). Hostname-keyed anti-affinity against the
+    # chat model's own pods guarantees they never compete for the same
+    # node's GPU, regardless of which physical zones exist.
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                serving.kserve.io/inferenceservice: {{ .Values.inferenceServiceName }}
+            topologyKey: kubernetes.io/hostname
     model:
       modelFormat:
         name: vLLM
