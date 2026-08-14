@@ -1,6 +1,6 @@
 # WP-11: SecNumCloud hardening increment (promotes ADR-0111)
 
-- **State:** Not started
+- **State:** Done (2026-08-14 — first-increment scope fully merged: control matrix, NetworkPolicy audit closing a real zuno-ai-run gap, hardcoded-secret check. ADR-0111 itself stays Partially implemented since the matrix still tracks gap rows owned by WP-12/WP-13/WP-26 and live-cluster verification items - that's expected, not unfinished work in this WP.)
 - **ADRs:** ADR-0111 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done); benefits from WP-04/WP-05 but does not block on them
 - **Estimated files touched:** ~7

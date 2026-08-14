@@ -80,7 +80,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0108](0100-v0.1-roadmap.md#adr-0108-automate-model-evaluation-with-lm-eval) | v0.1 | Proposed | Automate model evaluation with LM-Eval |
 | [ADR-0109](0100-v0.1-roadmap.md#adr-0109-implement-source-freshness-and-trust-scoring) | v0.1 | Proposed | Implement source freshness and trust scoring |
 | [ADR-0110](0100-v0.1-roadmap.md#adr-0110-automate-document-acl-synchronization) | v0.1 | Proposed | Automate document ACL synchronization |
-| [ADR-0111](0100-v0.1-roadmap.md#adr-0111-strengthen-secnumcloud-oriented-security-controls) | v0.1 | Proposed | Strengthen SecNumCloud-oriented security controls |
+| [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0100-v0.1-roadmap.md#adr-0112-implement-production-grade-backup-and-recovery) | v0.1 | Proposed | Implement production-grade backup and recovery |
 | [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Partially implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |

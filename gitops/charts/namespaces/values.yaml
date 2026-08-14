@@ -121,6 +121,20 @@ platformNamespaces:
       Agent Runtime, AI Gateway and MCP Gateway - shared runtime hosting
       every active agent.
     allowedFromNamespaces: []
+    # ADR-0111: this entry still owns zuno-ai-run's Namespace/ResourceQuota/
+    # LimitRange objects (all three also range over platformNamespaces),
+    # but must NOT get the zuno-default-deny-other-namespaces NetworkPolicy
+    # every other entry gets - that policy's "same-namespace traffic always
+    # allowed" ingress rule has no port restriction, so it would silently
+    # grant every zuno-ai-run pod (agent-runtime, ai-gateway, ...) access to
+    # every port of every other zuno-ai-run pod, additively overriding
+    # mcp-sales-db's own precise, port-8000-only, gateway-only
+    # NetworkPolicy (ADR-0037) - exactly the risk this file's own comment
+    # above already documented in prose but templates/
+    # networkpolicy-platform.yaml never actually enforced (a real,
+    # newly-fixed gap: this entry was silently included in the same range
+    # that comment says excludes it).
+    skipNetworkPolicy: true
     # RHOAI dashboard label, folded in here since this chart already owns
     # zuno-ai-run's Namespace object. istio-injection: sidecar-injected +
     # mTLS-enforced (service-mesh component, phase 4).

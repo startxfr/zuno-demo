@@ -5,6 +5,7 @@ router ingress are always allowed; allowedFromNamespaces adds specific callers.
 */}}
 {{- if .Values.policy.enabled }}
 {{- range .Values.platformNamespaces }}
+{{- if not .skipNetworkPolicy }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -40,5 +41,6 @@ spec:
               kubernetes.io/metadata.name: {{ . }}
         {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

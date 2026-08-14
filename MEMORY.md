@@ -810,3 +810,42 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   Streaming responses are not cached (first-version scope). Repo-provable
   end to end, so ADR-0104 is fully Implemented with no operator step
   required.
+
+- 2026-08-14 (ADR-0111, roadmap WP-11): first SecNumCloud hardening
+  increment. `docs/security/secnumcloud-controls.md` is the new control
+  matrix (deployment/supply-chain/identity/network/data families, each row
+  `enforced-in-ci`/`enforced-on-cluster`/`gap` with the exact enforcing
+  file cited) - derived documentation, `platform/security/
+  check_workload_hardening.py` remains authoritative.
+  `check_workload_hardening.py` itself gained two things: (1) a real BUG
+  FIX - `_helm_template()` never passed `--set` overrides, so
+  `check_networkpolicies("namespaces", ...)` and `check_keycloak_partial()`
+  were silently checking an always-empty render (both charts gate their
+  real content behind `enabled: false` defaults); now passes
+  `policy.enabled=true`/`keycloak.enabled=true` and both checks
+  meaningfully pass. (2) `check_no_hardcoded_secret_values` - a new,
+  first-ever automated check that no chart embeds a literal secret value
+  (as opposed to `secretKeyRef`) in a rendered manifest (ADR-0024/0041).
+  Also added the missing `mcp-confluence` chart (ADR-0117) to both check
+  lists - it was never covered.
+  **Real security gap found and closed**: `gitops/charts/namespaces`'s
+  `zuno-ai-run` entry was silently included in the `platformNamespaces`
+  loop that generates an all-ports, same-namespace-allowed NetworkPolicy -
+  directly contradicting this same file's own comment and ADR-0037/0052's
+  explicit design ("zuno-ai-run must not get a namespace-wide baseline - it
+  would defeat mcp-sales-db's own precise, port-8000-only NetworkPolicy",
+  since Kubernetes NetworkPolicies are additive). Fixed via a new
+  `skipNetworkPolicy: true` flag on that entry, guarded in
+  `templates/networkpolicy-platform.yaml` - confirmed via `helm template`
+  before/after that only the NetworkPolicy is skipped, not the
+  Namespace/ResourceQuota/LimitRange objects the same entry also drives.
+  Confirmed against the real cluster this was never actually deployed
+  (`policy.enabled` is currently false there; `oc get networkpolicy -n
+  zuno-ai-run` returns nothing) - the fix is preventative, not an active
+  incident. `check_workload_hardening.py` now passes 95/95 (was silently
+  "64/66... 2 failures" before the `_helm_template` fix, both false
+  failures on always-empty renders).
+  ADR-0111 stays Partially implemented: this WP's own first-increment
+  scope is fully closed, but the matrix still tracks `gap` rows owned by
+  WP-12 (HA/PDB), WP-13 (backup) and WP-26 (binding auth-mode
+  enforcement), plus several live-cluster-only verification items.

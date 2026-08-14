@@ -19,6 +19,7 @@ Run from the repository root:
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -36,6 +37,11 @@ DEPLOYMENT_CHARTS = [
     "ai-gateway",
     "mcp-gateway",
     "mcp-sales-db",
+    # ADR-0117/WP-02 added this chart without updating this list - a real
+    # gap ADR-0111's own repo-wide audit found and closed: every workload
+    # this repo directly controls must be checked, not just the ones this
+    # list happened to be updated for at the time it was written.
+    "mcp-confluence",
     "rag-service",
 ]
 
@@ -54,13 +60,23 @@ class CheckResult:
     detail: str = ""
 
 
-def _helm_template(chart: str) -> List[Dict[str, Any]]:
-    proc = subprocess.run(
-        ["helm", "template", "test", str(REPO_ROOT / "gitops" / "charts" / chart)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+def _helm_template(chart: str, set_values: Dict[str, str] | None = None) -> List[Dict[str, Any]]:
+    """`set_values` renders charts that gate their real content behind a
+    top-level `enabled: false` default (namespaces' `policy.enabled`,
+    keycloak's `keycloak.enabled` - same "both default false so `helm
+    template` with no overrides renders nothing" pattern several charts in
+    this repo use for their -d0/-d1 ArgoCD Application split). Without
+    this, `check_networkpolicies("namespaces", ...)` and
+    `check_keycloak_partial()` were structurally checking an always-empty
+    render - a real bug this ADR-0111 pass found and fixed, not a
+    loosened check: the baseline they assert was already correct, the gate
+    checker just never actually looked at it (ADR-0052's own "Implemented"
+    claim for these two was accurate; this fixes proving it in CI).
+    """
+    cmd = ["helm", "template", "test", str(REPO_ROOT / "gitops" / "charts" / chart)]
+    for key, value in (set_values or {}).items():
+        cmd.extend(["--set", f"{key}={value}"])
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return [d for d in yaml.safe_load_all(proc.stdout) if d]
 
 
@@ -123,14 +139,48 @@ def check_deployment_chart(chart: str, findings: Findings) -> None:
                 )
 
 
-def check_networkpolicies(chart: str, findings: Findings) -> None:
+# ADR-0111 first increment: ADR-0024/0041 already require every credential
+# to come from an ExternalSecret-populated secretKeyRef, never a literal
+# value committed to a chart - this is the first automated check for it,
+# catching a regression a reviewer might otherwise miss. Env var names
+# matching this pattern must never carry a literal `value:` field.
+_SECRET_ENV_NAME_PATTERN = re.compile(r"(PASSWORD|SECRET|TOKEN|API_KEY|PRIVATE_KEY)", re.IGNORECASE)
+
+
+def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
     docs = _helm_template(chart)
+    for dep in [d for d in docs if d.get("kind") == "Deployment"]:
+        dep_name = dep["metadata"]["name"]
+        pod_spec = _pod_spec_of(dep)
+        for container in pod_spec.get("containers", []):
+            cname = container["name"]
+            for env in container.get("env", []):
+                name = env.get("name", "")
+                if not _SECRET_ENV_NAME_PATTERN.search(name):
+                    continue
+                if name.endswith("_ENV"):
+                    # Meta-variable naming *which other* env var holds a
+                    # secret (e.g. MAAS_GATEWAY_API_KEY_ENV="MAAS_GATEWAY_
+                    # API_KEY" - components/ai-gateway/app/maas_adapter.py's
+                    # own indirection pattern) - its value is an env var
+                    # name, never a credential itself.
+                    continue
+                has_literal_value = bool(env.get("value"))
+                findings.check(
+                    f"{chart}/{dep_name}/{cname}: {name} is not a hardcoded literal value",
+                    not has_literal_value,
+                    f"got value={env.get('value')!r} - secret-like env vars must use valueFrom.secretKeyRef",
+                )
+
+
+def check_networkpolicies(chart: str, findings: Findings, set_values: Dict[str, str] | None = None) -> None:
+    docs = _helm_template(chart, set_values)
     policies = [d for d in docs if d.get("kind") == "NetworkPolicy"]
     findings.check(f"{chart}: at least one NetworkPolicy rendered", len(policies) > 0, f"found {len(policies)}")
 
 
 def check_keycloak_partial(findings: Findings) -> None:
-    docs = _helm_template("keycloak")
+    docs = _helm_template("keycloak", {"keycloak.enabled": "true"})
     kc = next((d for d in docs if d.get("kind") == "Keycloak"), None)
     findings.check("keycloak: Keycloak CR rendered", kc is not None)
     if kc is None:
@@ -179,12 +229,14 @@ def main() -> int:
 
     for chart in DEPLOYMENT_CHARTS:
         check_deployment_chart(chart, findings)
+        check_no_hardcoded_secret_values(chart, findings)
 
     # NetworkPolicy coverage: every zuno-ai-run workload chart (no namespace
     # baseline covers them - ADR-0037) plus the platform-namespace-baseline
     # owner and rag-service's precise cross-namespace policy.
-    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-sales-db", "rag-service", "models", "namespaces"]:
+    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-sales-db", "mcp-confluence", "rag-service", "models"]:
         check_networkpolicies(chart, findings)
+    check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 
     check_keycloak_partial(findings)
     check_models_partial(findings)
