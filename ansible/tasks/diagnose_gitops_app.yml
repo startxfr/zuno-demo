@@ -91,14 +91,15 @@
   vars:
     blocked_finding:
       component: "{{ _diag_component }}"
-      resource: "{{ item.kind | default('?') }}/{{ item.name | default('?') }} ({{ item.namespace | default('cluster-scoped') }})"
-      state: "sync={{ item.status | default('n/a') }}, health={{ item.health.status | default('n/a') }}"
-      cause: "{{ item.health.message | default('no health message reported') }}"
-      solution: "Inspect with `oc get {{ item.kind | default('?') | lower }} {{ item.name | default('?') }}{{ (' -n ' + item.namespace) if item.namespace is defined else '' }}`; usually fixed by a re-sync/re-apply"
+      resource: "{{ blocked.kind | default('?') }}/{{ blocked.name | default('?') }} ({{ blocked.namespace | default('cluster-scoped') }})"
+      state: "sync={{ blocked.status | default('n/a') }}, health={{ blocked.health.status | default('n/a') }}"
+      cause: "{{ blocked.health.message | default('no health message reported') }}"
+      solution: "Inspect with `oc get {{ blocked.kind | default('?') | lower }} {{ blocked.name | default('?') }}{{ (' -n ' + blocked.namespace) if blocked.namespace is defined else '' }}`; usually fixed by a re-sync/re-apply"
       auto_fix: "make d0 reconcile {{ _diag_component }}"
   loop: "{{ (_diag_blocked_resources | default([]) | unique)[:10] }}"
   loop_control:
-    label: "{{ item.kind | default('?') }}/{{ item.name | default('?') }}"
+    loop_var: "blocked"
+    label: "{{ blocked.kind | default('?') }}/{{ blocked.name | default('?') }}"
   when: (_diag_app.resources | default([]) | length) > 0
 
 - name: "diagnose | record the per-resource truncation marker"
