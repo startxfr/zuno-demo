@@ -2,17 +2,7 @@
 
 ## Purpose
 
-Zuno Demo uses Red Hat OpenShift AI to provide a reusable internal agent platform and an initial catalog of five agents. The same platform must be able to onboard future agents primarily through declarative definitions.
-
-## Initial agents
-
-| Agent | Audience | Primary capabilities |
-|---|---|---|
-| Comage | Sales | Follow-up prioritization, current deals, weekly sales synthesis |
-| Tekos | Technical consultants | Official technical documentation RAG and internal Confluence knowledge |
-| Arkos | Architects | DAT creation, Odyssey workshop preparation, Google Drive/Docs workflows |
-| Advantage | Sales administration | New confirmed business and monthly sales reporting |
-| Finage | Finance | Billable business and monthly invoice reporting |
+Zuno Demo uses Red Hat OpenShift AI to provide a reusable internal agent platform and an initial catalog of five agents (catalog: [README.md](../README.md#initial-agent-catalog)). The same platform must be able to onboard future agents primarily through declarative definitions.
 
 ## Shared platform principles
 
