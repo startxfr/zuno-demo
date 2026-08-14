@@ -41,6 +41,14 @@
 # `maas_model_ref` (optional): overrides `model` for the MaaS-published
 # model reference name, when it differs from the serving runtime's own
 # internal model name.
+#
+# `cache_enabled` (optional, default false; ADR-0104): opts this provider
+# into the semantic cache (components/ai-gateway/app/semantic_cache.py)
+# when the gateway's own SEMANTIC_CACHE_ENABLED switch is also on (chart
+# value `semanticCache.enabled`, default false - this file alone never
+# turns caching on). A cache entry is only ever served back to a request
+# with an identical model/user/classification/local-only/task context -
+# see the ADR for the full key. No entry below sets it yet.
 
 providers:
   - name: local

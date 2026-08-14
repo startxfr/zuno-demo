@@ -785,3 +785,28 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   `components/agent-runtime/tests/test_checkpointing.py`, including the
   cross-subject-resume security-negative. Repo-provable end to end, so
   ADR-0103 is fully Implemented (no operator step required).
+
+- 2026-08-14 (ADR-0104, roadmap WP-09): AI Gateway gained an opt-in
+  semantic cache for non-streaming `/v1/chat/completions` responses
+  (`components/ai-gateway/app/semantic_cache.py`), stored in the existing
+  platform Redis (same instance agent-frontend already uses for sessions -
+  its NetworkPolicy was extended to also allow `app.kubernetes.io/name:
+  ai-gateway` pods, a real gap the initial implementation would otherwise
+  have hit silently). Two-gate enablement (chart `semanticCache.enabled`
+  AND a model's `cache_enabled: true` in provider-routing.yaml), same
+  pattern as ADR-0114's MaaS adapter. "Semantic" means the prompt is
+  embedded via the same shared embedding InferenceService
+  `components/rag-service` uses and bucketed with fixed-seed SimHash
+  (locality-sensitive hashing) rather than exact-text matching. The cache
+  key binds to model identity, caller subject, effective classification,
+  local-only requirement and task identity - any one differing is a
+  guaranteed miss, proven by dedicated tests
+  (`components/ai-gateway/tests/test_semantic_cache.py`,
+  `test_cache_integration.py`). Cache infrastructure failures (Redis or
+  the embedding service unreachable) fail open - proceed uncached - since
+  caching is a performance optimization, never a security control; the
+  classification/eligibility check in `app/routing.py` always runs first,
+  structurally guaranteeing a policy denial never reaches the cache.
+  Streaming responses are not cached (first-version scope). Repo-provable
+  end to end, so ADR-0104 is fully Implemented with no operator step
+  required.

@@ -73,7 +73,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0101](0100-v0.1-roadmap.md#adr-0101-provide-ha-for-shared-agent-platform-services) | v0.1 | Proposed | Provide HA for shared agent platform services |
 | [ADR-0102](0100-v0.1-roadmap.md#adr-0102-target-999-percent-platform-availability) | v0.1 | Proposed | Target 99.9 percent platform availability |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Implemented | Persist resumable long-running agent workflows |
-| [ADR-0104](0100-v0.1-roadmap.md#adr-0104-introduce-controlled-semantic-caching) | v0.1 | Proposed | Introduce controlled semantic caching |
+| [ADR-0104](0104-introduce-controlled-semantic-caching.md) | v0.1 | Implemented | Introduce controlled semantic caching |
 | [ADR-0105](0100-v0.1-roadmap.md#adr-0105-automate-monthly-knowledge-ingestion) | v0.1 | Proposed | Automate monthly knowledge ingestion |
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v0.1 | Partially implemented | Enforce OKF bundle signing and validation |
 | [ADR-0107](0100-v0.1-roadmap.md#adr-0107-introduce-automated-model-quality-gates) | v0.1 | Proposed | Introduce automated model quality gates |

@@ -85,6 +85,24 @@ spec:
                   name: {{ .Values.maasAdapter.secretName }}
                   key: api_key
                   optional: true
+            # ADR-0104: semantic cache, default off - see
+            # components/ai-gateway/app/semantic_cache.py and
+            # platform/ai-gateway/provider-routing.yaml's `cache_enabled`
+            # field.
+            - name: SEMANTIC_CACHE_ENABLED
+              value: {{ .Values.semanticCache.enabled | quote }}
+            - name: SEMANTIC_CACHE_TTL_SECONDS
+              value: {{ .Values.semanticCache.ttlSeconds | quote }}
+            - name: EMBEDDING_SERVICE_URL
+              value: {{ .Values.semanticCache.embeddingServiceUrl | quote }}
+            - name: REDIS_ADDR
+              value: {{ .Values.semanticCache.redis.addr | quote }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.semanticCache.redis.secretName }}
+                  key: REDIS_PASSWORD
+                  optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

@@ -44,3 +44,18 @@ maasAdapter:
   enabled: false
   endpoint: ""
   secretName: llm-provider-maas
+
+# ADR-0104: opt-in semantic cache in the existing platform Redis
+# (gitops/charts/redis, zuno-auth namespace - same instance
+# gitops/charts/tekos already uses for sessions). Disabled by default;
+# flipping `enabled` alone changes nothing, since no provider-routing.yaml
+# entry opts in (`cache_enabled: true`) yet - both the global switch here
+# and the per-model opt-in must be true for a request to actually be
+# cached (same two-gate pattern as ADR-0114's maasAdapter above).
+semanticCache:
+  enabled: false
+  ttlSeconds: "3600"
+  embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings
+  redis:
+    addr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
+    secretName: ai-gateway-redis-credentials

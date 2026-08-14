@@ -140,6 +140,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_maas_adapter.py
+          python3 tests/test_semantic_cache.py
+          python3 tests/test_cache_integration.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |

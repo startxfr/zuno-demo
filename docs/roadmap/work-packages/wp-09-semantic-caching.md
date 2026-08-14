@@ -1,6 +1,6 @@
 # WP-09: Controlled semantic caching (promotes ADR-0104)
 
-- **State:** Not started
+- **State:** Done (2026-08-14 — repo-provable, no operator step required)
 - **ADRs:** ADR-0104 (Proposed -> To be implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** —

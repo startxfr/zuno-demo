@@ -1,14 +1,15 @@
 {{- if .Values.redis.enabled | default true }}
-# ADR-0042 session store must accept traffic only from agent-frontend
-# pods - not every pod in a namespace that happens to be allowed by
-# zuno-auth's broader default-deny-other-namespaces baseline
-# (gitops/charts/namespaces), and not from anywhere in the cluster (which
-# is what bitnami/redis's own default NetworkPolicy would otherwise
-# allow - disabled in values.yaml in favor of this). Same least-privilege
-# bar gitops/charts/mcp-sales-db already sets. Every active agent's
-# frontend deploys into the single shared zuno-ai-run namespace (ADR-0329,
-# supersedes ADR-0023's namespace-per-agent model), so this matches that
-# namespace by name rather than a per-agent namespace label.
+# ADR-0042 session store (agent-frontend pods) plus, since ADR-0104,
+# ai-gateway's semantic cache - not every pod in a namespace that happens
+# to be allowed by zuno-auth's broader default-deny-other-namespaces
+# baseline (gitops/charts/namespaces), and not from anywhere in the
+# cluster (which is what bitnami/redis's own default NetworkPolicy would
+# otherwise allow - disabled in values.yaml in favor of this). Same
+# least-privilege bar gitops/charts/mcp-sales-db already sets. Every
+# active agent's frontend, and every shared platform service, deploys
+# into the single shared zuno-ai-run namespace (ADR-0329, supersedes
+# ADR-0023's namespace-per-agent model), so this matches that namespace by
+# name rather than a per-agent namespace label.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -37,6 +38,15 @@ spec:
               # convention, not the app.kubernetes.io/name one
               # mcp-gateway/mcp-sales-db use).
               app.kubernetes.io/component: frontend
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-ai-run
+          podSelector:
+            matchLabels:
+              # ADR-0104: matches gitops/charts/ai-gateway/templates/
+              # deployment.yaml's own Deployment label
+              # (app.kubernetes.io/name, that chart's own convention).
+              app.kubernetes.io/name: ai-gateway
       ports:
         - protocol: TCP
           port: 6379

@@ -53,10 +53,11 @@ _tracer: Optional[trace.Tracer] = None
 _model_call_counter = None
 _token_counter = None
 _cost_counter = None
+_cache_lookup_counter = None
 
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
-    global _tracer, _model_call_counter, _token_counter, _cost_counter
+    global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -87,8 +88,25 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
     _cost_counter = meter.create_counter(
         "zuno.model_cost_usd", description="Estimated USD cost of model calls, by provider"
     )
+    _cache_lookup_counter = meter.create_counter(
+        "zuno.semantic_cache_lookups",
+        description="ADR-0104 semantic cache lookups, by outcome (hit/miss/unavailable)",
+    )
 
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
+
+
+def record_cache_outcome(outcome: str, model: str) -> None:
+    """ADR-0104: `outcome` is one of "hit", "miss" (cache reachable, no
+    entry), or "unavailable" (cache infrastructure itself failed - see
+    app/semantic_cache.py's CacheUnavailable). Also stamps the current
+    span, if one is active, so a single request's trace shows whether it
+    was served from cache."""
+    span = trace.get_current_span()
+    if span is not None:
+        span.set_attribute("zuno.cache_outcome", outcome)
+    if _cache_lookup_counter is not None:
+        _cache_lookup_counter.add(1, {"outcome": outcome, "model": model})
 
 
 def _estimate_cost_usd(provider: str, prompt_tokens: int, completion_tokens: int) -> float:

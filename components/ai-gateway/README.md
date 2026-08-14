@@ -133,6 +133,34 @@ out of scope for this build: adding a real budget/quota mechanism (e.g. a
 per-classification or per-provider request/token ceiling, likely enforced
 here and backed by Vault or a ConfigMap for the limits) is future work.
 
+## Semantic caching (ADR-0104)
+
+`app/semantic_cache.py` is an opt-in cache for non-streaming
+`/v1/chat/completions` responses, stored in the existing platform Redis
+(`gitops/charts/redis`, the same instance `components/agent-frontend`
+already uses for sessions). Two gates, both must be true or nothing is
+cached: the chart-level `semanticCache.enabled` switch (`SEMANTIC_CACHE_ENABLED`,
+default off) and the specific model's `cache_enabled: true` entry in
+`platform/ai-gateway/provider-routing.yaml` (no entry sets it yet).
+
+The cache key binds to model identity, caller subject, effective
+classification, `X-Zuno-Local-Only`, and task identity (`X-Zuno-Task`) -
+change any one of these and it's a guaranteed miss, never a cross-boundary
+hit. "Semantic" means the prompt is embedded (via the same shared
+embedding `InferenceService` `components/rag-service` uses,
+`EMBEDDING_SERVICE_URL`) and bucketed with a small, fixed set of random
+hyperplanes (SimHash-style locality-sensitive hashing) rather than
+matched on exact prompt text - cosine-similar prompts land in the same
+bucket with high probability. Cache infrastructure failures (Redis or the
+embedding service unreachable) fail open: the request proceeds uncached,
+exactly as if caching were disabled - this is a latency/cost optimization,
+never a correctness or security control, and the routing/eligibility
+check in `app/routing.py` always runs before any cache lookup regardless.
+Streaming responses are never cached (kept simple for this first version).
+
+Hit/miss/unavailable outcomes are recorded on the `zuno.semantic_cache_lookups`
+metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`).
+
 ## Configuration (env vars, no hardcoded secrets - ADR-0024)
 
 | Var | Default | Purpose |
@@ -142,6 +170,10 @@ here and backed by Vault or a ConfigMap for the limits) is future work.
 | `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `zuno/providers/<name>` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces/metrics (ADR-0029) |
+| `SEMANTIC_CACHE_ENABLED` | `false` | ADR-0104 global cache switch (chart value `semanticCache.enabled`) |
+| `SEMANTIC_CACHE_TTL_SECONDS` | `3600` | cache entry TTL |
+| `EMBEDDING_SERVICE_URL` | `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings` | shared embedding `InferenceService` the cache buckets prompts against |
+| `REDIS_ADDR` / `REDIS_PASSWORD` | `zuno-redis-master.zuno-auth.svc.cluster.local:6379` / unset | shared platform Redis (ADR-0104 cache backend) |
 
 ## Observability (ADR-0029)
 
