@@ -1,6 +1,6 @@
 # ADR-0101: Provide HA for shared agent platform services
 
-- **Status:** Partially implemented (HA chart mechanics, SLO definition and alert rules merged; failover drill and live measurement pending, roadmap WP-12)
+- **Status:** Partially implemented (HA chart mechanics, SLO definition and alert rules merged; failover drill and live measurement pending, roadmap WP-12). Incident 2026-08-14: the explicit `topologySpreadConstraints` added to `gitops/charts/postgresql`'s PostgresCluster (`spec.instances` and `spec.proxy.pgBouncer`) duplicated a default PGO 5.8 already injects (hostname + zone, both `ScheduleAnyway`) - Kubernetes SSA keys this field on `(topologyKey, whenUnsatisfiable)`, so the duplicate zone entry made every generated StatefulSet patch invalid and broke PGO reconciliation entirely, including `spec.users`, which meant the `agent-checkpoints`/`ogx` databases were never created and `agent-runtime` crash-looped. Reverted; PGO's own defaults already provide the intended zone spread, confirmed live via `oc get sts -n zuno-data -o jsonpath='{.items[*].spec.template.spec.topologySpreadConstraints}'`.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

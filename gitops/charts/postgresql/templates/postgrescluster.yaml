@@ -35,24 +35,19 @@ spec:
     - name: instance1
       replicas: {{ .Values.cluster.instances }}
       priorityClassName: zuno-platform-critical
-      {{- if .Values.topologySpreadConstraints.enabled }}
-      # ADR-0101 (roadmap WP-12): real field, confirmed via
-      # `oc explain postgrescluster.spec.instances.topologySpreadConstraints`
-      # against the live test cluster. PGO already auto-manages a
-      # PodDisruptionBudget for this instance set (confirmed live:
-      # `oc get pdb -n zuno-data` shows zuno-postgresql-set-instance1) and
-      # replicas is already 3 (HA) - this closes the one remaining gap.
-      # Labels match PGO's own convention, confirmed live via
-      # `oc get pods -n zuno-data --show-labels`.
-      topologySpreadConstraints:
-        - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
-          topologyKey: {{ .Values.topologySpreadConstraints.topologyKey }}
-          whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
-          labelSelector:
-            matchLabels:
-              postgres-operator.crunchydata.com/cluster: {{ .Values.cluster.name }}
-              postgres-operator.crunchydata.com/instance-set: instance1
-      {{- end }}
+      # ADR-0101 (roadmap WP-12) originally added an explicit
+      # topologySpreadConstraints block here. REVERTED 2026-08-14, confirmed
+      # live: PGO 5.8 already injects its own default
+      # topologySpreadConstraints (hostname + zone, both ScheduleAnyway) into
+      # every instance/pgBouncer/repo-host pod template it manages. K8s SSA
+      # treats this field as listType=map keyed on
+      # (topologyKey, whenUnsatisfiable), so re-declaring the same zone key
+      # here made every generated StatefulSet patch invalid
+      # ("duplicate entries for key ...") and broke reconciliation entirely -
+      # including spec.users, which is why checkpointDatabase/ogxDatabase
+      # were never created. PGO's own defaults already provide the intended
+      # zone spread; see docs/adr/0101-provide-ha-for-shared-agent-platform-services.md
+      # for the incident note.
       resources:
         requests:
           cpu: {{ .Values.cluster.resources.requests.cpu | quote }}
@@ -82,21 +77,9 @@ spec:
     pgBouncer:
       replicas: {{ .Values.pgBouncer.replicas }}
       priorityClassName: zuno-platform-critical
-      {{- if .Values.topologySpreadConstraints.enabled }}
-      # ADR-0101 (roadmap WP-12): real field, confirmed via `oc explain
-      # postgrescluster.spec.proxy.pgBouncer.topologySpreadConstraints`.
-      # PGO already auto-manages a PodDisruptionBudget for pgBouncer too
-      # (confirmed live: `oc get pdb -n zuno-data` shows
-      # zuno-postgresql-pgbouncer) and replicas is already 2.
-      topologySpreadConstraints:
-        - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
-          topologyKey: {{ .Values.topologySpreadConstraints.topologyKey }}
-          whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
-          labelSelector:
-            matchLabels:
-              postgres-operator.crunchydata.com/cluster: {{ .Values.cluster.name }}
-              postgres-operator.crunchydata.com/role: pgbouncer
-      {{- end }}
+      # See the matching comment on spec.instances above: an explicit
+      # topologySpreadConstraints block here collided with PGO's own
+      # injected default and was reverted 2026-08-14.
       resources:
         requests:
           cpu: {{ .Values.pgBouncer.resources.requests.cpu | quote }}
