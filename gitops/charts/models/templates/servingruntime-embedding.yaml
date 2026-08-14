@@ -24,7 +24,12 @@ spec:
       args:
         - --model=/mnt/models
         - --served-model-name={{ .Values.embeddingModel.modelId }}
-        - --task=embed
+        # This vLLM version (0.21.0+rhaiv.10) removed --task in favor of
+        # --runner/--convert - verified on-cluster: --task=embed fails
+        # argparse with "unrecognized arguments" (vllm/config/model.py
+        # still defines RunnerOption/ConvertOption, not TaskOption).
+        - --runner=pooling
+        - --convert=embed
         # See templates/servingruntime.yaml's --port comment: vLLM
         # defaults to 8000, but containerPort/readiness/Service/
         # NetworkPolicy all assume 8080.
