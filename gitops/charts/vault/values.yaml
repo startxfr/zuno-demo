@@ -62,7 +62,7 @@ vault:
 # provisioner) and `oc explain volumesnapshot.spec` confirms the schema
 # used below.
 backup:
-  enabled: false
+  enabled: true
   schedule: "0 4 * * *"  # daily 04:00 - RPO <= 24h (ADR-0112)
   retentionCount: 7
   volumeSnapshotClassName: csi-aws-vsc

@@ -61,4 +61,4 @@ collector:
 # false alongside every other switch in this chart, tracks collector's
 # own enablement since the alerts are meaningless without it.
 alerting:
-  enabled: false
+  enabled: true
