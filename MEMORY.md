@@ -979,7 +979,11 @@ until a future FE/BFF chart deploys for them into `zuno-ai-run`.
   `gitops/charts/openshift-ai/templates/lmevaljob.yaml`, one CR per
   `lmEval.jobs[]` values entry, disabled by default with an empty job
   list (opt-in per candidate model, per ADR-0108's "complements - never
-  replaces" framing). `ansible/roles/models/tasks/precheck.yml` now
+  replaces" framing). Moved (2026-08-14) to
+  `gitops/charts/models/templates/lmevaljob.yaml`: it benchmarks a model
+  the `models` chart deploys and belongs to that Day 1 lifecycle, not
+  `openshift-ai`'s Day 0 operator/DSC one - user caught this during the
+  cluster test pass. `ansible/roles/models/tasks/precheck.yml` now
   reports any LMEvalJob's `status.state`/`results` via `make d1 check
   models`, diagnostic only - never gates the models component's own
   install-state, since these are one-shot benchmarking runs, not a

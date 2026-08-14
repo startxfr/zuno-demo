@@ -1,12 +1,12 @@
 {{- /*
 ADR-0108 (roadmap WP-10). See values.yaml's lmEval comment for the full
 rationale. Every field below is confirmed real via `oc explain
-lmevaljob.spec...` against the live test cluster, 2026-08-14 - no
-LMEvalJob instance itself has been applied/verified live yet (`oc get
-lmevaljob -A` returns no resources today, and lmEval.jobs is empty by
-default), so this is a schema-correct, not yet cluster-verified,
-template. Disabled by default; renders nothing with an empty job list
-even if enabled.
+lmevaljob.spec...` against the live test cluster, 2026-08-14. Disabled by
+default; renders nothing with an empty job list even if enabled. Moved
+here (2026-08-14) from gitops/charts/openshift-ai (Day 0) to this chart
+(Day 1 "models" component): it benchmarks a model this chart deploys, so
+it belongs to the same install/uninstall lifecycle rather than the
+operator/DSC chart.
 */ -}}
 {{- if .Values.lmEval.enabled }}
 {{- range .Values.lmEval.jobs }}
@@ -15,7 +15,7 @@ apiVersion: trustyai.opendatahub.io/v1alpha1
 kind: LMEvalJob
 metadata:
   name: {{ .name }}
-  namespace: {{ $.Values.lmEval.namespace }}
+  namespace: {{ $.Values.namespace }}
   labels:
     app.kubernetes.io/name: lm-eval
     app.kubernetes.io/component: model-quality-gate

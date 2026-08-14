@@ -15,8 +15,8 @@
     gitops_app_name: "zuno-models-d1"
 
 # ADR-0108/roadmap WP-10: report any LMEvalJob results (candidate
-# local-model comparison, gitops/charts/openshift-ai/templates/
-# lmevaljob.yaml) so `make d1 check models` surfaces them without a
+# local-model comparison, gitops/charts/models/templates/lmevaljob.yaml)
+# so `make d1 check models` surfaces them without a
 # separate command. Diagnostic only, never gates _state_is_installed
 # below - LM-Eval jobs are one-shot, per-candidate benchmarking runs
 # (ADR-0108: "complements - never replaces - the per-agent ADR-0027
@@ -49,7 +49,7 @@
       No LMEvalJob resources found in
       {{ models_lmeval_namespace | default('zuno-ai-run') }} - no
       candidate model comparison has been run yet (ADR-0108, opt-in via
-      gitops/charts/openshift-ai's lmEval.jobs values).
+      gitops/charts/models's lmEval.jobs values).
   when: (_models_lmevaljobs.resources | default([]) | length) == 0
 
 - name: "models | record install state"
