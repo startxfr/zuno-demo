@@ -25,10 +25,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY components/mcp-gateway/app ./app
 COPY policies ./policies
 COPY agents ./agents
+# ADR-0116: the backend-binding registry rides the same bake-in/reload
+# lifecycle as the policy files above.
+COPY platform/bindings ./platform/bindings
 
 ENV TOOL_POLICY_PATH=/app/policies/tools/tool-policy.yaml \
     DATA_CLASSIFICATION_PATH=/app/policies/data-classification/classification.yaml \
     AGENTS_DIR=/app/agents \
+    TOOL_BINDINGS_PATH=/app/platform/bindings/tools/tool-bindings.yaml \
     PYTHONUNBUFFERED=1
 
 EXPOSE 8080

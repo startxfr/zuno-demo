@@ -11,7 +11,7 @@ Transport (ADR-0043): a real, standards-compliant MCP server - the
 official `mcp` Python SDK's `MCPServer`, streamable-HTTP transport,
 mounted at `POST /mcp` (real `initialize` handshake, `tools/list`,
 `tools/call` - not a hand-rolled JSON-RPC-shaped endpoint). The only
-caller, `components/mcp-gateway`'s `app/downstream.py:_invoke_sales_db`,
+caller, `components/mcp-gateway`'s `app/downstream.py:_invoke_streamable_http`,
 uses the SDK's own `ClientSession` client - not a plain `httpx` POST -
 matched and verified end-to-end against this server's real ASGI app (see
 `tests/test_mcp_protocol.py` and `components/mcp-gateway/tests/

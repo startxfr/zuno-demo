@@ -1,20 +1,20 @@
-"""Routes an authorized tool invocation to the correct downstream MCP
-server or demo-mode handler.
+"""Routes an authorized tool invocation to the physical backend its
+ADR-0116 binding names.
 
-Routing is keyed by tool name (fixed by the platform-wide tool contract)
-rather than by the ``mcp_server`` string in ``tool-policy.yaml``: the
-policy file's ``mcp_server`` field is authored by Track B and its exact
-values aren't guaranteed to match a naming scheme this module can key off
-safely, whereas the eight tool names themselves are a stable contract
-shared across tracks. The resolved ``mcp_server`` label from the policy
-decision is still threaded through for observability/logging.
+Routing is no longer keyed by hard-coded tool-name sets: main.py resolves
+the caller's tool name (canonical capability ID or migration alias) through
+app/bindings.py's registry BEFORE calling ``invoke()``, and this module
+dispatches purely on the resolved ``Binding`` - its transport, endpoint and
+the backend's own ``provider_tool`` name. An unresolved binding fails
+closed here with the same ``DownstreamError`` contract callers already
+depend on; no name ever falls through to a default backend.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 import httpx2  # the mcp SDK's own httpx fork/client type, required by streamable_http_client
@@ -22,19 +22,11 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
+from app.bindings import Binding
 from app.handlers import confluence, drive, email_report, gmail, web_search
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
-# ADR-0043: sales-db is a real, standards-compliant MCP server (streamable-
-# HTTP transport, mounted at /mcp - see components/mcp-servers/sales-db/
-# server.py) reached here via the official `mcp` SDK's ClientSession, not
-# the hand-rolled JSON-RPC-shaped POST this file used before. Only
-# `_invoke_sales_db` below needed to change - `invoke()`'s own signature
-# and every caller (app/main.py) are unaffected, exactly as this module's
-# docstring anticipated before the migration.
-SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc:8000")
-SALES_DB_MCP_ENDPOINT = f"{SALES_DB_MCP_URL}/mcp"
 DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "20"))
 
 # ADR-0037: a shared secret (vault-generated,
@@ -47,18 +39,20 @@ DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "20")
 # addition to relying on network location" second layer this ADR requires
 # for sensitive MCP servers. Not enforced as a hard startup requirement
 # here (unlike sales-db's own validation) so this gateway still starts and
-# serves every other tool if the secret hasn't landed yet - the sales-db
-# call itself degrades to a clear 502 from the missing/rejected header.
+# serves every other tool if the secret hasn't landed yet - the MCP call
+# itself degrades to a clear 502 from the missing/rejected header.
 MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
-SALES_DB_TOOLS = {"get_customer", "list_open_opportunities", "get_quote"}
-
-DEMO_MODE_HANDLERS = {
-    "search_confluence": confluence.handle,
-    "list_drive_files": drive.handle,
-    "read_gmail": gmail.handle,
+# The in-process demo-mode backends themselves (ADR-0116: this is the
+# physical-backend catalog the `in-process` transport dispatches into, keyed
+# by the binding's `handler` field - not a per-tool routing set; which tool
+# reaches which handler is the registry's decision, not this module's).
+IN_PROCESS_HANDLERS = {
+    "confluence": confluence.handle,
+    "drive": drive.handle,
+    "gmail": gmail.handle,
     "web_search": web_search.handle,
-    "send_technical_report_email": email_report.handle,
+    "email_report": email_report.handle,
 }
 
 
@@ -70,42 +64,72 @@ class DownstreamError(Exception):
 
 
 async def invoke(
-    tool_name: str, arguments: Dict[str, Any], caller_sub: str, bearer_token: str
+    binding: Optional[Binding],
+    tool_name: str,
+    arguments: Dict[str, Any],
+    caller_sub: str,
+    bearer_token: str,
 ) -> Dict[str, Any]:
-    if tool_name in SALES_DB_TOOLS:
-        return await _invoke_sales_db(tool_name, arguments, bearer_token)
+    if binding is None:
+        # Fail closed (ADR-0116): deterministic error, no backend contacted.
+        raise DownstreamError(502, f"no backend binding registered for tool '{tool_name}'")
 
-    handler = DEMO_MODE_HANDLERS.get(tool_name)
-    if handler is None:
-        raise DownstreamError(502, f"no downstream handler registered for tool '{tool_name}'")
-    return await handler(arguments, caller_sub)
+    if binding.transport == "streamable-http":
+        return await _invoke_streamable_http(binding, arguments, bearer_token)
+
+    if binding.transport == "in-process":
+        handler = IN_PROCESS_HANDLERS.get(binding.handler or "")
+        if handler is None:
+            raise DownstreamError(
+                502,
+                f"binding '{binding.capability}' names unknown in-process handler "
+                f"'{binding.handler}'",
+            )
+        return await handler(arguments, caller_sub)
+
+    raise DownstreamError(
+        502, f"binding '{binding.capability}' has unsupported transport '{binding.transport}'"
+    )
 
 
-async def _invoke_sales_db(
-    tool_name: str, arguments: Dict[str, Any], bearer_token: str
+async def _invoke_streamable_http(
+    binding: Binding, arguments: Dict[str, Any], bearer_token: str
 ) -> Dict[str, Any]:
+    # ADR-0043: real, standards-compliant MCP servers (streamable-HTTP
+    # transport, e.g. components/mcp-servers/sales-db/server.py mounted at
+    # /mcp) reached via the official `mcp` SDK's ClientSession. The endpoint
+    # comes from the binding's registry entry (environment-resolved at call
+    # time), and the tool actually called is the binding's `provider_tool` -
+    # the backend's own name, which callers using canonical capability IDs
+    # never see.
+    #
     # Authorization is still forwarded for audit/observability even though
-    # sales-db doesn't itself re-validate it (the gateway's ADR-0011 policy
-    # intersection already happened - see components/mcp-servers/sales-db/
-    # server.py's module docstring); X-Zuno-Gateway-Token is the one that's
-    # actually enforced (ADR-0037).
+    # downstream servers don't themselves re-validate it (the gateway's
+    # ADR-0011 policy intersection already happened);
+    # X-Zuno-Gateway-Token is the one that's actually enforced (ADR-0037).
+    endpoint = binding.endpoint_url()
     headers = {"Authorization": f"Bearer {bearer_token}", "X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
     try:
         http_client = httpx2.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS, headers=headers)
-        async with streamable_http_client(SALES_DB_MCP_ENDPOINT, http_client=http_client) as (read, write):
+        async with streamable_http_client(endpoint, http_client=http_client) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                result = await session.call_tool(tool_name, arguments)
+                result = await session.call_tool(binding.provider_tool, arguments)
     except MCPError as exc:
-        logger.error("sales-db MCP server returned a protocol-level error for tool '%s': %s", tool_name, exc)
-        raise DownstreamError(502, f"sales-db MCP server returned an error: {exc}") from exc
+        logger.error(
+            "%s MCP server returned a protocol-level error for tool '%s': %s",
+            binding.backend, binding.provider_tool, exc,
+        )
+        raise DownstreamError(502, f"{binding.backend} MCP server returned an error: {exc}") from exc
     except (httpx.HTTPError, OSError) as exc:
-        logger.error("sales-db MCP server call failed for tool '%s': %s", tool_name, exc)
-        raise DownstreamError(502, f"sales-db MCP server unreachable or errored: {exc}") from exc
+        logger.error(
+            "%s MCP server call failed for tool '%s': %s", binding.backend, binding.provider_tool, exc
+        )
+        raise DownstreamError(502, f"{binding.backend} MCP server unreachable or errored: {exc}") from exc
 
     if result.is_error:
         detail = "; ".join(block.text for block in result.content if hasattr(block, "text"))
-        raise DownstreamError(502, f"sales-db MCP server returned a tool error: {detail}")
+        raise DownstreamError(502, f"{binding.backend} MCP server returned a tool error: {detail}")
 
     if result.structured_content is not None:
         # Verified against the real SDK (mcp==2.0.0): a tool whose return

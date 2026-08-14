@@ -1,0 +1,110 @@
+# Bindings: tools - backend-binding registry (ADR-0116).
+#
+# Resolves an *authorized* logical tool capability to the physical backend
+# that serves it. This file is platform-controlled configuration: bindings
+# can never be supplied by an agent or caller, and the MCP Gateway
+# authorizes (policies/tools/tool-policy.yaml, the full ADR-0011
+# intersection) BEFORE resolving/invoking anything registered here.
+#
+# The stable contract consumed by OKF tasks and policy is the canonical
+# `capability` ID (`<domain>.<resource>.<verb>`). Everything else in an
+# entry - server, transport, endpoint, the backend's own tool name - is
+# binding data that may change without touching any agent definition
+# (ADR-0116's core property). Legacy pre-ADR-0116 tool names are carried
+# as explicit `aliases` during migration; new agent contracts must use the
+# canonical IDs.
+#
+# Schema per entry:
+#   capability:    canonical `<domain>.<resource>.<verb>` ID, unique key.
+#   aliases:       optional legacy tool names resolving to this same
+#                  binding (migration aid - ADR-0116 allows keeping
+#                  `search_confluence` etc. as explicit aliases).
+#   backend:       named physical backend (matches tool-policy.yaml's
+#                  `mcp_server` labels for observability).
+#   transport:     `streamable-http` (real MCP server via the MCP SDK) or
+#                  `in-process` (gateway-embedded demo handler,
+#                  components/mcp-gateway/app/handlers/).
+#   endpoint:      streamable-http only - {env, default, path}: the base
+#                  URL is read from environment variable `env` (falling
+#                  back to `default`), with `path` appended. Never a
+#                  secret; the gateway's workload token (ADR-0037) rides
+#                  separately.
+#   handler:       in-process only - handler module name under
+#                  app/handlers/.
+#   provider_tool: the backend's own native tool name invoked after
+#                  resolution (callers never see it).
+#
+# An unknown capability, a capability without exactly one entry here, or a
+# malformed entry fails closed: the gateway refuses the call without
+# contacting any backend, and startup/readiness validation flags policy
+# capabilities lacking a valid binding (ADR-0116 Operational
+# considerations).
+
+bindings:
+  # --- sales-db: real MCP server (ADR-0043), streamable-HTTP transport ---
+  - capability: sales.customer.read
+    aliases: [get_customer]
+    backend: sales-db
+    transport: streamable-http
+    endpoint:
+      env: SALES_DB_MCP_URL
+      default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: get_customer
+
+  - capability: sales.opportunity.search
+    aliases: [list_open_opportunities]
+    backend: sales-db
+    transport: streamable-http
+    endpoint:
+      env: SALES_DB_MCP_URL
+      default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: list_open_opportunities
+
+  - capability: sales.quote.read
+    aliases: [get_quote]
+    backend: sales-db
+    transport: streamable-http
+    endpoint:
+      env: SALES_DB_MCP_URL
+      default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: get_quote
+
+  # --- demo-mode in-process handlers (replaced by real servers as their
+  #     integrations land: confluence -> ADR-0117/WP-02) ---
+  - capability: confluence.page.search
+    aliases: [search_confluence]
+    backend: confluence
+    transport: in-process
+    handler: confluence
+    provider_tool: search_confluence
+
+  - capability: drive.document.search
+    aliases: [list_drive_files]
+    backend: google-workspace
+    transport: in-process
+    handler: drive
+    provider_tool: list_drive_files
+
+  - capability: gmail.message.read
+    aliases: [read_gmail]
+    backend: google-workspace
+    transport: in-process
+    handler: gmail
+    provider_tool: read_gmail
+
+  - capability: web.page.search
+    aliases: [web_search]
+    backend: web-search
+    transport: in-process
+    handler: web_search
+    provider_tool: web_search
+
+  - capability: email.report.send
+    aliases: [send_technical_report_email]
+    backend: smtp-technical
+    transport: in-process
+    handler: email_report
+    provider_tool: send_technical_report_email

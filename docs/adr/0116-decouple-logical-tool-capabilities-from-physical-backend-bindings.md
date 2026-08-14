@@ -1,6 +1,6 @@
 # ADR-0116: Decouple logical tool capabilities from physical backend bindings
 
-- **Status:** To be implemented
+- **Status:** Implemented - see `platform/bindings/tools/`, `components/mcp-gateway/app/bindings.py`.
 - **Target:** v0.1
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

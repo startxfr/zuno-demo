@@ -38,7 +38,16 @@
 # (see platform/identity/README.md).
 #
 # Schema per entry:
-#   tool:              MCP tool name, unique key.
+#   tool:              MCP tool name, unique key (legacy pre-ADR-0116 name,
+#                       kept as an explicit migration alias).
+#   capability:        ADR-0116 canonical `<domain>.<resource>.<verb>` logical
+#                       capability ID. The entry answers to BOTH names during
+#                       migration; new agent contracts use the capability ID.
+#                       Physical routing is NOT derived from either name - the
+#                       MCP Gateway resolves the capability through the
+#                       platform binding registry
+#                       (platform/bindings/tools/tool-bindings.yaml) after
+#                       this policy allows the call.
 #   mcp_server:        the downstream MCP server (components/mcp-servers/<name>,
 #                       or the smtp-technical reporting integration) that owns this tool.
 #   min_classification: C1 | C2 | C3 - see policies/data-classification/classification.yaml.
@@ -62,6 +71,7 @@
 
 tools:
   - tool: search_confluence
+    capability: confluence.page.search
     mcp_server: confluence
     # C2 per ADR-0035 (was incorrectly C1) - internal Confluence content is
     # business-sensitive, matching the `confluence` domain in
@@ -74,6 +84,7 @@ tools:
       allow_context: false
 
   - tool: list_drive_files
+    capability: drive.document.search
     mcp_server: google-workspace
     min_classification: C1
     allowed_groups:
@@ -81,6 +92,7 @@ tools:
       - board
 
   - tool: read_gmail
+    capability: gmail.message.read
     mcp_server: google-workspace
     min_classification: C1
     allowed_groups:
@@ -88,6 +100,7 @@ tools:
       - board
 
   - tool: get_customer
+    capability: sales.customer.read
     mcp_server: sales-db
     min_classification: C2
     allowed_groups:
@@ -96,6 +109,7 @@ tools:
       - board
 
   - tool: list_open_opportunities
+    capability: sales.opportunity.search
     mcp_server: sales-db
     min_classification: C2
     allowed_groups:
@@ -104,6 +118,7 @@ tools:
       - board
 
   - tool: get_quote
+    capability: sales.quote.read
     mcp_server: sales-db
     min_classification: C2
     allowed_groups:
@@ -112,6 +127,7 @@ tools:
       - board
 
   - tool: web_search
+    capability: web.page.search
     mcp_server: web-search
     min_classification: C1
     allowed_groups:
@@ -122,6 +138,7 @@ tools:
       - board
 
   - tool: send_technical_report_email
+    capability: email.report.send
     mcp_server: smtp-technical
     min_classification: C2
     allowed_groups:

@@ -1,6 +1,6 @@
 # WP-01: Logical tool IDs and the backend-binding registry
 
-- **State:** Not started
+- **State:** Repo work in review (2026-08-14 — all repo changes and status updates in the working tree; State flips to Done on merge)
 - **ADRs:** ADR-0116 (To be implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-02, WP-26, WP-32

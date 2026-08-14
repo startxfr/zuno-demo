@@ -12,13 +12,14 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.agent_declarations import AgentDeclarationStore
 from app.auth import CallerIdentity, validate_token
+from app.bindings import BindingRegistry
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyStore, evaluate
@@ -40,17 +41,25 @@ app = FastAPI(
 
 policy_store = PolicyStore()
 agent_declarations = AgentDeclarationStore()  # ADR-0036/0038: agents/<name>/agent.okf.md bundles
+binding_registry = BindingRegistry()  # ADR-0116: capability -> physical backend
 
-KNOWN_TOOLS = {
-    "search_confluence",
-    "list_drive_files",
-    "read_gmail",
-    "get_customer",
-    "list_open_opportunities",
-    "get_quote",
-    "web_search",
-    "send_technical_report_email",
-}
+
+def _binding_coverage_error() -> Optional[str]:
+    """ADR-0116 startup/health validation: every name the policy answers to
+    (legacy tool + canonical capability) must resolve to exactly one active
+    binding. Logged loudly at startup and re-checked on reload; surfaced via
+    /readyz so a gap fails readiness rather than silently failing calls."""
+    if not policy_store.loaded or not binding_registry.loaded:
+        return None  # the underlying load errors are already reported
+    problems = binding_registry.validate_policy_coverage(policy_store.policy_names())
+    if problems:
+        msg = "; ".join(problems)
+        logger.error("binding coverage validation failed (ADR-0116): %s", msg)
+        return msg
+    return None
+
+
+binding_coverage_error = _binding_coverage_error()
 
 
 @app.get("/healthz")
@@ -60,11 +69,21 @@ async def healthz() -> Dict[str, str]:
 
 @app.get("/readyz")
 async def readyz() -> JSONResponse:
-    if policy_store.loaded and agent_declarations.loaded:
+    if (
+        policy_store.loaded
+        and agent_declarations.loaded
+        and binding_registry.loaded
+        and not binding_coverage_error
+    ):
         return JSONResponse({"status": "ready"})
     reasons = [
         r
-        for r in (policy_store.load_error, agent_declarations.load_error)
+        for r in (
+            policy_store.load_error,
+            agent_declarations.load_error,
+            binding_registry.load_error,
+            binding_coverage_error,
+        )
         if r
     ]
     return JSONResponse(
@@ -76,16 +95,31 @@ async def readyz() -> JSONResponse:
 @app.post("/admin/reload-policy")
 async def reload_policy() -> Dict[str, Any]:
     """Operational escape hatch: re-reads tool-policy.yaml,
-    classification.yaml and the agents/ OKF bundles from disk without a pod
-    restart, for the case where Track B's policy files or an agent
-    definition land after this pod already started.
+    classification.yaml, the agents/ OKF bundles and the ADR-0116 tool
+    bindings from disk without a pod restart, for the case where Track B's
+    policy files, an agent definition or a binding change land after this
+    pod already started.
     """
+    global binding_coverage_error
     policy_store.reload()
     agent_declarations.reload()
+    binding_registry.reload()
+    binding_coverage_error = _binding_coverage_error()
     return {
-        "loaded": policy_store.loaded and agent_declarations.loaded,
-        "error": policy_store.load_error or agent_declarations.load_error,
+        "loaded": (
+            policy_store.loaded
+            and agent_declarations.loaded
+            and binding_registry.loaded
+            and not binding_coverage_error
+        ),
+        "error": (
+            policy_store.load_error
+            or agent_declarations.load_error
+            or binding_registry.load_error
+            or binding_coverage_error
+        ),
         "tools": policy_store.known_tools(),
+        "capabilities": binding_registry.capabilities(),
     }
 
 
@@ -103,9 +137,15 @@ async def invoke_tool(
     classification = x_zuno_data_classification.upper()
 
     with tool_invoke_span(tool_name, classification) as call:
-        if tool_name not in KNOWN_TOOLS:
+        # ADR-0116: the binding registry is the single source of known tool
+        # names (canonical capability IDs + migration aliases) - an unknown
+        # name fails closed here, before any policy or backend work.
+        binding = binding_registry.resolve(tool_name)
+        if binding is None:
             call.outcome = "unknown_tool"
             raise HTTPException(status_code=404, detail=f"unknown tool '{tool_name}'")
+        call.capability = binding.capability
+        call.binding = binding.backend
 
         raw_body = await request.body()
         if raw_body:
@@ -128,6 +168,7 @@ async def invoke_tool(
             task_name=x_zuno_task,
             caller_groups=identity.groups,
             request_classification=classification,
+            equivalent_names=binding.all_names(),
         )
         call.mcp_server = decision.mcp_server
         call.reason = decision.reason
@@ -150,7 +191,7 @@ async def invoke_tool(
             raise HTTPException(status_code=403, detail=decision.reason)
 
         try:
-            result = await invoke_downstream(tool_name, arguments, identity.sub, identity.token)
+            result = await invoke_downstream(binding, tool_name, arguments, identity.sub, identity.token)
         except DownstreamError as exc:
             call.outcome = "downstream_error"
             raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
@@ -159,6 +200,11 @@ async def invoke_tool(
         duration_ms = (time.monotonic() - started) * 1000
         return {
             "tool": tool_name,
+            # ADR-0116: both the logical capability and the resolved
+            # physical binding are reported (and traced) - callers keep the
+            # logical view, operators see the actual backend.
+            "capability": binding.capability,
+            "binding": binding.backend,
             "request_id": request_id,
             "mcp_server": decision.mcp_server,
             "duration_ms": round(duration_ms, 1),

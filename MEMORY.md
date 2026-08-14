@@ -659,3 +659,19 @@ acceptance-gate scenario, architecture docs) was updated to `zuno-ai-run`
 to match. Placeholder agents (Comage, Advantage, Finage, Arkos) now carry
 no namespace footprint at all - only their `agent.okf.md` bundle exists
 until a future FE/BFF chart deploys for them into `zuno-ai-run`.
+
+- 2026-08-14 (ADR-0116, roadmap WP-01): the MCP Gateway now routes through
+  the platform backend-binding registry
+  (`platform/bindings/tools/tool-bindings.yaml`, loaded by
+  `components/mcp-gateway/app/bindings.py`) instead of hard-coded tool-name
+  sets in `app/downstream.py`. Canonical `<domain>.<resource>.<verb>`
+  capability IDs are the stable contract (legacy names like
+  `search_confluence`/`get_customer` remain explicit aliases;
+  `policies/tools/tool-policy.yaml` entries carry both via the new
+  `capability` field and answer to either). Unknown names/missing bindings
+  fail closed before any backend contact; startup + `/readyz` validate that
+  every policy-listed name resolves to exactly one binding; traces/metrics
+  record `zuno.capability` and `zuno.binding`. The registry ships in the
+  gateway image (repo-root build context) and reloads via
+  `/admin/reload-policy`. Tests: `components/mcp-gateway/tests/
+  test_bindings.py` plus the migrated streamable-HTTP transport test.

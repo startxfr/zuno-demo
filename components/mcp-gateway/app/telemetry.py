@@ -97,6 +97,12 @@ def tool_invoke_span(tool_name: str, classification: str) -> Iterator["ToolInvok
             span.set_attribute("zuno.outcome", recorder.outcome)
             if recorder.mcp_server:
                 span.set_attribute("zuno.mcp_server", recorder.mcp_server)
+            # ADR-0116 Operational considerations: traces record both the
+            # logical capability and the resolved backend binding.
+            if recorder.capability:
+                span.set_attribute("zuno.capability", recorder.capability)
+            if recorder.binding:
+                span.set_attribute("zuno.binding", recorder.binding)
             if recorder.reason:
                 span.set_attribute("zuno.reason", recorder.reason)
             if _invoke_counter is not None:
@@ -104,6 +110,7 @@ def tool_invoke_span(tool_name: str, classification: str) -> Iterator["ToolInvok
                     1,
                     {
                         "tool": tool_name,
+                        "capability": recorder.capability or "unknown",
                         "mcp_server": recorder.mcp_server or "unknown",
                         "outcome": recorder.outcome,
                     },
@@ -115,3 +122,6 @@ class ToolInvokeRecorder:
         self.outcome = "unknown"
         self.mcp_server: Optional[str] = None
         self.reason: Optional[str] = None
+        # ADR-0116: logical capability ID + resolved backend name.
+        self.capability: Optional[str] = None
+        self.binding: Optional[str] = None

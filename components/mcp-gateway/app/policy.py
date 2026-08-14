@@ -57,6 +57,10 @@ class ToolPolicyEntry:
     # otherwise permit. Defaults true (no source-level restriction beyond
     # classification) for every tool that doesn't declare otherwise.
     allow_external_context: bool = True
+    # ADR-0116: the canonical `<domain>.<resource>.<verb>` capability ID
+    # this entry also answers to. `tool` keeps the legacy name as an
+    # explicit migration alias; the entry is indexed under both.
+    capability: Optional[str] = None
 
 
 class PolicyStore:
@@ -91,7 +95,7 @@ class PolicyStore:
                 # task_rights checks, not something those checks caused).
                 raw = raw_doc.get("tools", [])
                 for item in raw:
-                    entries[item["tool"]] = ToolPolicyEntry(
+                    entry = ToolPolicyEntry(
                         tool=item["tool"],
                         mcp_server=item["mcp_server"],
                         min_classification=item["min_classification"],
@@ -99,7 +103,14 @@ class PolicyStore:
                         allow_external_context=bool(
                             (item.get("external_model_policy") or {}).get("allow_context", True)
                         ),
+                        capability=item.get("capability"),
                     )
+                    # ADR-0116: one entry, two names during migration - the
+                    # legacy tool name and the canonical capability ID both
+                    # resolve to the same policy decision.
+                    entries[entry.tool] = entry
+                    if entry.capability:
+                        entries[entry.capability] = entry
             except FileNotFoundError:
                 msg = (
                     f"tool policy file not found at {self._tool_policy_path} "
@@ -146,7 +157,14 @@ class PolicyStore:
         return self._entries.get(tool_name)
 
     def known_tools(self) -> List[str]:
-        return list(self._entries.keys())
+        """Primary (legacy) tool names only - one per policy entry."""
+        return sorted({entry.tool for entry in self._entries.values()})
+
+    def policy_names(self) -> List[str]:
+        """Every name an entry answers to (legacy tool + canonical
+        capability) - the set ADR-0116's binding-coverage validation must
+        resolve."""
+        return sorted(self._entries.keys())
 
     def classification_map(self) -> Dict[str, str]:
         return dict(self._classification)
@@ -171,6 +189,7 @@ def evaluate(
     task_name: str,
     caller_groups: List[str],
     request_classification: str,
+    equivalent_names: Optional[List[str]] = None,
 ) -> PolicyDecision:
     """The full ADR-0011 intersection, now enforced entirely in this
     gateway (ADR-0036 - previously only the last three of five factors were
@@ -189,7 +208,16 @@ def evaluate(
     unknown declaration fails closed per this ADR's Security
     considerations, the same "any single no is a no" rule as every other
     factor below.
+
+    equivalent_names (ADR-0116): the requested tool's full name-equivalence
+    set - its canonical capability ID plus migration aliases, from the
+    binding registry. An OKF declaration or policy entry matching ANY name
+    in the set matches the tool; this lets bundles/policy migrate from
+    legacy names to canonical IDs without a flag day. Defaults to just
+    [tool_name] (pre-ADR-0116 behavior).
     """
+    names = set(equivalent_names or [tool_name])
+
     if not agent_name or not task_name:
         return PolicyDecision(allowed=False, reason="missing X-Zuno-Agent/X-Zuno-Task declaration")
 
@@ -200,7 +228,7 @@ def evaluate(
     if agent is None:
         return PolicyDecision(allowed=False, reason=f"unknown calling agent '{agent_name}'")
 
-    if tool_name not in agent.declared_tools():
+    if not (names & set(agent.declared_tools())):
         return PolicyDecision(
             allowed=False,
             reason=(
@@ -212,7 +240,7 @@ def evaluate(
     task_tools = agent.tasks.get(task_name)
     if task_tools is None:
         return PolicyDecision(allowed=False, reason=f"agent '{agent_name}' has no task '{task_name}'")
-    if tool_name not in task_tools:
+    if not (names & set(task_tools)):
         return PolicyDecision(
             allowed=False,
             reason=(
@@ -224,7 +252,7 @@ def evaluate(
     if store.load_error:
         return PolicyDecision(allowed=False, reason=f"policy store unavailable: {store.load_error}")
 
-    entry = store.get_tool(tool_name)
+    entry = next((e for e in (store.get_tool(n) for n in names) if e is not None), None)
     if entry is None:
         return PolicyDecision(
             allowed=False, reason=f"unknown tool '{tool_name}' (not present in tool-policy.yaml)"

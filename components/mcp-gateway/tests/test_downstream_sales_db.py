@@ -1,12 +1,14 @@
-"""ADR-0043 compatibility test for app/downstream.py's `_invoke_sales_db`:
-exercises the real `mcp` SDK client against a small local MCP server (not
-a cross-import of components/mcp-servers/sales-db - each component's
-tests stay self-contained, matching this repository's convention) that
-mimics the same shape: one tool that succeeds with a plain-dict return,
-one that raises (an MCP tool-level error), plus the ADR-0037
-workload-identity check as Starlette middleware ahead of the mount.
+"""ADR-0043 compatibility test for app/downstream.py's
+`_invoke_streamable_http` (the ADR-0116 binding-driven generalization of
+the former `_invoke_sales_db`): exercises the real `mcp` SDK client against
+a small local MCP server (not a cross-import of
+components/mcp-servers/sales-db - each component's tests stay
+self-contained, matching this repository's convention) that mimics the same
+shape: one tool that succeeds with a plain-dict return, one that raises (an
+MCP tool-level error), plus the ADR-0037 workload-identity check as
+Starlette middleware ahead of the mount.
 
-Proves `_invoke_sales_db` correctly:
+Proves `_invoke_streamable_http` correctly:
   - unwraps the SDK's {"result": <value>} structured-content envelope
     (verified against the real SDK - a tool with a plain `dict` return
     type gets wrapped this way, since MCP requires an object-typed
@@ -44,8 +46,22 @@ from starlette.requests import Request  # noqa: E402
 from starlette.responses import JSONResponse  # noqa: E402
 
 from app import downstream  # noqa: E402
+from app.bindings import Binding  # noqa: E402
 
 BASE_URL = "http://localhost:8000"
+
+
+def _sales_db_binding(provider_tool: str) -> Binding:
+    """A binding shaped exactly like the real sales-db entries in
+    platform/bindings/tools/tool-bindings.yaml, pointed at the local fake
+    server (endpoint default wins because the env var is unset in tests)."""
+    return Binding(
+        capability=f"sales.test.{provider_tool}",
+        backend="sales-db",
+        transport="streamable-http",
+        provider_tool=provider_tool,
+        endpoint={"env": "TEST_SALES_DB_MCP_URL", "default": BASE_URL, "path": "/mcp"},
+    )
 
 
 def _build_fake_sales_db_app() -> Starlette:
@@ -76,7 +92,6 @@ def _build_fake_sales_db_app() -> Starlette:
 
 
 async def test_successful_call_unwraps_structured_content_envelope(transport) -> None:
-    downstream.SALES_DB_MCP_ENDPOINT = f"{BASE_URL}/mcp"
     downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
 
     orig_client_cls = httpx2.AsyncClient
@@ -87,7 +102,9 @@ async def test_successful_call_unwraps_structured_content_envelope(transport) ->
 
     httpx2.AsyncClient = patched
     try:
-        result = await downstream._invoke_sales_db("get_customer", {"customer_id": 42}, "fake-bearer")
+        result = await downstream._invoke_streamable_http(
+            _sales_db_binding("get_customer"), {"customer_id": 42}, "fake-bearer"
+        )
     finally:
         httpx2.AsyncClient = orig_client_cls
 
@@ -95,7 +112,6 @@ async def test_successful_call_unwraps_structured_content_envelope(transport) ->
 
 
 async def test_tool_error_becomes_downstream_error_502(transport) -> None:
-    downstream.SALES_DB_MCP_ENDPOINT = f"{BASE_URL}/mcp"
     downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
 
     orig_client_cls = httpx2.AsyncClient
@@ -107,7 +123,9 @@ async def test_tool_error_becomes_downstream_error_502(transport) -> None:
     httpx2.AsyncClient = patched
     try:
         try:
-            await downstream._invoke_sales_db("get_customer", {"customer_id": 999}, "fake-bearer")
+            await downstream._invoke_streamable_http(
+                _sales_db_binding("get_customer"), {"customer_id": 999}, "fake-bearer"
+            )
             raise AssertionError("expected DownstreamError")
         except downstream.DownstreamError as exc:
             assert exc.status_code == 502
@@ -117,7 +135,6 @@ async def test_tool_error_becomes_downstream_error_502(transport) -> None:
 
 
 async def test_unknown_tool_becomes_downstream_error_502(transport) -> None:
-    downstream.SALES_DB_MCP_ENDPOINT = f"{BASE_URL}/mcp"
     downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
 
     orig_client_cls = httpx2.AsyncClient
@@ -129,7 +146,9 @@ async def test_unknown_tool_becomes_downstream_error_502(transport) -> None:
     httpx2.AsyncClient = patched
     try:
         try:
-            await downstream._invoke_sales_db("no_such_tool", {}, "fake-bearer")
+            await downstream._invoke_streamable_http(
+                _sales_db_binding("no_such_tool"), {}, "fake-bearer"
+            )
             raise AssertionError("expected DownstreamError")
         except downstream.DownstreamError as exc:
             assert exc.status_code == 502
