@@ -33,7 +33,7 @@ conscious override, never a silent one (ADR-0048 Security considerations).
 ## RawDeployment, not Serverless (ADR-0047)
 
 `templates/inferenceservice.yaml` sets
-`serving.kserve.io/deploymentMode: RawDeployment` explicitly, matching the
+`serving.kserve.io/deploymentMode: Standard` explicitly, matching the
 `openshift_ai` role's cluster-wide `kserve.serving.managementState: Removed`
 (`ansible/roles/openshift_ai/tasks/prepare.yml`) - this model runs
 `minReplicas == maxReplicas == 1`, always on, with no use for Serverless's

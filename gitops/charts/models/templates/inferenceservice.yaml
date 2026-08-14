@@ -15,7 +15,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     # RawDeployment: this always-on model has no need for Serverless/Knative.
-    serving.kserve.io/deploymentMode: RawDeployment
+    serving.kserve.io/deploymentMode: Standard
 spec:
   predictor:
     minReplicas: {{ .Values.minReplicas }}
