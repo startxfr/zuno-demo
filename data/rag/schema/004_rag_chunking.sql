@@ -37,8 +37,21 @@ ALTER TABLE document_embeddings
 -- real document now spans multiple rows (one per chunk), so uniqueness
 -- has to be per chunk, not per document.
 ALTER TABLE document_embeddings DROP CONSTRAINT IF EXISTS uq_document_embeddings_source;
-ALTER TABLE document_embeddings
-    ADD CONSTRAINT uq_document_embeddings_source_chunk UNIQUE (source, chunk_index);
+
+-- PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS - guard explicitly so
+-- this migration stays idempotent across ArgoCD's every-sync hook re-run
+-- like every other statement in this file (incident 2026-08-14: repeated
+-- syncs failed the schema-apply hook Job with "already exists" once the
+-- first sync had created this constraint).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_document_embeddings_source_chunk'
+    ) THEN
+        ALTER TABLE document_embeddings
+            ADD CONSTRAINT uq_document_embeddings_source_chunk UNIQUE (source, chunk_index);
+    END IF;
+END $$;
 
 -- ix_document_embeddings_source (002_pgvector.sql) already covers lookups
 -- by source alone (e.g. "delete every chunk of this document") and stays
