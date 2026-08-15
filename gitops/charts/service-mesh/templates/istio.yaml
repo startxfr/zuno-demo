@@ -48,12 +48,29 @@ spec:
     # both FailedCreate with "unable to validate against any security context
     # constraint", leaving DataScienceCluster's RayReady False at 0/1).
     # RHOAI owns those pod templates, so a per-pod inject=false annotation
-    # isn't available - excluded here at the injector instead. Deliberately
-    # NOT excluding maas-api-key-cleanup (its istio-proxy init fails its
-    # startup probe every CronJob run): those pods reach the maas database in
-    # mTLS-enforced zuno-data, so pulling them out of the mesh would trade a
-    # probe failure for a connection failure - revisit via the probe
-    # threshold above instead.
+    # isn't available - excluded here at the injector instead.
+    #
+    # 2026-08-15: widened to the rest of redhat-ods-applications' pure
+    # controller-manager/operator pods (VERIFIED live: zuno-platform-quota's
+    # 16-core limits.cpu was sized for these controllers' own ~11 real cores,
+    # never revisited after namespace-wide mesh injection added a 2-core/1Gi
+    # istio-proxy native sidecar to every one of the namespace's ~27 pods -
+    # ~90+ cores of sidecar tax alone, blocking kserve-controller-manager
+    # from scheduling at all, which cascades to both local model predictors
+    # via the admission webhook). Re-verified the original comment's own
+    # premise before widening rather than just copying the precedent: no
+    # PeerAuthentication exists anywhere on this cluster (no mesh-wide STRICT
+    # mTLS), Postgres auth here is Vault-sourced username/password not mTLS
+    # client certs, and zuno-data's own default-deny NetworkPolicy already
+    # allows ingress from the whole redhat-ods-applications namespace by
+    # plain namespace-selector (ADR-0343's own "NetworkPolicy widening",
+    # independent of mesh identity) - so losing the sidecar does not expose
+    # an application data path for these either, the same reasoning
+    # ADR-0343 already used for kuberay/localmodelnode-agent. Deliberately
+    # NOT excluding maas-api, maas-controller or model-serving-api (these
+    # carry real application/API traffic, not just controller-to-apiserver
+    # reconciliation) or rhods-dashboard/dashboard-redirect (user-facing UI
+    # traffic) - those stay meshed.
     sidecarInjectorWebhook:
       neverInjectSelector:
         - matchExpressions:
@@ -62,6 +79,32 @@ spec:
               values:
                 - kuberay
                 - kserve-localmodelnode-agent
+                - kserve-controller-manager
+                - kserve-localmodel-controller-manager
+                - data-science-pipelines-operator
+                - feast-operator
+                - mlflow-operator
+                - trainer
+                - training-operator
+                - ai-gateway-operator
+                - llm-d-batch-gateway-operator
+                - llmisvc-controller-manager
+                - ogx-k8s-operator
+                - spark-operator
+                - workload-variant-autoscaler
+        - matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - notebook-controller
+                - odh-model-controller
+                - odh-notebook-controller
+        - matchExpressions:
+            - key: control-plane
+              operator: In
+              values:
+                - trustyai-service-operator
+                - model-registry-operator
     telemetry:
       v2:
         prometheus:
