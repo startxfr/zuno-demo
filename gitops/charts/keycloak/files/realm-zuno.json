@@ -909,10 +909,10 @@
         {
             "clientId": "finage-frontend",
             "name": "Finage frontend (finance)",
-            "description": "Public SPA client for the Finage finance agent \u2014 namespace zuno-ai-run",
+            "description": "Confidential client for the Finage finance agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-36: flipped from the placeholder public-SPA entry to match every other agent's real, working shape - components/agent-frontend requires OIDC_CLIENT_SECRET and has no public/PKCE-only code path)",
             "enabled": true,
             "protocol": "openid-connect",
-            "publicClient": true,
+            "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
             "directAccessGrantsEnabled": false,
@@ -946,7 +946,9 @@
                     "userinfo.token.claim": "true",
                     "claim.name": "groups"
                 }
-            }]
+            }],
+            "secret": "${vault.finage_frontend_client_secret}",
+            "clientAuthenticatorType": "client-secret"
         },
         {
             "clientId": "arkos-frontend",

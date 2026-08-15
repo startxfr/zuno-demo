@@ -73,6 +73,25 @@
   vars:
     gitops_app_name: "zuno-advantage-d1"
 
+- name: "agents | save the advantage d1 check result"
+  ansible.builtin.set_fact:
+    _agents_advantage_d1_installed: "{{ _state_check_result }}"
+
+# ADR-0326 (WP-36)
+- name: "agents | check the finage Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-finage-d0"
+
+- name: "agents | save the finage d0 check result"
+  ansible.builtin.set_fact:
+    _agents_finage_d0_installed: "{{ _state_check_result }}"
+
+- name: "agents | check the finage Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-finage-d1"
+
 - name: "agents | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:
@@ -80,4 +99,5 @@
       {{ _agents_d0_installed and _agents_api_d1_installed and
          _agents_arkos_d0_installed and _agents_arkos_d1_installed and
          _agents_comage_d0_installed and _agents_comage_d1_installed and
-         _agents_advantage_d0_installed and _state_check_result }}
+         _agents_advantage_d0_installed and _agents_advantage_d1_installed and
+         _agents_finage_d0_installed and _state_check_result }}

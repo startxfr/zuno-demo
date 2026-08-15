@@ -3,15 +3,16 @@
 Applies each real agent's frontend/BFF workloads GitOps Application:
 Tekos's (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008), Arkos's
 (`gitops/apps/arkos` → `gitops/charts/arkos`, WP-31), Comage's
-(`gitops/apps/comage` → `gitops/charts/comage`, WP-33) and, since WP-35
-(ADR-0326), Advantage's (`gitops/apps/advantage` → `gitops/charts/advantage`,
+(`gitops/apps/comage` → `gitops/charts/comage`, WP-33), Advantage's
+(`gitops/apps/advantage` → `gitops/charts/advantage`, WP-35) and, since
+WP-36 (ADR-0326), Finage's (`gitops/apps/finage` → `gitops/charts/finage`,
 kept a distinct app-directory name rather than reusing `api`'s legacy
-name so each later agent's Application doesn't have to fight over it).
-This is Day 1's `agents` component (ADR-0056) - `precheck.yml` reports
-(never fails) whether every one of the
-`zuno-{api,arkos,comage,advantage}-{d0,d1}` Applications is
-Synced+Healthy. No operator involved, so all of this component's content
-is `-d1` - the `-d0` Applications are no-ops (see
+name so each later agent's Application doesn't have to fight over it) -
+closing ADR-0326's four-agent generalization. This is Day 1's `agents`
+component (ADR-0056) - `precheck.yml` reports (never fails) whether
+every one of the `zuno-{api,arkos,comage,advantage,finage}-{d0,d1}`
+Applications is Synced+Healthy. No operator involved, so all of this
+component's content is `-d1` - the `-d0` Applications are no-ops (see
 `gitops/apps/README.md`).
 
 Namespace creation used to live in this role too (a separate
@@ -34,16 +35,17 @@ in place. It structurally validates the four catalog-only agents'
 `agent.okf.md` OKF v0.2 Markdown bundles (ADR-0038 -
 `okf_version`/`type`/`zuno.status: placeholder`) - v0 formalizes Tekos as
 the only mandatory end-to-end business path (ADR-0031), but catalog-only is
-not the same as unchecked. Arkos (ADR-0326/WP-31), Comage (ADR-0326/WP-33)
-and Advantage (ADR-0326/WP-35) deliberately stay in that same
-structural-check loop even though their bundles/graph-shapes/charts are
-all real now: `zuno.status` stays `placeholder` for each until the
-operator confirms its own live acceptance gate passes, so they still
-correctly report `placeholder` here. The check then does a basic HTTP
-reachability smoke test against the Tekos, Arkos, Comage AND Advantage
-frontends' `/healthz` routes (each gets a smoke test, never its
-behavioral gate - `evaluations/arkos/`/`evaluations/comage/`/
-`evaluations/advantage/` each require their own human scenario review,
+not the same as unchecked. All four - Arkos (ADR-0326/WP-31), Comage
+(ADR-0326/WP-33), Advantage (ADR-0326/WP-35) and Finage (ADR-0326/WP-36) -
+deliberately stay in that same structural-check loop even though their
+bundles/graph-shapes/charts are all real now: `zuno.status` stays
+`placeholder` for each until the operator confirms its own live
+acceptance gate passes, so they still correctly report `placeholder`
+here. The check then does a basic HTTP reachability smoke test against
+the Tekos, Arkos, Comage, Advantage AND Finage frontends' `/healthz`
+routes (each gets a smoke test, never its behavioral gate -
+`evaluations/arkos/`/`evaluations/comage/`/`evaluations/advantage/`/
+`evaluations/finage/` each require their own human scenario review,
 gated by that WP's part (c) brief), then hands off to
 `run_acceptance_gate.yml`, which runs `evaluations/tekos/`'s full gate
 (the 20-scenario acceptance evaluation at a 75% threshold, ADR-0027/0028,
@@ -51,8 +53,8 @@ plus every mandatory security-negative check,
 ADR-0032/0033/0034/0035/0037/0040) as a one-shot in-cluster Job in
 `zuno-ai-run` - see that file's own header comment for why a Job (most of
 what the gate calls has no OpenShift Route) and for the "acceptance-gate"
-workload identity's narrow NetworkPolicy allowances. Once Arkos's,
-Comage's or Advantage's own scenarios are reviewed and its status flips
-to `active`, running its own `evaluations/<agent>/run_acceptance_gate.py`
-the same way becomes the operator's job, not this role's default
-automatic path.
+workload identity's narrow NetworkPolicy allowances. Once any of Arkos's,
+Comage's, Advantage's or Finage's own scenarios are reviewed and its
+status flips to `active`, running its own
+`evaluations/<agent>/run_acceptance_gate.py` the same way becomes the
+operator's job, not this role's default automatic path.

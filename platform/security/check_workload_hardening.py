@@ -53,6 +53,8 @@ DEPLOYMENT_CHARTS = [
     # ADR-0326/WP-35 - added proactively this time, learning from the gap
     # above.
     "advantage",
+    # ADR-0326/WP-36 - closes the four-agent generalization.
+    "finage",
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;

@@ -1,0 +1,29 @@
+# Grants the acceptance-gate Job (same zuno-ai-run namespace as this
+# chart's own workloads) ingress to the BFF, additive to the namespace-wide
+# default-deny baseline the frontend already relies on. No namespaceSelector
+# needed: an ingress `from` peer with only a podSelector matches same-
+# namespace pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: finage-bff
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "100"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: bff
+      zuno.io/agent: finage
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: acceptance-gate
+      ports:
+        - protocol: TCP
+          port: 8080
