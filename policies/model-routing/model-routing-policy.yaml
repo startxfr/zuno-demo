@@ -26,3 +26,29 @@ adapters: []
 #   task: check-deal-status
 #   adapter: comage-lora
 #   classification: C2
+
+# ADR-0304 (WP-40 Part B): per (agent, task) "task class" quality/cost/
+# latency objectives, consumed by evaluations/routing_report.py alongside
+# live ai-gateway metrics (ADR-0029) and evaluations/benchmarks/*.json
+# artifacts (ADR-0305) to emit a RECOMMENDED policy diff - a report file,
+# never a write to this policy. Applying a recommendation is a normal
+# reviewed GitOps change to the `adapters:` list above; nothing in this
+# repo writes here automatically (that is ADR-0309/WP-42's separately
+# governed, explicitly-enabled scope, not this WP's).
+#
+# quality_floor: minimum acceptable quality signal in [0, 1] - the same
+#   scale evaluations/quality_gate.py's own scenario_rate already uses,
+#   so a benchmark artifact's agent_gates[task].scenario_rate is directly
+#   comparable without a unit conversion.
+# cost_ceiling_usd_per_1k: maximum acceptable USD per 1,000 total tokens
+#   (matches components/ai-gateway/app/telemetry.py's own
+#   zuno.model_cost_usd metric convention).
+# latency_target_ms_p95: maximum acceptable P95 latency in milliseconds
+#   (matches components/ai-gateway/app/telemetry.py's own zuno.latency_ms
+#   span attribute).
+objectives: []
+# - agent: comage
+#   task: check-deal-status
+#   quality_floor: 0.75
+#   cost_ceiling_usd_per_1k: 0.01
+#   latency_target_ms_p95: 2000

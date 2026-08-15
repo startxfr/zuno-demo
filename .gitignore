@@ -37,6 +37,11 @@ coverage/
 # Chart.lock IS committed, to pin the dependency version.
 gitops/charts/*/charts/
 
+# ADR-0305 (WP-40): generated benchmark artifacts - real content is
+# produced by evaluations/benchmark.py against a live candidate, never
+# hand-authored/committed. See evaluations/benchmarks/README.md.
+evaluations/benchmarks/*.json
+
 # Editors / OS
 .DS_Store
 .idea/

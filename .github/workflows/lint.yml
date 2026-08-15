@@ -192,6 +192,12 @@ jobs:
         run: |
           pip install pyyaml httpx
           python3 tests/test_quality_gate.py
+      - name: evaluations benchmark harness tests (ADR-0305)
+        working-directory: evaluations
+        run: python3 tests/test_benchmark.py
+      - name: evaluations routing report tests (ADR-0304)
+        working-directory: evaluations
+        run: python3 tests/test_routing_report.py
 
   quality-gate:
     # ADR-0107 (roadmap WP-10): a real PASS/FAIL quality verdict needs a
@@ -255,6 +261,17 @@ jobs:
             fi
           done
           exit $exit_status
+      # ADR-0305 (WP-40): "a candidate without a benchmark artifact cannot
+      # be referenced by a routing-policy change" - fully repo-checkable
+      # (reads policies/model-routing/model-routing-policy.yaml and
+      # evaluations/benchmarks/*.json, both committed or absent, never a
+      # live call), unlike the scenario-rate verdict above, so this one
+      # IS a real, always-blocking gate rather than a wiring smoke check.
+      # Passes trivially today: adapters: [] has nothing to check.
+      - name: Enforce no-artifact-no-promotion for declared adapters (ADR-0305)
+        run: |
+          pip install pyyaml
+          python3 evaluations/benchmark.py --check-policy
 
   ansible:
     runs-on: ubuntu-latest

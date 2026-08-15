@@ -1,7 +1,53 @@
 # WP-40: Automated benchmarking and routing optimization (promotes ADR-0305 + ADR-0304)
 
-- **State:** Not started
-- **ADRs:** ADR-0305, ADR-0304 (Proposed -> To be implemented -> Partially implemented -> Implemented)
+- **State:** Repo work merged (2026-08-15); live benchmark+report loop
+  pending. Step 0 promoted both ADR-0305 and ADR-0304 verbatim.
+  **Part A** (`evaluations/benchmark.py`): orchestrates an LM-Eval results
+  read (`--lm-eval-results-file`, the primary/testable path - a local
+  JSON snapshot shaped like an `LMEvalJob.status.results` field; the
+  live-cluster alternative shells out to `oc get lmevaljob ... -o json`,
+  no new Kubernetes-client dependency) plus per-agent
+  `quality_gate.evaluate()` calls (reused unmodified, same "consume the
+  machine-readable output, never reimplement" discipline that module
+  already established for WP-10), and writes a versioned
+  `evaluations/benchmarks/<candidate>.json` artifact. New
+  `evaluations/benchmarks/README.md` + `.gitignore` entry (generated
+  output, empty today - no WP-34 GPU-trained adapter exists yet to
+  benchmark). The "no artifact, no promotion" rule
+  (`--check-policy` mode, scanning `policies/model-routing/model-routing-policy.yaml`'s
+  `adapters:` list against the benchmarks directory) is wired as a real,
+  always-blocking step in `.github/workflows/lint.yml`'s `quality-gate`
+  job (unlike the pre-existing scenario-rate smoke check there, this one
+  needs no live cluster - both its inputs are committed-or-absent repo
+  state - so it's a genuine gate, not a wiring check; passes trivially
+  today since `adapters: []`). **Part B**: `policies/model-routing/model-routing-policy.yaml`
+  gained a new `objectives: []` block (per agent/task "task class":
+  `quality_floor`/`cost_ceiling_usd_per_1k`/`latency_target_ms_p95`,
+  empty by default, commented example matching the `adapters:` block's
+  own style). `evaluations/routing_report.py` compares live metrics
+  (`--metrics-file` snapshot default per D13 - this repo's OTel Collector
+  has no queryable long-term store wired in; `--prometheus-url` is a
+  documented, deliberately-unimplemented operator seam, `NotImplementedError`
+  rather than a faked empty result) and `evaluations/benchmarks/*.json`
+  artifacts against those objectives, emitting recommendations
+  (`downgrade` when live cost/latency violates a ceiling/target,
+  `upgrade` when a non-incumbent benchmarked candidate clears the quality
+  floor) as a report file - confirmed it never writes to the policy file
+  itself (grep clean). Quality is compared at agent granularity
+  (`quality_gate.py`'s own `scenario_rate` measurement granularity, not
+  a finer per-task-class one) - a documented simplification, not false
+  precision. 21 new tests (`test_benchmark.py`: 12, `test_check_policy_artifacts_*`
+  fail-closed and pass cases included; `test_routing_report.py`: 10,
+  including the WP's own two named acceptance cases - a regression
+  produces a downgrade recommendation, an improvement produces an
+  upgrade one) plus the full pre-existing `evaluations/` suite, all
+  green - verified both via this repo's own established direct-script
+  convention AND via real `pytest` collection (33/33 passed), confirming
+  the brief's own literal `python3 -m pytest evaluations/ -q` acceptance
+  command works once pytest is actually installed (not a repo dependency
+  anywhere else, so not assumed present by default).
+  `python3 platform/docs/check_docs.py` PASS.
+- **ADRs:** ADR-0305, ADR-0304 (Partially implemented merged here -> Implemented after the live benchmark+report loop)
 - **Depends on:** WP-10 (merged), WP-34 (merged); WP-39 useful but not required
 - **Blocks:** WP-42
 - **Estimated files touched:** ~9 (two parts: 0305 first, 0304 second)
