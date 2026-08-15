@@ -570,6 +570,19 @@ under `docs/adr/`.
   `policy.enabled` is false there). `check_workload_hardening.py` passes
   95/95. ADR-0111 stays Partially implemented — remaining `gap` rows are
   owned by WP-12 (HA/PDB), WP-13 (backup) and WP-26 (binding auth-mode).
+- **2026-08-15 (ADR-0111 control-matrix sync)**: WP-12/13/26 had each
+  merged their repo half without flipping their owned `gap` rows in
+  `docs/security/secnumcloud-controls.md`, contradicting the matrix's own
+  "how to update" rule. Flipped auth-mode enforcement, backup
+  configuration/recency-check and PDB/topology-spread rows to
+  `enforced-in-ci` with concrete citations; split the backup row into
+  "configured" (closed) vs. "restore drill executed" (still `gap`, live);
+  reworded the SLO row to name its two real missing prerequisites
+  (`agent-bff`'s `zuno_bff_requests_total` metric, unconfirmed
+  `ServiceMonitor` scrape). No code changed — every remaining `gap` row in
+  the matrix is now genuinely live-cluster-only. ADR-0111 status line
+  updated with a dated Implementation note; no ADR-0111 index-row change
+  (label stays Partially implemented).
 - **2026-08-14 (ADR-0322, WP-06)**: OGX migration + RAG provider parity.
   DataScienceCluster already has `ogx.managementState: Managed` and the
   deprecated Llama Stack component `Removed`; live cluster confirms

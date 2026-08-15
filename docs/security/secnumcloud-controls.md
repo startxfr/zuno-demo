@@ -31,7 +31,7 @@ against a live deployment, not re-derivable from the repo alone),
 | End-user identity propagated via validated JWT, never trusted from request body | `enforced-in-ci` (tested) | `app/auth.py` in every service; `tests/test_auth.py` per component |
 | Tool/knowledge access is a fail-closed policy intersection (agent declaration ∩ task rights ∩ user groups ∩ classification ∩ platform policy) | `enforced-in-ci` (tested) | `components/mcp-gateway/app/policy.py` (ADR-0011/0036); `tests/test_bindings.py` |
 | No nominative/static demo credentials committed to git | `enforced-in-ci` | `ansible/roles/vault`'s self-generated-credentials pattern (ADR-0041); no automated repo scan for this yet - see Data row below |
-| Every physical tool binding declares an explicit, non-inferred authentication mode | `gap` (schema exists; enforcement pending WP-26) | `platform/bindings/tools/tool-bindings.yaml` (ADR-0208) |
+| Every physical tool binding declares an explicit, non-inferred authentication mode | `enforced-in-ci` (2026-08-15) | `platform/bindings/tools/tool-bindings.yaml` (ADR-0208); enforced in `main.py`'s `invoke_tool` between the policy decision and `invoke_downstream`, `app/delegation.py`; `test_auth_mode_enforcement.py` (WP-26) |
 
 ## Network
 
@@ -52,14 +52,15 @@ against a live deployment, not re-derivable from the repo alone),
 | Data classification (C1/C2/C3) is computed from the complete context and never silently downgraded | `enforced-in-ci` (tested) | `policies/data-classification/`; ADR-0034; per-service classification tests |
 | Restricted-context (C2/C3, `external_model_policy.allow_context: false`) sources never reach an external model | `enforced-in-ci` (tested) | ADR-0035; `app/routing.py`'s `local_only` gate, `X-Zuno-Local-Only` propagation |
 | Public repository fixtures contain no real/nominative commercial data | `enforced-on-cluster` (human review, no automated scanner) | ADR-0025 |
-| Backup/recovery objectives are defined and tested | `gap` | ADR-0112 / WP-13 |
+| Backup/recovery objectives are defined, mechanism configured and recency-checked | `enforced-in-ci` (2026-08-15) | `docs/platform/backup-recovery.md`; PostgreSQL pgBackRest (confirmed live) + `ansible/roles/postgresql/tasks/precheck.yml`; Vault CSI VolumeSnapshot `cronjob-backup.yaml` + `ansible/roles/vault/tasks/precheck.yml` (ADR-0112 / WP-13) |
+| A restore has actually been executed and RTO/RPO validated live | `gap` | ADR-0112 / WP-13 — documented runbook exists, drill unexecuted |
 
-## Availability (tracked here, closed by WP-12)
+## Availability (mechanism closed by WP-12; live measurement still pending)
 
 | Control | Status | Mechanism |
 |---|---|---|
-| Shared platform services run with production-oriented availability (replicas, PodDisruptionBudget, topology spread) | `gap` | ADR-0101 / WP-12 |
-| A measured 99.9% availability objective is defined and alerted on | `gap` | ADR-0102 / WP-12 |
+| Shared platform services run with production-oriented availability (replicas, PodDisruptionBudget, topology spread) | `enforced-in-ci` (2026-08-15) | PDB + `topologySpreadConstraints` on agent-runtime/ai-gateway/mcp-gateway/rag-service/Keycloak; PostgreSQL/Redis already replica/PDB-complete via PGO/Bitnami defaults; `check_workload_hardening.py`'s availability checks (ADR-0101 / WP-12) |
+| A measured 99.9% availability objective is defined and alerted on | `gap` (definition + alert rules exist, not yet measuring) | `docs/platform/slo.md` defines the SLO and ships `prometheusrule-slo.yaml` (disabled by default), but two prerequisites are still missing: `agent-bff` doesn't emit the `zuno_bff_requests_total` metric the query needs, and the OTel Collector's `prometheus` exporter is unconfirmed scraped by a live `ServiceMonitor`/`PodMonitor` (ADR-0102 / WP-12) |
 
 ## How to update this matrix
 
