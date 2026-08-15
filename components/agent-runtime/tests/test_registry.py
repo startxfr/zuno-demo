@@ -52,22 +52,17 @@ def test_tekos_loads_from_the_real_bundle() -> None:
     assert task.prompt and "Tekos" in task.prompt
 
 
-def test_placeholder_agents_declare_no_tools() -> None:
-    """Still-genuinely-placeholder agents (their coming-soon stub task has
-    an empty allowed_tools list by construction, ADR-0036) declare no
-    tools. Arkos, Comage and Advantage are special cases since
-    WP-31/WP-33/WP-35: their real task bundles and graph shapes are
-    merged, but `status` deliberately stays `placeholder` until the
-    operator confirms the live acceptance gate passes (each WP's own
-    Status-updates section) - they now legitimately DO declare real tools
-    while still reporting placeholder status, which is exactly the point
-    being tested for the remaining one."""
+def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
+    """Arkos, Comage, Advantage and Finage all have real task bundles and
+    graph shapes merged (WP-31/WP-33/WP-35/WP-36), but `status`
+    deliberately stays `placeholder` for each until the operator confirms
+    its own live acceptance gate passes (each WP's own Status-updates
+    section) - they legitimately DO declare real tools while still
+    reporting placeholder status. Finage completes the four-agent
+    generalization (ADR-0326): every non-Tekos agent now has a real
+    bundle, so there is no longer a "still-genuinely-placeholder, declares
+    no tools" case left to test."""
     registry = AgentRegistry(agents_dir=str(REAL_AGENTS_DIR))
-    for name in ("finage",):
-        agent = registry.get(name)
-        assert agent is not None, name
-        assert agent.status == "placeholder"
-        assert agent.declared_tools() == []
 
     arkos = registry.get("arkos")
     assert arkos is not None
@@ -97,6 +92,19 @@ def test_placeholder_agents_declare_no_tools() -> None:
     assert advantage.status == "placeholder"
     assert advantage.declared_tools() == [
         "web_search",
+        "list_drive_files",
+        "read_gmail",
+    ]
+
+    finage = registry.get("finage")
+    assert finage is not None
+    assert finage.status == "placeholder"
+    assert finage.declared_tools() == [
+        "web_search",
+        "sxa.customer.read",
+        "sxa.quote.read",
+        "sxa.aggregate.revenue-by-year",
+        "sxa.record.lookup",
         "list_drive_files",
         "read_gmail",
     ]
@@ -187,7 +195,7 @@ def test_changing_the_bundle_changes_resolved_behavior_with_no_code_change() -> 
 
 TESTS = [
     test_tekos_loads_from_the_real_bundle,
-    test_placeholder_agents_declare_no_tools,
+    test_placeholder_agents_declare_their_real_tool_ceiling,
     test_changing_the_bundle_changes_resolved_behavior_with_no_code_change,
 ]
 

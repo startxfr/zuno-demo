@@ -124,10 +124,10 @@ tools:
     external_model_policy:
       allow_context: false
 
-  # ADR-0326 (WP-33/WP-35): `sales`/`adv` added alongside the existing
-  # groups - Comage and Advantage each prove the same delegated Google
-  # Workspace pattern Arkos proved for Drive writes, exercised here for
-  # reads under their own business role.
+  # ADR-0326 (WP-33/WP-35/WP-36): `sales`/`adv`/`finance` added alongside
+  # the existing groups - Comage, Advantage and Finage each prove the
+  # same delegated Google Workspace pattern Arkos proved for Drive
+  # writes, exercised here for reads under their own business role.
   - tool: list_drive_files
     capability: drive.document.search
     mcp_server: google-workspace
@@ -138,6 +138,7 @@ tools:
       - cdp
       - sales
       - adv
+      - finance
 
   # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same
   # allowed_groups as the existing read capability above (no narrower
@@ -172,7 +173,14 @@ tools:
       - cdp
       - sales
       - adv
+      - finance
 
+  # ADR-0326 (WP-36): `finance` added to every sxa.* row below - Finage's
+  # invoicing/billing persona plausibly maps to the same legacy
+  # facture/facture_produit-derived tables this server already exposes
+  # (D10: no new knowledge/tool domain invented for Finage, reusing
+  # knowledge.sxa-legacy and these deterministic capabilities instead -
+  # documented as a gap, not a real Finage-specific billing system).
   - tool: get_customer
     capability: sxa.customer.read
     mcp_server: sales-db
@@ -181,6 +189,7 @@ tools:
       - sales
       - adv
       - board
+      - finance
 
   - tool: list_open_opportunities
     capability: sxa.opportunity.search
@@ -190,6 +199,7 @@ tools:
       - sales
       - adv
       - board
+      - finance
 
   - tool: get_quote
     capability: sxa.quote.read
@@ -199,6 +209,7 @@ tools:
       - sales
       - adv
       - board
+      - finance
 
   # ADR-0206 (WP-23): deterministic structured queries over the FULL legacy
   # SXA dataset - historical commercial data is C3 by default (until the
@@ -214,6 +225,13 @@ tools:
     allowed_groups:
       - sales
       - board
+      # ADR-0326 (WP-36): Finage's own monthly invoicing/revenue report
+      # (MEMORY.md section 9: "revenue, outstanding amounts, delay and
+      # forecast") is the direct use case for this deterministic
+      # aggregation - narrower than the per-record sxa.* rows above (no
+      # `adv`), matching this row's existing "Sales + Direction only"
+      # intent extended to finance.
+      - finance
 
   - tool: lookup_record
     capability: sxa.record.lookup
@@ -222,6 +240,7 @@ tools:
     allowed_groups:
       - sales
       - board
+      - finance
 
   # ADR-0326/ADR-0206 (WP-33): live Salesforce (components/mcp-servers/
   # salesforce) - the current-data counterpart to the sxa.* legacy reads
