@@ -1,0 +1,65 @@
+{{- if .Values.acme.enabled }}
+{{- $apiDomain := printf "api.%s" (trimPrefix "apps." .Values.acme.clusterBaseDomain) }}
+# ADR-0211: three separate Certificates - not one - because cert-manager
+# only writes a Certificate's Secret into the Certificate's own
+# namespace, and the three consumers live in three different namespaces
+# (the same cross-namespace constraint this repo already routes around
+# for ExternalSecrets, e.g. ADR-0320's two ExternalSecrets for one Vault
+# path). Rate-limit budget: two duplicate-SAN wildcards (2/week, under
+# Let's Encrypt's 5/week duplicate-certificate limit) plus one
+# distinct-SAN api certificate (its own bucket).
+#
+# All three reference .Values.acme.certificatesIssuer - the STAGING
+# issuer by default; flipped to production only after the rehearsal
+# succeeds (values.yaml's own step list).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: router-wildcard-tls
+  namespace: openshift-ingress
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "23"
+spec:
+  secretName: router-wildcard-tls
+  issuerRef:
+    name: {{ .Values.acme.certificatesIssuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.{{ .Values.acme.clusterBaseDomain }}"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keycloak-wildcard-tls
+  namespace: zuno-auth
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "23"
+spec:
+  secretName: keycloak-wildcard-tls
+  issuerRef:
+    name: {{ .Values.acme.certificatesIssuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.{{ .Values.acme.clusterBaseDomain }}"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: api-server-tls
+  namespace: openshift-config
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "23"
+spec:
+  secretName: api-server-tls
+  issuerRef:
+    name: {{ .Values.acme.certificatesIssuer }}
+    kind: ClusterIssuer
+  dnsNames:
+    - {{ $apiDomain | quote }}
+{{- end }}

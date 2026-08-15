@@ -8,6 +8,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Renumbering note (2026-08-13):** the roadmap reorganization moved open decisions into the v0.1 stream. ADR-0026 -> ADR-0113, ADR-0049 -> ADR-0114, ADR-0051 -> ADR-0115 (unimplemented 00xx records), and ADR-0207 -> ADR-0116, ADR-0210 -> ADR-0117 (promoted from v0.2 as concretely implementable). The old numbers are retired; each moved record carries a `Renumbered:` line.
 
+**Renumbering note (2026-08-15):** three decisions were re-streamed to the version that actually delivers them. ADR-0113 -> ADR-0350 (v0.1 -> v0.3, the CRD/operator is delivered by ADR-0327/ADR-0308), ADR-0348 -> ADR-0211 (v0.1 -> v0.2), ADR-0306 -> ADR-0410 (v0.3 -> v0.4). The old numbers are retired; each moved record carries a `Renumbered:` line.
+
 ## version 0
 
 | ADR | Target | Status | Decision |
@@ -82,7 +84,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | v0.1 | Partially implemented | Automate document ACL synchronization |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | v0.1 | Partially implemented | Implement production-grade backup and recovery |
-| [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.1 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Partially implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.1 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v0.1 | Implemented | Decouple logical tool capabilities from physical backend bindings |
@@ -100,6 +101,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.2 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v0.2 | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | Implemented | Introduce project-scoped agent memory |
+| [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | v0.2 | Partially implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
 
 ## version 0.3
 
@@ -110,7 +112,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Partially implemented | Support dynamic LoRA adapter loading |
 | [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | v0.3 | Partially implemented | Optimize model selection using quality cost and latency |
 | [ADR-0305](0305-introduce-automated-model-benchmarking.md) | v0.3 | Partially implemented | Introduce automated model benchmarking |
-| [ADR-0306](0306-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.3 | Partially implemented | Expand the agent catalog beyond the initial five agents |
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.3 | Partially implemented | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Partially implemented | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v0.3 | Partially implemented | Introduce policy-driven autonomous optimization |
@@ -143,8 +144,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) | v0.1 | Implemented | Make self-generated Vault credentials idempotent across ansible re-runs |
 | [ADR-0346](0346-trust-the-ingress-router-ca-and-absorb-the-startx-cluster-auth-oauth-settings.md) | v0.1 | Implemented (CA source corrected by ADR-0347) | Trust the ingress router CA and absorb the startx cluster-auth OAuth settings |
 | [ADR-0347](0347-trust-the-vault-pki-root-for-the-oauth-openid-idp.md) | v0.1 | Implemented | Trust the Vault PKI root for the OAuth OpenID IDP |
-| [ADR-0348](0348-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | v0.1 | Proposed | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
 | [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) | v0.1 | Proposed | Restructure demo personas, ocp-* cluster-access groups and two new agents |
+| [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Proposed | Provide an AIAgent Kubernetes CRD and operator |
 
 ## version 0.4
 
@@ -159,6 +160,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0407](0400-v0.4-roadmap.md#adr-0407-add-specialized-task-oriented-frontend-views) | v0.4 | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0408](0400-v0.4-roadmap.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) | v0.4 | Proposed | Automate removal of inaccessible private RAG content |
 | [ADR-0409](0400-v0.4-roadmap.md#adr-0409-introduce-advanced-human-approval-workflows) | v0.4 | Proposed | Introduce advanced human approval workflows |
+| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.4 | Partially implemented | Expand the agent catalog beyond the initial five agents |
 
 ## Standard clauses
 

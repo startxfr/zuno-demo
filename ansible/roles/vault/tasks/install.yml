@@ -601,6 +601,24 @@
 
 # These can't be self-generated - real external service credentials,
 # supplied via ansible/confidential.yml and re-applied idempotently.
+
+# ADR-0211: least-privilege Route53 DNS-01 IAM access key for the ACME
+# ClusterIssuers (gitops/charts/cert-manager acme.*) - created out of
+# band by the operator (see ansible/confidential.example.yml's exact IAM
+# policy; never the AdministratorAccess research credentials).
+- name: "vault | seed the AWS Route53 DNS-01 access key from ansible/confidential.yml (ADR-0211)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aws/route53-dns01
+      access_key_id={{ zuno_aws_route53_access_key_id | quote }} secret_access_key={{ zuno_aws_route53_secret_access_key | quote }}"
+  when: >-
+    zuno_aws_route53_access_key_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_aws_route53_secret_access_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 - name: "vault | seed the Google OAuth client from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -835,6 +853,7 @@
     - quay/registry
     - jira/technical
     - salesforce/technical
+    - aws/route53-dns01
   loop_control:
     loop_var: secret_path
     label: "{{ secret_path }}"

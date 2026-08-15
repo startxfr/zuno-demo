@@ -1,0 +1,64 @@
+{{- if .Values.acme.enabled }}
+# ADR-0211: ACME ClusterIssuers - Let's Encrypt via Route53 DNS-01.
+# AWS's role is proving domain ownership only; the trust root is Let's
+# Encrypt's own, already in every browser/OS store. The AWS access key
+# lives in Vault (aws/route53-dns01) and reaches the cert-manager operand
+# namespace via templates/acme-externalsecret.yaml - cert-manager resolves
+# ClusterIssuer secretRefs against its own "cluster resource namespace"
+# (the operand namespace), which is why that Secret lands there.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-route53
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: {{ .Values.acme.email }}
+    privateKeySecretRef:
+      name: letsencrypt-route53-account-key
+    solvers:
+      - dns01:
+          route53:
+            region: {{ .Values.acme.route53.region }}
+            hostedZoneID: {{ .Values.acme.route53.hostedZoneID }}
+            accessKeyIDSecretRef:
+              name: aws-route53-dns01
+              key: access_key_id
+            secretAccessKeySecretRef:
+              name: aws-route53-dns01
+              key: secret_access_key
+---
+# The ACME STAGING directory: full DNS-01 + issuance rehearsal without
+# consuming production rate-limit budget. Staging certs are NOT publicly
+# trusted - this issuer is a validation tool (ADR-0211 acceptance
+# criterion 1), never a long-term consumer-facing one.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-route53-staging
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: {{ .Values.acme.email }}
+    privateKeySecretRef:
+      name: letsencrypt-route53-staging-account-key
+    solvers:
+      - dns01:
+          route53:
+            region: {{ .Values.acme.route53.region }}
+            hostedZoneID: {{ .Values.acme.route53.hostedZoneID }}
+            accessKeyIDSecretRef:
+              name: aws-route53-dns01
+              key: access_key_id
+            secretAccessKeySecretRef:
+              name: aws-route53-dns01
+              key: secret_access_key
+{{- end }}

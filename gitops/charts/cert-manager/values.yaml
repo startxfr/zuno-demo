@@ -6,6 +6,62 @@ certmanager:
 issuer:
   enabled: false
 
+# ADR-0211: publicly-trusted wildcard TLS via Let's Encrypt + Route53
+# DNS-01. Everything ships DISABLED, flipped deliberately by the operator
+# (same posture as maas.enabled in gitops/charts/models):
+#   1. acme.enabled: true (in gitops/apps/cert-manager/application-d1.yaml)
+#      renders the two ClusterIssuers, the AWS-credential ExternalSecret
+#      and the three Certificate resources - against the STAGING issuer
+#      first (acme.certificatesIssuer's shipped default), proving the IAM
+#      policy/hosted-zone/solver config without touching Let's Encrypt's
+#      production rate-limit budget.
+#   2. acme.certificatesIssuer: letsencrypt-route53 re-issues all three
+#      from production once the staging rehearsal succeeded.
+#   3. acme.consumers.* patch the actual consumers (IngressController,
+#      APIServer) - separate flags, flipped ONLY after `oc get certificate
+#      -A` shows all three Ready: True, since pointing the router at a
+#      not-yet-issued Secret would break serving.
+# The Keycloak switch is the keycloak chart's own ingress.acmeWildcardTLS
+# flag (gitops/charts/keycloak/values.yaml), not managed here.
+acme:
+  enabled: false
+
+  # Substituted with the real cluster domain by
+  # ansible/tasks/apply_gitops_app.yml (same placeholder convention as
+  # every agent chart's global.clusterBaseDomain). The wildcard
+  # certificate covers "*.<clusterBaseDomain>"; the API-server
+  # certificate covers "api." + the domain with the leading "apps."
+  # stripped (api.demo222.startx.fr for apps.demo222.startx.fr).
+  clusterBaseDomain: apps.mycluster.example.com
+
+  # ACME account contact - Let's Encrypt sends expiry warnings here if
+  # renewal ever silently stalls (this repo has no cert-manager
+  # Certificate-readiness alerting yet; ADR-0211 flags that as future
+  # work, so this mailbox is the only passive safety net).
+  email: dev+zuno-acme@startx.fr
+
+  # Which issuer the three Certificate resources reference. Ships as the
+  # STAGING issuer (certs untrusted, but the full DNS-01 flow is
+  # exercised end to end) - flip to letsencrypt-route53 after the
+  # rehearsal, per ADR-0211's own acceptance criteria.
+  certificatesIssuer: letsencrypt-route53-staging
+
+  route53:
+    # Environment-specific; these defaults are the values ADR-0211
+    # verified live against this project's own AWS account (startx.fr
+    # public hosted zone). Not secret - the zone and its ID are public
+    # DNS facts; only the IAM access key (Vault: aws/route53-dns01) is.
+    region: eu-west-3
+    hostedZoneID: Z3HY376RT1N9S1
+
+  consumers:
+    # IngressController/default.spec.defaultCertificate -> the wildcard
+    # Secret (serves the Console and every Route without its own cert).
+    routerDefaultCert: false
+    # APIServer/cluster.spec.servingCerts.namedCertificates -> the API
+    # certificate (oc login with no custom CA flags).
+    apiServerNamedCert: false
+
 # Discovered by ansible and injected via gitops_app_extra_helm_values on the
 # -d1 apply; clusterissuer.yaml renders nothing until it's set.
 vaultServiceName: ""

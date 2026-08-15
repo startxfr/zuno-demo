@@ -23,7 +23,13 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
+    {{- if not .Values.ingress.acmeWildcardTLS }}
     cert-manager.io/cluster-issuer: vault-issuer
+    {{- end }}
+    {{- /* ADR-0211: with acmeWildcardTLS the annotation is dropped -
+    ingress-shim must not request a per-route Vault cert for a host the
+    already-issued Let's Encrypt wildcard Secret (consumed via
+    tls[].secretName below) covers. */}}
     route.openshift.io/termination: edge
     route.openshift.io/insecureEdgeTerminationPolicy: Redirect
 spec:
@@ -41,5 +47,5 @@ spec:
   tls:
     - hosts:
         - "keycloak.{{ .Values.clusterBaseDomain }}"
-      secretName: {{ .Values.ingress.tlsSecretName }}
+      secretName: {{ .Values.ingress.acmeWildcardTLS | ternary "keycloak-wildcard-tls" .Values.ingress.tlsSecretName }}
 {{- end }}

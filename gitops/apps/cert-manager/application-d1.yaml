@@ -21,6 +21,16 @@ spec:
           enabled: true
         issuer:
           enabled: true
+        # ADR-0211: ships disabled - the operator flips `enabled: true`
+        # here (a normal reviewed Git change) once the aws/route53-dns01
+        # Vault seed exists, then follows the staged rollout documented
+        # in gitops/charts/cert-manager/values.yaml's acme comment
+        # (staging rehearsal -> production issuer -> consumer flags).
+        acme:
+          enabled: false
+          # Substituted with the real cluster domain by
+          # ansible/tasks/apply_gitops_app.yml.
+          clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager

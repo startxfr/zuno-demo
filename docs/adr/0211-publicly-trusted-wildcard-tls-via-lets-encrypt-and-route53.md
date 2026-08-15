@@ -1,9 +1,10 @@
-# ADR-0348: Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01
+# ADR-0211: Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01
 
-- **Status:** Proposed
-- **Target:** v0.1
+- **Status:** Partially implemented (issuers, Vault seed, Certificates and consumer patches merged behind flags; staging rehearsal, production cutover and consumer flips pending)
+- **Target:** v0.2
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team
+- **Renumbered:** formerly ADR-0348 (2026-08-15 move to the v0.2 stream)
 
 ## Context
 
@@ -61,6 +62,16 @@ Renewal is fully automatic: cert-manager renews roughly 30 days before each cert
 ## Implementation state
 
 This ADR records a proposed architectural decision, verified against live AWS-account and DNS state but **not yet implemented**. No code, chart, Ansible role, IAM resource, or DNS record has been created or changed as part of writing this ADR. It remains `Proposed` until the user approves it and a follow-up implementation pass lands the `ClusterIssuer`s, Vault seed, `Certificate` resources, and the `IngressController`/`APIServer`/Keycloak patches described above, verified end-to-end first against the Let's Encrypt **staging** issuer before cutting over to production.
+
+### Implementation note (2026-08-15)
+
+The user approved implementation; the repo side is merged, everything shipped **disabled** behind flags mirroring the phased rollout above:
+
+- `gitops/charts/cert-manager` gained an `acme:` values block (`enabled: false`) gating both `ClusterIssuer`s (`templates/acme-clusterissuers.yaml`), the `aws-route53-dns01` `ExternalSecret` into the cert-manager operand namespace (`templates/acme-externalsecret.yaml`), the three `Certificate` resources (`templates/acme-certificates.yaml` — referencing `acme.certificatesIssuer`, shipped as the **staging** issuer per acceptance criterion 1), and the two consumer partial-patches (`templates/acme-cluster-patches.yaml`, each behind its own `acme.consumers.*` flag since pointing the router at a not-yet-issued Secret would break serving).
+- The Keycloak switch is `gitops/charts/keycloak` `ingress.acmeWildcardTLS: false` — when flipped, the Ingress consumes `keycloak-wildcard-tls` and drops the `vault-issuer` annotation, exactly as Decision point 6 describes.
+- `ansible/roles/vault` seeds `aws/route53-dns01` from two new `ansible/confidential.yml` fields (guarded, skipped while placeholders — same pattern as the Google OAuth seed); `ansible/confidential.example.yml` documents the exact least-privilege IAM policy inline.
+
+Remaining to close (live, in order): create the IAM user/key + fill `confidential.yml` + re-run the Vault seed; flip `acme.enabled: true`; verify a staging wildcard issues (acceptance criterion 1); flip `acme.certificatesIssuer` to production; after all three `Certificate`s are `Ready: True`, flip `acme.consumers.*` and `ingress.acmeWildcardTLS`; verify Console/Keycloak/`oc login` present publicly trusted chains (criteria 2–4) and confirm the follow-up ADR evaluation named in Consequences.
 
 ## Acceptance criteria
 

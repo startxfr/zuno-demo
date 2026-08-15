@@ -79,6 +79,14 @@ ingress:
   backendServiceName: ""
   backendServicePort: 8080
   tlsSecretName: keycloak-tls
+  # ADR-0211: when true, the Ingress consumes the already-issued
+  # Let's Encrypt wildcard Secret (keycloak-wildcard-tls, created in
+  # zuno-auth by gitops/charts/cert-manager's acme.enabled Certificate)
+  # instead of requesting its own per-route certificate from the
+  # vault-issuer annotation. Flip ONLY after that Certificate reports
+  # Ready: True - same sequencing rule as the cert-manager chart's own
+  # acme.consumers flags.
+  acmeWildcardTLS: false
 
 # zuno-auth needs its own OperatorGroup - RHBK only supports
 # OwnNamespace/SingleNamespace install modes.

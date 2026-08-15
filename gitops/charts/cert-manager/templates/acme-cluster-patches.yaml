@@ -1,0 +1,45 @@
+{{- if and .Values.acme.enabled .Values.acme.consumers.routerDefaultCert }}
+{{- /*
+ADR-0211 consumer patch 1 - like gitops/charts/openshift-oauth's
+cluster-trusted-ca.yaml (ADR-0347's Proxy/cluster pattern), this is a
+PARTIAL PATCH, not wholesale ownership: IngressController/default
+carries many operator-managed fields this chart must never touch;
+ArgoCD's default apply merges only the fields declared here. Gated on
+its own flag, flipped ONLY after `oc get certificate -A` shows
+router-wildcard-tls Ready: True - pointing the router at an absent
+Secret would break Console/route serving (values.yaml's own step list).
+*/}}
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  name: default
+  namespace: openshift-ingress-operator
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  defaultCertificate:
+    name: router-wildcard-tls
+{{- end }}
+{{- if and .Values.acme.enabled .Values.acme.consumers.apiServerNamedCert }}
+{{- $apiDomain := printf "api.%s" (trimPrefix "apps." .Values.acme.clusterBaseDomain) }}
+---
+{{- /*
+ADR-0211 consumer patch 2 - same partial-patch reasoning as above.
+namedCertificates is additive per SNI name: clients hitting
+api.<domain> get the Let's Encrypt cert; everything else keeps the
+operator-managed internal serving certs.
+*/}}
+apiVersion: config.openshift.io/v1
+kind: APIServer
+metadata:
+  name: cluster
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  servingCerts:
+    namedCertificates:
+      - names:
+          - {{ $apiDomain | quote }}
+        servingCertificate:
+          name: api-server-tls
+{{- end }}

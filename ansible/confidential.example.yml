@@ -87,6 +87,27 @@ zuno_salesforce_access_token: "xxxxxx"
 zuno_rag_s3_access_key_id: "xxxxxx"
 zuno_rag_s3_secret_access_key: "xxxxxx"
 
+# --- AWS Route53 DNS-01 (ADR-0211: Let's Encrypt wildcard TLS) --------------
+# Optional: leave "xxxxxx" and the aws/route53-dns01 Vault seed is skipped
+# (the ACME issuers then can't validate - gitops/charts/cert-manager's
+# acme.enabled should stay false until these are filled in).
+# Create a DEDICATED least-privilege IAM user (never reuse admin creds):
+#   1. IAM -> Users -> Create user (e.g. zuno-cert-manager-dns01),
+#      programmatic access only, no console.
+#   2. Attach this inline policy (scoped to the startx.fr hosted zone;
+#      ListHostedZonesByName requires Resource "*" by API design):
+#      {"Version": "2012-10-17", "Statement": [
+#        {"Effect": "Allow",
+#         "Action": ["route53:ChangeResourceRecordSets", "route53:GetChange"],
+#         "Resource": ["arn:aws:route53:::hostedzone/Z3HY376RT1N9S1",
+#                       "arn:aws:route53:::change/*"]},
+#        {"Effect": "Allow",
+#         "Action": ["route53:ListHostedZonesByName"],
+#         "Resource": "*"}]}
+#   3. Create an access key -> copy both values (secret shown once).
+zuno_aws_route53_access_key_id: "xxxxxx"
+zuno_aws_route53_secret_access_key: "xxxxxx"
+
 # --- LLM external provider API keys -----------------------------------------
 # Each optional: leave "xxxxxx" and the ModelRouter fails over to the next
 # eligible provider (the local model always works with none filled in).
