@@ -660,6 +660,44 @@
             }]
         },
         {
+            "username": "advantage-entitlement-only-user-01",
+            "email": "advantage-entitlement-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0326/WP-35): agent_advantage entitlement without any business role"
+                ]
+            },
+            "groups": [
+                "/agent_advantage"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
+            "username": "adv-role-only-user-01",
+            "email": "adv-role-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0326/WP-35): adv business role without agent_advantage entitlement"
+                ]
+            },
+            "groups": [
+                "/adv"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
             "username": "platform-admin-01",
             "email": "platform-admin-01@zuno-demo.internal",
             "enabled": true,

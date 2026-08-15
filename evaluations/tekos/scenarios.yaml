@@ -127,14 +127,15 @@ scenarios:
     title: Placeholder agents have no live workloads in the shared zuno-ai-run namespace
     type: agent_isolation_placeholder_empty
     namespace: zuno-ai-run
-    # ADR-0326/WP-31/WP-33: arkos and comage dropped from this list - their
-    # frontend/BFF are now genuinely deployed (gitops/apps/{arkos,comage}),
-    # so neither is a zero-pod placeholder any more even though each OKF
-    # `status` stays `placeholder` until its own operator gate confirms it.
-    # See evaluations/{arkos,comage}/scenarios.yaml's own scenario 19 for
-    # the isolation check scoped to the agents that remain genuinely
-    # placeholder at that point.
-    agents: [advantage, finage]
+    # ADR-0326/WP-31/WP-33/WP-35: arkos, comage and advantage dropped from
+    # this list - their frontend/BFF are now genuinely deployed
+    # (gitops/apps/{arkos,comage,advantage}), so none is a zero-pod
+    # placeholder any more even though each OKF `status` stays
+    # `placeholder` until its own operator gate confirms it. See
+    # evaluations/{arkos,comage,advantage}/scenarios.yaml's own scenario
+    # 19 for the isolation check scoped to the agent that remains
+    # genuinely placeholder at that point.
+    agents: [finage]
 
   - id: 20
     title: Every service's health endpoint returns 200

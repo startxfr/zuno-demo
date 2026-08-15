@@ -133,7 +133,11 @@ scenarios:
     title: Remaining placeholder agents have no live workloads in the shared zuno-ai-run namespace
     type: agent_isolation_placeholder_empty
     namespace: zuno-ai-run
-    agents: [advantage, finage]
+    # ADR-0326/WP-35: advantage dropped - its frontend/BFF are now
+    # genuinely deployed (gitops/apps/advantage), same reasoning as
+    # comage's own removal from evaluations/arkos/scenarios.yaml's
+    # scenario 19.
+    agents: [finage]
 
   - id: 20
     title: Every service's health endpoint returns 200

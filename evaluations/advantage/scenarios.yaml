@@ -1,0 +1,139 @@
+# Advantage acceptance scenarios (ADR-0027: 20 scenarios per agent;
+# ADR-0028: 75% pass threshold). Run with `python3 run_scenarios.py` (a
+# thin AGENT=advantage wrapper around evaluations/tekos/run_scenarios.py -
+# see README.md for required environment variables and personas).
+#
+# `persona` values are anonymized synthetic usernames from
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `adv-user-01`/
+# `-02` hold both the `adv` business role (governs tool/data permissions
+# inside Advantage, per agent.okf.md's own body prose) and the
+# `agent_advantage` entitlement group (ADR-0040) - see security_checks.py
+# for the negative tests covering entitlement without business role and
+# vice versa (`advantage-entitlement-only-user-01`/`adv-role-only-user-01`,
+# mirroring the prior slices' own ADR-0040 negative-test pattern). `type`
+# selects which handler in evaluations/tekos/run_scenarios.py executes the
+# scenario - each type's exact behavior is documented there, not
+# duplicated here.
+
+scenarios:
+  - id: 1
+    title: Portal loads all five agent tiles
+    type: portal_lists_all_agents
+    persona: adv-user-01
+
+  - id: 2
+    title: Unauthenticated request to the portal redirects to login
+    type: portal_requires_login
+
+  - id: 3
+    title: ADV persona can authenticate and the token carries the expected group claims
+    type: keycloak_login
+    persona: adv-user-01
+    expect_groups: [adv, agent_advantage]
+
+  - id: 4
+    title: Advantage tile is enabled for an adv-group, agent_advantage-entitled user
+    type: portal_tile_state
+    persona: adv-user-01
+    agent: advantage
+    expect_enabled: true
+
+  - id: 5
+    title: Advantage tile is disabled for a non-entitled user (board persona)
+    type: portal_tile_state
+    persona: board-user-01
+    agent: advantage
+    expect_enabled: false
+
+  - id: 6
+    title: Placeholder agent tile (Finage) shows "coming soon" for any user
+    type: portal_tile_state
+    persona: adv-user-01
+    agent: finage
+    expect_enabled: false
+    expect_placeholder: true
+
+  - id: 7
+    title: A project/delivery question returns a reply with citations
+    type: chat_basic_qa
+    persona: adv-user-01
+    message: "What's the current status of the Acme delivery project?"
+
+  - id: 8
+    title: First-token latency is under the 6-second interactive objective
+    type: chat_first_token_latency
+    persona: adv-user-02
+    message: "Summarize the Acme delivery project."
+    max_seconds: 6
+
+  - id: 9
+    title: Streaming chat emits token events followed by a done event
+    type: chat_streaming_sse
+    persona: adv-user-01
+    message: "Summarize the Acme delivery project in one sentence."
+
+  - id: 10
+    title: RAG retrieval contributes at least one citation for an ADV/project topic
+    type: rag_retrieval_has_citation
+    query: "Acme delivery project business unit ownership"
+
+  - id: 11
+    title: MCP Gateway returns 404 for an unknown tool name
+    type: mcp_gateway_unknown_tool
+    persona: adv-user-01
+    tool: does_not_exist
+    expect_status: 404
+
+  - id: 12
+    title: MCP Gateway denies a live Salesforce capability - Advantage never declares it, provably not inheriting Comage's capabilities
+    type: mcp_gateway_denied
+    persona: adv-user-01
+    tool: salesforce.opportunity.read
+    arguments: { query: "Acme" }
+    expect_status: 403
+
+  - id: 13
+    title: MCP Gateway denies a legacy SXA/sales capability - Advantage never declares it, provably not inheriting Comage's capabilities
+    type: mcp_gateway_denied
+    persona: adv-user-01
+    tool: sxa.customer.read
+    arguments: { customer_id: 1 }
+    expect_status: 403
+
+  - id: 14
+    title: C3-classified requests fail closed when no SaaS provider is eligible
+    type: model_router_fails_closed
+    classification: C3
+
+  - id: 15
+    title: C1-classified requests try the local model first
+    type: model_router_prefers_local
+    classification: C1
+
+  - id: 16
+    title: BFF rejects a chat request with no bearer token
+    type: bff_rejects_missing_jwt
+
+  - id: 17
+    title: BFF rejects a JWT with the wrong audience
+    type: bff_rejects_wrong_audience
+    persona: adv-user-01
+
+  - id: 18
+    title: MCP Gateway denies a Confluence capability no Advantage task declares (ADR-0036 agent_declaration factor)
+    type: mcp_gateway_denied
+    persona: adv-user-01
+    tool: confluence.page.search
+    arguments: { query: "OpenShift AI GPU sizing" }
+    expect_status: 403
+
+  - id: 19
+    title: Remaining placeholder agents have no live workloads in the shared zuno-ai-run namespace
+    type: agent_isolation_placeholder_empty
+    namespace: zuno-ai-run
+    agents: [finage]
+
+  - id: 20
+    title: Every service's health endpoint returns 200
+    type: health_endpoints_all_ok
+    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
