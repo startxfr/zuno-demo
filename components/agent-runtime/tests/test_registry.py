@@ -55,15 +55,15 @@ def test_tekos_loads_from_the_real_bundle() -> None:
 def test_placeholder_agents_declare_no_tools() -> None:
     """Still-genuinely-placeholder agents (their coming-soon stub task has
     an empty allowed_tools list by construction, ADR-0036) declare no
-    tools. Arkos and Comage are special cases since WP-31/WP-33: their
-    real task bundles and graph shapes are merged, but `status`
-    deliberately stays `placeholder` until the operator confirms the live
-    acceptance gate passes (WP-31/WP-33's own Status-updates sections) -
-    they now legitimately DO declare real tools while still reporting
-    placeholder status, which is exactly the point being tested for the
-    remaining two."""
+    tools. Arkos, Comage and Advantage are special cases since
+    WP-31/WP-33/WP-35: their real task bundles and graph shapes are
+    merged, but `status` deliberately stays `placeholder` until the
+    operator confirms the live acceptance gate passes (each WP's own
+    Status-updates section) - they now legitimately DO declare real tools
+    while still reporting placeholder status, which is exactly the point
+    being tested for the remaining one."""
     registry = AgentRegistry(agents_dir=str(REAL_AGENTS_DIR))
-    for name in ("advantage", "finage"):
+    for name in ("finage",):
         agent = registry.get(name)
         assert agent is not None, name
         assert agent.status == "placeholder"
@@ -88,6 +88,15 @@ def test_placeholder_agents_declare_no_tools() -> None:
         "salesforce.opportunity.update",
         "sxa.opportunity.search",
         "sxa.aggregate.revenue-by-year",
+        "list_drive_files",
+        "read_gmail",
+    ]
+
+    advantage = registry.get("advantage")
+    assert advantage is not None
+    assert advantage.status == "placeholder"
+    assert advantage.declared_tools() == [
+        "web_search",
         "list_drive_files",
         "read_gmail",
     ]

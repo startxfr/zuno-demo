@@ -124,9 +124,10 @@ tools:
     external_model_policy:
       allow_context: false
 
-  # ADR-0326 (WP-33): `sales` added alongside the existing groups - Comage
-  # proves the same delegated Google Workspace pattern Arkos proved for
-  # Drive writes, exercised here for reads under its own business role.
+  # ADR-0326 (WP-33/WP-35): `sales`/`adv` added alongside the existing
+  # groups - Comage and Advantage each prove the same delegated Google
+  # Workspace pattern Arkos proved for Drive writes, exercised here for
+  # reads under their own business role.
   - tool: list_drive_files
     capability: drive.document.search
     mcp_server: google-workspace
@@ -136,6 +137,7 @@ tools:
       - board
       - cdp
       - sales
+      - adv
 
   # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same
   # allowed_groups as the existing read capability above (no narrower
@@ -169,6 +171,7 @@ tools:
       - board
       - cdp
       - sales
+      - adv
 
   - tool: get_customer
     capability: sxa.customer.read
