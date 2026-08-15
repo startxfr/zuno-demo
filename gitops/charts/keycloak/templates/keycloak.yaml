@@ -117,6 +117,15 @@ spec:
                       - key: client_secret
                         path: zuno_comage_frontend_client_secret
                 - secret:
+                    # ADR-0326 (WP-35): advantage-frontend flipped to a
+                    # confidential client, same shape as tekos/arkos/
+                    # comage-frontend above.
+                    name: advantage-frontend-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_advantage_frontend_client_secret
+                - secret:
                     name: demo-personas-password
                     optional: true
                     items:

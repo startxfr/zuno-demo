@@ -50,6 +50,9 @@ DEPLOYMENT_CHARTS = [
     # ADR-0326/WP-33
     "comage",
     "mcp-salesforce",
+    # ADR-0326/WP-35 - added proactively this time, learning from the gap
+    # above.
+    "advantage",
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;

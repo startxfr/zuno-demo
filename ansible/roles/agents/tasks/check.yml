@@ -28,10 +28,11 @@
 # Catalog-only agents (comage/advantage/finage/arkos) get a structural check
 # instead: their agent.okf.md bundle must still parse and declare
 # zuno.status: placeholder, so a future status: active flip isn't starting
-# from a silently-rotted definition. Arkos (ADR-0326/WP-31) and Comage
-# (ADR-0326/WP-33) are deliberately still in this list even though their
-# bundles/graph-shapes/charts are now real: `status` stays `placeholder`
-# until the operator confirms each one's live acceptance gate passes (each
+# from a silently-rotted definition. Arkos (ADR-0326/WP-31), Comage
+# (ADR-0326/WP-33) and Advantage (ADR-0326/WP-35) are deliberately still
+# in this list even though their bundles/graph-shapes/charts are now real:
+# `status` stays `placeholder` until the operator confirms each one's live
+# acceptance gate passes (each
 # WP's own Status-updates section), so they correctly report `placeholder`
 # here too - this loop only checks structural validity + the declared
 # status value, not whether real content exists behind it. Their frontends
@@ -170,6 +171,39 @@
 - name: "agents | check summary (comage)"
   ansible.builtin.debug:
     msg: "Comage frontend healthy at https://{{ _agents_comage_host }}/healthz (evaluations/comage/ gate not run here - pending human scenario review)."
+
+# ADR-0326 (WP-35): Advantage's frontend/BFF are deployed
+# (gitops/apps/advantage) once this Application syncs, so it deserves the
+# same reachability proof Comage gets - but never the acceptance gate
+# (Layers 1-3): its scenarios require the human review checkpoint WP-35
+# part (c) documents before any cluster gate run counts, and
+# `status: placeholder` means its BFF's own calls to Agent Runtime 404 by
+# design regardless.
+- name: "agents | resolve the Advantage frontend route host"
+  ansible.builtin.set_fact:
+    _agents_advantage_host: "advantage.{{ cluster_base_domain }}"
+
+- name: "agents | GET the Advantage frontend health endpoint"
+  ansible.builtin.uri:
+    url: "https://{{ _agents_advantage_host }}/healthz"
+    method: GET
+    status_code: 200
+    validate_certs: false
+    timeout: 10
+  register: _agents_advantage_health
+  failed_when: false
+
+- name: "agents | fail the check if the Advantage frontend did not report healthy"
+  ansible.builtin.fail:
+    msg: >-
+      Advantage frontend at https://{{ _agents_advantage_host }}/healthz did not
+      respond 200 (got {{ _agents_advantage_health.status | default('no response') }}).
+      Confirm gitops/apps/advantage has synced.
+  when: (_agents_advantage_health.status | default(0)) != 200
+
+- name: "agents | check summary (advantage)"
+  ansible.builtin.debug:
+    msg: "Advantage frontend healthy at https://{{ _agents_advantage_host }}/healthz (evaluations/advantage/ gate not run here - pending human scenario review)."
 
 # Layers 1-3: auth, RAG, MCP allow/deny, routing, the 20 Tekos scenarios
 # (75% threshold), and every security-negative check (100% mandatory).
