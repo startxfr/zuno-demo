@@ -28,6 +28,20 @@ spec:
         startupProbe:
           enabled: true
           failureThreshold: 4
+        # 2026-08-15: Istio's stock sidecar default (2-core/1Gi limit,
+        # requests.cpu=100m/requests.memory=128Mi) was never right-sized for
+        # this cluster - VERIFIED live: it alone put redhat-ods-applications
+        # ~90+ cores over its 16-core zuno-platform-quota (many of that
+        # namespace's own app containers carry no CPU limit of their own at
+        # all, e.g. rhods-dashboard/maas-api/model-serving-api - the entire
+        # overage was sidecar tax, not real usage), on a 5-node/~69.5-core
+        # cluster that can never satisfy the stock default at this pod
+        # count. Still generous for this demo's actual per-service traffic
+        # (compare agent-bff/agent-runtime/etc.'s own much smaller
+        # requests/limits in their respective charts).
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits: { cpu: 500m, memory: 256Mi }
       meshID: zuno01
       istioNamespace: {{ .Values.meshNamespace }}
       priorityClassName: zuno-platform-critical
