@@ -21,6 +21,7 @@ data/sxa/source-data/
 # Python / Ansible
 __pycache__/
 *.pyc
+.venv/
 .ansible/
 *.retry
 
