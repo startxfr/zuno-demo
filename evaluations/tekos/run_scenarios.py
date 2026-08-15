@@ -53,6 +53,10 @@ RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.clu
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")
 RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster.local:8080")
 SALES_DB_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
+# ADR-0326/WP-33: Comage's own live MCP server (evaluations/comage's
+# scenario 20 includes it in `services:`; harmless to resolve unconditionally
+# for every agent, same as SALES_DB_URL above already was before WP-33).
+SALESFORCE_MCP_URL = os.getenv("SALESFORCE_MCP_URL", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 REALM = "zuno"
 # Shared demo-persona password (ADR-0041) - never hardcoded; read from the
@@ -76,6 +80,7 @@ SERVICE_HEALTH_URLS = {
     "mcp-gateway": f"{MCP_GATEWAY_URL}/healthz",
     "rag-service": f"{RAG_URL}/healthz",
     "sales-db-mcp": f"{SALES_DB_URL}/healthz",
+    "salesforce-mcp": f"{SALESFORCE_MCP_URL}/healthz",
 }
 
 
@@ -264,7 +269,14 @@ def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     if resp.status_code != 200:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
     citations = resp.json().get("citations", [])
-    ok = any("confluence" in c.get("source", "").lower() for c in citations)
+    # ADR-0326/WP-33: which live-read source's citations to look for -
+    # defaults to "confluence" so Tekos/Arkos's existing scenarios (which
+    # never set this field) keep matching their own live tool unchanged;
+    # Comage's own scenario sets this to "salesforce" instead (its
+    # live_read_tool is Salesforce, not Confluence - app/graph/nodes.py's
+    # tool_call_node/respond_node are agent-agnostic, see that module).
+    expect_source_contains = s.get("expect_source_contains", "confluence")
+    ok = any(expect_source_contains in c.get("source", "").lower() for c in citations)
     return ScenarioResult(s["id"], s["title"], ok, f"citations={citations}")
 
 

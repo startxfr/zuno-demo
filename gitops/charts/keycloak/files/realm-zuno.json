@@ -622,6 +622,44 @@
             }]
         },
         {
+            "username": "comage-entitlement-only-user-01",
+            "email": "comage-entitlement-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0326/WP-33): agent_comage entitlement without any business role"
+                ]
+            },
+            "groups": [
+                "/agent_comage"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
+            "username": "sales-role-only-user-01",
+            "email": "sales-role-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0326/WP-33): sales business role without agent_comage entitlement"
+                ]
+            },
+            "groups": [
+                "/sales"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
             "username": "platform-admin-01",
             "email": "platform-admin-01@zuno-demo.internal",
             "enabled": true,

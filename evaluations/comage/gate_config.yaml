@@ -1,0 +1,13 @@
+# ADR-0107 promotion quality gate configuration for the comage agent
+# (roadmap WP-10, extended here per ADR-0326/WP-33). Consumed by
+# evaluations/quality_gate.py, not by run_acceptance_gate.py (which keeps
+# its own SCENARIO_THRESHOLD default for `make check`'s unrelated
+# ADR-0053 acceptance gate - see quality_gate.py's module docstring for
+# why the two are separate).
+#
+# scenario_threshold: the ADR-0028 pass-rate a candidate must meet or
+# exceed on the ADR-0027 20-scenario suite to be promotable. Data, not
+# code (ADR-0107 Decision) - change this file, not quality_gate.py, to
+# adjust comage's own threshold. Same 75% default as every other agent
+# until evidence suggests otherwise.
+scenario_threshold: 0.75
