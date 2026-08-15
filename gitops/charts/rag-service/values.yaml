@@ -39,12 +39,17 @@ resources:
     cpu: 500m
     memory: 1Gi
 
-# zuno-postgresql-pgbouncer is PGO's auto-created PgBouncer Service in front
-# of the zuno-postgresql PostgresCluster (no plain "postgresql" Service).
-# Host/port are shared across every knowledge domain - one PostgresCluster,
-# many databases (ADR-0204).
+# Direct-to-primary, NOT PgBouncer - VERIFIED live (2026-08-15, WP-21
+# verification): the per-domain pools pass search_path as a connection
+# startup option, which PgBouncer's transaction pooling rejects
+# ("unsupported startup parameter: search_path" - the per-domain
+# schema-apply Jobs hit the identical failure), and asyncpg's implicit
+# prepared statements are unreliable through transaction pooling anyway.
+# Same precedent as Keycloak's spec.db (ansible/roles/keycloak/README.md
+# "## Database"). Host/port are shared across every knowledge domain -
+# one PostgresCluster, many databases (ADR-0204).
 pg:
-  host: zuno-postgresql-pgbouncer.zuno-data.svc
+  host: zuno-postgresql-primary.zuno-data.svc
   port: 5432
 
 # ADR-0204 (WP-21): one entry per logical knowledge domain this deployment
