@@ -1028,7 +1028,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://comage.apps.mycluster.example.com",
             "redirectUris": [
@@ -1072,7 +1072,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://tekos.apps.mycluster.example.com",
             "redirectUris": [
@@ -1116,7 +1116,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://advantage.apps.mycluster.example.com",
             "redirectUris": [
@@ -1160,7 +1160,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://finage.apps.mycluster.example.com",
             "redirectUris": [
@@ -1204,7 +1204,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://arkos.apps.mycluster.example.com",
             "redirectUris": [
@@ -1248,7 +1248,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://naveo.apps.mycluster.example.com",
             "redirectUris": [
@@ -1376,7 +1376,7 @@
             "publicClient": false,
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
+            "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": false,
             "rootUrl": "https://oauth-openshift.apps.mycluster.example.com",
             "redirectUris": [
