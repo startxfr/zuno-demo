@@ -708,3 +708,26 @@ under `docs/adr/`.
   `zuno.rag_freshness_lag_seconds` histogram plus a gated
   `PrometheusRule` (`gitops/charts/observability`) alerting each domain
   against its own freshness objective.
+
+- **2026-08-15 (ADR-0110, WP-25)**: promoted ADR-0110, honestly scoped
+  during implementation — the brief's "re-reads current source
+  authorization" assumed a live Confluence restrictions API that doesn't
+  exist in this repo; the actual authoritative source of `acl_groups` is
+  the platform's own declared `requiredGroups` config
+  (`gitops/charts/rag-ingestion/values.yaml`), same as `fetch-confluence`
+  already used. New `reconcile-acls` stage
+  (`components/rag-ingestion/src/rag_ingestion.py`) runs after `validate`
+  over EVERY indexed Confluence chunk (not just the run's changeset — an
+  unchanged document's authorization can still drift): updates
+  `acl_groups` when a source's `requiredGroups` changed, removes chunks
+  whose source is no longer visible or has fallen outside every
+  configured source's scope (fail closed — retrieval-side filtering alone
+  isn't sufficient), and aborts the whole stage with zero deletions if a
+  source listing call fails (never mistakes a transient outage for mass
+  deletion). Gave the previously-dead `preserveAcl` per-source field real
+  meaning: `false` confirms a page's continued existence without ever
+  letting reconciliation overwrite manually-curated `acl_groups`. Wired
+  into the KFP DAG after `validate` for every domain (a no-op wherever no
+  Confluence source is configured). ADR-0110 stays Partially implemented
+  — operator follow-up (live Confluence restriction change + verified
+  run) unchanged from the brief.

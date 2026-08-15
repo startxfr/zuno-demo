@@ -179,6 +179,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_source_adapters.py
+      - name: rag-ingestion ACL reconciliation tests (ADR-0110)
+        working-directory: components/rag-ingestion
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_reconcile_acls.py
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |

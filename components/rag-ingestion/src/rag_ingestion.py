@@ -34,7 +34,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 from urllib.parse import urljoin, urlparse
 
 import boto3
@@ -58,6 +58,7 @@ STAGES = (
     "embed",
     "index-pgvector",
     "validate",
+    "reconcile-acls",
 )
 
 DEFAULT_DOMAIN = "knowledge.tech"
@@ -1417,6 +1418,169 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
 
 
 # --------------------------------------------------------------------------
+# reconcile-acls (ADR-0110, WP-25)
+# --------------------------------------------------------------------------
+
+
+def _iter_live_confluence_pages(config: IngestionConfig, auth) -> Dict[str, Optional[list]]:
+    """Re-lists every page CURRENTLY visible and in-scope for each enabled
+    Confluence source, the same CQL/directory/label selection
+    stage_fetch_confluence uses (minus the body.storage expansion - this
+    only needs to know a page exists and what governs its ACLs, not its
+    content). Returns {page_url: required_groups | None} - None means
+    "page exists (participates in the liveness/deletion check below) but
+    this source's preserveAcl: false says never let reconciliation
+    overwrite its acl_groups" (gitops/charts/rag-ingestion/values.yaml's
+    per-source preserveAcl field, previously read by no code).
+
+    ADR-0110's authoritative source of "current source authorization" is
+    the declared platform config (source.requiredGroups,
+    gitops/charts/rag-ingestion/values.yaml) - NOT a live Confluence
+    restrictions API call (no such integration exists in this repo; see
+    the ADR's own Context for why that per-document generalization is
+    deferred to v0.4/ADR-0408). What IS live here is page *existence/
+    visibility*: a page absent from this listing has either been deleted
+    or the technical identity fetch-confluence authenticates as can no
+    longer see it - both cases must fail closed the same way.
+
+    Raises SystemExit on any source-listing failure, before any caller
+    can act on a partial result - a transient Confluence outage must
+    never be mistaken for "every page was deleted".
+    """
+    live: Dict[str, Optional[list]] = {}
+    for source in config.confluence_sources:
+        if not source.get("enabled", True):
+            continue
+        base_url = source["baseUrl"].rstrip("/")
+        directories = source.get("directories") or []
+        exclude_labels = set(source.get("excludeLabels") or [])
+        required_groups = source.get("requiredGroups") or []
+        preserve_acl = source.get("preserveAcl", True)
+
+        for space in source.get("spaces") or []:
+            start = 0
+            limit = 25
+            while True:
+                params = {
+                    "cql": f'space="{space}" and type=page',
+                    "start": start,
+                    "limit": limit,
+                    "expand": "ancestors,metadata.labels",
+                }
+                try:
+                    resp = requests.get(
+                        f"{base_url}/wiki/rest/api/content/search",
+                        params=params,
+                        auth=auth,
+                        timeout=HTTP_TIMEOUT_SECONDS,
+                    )
+                    resp.raise_for_status()
+                except requests.RequestException as exc:
+                    raise SystemExit(
+                        f"reconcile-acls: listing failed for space '{space}' ({exc}) - "
+                        "aborting with zero deletions rather than treating a transient "
+                        "outage as 'every page was deleted'"
+                    ) from exc
+                payload = resp.json()
+                results = payload.get("results", [])
+                for page in results:
+                    labels = {
+                        label["name"]
+                        for label in page.get("metadata", {}).get("labels", {}).get("results", [])
+                    }
+                    if labels & exclude_labels:
+                        continue
+                    ancestor_titles = [a["title"] for a in page.get("ancestors", [])]
+                    if directories and not any(
+                        _ancestor_path_matches(ancestor_titles, directory) for directory in directories
+                    ):
+                        continue
+                    web_ui = page.get("_links", {}).get("webui", "")
+                    page_url = f"{base_url}/wiki{web_ui}"
+                    live[page_url] = required_groups if preserve_acl else None
+                if len(results) < limit:
+                    break
+                start += limit
+    return live
+
+
+def stage_reconcile_acls(config: IngestionConfig, store: CorpusStore) -> None:
+    """ADR-0110: keeps indexed acl_groups aligned with current source
+    authorization and removes chunks whose source is no longer visible or
+    no longer under any declared source's scope. Runs over EVERY indexed
+    confluence chunk (unlike the other stages, not just this run's
+    changeset - an unchanged document's ACL can still change), fail
+    closed: undeterminable authorization (page absent from the live
+    listing) means removal, never "leave it as-is and hope". A no-op
+    when this domain has no Confluence sources configured (every domain
+    but knowledge.tech, and knowledge.tech before an operator configures
+    any real space)."""
+    if not config.confluence_sources:
+        logger.info("reconcile-acls: no confluence sources configured, nothing to reconcile")
+        return
+
+    auth = _confluence_auth(config)
+    live_pages = _iter_live_confluence_pages(config, auth)
+    run_snapshot = _utcnow_iso()
+
+    conn = _pg_connect(config)
+    updated = 0
+    deleted = 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT source, metadata -> 'acl_groups' FROM document_embeddings "
+                "WHERE metadata ->> 'source_type' = 'confluence'"
+            )
+            indexed = cur.fetchall()
+
+            for source_url, current_acl in indexed:
+                if isinstance(current_acl, str):  # defensive: some psycopg
+                    current_acl = json.loads(current_acl)  # configs return jsonb as text
+                current_acl = current_acl or []
+
+                if source_url not in live_pages:
+                    cur.execute("DELETE FROM document_embeddings WHERE source = %s", (source_url,))
+                    deleted += cur.rowcount
+                    # Audit: source + reason + this run's snapshot marker -
+                    # never chunk content (ADR-0110 task 3).
+                    logger.info(
+                        "reconcile-acls: removed source=%s reason=no-longer-visible-or-in-scope snapshot=%s",
+                        source_url, run_snapshot,
+                    )
+                    continue
+
+                new_acl = live_pages[source_url]
+                if new_acl is None:
+                    # preserveAcl: false - existence confirmed (so this
+                    # chunk is NOT deleted), acl_groups deliberately left
+                    # untouched.
+                    continue
+                if sorted(current_acl) != sorted(new_acl):
+                    cur.execute(
+                        "UPDATE document_embeddings SET metadata = jsonb_set(metadata, '{acl_groups}', %s::jsonb), "
+                        "updated_at = now() WHERE source = %s",
+                        (json.dumps(new_acl), source_url),
+                    )
+                    updated += cur.rowcount
+                    logger.info(
+                        "reconcile-acls: updated acl_groups source=%s snapshot=%s", source_url, run_snapshot
+                    )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    logger.info(
+        "reconcile-acls: %d document(s) had acl_groups updated, %d document(s) removed "
+        "(checked against %d live page(s))",
+        updated, deleted, len(live_pages),
+    )
+
+
+# --------------------------------------------------------------------------
 # CLI dispatch
 # --------------------------------------------------------------------------
 
@@ -1427,6 +1591,7 @@ STAGE_FUNCTIONS = {
     "embed": stage_embed,
     "index-pgvector": stage_index_pgvector,
     "validate": stage_validate,
+    "reconcile-acls": stage_reconcile_acls,
 }
 
 

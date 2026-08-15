@@ -1,6 +1,6 @@
 # WP-25: Document ACL synchronization (promotes ADR-0110)
 
-- **State:** Not started
+- **State:** Operator pending (2026-08-15 — repo work merged: ADR-0110 promoted to a full record, honestly scoped to reconciliation against the platform's own declared `requiredGroups` config plus live page-existence re-listing (the brief's "re-reads current source authorization" corrected to reflect there is no live Confluence restrictions API in this repo — see the ADR's Decision text); new `reconcile-acls` stage (`components/rag-ingestion/src/rag_ingestion.py`) runs after `validate` over every indexed Confluence chunk (not just the run's changeset), updates `acl_groups` on drift, removes chunks whose source is no longer visible or in scope (fail closed), aborts with zero deletions on a listing failure, and gives the previously-unused `preserveAcl` field real meaning (false = confirm existence, never overwrite `acl_groups`); wired into the KFP DAG for every domain (a no-op where no Confluence source is configured) and CI. 7 fixture tests cover propagation, deletion, scope-narrowing, no-op-on-unchanged, fail-closed-on-outage, `preserveAcl: false`, and the no-sources no-op. Awaiting the operator follow-up below: change a real Confluence page's restrictions, trigger a run, verify the index reflects it.)
 - **ADRs:** ADR-0110 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-21 (merged), WP-02 (merged — real Confluence access)
 - **Estimated files touched:** ~6

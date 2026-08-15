@@ -151,6 +151,7 @@ chunk = component("chunk")
 embed = component("embed")
 index_pgvector = component("index-pgvector")
 validate = component("validate")
+reconcile_acls = component("reconcile-acls")
 
 FETCH_COMPONENTS = {
     "fetch-redhat": fetch_redhat,
@@ -174,7 +175,13 @@ def rag_ingestion_pipeline():
     chunks = configure(chunk().after(normalized))
     embeddings = configure(embed().after(chunks), embedding=True)
     indexed = configure(index_pgvector().after(embeddings), postgres=True)
-    configure(validate().after(indexed), postgres=True)
+    validated = configure(validate().after(indexed), postgres=True)
+    # ADR-0110 (WP-25): after validate, over every indexed Confluence
+    # chunk (not just this run's changeset) - needs the same Confluence
+    # credential fetch_confluence uses (re-lists live pages) plus
+    # postgres (updates/deletes). A no-op for the tech pipeline too if
+    # no confluence sources are configured (see stage_reconcile_acls).
+    configure(reconcile_acls().after(validated), confluence=True, postgres=True)
 
 
 {{- range $name, $domain := .Values.domains }}
@@ -195,7 +202,12 @@ def rag_ingestion_pipeline_{{ $name | replace "-" "_" }}():
     chunks = configure(chunk().after(normalized), domain="{{ $name }}")
     embeddings = configure(embed().after(chunks), domain="{{ $name }}", embedding=True)
     indexed = configure(index_pgvector().after(embeddings), domain="{{ $name }}", postgres=True)
-    configure(validate().after(indexed), domain="{{ $name }}", postgres=True)
+    validated = configure(validate().after(indexed), domain="{{ $name }}", postgres=True)
+    # ADR-0110 (WP-25): a no-op for every domain but knowledge.tech (none
+    # of these fetchStages is fetch-confluence today) - wired uniformly
+    # so a future domain that DOES gain a confluence source doesn't need
+    # a template change to get reconciliation for free.
+    configure(reconcile_acls().after(validated), domain="{{ $name }}", postgres=True)
 {{- end }}
 {{- end }}
 
