@@ -46,6 +46,19 @@
   ai-gateway test step (39/40's were an omission caught here).
   `check_docs.py` PASS; `check_workload_hardening.py` 188/188;
   `check_build_matrix.py` PASS (no new component).
+  **Completed 2026-08-15 (follow-up commit)**: the Decision text's
+  "TTL/**enablement per model**" clause, which the first commit's
+  cache_ttl scope alone didn't cover, is now implemented - a new
+  `cache_enabled` scope (per-model allow-list in the policy file;
+  the toggle substitutes for the per-model provider-routing
+  `cache_enabled` flag only, and can never override the deployment-level
+  `SEMANTIC_CACHE_ENABLED` switch - autonomy tunes within the
+  deployment's envelope, never widens it), a
+  `set_runtime_cache_enabled_override()` seam in `semantic_cache.py`,
+  the `/admin/optimizer/apply` parameter `cache_enabled`, and 4 more
+  tests (applied end-to-end through `should_use_cache()`,
+  global-switch-supremacy, allow-list refusal, rollback/kill revert) -
+  18 total, all green.
 - **ADRs:** ADR-0309 (Partially implemented merged here -> Implemented after the observed live cycle + user sign-off)
 - **Depends on:** WP-40 (merged + live loop done); WP-09 (cache tuning surface)
 - **Estimated files touched:** ~7

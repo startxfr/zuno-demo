@@ -94,6 +94,8 @@ class OptimizationPolicy:
     cache_ttl_enabled: bool = False
     cache_ttl_min: int = 300
     cache_ttl_max: int = 86400
+    cache_enabled_scope: bool = False
+    cache_enabled_models: List[str] = field(default_factory=list)
     routing_enabled: bool = False
     pre_approved_equivalents: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -111,6 +113,7 @@ class OptimizationPolicy:
 
         scopes = raw.get("scopes", {}) or {}
         cache_ttl = scopes.get("cache_ttl", {}) or {}
+        cache_enabled = scopes.get("cache_enabled", {}) or {}
         routing = scopes.get("routing", {}) or {}
         triggers = raw.get("rollback_triggers", {}) or {}
         return cls(
@@ -122,6 +125,8 @@ class OptimizationPolicy:
             cache_ttl_enabled=bool(cache_ttl.get("enabled", False)),
             cache_ttl_min=int(cache_ttl.get("min_seconds", 300)),
             cache_ttl_max=int(cache_ttl.get("max_seconds", 86400)),
+            cache_enabled_scope=bool(cache_enabled.get("enabled", False)),
+            cache_enabled_models=list(cache_enabled.get("models", []) or []),
             routing_enabled=bool(routing.get("enabled", False)),
             pre_approved_equivalents=list(routing.get("pre_approved_equivalents", []) or []),
         )
@@ -200,6 +205,34 @@ class TuningController:
         entry = self._record("cache_ttl", old, ttl_seconds, evidence,
                              rollback=lambda: semantic_cache.set_runtime_ttl_override(None))
         logger.info("optimizer applied cache_ttl=%ss (was %ss)", ttl_seconds, old)
+        return entry
+
+    def apply_cache_enabled(self, model: str, enabled: bool, evidence: Dict[str, Any]) -> AuditEntry:
+        """ADR-0309's "enablement per model": toggles the semantic cache
+        for ONE provider-routing model name, but only if that name is in
+        the policy's own cache_enabled.models allow-list - the tuner can
+        never discover/spread to models a human didn't pre-approve for
+        autonomous toggling. Substitutes for the per-model
+        provider-routing flag only; the global deployment switch stays
+        supreme (see semantic_cache.should_use_cache)."""
+        self._refuse_if_inactive()
+        self._refuse_forbidden(f"cache_enabled:{model}")
+        if not self._policy.cache_enabled_scope:
+            raise OptimizationRefused("cache_enabled scope is not enabled in the optimization policy")
+        if model not in self._policy.cache_enabled_models:
+            raise OptimizationRefused(
+                f"model {model!r} is not in the cache_enabled scope's models allow-list - "
+                "only a human-reviewed policy PR can add models (ADR-0309 boundary)"
+            )
+
+        old = semantic_cache._runtime_cache_enabled_overrides.get(model)
+        semantic_cache.set_runtime_cache_enabled_override(model, enabled)
+
+        def _rollback() -> None:
+            semantic_cache.set_runtime_cache_enabled_override(model, old)
+
+        entry = self._record(f"cache_enabled:{model}", old, enabled, evidence, rollback=_rollback)
+        logger.info("optimizer applied cache_enabled[%s]=%s (was %s)", model, enabled, old)
         return entry
 
     def apply_routing_override(self, agent: str, task: str, adapter: str, evidence: Dict[str, Any]) -> AuditEntry:

@@ -41,11 +41,15 @@ logger = logging.getLogger("ai_gateway.semantic_cache")
 SEMANTIC_CACHE_ENABLED = os.getenv("SEMANTIC_CACHE_ENABLED", "false").strip().lower() == "true"
 SEMANTIC_CACHE_TTL_SECONDS = int(os.getenv("SEMANTIC_CACHE_TTL_SECONDS", "3600"))
 
-# ADR-0309 (WP-42): the one cache parameter the bounded tuning controller
-# (app/optimizer.py) may mutate at runtime - None means "use the
-# deployment-time value above". Runtime configuration only, never
-# persisted: a pod restart always reverts to SEMANTIC_CACHE_TTL_SECONDS.
+# ADR-0309 (WP-42): the cache parameters the bounded tuning controller
+# (app/optimizer.py) may mutate at runtime - None/absent means "use the
+# deployment-time value". Runtime configuration only, never persisted: a
+# pod restart always reverts to SEMANTIC_CACHE_TTL_SECONDS and the
+# provider-routing.yaml cache_enabled flags.
 _runtime_ttl_override: "int | None" = None
+# Per-model cache-enablement overrides, keyed by the provider-routing
+# entry's own `model` name (ADR-0309's "TTL/enablement per model").
+_runtime_cache_enabled_overrides: "Dict[str, bool]" = {}
 
 
 def effective_ttl_seconds() -> int:
@@ -58,6 +62,18 @@ def set_runtime_ttl_override(ttl_seconds: "int | None") -> None:
     enforcement point, in the tuner, tested there)."""
     global _runtime_ttl_override
     _runtime_ttl_override = ttl_seconds
+
+
+def set_runtime_cache_enabled_override(model: str, enabled: "bool | None") -> None:
+    """Per-model cache-enablement override (ADR-0309) - same
+    single-enforcement-point contract as set_runtime_ttl_override above:
+    only app/optimizer.py calls this, after validating the model is in
+    the optimization policy's own allow-list. None clears the override,
+    restoring the provider-routing.yaml deployment-time flag."""
+    if enabled is None:
+        _runtime_cache_enabled_overrides.pop(model, None)
+    else:
+        _runtime_cache_enabled_overrides[model] = enabled
 EMBEDDING_SERVICE_URL = os.getenv(
     "EMBEDDING_SERVICE_URL", "http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings"
 )
@@ -79,8 +95,14 @@ class CacheUnavailable(Exception):
 def should_use_cache(cfg: Dict[str, Any]) -> bool:
     """Two-gate rule, same pattern as app/maas_adapter.py's should_use_maas:
     the global chart switch AND this specific model's provider-routing.yaml
-    entry must both opt in."""
-    return SEMANTIC_CACHE_ENABLED and bool(cfg.get("cache_enabled", False))
+    entry must both opt in. ADR-0309 (WP-42): the tuning controller's
+    per-model runtime override, when present, substitutes for the
+    per-model flag ONLY - it can never override the global deployment
+    switch (autonomy tunes within the deployment's own envelope, never
+    widens it)."""
+    model = cfg.get("model", "")
+    per_model = _runtime_cache_enabled_overrides.get(model, bool(cfg.get("cache_enabled", False)))
+    return SEMANTIC_CACHE_ENABLED and per_model
 
 
 @dataclass(frozen=True)

@@ -130,6 +130,10 @@ async def optimizer_apply(payload: Dict[str, Any]) -> JSONResponse:
     try:
         if payload.get("parameter") == "cache_ttl":
             entry = tuning_controller.apply_cache_ttl(int(payload["value"]), evidence=payload)
+        elif payload.get("parameter") == "cache_enabled":
+            entry = tuning_controller.apply_cache_enabled(
+                model=payload["model"], enabled=bool(payload["value"]), evidence=payload,
+            )
         elif payload.get("parameter") == "routing":
             entry = tuning_controller.apply_routing_override(
                 agent=payload["agent"], task=payload["task"], adapter=payload["adapter"], evidence=payload,

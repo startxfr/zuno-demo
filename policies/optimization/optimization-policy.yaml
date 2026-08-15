@@ -37,6 +37,19 @@ scopes:
     min_seconds: 300
     max_seconds: 86400
 
+  # Scope 1b: per-model semantic-cache enablement (ADR-0309's
+  # "TTL/enablement per model"). The tuner may toggle the cache on/off
+  # for a model ONLY if its provider-routing `model` name is listed in
+  # `models:` below - an allow-list a human curates via a reviewed PR,
+  # never something the tuner extends. The toggle substitutes for the
+  # per-model provider-routing.yaml `cache_enabled` flag only; the
+  # deployment-level SEMANTIC_CACHE_ENABLED switch always stays supreme
+  # (autonomy tunes within the deployment's envelope, never widens it).
+  cache_enabled:
+    enabled: true
+    models:
+      - qwen2.5-7b-instruct
+
   # Scope 2: routing choice between PRE-APPROVED EQUIVALENT model/adapter
   # candidates only. Each entry lists candidates a human has already
   # judged interchangeable for the given agent/task - the tuner may swap
