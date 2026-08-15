@@ -1,7 +1,40 @@
 # WP-41: Self-service onboarding and catalog expansion (promotes ADR-0307 + ADR-0306)
 
-- **State:** Not started
-- **ADRs:** ADR-0307, ADR-0306 (Proposed -> To be implemented -> Partially implemented -> Implemented)
+- **State:** Part A merged (2026-08-15); Part B (sixth agent) next.
+  **Part A** promoted ADR-0307 verbatim and delivered
+  `platform/templates/agent/`: `scaffold_agent.py` (a hand-rolled
+  parameterized generator, repo convention - one `render_*` function per
+  output file type over an `AgentSpec` dataclass) writes 18 real files
+  into the real tree per agent: OKF bundle skeleton (agent.okf.md +
+  primary task + prompt + tasks README), a CR-managed GitOps chart
+  (`templates/aiagent.yaml` rendering a single `AIAgent` CR - the
+  post-WP-38-migration Arkos shape, so "self-service" and "CR-managed"
+  arrive together, never a raw-manifest chart), `gitops/apps/<name>/`
+  Applications, and a full evaluations skeleton (20-scenario
+  scenarios.yaml reusing the shared ADR-0342 runner's exact type
+  vocabulary, gate_config.yaml, thin wrapper scripts, a generated
+  security_checks.py with the agent-generic ADR-0032/0033/0040 checks
+  plus a scaffold-ceiling self-consistency check). Two things it
+  deliberately does NOT write, documented in its own docstring:
+  policies/*.yaml entries and realm-zuno.json (both hand-curated,
+  densely commented files a programmatic YAML/JSON round-trip would
+  corrupt) - it emits `agents/<name>/keycloak-fragment.json` +
+  `NEXT_STEPS.md` (an explicit human checklist) instead.
+  `test_scaffold_validate_discard.py` (the brief's own
+  scaffold-validate-discard CI test) scaffolds a throwaway
+  `zzz-scaffold-ci-test` agent, runs the composed validators
+  (`validate_okf_bundle.py` - 6 bundles PASS with the throwaway present -
+  `check_knowledge_refs.py`, `helm lint`) and ALWAYS discards it in a
+  `finally` block; verified end-to-end locally (exit 0, tree left
+  byte-identical) and wired into `.github/workflows/lint.yml`'s
+  `policy-as-code` job as a blocking step. Two real generator bugs found
+  and fixed by actually running it: a REPO_ROOT parents[] off-by-one
+  (files landed under platform/ instead of the repo root) and a
+  hyphenated-slug-in-Python-identifier crash in the generated
+  security_checks.py (fixed with an underscored py_name variant for the
+  one function name, keeping the real slug everywhere else).
+  `python3 platform/docs/check_docs.py` PASS.
+- **ADRs:** ADR-0307 (Partially implemented, Part A), ADR-0306 (Proposed -> promoted in Part B)
 - **Depends on:** WP-38 (merged — the operator is the onboarding substrate); all four slices merged
 - **Estimated files touched:** ~10
 

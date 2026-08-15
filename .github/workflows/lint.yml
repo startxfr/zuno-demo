@@ -59,6 +59,12 @@ jobs:
         run: python3 platform/api/lint_openapi.py
       - name: Permitted SaaS fallback capability check (ADR-0053)
         run: python3 evaluations/tekos/gate_checks.py
+      # ADR-0307 (WP-41): scaffolds a throwaway agent, runs the composed
+      # OKF/knowledge-ref validators (+ helm lint when available) against
+      # it, and always discards it - proving the onboarding template stays
+      # generatively valid as the validators/platform evolve.
+      - name: Agent onboarding scaffold-validate-discard test (ADR-0307)
+        run: python3 platform/templates/agent/test_scaffold_validate_discard.py
 
   helm:
     runs-on: ubuntu-latest
