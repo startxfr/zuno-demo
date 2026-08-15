@@ -64,6 +64,13 @@ async def _connect_one(binding: KnowledgeBinding) -> None:
             max_size=config.PG_POOL_MAX_SIZE,
             init=_init_connection,
             server_settings={"search_path": binding.schema},
+            # VERIFIED live (2026-08-15, WP-21): connecting direct to the
+            # PGO primary (required because PgBouncer's transaction pooling
+            # rejects the search_path startup option above) needs TLS -
+            # PGO's pg_hba only has hostssl entries for external clients
+            # ("no pg_hba.conf entry ... no encryption" otherwise). asyncpg
+            # ignores PGSSLMODE, so this must be explicit.
+            ssl="require",
         )
         _pools[binding.domain] = pool
         _pool_errors.pop(binding.domain, None)
