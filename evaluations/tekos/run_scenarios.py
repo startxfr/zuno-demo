@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""Runs the 20 Tekos acceptance scenarios (scenarios.yaml) against a live
-deployment and reports the pass rate against the 75% threshold (ADR-0027,
-ADR-0028). See README.md for required environment variables.
+"""Runs an agent's 20 acceptance scenarios (scenarios.yaml, in this same
+directory by default) against a live deployment and reports the pass rate
+against the 75% threshold (ADR-0027, ADR-0028). See README.md for required
+environment variables.
+
+ADR-0342/WP-31: genuinely shared across every agent, not copied per agent -
+parameterized by the AGENT env var (default "tekos", preserving this
+module's original behavior unchanged when unset). evaluations/arkos/ (and
+every later agent slice) reuses this exact file via a thin wrapper that
+sets AGENT before delegating to main() - see that directory's own
+run_scenarios.py for the two-line pattern.
 
 This cannot be executed in the sandbox this repo was built in (no live
 cluster) - it is written to be genuinely runnable once one exists, not a
@@ -13,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import sys
 import time
 from dataclasses import dataclass, field
@@ -21,9 +30,25 @@ from typing import Any, Callable, Dict, List, Optional
 import httpx
 import yaml
 
+# ADR-0342/WP-31: which agent this run evaluates - drives the frontend/BFF
+# hostnames, the OIDC client id, and (via TASK_NAME below) which OKF task
+# name is declared to the MCP Gateway. Defaults to "tekos" so every
+# existing direct invocation of this file (`cd evaluations/tekos &&
+# python3 run_scenarios.py`, with no AGENT set) behaves exactly as before
+# this parameterization.
+AGENT = os.getenv("AGENT", "tekos")
+# The OKF task this agent's evaluation exercises (app/registry.py's
+# TaskDefinition.name) - required by _invoke_tool's X-Zuno-Task header
+# (ADR-0036). Each agent's own README documents its value; defaulting to
+# Tekos's real task name keeps the unparameterized case unchanged.
+TASK_NAME = os.getenv("TASK_NAME", "answer-technical-question")
+
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://keycloak.apps.mycluster.example.com")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tekos.apps.mycluster.example.com")
-BFF_URL = os.getenv("BFF_URL", "http://tekos-bff.zuno-ai-run.svc.cluster.local:8080")
+FRONTEND_URL = os.getenv("FRONTEND_URL", f"https://{AGENT}.apps.mycluster.example.com")
+BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
+# Agent Runtime and every platform service below are shared across every
+# agent (ADR-0342's generic dispatch, ADR-0009's split services) - never
+# agent-specific, unlike FRONTEND_URL/BFF_URL above.
 RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080")
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")
 RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster.local:8080")
@@ -39,8 +64,10 @@ REALM = "zuno"
 DEMO_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD")
 # Confidential client's own secret - never hardcoded; read from the same
 # place `make configure keycloak` puts it (an operator running this script
-# fetches it once, e.g. `vault kv get -field=client_secret secret/zuno/keycloak/tekos-frontend`).
-TEKOS_FRONTEND_CLIENT_SECRET = os.getenv("TEKOS_FRONTEND_CLIENT_SECRET")
+# fetches it once, e.g. `vault kv get -field=client_secret secret/zuno/keycloak/<agent>-frontend`).
+# Named after AGENT (TEKOS_FRONTEND_CLIENT_SECRET when unset, matching this
+# module's original single env var exactly).
+FRONTEND_CLIENT_SECRET = os.getenv(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET")
 
 SERVICE_HEALTH_URLS = {
     "frontend": f"{FRONTEND_URL}/healthz",
@@ -64,15 +91,15 @@ _token_cache: Dict[str, str] = {}
 
 
 def get_token(persona: str) -> str:
-    """Resource Owner Password Credentials grant against the confidential
-    tekos-frontend client - appropriate for an automated evaluation harness
-    acting on behalf of fixture personas, not for real user login (which
-    uses the authorization-code flow, see components/agent-frontend).
+    """Resource Owner Password Credentials grant against AGENT's own
+    confidential frontend client - appropriate for an automated evaluation
+    harness acting on behalf of fixture personas, not for real user login
+    (which uses the authorization-code flow, see components/agent-frontend).
     """
     if persona in _token_cache:
         return _token_cache[persona]
-    if not TEKOS_FRONTEND_CLIENT_SECRET:
-        raise RuntimeError("TEKOS_FRONTEND_CLIENT_SECRET is required to obtain persona tokens")
+    if not FRONTEND_CLIENT_SECRET:
+        raise RuntimeError(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET is required to obtain persona tokens")
     if not DEMO_PASSWORD:
         raise RuntimeError("DEMO_PERSONA_PASSWORD is required to obtain persona tokens")
 
@@ -80,8 +107,8 @@ def get_token(persona: str) -> str:
         f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token",
         data={
             "grant_type": "password",
-            "client_id": "tekos-frontend",
-            "client_secret": TEKOS_FRONTEND_CLIENT_SECRET,
+            "client_id": f"{AGENT}-frontend",
+            "client_secret": FRONTEND_CLIENT_SECRET,
             "username": persona,
             "password": DEMO_PASSWORD,
             "scope": "openid",
@@ -186,7 +213,7 @@ def chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
     try:
         with httpx.stream(
             "POST",
-            f"{RUNTIME_URL}/v1/agents/tekos/chat",
+            f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
             headers={**auth_headers(s["persona"]), "Accept": "text/event-stream"},
             json={"session_id": "eval-9", "user_sub": s["persona"], "message": s["message"]},
             timeout=30,
@@ -210,7 +237,7 @@ def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
     try:
         with httpx.stream(
             "POST",
-            f"{RUNTIME_URL}/v1/agents/tekos/chat",
+            f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
             headers={**auth_headers(s["persona"]), "Accept": "text/event-stream"},
             json={"session_id": "eval-10", "user_sub": s["persona"], "message": s["message"]},
             timeout=30,
@@ -229,7 +256,7 @@ def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
 
 def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/tekos/chat",
+        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
         headers=auth_headers(s["persona"]),
         json={"session_id": "eval-11", "user_sub": s["persona"], "message": s["message"]},
         timeout=30,
@@ -260,8 +287,8 @@ def _invoke_tool(persona: str, tool: str, arguments: Dict[str, Any], classificat
         headers={
             **auth_headers(persona),
             "X-Zuno-Data-Classification": classification,
-            "X-Zuno-Agent": "tekos",
-            "X-Zuno-Task": "answer-technical-question",
+            "X-Zuno-Agent": AGENT,
+            "X-Zuno-Task": TASK_NAME,
         },
         json=arguments,
         timeout=15,
@@ -314,11 +341,11 @@ def bff_rejects_missing_jwt(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
-    # Any non-tekos-frontend-audience token would do; in practice only
-    # tekos-frontend is used for login in v0 (all personas authenticate
-    # through it - see components/agent-frontend/README.md), so this
-    # exercises the audience check with a deliberately malformed/foreign
-    # token instead of a same-realm token with a different audience.
+    # Any non-AGENT-frontend-audience token would do; this evaluation
+    # harness only ever authenticates through AGENT's own confidential
+    # client (see get_token() above), so this exercises the audience check
+    # with a deliberately malformed/foreign token instead of a same-realm
+    # token carrying a different agent's audience.
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
         headers={"Authorization": "Bearer not-a-real-jwt"},
@@ -393,9 +420,12 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
 
 
 def run() -> List[ScenarioResult]:
-    import pathlib
-
-    scenarios_path = pathlib.Path(__file__).parent / "scenarios.yaml"
+    # Resolved via AGENT, not this file's own directory: a wrapper agent
+    # (e.g. evaluations/arkos/run_scenarios.py) delegates to this exact
+    # function after setting AGENT, and its scenarios.yaml lives in ITS
+    # OWN directory (evaluations/<AGENT>/), not wherever this canonical
+    # implementation happens to be physically checked in.
+    scenarios_path = pathlib.Path(__file__).resolve().parent.parent / AGENT / "scenarios.yaml"
     scenarios = yaml.safe_load(scenarios_path.read_text())["scenarios"]
 
     results: List[ScenarioResult] = []

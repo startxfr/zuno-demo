@@ -3,13 +3,24 @@
 acceptance-gate Job - ansible/roles/agents/tasks/check.yml). Combines three
 independently-runnable layers into one gate with one exit code:
 
-  - run_scenarios.py   - the 20 fixed Tekos acceptance scenarios (ADR-0027),
+  - run_scenarios.py   - the fixed 20 acceptance scenarios (ADR-0027),
                           a 75% pass-rate quality threshold (ADR-0028).
   - security_checks.py - security-negative checks (ADR-0032/0033/0034/0035/
                           0037/0040), 100% mandatory.
   - gate_checks.py      - remaining ADR-0053 capability checks not covered
                           by the two above (currently: permitted SaaS
                           fallback), 100% mandatory.
+
+ADR-0342/WP-31: genuinely shared across every agent (same reasoning as
+run_scenarios.py's own docstring) - run_scenarios.py/gate_checks.py are
+platform-agnostic or already AGENT-parameterized and imported normally,
+but security_checks.py's actual CONTENT is genuinely agent-specific (each
+agent's own personas/tools/policy boundaries), so it's loaded dynamically
+from evaluations/<AGENT>/security_checks.py rather than a static top-level
+import - a static `import security_checks` can only ever resolve to
+whichever one module of that name sys.path happens to find first, which
+breaks the moment two agents' wrapper scripts are both importable in the
+same process.
 
 Per ADR-0053's Operational considerations ("Return machine-readable results
 and non-zero exit status when mandatory gates fail. Preserve the 75%
@@ -22,17 +33,41 @@ scraping text.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
+import pathlib
 import sys
 
 import gate_checks
 import run_scenarios
-import security_checks
+from run_scenarios import AGENT
 
 SCENARIO_THRESHOLD = 0.75
 
 
+def _load_security_checks():
+    """Dynamically loads evaluations/<AGENT>/security_checks.py - see the
+    module docstring above for why this can't be a static top-level
+    import. That file's own `from run_scenarios import ...` still resolves
+    normally (sys.path, not this loader) once executed.
+
+    Registers the module in sys.modules before exec_module() runs, the
+    standard importlib recipe - security_checks.py's own `@dataclass`
+    (CheckResult) needs `sys.modules[cls.__module__]` to already resolve
+    to something while it's being defined, or dataclass's own type-hint
+    resolution crashes with a bare AttributeError on None.
+    """
+    path = pathlib.Path(__file__).resolve().parent.parent / AGENT / "security_checks.py"
+    spec = importlib.util.spec_from_file_location("security_checks", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def main() -> int:
+    security_checks = _load_security_checks()
+
     scenario_results = run_scenarios.run()
     security_results = security_checks.run()
     gate_results = gate_checks.run()
@@ -52,7 +87,7 @@ def main() -> int:
 
     overall_ok = scenario_ok and security_ok and gate_ok
 
-    print("=== Layer 1/3: Tekos acceptance scenarios (ADR-0027/0028, 75% threshold) ===")
+    print(f"=== Layer 1/3: {AGENT} acceptance scenarios (ADR-0027/0028, 75% threshold) ===")
     print(f"{'ID':<4}{'PASS':<6}{'TITLE'}")
     for r in scenario_results:
         print(f"{r.id:<4}{'✓' if r.passed else '✗':<6}{r.title}")

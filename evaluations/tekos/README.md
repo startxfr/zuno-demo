@@ -1,12 +1,17 @@
 # Tekos Evaluation
 
-The 20 acceptance scenarios and the 75% pass-threshold report for Tekos -
-the only functional agent in v0. The other four
-agents have no evaluation scenarios yet; they have no runtime workflow to
-evaluate (`evaluations/{comage,advantage,finage,arkos}/README.md`).
+The 20 acceptance scenarios and the 75% pass-threshold report for Tekos,
+the first functional agent. Since ADR-0342/WP-31, `run_scenarios.py`,
+`run_acceptance_gate.py` and `gate_checks.py` here are the canonical,
+shared implementation every real agent's own evaluation directory reuses
+(see `evaluations/arkos/README.md` for the first reuse, via a thin
+`AGENT=arkos` wrapper) - `scenarios.yaml` and `security_checks.py` stay
+genuinely per-agent content. Comage/Advantage/Finage still have no
+evaluation scenarios yet; they have no runtime workflow to evaluate
+(`evaluations/{comage,advantage,finage}/README.md`).
 
 `run_acceptance_gate.py` is the layered entrypoint
-`make day1|d1 check agents` actually invokes (see
+`make day1|d1 check agents` actually invokes for Tekos specifically (see
 `ansible/roles/agents/tasks/check.yml`'s `run_acceptance_gate.yml`
 include, which runs it as a one-shot in-cluster Job): it combines this
 file's 20 scenarios (75% threshold) with `security_checks.py` and

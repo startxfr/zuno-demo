@@ -579,6 +579,44 @@
             }]
         },
         {
+            "username": "arkos-entitlement-only-user-01",
+            "email": "arkos-entitlement-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0326/WP-31): agent_arkos entitlement without any business role"
+                ]
+            },
+            "groups": [
+                "/agent_arkos"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
+            "username": "board-role-only-user-01",
+            "email": "board-role-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0326/WP-31): board business role without agent_arkos entitlement"
+                ]
+            },
+            "groups": [
+                "/board"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
             "username": "platform-admin-01",
             "email": "platform-admin-01@zuno-demo.internal",
             "enabled": true,

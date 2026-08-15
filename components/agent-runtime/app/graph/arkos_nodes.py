@@ -23,7 +23,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
-from app.graph.nodes import _escalate
+from app.graph.nodes import CONFLUENCE_CLASSIFICATION, _escalate
 from app.graph.state import AgentState
 from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
 from app.registry import AgentRegistry
@@ -94,6 +94,16 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     request like "draft a DAT for the OpenShift AI GPU sizing project"
     should retrieve on "the OpenShift AI GPU sizing project", not the
     whole imperative sentence.
+
+    Also calls live Confluence search (ADR-0117/WP-02's real MCP server)
+    when the task declares it - ADR-0326's "live Jira/Confluence actions
+    without physical endpoint coupling" completion-pattern bullet. Unlike
+    Tekos's separate, conditionally-triggered tool_call_node, Arkos folds
+    this into retrieve_node itself and calls it unconditionally: a DAT
+    always benefits from checking internal Confluence context alongside
+    the RAG corpus, there is no "does this look like a live-data question"
+    trigger to evaluate first - one more structural way this shape
+    genuinely differs from Tekos's.
     """
     caller_groups = state.get("groups", [])
     project_id = state.get("project_id")
@@ -106,46 +116,71 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
         project_id=project_id,
     )
     authorized_domains = decision.authorized_domains
+    topic = (state.get("doc_plan") or {}).get("topic") or state["message"]
+
+    docs = []
+    effective_classification = ARKOS_BASE_CLASSIFICATION
+    errors = list(state.get("errors", []))
 
     if not authorized_domains:
         logger.warning(
-            "no knowledge domain authorized for this call, skipping retrieval: %s", decision.denied
+            "no knowledge domain authorized for this call, skipping RAG retrieval: %s", decision.denied
         )
-        return {
-            "retrieved_docs": [],
-            "effective_classification": ARKOS_BASE_CLASSIFICATION,
-            "errors": state.get("errors", []) + [f"retrieve: no authorized knowledge domain ({decision.denied})"],
-        }
+        errors.append(f"retrieve: no authorized knowledge domain ({decision.denied})")
+    else:
+        try:
+            docs = await search(
+                query=topic,
+                top_k=RAG_TOP_K,
+                caller_groups=caller_groups,
+                domains=authorized_domains,
+                project_id=project_id,
+                caller_sub=state.get("user_sub"),
+            )
+        except RagClientError as exc:
+            logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)
+            errors.append(f"retrieve: {exc}")
 
-    topic = (state.get("doc_plan") or {}).get("topic") or state["message"]
-    try:
-        docs = await search(
-            query=topic,
-            top_k=RAG_TOP_K,
-            caller_groups=caller_groups,
-            domains=authorized_domains,
-            project_id=project_id,
-            caller_sub=state.get("user_sub"),
-        )
-    except RagClientError as exc:
-        logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)
-        return {
-            "retrieved_docs": [],
-            "effective_classification": ARKOS_BASE_CLASSIFICATION,
-            "errors": state.get("errors", []) + [f"retrieve: {exc}"],
-        }
-
-    effective_classification = ARKOS_BASE_CLASSIFICATION
     for doc in docs:
         effective_classification = _escalate(effective_classification, doc.get("classification", "C1"))
 
-    return {"retrieved_docs": docs, "effective_classification": effective_classification}
+    update: Dict[str, Any] = {"retrieved_docs": docs, "effective_classification": effective_classification, "errors": errors}
+
+    if "confluence.page.search" not in _DRAFT_TASK.allowed_tools:
+        return update
+
+    escalated = _escalate(effective_classification, CONFLUENCE_CLASSIFICATION)
+    try:
+        result = await invoke_tool(
+            tool_name="confluence.page.search",
+            arguments={"query": topic},
+            bearer_token=state["bearer_token"],
+            data_classification=escalated,
+            agent_name=_ARKOS.name,
+            task_name=_DRAFT_TASK.name,
+        )
+    except McpClientError as exc:
+        logger.warning("Confluence search failed, continuing without it: %s", exc)
+        update["errors"] = errors + [f"retrieve: confluence search: {exc}"]
+        return update
+
+    update["effective_classification"] = escalated
+    update["tool_results"] = {"confluence.page.search": result}
+    if not result.get("external_model_policy", {}).get("allow_context", True):
+        update["local_only_required"] = True
+    return update
 
 
 def _build_context_block(state: AgentState) -> str:
     parts = []
     for doc in state.get("retrieved_docs", []):
         parts.append(f"[{doc['title']}] ({doc['source']})\n{doc.get('snippet', '')}")
+
+    confluence = state.get("tool_results", {}).get("confluence.page.search")
+    if confluence:
+        for item in confluence.get("result", {}).get("results", []):
+            parts.append(f"[Confluence: {item['title']}] ({item.get('url', '')})\n{item.get('excerpt', '')}")
+
     return "\n\n---\n\n".join(parts) if parts else "(no supporting context retrieved)"
 
 
@@ -192,11 +227,25 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
 
 
 def _citations(state: AgentState):
-    return [{"source": doc["source"], "title": doc["title"]} for doc in state.get("retrieved_docs", [])]
+    citations = [{"source": doc["source"], "title": doc["title"]} for doc in state.get("retrieved_docs", [])]
+    confluence = state.get("tool_results", {}).get("confluence.page.search")
+    if confluence:
+        for item in confluence.get("result", {}).get("results", []):
+            citations.append({"source": item.get("url", "confluence"), "title": item["title"]})
+    return citations
 
 
 def _compute_source_mode(state: AgentState) -> str:
-    return "indexed" if state.get("retrieved_docs") else "none"
+    used_indexed = bool(state.get("retrieved_docs"))
+    confluence = state.get("tool_results", {}).get("confluence.page.search") or {}
+    used_live = bool(confluence.get("result", {}).get("results"))
+    if used_indexed and used_live:
+        return "both"
+    if used_live:
+        return "live"
+    if used_indexed:
+        return "indexed"
+    return "none"
 
 
 def _drive_result_url(result: Dict[str, Any]) -> Optional[str]:

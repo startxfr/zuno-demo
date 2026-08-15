@@ -1,6 +1,6 @@
 # ADR-0326: Generalize the Tekos vertical slice to the four remaining agents
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (Arkos slice merged, 1 of 4; cluster gate pending)
 - **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

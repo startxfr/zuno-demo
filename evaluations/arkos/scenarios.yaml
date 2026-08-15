@@ -1,0 +1,138 @@
+# Arkos acceptance scenarios (ADR-0027: 20 scenarios per agent; ADR-0028:
+# 75% pass threshold). Run with `python3 run_scenarios.py` (a thin
+# AGENT=arkos wrapper around evaluations/tekos/run_scenarios.py - see
+# README.md for required environment variables and personas).
+#
+# `persona` values are anonymized synthetic usernames from
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `board-user-01`/
+# `-02` hold both the `board` business role (governs tool/data permissions
+# inside Arkos, per agent.okf.md's own body prose) and the `agent_arkos`
+# entitlement group (ADR-0040) - see security_checks.py for the negative
+# tests covering entitlement without business role and vice versa (new
+# `arkos-entitlement-only-user-01`/`board-role-only-user-01` fixtures,
+# mirroring Tekos's own `tekos-entitlement-only-user-01`/
+# `consultant-role-only-user-01`). `type` selects which handler in
+# evaluations/tekos/run_scenarios.py executes the scenario - each type's
+# exact behavior is documented there, not duplicated here.
+
+scenarios:
+  - id: 1
+    title: Portal loads all five agent tiles
+    type: portal_lists_all_agents
+    persona: board-user-01
+
+  - id: 2
+    title: Unauthenticated request to the portal redirects to login
+    type: portal_requires_login
+
+  - id: 3
+    title: Board persona can authenticate and the token carries the expected group claims
+    type: keycloak_login
+    persona: board-user-01
+    expect_groups: [board, agent_arkos]
+
+  - id: 4
+    title: Arkos tile is enabled for a board-group, agent_arkos-entitled user
+    type: portal_tile_state
+    persona: board-user-01
+    agent: arkos
+    expect_enabled: true
+
+  - id: 5
+    title: Arkos tile is disabled for a non-entitled user (sales persona)
+    type: portal_tile_state
+    persona: sales-user-01
+    agent: arkos
+    expect_enabled: false
+
+  - id: 6
+    title: Placeholder agent tiles (Comage) show "coming soon" for any user
+    type: portal_tile_state
+    persona: sales-user-01
+    agent: comage
+    expect_enabled: false
+    expect_placeholder: true
+
+  - id: 7
+    title: Drafting a DAT returns a reply with citations
+    type: chat_basic_qa
+    persona: board-user-01
+    message: "Draft a DAT for the OpenShift AI GPU sizing project"
+
+  - id: 8
+    title: First-token latency is under the 6-second interactive objective
+    type: chat_first_token_latency
+    persona: board-user-02
+    message: "Draft a DAT for the Keycloak SSO migration project"
+    max_seconds: 6
+
+  - id: 9
+    title: Streaming chat emits token events followed by a done event
+    type: chat_streaming_sse
+    persona: board-user-01
+    message: "Summarize what a DAT is in one sentence."
+
+  - id: 10
+    title: Drafting a DAT includes live Confluence context in its citations
+    type: chat_triggers_tool
+    persona: board-user-01
+    message: "Draft a DAT for the OpenShift AI GPU sizing project"
+    expect_tool: confluence.page.search
+
+  - id: 11
+    title: RAG retrieval contributes at least one citation for a technical topic
+    type: rag_retrieval_has_citation
+    query: "OpenShift AI model serving NVIDIA L4"
+
+  - id: 12
+    title: MCP Gateway denies a tool call outside the caller's allowed groups
+    type: mcp_gateway_denied
+    persona: sales-user-01
+    tool: confluence.page.read
+    arguments: { page_id: "1" }
+    expect_status: 403
+
+  - id: 13
+    title: MCP Gateway returns 404 for an unknown tool name
+    type: mcp_gateway_unknown_tool
+    persona: board-user-01
+    tool: does_not_exist
+    expect_status: 404
+
+  - id: 14
+    title: C3-classified requests fail closed when no SaaS provider is eligible
+    type: model_router_fails_closed
+    classification: C3
+
+  - id: 15
+    title: C1-classified requests try the local model first
+    type: model_router_prefers_local
+    classification: C1
+
+  - id: 16
+    title: BFF rejects a chat request with no bearer token
+    type: bff_rejects_missing_jwt
+
+  - id: 17
+    title: BFF rejects a JWT with the wrong audience
+    type: bff_rejects_wrong_audience
+    persona: board-user-01
+
+  - id: 18
+    title: MCP Gateway denies a tool Arkos's task doesn't declare (ADR-0036 agent_declaration factor)
+    type: mcp_gateway_denied
+    persona: board-user-01
+    tool: get_customer
+    arguments: { customer_id: 1 }
+    expect_status: 403
+
+  - id: 19
+    title: Remaining placeholder agents have no live workloads in the shared zuno-ai-run namespace
+    type: agent_isolation_placeholder_empty
+    namespace: zuno-ai-run
+    agents: [comage, advantage, finage]
+
+  - id: 20
+    title: Every service's health endpoint returns 200
+    type: health_endpoints_all_ok
+    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service, sales-db-mcp]
