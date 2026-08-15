@@ -15,6 +15,14 @@ Fail-closed invariants (ADR-0116 Security/Operational considerations):
 - a capability with zero or duplicate entries never loads;
 - ``validate_policy_coverage()`` flags every policy-listed tool name that
   does not resolve to exactly one binding, for startup/readiness checks.
+
+ADR-0208 (WP-26): every binding also declares an explicit ``auth_mode``
+(``delegated-user`` | ``service-identity`` | ``provider-delegated``) - a
+missing or unrecognized value fails the same way a bad transport does,
+never inferred from the tool/capability name. Enforcement (which
+credential flow a mode actually requires) lives in app/main.py's
+``invoke_tool``, not here - this module only guarantees the mode is
+always present and well-formed by the time a binding resolves.
 """
 
 from __future__ import annotations
@@ -35,6 +43,11 @@ TOOL_BINDINGS_PATH = os.getenv(
 
 VALID_TRANSPORTS = {"streamable-http", "in-process"}
 
+# ADR-0208 (WP-26): explicit, never inferred from the tool/capability name.
+# See platform/bindings/tools/README.md for what each mode means and
+# app/main.py's invoke_tool for enforcement.
+VALID_AUTH_MODES = {"delegated-user", "service-identity", "provider-delegated"}
+
 
 @dataclass
 class Binding:
@@ -42,6 +55,7 @@ class Binding:
     backend: str
     transport: str
     provider_tool: str
+    auth_mode: str
     aliases: List[str] = field(default_factory=list)
     # streamable-http only: {env, default, path}
     endpoint: Optional[Dict[str, str]] = None
@@ -86,6 +100,11 @@ class BindingRegistry:
                         backend=item["backend"],
                         transport=item["transport"],
                         provider_tool=item["provider_tool"],
+                        # ADR-0208: required, never defaulted - a missing
+                        # value must fail _validate() below with a clear
+                        # reason, not silently resolve to some implicit
+                        # mode.
+                        auth_mode=item.get("auth_mode", ""),
                         aliases=list(item.get("aliases", [])),
                         endpoint=item.get("endpoint"),
                         handler=item.get("handler"),
@@ -155,6 +174,12 @@ class BindingRegistry:
 
 
 def _validate(binding: Binding) -> Optional[str]:
+    if binding.auth_mode not in VALID_AUTH_MODES:
+        return (
+            f"binding '{binding.capability}' has missing or unknown auth_mode "
+            f"{binding.auth_mode!r} (expected one of {sorted(VALID_AUTH_MODES)}, ADR-0208) - "
+            "an entry without an explicit mode never loads"
+        )
     if binding.transport not in VALID_TRANSPORTS:
         return (
             f"binding '{binding.capability}' has unknown transport "

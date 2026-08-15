@@ -68,6 +68,7 @@ async def invoke(
     arguments: Dict[str, Any],
     caller_sub: str,
     bearer_token: str,
+    delegated_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     if binding is None:
         # Fail closed (ADR-0116): deterministic error, no backend contacted.
@@ -84,7 +85,10 @@ async def invoke(
                 f"binding '{binding.capability}' names unknown in-process handler "
                 f"'{binding.handler}'",
             )
-        return await handler(arguments, caller_sub)
+        # ADR-0208: delegated_token is None for every non-delegated-user
+        # binding (app/main.py only resolves one when auth_mode requires
+        # it) - handlers that don't need it simply ignore the kwarg.
+        return await handler(arguments, caller_sub, delegated_token=delegated_token)
 
     raise DownstreamError(
         502, f"binding '{binding.capability}' has unsupported transport '{binding.transport}'"

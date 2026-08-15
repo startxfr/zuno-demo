@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from app.agent_declarations import AgentDeclarationStore
 from app.auth import CallerIdentity, validate_token
 from app.bindings import BindingRegistry
+from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyStore, evaluate
@@ -174,8 +175,12 @@ async def invoke_tool(
         call.reason = decision.reason
 
         logger.info(
-            "tool=%s agent=%s task=%s caller=%s groups=%s classification=%s allowed=%s reason=%s request_id=%s",
+            "tool=%s capability=%s binding=%s auth_mode=%s agent=%s task=%s caller=%s groups=%s "
+            "classification=%s allowed=%s reason=%s request_id=%s",
             tool_name,
+            binding.capability,
+            binding.backend,
+            binding.auth_mode,
             x_zuno_agent,
             x_zuno_task,
             identity.sub,
@@ -190,8 +195,43 @@ async def invoke_tool(
             call.outcome = "denied"
             raise HTTPException(status_code=403, detail=decision.reason)
 
+        # ADR-0208 (WP-26): the credential flow used must match the
+        # binding's declared auth_mode - checked here, after the policy
+        # decision (so a subject-specific "no" from evaluate() above is
+        # still the first word) and before any backend is contacted.
+        call.auth_mode = binding.auth_mode
+        delegated_token: Optional[str] = None
+        if binding.auth_mode == "delegated-user":
+            # Never falls back to the gateway's own service identity: a
+            # missing delegated credential (including a revoked Google
+            # permission - app/delegation.py's own docstring) is a
+            # deterministic denial, identical in shape to a policy denial.
+            delegated_token = get_delegated_token(binding.backend, identity.sub)
+            if not delegated_token:
+                call.outcome = "delegated_credential_missing"
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"'{binding.capability}' requires a delegated {binding.backend} "
+                        "credential for this user, and none is available"
+                    ),
+                )
+        elif binding.auth_mode == "provider-delegated":
+            # Schema-only today (ADR-0208 Out of scope / deferred) - no
+            # provider that supports on-behalf-of delegation is bound yet.
+            call.outcome = "auth_mode_not_implemented"
+            raise HTTPException(
+                status_code=501,
+                detail=f"'{binding.capability}' declares auth_mode=provider-delegated, which has no implementation yet",
+            )
+        # service-identity: the policy decision just above already
+        # evaluated the specific calling subject before any shared
+        # credential is used - no further gate needed here.
+
         try:
-            result = await invoke_downstream(binding, tool_name, arguments, identity.sub, identity.token)
+            result = await invoke_downstream(
+                binding, tool_name, arguments, identity.sub, identity.token, delegated_token=delegated_token
+            )
         except DownstreamError as exc:
             call.outcome = "downstream_error"
             raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc

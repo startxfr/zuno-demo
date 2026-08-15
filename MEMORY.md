@@ -731,3 +731,27 @@ under `docs/adr/`.
   Confluence source is configured). ADR-0110 stays Partially implemented
   — operator follow-up (live Confluence restriction change + verified
   run) unchanged from the brief.
+
+- **2026-08-15 (ADR-0208, WP-26)**: every binding in
+  `platform/bindings/tools/tool-bindings.yaml` (13 entries) now declares a
+  required, explicit `auth_mode` (`delegated-user` | `service-identity` |
+  `provider-delegated`), never inferred from the tool/capability name -
+  `drive.*`/`gmail.*` are `delegated-user`, everything else (`sxa.*`,
+  `confluence.page.*`, `web.page.search`, `email.report.send`) is
+  `service-identity`. `components/mcp-gateway/app/bindings.py`'s loader
+  fails closed on a missing/unrecognized mode. Enforcement lives in
+  `main.py`'s `invoke_tool`, between the policy decision and the
+  downstream call: `delegated-user` requires a resolvable delegated token
+  (new `app/delegation.py` - a documented seam, since no component
+  resolves a real Keycloak Google-broker token yet; the CONTRACT is fully
+  enforced today, only the concrete resolution is pending a live
+  integration) and NEVER falls back to a shared credential - a missing
+  token (including a "revoked" one at the mock level) is a deterministic
+  403, identical in shape to a policy denial. `provider-delegated` is
+  schema-only (501, no binding uses it yet). `downstream.py` and all four
+  in-process handlers (`drive`, `gmail`, `web_search`, `email_report`)
+  thread an optional `delegated_token` kwarg. Audit trail (log line + OTel
+  span) carries `auth_mode` alongside subject/capability/binding - never
+  token material, verified by a dedicated test. Fully repo-provable - ADR-0208
+  flips straight to Implemented; optional live Google-revocation
+  confirmation left for the operator.

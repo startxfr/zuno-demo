@@ -25,3 +25,37 @@ Rules (from ADR-0116):
 The file ships inside the mcp-gateway image (repo-root build context, see
 `components/mcp-gateway/Dockerfile`) and is re-read via the gateway's
 `/admin/reload-policy` endpoint.
+
+## Authentication mode (ADR-0208)
+
+Every entry declares a required `auth_mode` field, one of:
+
+- **`delegated-user`** — the call must run with the CALLING user's own
+  delegated credential for that backend (ADR-0014: per-user delegated
+  OAuth2, never domain-wide service-account impersonation). No delegated
+  credential available (including a revoked permission) is a deterministic
+  denial — this mode never falls back to a shared/service credential.
+  Google Workspace capabilities (`drive.*`, `gmail.*`) use this mode; a
+  future `calendar.*`/`meet.*` binding would too.
+- **`service-identity`** — the call runs with a shared backend credential
+  (a workload token, a technical API key, ...), never a per-user one. The
+  gateway's own policy-intersection decision (`policy.evaluate()`) has
+  already evaluated the specific calling subject before this credential is
+  ever used — there is no separate per-call gate beyond that. Every
+  streamable-HTTP binding here (`sxa.*`, `confluence.page.*`) and the
+  remaining in-process ones (`web.page.search`, `email.report.send`) use
+  this mode.
+- **`provider-delegated`** — reserved for a future on-behalf-of delegation
+  flow (a provider acting for the platform rather than a specific end
+  user). Schema-only today: no binding declares it, and the gateway
+  refuses to invoke one that does (501) until a real implementation lands.
+
+Mode is explicit, never inferred from the capability/tool name — a binding
+missing `auth_mode`, or declaring an unrecognized value, fails to load
+(`components/mcp-gateway/app/bindings.py`'s fail-closed `_validate`).
+Enforcement (which credential flow a mode actually requires before the
+downstream call) lives in `components/mcp-gateway/app/main.py`'s
+`invoke_tool`; the delegated-user credential itself is resolved by
+`components/mcp-gateway/app/delegation.py`, currently a documented seam
+(no live Google Workspace tenant is reachable from this environment — see
+that module's docstring for what a real integration replaces).

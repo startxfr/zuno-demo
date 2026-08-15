@@ -1,20 +1,25 @@
 """Demo-mode handler for the ``list_drive_files`` MCP tool.
 
 To make this call real Google Drive: replace the body below with a call to
-the Drive v3 API (``GET /drive/v3/files``) using the *caller's* delegated
-OAuth2 token (ADR-0014 -- per-user delegated OAuth, not domain-wide service
-account impersonation) so the results respect the user's own effective
-Drive permissions. The delegated token would be resolved from the user's
-Keycloak-linked Google session, not from a service credential stored in
-Vault. No live Google Workspace tenant is reachable from this environment.
+the Drive v3 API (``GET /drive/v3/files``) using ``delegated_token`` (the
+*caller's* delegated OAuth2 token, ADR-0014/ADR-0208 -- per-user delegated
+OAuth, never domain-wide service-account impersonation) so the results
+respect the user's own effective Drive permissions. app/main.py's
+invoke_tool already refuses to call this handler at all when no delegated
+token is available (auth_mode=delegated-user, app/delegation.py) - by the
+time this function runs, delegated_token is guaranteed non-empty. No live
+Google Workspace tenant is reachable from this environment, so the demo
+body below ignores it and returns synthetic data.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
-async def handle(arguments: Dict[str, Any], caller_sub: str) -> Dict[str, Any]:
+async def handle(
+    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+) -> Dict[str, Any]:
     folder = str(arguments.get("folder", "")).strip() or "My Drive"
     return {
         "demo_mode": True,

@@ -15,7 +15,7 @@ technical SMTP identity's credentials sourced from
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 # Domains considered "internal" for this demo. Override via the
 # INTERNAL_EMAIL_DOMAINS env var (comma-separated) once a real internal
@@ -34,7 +34,12 @@ def _is_internal(recipient: str) -> bool:
     return "@" in recipient and recipient.split("@", 1)[1] in _INTERNAL_DOMAINS
 
 
-async def handle(arguments: Dict[str, Any], caller_sub: str) -> Dict[str, Any]:
+async def handle(
+    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+) -> Dict[str, Any]:
+    # auth_mode=service-identity (ADR-0208): the technical SMTP identity
+    # is a shared credential, never a per-user one - delegated_token is
+    # always None here and intentionally unused.
     recipients: List[str] = list(arguments.get("recipients", []) or [])
     subject = str(arguments.get("subject", "")).strip()
     body = str(arguments.get("body", "")).strip()

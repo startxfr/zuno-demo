@@ -103,6 +103,12 @@ def tool_invoke_span(tool_name: str, classification: str) -> Iterator["ToolInvok
                 span.set_attribute("zuno.capability", recorder.capability)
             if recorder.binding:
                 span.set_attribute("zuno.binding", recorder.binding)
+            # ADR-0208 (WP-26): audit records carry the auth_mode a
+            # binding declared alongside the existing subject/capability/
+            # binding fields - never token material (that never reaches
+            # this recorder at all; see app/delegation.py).
+            if recorder.auth_mode:
+                span.set_attribute("zuno.auth_mode", recorder.auth_mode)
             if recorder.reason:
                 span.set_attribute("zuno.reason", recorder.reason)
             if _invoke_counter is not None:
@@ -125,3 +131,6 @@ class ToolInvokeRecorder:
         # ADR-0116: logical capability ID + resolved backend name.
         self.capability: Optional[str] = None
         self.binding: Optional[str] = None
+        # ADR-0208 (WP-26): the binding's declared auth_mode - never a
+        # token/credential value.
+        self.auth_mode: Optional[str] = None

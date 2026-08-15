@@ -137,6 +137,7 @@ jobs:
           python3 tests/test_auth.py
           python3 tests/test_downstream_sales_db.py
           python3 tests/test_bindings.py
+          python3 tests/test_auth_mode_enforcement.py
       - name: ai-gateway tests
         working-directory: components/ai-gateway
         run: |

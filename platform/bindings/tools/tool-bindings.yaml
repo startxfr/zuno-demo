@@ -59,6 +59,7 @@ bindings:
       default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: get_customer
+    auth_mode: service-identity
 
   - capability: sxa.opportunity.search
     aliases: [list_open_opportunities]
@@ -69,6 +70,7 @@ bindings:
       default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: list_open_opportunities
+    auth_mode: service-identity
 
   - capability: sxa.quote.read
     aliases: [get_quote]
@@ -79,6 +81,7 @@ bindings:
       default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: get_quote
+    auth_mode: service-identity
 
   # ADR-0206 (WP-23): deterministic structured-query capabilities over the
   # legacy SXA schema - parameterized aggregations/lookups only, no tool
@@ -94,6 +97,7 @@ bindings:
       default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: aggregate_revenue_by_year
+    auth_mode: service-identity
 
   - capability: sxa.record.lookup
     aliases: [lookup_record]
@@ -104,6 +108,7 @@ bindings:
       default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: lookup_record
+    auth_mode: service-identity
 
   # --- confluence: real MCP server (ADR-0117), streamable-HTTP transport ---
   - capability: confluence.page.search
@@ -115,6 +120,7 @@ bindings:
       default: "http://confluence-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: search_pages
+    auth_mode: service-identity
 
   - capability: confluence.page.read
     backend: confluence
@@ -124,6 +130,7 @@ bindings:
       default: "http://confluence-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: read_page
+    auth_mode: service-identity
 
   - capability: confluence.page.create
     backend: confluence
@@ -133,6 +140,7 @@ bindings:
       default: "http://confluence-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: create_page
+    auth_mode: service-identity
 
   - capability: confluence.page.update
     backend: confluence
@@ -142,6 +150,7 @@ bindings:
       default: "http://confluence-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: update_page
+    auth_mode: service-identity
 
   # --- demo-mode in-process handlers (replaced by real servers as their
   #     integrations land) ---
@@ -151,6 +160,7 @@ bindings:
     transport: in-process
     handler: drive
     provider_tool: list_drive_files
+    auth_mode: delegated-user
 
   - capability: gmail.message.read
     aliases: [read_gmail]
@@ -158,6 +168,7 @@ bindings:
     transport: in-process
     handler: gmail
     provider_tool: read_gmail
+    auth_mode: delegated-user
 
   - capability: web.page.search
     aliases: [web_search]
@@ -165,6 +176,7 @@ bindings:
     transport: in-process
     handler: web_search
     provider_tool: web_search
+    auth_mode: service-identity
 
   - capability: email.report.send
     aliases: [send_technical_report_email]
@@ -172,3 +184,4 @@ bindings:
     transport: in-process
     handler: email_report
     provider_tool: send_technical_report_email
+    auth_mode: service-identity

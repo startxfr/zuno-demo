@@ -1,19 +1,26 @@
 """Demo-mode handler for the ``read_gmail`` MCP tool.
 
 To make this call real Gmail: replace the body below with a call to the
-Gmail API (``GET /gmail/v1/users/me/messages``) using the caller's
-delegated OAuth2 token (ADR-0014). Per MEMORY.md section 8, tools that read
-a user's mailbox must never be used to send mail as that user -- this
-handler (and its real-API replacement) must stay read-only. No live Google
-Workspace tenant is reachable from this environment.
+Gmail API (``GET /gmail/v1/users/me/messages``) using ``delegated_token``
+(the caller's delegated OAuth2 token, ADR-0014/ADR-0208). app/main.py's
+invoke_tool already refuses to call this handler at all when no delegated
+token is available (auth_mode=delegated-user, app/delegation.py) - by the
+time this function runs, delegated_token is guaranteed non-empty. Per
+MEMORY.md section 8, tools that read a user's mailbox must never be used
+to send mail as that user -- this handler (and its real-API replacement)
+must stay read-only. No live Google Workspace tenant is reachable from
+this environment, so the demo body below ignores delegated_token and
+returns synthetic data.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
-async def handle(arguments: Dict[str, Any], caller_sub: str) -> Dict[str, Any]:
+async def handle(
+    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+) -> Dict[str, Any]:
     query = str(arguments.get("query", "")).strip() or "in:inbox"
     return {
         "demo_mode": True,

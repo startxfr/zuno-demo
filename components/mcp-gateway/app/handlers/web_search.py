@@ -11,10 +11,15 @@ retrieved internal document content).
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
-async def handle(arguments: Dict[str, Any], caller_sub: str) -> Dict[str, Any]:
+async def handle(
+    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+) -> Dict[str, Any]:
+    # auth_mode=service-identity (ADR-0208): this backend uses a shared
+    # provider credential, never a per-user one - delegated_token is
+    # always None here and intentionally unused.
     query = str(arguments.get("query", "")).strip()
     return {
         "demo_mode": True,

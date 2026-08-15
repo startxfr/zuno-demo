@@ -117,11 +117,13 @@ bindings:
     transport: in-process
     handler: web_search
     provider_tool: t1
+    auth_mode: service-identity
   - capability: a.b.read
     backend: y
     transport: in-process
     handler: web_search
     provider_tool: t2
+    auth_mode: service-identity
 """
     )
     assert not registry.loaded
@@ -136,6 +138,7 @@ bindings:
     backend: x
     transport: in-process
     provider_tool: t1
+    auth_mode: service-identity
 """
     )
     assert not no_handler.loaded and "handler" in (no_handler.load_error or "")
@@ -147,9 +150,40 @@ bindings:
     backend: x
     transport: streamable-http
     provider_tool: t1
+    auth_mode: service-identity
 """
     )
     assert not no_endpoint.loaded and "endpoint" in (no_endpoint.load_error or "")
+
+
+def test_binding_without_auth_mode_fails_to_load() -> None:
+    """ADR-0208: auth_mode is required, never defaulted or inferred."""
+    missing = _registry_from(
+        """
+bindings:
+  - capability: a.b.read
+    backend: x
+    transport: in-process
+    handler: web_search
+    provider_tool: t1
+"""
+    )
+    assert not missing.loaded
+    assert "auth_mode" in (missing.load_error or "")
+
+    unknown = _registry_from(
+        """
+bindings:
+  - capability: a.b.read
+    backend: x
+    transport: in-process
+    handler: web_search
+    provider_tool: t1
+    auth_mode: not-a-real-mode
+"""
+    )
+    assert not unknown.loaded
+    assert "auth_mode" in (unknown.load_error or "")
 
 
 def test_invoke_without_binding_is_deterministic_502() -> None:
@@ -170,6 +204,7 @@ def test_invoke_with_unknown_handler_is_deterministic_502() -> None:
         backend="x",
         transport="in-process",
         provider_tool="t",
+        auth_mode="service-identity",
         handler="not_a_real_handler",
     )
 
@@ -246,6 +281,7 @@ TESTS = [
     test_sxa_legacy_capabilities_never_share_the_sales_namespace,
     test_duplicate_capability_rejected_at_load,
     test_malformed_entries_rejected_at_load,
+    test_binding_without_auth_mode_fails_to_load,
     test_invoke_without_binding_is_deterministic_502,
     test_invoke_with_unknown_handler_is_deterministic_502,
     test_evaluate_treats_capability_and_alias_as_one_tool,

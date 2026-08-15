@@ -60,6 +60,7 @@ def _sales_db_binding(provider_tool: str) -> Binding:
         backend="sales-db",
         transport="streamable-http",
         provider_tool=provider_tool,
+        auth_mode="service-identity",
         endpoint={"env": "TEST_SALES_DB_MCP_URL", "default": BASE_URL, "path": "/mcp"},
     )
 

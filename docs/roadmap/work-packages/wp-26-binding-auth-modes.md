@@ -1,6 +1,6 @@
 # WP-26: Per-binding authentication modes and audit
 
-- **State:** Not started
+- **State:** Done (2026-08-15 — repo-provable, no operator step required: required `auth_mode` (`delegated-user`|`service-identity`|`provider-delegated`) added to all 13 entries in `platform/bindings/tools/tool-bindings.yaml` (`drive.*`/`gmail.*` → delegated-user; every other binding → service-identity), fail-closed loader validation in `bindings.py`; enforcement in `main.py`'s `invoke_tool` between the policy decision and `invoke_downstream` (delegated-user without a resolvable token → deterministic 403, never a service-identity fallback; provider-delegated → 501, schema-only); new `app/delegation.py` documents the mock-level delegated-token contract (no live Google Workspace tenant reachable from this environment, per ADR-0014/handlers' own docstrings) with a test-only resolver hook; `downstream.py`/all four in-process handlers thread an optional `delegated_token` kwarg; `auth_mode` added to the audit log line and the `tool_invoke` OTel span (never token material). 5 new end-to-end tests (`test_auth_mode_enforcement.py`, using the real repo bindings/policy/agent files via FastAPI's `TestClient`) cover denial-without-token, success-once-resolved, mock revocation, service-identity needing no token, and no-token-material-in-logs; `test_bindings.py` gained a load-rejection test for missing/unknown `auth_mode`.)
 - **ADRs:** ADR-0208 (To be implemented -> Implemented)
 - **Depends on:** WP-01 (merged)
 - **Blocks:** WP-31, WP-32, WP-33

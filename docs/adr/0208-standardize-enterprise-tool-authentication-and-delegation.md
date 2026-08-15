@@ -1,6 +1,6 @@
 # ADR-0208: Standardize enterprise tool authentication and delegation
 
-- **Status:** To be implemented
+- **Status:** Implemented - see `platform/bindings/tools/tool-bindings.yaml`, `components/mcp-gateway/app/bindings.py`.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
