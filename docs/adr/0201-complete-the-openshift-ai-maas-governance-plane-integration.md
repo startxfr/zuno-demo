@@ -1,6 +1,6 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (governance manifests, key lifecycle, correlation and guards merged; live MaaS verification pending)
 - **Target:** v0.2
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

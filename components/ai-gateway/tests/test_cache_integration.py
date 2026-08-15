@@ -78,6 +78,7 @@ async def _invoke(fake_model: _FakeModel, *, caller_sub: str, classification: st
             task_id=task_id,
             requested_model="zuno-auto",
             raw_messages=raw_messages,
+            request_id="test-request-id",
         )
 
 

@@ -30,7 +30,7 @@ comparison this prototype exists to inform.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -41,6 +41,14 @@ MAAS_GATEWAY_ENDPOINT = os.getenv("MAAS_GATEWAY_ENDPOINT", "")
 # in provider-routing.yaml - never a literal value here, ADR-0024).
 MAAS_GATEWAY_API_KEY_ENV = os.getenv("MAAS_GATEWAY_API_KEY_ENV", "MAAS_GATEWAY_API_KEY")
 
+# ADR-0201 (WP-27): a THIRD gate, on top of the two above, specific to
+# candidates that leave the cluster (candidate.kind != "local") - external-
+# model egress through MaaS is a distinct lifecycle/policy decision from
+# "route the local model's own traffic through MaaS" (which never leaves
+# the cluster network, no egress concern). Default off: enabling
+# MAAS_ADAPTER_ENABLED alone must never open external egress by itself.
+MAAS_EXTERNAL_EGRESS_ENABLED = os.getenv("MAAS_EXTERNAL_EGRESS_ENABLED", "false").strip().lower() == "true"
+
 
 class MaasAdapterError(RuntimeError):
     pass
@@ -50,14 +58,26 @@ def enabled() -> bool:
     return MAAS_ADAPTER_ENABLED
 
 
-def should_use_maas(cfg: Dict[str, Any]) -> bool:
-    """True only when BOTH the global switch is on AND this specific
-    provider's config opted in - the two-key gate that keeps this
-    default-off and additive."""
-    return MAAS_ADAPTER_ENABLED and bool(cfg.get("via_maas", False))
+def should_use_maas(cfg: Dict[str, Any], candidate_kind: str = "local") -> bool:
+    """True only when the global switch is on AND this specific provider's
+    config opted in - the two-key gate that keeps this default-off and
+    additive. For a non-local candidate (an external SaaS provider routed
+    through MaaS, `candidate_kind != "local"`), a THIRD gate applies:
+    MAAS_EXTERNAL_EGRESS_ENABLED must also be on (ADR-0201's "external-
+    model egress, if enabled, is explicitly marked optional"). This never
+    changes WHETHER a candidate was eligible in the first place -
+    app/routing.py's classification/local-only filtering already ran
+    before chat_model_for() (and this function) are ever consulted; this
+    only gates the TRANSPORT for an already-eligible external candidate.
+    """
+    if not MAAS_ADAPTER_ENABLED or not cfg.get("via_maas", False):
+        return False
+    if candidate_kind != "local" and not MAAS_EXTERNAL_EGRESS_ENABLED:
+        return False
+    return True
 
 
-def chat_model_via_maas(cfg: Dict[str, Any]) -> BaseChatModel:
+def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -> BaseChatModel:
     """The exact same `ChatOpenAI` class every direct candidate in
     app/providers.py already uses, pointed at the MaaS gateway's
     OpenAI-compatible endpoint. `maas_model_ref` lets a provider-routing.yaml
@@ -65,6 +85,13 @@ def chat_model_via_maas(cfg: Dict[str, Any]) -> BaseChatModel:
     differs from the serving runtime's own internal model name
     (ADR-0114/ADR-0201 - MaaS model publication naming is not guaranteed to
     match `model`).
+
+    ADR-0201 (WP-27) usage correlation: `request_id`, when the caller has
+    one (app/main.py forwards the same X-Zuno-Request-Id
+    app/telemetry.py:model_call_span stamps on this call's own span), rides
+    along as a request header to MaaS itself - so MaaS-side usage/token
+    metrics can be joined to this same Zuno request trace, not just
+    ai-gateway's own span.
     """
     if not MAAS_GATEWAY_ENDPOINT:
         raise MaasAdapterError(
@@ -74,10 +101,13 @@ def chat_model_via_maas(cfg: Dict[str, Any]) -> BaseChatModel:
 
     from langchain_openai import ChatOpenAI
 
+    default_headers = {"X-Zuno-Request-Id": request_id} if request_id else None
+
     return ChatOpenAI(
         base_url=MAAS_GATEWAY_ENDPOINT,
         api_key=os.getenv(MAAS_GATEWAY_API_KEY_ENV, "not-required"),
         model=cfg.get("maas_model_ref", cfg.get("model")),
         temperature=cfg.get("temperature", 0.2),
         timeout=cfg.get("timeout_seconds", 60),
+        default_headers=default_headers,
     )

@@ -65,6 +65,15 @@ maasAdapter:
   enabled: false
   endpoint: ""
   secretName: llm-provider-maas
+  # ADR-0201 (WP-27): distinct from `enabled` above - routing the LOCAL
+  # model's own traffic through MaaS (enabled: true alone) never leaves
+  # the cluster network; letting an EXTERNAL SaaS candidate (via_maas:
+  # true in provider-routing.yaml) actually reach MaaS is a separate
+  # egress/lifecycle decision (ADR-0201 acceptance: "external-model
+  # egress, if enabled, is explicitly marked optional"). Operator+user
+  # decide (WP-27 brief's follow-up) - stays false until that decision is
+  # made, regardless of `enabled` above.
+  externalEgressEnabled: false
 
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance

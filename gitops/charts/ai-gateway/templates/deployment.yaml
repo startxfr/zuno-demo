@@ -88,6 +88,8 @@ spec:
               value: {{ .Values.maasAdapter.endpoint | quote }}
             - name: MAAS_GATEWAY_API_KEY_ENV
               value: "MAAS_GATEWAY_API_KEY"
+            - name: MAAS_EXTERNAL_EGRESS_ENABLED
+              value: {{ .Values.maasAdapter.externalEgressEnabled | quote }}
             - name: MAAS_GATEWAY_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -92,7 +92,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.2 | To be implemented | Complete the OpenShift AI MaaS governance plane integration |
+| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.2 | Partially implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v0.2 | Implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v0.2 | Implemented | Enforce knowledge authorization as policy intersection |
 | [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Partially implemented | Generalize the RAG platform to multiple isolated knowledge domains |

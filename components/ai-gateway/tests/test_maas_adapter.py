@@ -30,7 +30,12 @@ from app.routing import ProviderCandidate, RoutingTable  # noqa: E402
 
 
 def _reset_adapter_env(**overrides: str) -> None:
-    for key in ("MAAS_ADAPTER_ENABLED", "MAAS_GATEWAY_ENDPOINT", "MAAS_GATEWAY_API_KEY_ENV"):
+    for key in (
+        "MAAS_ADAPTER_ENABLED",
+        "MAAS_GATEWAY_ENDPOINT",
+        "MAAS_GATEWAY_API_KEY_ENV",
+        "MAAS_EXTERNAL_EGRESS_ENABLED",
+    ):
         os.environ.pop(key, None)
     os.environ.update(overrides)
     maas_adapter.MAAS_ADAPTER_ENABLED = (
@@ -38,6 +43,9 @@ def _reset_adapter_env(**overrides: str) -> None:
     )
     maas_adapter.MAAS_GATEWAY_ENDPOINT = os.getenv("MAAS_GATEWAY_ENDPOINT", "")
     maas_adapter.MAAS_GATEWAY_API_KEY_ENV = os.getenv("MAAS_GATEWAY_API_KEY_ENV", "MAAS_GATEWAY_API_KEY")
+    maas_adapter.MAAS_EXTERNAL_EGRESS_ENABLED = (
+        os.getenv("MAAS_EXTERNAL_EGRESS_ENABLED", "false").strip().lower() == "true"
+    )
 
 
 def test_adapter_disabled_by_default() -> None:
@@ -114,6 +122,34 @@ def test_maas_adapter_never_widens_c3_local_only_eligibility() -> None:
     )
 
 
+def test_external_egress_stays_blocked_even_when_adapter_and_provider_both_opt_in() -> None:
+    """ADR-0201 (WP-27) security-negative: MAAS_ADAPTER_ENABLED + a
+    provider's via_maas: true together are NOT sufficient for a non-local
+    (external) candidate - MAAS_EXTERNAL_EGRESS_ENABLED must also be on.
+    This is the egress-lifecycle gate, independent of and in addition to
+    the classification/local-only eligibility test above."""
+    _reset_adapter_env(MAAS_ADAPTER_ENABLED="true", MAAS_GATEWAY_ENDPOINT="http://maas.example/v1")
+    cfg = {"via_maas": True, "model": "gpt-4o-mini"}
+    assert maas_adapter.should_use_maas(cfg, "saas") is False, (
+        "external egress must stay blocked until MAAS_EXTERNAL_EGRESS_ENABLED is explicitly set"
+    )
+    # The same config, for the LOCAL candidate, is unaffected by the
+    # egress gate (routing traffic to the local model through MaaS never
+    # leaves the cluster).
+    assert maas_adapter.should_use_maas(cfg, "local") is True
+
+
+def test_external_egress_opt_in_only_affects_non_local_candidates() -> None:
+    _reset_adapter_env(
+        MAAS_ADAPTER_ENABLED="true",
+        MAAS_GATEWAY_ENDPOINT="http://maas.example/v1",
+        MAAS_EXTERNAL_EGRESS_ENABLED="true",
+    )
+    cfg = {"via_maas": True, "model": "gpt-4o-mini"}
+    assert maas_adapter.should_use_maas(cfg, "saas") is True
+    assert maas_adapter.should_use_maas(cfg, "local") is True
+
+
 TESTS = [
     test_adapter_disabled_by_default,
     test_provider_must_opt_in_even_when_globally_enabled,
@@ -122,6 +158,8 @@ TESTS = [
     test_chat_model_for_uses_maas_client_when_opted_in_and_enabled,
     test_maas_adapter_without_endpoint_fails_loudly,
     test_maas_adapter_never_widens_c3_local_only_eligibility,
+    test_external_egress_stays_blocked_even_when_adapter_and_provider_both_opt_in,
+    test_external_egress_opt_in_only_affects_non_local_candidates,
 ]
 
 

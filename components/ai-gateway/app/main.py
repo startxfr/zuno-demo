@@ -90,9 +90,18 @@ async def chat_completions(
     # across tasks once callers do start sending it; it just means the
     # cache doesn't yet differentiate by task).
     x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
+    # ADR-0201 (WP-27) usage correlation: the same request id agent-runtime
+    # mints per chat turn (components/agent-runtime/app/main.py's
+    # _request_id) and forwards via ModelRouter - optional, so this
+    # endpoint stays callable by anything that doesn't send it yet; a
+    # fresh id is minted here rather than left blank, so every model_call
+    # span still carries a stable id even for a caller that never sends
+    # one (never blank, always joinable to something).
+    x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
 ):
     classification = x_zuno_data_classification.upper()
     local_only = x_zuno_local_only.strip().lower() == "true"
+    request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
     try:
         candidates = routing_table.candidates_for(classification, local_only=local_only)
     except RoutingError as exc:
@@ -102,7 +111,7 @@ async def chat_completions(
 
     if payload.stream:
         return StreamingResponse(
-            _stream_completion(candidates, classification, messages),
+            _stream_completion(candidates, classification, messages, request_id),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -116,6 +125,7 @@ async def chat_completions(
         task_id=x_zuno_task,
         requested_model=payload.model,
         raw_messages=payload.messages,
+        request_id=request_id,
     )
 
 
@@ -128,6 +138,7 @@ async def _invoke_with_fallback(
     task_id: str,
     requested_model: str,
     raw_messages: List[ChatMessage],
+    request_id: str,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -169,8 +180,8 @@ async def _invoke_with_fallback(
         cfg = routing_table.provider_config(candidate.name)
         model_name = cfg.get("model", candidate.name)
         try:
-            with model_call_span(candidate.name, model_name, classification) as call:
-                model = chat_model_for(candidate, cfg)
+            with model_call_span(candidate.name, model_name, classification, request_id) as call:
+                model = chat_model_for(candidate, cfg, request_id=request_id)
                 result = await model.ainvoke(messages)
                 usage = getattr(result, "usage_metadata", None) or {}
                 prompt_tokens = usage.get("input_tokens", 0)
@@ -219,7 +230,7 @@ def _sse_chunk(completion_id: str, created: int, model_name: str, delta: Dict[st
 
 
 async def _stream_completion(
-    candidates: List[ProviderCandidate], classification: str, messages: List[Any]
+    candidates: List[ProviderCandidate], classification: str, messages: List[Any], request_id: str
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -240,8 +251,8 @@ async def _stream_completion(
         model_name = cfg.get("model", candidate.name)
         sent_any = False
         try:
-            with model_call_span(candidate.name, model_name, classification):
-                model = chat_model_for(candidate, cfg)
+            with model_call_span(candidate.name, model_name, classification, request_id):
+                model = chat_model_for(candidate, cfg, request_id=request_id)
                 async for event in model.astream(messages):
                     token = getattr(event, "content", "") or ""
                     if token:

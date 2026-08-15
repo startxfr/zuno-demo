@@ -118,6 +118,105 @@ embeddingModel:
 # chart (Day 1 "models" component, moved 2026-08-14 from
 # gitops/charts/openshift-ai which is Day 0) since it benchmarks a model
 # this chart deploys and belongs to the same install/uninstall lifecycle.
+maas:
+  # ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane -
+  # publishes the local chat model, group-based subscriptions and an
+  # authorization policy proving denial for an unentitled group. Disabled
+  # by default: the maas.opendatahub.io/v1alpha1 CRDs (MaaSModelRef,
+  # MaaSSubscription, MaaSAuthPolicy, ExternalModel) are confirmed
+  # installed on the test cluster (`oc get crd`, 2026-08-15), but no
+  # MaaSModelRef/Subscription/AuthPolicy exists there yet - every
+  # acceptance bullet (publish, two-group access difference, AuthPolicy
+  # deny, end-to-end request, metric/trace correlation) is a live-cluster
+  # operator step (see the WP-27 brief's follow-up section), same
+  # "manifests exist, live verification pending" posture as
+  # maasAdapter.enabled in gitops/charts/ai-gateway.
+  enabled: false
+
+  modelRef:
+    name: qwen25-7b-instruct-maas
+    # CONFIRM on the live cluster (WP-27 follow-up) - two real bridging
+    # options exist, neither a clean fit, and OpenShift AI 3.5's own
+    # documentation should decide between them:
+    #
+    #   1. modelRef.kind: LLMInferenceService (serving.kserve.io/v1alpha2,
+    #      confirmed installed) - the CRD MaaS's own schema seems to
+    #      expect for a "local" model, but it is a FULL SEPARATE serving
+    #      stack (model.uri, replicas, parallelism - no field references
+    #      an existing classic InferenceService), meaning publishing this
+    #      way would deploy a SECOND GPU-bound copy of the same model.
+    #      This cluster has exactly one GPU per node, both already
+    #      committed (see values.yaml's own resources block +
+    #      embeddingModel's) - not schedulable without more GPU capacity
+    #      or migrating the existing classic InferenceService off first
+    #      (a materially bigger, out-of-WP-27-scope change).
+    #   2. modelRef.kind: ExternalModel (maas.opendatahub.io/v1alpha1,
+    #      the CHOICE BELOW) - a much lighter resource (endpoint/provider/
+    #      targetModel/credentialRef, no GPU footprint of its own), but
+    #      its own CRD schema description says `endpoint` is "metadata for
+    #      downstream consumers... not used by the controller for
+    #      endpoint derivation" and its doc example is a third-party
+    #      hostname ("api.openai.com") - i.e. it reads as designed for
+    #      genuinely external SaaS providers, not confirmed to route
+    #      traffic to an internal cluster-local vLLM Service the way this
+    #      values block assumes. Chosen here only because it doesn't
+    #      duplicate GPU-bound infrastructure; VERIFY the resulting
+    #      MaaSModelRef actually serves real inference before relying on
+    #      it, and correct to option 1 (with a genuine capacity/migration
+    #      plan) if OpenShift AI 3.5 docs say ExternalModel cannot wrap an
+    #      internal endpoint.
+    kind: ExternalModel
+  externalModel:
+    # FQDN only, no scheme/path (CRD pattern-validated) - the existing
+    # classic InferenceService's own predictor Service (templates/
+    # inferenceservice.yaml), OpenAI-compatible per vLLM's own API.
+    endpoint: qwen25-7b-instruct-predictor.zuno-ai-run.svc.cluster.local
+    # CONFIRM: no enum in the CRD schema (free-form string, "identifies
+    # the API format and auth type") - "openai" is a guess matching vLLM's
+    # OpenAI-compatible surface, not confirmed against a live MaaS
+    # provider-resolver plugin list.
+    provider: openai
+    targetModel: qwen2.5-7b-instruct
+    # CRD-documented required shape: the referenced Secret MUST carry a
+    # data key literally named "api-key" (confirmed via the live CRD's
+    # OpenAPI schema description, 2026-08-15) - vLLM's own OpenAI-
+    # compatible server does not require a real key, so this is a
+    # placeholder value, not a real credential (ADR-0024: never a literal
+    # secret in this file - templates/maas.yaml renders it as a Secret,
+    # not an ExternalSecret, precisely because there is no real credential
+    # to resolve from Vault here).
+    credentialSecretName: qwen25-7b-instruct-maas-credential
+
+  # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
+  # demonstrating different MaaSSubscription access to the same published
+  # model via different token rate limits (MaaSSubscription has no
+  # separate "which models" dimension beyond modelRefs[], so
+  # differentiated *rate* is the schema-supported way to show two groups
+  # getting different access) - agent_tekos (Tekos's own primary
+  # consumers) gets the higher limit, sales a materially lower one to
+  # make the difference obvious in a live comparison.
+  subscriptions:
+    - name: qwen25-7b-instruct-tekos
+      group: agent_tekos
+      tokenRateLimits:
+        - limit: 100000
+          window: 1h
+      priority: 10
+    - name: qwen25-7b-instruct-sales
+      group: sales
+      tokenRateLimits:
+        - limit: 5000
+          window: 1h
+      priority: 1
+
+  # Proves a group/model combination WITHOUT entitlement is denied
+  # (ADR-0201 acceptance bullet 3): only the groups above are subjects -
+  # any other group (e.g. `finance`, used in the operator's live negative
+  # test) is denied by omission. The live proof itself is the WP-27
+  # follow-up's job; this manifest is what makes that proof possible.
+  authPolicy:
+    name: qwen25-7b-instruct-entitlement
+
 lmEval:
   enabled: true
   # First real run (2026-08-14, roadmap WP-10 test pass): benchmarks the

@@ -116,7 +116,7 @@ def _request_id(request: Request) -> str:
     return request.headers.get(REQUEST_ID_HEADER) or str(uuid.uuid4())
 
 
-def _initial_state(payload: ChatRequest, identity: CallerIdentity) -> Dict[str, Any]:
+def _initial_state(payload: ChatRequest, identity: CallerIdentity, request_id: str) -> Dict[str, Any]:
     # ADR-0033: user_sub in the request body is informational/correlation
     # only, never an authorization input - the graph state's "user_sub"
     # (and every downstream classification/tool-authorization decision) is
@@ -138,6 +138,11 @@ def _initial_state(payload: ChatRequest, identity: CallerIdentity) -> Dict[str, 
         "groups": identity.groups,
         "bearer_token": identity.token,
         "message": payload.message,
+        # ADR-0201 (WP-27): threaded to reason_node -> ModelRouter ->
+        # ai-gateway -> (when routed via MaaS) the MaaS adapter, so a
+        # model-call trace/usage record can be joined back to this exact
+        # chat turn.
+        "request_id": request_id,
         "retrieved_docs": [],
         "tool_results": {},
         "errors": [],
@@ -188,8 +193,8 @@ async def tekos_chat(
     """
     graph = request.app.state.tekos_graph
     accept = request.headers.get("accept", "")
-    initial_state = _initial_state(payload, identity)
     request_id = _request_id(request)
+    initial_state = _initial_state(payload, identity, request_id)
     run_id = await _resolve_run_id(graph, payload, identity)
     config = {"configurable": {"thread_id": run_id}}
 

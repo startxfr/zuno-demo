@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any, List, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
@@ -50,7 +50,29 @@ class ModelRouterError(RuntimeError):
 
 
 class ModelRouter:
-    def chat_model_for(self, classification: str, bearer_token: str, local_only: bool = False) -> BaseChatModel:
+    def chat_model_for(
+        self,
+        classification: str,
+        bearer_token: str,
+        local_only: bool = False,
+        request_id: Optional[str] = None,
+    ) -> BaseChatModel:
+        headers = {
+            "X-Zuno-Data-Classification": classification.upper(),
+            # ADR-0035: source-level restriction independent of
+            # classification - set when a source this turn (e.g.
+            # Confluence) declared external_model_policy.allow_context:
+            # false, forcing the gateway to only consider local
+            # candidates regardless of what this classification would
+            # otherwise allow.
+            "X-Zuno-Local-Only": "true" if local_only else "false",
+        }
+        if request_id:
+            # ADR-0201/WP-27: lets ai-gateway (and, when routed via MaaS,
+            # MaaS's own usage metrics) correlate back to this exact chat
+            # turn - see components/ai-gateway/app/telemetry.py's
+            # model_call_span and app/maas_adapter.py.
+            headers["X-Zuno-Request-Id"] = request_id
         return ChatOpenAI(
             base_url=f"{AI_GATEWAY_URL}/v1",
             # ADR-0032: forward the same validated end-user token the
@@ -71,20 +93,16 @@ class ModelRouter:
             # default_header below), not model-name-driven. Required by
             # the OpenAI wire schema regardless.
             model="zuno-auto",
-            default_headers={
-                "X-Zuno-Data-Classification": classification.upper(),
-                # ADR-0035: source-level restriction independent of
-                # classification - set when a source this turn (e.g.
-                # Confluence) declared external_model_policy.allow_context:
-                # false, forcing the gateway to only consider local
-                # candidates regardless of what this classification would
-                # otherwise allow.
-                "X-Zuno-Local-Only": "true" if local_only else "false",
-            },
+            default_headers=headers,
         )
 
     async def invoke_with_fallback(
-        self, classification: str, messages: List[Any], bearer_token: str, local_only: bool = False
+        self,
+        classification: str,
+        messages: List[Any],
+        bearer_token: str,
+        local_only: bool = False,
+        request_id: Optional[str] = None,
     ):
         """Kept as async + same name/signature as before this split (plus
         `bearer_token`/`local_only`, added for ADR-0032/ADR-0035) so
@@ -93,7 +111,7 @@ class ModelRouter:
         gateway now (app/main.py:_invoke_with_fallback there) - this is a
         single HTTP call.
         """
-        model = self.chat_model_for(classification, bearer_token, local_only)
+        model = self.chat_model_for(classification, bearer_token, local_only, request_id)
         try:
             result = await model.ainvoke(messages)
         except Exception as exc:

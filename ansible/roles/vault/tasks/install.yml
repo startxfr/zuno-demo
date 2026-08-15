@@ -592,6 +592,28 @@
     and zuno_aramis_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# ADR-0201 (WP-27): the ai-gateway MaaS adapter's programmatic-client API
+# key (components/ai-gateway/app/maas_adapter.py,
+# gitops/charts/ai-gateway/templates/externalsecret-maas.yaml). Unlike the
+# generated postgresql/app-style credentials above, this key is minted by
+# MaaS itself once a real MaaSSubscription/API-key request flow runs on
+# the live cluster (operator action, WP-27 follow-up) - ansible cannot
+# generate it, only seed a value the operator already obtained, same
+# operator-supplied pattern as confluence/salesforce/aramis above. Skipped
+# while the placeholder remains, so maasAdapter.enabled stays effectively
+# inert (MAAS_GATEWAY_API_KEY unset) until this is seeded.
+- name: "vault | seed the MaaS gateway API key from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/maas/gateway-api-key
+      api_key={{ zuno_maas_gateway_api_key | quote }}"
+  when: >-
+    zuno_maas_gateway_api_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 # Only seeded when all five fields are real - no placeholder fallback,
 # since the ExternalSecret that reads it only renders under the same
 # condition (postgresql role's backups.s3.enabled).

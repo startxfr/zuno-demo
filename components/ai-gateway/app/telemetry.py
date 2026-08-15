@@ -115,13 +115,22 @@ def _estimate_cost_usd(provider: str, prompt_tokens: int, completion_tokens: int
 
 
 @contextmanager
-def model_call_span(provider: str, model: str, classification: str) -> Iterator["ModelCallRecorder"]:
+def model_call_span(
+    provider: str, model: str, classification: str, request_id: Optional[str] = None
+) -> Iterator["ModelCallRecorder"]:
     """Wraps one model invocation: records a span plus the
     zuno.model_calls / zuno.model_tokens / zuno.model_cost_usd metrics
     (ADR-0029) once `.record_usage()` is called on the yielded recorder, or
     just the outcome/latency if the caller never has token counts (e.g. a
     failed call, or a streaming call - see app/main.py's streaming path for
     why token accounting is best-effort there).
+
+    ADR-0201 (WP-27): `request_id` is the same X-Zuno-Request-Id
+    agent-runtime mints per chat turn (app/main.py's `_request_id`,
+    components/agent-runtime/app/telemetry.py's `graph_run_span`) -
+    stamping it here is what lets this span (and, when the MaaS adapter
+    is in use, MaaS's own usage/token metrics - see app/maas_adapter.py)
+    be correlated back to the originating Zuno request trace.
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
@@ -129,6 +138,8 @@ def model_call_span(provider: str, model: str, classification: str) -> Iterator[
         span.set_attribute("zuno.provider", provider)
         span.set_attribute("zuno.model", model)
         span.set_attribute("zuno.classification", classification)
+        if request_id:
+            span.set_attribute("zuno.request_id", request_id)
         recorder = ModelCallRecorder(provider=provider)
         try:
             yield recorder

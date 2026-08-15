@@ -43,6 +43,10 @@ class AgentState(TypedDict, total=False):
     groups: List[str]
     bearer_token: str
     message: str
+    # ADR-0201/WP-27: forwarded to ai-gateway (and, when routed via MaaS,
+    # the MaaS adapter) as X-Zuno-Request-Id for usage/trace correlation -
+    # see app/main.py's _request_id and app/clients/model_router.py.
+    request_id: str
 
     # Node outputs, accumulated as the graph runs
     retrieved_docs: List[RetrievedDoc]

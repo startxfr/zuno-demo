@@ -755,3 +755,36 @@ under `docs/adr/`.
   token material, verified by a dedicated test. Fully repo-provable - ADR-0208
   flips straight to Implemented; optional live Google-revocation
   confirmation left for the operator.
+
+- **2026-08-15 (ADR-0201, WP-27)**: MaaS governance-plane manifests, key
+  lifecycle, correlation and guards - live MaaS verification pending.
+  `gitops/charts/models/templates/maas.yaml` publishes the local chat
+  model through `MaaSModelRef`, wrapping the existing vLLM predictor's
+  OpenAI-compatible endpoint via an `ExternalModel`
+  (`maas.opendatahub.io/v1alpha1`) rather than `LLMInferenceService` -
+  the latter is a FULL SEPARATE serving stack per its live-cluster schema
+  (`model.uri`, no reference to an existing InferenceService), and this
+  cluster's two GPUs are already both committed, so duplicating one would
+  need real capacity/migration planning out of this WP's scope; the
+  ExternalModel choice is flagged `# CONFIRM` since its own schema
+  description reads as designed for genuinely external providers, not
+  confirmed for an internal Service. Two `MaaSSubscription`s
+  (`agent_tekos`/`sales`) demonstrate different access via differentiated
+  token-rate limits (MaaSSubscription has no separate "which models"
+  axis beyond rate); one `MaaSAuthPolicy` scoped to just those two groups
+  proves denial-by-omission for any other group. Every CRD field checked
+  live (`oc explain`, 2026-08-15) except explicitly marked
+  `# CONFIRM`/`# verify-on-cluster` fields. New
+  `externalsecret-maas.yaml` + a `maas/gateway-api-key` Vault seed close
+  the API-key lifecycle gap the adapter already expected but nothing
+  populated. `X-Zuno-Request-Id` now threads end to end (agent-runtime's
+  `AgentState.request_id` → `ModelRouter` → ai-gateway's `model_call_span`
+  → `maas_adapter.chat_model_via_maas`'s own header) for usage/trace
+  correlation. New `MAAS_EXTERNAL_EGRESS_ENABLED` gate (default off,
+  independent of `MAAS_ADAPTER_ENABLED`) blocks external-provider egress
+  through MaaS until explicitly opted in - 2 new security-negative tests,
+  alongside the existing WP-03 C3/local-only eligibility test. Day 1 check
+  extended, diagnostic only. Everything new ships disabled by default.
+  ADR-0201 stays Partially implemented; every ADR-0201 acceptance bullet
+  and the external-egress lifecycle decision remain live-cluster operator
+  steps.

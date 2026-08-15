@@ -52,6 +52,45 @@
       gitops/charts/models's lmEval.jobs values).
   when: (_models_lmevaljobs.resources | default([]) | length) == 0
 
+# ADR-0201/roadmap WP-27: reports whether the MaaS governance resources
+# (gitops/charts/models/templates/maas.yaml) reconciled, so
+# `make d1 check models` surfaces MaaS state without a separate command.
+# Same diagnostic-only posture as the LMEvalJob block above: never gates
+# _state_is_installed - MaaS is an opt-in governance layer on top of the
+# model this role already owns, not something this role installs itself.
+# Skips gracefully (a clear "not enabled" message, no error) when
+# gitops/charts/models's maas.enabled is false, the chart's own default.
+- name: "models | look up MaaSModelRef resources (ADR-0201 MaaS governance)"
+  kubernetes.core.k8s_info:
+    api_version: maas.opendatahub.io/v1alpha1
+    kind: MaaSModelRef
+    namespace: "{{ models_lmeval_namespace | default('zuno-ai-run') }}"
+  register: _models_maasmodelrefs
+  ignore_errors: true
+
+- name: "models | report MaaSModelRef/Subscription/AuthPolicy reconciliation"
+  ansible.builtin.debug:
+    msg: >-
+      MaaSModelRef {{ item.metadata.name }}: found and reconciled by the
+      MaaS operator (status={{ item.status | default('(no status reported)') }}).
+      See the WP-27 brief's operator follow-up for the full acceptance
+      checklist (subscription/AuthPolicy verification, end-to-end request,
+      metric/trace correlation) - this check only confirms the resource
+      itself synced, not that every governance behavior it declares works.
+  loop: "{{ _models_maasmodelrefs.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name | default('?') }}"
+  when: (_models_maasmodelrefs.resources | default([]) | length) > 0
+
+- name: "models | note MaaS governance is not enabled"
+  ansible.builtin.debug:
+    msg: >-
+      No MaaSModelRef resources found in
+      {{ models_lmeval_namespace | default('zuno-ai-run') }} - MaaS
+      governance is not enabled for this deployment (ADR-0201, opt-in via
+      gitops/charts/models's maas.enabled value) or has not synced yet.
+  when: (_models_maasmodelrefs.resources | default([]) | length) == 0
+
 - name: "models | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:

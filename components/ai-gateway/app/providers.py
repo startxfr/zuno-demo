@@ -17,7 +17,7 @@ MaaS adapter can change transport, never eligibility.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -29,9 +29,15 @@ class ProviderFactoryError(RuntimeError):
     pass
 
 
-def chat_model_for(candidate: ProviderCandidate, cfg: Dict[str, Any]) -> BaseChatModel:
-    if maas_adapter.should_use_maas(cfg):
-        return maas_adapter.chat_model_via_maas(cfg)
+def chat_model_for(
+    candidate: ProviderCandidate, cfg: Dict[str, Any], request_id: Optional[str] = None
+) -> BaseChatModel:
+    if maas_adapter.should_use_maas(cfg, candidate.kind):
+        # ADR-0201 (WP-27): only the MaaS transport forwards request_id as
+        # a header - direct providers already get it on their own
+        # model_call_span (app/main.py), which is the only correlation
+        # surface Zuno controls for those.
+        return maas_adapter.chat_model_via_maas(cfg, request_id=request_id)
 
     if candidate.kind == "local":
         from langchain_openai import ChatOpenAI
