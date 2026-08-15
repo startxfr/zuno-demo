@@ -20,6 +20,7 @@ sources:
 zuno:
   name: tekos
   status: active
+  graph_shape: retrieve_reason_respond
   tasks:
     - answer-technical-question
     - find-relevant-docs
@@ -59,6 +60,14 @@ Conforms to `platform/okf/schema/zuno-okf-v0.2.schema.json` (ADR-0005,
 ADR-0006, ADR-0038). Task detail lives in `tasks/*.md`, linked by name from
 `zuno.tasks` above; the system prompt for the primary task lives in
 `prompts/answer-technical-question.md`.
+
+`zuno.graph_shape: retrieve_reason_respond` (ADR-0342) names the LangGraph
+workflow module (`components/agent-runtime/app/graph/shapes/`) Agent
+Runtime's `GraphFactory` resolves for Tekos's chat turns - retrieve, an
+optional live tool call, reason, respond. Naming it declaratively here (no
+prior behavior change) is what lets a later agent reuse this exact shape,
+or Arkos declare a materially different one, without any Agent Runtime
+code change.
 
 Tekos has no agent-level `zuno.allowed_knowledge` field (ADR-0203): like its
 tool ceiling, its knowledge-domain ceiling is derived as the union of every

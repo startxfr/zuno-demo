@@ -1,8 +1,9 @@
 """Zuno Agent Runtime (ADR-0009, ADR-0018): shared stateful orchestration
-service. This v0 build implements the Tekos workflow only - the other four
-agents are access-gated placeholder tiles built by a parallel track and do
-not have a runtime workflow yet. See README.md for the exact HTTP API
-contract.
+service. ADR-0342 (WP-30) generalized this from a single hardcoded Tekos
+route to agent-name-driven dispatch resolved through `AgentRegistry` and
+`GraphFactory` - Tekos remains the only `active` agent until WP-31 lands
+Arkos as the second, but nothing here is hardcoded to Tekos by name
+anymore. See README.md for the exact HTTP API contract.
 """
 
 from __future__ import annotations
@@ -20,9 +21,10 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from app.auth import CallerIdentity, validate_token
 from app.clients import project_memory_client
-from app.graph.build import build_graph
-from app.graph.nodes import TEKOS_BASE_CLASSIFICATION, _TEKOS, _model_router
+from app.graph.build import GraphFactory, validate_shapes
+from app.graph.nodes import _model_router
 from app.memory import MemoryExtractionError, extract_memory
+from app.registry import AgentDefinition, AgentRegistry
 from app.schemas import ChatRequest, ChatResponse
 from app.telemetry import graph_run_span, init_telemetry
 
@@ -30,6 +32,29 @@ logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(m
 logger = logging.getLogger("agent_runtime")
 
 init_telemetry("agent-runtime")  # ADR-0029: traces/metrics to the shared OTel Collector
+
+# ADR-0342 (WP-30): the generic dispatch route's own registry lookup - a
+# second AgentRegistry instance from app/graph/nodes.py's (that one stays
+# Tekos-coupled for now, see that module's own docstring); both read the
+# same checked-in agents/ bundles, so a second idempotent load here is
+# cheap and keeps this module's dispatch concern independent of nodes.py's
+# internals. Fails fast at import time, same posture as nodes.py's own
+# registry.
+_registry = AgentRegistry()
+if _registry.load_errors:
+    raise RuntimeError(f"agent-runtime: failed to load OKF bundles: {_registry.load_errors}")
+
+
+def _active_agent_or_404(agent: str) -> AgentDefinition:
+    """Every route keyed on a path `{agent}` segment resolves through
+    here: an unknown name or a `placeholder` agent (no runtime workflow
+    exists for it, ADR-0007) both fail the same deterministic way, before
+    GraphFactory is ever consulted."""
+    agent_def = _registry.get(agent)
+    if agent_def is None or agent_def.status != "active":
+        raise HTTPException(status_code=404, detail=f"unknown agent '{agent}'")
+    return agent_def
+
 
 # ADR-0103: separate PG* variables (never a single combined DSN env var),
 # same convention as components/mcp-servers/sales-db/server.py's
@@ -62,16 +87,21 @@ def _checkpoint_conninfo() -> Optional[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """ADR-0103: builds the Tekos graph once at startup against either a
-    persistent Postgres checkpointer (CHECKPOINT_PG* configured) or an
-    in-memory one (default) - stored on `app.state`, not a module-level
-    constant, since a Postgres-backed checkpointer needs a live async
-    connection that can't be opened before the event loop exists.
+    """ADR-0103/ADR-0342: builds one `GraphFactory` at startup against
+    either a persistent Postgres checkpointer (CHECKPOINT_PG* configured)
+    or an in-memory one (default) - stored on `app.state`, not a
+    module-level constant, since a Postgres-backed checkpointer needs a
+    live async connection that can't be opened before the event loop
+    exists. Fail-fast: every registered agent must resolve to a known
+    graph shape before the app finishes starting (ADR-0342 Operational
+    considerations) - this runs regardless of which checkpointer backend
+    is selected.
     """
+    validate_shapes(_registry.all())
     conninfo = _checkpoint_conninfo()
     if conninfo is None:
         logger.info("CHECKPOINT_PG* not fully configured - using in-memory checkpointing (not resumable across restarts)")
-        app.state.tekos_graph = build_graph(MemorySaver())
+        app.state.graph_factory = GraphFactory(MemorySaver())
         yield
         return
 
@@ -79,7 +109,7 @@ async def lifespan(app: FastAPI):
 
     async with AsyncPostgresSaver.from_conn_string(conninfo) as checkpointer:
         await checkpointer.setup()  # idempotent - creates the checkpoint tables on first run
-        app.state.tekos_graph = build_graph(checkpointer)
+        app.state.graph_factory = GraphFactory(checkpointer)
         logger.info("Postgres-backed checkpointing enabled at %s:%s/%s", CHECKPOINT_PGHOST, CHECKPOINT_PGPORT, CHECKPOINT_PGDATABASE)
         yield
 
@@ -209,21 +239,23 @@ async def _build_transcript(graph, run_id: str) -> str:
     return "\n".join(turns)
 
 
-@app.post("/v1/agents/tekos/runs/{run_id}/extract-memory")
+@app.post("/v1/agents/{agent}/runs/{run_id}/extract-memory")
 async def extract_memory_endpoint(
+    agent: str,
     run_id: str,
     request: Request,
     identity: CallerIdentity = Depends(validate_token),
 ) -> Dict[str, Any]:
-    """ADR-0209 (WP-28): the explicit extraction step - session end or an
-    explicit checkpoint, never automatic per-turn. Reuses
-    _resolve_run_id's ownership check (404 unknown run, 403 wrong
-    subject) since this endpoint reads the exact same checkpoint state,
-    then requires the run to actually carry a project_id (a run with none
-    has nothing to extract INTO - knowledge.project is per-project, not a
-    default bucket).
+    """ADR-0209 (WP-28), generalized per ADR-0342 (WP-30): the explicit
+    extraction step - session end or an explicit checkpoint, never
+    automatic per-turn. Reuses _resolve_run_id's ownership check (404
+    unknown run, 403 wrong subject) since this endpoint reads the exact
+    same checkpoint state, then requires the run to actually carry a
+    project_id (a run with none has nothing to extract INTO -
+    knowledge.project is per-project, not a default bucket).
     """
-    graph = request.app.state.tekos_graph
+    agent_def = _active_agent_or_404(agent)
+    graph = request.app.state.graph_factory.graph_for(agent_def)
     config = {"configurable": {"thread_id": run_id}}
     tuple_ = await graph.checkpointer.aget_tuple(config)
     if tuple_ is None:
@@ -247,8 +279,10 @@ async def extract_memory_endpoint(
 
     # ADR-0034: the highest classification reached across this run's
     # turns, monotonically escalated by _escalate - never re-derived or
-    # downgraded here.
-    classification = channel_values.get("effective_classification", TEKOS_BASE_CLASSIFICATION)
+    # downgraded here. Falls back to this agent's own OKF-declared
+    # baseline (not a Tekos-specific constant) if the checkpoint somehow
+    # never recorded one.
+    classification = channel_values.get("effective_classification", agent_def.preferred_classification)
 
     try:
         facts, memories = await extract_memory(
@@ -272,7 +306,7 @@ async def extract_memory_endpoint(
             project_id=project_id,
             caller_sub=identity.sub,
             caller_groups=identity.groups,
-            agent=_TEKOS.name,
+            agent=agent_def.name,
             session_id=channel_values.get("session_id"),
             classification=classification,
             facts=facts,
@@ -287,16 +321,23 @@ async def extract_memory_endpoint(
     return result
 
 
-@app.post("/v1/agents/tekos/chat")
-async def tekos_chat(
+@app.post("/v1/agents/{agent}/chat")
+async def agent_chat(
+    agent: str,
     payload: ChatRequest,
     request: Request,
     identity: CallerIdentity = Depends(validate_token),
 ):
     """Synchronous JSON response, or SSE token streaming when the caller
-    sends `Accept: text/event-stream`.
+    sends `Accept: text/event-stream`. ADR-0342 (WP-30): `{agent}` is
+    resolved through `AgentRegistry`/`GraphFactory` - no per-agent
+    hardcoded route or graph. Tekos's own chat path keeps working
+    unchanged (agent-bff already calls this exact generic pattern with its
+    own configured `AGENT_NAME`, per components/agent-bff/internal/
+    runtime/client.go) - only the server-side dispatch generalized.
     """
-    graph = request.app.state.tekos_graph
+    agent_def = _active_agent_or_404(agent)
+    graph = request.app.state.graph_factory.graph_for(agent_def)
     accept = request.headers.get("accept", "")
     request_id = _request_id(request)
     initial_state = _initial_state(payload, identity, request_id)
@@ -315,7 +356,7 @@ async def tekos_chat(
         )
 
     try:
-        with graph_run_span(payload.session_id) as recorder:
+        with graph_run_span(payload.session_id, agent=agent_def.name, graph_shape=agent_def.graph_shape) as recorder:
             final_state = await graph.ainvoke(initial_state, config=config)
             recorder.source_mode = final_state.get("source_mode", "none")
             recorder.live_read_trigger_reason = final_state.get("live_read_trigger_reason")

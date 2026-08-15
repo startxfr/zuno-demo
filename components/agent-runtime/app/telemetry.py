@@ -57,17 +57,29 @@ class GraphRunRecorder:
 
 
 @contextmanager
-def graph_run_span(session_id: str) -> Iterator[GraphRunRecorder]:
+def graph_run_span(
+    session_id: str, agent: Optional[str] = None, graph_shape: Optional[str] = None
+) -> Iterator[GraphRunRecorder]:
     """WP-24 (ADR-0205): wraps one LangGraph run, recording the same
     no-silent-substitution signals the response body carries -
     zuno.source_mode ("indexed"/"live"/"both"/"none") and, when present,
     why a live-read was triggered this turn - so a trace answers the
     acceptance bullet without needing to correlate against the HTTP
-    response body separately."""
+    response body separately.
+
+    WP-30/ADR-0342: also records which agent and which graph shape served
+    this run - the Operational considerations requirement that "tracing
+    must record which graph shape served a given request, alongside the
+    existing agent/task identifiers."
+    """
     tracer = _tracer or trace.get_tracer("agent-runtime")
     start = time.monotonic()
     with tracer.start_as_current_span("agent_graph_run") as span:
         span.set_attribute("zuno.session_id", session_id)
+        if agent:
+            span.set_attribute("zuno.agent", agent)
+        if graph_shape:
+            span.set_attribute("zuno.graph_shape", graph_shape)
         recorder = GraphRunRecorder()
         try:
             yield recorder

@@ -1,6 +1,6 @@
 # ADR-0342: Support multiple agent graph shapes in Agent Runtime
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (shape registry, generic dispatch, fail-fast validation and tests merged; Arkos second shape pending WP-31)
 - **Target:** v0.3
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

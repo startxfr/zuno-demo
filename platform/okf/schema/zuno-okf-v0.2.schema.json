@@ -86,6 +86,11 @@
           },
           "uniqueItems": true
         },
+        "graph_shape": {
+          "description": "[ZUNO EXT] ADR-0342: name of the Agent Runtime LangGraph workflow shape (components/agent-runtime/app/graph/shapes/<name>.py) this agent's active workflow executes - e.g. \"retrieve_reason_respond\". Not enforced `required` here (this schema checks *shape*, not business rules, per app/registry.py's own convention): Agent Runtime's AgentRegistry fail-fast startup validation requires it once `status` is `active`; a `placeholder` agent has no runtime workflow yet (ADR-0007) and may omit it.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
         "rag": {
           "description": "ADR-0039: RAG retrieval parameters consumed by Agent Runtime's retrieve node - config, not code, so changing this changes runtime behavior without a source change.",
           "type": "object",

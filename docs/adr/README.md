@@ -137,7 +137,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | v0 | Implemented | Revert OpenShift AI to the default applications namespace |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v0.3 | To be implemented | Extend business-role authorization with CDP and scoped capabilities |
-| [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | To be implemented | Support multiple agent graph shapes in Agent Runtime |
+| [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | Partially implemented | Support multiple agent graph shapes in Agent Runtime |
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | v0.1 | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
 | [ADR-0344](0344-track-blocked-resources-and-add-a-day-0-reconcile-verb.md) | v0.1 | Implemented | Track blocked resources and add a Day 0 reconcile verb |
 | [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) | v0.1 | Implemented | Make self-generated Vault credentials idempotent across ansible re-runs |

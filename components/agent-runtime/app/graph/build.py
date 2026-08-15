@@ -1,56 +1,91 @@
-"""Compiles the Tekos LangGraph workflow: an explicit graph of
-retrieve -> tool_call (conditional) -> reason -> respond nodes, per
-ADR-0018's decision to use LangGraph as the orchestration layer over the
-OGX inference/retrieval substrate.
+"""GraphFactory (ADR-0342): resolves, compiles and caches a LangGraph
+workflow per named shape, keyed off `AgentDefinition.graph_shape` rather
+than one hardcoded build function per agent. Before this ADR, v0 had
+exactly one graph shape (Tekos's) and this module WAS that one build
+function - see app/graph/shapes/retrieve_reason_respond.py for where that
+function moved verbatim; this module now only resolves a shape name to a
+builder and compiles/caches the result.
 
-ADR-0039's "GraphFactory" for v0: there is exactly one graph shape today
-(Tekos's), so this module doesn't select among alternatives yet - what
-ADR-0039 requires (prompts/tools/RAG/classification coming from the OKF
-contract rather than code) is satisfied by app/graph/nodes.py resolving
-those values from app/registry.py's AgentRegistry at import time. A second
-agent's graph shape would add a second build function here plus a
-selector keyed on AgentDefinition.name.
-
-ADR-0103: `build_graph` now takes an explicit `checkpointer` (any
-`BaseCheckpointSaver` - `MemorySaver` for the in-memory default, or an
-`AsyncPostgresSaver` for persistent, resumable runs) instead of compiling
-once at import time. A Postgres-backed checkpointer needs a live async
-connection, which cannot be opened at plain module-import time (no event
-loop yet) - so the compiled graph is now built during app startup
-(app/main.py's lifespan) and stored on `app.state`, not as a module-level
-constant.
+A compiled graph is safe to reuse concurrently across every agent that
+declares the same shape name (per-invocation state flows through `config`,
+never held on the graph object) - so two agents sharing a shape (e.g. a
+future agent reusing `retrieve_reason_respond`) share one compiled graph
+object, compiled at most once.
 """
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Dict, Iterable
+
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.graph.nodes import reason_node, respond_node, retrieve_node, should_call_tools, tool_call_node
-from app.graph.state import AgentState
+from app.graph.shapes import SHAPE_BUILDERS
+
+if TYPE_CHECKING:
+    from app.registry import AgentDefinition
 
 
-def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
-    graph = StateGraph(AgentState)
+class UnknownGraphShapeError(RuntimeError):
+    pass
 
-    graph.add_node("retrieve", retrieve_node)
-    graph.add_node("tool_call", tool_call_node)
-    graph.add_node("reason", reason_node)
-    graph.add_node("respond", respond_node)
 
-    graph.add_edge(START, "retrieve")
-    graph.add_conditional_edges(
-        "retrieve",
-        should_call_tools,
-        {"tool_call": "tool_call", "reason": "reason"},
-    )
-    graph.add_edge("tool_call", "reason")
-    graph.add_edge("reason", "respond")
-    graph.add_edge("respond", END)
+def known_shapes() -> Iterable[str]:
+    return SHAPE_BUILDERS.keys()
 
-    # Compiled once per checkpointer (at app startup, or once per test); the
-    # compiled graph is safe to reuse concurrently across requests -
-    # per-invocation state is passed explicitly via `config`, never held on
-    # the graph object itself.
-    return graph.compile(checkpointer=checkpointer)
+
+def validate_shapes(agents: Iterable["AgentDefinition"]) -> None:
+    """ADR-0342 Operational considerations / fail-fast startup: an
+    `active` agent - the only kind this runtime is ever asked to actually
+    serve a graph for (app/main.py's generic dispatch 404s on anything
+    else before ever reaching GraphFactory) - must resolve to exactly one
+    known graph shape, or the app aborts startup with a clear error rather
+    than discovering the misconfiguration on the first real request.
+
+    A `placeholder` agent has no runtime workflow at all (ADR-0007) and may
+    omit `graph_shape` entirely; if it names one anyway (e.g. metadata
+    prepared ahead of going active), that name is still checked - a typo
+    in unused-today metadata is still worth catching early.
+    """
+    for agent in agents:
+        if agent.status != "active":
+            if agent.graph_shape is not None and agent.graph_shape not in SHAPE_BUILDERS:
+                raise UnknownGraphShapeError(
+                    f"agent '{agent.name}' (status={agent.status}) declares unknown graph "
+                    f"shape '{agent.graph_shape}' (known shapes: {sorted(SHAPE_BUILDERS)})"
+                )
+            continue
+        if agent.graph_shape is None or agent.graph_shape not in SHAPE_BUILDERS:
+            raise UnknownGraphShapeError(
+                f"active agent '{agent.name}' does not resolve to a known graph shape "
+                f"(declared: {agent.graph_shape!r}, known shapes: {sorted(SHAPE_BUILDERS)})"
+            )
+
+
+class GraphFactory:
+    """One instance per running Agent Runtime process
+    (app.state.graph_factory), built against the process's single
+    checkpointer at startup - the same async-connection-needs-an-event-loop
+    constraint the old single build_graph() call already had (see
+    app/main.py's lifespan). Compiles each shape at most once, lazily, on
+    first use, and reuses the compiled graph across every agent sharing
+    that shape name.
+    """
+
+    def __init__(self, checkpointer: BaseCheckpointSaver):
+        self._checkpointer = checkpointer
+        self._compiled: Dict[str, CompiledStateGraph] = {}
+
+    def graph_for_shape(self, shape: str) -> CompiledStateGraph:
+        if shape not in SHAPE_BUILDERS:
+            raise UnknownGraphShapeError(
+                f"unknown graph shape '{shape}' (known shapes: {sorted(SHAPE_BUILDERS)})"
+            )
+        if shape not in self._compiled:
+            self._compiled[shape] = SHAPE_BUILDERS[shape](self._checkpointer)
+        return self._compiled[shape]
+
+    def graph_for(self, agent: "AgentDefinition") -> CompiledStateGraph:
+        if agent.graph_shape is None:
+            raise UnknownGraphShapeError(f"agent '{agent.name}' declares no graph shape")
+        return self.graph_for_shape(agent.graph_shape)

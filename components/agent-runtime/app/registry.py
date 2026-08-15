@@ -80,6 +80,12 @@ class AgentDefinition:
     preferred_classification: str
     rag_top_k: int
     tasks: Dict[str, TaskDefinition] = field(default_factory=dict)
+    # ADR-0342: name of the app/graph/shapes/<name>.py LangGraph workflow
+    # this agent's active workflow executes, resolved by
+    # app/graph/build.py:GraphFactory. None for a `placeholder` agent (no
+    # runtime workflow exists yet, ADR-0007) - see that module's
+    # validate_shapes() for the fail-fast rule this field feeds.
+    graph_shape: Optional[str] = None
 
     def declared_tools(self) -> List[str]:
         """Union of every task's allowed_tools - ADR-0011 factor 1 (agent
@@ -194,6 +200,7 @@ class AgentRegistry:
             preferred_classification=model.get("preferred_classification", "C1"),
             rag_top_k=int(rag.get("top_k", 5)),
             tasks=tasks,
+            graph_shape=zuno.get("graph_shape"),
         )
 
     def _load_task(self, task_name: str, agent_dir: Path) -> TaskDefinition:
@@ -221,3 +228,9 @@ class AgentRegistry:
 
     def get(self, name: str) -> Optional[AgentDefinition]:
         return self._agents.get(name)
+
+    def all(self) -> List[AgentDefinition]:
+        """ADR-0342: iterated once at startup by GraphFactory's fail-fast
+        validate_shapes() - every registered agent, not just one hardcoded
+        name."""
+        return list(self._agents.values())

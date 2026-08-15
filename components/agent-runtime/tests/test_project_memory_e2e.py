@@ -57,7 +57,7 @@ from app.auth import CallerIdentity  # noqa: E402
 from app.clients import project_memory_client  # noqa: E402
 from app.clients.model_router import ProviderCandidate  # noqa: E402
 from app.graph import nodes  # noqa: E402
-from app.graph.build import build_graph  # noqa: E402
+from app.graph.shapes.retrieve_reason_respond import build as build_graph  # noqa: E402
 from app.main import extract_memory_endpoint  # noqa: E402
 
 
@@ -68,6 +68,18 @@ def _identity(sub: str, groups) -> CallerIdentity:
 class _FakeModelResult:
     def __init__(self, content: str):
         self.content = content
+
+
+class _FakeGraphFactory:
+    """Stands in for app.graph.build.GraphFactory (ADR-0342/WP-30) -
+    these tests already hold one compiled graph directly, so this just
+    hands it back regardless of which agent is asked for."""
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def graph_for(self, agent_def):
+        return self._graph
 
 
 async def test_tekos_demo_001_store_and_retrieve_across_sessions() -> None:
@@ -174,9 +186,11 @@ async def test_tekos_demo_001_store_and_retrieve_across_sessions() -> None:
 
         # --- Explicit extraction (session end), reusing _resolve_run_id's
         # ownership check by construction - same run_id, same identity. ---
-        fake_request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(tekos_graph=graph)))
+        fake_request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(graph_factory=_FakeGraphFactory(graph)))
+        )
         extraction_result = await extract_memory_endpoint(
-            run_id=run_id_1, request=fake_request, identity=identity
+            agent="tekos", run_id=run_id_1, request=fake_request, identity=identity
         )
         assert extraction_result["facts_written"] == 1
         assert extraction_result["memories_written"] == 1
@@ -265,9 +279,11 @@ async def test_extraction_is_refused_for_a_run_with_no_project_id() -> None:
             config=config,
         )
 
-        fake_request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(tekos_graph=graph)))
+        fake_request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(graph_factory=_FakeGraphFactory(graph)))
+        )
         try:
-            await extract_memory_endpoint(run_id=run_id, request=fake_request, identity=identity)
+            await extract_memory_endpoint(agent="tekos", run_id=run_id, request=fake_request, identity=identity)
             raise AssertionError("expected an HTTPException for a run with no project_id")
         except Exception as exc:  # HTTPException
             assert getattr(exc, "status_code", None) == 400, exc

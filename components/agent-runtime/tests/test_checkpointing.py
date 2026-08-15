@@ -41,7 +41,7 @@ from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
 
 import app.main as main_module  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
-from app.graph.build import build_graph  # noqa: E402
+from app.graph.shapes.retrieve_reason_respond import build as build_graph  # noqa: E402
 from app.main import _checkpoint_conninfo, _resolve_run_id  # noqa: E402
 from app.schemas import ChatRequest  # noqa: E402
 
