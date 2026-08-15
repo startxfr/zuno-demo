@@ -1,0 +1,56 @@
+# ADR-0306/ADR-0307 (WP-41): scaffolded by platform/templates/agent/ -
+# see gitops/charts/arkos/values.yaml's own comment for why this chart
+# carries only CR-population fields, never platform-wide constants
+# (those live once, in gitops/charts/aiagent-operator/).
+
+namespace: zuno-ai-run
+
+agentName: naveo
+
+okfBundleRef: agents/naveo
+
+image:
+  registry: image-registry.openshift-image-registry.svc:5000
+  frontendRepository: zuno-ai-build/agent-frontend
+  bffRepository: zuno-ai-build/agent-bff
+  tag: latest
+
+frontend:
+  replicas: 1
+  # Empty means "naveo.<the operator's own clusterBaseDomain>".
+  routeHost: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  oidcClientId: naveo-frontend
+
+bff:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  oidcAudience: naveo-frontend
+
+# ADR-0040: agent entitlement group, orthogonal to the business role that
+# governs tool/data permissions inside Naveo.
+groups:
+  entitlementGroup: agent_naveo
+  businessRoles:
+    - consultant
+
+knowledgeDomains:
+  - knowledge.tech
+  - knowledge.project
+
+toolCapabilities:
+  - search_confluence
+  - web_search
+  - list_drive_files

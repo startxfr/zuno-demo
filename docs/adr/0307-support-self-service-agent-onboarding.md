@@ -1,6 +1,6 @@
 # ADR-0307: Support self-service agent onboarding
 
-- **Status:** Partially implemented (template and validation workflow merged; sixth-agent proof is WP-41b, deployment gate pending)
+- **Status:** Partially implemented (template, validation workflow and sixth-agent definition merged; deployment gate pending)
 - **Target:** v0.3
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -27,7 +27,7 @@ Migration/evolution and Review evidence.
 
 ## Related ADRs
 
-- [ADR-0306](0300-v0.3-roadmap.md#adr-0306-expand-the-agent-catalog-beyond-the-initial-five-agents)
+- [ADR-0306](0306-expand-the-agent-catalog-beyond-the-initial-five-agents.md)
 - [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
 - [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md)
 - [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md)

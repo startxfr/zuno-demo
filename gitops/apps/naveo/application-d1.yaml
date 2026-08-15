@@ -1,0 +1,32 @@
+---
+# Naveo's frontend + BFF (ADR-0306/ADR-0307/WP-41, sixth agent,
+# scaffolded from platform/templates/agent/). Depends on the
+# naveo-frontend confidential OIDC client from keycloak (see this
+# agent's own keycloak-fragment.json) and on
+# gitops/apps/aiagent-operator/application-d1.yaml (earlier sync-wave)
+# having already reconciled the AIAgent CRD + operator manager - this
+# chart's only resource is a CR the operator must exist to act on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-naveo-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-96"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/naveo
+    helm:
+      releaseName: zuno-naveo-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

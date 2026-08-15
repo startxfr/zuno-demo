@@ -55,6 +55,10 @@
     - advantage
     - finage
     - arkos
+    # ADR-0306/ADR-0307 (WP-41): the sixth agent, scaffolded from
+    # platform/templates/agent/ - same real-bundle-but-status-placeholder
+    # posture as the four above until its own gate passes.
+    - naveo
   loop_control:
     loop_var: catalog_agent
 
@@ -77,7 +81,7 @@
 
 - name: "agents | catalog-only structural check summary"
   ansible.builtin.debug:
-    msg: "All 4 catalog-only agent definitions (comage, advantage, finage, arkos) are structurally valid placeholders (ADR-0031)."
+    msg: "All 5 catalog-only agent definitions (comage, advantage, finage, arkos, naveo) are structurally valid placeholders (ADR-0031)."
 
 - name: "agents | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
@@ -282,6 +286,41 @@
 - name: "agents | check summary (finage)"
   ansible.builtin.debug:
     msg: "Finage frontend healthy at https://{{ _agents_finage_host }}/healthz (evaluations/finage/ gate not run here - pending human scenario review)."
+
+# ADR-0306/ADR-0307 (WP-41): Naveo's frontend/BFF are deployed via the
+# aiagent-operator reconciling its AIAgent CR (gitops/charts/naveo renders
+# only the CR) once gitops/apps/naveo syncs, so it deserves the same
+# reachability proof every other agent gets - but never the acceptance
+# gate (Layers 1-3): its scenarios require the human review checkpoint
+# WP-41's own brief gates on, and `status: placeholder` means its BFF's
+# calls to Agent Runtime 404 by design regardless.
+- name: "agents | resolve the Naveo frontend route host"
+  ansible.builtin.set_fact:
+    _agents_naveo_host: "naveo.{{ cluster_base_domain }}"
+
+- name: "agents | GET the Naveo frontend health endpoint"
+  ansible.builtin.uri:
+    url: "https://{{ _agents_naveo_host }}/healthz"
+    method: GET
+    status_code: 200
+    validate_certs: false
+    timeout: 10
+  register: _agents_naveo_health
+  failed_when: false
+
+- name: "agents | fail the check if the Naveo frontend did not report healthy"
+  ansible.builtin.fail:
+    msg: >-
+      Naveo frontend at https://{{ _agents_naveo_host }}/healthz did not
+      respond 200 (got {{ _agents_naveo_health.status | default('no response') }}).
+      Confirm gitops/apps/aiagent-operator and gitops/apps/naveo have both
+      synced (Naveo's chart renders only an AIAgent CR - no operator, no
+      workloads).
+  when: (_agents_naveo_health.status | default(0)) != 200
+
+- name: "agents | check summary (naveo)"
+  ansible.builtin.debug:
+    msg: "Naveo frontend healthy at https://{{ _agents_naveo_host }}/healthz (evaluations/naveo/ gate not run here - pending human scenario review)."
 
 # Layers 1-3: auth, RAG, MCP allow/deny, routing, the 20 Tekos scenarios
 # (75% threshold), and every security-negative check (100% mandatory).

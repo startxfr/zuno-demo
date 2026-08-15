@@ -26,6 +26,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import a
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 REAL_AGENTS_DIR = REPO_ROOT / "agents"
 
+def _all_real_agent_names() -> list:
+    """Derived from the real agents/ tree, not a hardcoded list - WP-41b's
+    sixth agent exposed that a literal name list here silently rots every
+    time an agent is added (the registry loads EVERY bundle directory, so
+    every one needs a fake signature for the enforcement-on happy path)."""
+    return sorted(p.name for p in REAL_AGENTS_DIR.iterdir() if (p / "agent.okf.md").exists())
+
 
 def _install_fake_sign_module(*, verify_error_message: str | None) -> types.ModuleType:
     """Injects a fake `app._sign_okf_bundle` so `AgentRegistry._verify_signature`'s
@@ -81,7 +88,7 @@ def test_enforcement_on_refuses_a_bundle_with_no_signature_files(tmp_sig_dir) ->
 def test_enforcement_on_accepts_a_bundle_whose_signature_verifies(tmp_sig_dir) -> None:
     from app.registry import AgentRegistry
 
-    for name in ("tekos", "comage", "advantage", "finage", "arkos"):
+    for name in _all_real_agent_names():
         (tmp_sig_dir / f"{name}.sig").write_text("fake-sig")
         (tmp_sig_dir / f"{name}.pem").write_text("fake-cert")
 
@@ -102,7 +109,7 @@ def test_enforcement_on_accepts_a_bundle_whose_signature_verifies(tmp_sig_dir) -
 def test_enforcement_on_refuses_a_tampered_or_invalid_signature(tmp_sig_dir) -> None:
     from app.registry import AgentRegistry
 
-    for name in ("tekos", "comage", "advantage", "finage", "arkos"):
+    for name in _all_real_agent_names():
         (tmp_sig_dir / f"{name}.sig").write_text("fake-sig")
         (tmp_sig_dir / f"{name}.pem").write_text("fake-cert")
 

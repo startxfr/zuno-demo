@@ -1,0 +1,19 @@
+{
+  "_comment": "ADR-0306/ADR-0307 (WP-41) scaffold output - NOT auto-merged. A human merges the relevant pieces into gitops/charts/keycloak/files/realm-zuno.json by hand (see agents/naveo/NEXT_STEPS.md), the same way every prior agent's realm entries were added - see agent_arkos's own client/group/user entries in that file as the worked example.",
+  "client": {
+    "clientId": "naveo-frontend",
+    "name": "Naveo frontend",
+    "publicClient": false,
+    "secret": "${{vault.naveo_frontend_client_secret}}"
+  },
+  "group": {
+    "name": "agent_naveo",
+    "path": "/agent_naveo",
+    "clientRoles": {
+      "naveo-frontend": [
+        "access"
+      ]
+    }
+  },
+  "entitlement_only_fixture_user": "naveo-entitlement-only-user-01"
+}

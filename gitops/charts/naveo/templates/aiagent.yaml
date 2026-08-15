@@ -1,0 +1,46 @@
+# ADR-0306/ADR-0307 (WP-41 scaffold): the ONLY resource this chart
+# renders - see gitops/charts/arkos/templates/aiagent.yaml's own comment
+# for the full ownership-model rationale (identical here).
+apiVersion: zuno.zuno.ai/v1alpha1
+kind: AIAgent
+metadata:
+  name: {{ .Values.agentName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/agent: {{ .Values.agentName }}
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "90"
+spec:
+  agentName: {{ .Values.agentName }}
+  targetNamespace: {{ .Values.namespace }}
+  okfBundleRef: {{ .Values.okfBundleRef }}
+  frontend:
+    image:
+      registry: {{ .Values.image.registry }}
+      repository: {{ .Values.image.frontendRepository }}
+      tag: {{ .Values.image.tag }}
+    replicas: {{ .Values.frontend.replicas }}
+    {{- if .Values.frontend.routeHost }}
+    routeHost: {{ .Values.frontend.routeHost }}
+    {{- end }}
+    resources:
+      {{- toYaml .Values.frontend.resources | nindent 6 }}
+    oidcClientId: {{ .Values.frontend.oidcClientId }}
+  bff:
+    image:
+      registry: {{ .Values.image.registry }}
+      repository: {{ .Values.image.bffRepository }}
+      tag: {{ .Values.image.tag }}
+    replicas: {{ .Values.bff.replicas }}
+    resources:
+      {{- toYaml .Values.bff.resources | nindent 6 }}
+    oidcAudience: {{ .Values.bff.oidcAudience }}
+  groups:
+    entitlementGroup: {{ .Values.groups.entitlementGroup }}
+    businessRoles:
+      {{- toYaml .Values.groups.businessRoles | nindent 6 }}
+  knowledgeDomains:
+    {{- toYaml .Values.knowledgeDomains | nindent 4 }}
+  toolCapabilities:
+    {{- toYaml .Values.toolCapabilities | nindent 4 }}

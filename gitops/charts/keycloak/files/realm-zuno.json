@@ -32,6 +32,10 @@
             "arkos-frontend": [{
                 "name": "access",
                 "description": "Grants sign-in access to the Arkos (architects) agent frontend"
+            }],
+            "naveo-frontend": [{
+                "name": "access",
+                "description": "Grants sign-in access to the Naveo (onboarding) agent frontend"
             }]
         }
     },
@@ -101,6 +105,20 @@
             },
             "clientRoles": {
                 "arkos-frontend": [
+                    "access"
+                ]
+            }
+        },
+        {
+            "name": "agent_naveo",
+            "path": "/agent_naveo",
+            "attributes": {
+                "description": [
+                    "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Naveo frontend, independent of business role"
+                ]
+            },
+            "clientRoles": {
+                "naveo-frontend": [
                     "access"
                 ]
             }
@@ -373,7 +391,8 @@
                 "/consultant/confluence-archi-openshift-ai",
                 "/consultant/confluence-archi-keycloak",
                 "/agent_tekos",
-                "/agent_arkos"
+                "/agent_arkos",
+                "/agent_naveo"
             ],
             "credentials": [{
                 "type": "password",
@@ -736,6 +755,25 @@
             }]
         },
         {
+            "username": "naveo-entitlement-only-user-01",
+            "email": "naveo-entitlement-only-user-01@zuno-demo.internal",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "ADR-0040 negative-test fixture (ADR-0306/ADR-0307/WP-41): agent_naveo entitlement without any business role - Naveo reuses the existing consultant role (no new business role for a sixth demo agent), so the converse case reuses the existing consultant-role-only-user-01 fixture rather than adding a redundant one"
+                ]
+            },
+            "groups": [
+                "/agent_naveo"
+            ],
+            "credentials": [{
+                "type": "password",
+                "value": "${vault.demo_personas_password}",
+                "temporary": false
+            }]
+        },
+        {
             "username": "platform-admin-01",
             "email": "platform-admin-01@zuno-demo.internal",
             "enabled": true,
@@ -1030,6 +1068,50 @@
                 }
             }],
             "secret": "${vault.arkos_frontend_client_secret}",
+            "clientAuthenticatorType": "client-secret"
+        },
+        {
+            "clientId": "naveo-frontend",
+            "name": "Naveo frontend (onboarding)",
+            "description": "Confidential client for the Naveo onboarding-assistant agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0306/ADR-0307/WP-41: sixth demo agent, scaffolded from platform/templates/agent/ - proves self-service onboarding produces the same real, working shape as every hand-built agent, never a placeholder public-SPA entry)",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "rootUrl": "https://naveo.apps.mycluster.example.com",
+            "redirectUris": [
+                "https://naveo.apps.mycluster.example.com/*"
+            ],
+            "webOrigins": [
+                "https://naveo.apps.mycluster.example.com"
+            ],
+            "attributes": {
+                "agent.namespace": "zuno-ai-run",
+                "post.logout.redirect.uris": "https://naveo.apps.mycluster.example.com/*"
+            },
+            "defaultClientScopes": [
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "protocolMappers": [{
+                "name": "groups",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-group-membership-mapper",
+                "consentRequired": false,
+                "config": {
+                    "full.path": "true",
+                    "id.token.claim": "true",
+                    "access.token.claim": "true",
+                    "userinfo.token.claim": "true",
+                    "claim.name": "groups"
+                }
+            }],
+            "secret": "${vault.naveo_frontend_client_secret}",
             "clientAuthenticatorType": "client-secret"
         },
         {

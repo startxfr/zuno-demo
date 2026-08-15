@@ -1,0 +1,131 @@
+# Naveo acceptance scenarios (ADR-0027: 20 scenarios per agent;
+# ADR-0028: 75% pass threshold). Scaffolded by platform/templates/agent/
+# (ADR-0307/WP-41) - review and adjust scenario messages/personas before
+# the human review checkpoint.
+#
+# `persona` values are anonymized synthetic usernames from
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041).
+# consultant-user-01 holds both the `consultant` business role
+# and the `agent_naveo` entitlement group.
+
+scenarios:
+  - id: 1
+    title: Portal loads all six agent tiles
+    type: portal_lists_all_agents
+    persona: consultant-user-01
+
+  - id: 2
+    title: Unauthenticated request to the portal redirects to login
+    type: portal_requires_login
+
+  - id: 3
+    title: Consultant persona can authenticate and the token carries the expected group claims
+    type: keycloak_login
+    persona: consultant-user-01
+    expect_groups: [consultant, agent_naveo]
+
+  - id: 4
+    title: "Naveo tile is enabled for a consultant-group, agent_naveo-entitled user"
+    type: portal_tile_state
+    persona: consultant-user-01
+    agent: naveo
+    expect_enabled: true
+
+  - id: 5
+    title: "Naveo tile is disabled for a non-entitled user (sales persona)"
+    type: portal_tile_state
+    persona: sales-user-01
+    agent: naveo
+    expect_enabled: false
+
+  - id: 6
+    title: Placeholder agent tiles (Arkos) show "coming soon" for any user
+    type: portal_tile_state
+    persona: sales-user-01
+    agent: arkos
+    expect_enabled: false
+    expect_placeholder: true
+
+  - id: 7
+    title: "Naveo answers a basic question with a grounded reply"
+    type: chat_basic_qa
+    persona: consultant-user-01
+    message: "Where do I find the onboarding checklist?"
+
+  - id: 8
+    title: First-token latency is under the 6-second interactive objective
+    type: chat_first_token_latency
+    persona: consultant-user-01
+    message: "Where do I find the onboarding checklist?"
+    max_seconds: 6
+
+  - id: 9
+    title: Streaming chat emits token events followed by a done event
+    type: chat_streaming_sse
+    persona: consultant-user-01
+    message: "Summarize the onboarding process in one sentence."
+
+  - id: 10
+    title: Naveo answering a question includes a live-read tool call
+    type: chat_triggers_tool
+    persona: consultant-user-01
+    message: "Where do I find the onboarding checklist?"
+    expect_tool: search_confluence
+
+  - id: 11
+    title: RAG retrieval contributes at least one citation for a technical topic
+    type: rag_retrieval_has_citation
+    query: "OpenShift AI model serving NVIDIA L4"
+
+  - id: 12
+    title: MCP Gateway denies a tool call outside the caller's allowed groups
+    type: mcp_gateway_denied
+    persona: sales-user-01
+    tool: search_confluence
+    arguments: {}
+    expect_status: 403
+
+  - id: 13
+    title: MCP Gateway returns 404 for an unknown tool name
+    type: mcp_gateway_unknown_tool
+    persona: consultant-user-01
+    tool: does_not_exist
+    expect_status: 404
+
+  - id: 14
+    title: C3-classified requests fail closed when no SaaS provider is eligible
+    type: model_router_fails_closed
+    classification: C3
+
+  - id: 15
+    title: C1-classified requests try the local model first
+    type: model_router_prefers_local
+    classification: C1
+
+  - id: 16
+    title: BFF rejects a chat request with no bearer token
+    type: bff_rejects_missing_jwt
+
+  - id: 17
+    title: BFF rejects a JWT with the wrong audience
+    type: bff_rejects_wrong_audience
+    persona: consultant-user-01
+
+  - id: 18
+    title: "MCP Gateway denies a tool Naveo's task doesn't declare (ADR-0036 agent_declaration factor)"
+    type: mcp_gateway_denied
+    persona: consultant-user-01
+    tool: get_customer
+    arguments: {customer_id: 1}
+    expect_status: 403
+
+  - id: 19
+    title: Remaining placeholder agents have no live workloads in the shared zuno-ai-run namespace
+    type: agent_isolation_placeholder_empty
+    namespace: zuno-ai-run
+    agents: []
+
+  - id: 20
+    title: Every service's health endpoint returns 200
+    type: health_endpoints_all_ok
+    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]

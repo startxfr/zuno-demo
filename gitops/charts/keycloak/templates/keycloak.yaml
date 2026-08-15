@@ -135,6 +135,16 @@ spec:
                       - key: client_secret
                         path: zuno_finage_frontend_client_secret
                 - secret:
+                    # ADR-0306/ADR-0307 (WP-41): naveo-frontend, the sixth
+                    # demo agent (scaffolded from platform/templates/agent/)
+                    # - same confidential-client shape as every other
+                    # agent's own frontend above.
+                    name: naveo-frontend-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_naveo_frontend_client_secret
+                - secret:
                     name: demo-personas-password
                     optional: true
                     items:

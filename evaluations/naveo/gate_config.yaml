@@ -1,0 +1,5 @@
+# ADR-0107 promotion quality gate configuration for the naveo agent
+# (roadmap WP-41, scaffolded from platform/templates/agent/). Consumed by
+# evaluations/quality_gate.py. Same 75% default as every other agent
+# until evidence suggests otherwise.
+scenario_threshold: 0.75

@@ -34,7 +34,53 @@
   security_checks.py (fixed with an underscored py_name variant for the
   one function name, keeping the real slug everywhere else).
   `python3 platform/docs/check_docs.py` PASS.
-- **ADRs:** ADR-0307 (Partially implemented, Part A), ADR-0306 (Proposed -> promoted in Part B)
+
+  **Part B merged (2026-08-15)**: promoted ADR-0306 verbatim and
+  generated **Naveo** (onboarding assistant for new team members - a
+  synthetic persona per the ADR's own constraint) with the real
+  generator, unmodified: `agents/naveo/` (retrieve_reason_respond shape,
+  `knowledge.tech`+`knowledge.project`, `search_confluence`/`web_search`/
+  `list_drive_files` with `search_confluence` as live_read_tool,
+  `consultant` business role - all pre-existing capabilities),
+  `gitops/charts/naveo/` (single AIAgent CR, CR-managed from day one via
+  WP-38's operator - the first agent never to have a raw-manifest chart
+  at all), `gitops/apps/naveo/` (sync-wave -96, after Finage's -97),
+  `evaluations/naveo/` (20 scenarios + security checks + wrappers).
+  A third real generator bug surfaced by actually consuming the output:
+  generated prompt files lacked the OKF `type: prompt` frontmatter
+  AgentRegistry requires - caught by the agent-runtime suite failing on
+  import, fixed in both the generator and Naveo's own file. Keycloak:
+  `naveo-frontend` confidential client + `agent_naveo` group +
+  `naveo-entitlement-only-user-01` fixture merged by hand from the
+  generated keycloak-fragment.json (the converse role-only case reuses
+  the existing `consultant-role-only-user-01` fixture - Naveo introduces
+  no new business role); `consultant-user-01` gained `/agent_naveo`;
+  new externalsecret + keycloak.yaml vault-file mount + two Vault seeds.
+  **Policy entries: zero edits needed** - `consultant` was already in
+  every declared tool's and knowledge domain's allowed_groups, the
+  cleanest possible ADR-0306 proof that a template agent composes
+  existing capabilities without widening any policy. Platform wiring:
+  `naveo` added to build-publish.yml's sign-okf-bundles matrix, to
+  `ansible/roles/agents` install/uninstall/precheck + check.yml
+  (structural placeholder check + frontend smoke test), and to
+  `evaluations/tekos/run_scenarios.py`'s `portal_lists_all_agents`
+  handler's expected-tile list (previously hardcoded to five; the portal
+  itself auto-discovers tiles from the baked-in OKF bundles, zero
+  frontend code change - exactly as this WP's own plan predicted).
+  `test_bundle_signing.py`'s two hardcoded five-agent loops rewritten to
+  derive the list from the real agents/ tree (the same
+  silently-rots-on-agent-add brittleness the sixth agent was bound to
+  expose). Full agent-runtime (11 files) + mcp-gateway (6 files) suites
+  green with the sixth bundle loaded; `validate_okf_bundle.py` (6
+  bundles)/`check_knowledge_refs.py`/`check_docs.py` PASS; `helm lint`
+  clean on naveo + keycloak; realm-zuno.json `python3 -m json.tool`
+  valid; all four `day1_*.yml --syntax-check` clean.
+  `agents/naveo/NEXT_STEPS.md` updated in place to record steps 1-6 as
+  done, leaving 7-8 (human scenario review, operator deploy/gate/flip)
+  as the same bar every hand-built agent clears. **Human review
+  checkpoint (persona + scenarios) and the live deployment gate remain
+  open** - both need the cluster and the user.
+- **ADRs:** ADR-0307, ADR-0306 (both Partially implemented - template/workflow/sixth-agent definition merged; deployment gate pending)
 - **Depends on:** WP-38 (merged — the operator is the onboarding substrate); all four slices merged
 - **Estimated files touched:** ~10
 

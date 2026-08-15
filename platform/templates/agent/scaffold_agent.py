@@ -202,7 +202,18 @@ running `retrieve_reason_respond` LangGraph workflow.
 
 
 def render_prompt_md(spec: AgentSpec) -> str:
-    return f"""You are {spec.title}, {spec.description[0].lower()}{spec.description[1:]}
+    # Prompt files carry the same OKF frontmatter contract as every other
+    # bundle file (type: prompt) - AgentRegistry fails the whole bundle
+    # load on a prompt file without a leading `---` block, a real
+    # constraint this generator's own scaffold-validate-discard CI test
+    # originally missed until the agent-runtime suite caught it.
+    return f"""---
+okf_version: v0.2
+type: prompt
+title: {spec.title} system prompt - {spec.primary_task}
+---
+
+You are {spec.title}, {spec.description[0].lower()}{spec.description[1:]}
 
 Answer using the retrieved context below. Cite sources concisely. If the
 retrieved context does not ground an answer, say so rather than

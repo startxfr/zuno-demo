@@ -1,0 +1,11 @@
+apiVersion: v2
+name: naveo
+description: >-
+  ADR-0306/ADR-0307 (WP-41): renders a single AIAgent CR that the
+  aiagent-operator reconciles into Naveo's frontend (portal + chat
+  UI) and BFF Deployment/Service/Route in the shared zuno-ai-run
+  namespace - scaffolded from platform/templates/agent/, CR-managed from
+  day one (never a raw-manifest chart).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
