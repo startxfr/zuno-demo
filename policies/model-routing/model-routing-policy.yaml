@@ -1,0 +1,28 @@
+# ADR-0303 (WP-39): per-agent/task adapter declarations for the AI
+# Gateway's per-request dynamic adapter selection
+# (components/ai-gateway/app/model_routing_policy.py). Mechanism only -
+# WHICH requests get an approved adapter, never WHICH adapter is best
+# (ADR-0304/WP-40's job, which extends this same file with objectives
+# blocks rather than a second file - see that WP's own brief).
+#
+# An `adapter:` name here must already be a real
+# gitops/charts/models/values.yaml `loraAdapters[].name` entry (WP-34B) -
+# this file references, never invents, adapter names. Empty by default,
+# same as `loraAdapters: []` itself: WP-34's GPU training run hasn't
+# produced a real registered adapter yet (cluster GPU capacity is fully
+# committed - see MEMORY.md), so activating an entry here before one
+# exists would route real requests to a model vLLM doesn't actually serve.
+# Uncomment/adapt the example below once a real adapter is registered.
+#
+# classification is documentation/review metadata, not an enforcement
+# input: the AI Gateway's actual security guard (a C2/C3 adapter must
+# never reach an externally-eligible serving path) is structural -
+# app/providers.py only ever applies an adapter to a `candidate.kind ==
+# "local"` candidate, regardless of what this field says, since vLLM
+# multi-LoRA request-level selection is a local-runtime-only mechanism to
+# begin with (no SaaS provider has any concept of "our" adapter module).
+adapters: []
+# - agent: comage
+#   task: check-deal-status
+#   adapter: comage-lora
+#   classification: C2

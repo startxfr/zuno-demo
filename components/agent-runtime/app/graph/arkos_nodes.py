@@ -209,6 +209,8 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
+            agent_name=_ARKOS.name,
+            task_name=_DRAFT_TASK.name,
         )
     except ModelRouterError as exc:
         logger.error("all model providers failed: %s", exc)

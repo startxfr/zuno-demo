@@ -407,6 +407,8 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 bearer_token=state["bearer_token"],
                 local_only=local_only,
                 request_id=state.get("request_id"),
+                agent_name=agent.name,
+                task_name=task.name,
             )
         except ModelRouterError as exc:
             logger.error("all model providers failed: %s", exc)

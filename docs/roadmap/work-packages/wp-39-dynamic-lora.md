@@ -1,7 +1,59 @@
 # WP-39: Dynamic LoRA adapter loading (promotes ADR-0303)
 
-- **State:** Not started
-- **ADRs:** ADR-0303 (Proposed -> To be implemented -> Partially implemented -> Implemented)
+- **State:** Repo work merged (2026-08-15); GPU verification pending.
+  Step 0 promoted ADR-0303 verbatim. New
+  `policies/model-routing/model-routing-policy.yaml` (per-agent/task
+  `adapter:` declarations, `adapters: []` by default - WP-34's GPU
+  training run hasn't produced a real registered adapter yet, so
+  activating an entry before one exists would route real requests to a
+  model vLLM doesn't actually serve; a commented example shows the
+  shape). Bakes into the ai-gateway image (`policies/` convention,
+  matching `policies/knowledge/`/`policies/tools/` in their own
+  services) rather than the mounted-ConfigMap pattern
+  `platform/ai-gateway/provider-routing.yaml` uses - required changing
+  `components/ai-gateway/Dockerfile`'s build context to repo-root
+  (`.`, was `components/ai-gateway`), mirrored in both
+  `.github/workflows/build-publish.yml`'s matrix entry and
+  `ansible/roles/ai_gateway_build/tasks/build.yml`.
+  `app/model_routing_policy.py` (`ModelRoutingPolicy.adapter_for(agent,
+  task)`) fails closed per malformed entry, not per file - a bad entry is
+  skipped and logged, every other valid one still loads. `app/main.py`
+  gains an `X-Zuno-Agent` header (new) alongside the existing but
+  previously-unused `X-Zuno-Task` (WP-39 is the first real sender of
+  both - `components/agent-runtime/app/clients/model_router.py`'s
+  `chat_model_for`/`invoke_with_fallback` gained `agent_name`/`task_name`
+  params, threaded from `app/graph/nodes.py`'s `_make_reason_node` and
+  `app/graph/arkos_nodes.py`'s own reason-equivalent node using each
+  closure's already-bound `agent`/`task` objects - `app/memory.py`'s
+  separate extraction call site deliberately left without them, since a
+  generic post-turn fact-extraction utility call is not "this agent/
+  task's declared model behavior" in the same sense). Classification
+  guard (the WP's own signature security property, "a C2/C3 adapter
+  never reaches an external-eligible serving path"): enforced INSIDE
+  `app/providers.py:chat_model_for()` itself, not just by its caller's
+  discipline - an adapter is dropped (logged, never applied) unless
+  `candidate.kind == "local"` AND the request isn't routed via ADR-0114's
+  MaaS transport either (combining dynamic adapter selection with
+  MaaS-mediated serving is out of this WP's scope). Selection recorded in
+  traces/metering: `app/telemetry.py:model_call_span()` gained an
+  `adapter` param/`zuno.adapter` span attribute, and the `model` value
+  passed to it (plus the response's own `model` field) is already the
+  adapter's served name whenever one applied, not the base model name.
+  Tests (this repo's own established plain-script convention, run via
+  each component's `.venv` - the brief's own literal `pytest` acceptance
+  command doesn't match how this repo actually runs Python tests
+  anywhere else, so the real convention was followed instead):
+  `components/ai-gateway/tests/test_model_routing_policy.py` (7 tests:
+  declared/undeclared/malformed-entry/missing-file/reload/default-
+  classification) and `tests/test_adapter_selection.py` (4 tests:
+  declared adapter honored, undeclared -> base model, adapter never
+  applied to a SaaS candidate, adapter never applied via MaaS) - all
+  green, alongside the full pre-existing ai-gateway and agent-runtime
+  suites (`test_cache_integration.py`'s background OTel exporter
+  DNS-resolution noise is the same pre-existing, expected no-live-cluster
+  gap this repo already documents elsewhere; its own 5 assertions pass,
+  exit 0). `python3 platform/docs/check_docs.py` PASS.
+- **ADRs:** ADR-0303 (Partially implemented merged here -> Implemented after GPU verification)
 - **Depends on:** WP-34 (merged + GPU run done)
 - **Estimated files touched:** ~6
 

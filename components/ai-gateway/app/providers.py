@@ -12,10 +12,22 @@ local candidate or a SaaS one. This check runs strictly AFTER
 app/routing.py's classification-eligibility filtering already happened
 (candidates_for() is called before chat_model_for() in app/main.py) - the
 MaaS adapter can change transport, never eligibility.
+
+ADR-0303 (WP-39): `adapter`, when set, overrides the local candidate's
+`model=` value with the adapter's own served name (vLLM multi-LoRA
+request-level selection - the OpenAI-compatible `model` field IS the
+adapter module name). Enforced here, not just by the caller: an `adapter`
+passed alongside anything other than `candidate.kind == "local"` is
+ignored (logged, never applied) - LoRA adapters are a local-vLLM-only
+mechanism with no SaaS-provider equivalent, so this is the concrete
+security boundary the "a C2/C3 adapter never reaches an external-eligible
+serving path" acceptance test exercises directly against this function,
+not just against app/main.py's own call-site discipline.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Dict, Optional
 
@@ -24,15 +36,33 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from app import maas_adapter
 from app.routing import ProviderCandidate
 
+logger = logging.getLogger("ai_gateway.providers")
+
 
 class ProviderFactoryError(RuntimeError):
     pass
 
 
 def chat_model_for(
-    candidate: ProviderCandidate, cfg: Dict[str, Any], request_id: Optional[str] = None
+    candidate: ProviderCandidate,
+    cfg: Dict[str, Any],
+    request_id: Optional[str] = None,
+    adapter: Optional[str] = None,
 ) -> BaseChatModel:
-    if maas_adapter.should_use_maas(cfg, candidate.kind):
+    via_maas = maas_adapter.should_use_maas(cfg, candidate.kind)
+    if adapter and (candidate.kind != "local" or via_maas):
+        # LoRA adapters only serve on the direct local vLLM endpoint - not
+        # a non-local candidate, and not even the local candidate when
+        # ADR-0114's MaaS transport is in front of it (out of scope here;
+        # gitops/charts/models' loraAdapters flags are a direct-vLLM
+        # mechanism MaaS's own CR wrapping doesn't expose).
+        logger.warning(
+            "ignoring adapter '%s' for candidate '%s' (kind=%s, via_maas=%s): LoRA adapters only serve on the direct local vLLM runtime (ADR-0303)",
+            adapter, candidate.name, candidate.kind, via_maas,
+        )
+        adapter = None
+
+    if via_maas:
         # ADR-0201 (WP-27): only the MaaS transport forwards request_id as
         # a header - direct providers already get it on their own
         # model_call_span (app/main.py), which is the only correlation
@@ -51,7 +81,10 @@ def chat_model_for(
                 ),
             ),
             api_key=os.getenv("LOCAL_MODEL_API_KEY", "not-required"),
-            model=cfg.get("model", os.getenv("LOCAL_MODEL_NAME", "qwen2.5-7b-instruct")),
+            # ADR-0303 (WP-39): a declared adapter overrides the base
+            # model name outright - vLLM multi-LoRA selects the adapter
+            # module by this exact field.
+            model=adapter or cfg.get("model", os.getenv("LOCAL_MODEL_NAME", "qwen2.5-7b-instruct")),
             temperature=cfg.get("temperature", 0.2),
             timeout=cfg.get("timeout_seconds", 60),
         )

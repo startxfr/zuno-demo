@@ -116,7 +116,11 @@ def _estimate_cost_usd(provider: str, prompt_tokens: int, completion_tokens: int
 
 @contextmanager
 def model_call_span(
-    provider: str, model: str, classification: str, request_id: Optional[str] = None
+    provider: str,
+    model: str,
+    classification: str,
+    request_id: Optional[str] = None,
+    adapter: Optional[str] = None,
 ) -> Iterator["ModelCallRecorder"]:
     """Wraps one model invocation: records a span plus the
     zuno.model_calls / zuno.model_tokens / zuno.model_cost_usd metrics
@@ -131,6 +135,14 @@ def model_call_span(
     stamping it here is what lets this span (and, when the MaaS adapter
     is in use, MaaS's own usage/token metrics - see app/maas_adapter.py)
     be correlated back to the originating Zuno request trace.
+
+    ADR-0303 (WP-39): `adapter`, when a request was routed to a declared
+    LoRA adapter, discharges that ADR's "selection is recorded in traces
+    and usage metering" acceptance bullet - `model` itself is already the
+    adapter's served name by the time this is called (app/main.py passes
+    the resolved name, not the base model, whenever an adapter applied),
+    so this attribute exists to make that fact unambiguous in a trace
+    query without needing app/providers.py's own resolution logic.
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
@@ -140,6 +152,8 @@ def model_call_span(
         span.set_attribute("zuno.classification", classification)
         if request_id:
             span.set_attribute("zuno.request_id", request_id)
+        if adapter:
+            span.set_attribute("zuno.adapter", adapter)
         recorder = ModelCallRecorder(provider=provider)
         try:
             yield recorder

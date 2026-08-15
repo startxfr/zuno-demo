@@ -1,9 +1,12 @@
 ---
 # Builds the AI/Inference Gateway image. Without this, ai-gateway pods sit
 # in permanent ImagePullBackOff on a fresh cluster (no other role builds it).
+# ADR-0303/WP-39: build_context_dir changed to "." (repo root) - the image
+# now bakes in policies/model-routing/, outside its own component
+# directory (see components/ai-gateway/Dockerfile's own header comment).
 - name: "ai_gateway_build | build ai-gateway"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:
     build_image_name: ai-gateway
-    build_dockerfile_path: Dockerfile
-    build_context_dir: components/ai-gateway
+    build_dockerfile_path: components/ai-gateway/Dockerfile
+    build_context_dir: "."

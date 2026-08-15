@@ -56,6 +56,8 @@ class ModelRouter:
         bearer_token: str,
         local_only: bool = False,
         request_id: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        task_name: Optional[str] = None,
     ) -> BaseChatModel:
         headers = {
             "X-Zuno-Data-Classification": classification.upper(),
@@ -67,6 +69,14 @@ class ModelRouter:
             # otherwise allow.
             "X-Zuno-Local-Only": "true" if local_only else "false",
         }
+        # ADR-0303 (WP-39): lets ai-gateway's model_routing_policy.py
+        # resolve a declared adapter for this (agent, task) pair -
+        # X-Zuno-Task existed before this WP but nothing sent it yet;
+        # this is the first real caller of both headers.
+        if agent_name:
+            headers["X-Zuno-Agent"] = agent_name
+        if task_name:
+            headers["X-Zuno-Task"] = task_name
         if request_id:
             # ADR-0201/WP-27: lets ai-gateway (and, when routed via MaaS,
             # MaaS's own usage metrics) correlate back to this exact chat
@@ -103,6 +113,8 @@ class ModelRouter:
         bearer_token: str,
         local_only: bool = False,
         request_id: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        task_name: Optional[str] = None,
     ):
         """Kept as async + same name/signature as before this split (plus
         `bearer_token`/`local_only`, added for ADR-0032/ADR-0035) so
@@ -111,7 +123,7 @@ class ModelRouter:
         gateway now (app/main.py:_invoke_with_fallback there) - this is a
         single HTTP call.
         """
-        model = self.chat_model_for(classification, bearer_token, local_only, request_id)
+        model = self.chat_model_for(classification, bearer_token, local_only, request_id, agent_name, task_name)
         try:
             result = await model.ainvoke(messages)
         except Exception as exc:

@@ -22,6 +22,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app import semantic_cache
 from app.auth import CallerIdentity, validate_token
+from app.model_routing_policy import AdapterDeclaration, ModelRoutingPolicy
 from app.providers import chat_model_for
 from app.routing import ProviderCandidate, RoutingError, RoutingTable
 from app.schemas import (
@@ -48,6 +49,7 @@ app = FastAPI(
 )
 
 routing_table = RoutingTable()
+model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
 
 _ROLE_TO_MESSAGE = {"system": SystemMessage, "user": HumanMessage, "assistant": AIMessage}
 
@@ -68,10 +70,12 @@ async def readyz() -> JSONResponse:
 
 @app.post("/admin/reload-routing")
 async def reload_routing() -> Dict[str, Any]:
-    """Operational escape hatch: re-reads provider-routing.yaml from disk
-    without a pod restart (mirrors mcp-gateway's /admin/reload-policy).
+    """Operational escape hatch: re-reads provider-routing.yaml and
+    policies/model-routing/model-routing-policy.yaml from disk without a
+    pod restart (mirrors mcp-gateway's /admin/reload-policy).
     """
     routing_table.reload()
+    model_routing_policy.reload()
     return {"loaded": routing_table.loaded}
 
 
@@ -85,11 +89,18 @@ async def chat_completions(
     identity: CallerIdentity = Depends(validate_token),
     x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
     x_zuno_local_only: str = Header(default="false", alias="X-Zuno-Local-Only"),
-    # ADR-0104: optional - not sent by any caller yet, degrades safely to
-    # "" (the cache key still binds to it, so this can never widen a hit
-    # across tasks once callers do start sending it; it just means the
-    # cache doesn't yet differentiate by task).
+    # ADR-0104: optional, degrades safely to "" (the cache key still binds
+    # to it, so this can never widen a hit across tasks). ADR-0303
+    # (WP-39): as of components/agent-runtime/app/clients/model_router.py,
+    # every real caller now sends this alongside X-Zuno-Agent below -
+    # together they're the (agent, task) key model_routing_policy.py
+    # resolves an adapter declaration from.
     x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
+    # ADR-0303 (WP-39): optional, degrades safely to "" - a caller that
+    # never sends it simply never resolves to a declared adapter (falls
+    # back to the base model, the same fail-closed-to-safe default as an
+    # unresolved X-Zuno-Task).
+    x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
     # ADR-0201 (WP-27) usage correlation: the same request id agent-runtime
     # mints per chat turn (components/agent-runtime/app/main.py's
     # _request_id) and forwards via ModelRouter - optional, so this
@@ -107,11 +118,17 @@ async def chat_completions(
     except RoutingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    # ADR-0303 (WP-39): resolved once, from the classification-eligible
+    # candidate list's own request context - never itself widens or
+    # narrows `candidates`, only picks which model name a `local`
+    # candidate uses once the fallback loop reaches it.
+    adapter_decl = model_routing_policy.adapter_for(x_zuno_agent, x_zuno_task)
+
     messages = _to_langchain_messages(payload.messages)
 
     if payload.stream:
         return StreamingResponse(
-            _stream_completion(candidates, classification, messages, request_id),
+            _stream_completion(candidates, classification, messages, request_id, adapter_decl),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -126,7 +143,17 @@ async def chat_completions(
         requested_model=payload.model,
         raw_messages=payload.messages,
         request_id=request_id,
+        adapter_decl=adapter_decl,
     )
+
+
+def _resolve_adapter(candidate: ProviderCandidate, adapter_decl: Optional[AdapterDeclaration]) -> Optional[str]:
+    """None unless the candidate is local and a declaration exists for
+    this request's (agent, task) - the same guard app/providers.py's
+    chat_model_for() re-checks itself (ADR-0303/WP-39 defense in depth)."""
+    if adapter_decl and candidate.kind == "local":
+        return adapter_decl.adapter
+    return None
 
 
 async def _invoke_with_fallback(
@@ -139,6 +166,7 @@ async def _invoke_with_fallback(
     requested_model: str,
     raw_messages: List[ChatMessage],
     request_id: str,
+    adapter_decl: Optional[AdapterDeclaration] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -179,9 +207,15 @@ async def _invoke_with_fallback(
     for candidate in candidates:
         cfg = routing_table.provider_config(candidate.name)
         model_name = cfg.get("model", candidate.name)
+        # ADR-0303 (WP-39): adapter_name is None unless this candidate is
+        # local AND a declaration exists - effective_model_name is what
+        # actually gets served/traced/returned, always the adapter's own
+        # name when one applies.
+        adapter_name = _resolve_adapter(candidate, adapter_decl)
+        effective_model_name = adapter_name or model_name
         try:
-            with model_call_span(candidate.name, model_name, classification, request_id) as call:
-                model = chat_model_for(candidate, cfg, request_id=request_id)
+            with model_call_span(candidate.name, effective_model_name, classification, request_id, adapter=adapter_name) as call:
+                model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 result = await model.ainvoke(messages)
                 usage = getattr(result, "usage_metadata", None) or {}
                 prompt_tokens = usage.get("input_tokens", 0)
@@ -197,7 +231,7 @@ async def _invoke_with_fallback(
 
         content = result.content if hasattr(result, "content") else str(result)
         response = ChatCompletionResponse(
-            model=model_name,
+            model=effective_model_name,
             choices=[ChatCompletionChoice(message=ChatMessage(role="assistant", content=content))],
             usage=ChatCompletionUsage(
                 prompt_tokens=prompt_tokens,
@@ -230,7 +264,11 @@ def _sse_chunk(completion_id: str, created: int, model_name: str, delta: Dict[st
 
 
 async def _stream_completion(
-    candidates: List[ProviderCandidate], classification: str, messages: List[Any], request_id: str
+    candidates: List[ProviderCandidate],
+    classification: str,
+    messages: List[Any],
+    request_id: str,
+    adapter_decl: Optional[AdapterDeclaration] = None,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -249,25 +287,27 @@ async def _stream_completion(
     for candidate in candidates:
         cfg = routing_table.provider_config(candidate.name)
         model_name = cfg.get("model", candidate.name)
+        adapter_name = _resolve_adapter(candidate, adapter_decl)
+        effective_model_name = adapter_name or model_name
         sent_any = False
         try:
-            with model_call_span(candidate.name, model_name, classification, request_id):
-                model = chat_model_for(candidate, cfg, request_id=request_id)
+            with model_call_span(candidate.name, effective_model_name, classification, request_id, adapter=adapter_name):
+                model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 async for event in model.astream(messages):
                     token = getattr(event, "content", "") or ""
                     if token:
                         sent_any = True
-                        yield _sse_chunk(completion_id, created, model_name, {"content": token})
+                        yield _sse_chunk(completion_id, created, effective_model_name, {"content": token})
         except Exception as exc:
             logger.warning("provider '%s' failed mid-stream-setup: %s", candidate.name, exc)
             errors.append(f"{candidate.name}: {exc}")
             if sent_any:
-                yield _sse_chunk(completion_id, created, model_name, {}, finish_reason="error")
+                yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="error")
                 yield "data: [DONE]\n\n"
                 return
             continue
 
-        yield _sse_chunk(completion_id, created, model_name, {}, finish_reason="stop")
+        yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="stop")
         yield "data: [DONE]\n\n"
         return
 

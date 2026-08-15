@@ -50,9 +50,13 @@ jobs:
           - name: agent-runtime
             dockerfile: components/agent-runtime/Dockerfile
             context: .
+          # ADR-0303/WP-39: context changed from "components/ai-gateway" to
+          # "." - the image now bakes in policies/model-routing/, outside
+          # its own component directory (same reason agent-bff's sibling
+          # entries above already use ".").
           - name: ai-gateway
             dockerfile: components/ai-gateway/Dockerfile
-            context: components/ai-gateway
+            context: .
           - name: mcp-gateway
             dockerfile: components/mcp-gateway/Dockerfile
             context: .
