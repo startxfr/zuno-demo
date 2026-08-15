@@ -318,7 +318,7 @@
             "path": "/board",
             "attributes": {
                 "description": [
-                    "Board / Direction business role \u2014 grants Confluence/Drive/Gmail/sales-db/web-search/SMTP tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access. ADR-0340/WP-32: the ADR-0330 confluence-archi-* architect-tier subgroups relocated to /consultant so `board` consistently means Direction, never a technical-skill container."
+                    "Board / Direction business role \u2014 grants tool rights inside authorized agents (ADR-0040), never frontend access. ADR-0340/WP-32: confluence-archi-* subgroups moved to /consultant, so board consistently means Direction."
                 ]
             }
         },
@@ -327,7 +327,7 @@
             "path": "/cdp",
             "attributes": {
                 "description": [
-                    "ADR-0340/WP-32: project-manager business role \u2014 read-scoped Workday access (self.read + any.read, never any.update) plus the same Confluence/Drive/Gmail/Calendar/Meet rights as consultant inside authorized agents (see the ADR's access-intent table); does not by itself grant any frontend access."
+                    "ADR-0340/WP-32: project-manager business role \u2014 read-scoped Workday (self.read + any.read, never any.update) plus consultant-equivalent Confluence/Drive/Gmail rights inside authorized agents; never frontend access."
                 ]
             }
         },
@@ -345,7 +345,7 @@
             "path": "/ocp-paas-ops",
             "attributes": {
                 "description": [
-                    "ADR-0349 cluster-access dimension (replaces ADR-0320's admin/zuno-admin) \u2014 bound to cluster-admin via gitops/charts/openshift-rbac-groups and to role:admin in ArgoCD; orthogonal to the agent_<name>/business-role dimensions above, gates cluster/Console access, not agent-app access"
+                    "ADR-0349 cluster-access dimension (replaces admin/zuno-admin) \u2014 cluster-admin via openshift-rbac-groups + ArgoCD role:admin; orthogonal to agent/business-role dimensions, gates cluster access only"
                 ]
             }
         },
@@ -857,7 +857,7 @@
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "ADR-0040 negative-test fixture: board business role without any agent entitlement - originally Arkos's converse case (ADR-0326/WP-31); since ADR-0349 moved Arkos to the consultant tier, forward-reserved for Cognos (board-audience agent, no agent_cognos here)"
+                    "ADR-0040 negative-test fixture: board business role without any agent entitlement - forward-reserved for Cognos since ADR-0349 moved Arkos to the consultant tier (ADR-0326/WP-31)"
                 ]
             },
             "groups": [
@@ -1004,7 +1004,7 @@
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "ADR-0040 negative-test fixture (ADR-0410/ADR-0307/WP-41): agent_naveo entitlement without any business role - Naveo reuses the existing consultant role (no new business role for a sixth demo agent), so the converse case reuses the existing consultant-role-only-user-01 fixture rather than adding a redundant one"
+                    "ADR-0040 negative-test fixture (ADR-0410/ADR-0307/WP-41): agent_naveo entitlement without any business role - the converse case reuses consultant-role-only-user-01 (Naveo reuses the consultant role)"
                 ]
             },
             "groups": [
