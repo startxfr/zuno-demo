@@ -169,6 +169,13 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             language=language,
             caller_groups=caller_groups,
             domains=decision.authorized_domains,
+            # ADR-0202/WP-22: _extract_product_version's values ("openshift",
+            # "openshift-ai") ARE canonical technology_vocabulary entries
+            # (knowledge/tech/domain.yaml), so the same detection doubles as
+            # the cross-source technology filter that matches web AND
+            # Confluence chunks - the per-source `product` vocabulary never
+            # did (its deprecation as a filter key is flagged for v0.3).
+            technology=product,
         )
     except RagClientError as exc:
         logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)

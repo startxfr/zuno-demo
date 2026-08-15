@@ -1,0 +1,41 @@
+{{- /* ADR-0105 (WP-22): one schedule ConfigMap per scheduled domain -
+knowledge.tech from the chart's top-level schedule block, every enabled
+domains.<name> from its own schedule block. RHOAI's DSPA exposes no
+Kubernetes-native RecurringRun CRD, so these ConfigMaps are the chart's
+declarative half of scheduling: ansible/roles/rag_ingestion/tasks/
+install.yml discovers them by the zuno.io/rag-ingestion-schedule label
+and creates one KFP recurring run per ConfigMap through the v2beta1 API
+(the same API the OpenShift AI dashboard uses). The cron in values.yaml
+is therefore no longer decorative - this is the single source the
+Ansible role reads.
+
+TIMEZONE is carried for the operator/dashboard but not sent to the API:
+the KFP v2beta1 recurring-run payload has no confirmed timezone field in
+this RHOAI version (see install.yml's comment). */}}
+{{- $root := . }}
+{{- $entries := list }}
+{{- if .Values.schedule.enabled }}
+{{- $entries = append $entries (dict "name" "tech" "domain" "knowledge.tech" "pipelineName" .Values.pipeline.name "displayName" .Values.pipeline.displayName "schedule" .Values.schedule) }}
+{{- end }}
+{{- range $name, $domain := .Values.domains }}
+{{- if and $domain.enabled $domain.schedule.enabled }}
+{{- $entries = append $entries (dict "name" $name "domain" (printf "knowledge.%s" $name) "pipelineName" (printf "%s-%s" $root.Values.pipeline.name $name) "displayName" (printf "%s (%s)" $root.Values.pipeline.displayName $name) "schedule" $domain.schedule) }}
+{{- end }}
+{{- end }}
+{{- range $entries }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-ingestion-schedule-{{ .name }}
+  namespace: {{ $root.Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" $root | nindent 4 }}
+    zuno.io/rag-ingestion-schedule: "true"
+data:
+  DOMAIN: {{ .domain | quote }}
+  PIPELINE_NAME: {{ .pipelineName | quote }}
+  PIPELINE_DISPLAY_NAME: {{ .displayName | quote }}
+  CRON: {{ .schedule.cron | quote }}
+  TIMEZONE: {{ .schedule.timezone | default "UTC" | quote }}
+---
+{{- end }}

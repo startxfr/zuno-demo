@@ -419,6 +419,8 @@ confluenceAuthDefault: &confluenceAuthDefault
 confluence:
   - enabled: true
     name: satellite-archi
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -430,6 +432,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: satellite-build
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -441,6 +445,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: satellite-run
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -452,6 +458,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: openshift-archi
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -463,6 +471,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: openshift-build
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -474,6 +484,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: openshift-run
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -485,6 +497,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: openshift-ai-archi
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: openshift-ai
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -496,6 +510,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: openshift-ai-build
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: openshift-ai
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -507,6 +523,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: openshift-ai-run
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: openshift-ai
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -518,6 +536,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: keycloak-archi
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: keycloak
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -529,6 +549,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: keycloak-build
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: keycloak
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -540,6 +562,8 @@ confluence:
     authentication: *confluenceAuthDefault
   - enabled: true
     name: keycloak-run
+    # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
+    technology: keycloak
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
     spaces: ["ARCH"]
@@ -630,12 +654,17 @@ corpus:
   hashAlgorithm: sha256
   deleteOrphans: true
 
+# knowledge.tech's cadence (ADR-0105: weekly minimum for tech). KFP
+# recurring runs are created through the OpenShift AI/KFP API, not a
+# chart-rendered CRD (this RHOAI version's DataSciencePipelinesApplication
+# doesn't expose a K8s-native RecurringRun resource) - what the chart DOES
+# render is one schedule ConfigMap per scheduled domain
+# (templates/schedule-configmaps.yaml, this block + each enabled
+# domains.<name>.schedule below), which
+# ansible/roles/rag_ingestion/tasks/install.yml consumes to create the
+# actual recurring runs - see README's "Scheduling" section.
 schedule:
   enabled: true
-  # KFP recurring runs are created through the OpenShift AI/KFP API, not a
-  # chart-rendered CRD (this RHOAI version's DataSciencePipelinesApplication
-  # doesn't expose a K8s-native RecurringRun resource) - see README's
-  # "Scheduling" section for the manual/follow-up activation step.
   cron: "0 0 2 * * 0"
   timezone: Europe/Paris
 
@@ -645,6 +674,109 @@ pipeline:
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
+
+# ADR-0204 part 2 + ADR-0105 (WP-22): the additional logical knowledge
+# domains this chart can ingest for. The chart's existing top-level
+# redhat[]/confluence[]/postgres/schedule blocks ARE knowledge.tech's
+# configuration (kept top-level so the 500 lines of tech source entries
+# and the WP-07-verified paths don't churn); each entry below adds one
+# further domain with its own fetch stages, its own database (the
+# deploy-side counterpart of platform/bindings/knowledge/bindings.yaml,
+# same rule as gitops/charts/rag-service), its own source config and its
+# own cadence. Every enabled entry renders: a per-domain config ConfigMap,
+# per-domain ExternalSecrets, a per-domain Pipeline CR
+# (rag-corpus-ingestion-<name>) and - when schedule.enabled - a schedule
+# ConfigMap the Ansible role turns into a KFP recurring run.
+#
+# All three ship enabled: false: their databases/Vault credentials only
+# exist after the operator provisions them (WP-21 follow-up), and their
+# source credentials are operator-supplied (WP-22 follow-up) - flipping a
+# domain on is that operator step, not a code change.
+domains:
+  sales:
+    enabled: false
+    fetchStages: [fetch-salesforce]
+    postgres:
+      database: rag-sales
+      schema: rag
+      secretName: rag-postgres-sales
+      externalSecret:
+        remoteKey: "rag-sales/postgresql-app"
+        usernameProperty: username
+        passwordProperty: password
+    salesforce:
+      # Operator-supplied: instance URL + token at Vault zuno/salesforce/technical
+      # ({instance_url, token}), consumed via the ExternalSecret below.
+      secretName: rag-salesforce
+      externalSecret:
+        remoteKey: "salesforce/technical"
+        instanceUrlProperty: instance_url
+        tokenProperty: token
+      # One entry per queried object; fields render in this order into the
+      # indexed text. dealType/statusField feed ADR-0202's sales metadata
+      # extensions. requiredGroups -> acl_groups, same as confluence[].
+      sources:
+        - enabled: true
+          object: Opportunity
+          fields: [Id, Name, StageName, Amount, CloseDate, LastModifiedDate]
+          statusField: StageName
+          dealType: pipeline
+          requiredGroups: [sales]
+    # ADR-0105: hours-scale for sales - every 4 hours by default,
+    # environment-configurable.
+    schedule:
+      enabled: true
+      cron: "0 0 */4 * * *"
+      timezone: Europe/Paris
+  adv:
+    enabled: false
+    fetchStages: [fetch-aramis]
+    postgres:
+      database: rag-adv
+      schema: rag
+      secretName: rag-postgres-adv
+      externalSecret:
+        remoteKey: "rag-adv/postgresql-app"
+        usernameProperty: username
+        passwordProperty: password
+    aramis:
+      # Operator-supplied: base URL + token at Vault zuno/aramis/technical.
+      secretName: rag-aramis
+      externalSecret:
+        remoteKey: "aramis/technical"
+        baseUrlProperty: base_url
+        tokenProperty: token
+      sources:
+        - enabled: true
+          name: projects
+          endpoint: /api/projects
+          projectType: delivery
+          requiredGroups: [adv]
+    # ADR-0105: configurable - daily by default.
+    schedule:
+      enabled: true
+      cron: "0 0 3 * * *"
+      timezone: Europe/Paris
+  sxa-legacy:
+    enabled: false
+    fetchStages: [load-sxa-dump]
+    postgres:
+      database: rag-sxa-legacy
+      schema: rag
+      secretName: rag-postgres-sxa-legacy
+      externalSecret:
+        remoteKey: "rag-sxa-legacy/postgresql-app"
+        usernameProperty: username
+        passwordProperty: password
+    sxaDump:
+      # Operator-supplied: the approved snapshot's key in the corpus bucket
+      # (ADR-0025: the dump itself never lives in git) and its version ID.
+      s3Key: ""
+      snapshotId: ""
+    # ADR-0105: immutable legacy source - on-demand only, never scheduled.
+    # Manual refresh: make d1 install rag-ingestion (see README).
+    schedule:
+      enabled: false
 
 # Runtime image is built imperatively by the day1-build Ansible role
 # (ansible/roles/rag_ingestion_build, ansible/tasks/apply_openshift_build.yml)

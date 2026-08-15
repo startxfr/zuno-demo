@@ -1,0 +1,57 @@
+{{- /* ADR-0204 part 2 (WP-22): one config ConfigMap per enabled
+additional domain, same key set as templates/configmap.yaml (tech's) so
+every pipeline pod reads one contract - only the domain, its database,
+its source config and its S3 prefixes differ.
+
+S3 prefixes are suffixed per domain deliberately: detect-changes builds
+its manifest from EVERYTHING under the raw prefix, so two domains
+sharing one prefix would each see the other's documents as
+deleted-orphans on every run. tech keeps the unsuffixed prefixes its
+existing corpus state already lives under. */}}
+{{- $root := . }}
+{{- range $name, $domain := .Values.domains }}
+{{- if $domain.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rag-ingestion.fullname" $root }}-config-{{ $name }}
+  namespace: {{ $root.Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" $root | nindent 4 }}
+    zuno.io/rag-ingestion-domain: {{ $name | quote }}
+data:
+  INGESTION_DOMAIN: "knowledge.{{ $name }}"
+  REDHAT_SOURCES_JSON: "[]"
+  CONFLUENCE_SOURCES_JSON: "[]"
+  SALESFORCE_SOURCES_JSON: {{ ($domain.salesforce).sources | default list | toJson | quote }}
+  ARAMIS_SOURCES_JSON: {{ ($domain.aramis).sources | default list | toJson | quote }}
+  SXA_DUMP_S3_KEY: {{ ($domain.sxaDump).s3Key | default "" | quote }}
+  SXA_SNAPSHOT_ID: {{ ($domain.sxaDump).snapshotId | default "" | quote }}
+  S3_ENDPOINT: {{ include "rag-ingestion.s3Endpoint" $root | quote }}
+  S3_BUCKET: {{ $root.Values.s3.bucket | quote }}
+  S3_REGION: {{ $root.Values.s3.region | quote }}
+  S3_PATH_STYLE: {{ $root.Values.s3.pathStyle | quote }}
+  S3_RAW_PREFIX: "{{ $root.Values.corpus.rawPrefix }}-{{ $name }}"
+  S3_NORMALIZED_PREFIX: "{{ $root.Values.corpus.normalizedPrefix }}-{{ $name }}"
+  S3_MANIFEST_PREFIX: "{{ $root.Values.corpus.manifestPrefix }}-{{ $name }}"
+  S3_FAILED_PREFIX: "{{ $root.Values.corpus.failedPrefix }}-{{ $name }}"
+  PGHOST: {{ $root.Values.postgres.host | quote }}
+  PGPORT: {{ $root.Values.postgres.port | quote }}
+  PGDATABASE: {{ $domain.postgres.database | quote }}
+  PGSCHEMA: {{ $domain.postgres.schema | quote }}
+  PGSSLMODE: {{ $root.Values.postgres.sslmode | quote }}
+  EMBEDDING_ENDPOINT: {{ $root.Values.embedding.endpoint | quote }}
+  EMBEDDING_MODEL: {{ $root.Values.embedding.model | quote }}
+  EMBEDDING_DIMENSIONS: {{ $root.Values.embedding.dimensions | quote }}
+  EMBEDDING_BATCH_SIZE: {{ $root.Values.embedding.batchSize | quote }}
+  CHUNKING_STRATEGY: {{ $root.Values.chunking.strategy | quote }}
+  CHUNK_MAX_TOKENS: {{ $root.Values.chunking.maxTokens | quote }}
+  CHUNK_OVERLAP_TOKENS: {{ $root.Values.chunking.overlapTokens | quote }}
+  CHUNK_PRESERVE_CODE_BLOCKS: {{ $root.Values.chunking.preserveCodeBlocks | quote }}
+  CHUNK_PRESERVE_TABLES: {{ $root.Values.chunking.preserveTables | quote }}
+  CORPUS_INCREMENTAL: {{ $root.Values.corpus.incremental | quote }}
+  CORPUS_HASH_ALGORITHM: {{ $root.Values.corpus.hashAlgorithm | quote }}
+  CORPUS_DELETE_ORPHANS: {{ $root.Values.corpus.deleteOrphans | quote }}
+---
+{{- end }}
+{{- end }}

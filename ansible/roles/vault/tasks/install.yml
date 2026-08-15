@@ -555,6 +555,43 @@
     and zuno_jira_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# ADR-0204/ADR-0105 (WP-22): source credentials for the knowledge.sales
+# and knowledge.adv ingestion adapters (gitops/charts/rag-ingestion's
+# domains.sales.salesforce / domains.adv.aramis ExternalSecrets). Property
+# names (instance_url/token, base_url/token) match those ExternalSecrets'
+# remoteRef properties. Operator-supplied in ansible/confidential.yml;
+# skipped while placeholders remain - the domains ship enabled: false
+# until then (WP-22 operator follow-up).
+- name: "vault | seed the Salesforce technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/salesforce/technical
+      instance_url={{ zuno_salesforce_instance_url | quote }}
+      token={{ zuno_salesforce_token | quote }}
+      enabled={{ (zuno_salesforce_enabled | default(false)) | quote }}"
+  when: >-
+    zuno_salesforce_instance_url | default('xxxxxx') != 'xxxxxx'
+    and zuno_salesforce_token | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+- name: "vault | seed the Aramis technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aramis/technical
+      base_url={{ zuno_aramis_base_url | quote }}
+      token={{ zuno_aramis_token | quote }}
+      enabled={{ (zuno_aramis_enabled | default(false)) | quote }}"
+  when: >-
+    zuno_aramis_base_url | default('xxxxxx') != 'xxxxxx'
+    and zuno_aramis_token | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 # Only seeded when all five fields are real - no placeholder fallback,
 # since the ExternalSecret that reads it only renders under the same
 # condition (postgresql role's backups.s3.enabled).

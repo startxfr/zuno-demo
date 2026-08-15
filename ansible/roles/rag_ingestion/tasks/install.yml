@@ -97,6 +97,29 @@
 - name: "rag_ingestion | KFP recurring-run activation"
   when: _rag_ingestion_kfp_api_base != '' and _rag_ingestion_kfp_token != ''
   block:
+    # ADR-0105 (WP-22): the chart renders one schedule ConfigMap per
+    # scheduled domain (templates/schedule-configmaps.yaml) - tech weekly,
+    # sales hours-scale, adv daily, sxa-legacy none (on-demand only). This
+    # discovery loop makes those values the single source of scheduling
+    # truth (the previous version ignored values.yaml's cron entirely and
+    # hardcoded one weekly schedule here).
+    - name: "rag_ingestion | discover the chart's schedule ConfigMaps"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        namespace: zuno-ai-build
+        label_selectors:
+          - zuno.io/rag-ingestion-schedule=true
+      register: _rag_ingestion_schedule_cms
+
+    - name: "rag_ingestion | note when no schedule ConfigMap exists"
+      ansible.builtin.debug:
+        msg: >-
+          No zuno.io/rag-ingestion-schedule ConfigMaps found in
+          zuno-ai-build - every domain is unscheduled (on-demand only), so
+          no recurring run is created.
+      when: (_rag_ingestion_schedule_cms.resources | default([]) | length) == 0
+
     - name: "rag_ingestion | list pipelines on the DSPA API server"
       ansible.builtin.uri:
         url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines"
@@ -106,77 +129,14 @@
         status_code: [200]
         return_content: true
       register: _rag_ingestion_pipelines_list
+      when: (_rag_ingestion_schedule_cms.resources | default([]) | length) > 0
 
-    - name: "rag_ingestion | resolve the rag-corpus-ingestion pipeline_id"
-      ansible.builtin.set_fact:
-        _rag_ingestion_pipeline_id: >-
-          {{
-            (_rag_ingestion_pipelines_list.json.pipelines | default([])
-             | selectattr('display_name', 'equalto', 'RAG corpus ingestion')
-             | map(attribute='pipeline_id') | list | first) | default('')
-          }}
-
-    - name: "rag_ingestion | fail this block loudly if the pipeline isn't registered yet"
-      ansible.builtin.fail:
-        msg: >-
-          No pipeline named 'RAG corpus ingestion' found via
-          {{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines - the
-          Pipeline CR (templates/pipeline.yaml) may not have synced yet.
-      when: _rag_ingestion_pipeline_id == ''
-
-    - name: "rag_ingestion | list versions for the resolved pipeline"
-      ansible.builtin.uri:
-        url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines/{{ _rag_ingestion_pipeline_id }}/versions"
-        headers:
-          Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
-        validate_certs: false
-        status_code: [200]
-        return_content: true
-      register: _rag_ingestion_pipeline_versions
-
-    - name: "rag_ingestion | resolve the latest pipeline_version_id"
-      ansible.builtin.set_fact:
-        # Assumes the API returns versions newest-first (index 0) -
-        # UNVERIFIED, confirm against a live cluster and sort by
-        # created_at explicitly if that assumption is wrong.
-        _rag_ingestion_pipeline_version_id: >-
-          {{ (_rag_ingestion_pipeline_versions.json.pipeline_versions | default([]) | first).pipeline_version_id | default('') }}
-
-    - name: "rag_ingestion | create or update the recurring run"
-      ansible.builtin.uri:
-        url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns"
-        method: POST
-        headers:
-          Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
-          Content-Type: application/json
-        validate_certs: false
-        status_code: [200, 201, 409]
-        body_format: json
-        body:
-          display_name: "rag-corpus-ingestion-schedule"
-          pipeline_version_reference:
-            pipeline_id: "{{ _rag_ingestion_pipeline_id }}"
-            pipeline_version_id: "{{ _rag_ingestion_pipeline_version_id }}"
-          # 6-field (seconds-first) cron, matching values.yaml's
-          # schedule.cron. schedule.timezone (Europe/Paris by default) has
-          # no confirmed equivalent field in this API version and is
-          # omitted rather than guessed - the KFP/Argo cron scheduler's
-          # timezone handling needs confirming against a live cluster.
-          trigger:
-            cron_schedule:
-              cron: "{{ rag_ingestion_schedule_cron | default('0 0 2 * * 0') }}"
-          mode: ENABLE
-          no_catchup: true
-      register: _rag_ingestion_recurring_run
-      when: _rag_ingestion_pipeline_version_id != ''
-
-    - name: "rag_ingestion | recurring-run activation summary"
-      ansible.builtin.debug:
-        msg: >-
-          KFP recurring run 'rag-corpus-ingestion-schedule' request returned
-          HTTP {{ _rag_ingestion_recurring_run.status | default('unknown') }}
-          (409 = already exists, treated as success).
-      when: _rag_ingestion_pipeline_version_id != ''
+    - name: "rag_ingestion | create one recurring run per schedule ConfigMap"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/rag_ingestion/tasks/recurring_run.yml"
+      loop: "{{ _rag_ingestion_schedule_cms.resources | default([]) }}"
+      loop_control:
+        loop_var: _rag_schedule_cm
+        label: "{{ _rag_schedule_cm.metadata.name }}"
   rescue:
     # ADR-0330/roadmap WP-07: enumerate the three concrete UNVERIFIED
     # assumptions this block depends on (not just "see the task output

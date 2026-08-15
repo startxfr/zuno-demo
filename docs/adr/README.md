@@ -74,7 +74,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v0.1 | Partially implemented | Target 99.9 percent platform availability |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Implemented | Persist resumable long-running agent workflows |
 | [ADR-0104](0104-introduce-controlled-semantic-caching.md) | v0.1 | Implemented | Introduce controlled semantic caching |
-| [ADR-0105](0100-v0.1-roadmap.md#adr-0105-automate-monthly-knowledge-ingestion) | v0.1 | Proposed | Automate monthly knowledge ingestion |
+| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.1 | Partially implemented | Automate source-specific knowledge ingestion |
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v0.1 | Partially implemented | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | v0.1 | Partially implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Partially implemented | Automate model evaluation with LM-Eval |

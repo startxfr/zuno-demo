@@ -112,15 +112,24 @@ OpenShift AI / Kubeflow Pipelines orchestrates the chain. The chart creates the 
 
 ## Scheduling
 
-`schedule.cron`/`schedule.timezone` describe the desired KFP recurring-run
-cadence. `ansible/roles/rag_ingestion/tasks/install.yml` activates it via
+ADR-0105 (WP-22): each domain has its own cadence - `schedule.cron` is
+`knowledge.tech`'s (weekly), every `domains.<name>.schedule` block its
+own (sales hours-scale, adv daily, sxa-legacy none: on-demand only). The
+chart renders **one schedule ConfigMap per scheduled domain**
+(`rag-ingestion-schedule-<name>`, label
+`zuno.io/rag-ingestion-schedule`);
+`ansible/roles/rag_ingestion/tasks/install.yml` discovers those
+ConfigMaps and creates one KFP recurring run each via
 `ansible.builtin.uri` calls against the DSPA's OAuth-proxied Route
 (`ds-pipeline-rag-dspa`) once the pipeline is Ready, since RHOAI exposes
 no native `RecurringRun` CRD. This is **best-effort and UNVERIFIED
 against a live cluster**; a failure is logged but non-blocking - create
-the schedule manually via the dashboard if needed. `schedule.timezone`
-isn't passed to the API: this KFP version has no confirmed equivalent
-field.
+the schedule manually via the dashboard if needed. `TIMEZONE` isn't
+passed to the API: this KFP version has no confirmed equivalent field.
+
+Manual refresh (any domain, including sxa-legacy): `make d1 install
+rag-ingestion` after uploading/refreshing the domain's source data - the
+on-demand path ADR-0105 retains.
 
 ## Runtime image / CLI stages
 

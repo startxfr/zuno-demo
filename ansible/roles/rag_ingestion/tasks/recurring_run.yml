@@ -1,0 +1,82 @@
+---
+# One KFP recurring run per schedule ConfigMap (ADR-0105, WP-22) - included
+# from install.yml with `_rag_schedule_cm` set to one ConfigMap discovered
+# by the zuno.io/rag-ingestion-schedule label. The ConfigMap is the chart's
+# declarative half (templates/schedule-configmaps.yaml): its data carries
+# the pipeline to schedule (PIPELINE_DISPLAY_NAME - display names are what
+# the v2beta1 list API exposes), the domain and the cron. Same UNVERIFIED
+# API-shape caveats as install.yml's rescue block documents.
+
+- name: "rag_ingestion | resolve the pipeline_id for '{{ _rag_schedule_cm.data.PIPELINE_DISPLAY_NAME }}'"
+  ansible.builtin.set_fact:
+    _rag_ingestion_pipeline_id: >-
+      {{
+        (_rag_ingestion_pipelines_list.json.pipelines | default([])
+         | selectattr('display_name', 'equalto', _rag_schedule_cm.data.PIPELINE_DISPLAY_NAME)
+         | map(attribute='pipeline_id') | list | first) | default('')
+      }}
+
+- name: "rag_ingestion | fail this block loudly if the pipeline isn't registered yet"
+  ansible.builtin.fail:
+    msg: >-
+      No pipeline named '{{ _rag_schedule_cm.data.PIPELINE_DISPLAY_NAME }}' found via
+      {{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines - the
+      Pipeline CR (templates/pipeline.yaml) may not have synced yet, or
+      this domain's pipeline version was never uploaded (see the chart
+      README's "Scheduling" section).
+  when: _rag_ingestion_pipeline_id == ''
+
+- name: "rag_ingestion | list versions for the resolved pipeline"
+  ansible.builtin.uri:
+    url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/pipelines/{{ _rag_ingestion_pipeline_id }}/versions"
+    headers:
+      Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+    validate_certs: false
+    status_code: [200]
+    return_content: true
+  register: _rag_ingestion_pipeline_versions
+
+- name: "rag_ingestion | resolve the latest pipeline_version_id"
+  ansible.builtin.set_fact:
+    # Assumes the API returns versions newest-first (index 0) -
+    # UNVERIFIED, confirm against a live cluster and sort by
+    # created_at explicitly if that assumption is wrong.
+    _rag_ingestion_pipeline_version_id: >-
+      {{ (_rag_ingestion_pipeline_versions.json.pipeline_versions | default([]) | first).pipeline_version_id | default('') }}
+
+- name: "rag_ingestion | create or update the recurring run for {{ _rag_schedule_cm.data.DOMAIN }}"
+  ansible.builtin.uri:
+    url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+      Content-Type: application/json
+    validate_certs: false
+    status_code: [200, 201, 409]
+    body_format: json
+    body:
+      display_name: "{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule"
+      pipeline_version_reference:
+        pipeline_id: "{{ _rag_ingestion_pipeline_id }}"
+        pipeline_version_id: "{{ _rag_ingestion_pipeline_version_id }}"
+      # 6-field (seconds-first) cron from the schedule ConfigMap (the
+      # chart's values are the single source now - ADR-0105). The
+      # ConfigMap's TIMEZONE is informational only: this API version has
+      # no confirmed timezone field and it is omitted rather than guessed.
+      trigger:
+        cron_schedule:
+          cron: "{{ _rag_schedule_cm.data.CRON }}"
+      mode: ENABLE
+      no_catchup: true
+  register: _rag_ingestion_recurring_run
+  when: _rag_ingestion_pipeline_version_id != ''
+
+- name: "rag_ingestion | recurring-run activation summary for {{ _rag_schedule_cm.data.DOMAIN }}"
+  ansible.builtin.debug:
+    msg: >-
+      KFP recurring run '{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule'
+      ({{ _rag_schedule_cm.data.DOMAIN }}, cron
+      '{{ _rag_schedule_cm.data.CRON }}') request returned HTTP
+      {{ _rag_ingestion_recurring_run.status | default('unknown') }}
+      (409 = already exists, treated as success).
+  when: _rag_ingestion_pipeline_version_id != ''

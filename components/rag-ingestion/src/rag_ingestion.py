@@ -6,13 +6,23 @@ image for all stages (see files/pipeline.py.tpl in the Helm chart). Every stage
 round-trips its state through S3 - KFP runs each stage in its own pod, so there is
 no shared local disk between them:
 
-    fetch-redhat/fetch-confluence  -> <rawPrefix>/<doc_id>.json
+    fetch-* / load-sxa-dump        -> <rawPrefix>/<doc_id>.json   (source adapters)
     detect-changes                 -> <manifestPrefix>/{manifest,changeset}.json
     normalize                      -> <normalizedPrefix>/<doc_id>.json
     chunk                          -> <normalizedPrefix>/<doc_id>.chunks.json
     embed                          -> (same file, chunks gain an "embedding" key)
     index-pgvector                 -> document_embeddings rows (data/rag/schema/004_rag_chunking.sql)
     validate                       -> exits non-zero if anything index-pgvector touched is incomplete
+
+ADR-0204 (WP-22): the fetch stages are implementations of one source-adapter
+interface (SOURCE_ADAPTERS below), each bound to exactly one logical knowledge
+domain: fetch-redhat + fetch-confluence -> knowledge.tech, fetch-salesforce ->
+knowledge.sales, fetch-aramis -> knowledge.adv, load-sxa-dump ->
+knowledge.sxa-legacy. A pipeline run targets one domain (--domain /
+INGESTION_DOMAIN): running a fetch stage against the wrong domain aborts
+before writing anything (fail closed - the per-domain databases of ADR-0204
+must never receive another domain's records), and every raw record is stamped
+with the domain so normalize can carry it into chunk metadata (ADR-0202).
 """
 import argparse
 import fnmatch
@@ -23,7 +33,7 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 from urllib.parse import urljoin, urlparse
 
 import boto3
@@ -38,6 +48,9 @@ logger = logging.getLogger("rag_ingestion")
 STAGES = (
     "fetch-redhat",
     "fetch-confluence",
+    "fetch-salesforce",
+    "fetch-aramis",
+    "load-sxa-dump",
     "detect-changes",
     "normalize",
     "chunk",
@@ -45,6 +58,22 @@ STAGES = (
     "index-pgvector",
     "validate",
 )
+
+DEFAULT_DOMAIN = "knowledge.tech"
+
+# ADR-0202's canonical cross-source `technology` vocabulary
+# (knowledge/tech/domain.yaml technology_vocabulary) keyed by
+# docs.redhat.com productSlug. Deliberately partial: an unmapped slug gets
+# NO technology key (omit, never invent) - extending the vocabulary means
+# editing knowledge/tech/domain.yaml and this map together. Confluence
+# sources carry an explicit per-source `technology` value in
+# gitops/charts/rag-ingestion/values.yaml instead of a mapping here.
+TECHNOLOGY_BY_PRODUCT_SLUG = {
+    "red-hat-satellite": "satellite",
+    "openshift-container-platform": "openshift",
+    "red-hat-openshift-ai-self-managed": "openshift-ai",
+    "red-hat-build-of-keycloak": "keycloak",
+}
 
 DOC_LINK_PATTERN = re.compile(r"/(html|html-single)/")
 MAX_DISCOVERED_LINKS = 50
@@ -59,8 +88,28 @@ HTTP_USER_AGENT = "zuno-rag-ingestion/1.0 (+https://github.com/startxfr/zuno-dem
 
 @dataclass
 class IngestionConfig:
+    # ADR-0204 (WP-22): the one logical knowledge domain this pipeline run
+    # targets. Selects which source adapters may run and is stamped into
+    # every record's metadata; the per-domain database identity arrives
+    # through the same PG* env vars as before, wired per domain by the
+    # chart (the deploy-side counterpart of
+    # platform/bindings/knowledge/bindings.yaml).
+    domain: str
+
     redhat_sources: list
     confluence_sources: list
+    salesforce_sources: list
+    aramis_sources: list
+
+    salesforce_instance_url: Optional[str]
+    salesforce_token: Optional[str]
+    aramis_base_url: Optional[str]
+    aramis_token: Optional[str]
+
+    # load-sxa-dump reads the operator-supplied, approved snapshot from the
+    # corpus bucket itself (ADR-0025: no dump ever lives in git).
+    sxa_dump_s3_key: Optional[str]
+    sxa_snapshot_id: Optional[str]
 
     s3_endpoint: str
     s3_bucket: str
@@ -134,8 +183,17 @@ def _env_json(name: str, default: Any) -> Any:
 
 def load_config() -> IngestionConfig:
     return IngestionConfig(
+        domain=os.environ.get("INGESTION_DOMAIN") or DEFAULT_DOMAIN,
         redhat_sources=_env_json("REDHAT_SOURCES_JSON", []),
         confluence_sources=_env_json("CONFLUENCE_SOURCES_JSON", []),
+        salesforce_sources=_env_json("SALESFORCE_SOURCES_JSON", []),
+        aramis_sources=_env_json("ARAMIS_SOURCES_JSON", []),
+        salesforce_instance_url=os.environ.get("SALESFORCE_INSTANCE_URL"),
+        salesforce_token=os.environ.get("SALESFORCE_TOKEN"),
+        aramis_base_url=os.environ.get("ARAMIS_BASE_URL"),
+        aramis_token=os.environ.get("ARAMIS_TOKEN"),
+        sxa_dump_s3_key=os.environ.get("SXA_DUMP_S3_KEY"),
+        sxa_snapshot_id=os.environ.get("SXA_SNAPSHOT_ID"),
         s3_endpoint=os.environ.get("S3_ENDPOINT", ""),
         s3_bucket=_env("S3_BUCKET", required=True),
         s3_region=os.environ.get("S3_REGION", ""),
@@ -221,6 +279,18 @@ class CorpusStore:
                 keys.append(obj["Key"])
         return keys
 
+    def get_bytes(self, key: str) -> Optional[bytes]:
+        """Raw object read - load-sxa-dump's snapshot file is a SQL dump,
+        not JSON."""
+        try:
+            resp = self._client.get_object(Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code in ("NoSuchKey", "404"):
+                return None
+            raise
+        return resp["Body"].read()
+
 
 def doc_id_for(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()[:32]
@@ -292,11 +362,44 @@ def _extract_title_and_text(html: str) -> tuple:
 
 
 # --------------------------------------------------------------------------
-# fetch-redhat
+# Source adapters (ADR-0204, WP-22)
 # --------------------------------------------------------------------------
 
 
-def stage_fetch_redhat(config: IngestionConfig, store: CorpusStore) -> None:
+@dataclass(frozen=True)
+class SourceAdapter:
+    """One entry per source system: the stage name the KFP DAG invokes, the
+    single knowledge domain whose corpus the adapter feeds, and the fetch
+    callable. Every adapter shares the same contract - read its own slice
+    of IngestionConfig, write one raw record per document to
+    <rawPrefix>/<doc_id>.json through the same CorpusStore round-trip,
+    stamp `domain` (and `technology` where the canonical vocabulary
+    applies) on each record, and return how many records it wrote."""
+
+    stage: str
+    domain: str
+    fetch: Callable[[IngestionConfig, CorpusStore], int]
+
+
+def _run_source_adapter(adapter: SourceAdapter, config: IngestionConfig, store: CorpusStore) -> None:
+    if config.domain != adapter.domain:
+        # Fail closed BEFORE any write: a run targeting one domain must
+        # never produce raw records for another (they would be indexed
+        # into that run's database with the wrong domain metadata).
+        raise SystemExit(
+            f"{adapter.stage}: adapter feeds {adapter.domain} but this run targets "
+            f"{config.domain} (INGESTION_DOMAIN/--domain) - refusing to fetch"
+        )
+    written = adapter.fetch(config, store)
+    logger.info("%s: wrote %d raw documents", adapter.stage, written)
+
+
+# --------------------------------------------------------------------------
+# fetch-redhat (knowledge.tech)
+# --------------------------------------------------------------------------
+
+
+def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
     fetched = 0
     for source in config.redhat_sources:
         if not source.get("enabled", True):
@@ -334,6 +437,7 @@ def stage_fetch_redhat(config: IngestionConfig, store: CorpusStore) -> None:
                 "url": url,
                 "title": title or url,
                 "raw_html": page.text,
+                "domain": "knowledge.tech",
                 "product": source["productSlug"],
                 "version": source["version"],
                 "language": _normalize_language((source.get("languages") or ["en-US"])[0]),
@@ -344,13 +448,16 @@ def stage_fetch_redhat(config: IngestionConfig, store: CorpusStore) -> None:
                 "sha256": hashlib.sha256(page.text.encode("utf-8")).hexdigest(),
                 "provenance": url,
             }
+            technology = TECHNOLOGY_BY_PRODUCT_SLUG.get(source["productSlug"])
+            if technology:
+                record["technology"] = technology
             store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
             fetched += 1
-    logger.info("fetch-redhat: wrote %d raw documents", fetched)
+    return fetched
 
 
 # --------------------------------------------------------------------------
-# fetch-confluence
+# fetch-confluence (knowledge.tech)
 # --------------------------------------------------------------------------
 
 
@@ -385,10 +492,10 @@ def _ancestor_path_matches(ancestor_titles: list, directory: str) -> bool:
     return False
 
 
-def stage_fetch_confluence(config: IngestionConfig, store: CorpusStore) -> None:
+def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
     if not config.confluence_sources:
         logger.info("fetch-confluence: no confluence sources configured")
-        return
+        return 0
     auth = _confluence_auth(config)
     fetched = 0
     for source in config.confluence_sources:
@@ -445,6 +552,7 @@ def stage_fetch_confluence(config: IngestionConfig, store: CorpusStore) -> None:
                         "url": page_url,
                         "title": page.get("title", page_url),
                         "raw_html": html,
+                        "domain": "knowledge.tech",
                         "product": source.get("name", space),
                         "version": None,
                         "language": "en",
@@ -456,12 +564,286 @@ def stage_fetch_confluence(config: IngestionConfig, store: CorpusStore) -> None:
                         "provenance": page_url,
                         "last_modified": page.get("history", {}).get("lastUpdated", {}).get("when"),
                     }
+                    # Explicit per-source canonical value (values.yaml
+                    # confluence[].technology) - never derived from the
+                    # source name (omit rather than invent, ADR-0202).
+                    if source.get("technology"):
+                        record["technology"] = source["technology"]
                     store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
                     fetched += 1
                 if len(results) < limit:
                     break
                 start += limit
-    logger.info("fetch-confluence: wrote %d raw documents", fetched)
+    return fetched
+
+
+# --------------------------------------------------------------------------
+# fetch-salesforce (knowledge.sales)
+# --------------------------------------------------------------------------
+
+
+def _render_record_text(fields: dict) -> str:
+    """Stable "Field: value" rendering - the semantic text a structured
+    record contributes to the corpus. Keys render in the configured field
+    order, never dict order, so the sha256 change detection stays
+    deterministic."""
+    lines = []
+    for name, value in fields.items():
+        if value is None or value == "":
+            continue
+        lines.append(f"{name}: {value}")
+    return "\n".join(lines)
+
+
+def _fetch_salesforce(config: IngestionConfig, store: CorpusStore) -> int:
+    """REST (SOQL) query of the configured objects -> one raw record per
+    Salesforce record, carrying ADR-0202's sales metadata extensions. The
+    instance URL and token arrive via env/ESO (operator-supplied - no live
+    call ever happens in CI; tests drive this with fixtures)."""
+    if not config.salesforce_sources:
+        logger.info("fetch-salesforce: no salesforce sources configured")
+        return 0
+    if not config.salesforce_instance_url or not config.salesforce_token:
+        raise SystemExit(
+            "fetch-salesforce: SALESFORCE_INSTANCE_URL/SALESFORCE_TOKEN not set - "
+            "supply them via the chart's ExternalSecret before enabling this domain"
+        )
+    base = config.salesforce_instance_url.rstrip("/")
+    headers = {"Authorization": f"Bearer {config.salesforce_token}"}
+    fetched = 0
+    for source in config.salesforce_sources:
+        if not source.get("enabled", True):
+            continue
+        object_name = source["object"]
+        fields = source.get("fields") or ["Id", "Name"]
+        soql = source.get("soql") or f"SELECT {', '.join(fields)} FROM {object_name}"
+        url = f"{base}/services/data/v59.0/query"
+        try:
+            resp = requests.get(
+                url, params={"q": soql}, headers=headers, timeout=HTTP_TIMEOUT_SECONDS
+            )
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            logger.error("fetch-salesforce: query failed for %s: %s", object_name, exc)
+            continue
+        for sf_record in resp.json().get("records", []):
+            record_id = sf_record.get("Id")
+            if not record_id:
+                continue
+            ordered = {name: sf_record.get(name) for name in fields}
+            text = _render_record_text(ordered)
+            if not text.strip():
+                continue
+            record_url = f"{base}/{record_id}"
+            doc_id = doc_id_for(record_url)
+            record = {
+                "doc_id": doc_id,
+                "url": record_url,
+                "title": sf_record.get("Name") or f"{object_name} {record_id}",
+                "text": text,
+                "domain": "knowledge.sales",
+                "product": None,
+                "version": None,
+                "language": "en",
+                "source_type": "salesforce-object",
+                # sales-data -> C2 (policies/data-classification/classification.yaml)
+                "classification": source.get("classification", "C2"),
+                "acl_groups": source.get("requiredGroups") or [],
+                "fetched_at": _utcnow_iso(),
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "provenance": record_url,
+                "last_modified": sf_record.get("LastModifiedDate"),
+                # ADR-0202 sales extensions - straight from the record where
+                # the source config names the field, absent otherwise.
+                "sales": {
+                    "object": object_name,
+                    "deal_type": source.get("dealType"),
+                    "status": sf_record.get(source.get("statusField") or "StageName"),
+                },
+            }
+            store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+            fetched += 1
+    return fetched
+
+
+# --------------------------------------------------------------------------
+# fetch-aramis (knowledge.adv)
+# --------------------------------------------------------------------------
+
+
+def _fetch_aramis(config: IngestionConfig, store: CorpusStore) -> int:
+    """Aramis API/export ingestion -> one raw record per exported item,
+    carrying ADR-0202's adv metadata extensions. Endpoint/token via
+    env/ESO (operator-supplied); fixture-driven in tests."""
+    if not config.aramis_sources:
+        logger.info("fetch-aramis: no aramis sources configured")
+        return 0
+    if not config.aramis_base_url:
+        raise SystemExit(
+            "fetch-aramis: ARAMIS_BASE_URL not set - supply it via the chart "
+            "before enabling this domain"
+        )
+    base = config.aramis_base_url.rstrip("/")
+    headers = {}
+    if config.aramis_token:
+        headers["Authorization"] = f"Bearer {config.aramis_token}"
+    fetched = 0
+    for source in config.aramis_sources:
+        if not source.get("enabled", True):
+            continue
+        endpoint = source["endpoint"]
+        try:
+            resp = requests.get(f"{base}{endpoint}", headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            logger.error("fetch-aramis: export failed for %s: %s", endpoint, exc)
+            continue
+        payload = resp.json()
+        items = payload if isinstance(payload, list) else payload.get("items", [])
+        for item in items:
+            item_id = str(item.get("id") or item.get("reference") or "")
+            if not item_id:
+                continue
+            fields = {k: v for k, v in item.items() if not isinstance(v, (dict, list))}
+            text = _render_record_text(fields)
+            if not text.strip():
+                continue
+            record_url = f"aramis://{source.get('name', endpoint.strip('/'))}/{item_id}"
+            doc_id = doc_id_for(record_url)
+            record = {
+                "doc_id": doc_id,
+                "url": record_url,
+                "title": item.get("title") or item.get("name") or record_url,
+                "text": text,
+                "domain": "knowledge.adv",
+                "product": None,
+                "version": None,
+                "language": _normalize_language(source.get("language")),
+                "source_type": "aramis-export",
+                "classification": source.get("classification", "C2"),
+                "acl_groups": source.get("requiredGroups") or [],
+                "fetched_at": _utcnow_iso(),
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "provenance": record_url,
+                "last_modified": item.get("updated_at") or item.get("modified"),
+                # ADR-0202 adv extensions.
+                "adv": {
+                    "project_type": source.get("projectType"),
+                    "status": item.get("status"),
+                    "customer": item.get("customer"),
+                },
+            }
+            store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+            fetched += 1
+    return fetched
+
+
+# --------------------------------------------------------------------------
+# load-sxa-dump (knowledge.sxa-legacy)
+# --------------------------------------------------------------------------
+
+_SXA_TABLE_PATTERN = re.compile(
+    r"-- Table structure for table `(?P<table>[^`]+)`", re.IGNORECASE
+)
+_SXA_MAX_ROW_LINES = 40
+
+
+def _split_sxa_dump(dump_text: str) -> dict:
+    """Splits a mysqldump-style export into per-table sections (DDL +
+    INSERT block). Anything before the first table marker is ignored
+    (dump header)."""
+    sections: dict = {}
+    matches = list(_SXA_TABLE_PATTERN.finditer(dump_text))
+    for i, match in enumerate(matches):
+        start = match.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(dump_text)
+        sections[match.group("table")] = dump_text[start:end].strip()
+    return sections
+
+
+def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
+    """Validated SQL dump snapshot -> one raw record per legacy table
+    (schema DDL + sample rows as text), with the versioned snapshot ID,
+    import timestamp and checksum ADR-0206 requires on every sxa-legacy
+    record. The dump itself is operator-uploaded to the corpus bucket
+    (ADR-0025: never in git); records use stable sxa-dump://<table> URLs so
+    re-importing the SAME snapshot upserts identical rows (idempotent -
+    detect-changes sees unchanged sha256s) and a NEW snapshot version
+    replaces content under the same identity with new snapshot metadata."""
+    if not config.sxa_dump_s3_key:
+        raise SystemExit(
+            "load-sxa-dump: SXA_DUMP_S3_KEY not set - upload the approved "
+            "snapshot to the corpus bucket and point this at it"
+        )
+    raw_bytes = store.get_bytes(config.sxa_dump_s3_key)
+    if raw_bytes is None:
+        raise SystemExit(
+            f"load-sxa-dump: no object at s3://{config.s3_bucket}/{config.sxa_dump_s3_key}"
+        )
+    dump_text = raw_bytes.decode("utf-8", errors="replace")
+    checksum = hashlib.sha256(raw_bytes).hexdigest()
+    snapshot_id = config.sxa_snapshot_id or f"sha256-{checksum[:16]}"
+    imported_at = _utcnow_iso()
+
+    sections = _split_sxa_dump(dump_text)
+    if not sections:
+        raise SystemExit(
+            "load-sxa-dump: no '-- Table structure for table' sections found - "
+            "not a mysqldump-style export, refusing to index an unvalidated shape"
+        )
+    written = 0
+    for table, section in sections.items():
+        lines = section.splitlines()
+        if len(lines) > _SXA_MAX_ROW_LINES:
+            omitted = len(lines) - _SXA_MAX_ROW_LINES
+            lines = lines[:_SXA_MAX_ROW_LINES] + [f"-- ({omitted} further lines omitted)"]
+        text = "\n".join(lines)
+        record_url = f"sxa-dump://{table}"
+        doc_id = doc_id_for(record_url)
+        record = {
+            "doc_id": doc_id,
+            "url": record_url,
+            "title": f"SXA legacy table {table}",
+            "text": text,
+            "domain": "knowledge.sxa-legacy",
+            "product": None,
+            "version": None,
+            "language": "fr",
+            "source_type": "sxa-dump",
+            # Historical commercial data: C3 by default (ADR-0206) until the
+            # field-level review WP-23 records says otherwise.
+            "classification": "C3",
+            "acl_groups": [],
+            "fetched_at": imported_at,
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "provenance": f"sxa-dump snapshot {snapshot_id}",
+            # ADR-0206 snapshot discipline + ADR-0202 sxa-legacy extensions.
+            "sxa": {
+                "snapshot_id": snapshot_id,
+                "imported_at": imported_at,
+                "snapshot_checksum": checksum,
+                "table": table,
+            },
+        }
+        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+        written += 1
+    return written
+
+
+# --------------------------------------------------------------------------
+# Adapter registry
+# --------------------------------------------------------------------------
+
+SOURCE_ADAPTERS = {
+    adapter.stage: adapter
+    for adapter in (
+        SourceAdapter("fetch-redhat", "knowledge.tech", _fetch_redhat),
+        SourceAdapter("fetch-confluence", "knowledge.tech", _fetch_confluence),
+        SourceAdapter("fetch-salesforce", "knowledge.sales", _fetch_salesforce),
+        SourceAdapter("fetch-aramis", "knowledge.adv", _fetch_aramis),
+        SourceAdapter("load-sxa-dump", "knowledge.sxa-legacy", _load_sxa_dump),
+    )
+}
 
 
 # --------------------------------------------------------------------------
@@ -569,29 +951,46 @@ def stage_normalize(config: IngestionConfig, store: CorpusStore) -> None:
         if not raw:
             logger.warning("normalize: raw document %s missing, skipping", doc_id)
             continue
-        title, text = _normalize_html(
-            raw["raw_html"],
-            preserve_code_blocks=config.chunk_preserve_code_blocks,
-            preserve_tables=config.chunk_preserve_tables,
-        )
+        if raw.get("raw_html") is not None:
+            title, text = _normalize_html(
+                raw["raw_html"],
+                preserve_code_blocks=config.chunk_preserve_code_blocks,
+                preserve_tables=config.chunk_preserve_tables,
+            )
+        else:
+            # Structured-source adapters (salesforce/aramis/sxa-dump) emit
+            # ready text, not HTML - nothing to clean up.
+            title, text = raw.get("title") or "", raw.get("text") or ""
         if not text.strip():
             logger.warning("normalize: %s produced no text after cleanup, skipping", raw["url"])
             continue
+        metadata = {
+            # ADR-0202/ADR-0204: records written before the domain field
+            # existed are knowledge.tech by construction - the only domain
+            # this pipeline ever served (same default rag-service applies).
+            "domain": raw.get("domain") or config.domain,
+            "product": raw.get("product"),
+            "version": raw.get("version"),
+            "language": _normalize_language(raw.get("language")),
+            "source_type": raw.get("source_type"),
+            "classification": raw.get("classification", "C1"),
+            "acl_groups": raw.get("acl_groups") or [],
+            "last_modified": raw.get("last_modified") or raw.get("fetched_at"),
+            "provenance": raw.get("provenance") or raw.get("url"),
+        }
+        if raw.get("technology"):
+            metadata["technology"] = raw["technology"]
+        # Per-domain metadata extensions (ADR-0202's metadata-schema.yaml)
+        # ride through under their domain's own key.
+        for extension_key in ("sales", "adv", "sxa"):
+            if raw.get(extension_key):
+                metadata[extension_key] = raw[extension_key]
         record = {
             "doc_id": doc_id,
             "url": raw["url"],
             "title": raw.get("title") or title,
             "text": text,
-            "metadata": {
-                "product": raw.get("product"),
-                "version": raw.get("version"),
-                "language": _normalize_language(raw.get("language")),
-                "source_type": raw.get("source_type"),
-                "classification": raw.get("classification", "C1"),
-                "acl_groups": raw.get("acl_groups") or [],
-                "last_modified": raw.get("last_modified") or raw.get("fetched_at"),
-                "provenance": raw.get("provenance") or raw.get("url"),
-            },
+            "metadata": metadata,
         }
         store.put_json(f"{config.normalized_prefix}/{doc_id}.json", record)
         normalized += 1
@@ -917,8 +1316,6 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
 # --------------------------------------------------------------------------
 
 STAGE_FUNCTIONS = {
-    "fetch-redhat": stage_fetch_redhat,
-    "fetch-confluence": stage_fetch_confluence,
     "detect-changes": stage_detect_changes,
     "normalize": stage_normalize,
     "chunk": stage_chunk,
@@ -931,13 +1328,28 @@ STAGE_FUNCTIONS = {
 def main() -> int:
     parser = argparse.ArgumentParser(prog="rag-ingestion")
     parser.add_argument("stage", choices=STAGES)
+    parser.add_argument(
+        "--domain",
+        help=(
+            "logical knowledge domain this run targets (default: "
+            "INGESTION_DOMAIN env or knowledge.tech). Fetch stages refuse "
+            "to run for a domain they don't feed (ADR-0204)."
+        ),
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    logger.info("Starting RAG ingestion stage: %s", args.stage)
 
+    if args.domain:
+        os.environ["INGESTION_DOMAIN"] = args.domain
     config = load_config()
+    logger.info("Starting RAG ingestion stage: %s (domain %s)", args.stage, config.domain)
+
     store = CorpusStore(config)
-    STAGE_FUNCTIONS[args.stage](config, store)
+    adapter = SOURCE_ADAPTERS.get(args.stage)
+    if adapter is not None:
+        _run_source_adapter(adapter, config, store)
+    else:
+        STAGE_FUNCTIONS[args.stage](config, store)
     return 0
 
 

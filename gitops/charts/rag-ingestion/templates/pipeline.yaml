@@ -9,4 +9,26 @@ metadata:
 spec:
   displayName: {{ .Values.pipeline.displayName | quote }}
   description: {{ .Values.pipeline.description | quote }}
+{{- /* ADR-0204 part 2 (WP-22): one further Pipeline CR per enabled
+additional domain. The tech pipeline above keeps its original
+name/displayName untouched (the WP-07-verified lookup path); each
+domain's DAG variant lives in the same pipeline.py source, compiled per
+domain - see files/pipeline.py.tpl. */}}
+{{- $root := . }}
+{{- range $name, $domain := .Values.domains }}
+{{- if $domain.enabled }}
+---
+apiVersion: pipelines.kubeflow.org/v2beta1
+kind: Pipeline
+metadata:
+  name: {{ $root.Values.pipeline.name }}-{{ $name }}
+  namespace: {{ $root.Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" $root | nindent 4 }}
+    zuno.io/rag-ingestion-domain: {{ $name | quote }}
+spec:
+  displayName: "{{ $root.Values.pipeline.displayName }} ({{ $name }})"
+  description: "knowledge.{{ $name }} ingestion - {{ $root.Values.pipeline.description }}"
+{{- end }}
+{{- end }}
 {{- end }}

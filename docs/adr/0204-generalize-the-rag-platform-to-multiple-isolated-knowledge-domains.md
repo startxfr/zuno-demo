@@ -1,6 +1,11 @@
 # ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
-- **Status:** Partially implemented (multi-domain retrieval core, bindings and per-domain databases merged; source adapters (WP-22) and live provisioning pending)
+- **Status:** Partially implemented (multi-domain retrieval core, bindings, per-domain databases and source adapters merged; live provisioning pending)
+  <!-- 2026-08-15: WP-22 merged part 2 - the source-adapter interface
+  (fetch-redhat/fetch-confluence refactored, fetch-salesforce/fetch-aramis/
+  load-sxa-dump added), per-domain pipeline targeting and ADR-0105 cadences.
+  Only the operator provisioning/live-run follow-up (WP-21+WP-22 briefs)
+  separates this from Implemented. -->
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
