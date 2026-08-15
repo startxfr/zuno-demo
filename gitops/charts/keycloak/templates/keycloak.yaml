@@ -81,6 +81,13 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         volumes:
+          # File names follow Keycloak's file vault provider convention
+          # <realm>_<key> with underscores INSIDE the realm/key escaped as
+          # "__" - VERIFIED live (2026-08-15): resolving
+          # ${vault.openshift_client_secret} in realm zuno, Keycloak looked
+          # for zuno_openshift__client__secret (FilesPlainTextVaultProvider
+          # warning in the server log). Single-underscore names silently
+          # fail every runtime lookup.
           - name: vault-secrets
             projected:
               sources:
@@ -89,15 +96,15 @@ spec:
                     optional: true
                     items:
                       - key: client_id
-                        path: zuno_google_client_id
+                        path: zuno_google__client__id
                       - key: client_secret
-                        path: zuno_google_client_secret
+                        path: zuno_google__client__secret
                 - secret:
                     name: tekos-frontend-client-secret
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_tekos_frontend_client_secret
+                        path: zuno_tekos__frontend__client__secret
                 - secret:
                     # ADR-0326 (WP-31): arkos-frontend flipped to a
                     # confidential client, same shape as tekos-frontend
@@ -106,7 +113,7 @@ spec:
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_arkos_frontend_client_secret
+                        path: zuno_arkos__frontend__client__secret
                 - secret:
                     # ADR-0326 (WP-33): comage-frontend flipped to a
                     # confidential client, same shape as tekos/arkos-frontend
@@ -115,7 +122,7 @@ spec:
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_comage_frontend_client_secret
+                        path: zuno_comage__frontend__client__secret
                 - secret:
                     # ADR-0326 (WP-35): advantage-frontend flipped to a
                     # confidential client, same shape as tekos/arkos/
@@ -124,7 +131,7 @@ spec:
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_advantage_frontend_client_secret
+                        path: zuno_advantage__frontend__client__secret
                 - secret:
                     # ADR-0326 (WP-36): finage-frontend flipped to a
                     # confidential client, same shape as every other
@@ -133,7 +140,7 @@ spec:
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_finage_frontend_client_secret
+                        path: zuno_finage__frontend__client__secret
                 - secret:
                     # ADR-0410/ADR-0307 (WP-41): naveo-frontend, the sixth
                     # demo agent (scaffolded from platform/templates/agent/)
@@ -143,20 +150,20 @@ spec:
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_naveo_frontend_client_secret
+                        path: zuno_naveo__frontend__client__secret
                 - secret:
                     name: demo-personas-password
                     optional: true
                     items:
                       - key: password
-                        path: zuno_demo_personas_password
+                        path: zuno_demo__personas__password
                 - secret:
                     # ADR-0320
                     name: openshift-client-secret
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_openshift_client_secret
+                        path: zuno_openshift__client__secret
         containers:
           - name: keycloak
             securityContext:

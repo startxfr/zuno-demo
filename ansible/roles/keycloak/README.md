@@ -112,11 +112,28 @@ built-in **vault SPI in `file` mode**
 `KC_VAULT=file` is required: `env` is not a valid `KC_VAULT` value on
 the installed RHBK version (`kc.sh` fails with `Invalid value for
 option 'KC_VAULT': env. Expected values are: file, keystore`).
-**Assumption still flagged for review:** the `<realm>_<key>` file-naming
-convention is the documented default for Keycloak's file vault provider,
-but has not been verified against a real realm import on this RHBK
-version - if a future RHBK version exposes a first-class `spec.db`-style
-secret reference for identity provider config, prefer that instead.
+
+**Verified live (2026-08-15, RHBK 26.6 on the demo cluster) - two
+corrections to the original assumptions:**
+
+1. The file-naming convention is `<realm>_<key>` with underscores INSIDE
+   the realm/key **escaped as `__`**: resolving
+   `${vault.openshift_client_secret}` in realm `zuno`, Keycloak looked for
+   `zuno_openshift__client__secret` (FilesPlainTextVaultProvider warning
+   in the server log). The originally-projected single-underscore file
+   names silently failed every runtime lookup;
+   `templates/keycloak.yaml`'s projected `items[].path` values now carry
+   the `__` escaping.
+2. The vault SPI is **runtime-only** - it resolves `${vault.*}` on use
+   for fields like client secrets and IdP config, but user
+   `credentials[].value` is hashed at import time and never consults it:
+   the first real import stored the literal string
+   `${vault.demo_personas_password}` as every persona's password.
+   User passwords now use the operator's own import-time mechanism
+   instead: `KeycloakRealmImport spec.placeholders` injects the
+   `demo-personas-password` Secret as an env var into the import job, and
+   `realm-zuno.json`'s credential values reference it as
+   `${DEMO_PERSONAS_PASSWORD}` (see `templates/realmimport.yaml`).
 
 ## Database
 

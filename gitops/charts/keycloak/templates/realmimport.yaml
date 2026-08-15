@@ -26,6 +26,20 @@ metadata:
     argocd.argoproj.io/sync-wave: "-10"
 spec:
   keycloakCRName: {{ .Values.keycloakCRName }}
+  # VERIFIED live (2026-08-15, first real import of this realm): user
+  # credentials[].value is hashed at import time and never consults the
+  # runtime vault SPI - a ${vault.*} credential value imports as the
+  # LITERAL password string. spec.placeholders is the operator's own
+  # mechanism for import-time values: it injects the Secret as an env var
+  # into the import job, and Keycloak's import substitutes ${<NAME>} from
+  # the environment while parsing the JSON. The ${vault.*} references
+  # elsewhere in the realm (client secrets, Google IdP) are correct as-is:
+  # those fields resolve through the vault SPI at runtime, on use.
+  placeholders:
+    DEMO_PERSONAS_PASSWORD:
+      secret:
+        name: {{ .Values.demoPersonasSecretName | default "demo-personas-password" }}
+        key: password
   realm:
 {{ $realm | toYaml | indent 4 }}
 {{- end }}
