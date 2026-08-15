@@ -5,10 +5,12 @@
 #
 # `persona` values are anonymized synthetic usernames from
 # gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `consultant-01`/
-# `-02` hold both the `board` business role (governs tool/data permissions
-# inside Arkos, per agent.okf.md's own body prose) and the `agent_arkos`
-# entitlement group (ADR-0040) - see security_checks.py for the negative
-# tests covering entitlement without business role and vice versa (new
+# `-02` hold both the `consultant` business role (governs tool/data
+# permissions inside Arkos since ADR-0349 moved Arkos's audience from board
+# to the consultant architect tier, per agent.okf.md's own body prose) and
+# the `agent_arkos` entitlement group (ADR-0040) - see security_checks.py
+# for the negative tests covering entitlement without business role and
+# vice versa (new
 # `arkos-entitlement-only-user-01`/`board-role-only-user-01` fixtures,
 # mirroring Tekos's own `tekos-entitlement-only-user-01`/
 # `consultant-role-only-user-01`). `type` selects which handler in
