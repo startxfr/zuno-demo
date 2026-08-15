@@ -4,6 +4,20 @@ namespace: zuno-data
 configMapGenerator:
   - name: zuno-rag-schema
     files:
+      # WP-21/WP-28 fix: 003/004 only ALTER document_embeddings - they
+      # assume it already exists (originally true only for the "zuno"
+      # database, bootstrapped separately by ansible/roles/sql_schema from
+      # data/sxa/schema/002_pgvector.sql). Every per-domain database
+      # ADR-0204 introduces (rag-tech, rag-sales, rag-adv,
+      # rag-sxa-legacy, rag-project) is fresh and has never seen that
+      # CREATE TABLE - without it here too,
+      # gitops/charts/rag-service/templates/job-schema-apply.yaml's first
+      # ALTER fails with "relation document_embeddings does not exist"
+      # for every domain except the original zuno database. Included
+      # unconditionally (IF NOT EXISTS-guarded) rather than only for new
+      # domains, so there is one schema-apply story for every domain, not
+      # two.
+      - 002_pgvector.sql=../../../../../data/sxa/schema/002_pgvector.sql
       - 003_rag_metadata.sql=../../../../../data/rag/schema/003_rag_metadata.sql
       - 004_rag_chunking.sql=../../../../../data/rag/schema/004_rag_chunking.sql
       - seed.sql=../../../../../data/rag/fixtures/seed.sql

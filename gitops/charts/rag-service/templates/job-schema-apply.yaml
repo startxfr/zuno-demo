@@ -73,6 +73,14 @@ spec:
             - ON_ERROR_STOP=1
             - -c
             - CREATE SCHEMA IF NOT EXISTS {{ .schema }};
+            # WP-21/WP-28 fix: creates document_embeddings (IF NOT EXISTS)
+            # before 003/004 ALTER it - every per-domain database is
+            # fresh and has never run data/sxa/schema/002_pgvector.sql's
+            # CREATE TABLE the way the original "zuno" database has (see
+            # ansible/roles/rag/kustomize/schema/kustomization.yaml's own
+            # comment on this same fix).
+            - -f
+            - /sql/002_pgvector.sql
             - -f
             - /sql/003_rag_metadata.sql
             - -f
