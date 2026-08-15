@@ -96,13 +96,19 @@ async def test_unauthenticated_call_rejected_before_any_protocol_handling(transp
     assert resp.status_code == 401, f"expected 401 with no gateway token, got {resp.status_code}"
 
 
-async def test_tools_list_reports_exactly_the_three_declared_tools(transport) -> None:
+async def test_tools_list_reports_exactly_the_five_declared_tools(transport) -> None:
     async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
     names = sorted(t.name for t in result.tools)
-    assert names == ["get_customer", "get_quote", "list_open_opportunities"], names
+    assert names == [
+        "aggregate_revenue_by_year",
+        "get_customer",
+        "get_quote",
+        "list_open_opportunities",
+        "lookup_record",
+    ], names
 
 
 async def test_get_customer_round_trip_with_a_real_authenticated_call(transport) -> None:
@@ -138,11 +144,87 @@ async def test_get_customer_not_found_reports_as_a_tool_error_not_a_crash(transp
     assert any("no customer with id 999" in block.text for block in result.content if hasattr(block, "text"))
 
 
+async def test_aggregate_revenue_by_year_round_trip(transport) -> None:
+    async def fake_connect():
+        return _FakeConn({"total_revenue": 42000, "invoice_count": 3}, [])
+
+    with mock.patch.object(server, "_connect", fake_connect):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "aggregate_revenue_by_year", {"year": 2026, "status": "paid"}
+                )
+
+    assert not result.is_error, result.content
+    assert result.structured_content == {
+        "result": {
+            "year": 2026, "status_filter": "paid", "total_revenue": 42000, "invoice_count": 3,
+        }
+    }, result.structured_content
+
+
+async def test_aggregate_revenue_by_year_rejects_an_unknown_status(transport) -> None:
+    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "aggregate_revenue_by_year", {"year": 2026, "status": "not-a-real-status"}
+            )
+
+    assert result.is_error, "expected an MCP tool-level error for an unknown status"
+    assert any(
+        "unknown status" in block.text for block in result.content if hasattr(block, "text")
+    )
+
+
+async def test_lookup_record_round_trip_for_an_allow_listed_type(transport) -> None:
+    fake_invoice = {"id": 7, "reference": "INV-007", "total_amount": 500}
+
+    async def fake_connect():
+        return _FakeConn(fake_invoice, [])
+
+    with mock.patch.object(server, "_connect", fake_connect):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "lookup_record", {"record_type": "invoice", "record_id": 7}
+                )
+
+    assert not result.is_error, result.content
+    assert result.structured_content == {
+        "result": {"record_type": "invoice", "record": fake_invoice}
+    }, result.structured_content
+
+
+async def test_lookup_record_rejects_a_record_type_outside_the_allow_list(transport) -> None:
+    # No path from caller input to SQL text: an unrecognized record_type
+    # never reaches a query at all (proves the allow-list check runs
+    # before any table-name interpolation, not just that a bad table
+    # name would fail).
+    async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "lookup_record", {"record_type": "users", "record_id": 1}
+            )
+
+    assert result.is_error, "expected an MCP tool-level error for a non-allow-listed record_type"
+    assert any(
+        "unknown record_type" in block.text for block in result.content if hasattr(block, "text")
+    )
+
+
 TESTS = [
     test_unauthenticated_call_rejected_before_any_protocol_handling,
-    test_tools_list_reports_exactly_the_three_declared_tools,
+    test_tools_list_reports_exactly_the_five_declared_tools,
     test_get_customer_round_trip_with_a_real_authenticated_call,
     test_get_customer_not_found_reports_as_a_tool_error_not_a_crash,
+    test_aggregate_revenue_by_year_round_trip,
+    test_aggregate_revenue_by_year_rejects_an_unknown_status,
+    test_lookup_record_round_trip_for_an_allow_listed_type,
+    test_lookup_record_rejects_a_record_type_outside_the_allow_list,
 ]
 
 

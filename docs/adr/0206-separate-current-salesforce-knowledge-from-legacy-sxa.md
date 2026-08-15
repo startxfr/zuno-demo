@@ -1,6 +1,6 @@
 # ADR-0206: Separate current Salesforce knowledge from legacy SXA
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (policy, deterministic query capabilities, metadata separation and snapshot discipline merged; live snapshot load pending)
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

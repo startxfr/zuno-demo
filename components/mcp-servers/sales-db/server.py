@@ -1,10 +1,16 @@
 """sales-db MCP server (ADR-0017, protocol per ADR-0043).
 
-Exposes exactly three deterministic, read-only tools over the SXA-derived
+Exposes five deterministic, read-only tools over the SXA-derived legacy
 sales-operations schema (data/sxa/schema/001_init.sql): get_customer,
-list_open_opportunities, get_quote. Every query is parameterized and
-read-only - there is no path from an LLM-constructed string to SQL here,
-which is the entire point of ADR-0017 ("no direct LLM-to-DB freedom").
+list_open_opportunities, get_quote (per-record reads, `sxa.*` capabilities
+per ADR-0206/WP-23 - this data is legacy SXA, never current Salesforce),
+plus aggregate_revenue_by_year and lookup_record (deterministic structured
+queries added by WP-23, narrower policy: Sales + Direction/`board` only,
+C3 by default). Every query is parameterized and read-only - there is no
+path from an LLM-constructed string to SQL here, which is the entire
+point of ADR-0017 ("no direct LLM-to-DB freedom"); the aggregation tools
+exist precisely so an exact number is never something a RAG chunk has to
+approximate.
 
 ADR-0043: the tool-call surface is a real, standards-compliant MCP server
 (the `mcp` SDK's MCPServer, streamable-HTTP transport, mounted at /mcp),
@@ -196,6 +202,82 @@ async def get_quote(quote_id: int) -> Dict[str, Any]:
             lines = await cur.fetchall()
 
     return {"quote": quote, "lines": lines}
+
+
+_VALID_INVOICE_STATUSES = {"draft", "sent", "paid", "overdue", "cancelled"}
+
+
+@mcp_server.tool()
+async def aggregate_revenue_by_year(year: int, status: Optional[str] = None) -> Dict[str, Any]:
+    """Deterministic revenue aggregation (sum of invoice totals) for a
+    single calendar year, derived from `sent_on` - the year the invoice
+    was issued to the customer, not `paid_on` (unpaid/overdue invoices
+    still count as billed revenue for the year). Optional `status` narrows
+    to one invoice_statuses code (paid, sent, ...); an unrecognized status
+    is a caller error, not silently ignored - ADR-0206's "exact numbers,
+    never approximated" applies to the filter as much as the sum."""
+    if status is not None and status not in _VALID_INVOICE_STATUSES:
+        raise ValueError(
+            f"unknown status '{status}' - must be one of {sorted(_VALID_INVOICE_STATUSES)}"
+        )
+    query = """
+        SELECT coalesce(sum(i.total_amount), 0) AS total_revenue, count(*) AS invoice_count
+        FROM invoices i
+        JOIN invoice_statuses s ON s.id = i.status_id
+        WHERE extract(year FROM i.sent_on) = %(year)s
+    """
+    params: Dict[str, Any] = {"year": year}
+    if status:
+        query += " AND s.code = %(status)s"
+        params["status"] = status
+
+    async with await _connect() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(query, params)
+            row = await cur.fetchone()
+
+    return {
+        "year": year,
+        "status_filter": status,
+        "total_revenue": row["total_revenue"],
+        "invoice_count": row["invoice_count"],
+    }
+
+
+_LOOKUP_TABLES = {
+    "customer": ("customers", "id, name, legal_name, industry, city, country"),
+    "opportunity": ("opportunities", "id, reference, name, customer_id, budget_amount, due_on"),
+    "quote": ("quotes", "id, reference, opportunity_id, customer_id, total_amount, issued_at"),
+    "order": ("orders", "id, reference, customer_id, total_amount, created_at"),
+    "invoice": ("invoices", "id, reference, order_id, customer_id, total_amount, sent_on, paid_on"),
+}
+
+
+@mcp_server.tool()
+async def lookup_record(record_type: str, record_id: int) -> Dict[str, Any]:
+    """Deterministic single-row lookup by numeric id across a fixed,
+    allow-listed set of legacy SXA tables (customer/opportunity/quote/
+    order/invoice) - a generalization of get_customer/get_quote for the
+    other legacy record types, still with no path from caller input to
+    SQL text: record_type only ever selects a column list from
+    _LOOKUP_TABLES above, never gets interpolated into the query itself."""
+    if record_type not in _LOOKUP_TABLES:
+        raise ValueError(
+            f"unknown record_type '{record_type}' - must be one of {sorted(_LOOKUP_TABLES)}"
+        )
+    table, columns = _LOOKUP_TABLES[record_type]
+
+    async with await _connect() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                f"SELECT {columns} FROM {table} WHERE id = %(record_id)s",
+                {"record_id": record_id},
+            )
+            record = await cur.fetchone()
+            if record is None:
+                raise ValueError(f"no {record_type} with id {record_id}")
+
+    return {"record_type": record_type, "record": record}
 
 
 class GatewayTokenMiddleware(BaseHTTPMiddleware):

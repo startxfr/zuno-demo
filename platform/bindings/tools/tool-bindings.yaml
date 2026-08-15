@@ -42,7 +42,15 @@
 
 bindings:
   # --- sales-db: real MCP server (ADR-0043), streamable-HTTP transport ---
-  - capability: sales.customer.read
+  # ADR-0206 (WP-23): these capabilities are `sxa.*`, not `sales.*` - the
+  # sales-db server's data IS the SXA-derived legacy schema
+  # (data/sxa/schema/001_init.sql), and legacy SXA knowledge must never be
+  # indistinguishable from current Salesforce data. The `sales.*`
+  # namespace is deliberately vacant: it is reserved for the real live
+  # Salesforce capabilities WP-33 introduces (ADR-0208 auth modes apply
+  # there). The legacy tool-name aliases (get_customer, ...) are
+  # unchanged - they name the provider tools, not the logical namespace.
+  - capability: sxa.customer.read
     aliases: [get_customer]
     backend: sales-db
     transport: streamable-http
@@ -52,7 +60,7 @@ bindings:
       path: /mcp
     provider_tool: get_customer
 
-  - capability: sales.opportunity.search
+  - capability: sxa.opportunity.search
     aliases: [list_open_opportunities]
     backend: sales-db
     transport: streamable-http
@@ -62,7 +70,7 @@ bindings:
       path: /mcp
     provider_tool: list_open_opportunities
 
-  - capability: sales.quote.read
+  - capability: sxa.quote.read
     aliases: [get_quote]
     backend: sales-db
     transport: streamable-http
@@ -71,6 +79,31 @@ bindings:
       default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
       path: /mcp
     provider_tool: get_quote
+
+  # ADR-0206 (WP-23): deterministic structured-query capabilities over the
+  # legacy SXA schema - parameterized aggregations/lookups only, no tool
+  # anywhere accepts SQL text (ADR-0017's "no LLM-to-DB freedom" applies
+  # to exact numbers doubly: RAG chunks must never be the source of an
+  # aggregate a deterministic query can compute).
+  - capability: sxa.aggregate.revenue-by-year
+    aliases: [aggregate_revenue_by_year]
+    backend: sales-db
+    transport: streamable-http
+    endpoint:
+      env: SALES_DB_MCP_URL
+      default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: aggregate_revenue_by_year
+
+  - capability: sxa.record.lookup
+    aliases: [lookup_record]
+    backend: sales-db
+    transport: streamable-http
+    endpoint:
+      env: SALES_DB_MCP_URL
+      default: "http://sales-db-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: lookup_record
 
   # --- confluence: real MCP server (ADR-0117), streamable-HTTP transport ---
   - capability: confluence.page.search

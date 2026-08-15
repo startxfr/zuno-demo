@@ -137,7 +137,7 @@ tools:
       - board
 
   - tool: get_customer
-    capability: sales.customer.read
+    capability: sxa.customer.read
     mcp_server: sales-db
     min_classification: C2
     allowed_groups:
@@ -146,7 +146,7 @@ tools:
       - board
 
   - tool: list_open_opportunities
-    capability: sales.opportunity.search
+    capability: sxa.opportunity.search
     mcp_server: sales-db
     min_classification: C2
     allowed_groups:
@@ -155,12 +155,35 @@ tools:
       - board
 
   - tool: get_quote
-    capability: sales.quote.read
+    capability: sxa.quote.read
     mcp_server: sales-db
     min_classification: C2
     allowed_groups:
       - sales
       - adv
+      - board
+
+  # ADR-0206 (WP-23): deterministic structured queries over the FULL legacy
+  # SXA dataset - historical commercial data is C3 by default (until the
+  # field-level review the WP-23 brief schedules says otherwise), and
+  # narrower than the per-record reads above: Sales + Direction only
+  # ("Direction" maps to the existing `board` Keycloak group - no separate
+  # `direction` group exists in the realm, same mapping
+  # policies/knowledge/knowledge-policy.yaml documents).
+  - tool: aggregate_revenue_by_year
+    capability: sxa.aggregate.revenue-by-year
+    mcp_server: sales-db
+    min_classification: C3
+    allowed_groups:
+      - sales
+      - board
+
+  - tool: lookup_record
+    capability: sxa.record.lookup
+    mcp_server: sales-db
+    min_classification: C3
+    allowed_groups:
+      - sales
       - board
 
   - tool: web_search

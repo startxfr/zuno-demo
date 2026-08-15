@@ -1,11 +1,23 @@
 # MCP server: sales-db
 
-Controlled deterministic access to the migrated SXA sales database, including validated state transitions.
+Controlled deterministic access to the migrated **legacy SXA** database
+(ADR-0206/WP-23: this data is historical legacy commercial data, not
+current Salesforce - the server keeps its original `sales-db` name for
+now, but every capability it exposes is namespaced `sxa.*` in
+`platform/bindings/tools/tool-bindings.yaml`; `sales.*` is reserved for
+the real live Salesforce capabilities WP-33 introduces).
 
-Three tools, each a parameterized, read-only query against the schema in
+Five tools, each a parameterized, read-only query against the schema in
 `data/sxa/schema/001_init.sql` - never LLM-constructed SQL:
 `get_customer(customer_id)`, `list_open_opportunities(owner?)`,
-`get_quote(quote_id)`.
+`get_quote(quote_id)` (per-record reads, `sxa.customer.read` /
+`sxa.opportunity.search` / `sxa.quote.read`), plus
+`aggregate_revenue_by_year(year, status?)` and
+`lookup_record(record_type, record_id)` (deterministic structured
+queries over the full legacy dataset, `sxa.aggregate.revenue-by-year` /
+`sxa.record.lookup` - narrower policy: Sales + Direction/`board` only,
+C3 by default per `policies/knowledge/knowledge-policy.yaml`'s
+`knowledge.sxa-legacy` entry).
 
 Transport: a real, standards-compliant MCP server - the
 official `mcp` Python SDK's `MCPServer`, streamable-HTTP transport,

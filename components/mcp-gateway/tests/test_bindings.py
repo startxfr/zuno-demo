@@ -78,6 +78,36 @@ def test_unknown_name_fails_closed() -> None:
     assert len(problems) == 1
 
 
+def test_sxa_legacy_capabilities_never_share_the_sales_namespace() -> None:
+    """ADR-0206 (WP-23) write-path guard, binding-registry level: the
+    `sales-db` server's data is legacy SXA, not current Salesforce, and a
+    future real Salesforce write capability (WP-33) must never resolve to
+    it. Proven two ways: (1) every capability this legacy server backs is
+    namespaced `sxa.*`, never `sales.*` - the namespace stays fully vacant
+    until WP-33 defines it against a different backend; (2) resolving any
+    `sales.*` name today (including one that would be a natural write
+    capability name) fails closed rather than silently matching a sxa.*
+    entry or an alias."""
+    registry = BindingRegistry(path=REAL_BINDINGS_PATH)
+    assert registry.loaded, registry.load_error
+
+    sxa_capabilities = [c for c in registry.capabilities() if c.startswith("sxa.")]
+    assert sxa_capabilities, "expected at least one sxa.* capability"
+    for capability in sxa_capabilities:
+        binding = registry.resolve(capability)
+        assert binding.backend == "sales-db", (
+            f"{capability} unexpectedly bound to backend '{binding.backend}', "
+            "not the legacy sales-db server"
+        )
+
+    for probe in ("sales.customer.read", "sales.opportunity.write", "sales.opportunity.create"):
+        assert registry.resolve(probe) is None, (
+            f"'{probe}' unexpectedly resolved - the sales.* namespace must stay "
+            "vacant (reserved for WP-33's real Salesforce capabilities) until a "
+            "binding for it is explicitly authored"
+        )
+
+
 def test_duplicate_capability_rejected_at_load() -> None:
     registry = _registry_from(
         """
@@ -213,6 +243,7 @@ TESTS = [
     test_real_registry_loads_and_aliases_resolve,
     test_real_policy_names_are_fully_covered,
     test_unknown_name_fails_closed,
+    test_sxa_legacy_capabilities_never_share_the_sales_namespace,
     test_duplicate_capability_rejected_at_load,
     test_malformed_entries_rejected_at_load,
     test_invoke_without_binding_is_deterministic_502,
