@@ -1,0 +1,57 @@
+# Derived field-by-field from gitops/charts/arkos/values.yaml and
+# agents/arkos/agent.okf.md (ADR-0327/WP-37). Not applied by any
+# Application yet — Arkos is WP-38's designated migration proof (plan D9):
+# once the operator reconciles this CR, the equivalent resources generated
+# today by gitops/apps/arkos/application-d1.yaml + gitops/charts/arkos are
+# removed for Arkos only, documented as an explicit diff in that commit.
+apiVersion: zuno.zuno.ai/v1alpha1
+kind: AIAgent
+metadata:
+  name: arkos
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  agentName: arkos
+  targetNamespace: zuno-ai-run
+  okfBundleRef: agents/arkos
+  frontend:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-frontend
+      tag: latest
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    oidcClientId: arkos-frontend
+  bff:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-bff
+      tag: latest
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    oidcAudience: arkos-frontend
+  groups:
+    entitlementGroup: agent_arkos
+    businessRoles:
+      - board
+  knowledgeDomains:
+    - knowledge.tech
+    - knowledge.project
+  toolCapabilities:
+    - confluence.page.read
+    - confluence.page.search
+    - drive.document.create
+    - drive.document.update

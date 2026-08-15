@@ -1,7 +1,54 @@
 # WP-37: AIAgent CRD reconciliation contract
 
-- **State:** Not started
-- **ADRs:** ADR-0327 (To be implemented -> Implemented)
+- **State:** Done (2026-08-15). `operator/aiagent-operator/` is a real
+  Kubebuilder v4 (Go + controller-runtime) scaffold - `kubebuilder init`
+  then `kubebuilder create api --resource=true --controller=false`, no
+  reconciler/manager wiring (WP-38's job). `api/v1alpha1/aiagent_types.go`
+  hand-authors `AIAgentSpec` (agentName, targetNamespace, okfBundleRef,
+  frontend/bff deployment profiles with image/replicas/resources/OIDC
+  ids, entitlement+business-role group bindings, knowledgeDomains,
+  toolCapabilities, modelPolicyRef, evaluationProfileRef - deployment
+  bindings/references only, no secrets/prompts/tokens anywhere in the
+  type) and `AIAgentStatus` (`conditions` with five named constants -
+  ConfigValid/OKFReady/FrontendReady/BFFReady/RuntimeBindingReady,
+  `observedGeneration`); `make manifests`/`make generate` produced
+  `config/crd/bases/zuno.zuno.ai_aiagents.yaml` (note: the real API group
+  is `zuno.zuno.ai`, Kubebuilder's `--domain zuno.ai --group zuno`
+  concatenation - a concrete realization of the ADR's own "for example
+  `zuno.ai/v1alpha1`" wording, not a deviation) plus deepcopy code;
+  `go build ./...` clean. Three `config/samples/` CRs
+  (tekos/arkos/comage) hand-derived field-by-field from the real merged
+  `gitops/charts/<agent>/values.yaml` + `agents/<agent>/agent.okf.md` +
+  every task file's `allowed_knowledge`/`allowed_tools` union (satisfies
+  the "validated against at least Tekos plus Arkos or Comage" acceptance
+  criterion with all three, not the minimum two).
+  `operator/aiagent-operator/validate_contract.py` (plain Python, no new
+  dependency - hand-rolled schema validator over the CRD's actual OpenAPI
+  keyword subset, matching `platform/supply-chain/validate_okf_bundle.py`'s
+  own house style) runs four independent checks - schema, reject_rules
+  (secret-shaped field names, cross-namespace references), a self_test
+  that builds a deliberately-broken in-memory copy of the Tekos sample and
+  fails the run if reject_rules does NOT catch it (an automatic,
+  permanent regression test satisfying the brief's "add an inline secret
+  field to a scratch sample -> harness fails; remove the scratch" check
+  without ever touching disk - stronger than a one-time manual demo), and
+  drift against real chart/OKF state - all green. Wired into the repo
+  root's `.github/workflows/lint.yml` `policy-as-code` job as a blocking
+  step. `operator/aiagent-operator/CONTRACT.md` restates the ownership
+  model, the "operator must NOT" list, the status condition table and the
+  incremental plain-manifest-to-CR-managed migration path (Arkos
+  designated as WP-38's first migration proof, Tekos deliberately staying
+  plain-manifest to prove coexistence) verbatim from ADR-0327. The
+  existing `operator/aiagent-operator/README.md` placeholder was rewritten
+  to describe the real scaffold layout and point at CONTRACT.md; Kubebuilder's
+  own newer-version scaffold extras (`AGENTS.md`, `.devcontainer/`,
+  `.golangci.yml`, `.custom-gcl.yml`, a nested `.github/workflows/` that
+  GitHub Actions never reads since only the repo root's is discovered,
+  `test/e2e/`) were kept as-is, standard unmodified tool output, not
+  hand-pruned. `python3 platform/docs/check_docs.py` PASS. Zero
+  operator-pending items, per the brief's own acceptance section - this WP
+  closes cleanly.
+- **ADRs:** ADR-0327 (Implemented)
 - **Depends on:** WP-31 (merged); ideally WP-33 (two non-Tekos agents give a better common-field sample)
 - **Blocks:** WP-38
 - **Estimated files touched:** ~7

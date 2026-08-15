@@ -1,0 +1,393 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: aiagents.zuno.zuno.ai
+spec:
+  group: zuno.zuno.ai
+  names:
+    kind: AIAgent
+    listKind: AIAgentList
+    plural: aiagents
+    singular: aiagent
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.agentName
+      name: Agent
+      type: string
+    - jsonPath: .spec.targetNamespace
+      name: Namespace
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: AIAgent is the Schema for the aiagents API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of AIAgent
+            properties:
+              agentName:
+                description: |-
+                  agentName identifies the agent instance. Must match the OKF
+                  bundle's own `zuno.name` (agents/<agentName>/agent.okf.md) and the
+                  Keycloak client id prefix. Renaming an agent is a new instance, not
+                  an update to this field.
+                maxLength: 63
+                pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
+                type: string
+              bff:
+                description: BFFProfile is the BFF Deployment/Service deployment binding.
+                properties:
+                  image:
+                    description: |-
+                      ImageRef is a registry-relative image reference. Deliberately has no
+                      pull-secret field: cross-namespace image pulls rely on the existing
+                      system:image-puller RoleBinding (gitops/charts/tekos and every sibling
+                      agent chart already depend on this), never a credential embedded here.
+                    properties:
+                      registry:
+                        description: |-
+                          registry is the image registry host, e.g. the in-cluster
+                          ImageStream registry service.
+                        minLength: 1
+                        type: string
+                      repository:
+                        description: |-
+                          repository is the registry-relative image repository, e.g.
+                          "zuno-ai-build/agent-frontend".
+                        minLength: 1
+                        type: string
+                      tag:
+                        description: tag is the image tag to deploy.
+                        minLength: 1
+                        type: string
+                    required:
+                    - registry
+                    - repository
+                    - tag
+                    type: object
+                  oidcAudience:
+                    description: |-
+                      oidcAudience is the JWT audience the BFF validates incoming tokens
+                      against (matches FrontendProfile.oidcClientId by convention; kept
+                      as a separate field since they are logically distinct concerns).
+                    minLength: 1
+                    type: string
+                  replicas:
+                    default: 1
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  resources:
+                    description: |-
+                      ResourceRequirements mirrors corev1.ResourceRequirements for CPU/memory
+                      only.
+                    properties:
+                      limits:
+                        description: |-
+                          ResourceList is a CPU/memory pair matching every hand-authored agent
+                          chart's own requests/limits shape (no arbitrary resource names).
+                        properties:
+                          cpu:
+                            type: string
+                          memory:
+                            type: string
+                        type: object
+                      requests:
+                        description: |-
+                          ResourceList is a CPU/memory pair matching every hand-authored agent
+                          chart's own requests/limits shape (no arbitrary resource names).
+                        properties:
+                          cpu:
+                            type: string
+                          memory:
+                            type: string
+                        type: object
+                    type: object
+                required:
+                - image
+                - oidcAudience
+                type: object
+              evaluationProfileRef:
+                description: |-
+                  evaluationProfileRef names the evaluations/<agentName> acceptance
+                  profile (ADR-0027/ADR-0028) `make check` consults for this
+                  instance's readiness. Empty means "same as agentName".
+                type: string
+              frontend:
+                description: |-
+                  FrontendProfile is the frontend Deployment/Service/Route deployment
+                  binding. Deployment shape only: no session content, no OIDC client
+                  secret (resolved via the existing Vault/External Secrets convention,
+                  keyed by agentName).
+                properties:
+                  image:
+                    description: |-
+                      ImageRef is a registry-relative image reference. Deliberately has no
+                      pull-secret field: cross-namespace image pulls rely on the existing
+                      system:image-puller RoleBinding (gitops/charts/tekos and every sibling
+                      agent chart already depend on this), never a credential embedded here.
+                    properties:
+                      registry:
+                        description: |-
+                          registry is the image registry host, e.g. the in-cluster
+                          ImageStream registry service.
+                        minLength: 1
+                        type: string
+                      repository:
+                        description: |-
+                          repository is the registry-relative image repository, e.g.
+                          "zuno-ai-build/agent-frontend".
+                        minLength: 1
+                        type: string
+                      tag:
+                        description: tag is the image tag to deploy.
+                        minLength: 1
+                        type: string
+                    required:
+                    - registry
+                    - repository
+                    - tag
+                    type: object
+                  oidcClientId:
+                    description: |-
+                      oidcClientId is the Keycloak client id this frontend authenticates
+                      as, e.g. "tekos-frontend". The client secret itself is never in
+                      this CR.
+                    minLength: 1
+                    type: string
+                  replicas:
+                    default: 1
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  resources:
+                    description: |-
+                      ResourceRequirements mirrors corev1.ResourceRequirements for CPU/memory
+                      only.
+                    properties:
+                      limits:
+                        description: |-
+                          ResourceList is a CPU/memory pair matching every hand-authored agent
+                          chart's own requests/limits shape (no arbitrary resource names).
+                        properties:
+                          cpu:
+                            type: string
+                          memory:
+                            type: string
+                        type: object
+                      requests:
+                        description: |-
+                          ResourceList is a CPU/memory pair matching every hand-authored agent
+                          chart's own requests/limits shape (no arbitrary resource names).
+                        properties:
+                          cpu:
+                            type: string
+                          memory:
+                            type: string
+                        type: object
+                    type: object
+                  routeHost:
+                    description: |-
+                      routeHost overrides the default "<agentName>.<clusterBaseDomain>"
+                      Route hostname (matches gitops/charts/*/values.yaml's own
+                      frontend.route.host convention). Empty means "use the default".
+                    type: string
+                required:
+                - image
+                - oidcClientId
+                type: object
+              groups:
+                description: |-
+                  GroupBindings references existing Keycloak groups (ADR-0040): the
+                  agent entitlement group is orthogonal to the business role(s) that
+                  govern tool/data permissions inside the agent. Neither field grants
+                  anything by itself — both are enforced by the realm/policy
+                  configuration this CR only points at, never duplicates.
+                properties:
+                  businessRoles:
+                    description: |-
+                      businessRoles are the ADR-0040 business-role groups authorized to
+                      use this agent's tools/data, e.g. ["consultant"], ["sales"],
+                      ["board"]. Reference only — the actual grants live in
+                      policies/tools/tool-policy.yaml and
+                      policies/knowledge/knowledge-policy.yaml.
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  entitlementGroup:
+                    description: |-
+                      entitlementGroup is the ADR-0040 agent-entitlement Keycloak group,
+                      e.g. "agent_tekos".
+                    minLength: 1
+                    type: string
+                required:
+                - businessRoles
+                - entitlementGroup
+                type: object
+              knowledgeDomains:
+                description: |-
+                  knowledgeDomains are the logical RAG domain ids (ADR-0202) this
+                  instance binds to, e.g. ["knowledge.tech", "knowledge.project"].
+                  Physical collection endpoints are never listed here (ADR-0204) —
+                  only logical ids the operator resolves via the existing RAG
+                  platform bindings. This is the deployment-time binding
+                  requirement, not a grant: actual per-task authorization stays
+                  governed by policies/knowledge/knowledge-policy.yaml and each OKF
+                  task's own `allowed_knowledge` (ADR-0203).
+                items:
+                  type: string
+                type: array
+              modelPolicyRef:
+                description: |-
+                  modelPolicyRef names the model-routing/classification policy this
+                  instance uses (policies/model-routing, ADR-0303). Empty means "the
+                  platform default policy".
+                type: string
+              okfBundleRef:
+                description: |-
+                  okfBundleRef is the Git-relative path to this agent's OKF bundle,
+                  e.g. "agents/tekos". A reference only: OKF remains the sole source
+                  of task/prompt/behavioral content (ADR-0005/ADR-0039), never
+                  mirrored into this CR.
+                pattern: ^agents/[a-z][-a-z0-9]*$
+                type: string
+              targetNamespace:
+                description: |-
+                  targetNamespace is the namespace intent for this agent's generated
+                  workloads. Every agent shares "zuno-ai-run" today (ADR-0329
+                  supersedes the earlier per-agent-namespace ADR-0023); the field
+                  stays explicit so a future per-agent-namespace policy is a CR
+                  change, not a controller rewrite. The operator only ever creates
+                  resources inside this one namespace — no other field on this spec
+                  carries a namespace, so there is no way to construct a
+                  cross-namespace reference through an AIAgent CR at all.
+                minLength: 1
+                type: string
+              toolCapabilities:
+                description: |-
+                  toolCapabilities are the logical MCP/tool capability ids
+                  (ADR-0116) this instance binds to, e.g. ["search_confluence",
+                  "web_search"]. Physical MCP server endpoints/credentials are never
+                  listed here — only logical ids the operator resolves via the
+                  existing MCP Gateway bindings. This is the deployment-time binding
+                  requirement, not a grant: actual per-task authorization stays
+                  governed by policies/tools/tool-policy.yaml and each OKF task's own
+                  `allowed_tools`.
+                items:
+                  type: string
+                type: array
+            required:
+            - agentName
+            - bff
+            - frontend
+            - groups
+            - okfBundleRef
+            - targetNamespace
+            type: object
+          status:
+            description: status defines the observed state of AIAgent
+            properties:
+              conditions:
+                description: |-
+                  conditions surfaces reconciliation state. Must include at least
+                  ConditionConfigValid, ConditionOKFReady, ConditionFrontendReady,
+                  ConditionBFFReady and ConditionRuntimeBindingReady (ADR-0327's
+                  status contract) — the controller (WP-38) may add more but must
+                  not drop any of these five.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  observedGeneration is the .metadata.generation last reconciled by
+                  the controller, the standard way to detect stale status.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

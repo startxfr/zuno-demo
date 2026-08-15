@@ -1,0 +1,57 @@
+# Derived field-by-field from gitops/charts/tekos/values.yaml and
+# agents/tekos/agent.okf.md (ADR-0327/WP-37). Not applied by any
+# Application yet — WP-38's operator/reconciler is what makes this CR
+# live; Tekos keeps running as a plain-manifest chart via
+# gitops/apps/api/application-d1.yaml until that migration happens
+# (ADR-0327's "existing plain-manifest agents can be migrated
+# incrementally, no flag day").
+apiVersion: zuno.zuno.ai/v1alpha1
+kind: AIAgent
+metadata:
+  name: tekos
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  agentName: tekos
+  targetNamespace: zuno-ai-run
+  okfBundleRef: agents/tekos
+  frontend:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-frontend
+      tag: latest
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    oidcClientId: tekos-frontend
+  bff:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-bff
+      tag: latest
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    oidcAudience: tekos-frontend
+  groups:
+    entitlementGroup: agent_tekos
+    businessRoles:
+      - consultant
+  knowledgeDomains:
+    - knowledge.tech
+    - knowledge.project
+  toolCapabilities:
+    - search_confluence
+    - web_search
+    - list_drive_files

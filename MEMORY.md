@@ -788,3 +788,33 @@ under `docs/adr/`.
   ADR-0201 stays Partially implemented; every ADR-0201 acceptance bullet
   and the external-egress lifecycle decision remain live-cluster operator
   steps.
+
+### Dated entries (roadmap work packages, v0.3)
+
+- **2026-08-15 (ADR-0327, WP-37)**: `zuno.zuno.ai/v1alpha1 AIAgent` CRD
+  reconciliation contract — first commit against a brand-new Kubebuilder
+  v4 (Go + controller-runtime) scaffold in `operator/aiagent-operator/`,
+  a deliberate first-of-its-kind framework dependency (contrast
+  `components/agent-bff`'s stdlib-only Go, kept that way on purpose).
+  Contract only, no reconciler (WP-38). `api/v1alpha1/aiagent_types.go`
+  hand-authors `AIAgentSpec` as deployment bindings/references only
+  (agentName, targetNamespace, okfBundleRef, frontend/bff profiles,
+  entitlement+business-role group bindings, knowledgeDomains,
+  toolCapabilities, modelPolicyRef, evaluationProfileRef — no secrets,
+  prompts or tokens anywhere in the type) and `AIAgentStatus.conditions`
+  with five required condition types
+  (ConfigValid/OKFReady/FrontendReady/BFFReady/RuntimeBindingReady).
+  Three `config/samples/` CRs (tekos/arkos/comage) hand-derived
+  field-by-field from real chart values + OKF bundles.
+  `validate_contract.py` (plain Python, no new dependency) enforces
+  schema shape, secret/cross-namespace reject rules (a vanilla CRD
+  structural schema only prunes unknown fields silently — it does not
+  reject the create — so this is harness-enforced, not schema-inferred),
+  a self-test proving the reject rules actually fire, and drift against
+  real chart/OKF state; wired blocking into the repo root
+  `.github/workflows/lint.yml`. `CONTRACT.md` restates the ownership
+  model and migration path (Arkos is WP-38's designated first
+  plain-manifest→CR migration proof; Tekos deliberately stays
+  plain-manifest to prove coexistence, no flag day). ADR-0327 → fully
+  Implemented, zero operator-pending items — the only WP-30–42 WP in
+  this phase that closes with no live-cluster step remaining.

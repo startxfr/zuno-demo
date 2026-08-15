@@ -1,0 +1,6 @@
+## Append samples of your project ##
+resources:
+- zuno_v1alpha1_aiagent_tekos.yaml
+- zuno_v1alpha1_aiagent_arkos.yaml
+- zuno_v1alpha1_aiagent_comage.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

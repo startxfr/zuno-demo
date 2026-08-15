@@ -1,0 +1,60 @@
+# Derived field-by-field from gitops/charts/comage/values.yaml and
+# agents/comage/agent.okf.md (ADR-0327/WP-37). Not applied by any
+# Application yet — kept only as a second non-Tekos static-validation
+# sample (WP-37's own acceptance criterion: "validated against at least
+# Tekos plus Arkos or Comage").
+apiVersion: zuno.zuno.ai/v1alpha1
+kind: AIAgent
+metadata:
+  name: comage
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  agentName: comage
+  targetNamespace: zuno-ai-run
+  okfBundleRef: agents/comage
+  frontend:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-frontend
+      tag: latest
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    oidcClientId: comage-frontend
+  bff:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-bff
+      tag: latest
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    oidcAudience: comage-frontend
+  groups:
+    entitlementGroup: agent_comage
+    businessRoles:
+      - sales
+  knowledgeDomains:
+    - knowledge.sales
+    - knowledge.project
+    - knowledge.sxa-legacy
+  toolCapabilities:
+    - salesforce.opportunity.read
+    - salesforce.opportunity.update
+    - web_search
+    - list_drive_files
+    - read_gmail
+    - sxa.opportunity.search
+    - sxa.aggregate.revenue-by-year

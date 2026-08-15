@@ -1,6 +1,6 @@
 # ADR-0327: Define the AIAgent CRD reconciliation contract before implementing the operator
 
-- **Status:** To be implemented
+- **Status:** Implemented - see `operator/aiagent-operator/config/crd/`, `operator/aiagent-operator/CONTRACT.md`.
 - **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

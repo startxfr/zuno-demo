@@ -130,7 +130,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | Implemented | Establish canonical generated and validated platform documentation |
 | [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v0.3 | Partially implemented | Generalize the Tekos vertical slice to the four remaining agents |
-| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | To be implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
+| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | Implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | Superseded by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
 | [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0/v0.1 | Partially implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
