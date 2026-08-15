@@ -163,6 +163,14 @@ platformNamespaces:
       - zuno-auth
       - zuno-ai-run
       - zuno-ai-build
+      # VERIFIED live (2026-08-15): redhat-ods-applications is namespace-
+      # injected (istio-injection: enabled below) but was missing from this
+      # allowlist - its sidecars could never reach istiod's XDS or
+      # cert-manager-istio-csr's CA, leaving every meshed RHOAI pod
+      # (rhods-dashboard, maas-api/controller, model-serving-api,
+      # dashboard-redirect) crash-looping on the istio-proxy startup probe
+      # from the moment this default-deny policy first applied.
+      - redhat-ods-applications
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
@@ -220,9 +228,15 @@ platformNamespaces:
       opendatahub.io/application-namespace: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+    # Sized live (2026-08-15): RHOAI's own pods ship many containers with no
+    # explicit limits (rhods-dashboard alone has 10), so the limitRange
+    # default below assigns them ~15.6 cores of limits; the ~18
+    # controller-managers add ~11 real cores - ~27 cores of limits when
+    # healthy, against the previous 16. Limits are overcommit (only
+    # requests reserve node capacity), so 32 is headroom, not reservation.
     resourceQuota:
-      requests: { cpu: "4", memory: "8Gi" }
-      limits: { cpu: "16", memory: "32Gi" }
+      requests: { cpu: "8", memory: "12Gi" }
+      limits: { cpu: "32", memory: "48Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "1Gi" }
