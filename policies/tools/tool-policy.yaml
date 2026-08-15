@@ -80,6 +80,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
     external_model_policy:
       allow_context: false
 
@@ -97,6 +98,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
     external_model_policy:
       allow_context: false
 
@@ -107,6 +109,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
     external_model_policy:
       allow_context: false
 
@@ -117,6 +120,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
     external_model_policy:
       allow_context: false
 
@@ -127,6 +131,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
 
   # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same
   # allowed_groups as the existing read capability above (no narrower
@@ -140,6 +145,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
 
   - tool: drive.document.update
     capability: drive.document.update
@@ -148,6 +154,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
 
   - tool: read_gmail
     capability: gmail.message.read
@@ -156,6 +163,7 @@ tools:
     allowed_groups:
       - consultant
       - board
+      - cdp
 
   - tool: get_customer
     capability: sxa.customer.read
@@ -225,3 +233,53 @@ tools:
     allowed_groups:
       - sales
       - board
+
+  # ADR-0340 (WP-32): Workday - resource scope lives in the capability
+  # itself (self vs. any), never in a broad role name. Technical users get
+  # read AND write on their OWN profile (self.read + self.update); cdp
+  # gets read-only, but on BOTH their own profile and any authorized
+  # staff's (self.read + any.read) - cdp is deliberately absent from
+  # self.update and there is no any.update capability at all (the ADR's
+  # own "not implied, must be a separately approved capability if ever
+  # introduced"). C3, matching this repo's own pre-existing `hr-data: C3`
+  # domain (policies/data-classification/classification.yaml already names
+  # "financial, HR, sovereign/nominative data" at that tier) - a Workday
+  # employee profile is squarely HR data. No Workday backend exists yet -
+  # every entry's binding (platform/bindings/tools/tool-bindings.yaml) is
+  # auth_mode: provider-delegated, so every call fails closed with 501
+  # regardless of this policy passing; these entries still matter today
+  # because policy-evaluation tests must prove the intersection is
+  # correctly *shaped*, independent of whether a backend exists.
+  - tool: workday.profile.self.read
+    capability: workday.profile.self.read
+    mcp_server: workday
+    min_classification: C3
+    allowed_groups:
+      - consultant
+      - cdp
+    # ADR-0340 Security considerations: "resource ownership ... checks for
+    # *.self.* ... are enforced server-side from validated identity claims
+    # ... not prompt text." components/mcp-gateway/app/main.py's
+    # invoke_tool compares this argument key against the caller's own
+    # validated JWT `sub` after the group-level decision above already
+    # allowed the call - a mismatch is 403, regardless of what the
+    # request body claims. No Workday employee-ID<->Keycloak-sub mapping
+    # exists in this demo (no real backend), so `employee_id` is expected
+    # to equal the caller's own sub directly, the same simplification
+    # every other mock backend in this repo makes.
+    subject_field: employee_id
+
+  - tool: workday.profile.self.update
+    capability: workday.profile.self.update
+    mcp_server: workday
+    min_classification: C3
+    allowed_groups:
+      - consultant
+    subject_field: employee_id
+
+  - tool: workday.profile.any.read
+    capability: workday.profile.any.read
+    mcp_server: workday
+    min_classification: C3
+    allowed_groups:
+      - cdp

@@ -23,7 +23,7 @@ from app.bindings import BindingRegistry
 from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
-from app.policy import PolicyStore, evaluate
+from app.policy import PolicyDecision, PolicyStore, evaluate
 from app.telemetry import init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -124,6 +124,28 @@ async def reload_policy() -> Dict[str, Any]:
     }
 
 
+def _self_scope_denial_reason(
+    decision: PolicyDecision, arguments: Dict[str, Any], caller_sub: str
+) -> Optional[str]:
+    """ADR-0340 (WP-32): *.self.* ownership check, server-side from the
+    validated JWT subject - never from prompt-influenced request content.
+    Returns a denial detail string when `decision.subject_field` is set
+    and the matching request argument doesn't equal the caller's own
+    subject; None (no denial) when the capability has no self/any
+    distinction (subject_field unset) or the argument matches. A pure
+    function so it's directly unit-testable without an HTTP round trip or
+    a real agent bundle declaring a workday.* capability (none does yet -
+    see tests/test_workday_ownership.py).
+    """
+    if not decision.subject_field:
+        return None
+    if arguments.get(decision.subject_field) != caller_sub:
+        return (
+            f"self-scoped: argument '{decision.subject_field}' must equal the caller's own subject"
+        )
+    return None
+
+
 @app.post("/v1/tools/{tool_name}/invoke")
 async def invoke_tool(
     tool_name: str,
@@ -194,6 +216,16 @@ async def invoke_tool(
         if not decision.allowed:
             call.outcome = "denied"
             raise HTTPException(status_code=403, detail=decision.reason)
+
+        # ADR-0340 (WP-32): *.self.* ownership check - runs after the
+        # group-level decision above already allowed the call, before any
+        # backend is contacted. See _self_scope_denial_reason's own
+        # docstring for why this is a separate, directly-unit-testable
+        # function rather than inlined here.
+        self_scope_denial = _self_scope_denial_reason(decision, arguments, identity.sub)
+        if self_scope_denial:
+            call.outcome = "denied"
+            raise HTTPException(status_code=403, detail=f"'{tool_name}' is {self_scope_denial}")
 
         # ADR-0208 (WP-26): the credential flow used must match the
         # binding's declared auth_mode - checked here, after the policy

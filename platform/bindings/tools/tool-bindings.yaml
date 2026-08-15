@@ -206,3 +206,43 @@ bindings:
     handler: email_report
     provider_tool: send_technical_report_email
     auth_mode: service-identity
+
+  # ADR-0340 (WP-32): no Workday backend exists yet (out of scope - see
+  # that ADR's "Out of scope/deferred"). Registered with
+  # auth_mode: provider-delegated (ADR-0208's third mode - "no provider
+  # that supports on-behalf-of delegation is bound yet") so every
+  # invocation fails closed with a deterministic 501 at
+  # components/mcp-gateway/app/main.py's own auth_mode dispatch, BEFORE
+  # invoke_downstream ever runs - the endpoint below is therefore never
+  # actually dialed; it's declared only so this streamable-http entry
+  # satisfies app/bindings.py's _validate() shape check, matching the
+  # naming a real Workday MCP server would eventually use.
+  - capability: workday.profile.self.read
+    backend: workday
+    transport: streamable-http
+    endpoint:
+      env: WORKDAY_MCP_URL
+      default: "http://workday-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: get_own_profile
+    auth_mode: provider-delegated
+
+  - capability: workday.profile.self.update
+    backend: workday
+    transport: streamable-http
+    endpoint:
+      env: WORKDAY_MCP_URL
+      default: "http://workday-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: update_own_profile
+    auth_mode: provider-delegated
+
+  - capability: workday.profile.any.read
+    backend: workday
+    transport: streamable-http
+    endpoint:
+      env: WORKDAY_MCP_URL
+      default: "http://workday-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: get_staff_profile
+    auth_mode: provider-delegated

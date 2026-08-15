@@ -60,23 +60,43 @@
 #                         mixes multiple source types.
 
 domains:
+  # ADR-0340 (WP-32): each domain's `allowed_groups` below encodes that
+  # ADR's access-intent table (consultant/tech, cdp, sales, adv, board,
+  # finance) - "policy-defined" cells are decided here, "-" cells stay
+  # absent, "R"/"RW" cells were already correctly present from the WPs
+  # that built each domain (WP-20/23/24). `cdp` (project manager) is the
+  # only genuinely new column this WP adds; existing roles' entries are
+  # left as those earlier WPs decided them.
   knowledge.tech:
     allowed_groups:
       - consultant
       - board
+      # cdp: "policy-defined" in the ADR's table - a project manager
+      # plausibly needs to read technical documentation to manage a
+      # technical engagement.
+      - cdp
 
   knowledge.sales:
     allowed_groups:
       - sales
       - adv
       - board
+      # cdp/finance: both "policy-defined" - a project manager or finance
+      # user overseeing a sales engagement plausibly needs sales-domain
+      # context (e.g. for invoicing/reporting, matching Finage's own
+      # persona per MEMORY.md section 9).
+      - cdp
+      - finance
     min_classification: C2
 
   knowledge.sxa-legacy:
     # WP-23 (ADR-0206) narrows this further with deterministic query
     # capabilities and snapshot discipline. "Direction" (ADR-0206's stated
     # business role) maps to the existing `board` Keycloak group - no
-    # separate `direction` group exists in the realm.
+    # separate `direction` group exists in the realm. ADR-0340's table
+    # marks cdp/finance "-" here (deliberately excluded, unlike the
+    # "policy-defined" cells above) - legacy commercial data stays
+    # narrower than the live knowledge.sales domain.
     allowed_groups:
       - sales
       - board
@@ -86,6 +106,10 @@ domains:
     allowed_groups:
       - adv
       - board
+      # cdp/finance: both "policy-defined", same reasoning as
+      # knowledge.sales above.
+      - cdp
+      - finance
     min_classification: C2
 
   knowledge.project:
@@ -105,3 +129,7 @@ domains:
       - sales
       - adv
       - finance
+      # ADR-0340 (WP-32): cdp is now a real business-role group - this
+      # domain's own stated intent is that EVERY real group is listed
+      # here, membership (not this factor) is the actual gate.
+      - cdp

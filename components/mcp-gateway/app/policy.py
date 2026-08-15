@@ -61,6 +61,13 @@ class ToolPolicyEntry:
     # this entry also answers to. `tool` keeps the legacy name as an
     # explicit migration alias; the entry is indexed under both.
     capability: Optional[str] = None
+    # ADR-0340 (WP-32): set on a `*.self.*`-shaped capability - the
+    # request `arguments` key whose value main.py's invoke_tool must
+    # verify equals the validated caller's own JWT subject before
+    # invoking anything. None for capabilities with no self/any
+    # distinction (group membership alone is the gate, as for every
+    # capability before this WP).
+    subject_field: Optional[str] = None
 
 
 class PolicyStore:
@@ -104,6 +111,7 @@ class PolicyStore:
                             (item.get("external_model_policy") or {}).get("allow_context", True)
                         ),
                         capability=item.get("capability"),
+                        subject_field=item.get("subject_field"),
                     )
                     # ADR-0116: one entry, two names during migration - the
                     # legacy tool name and the canonical capability ID both
@@ -179,6 +187,11 @@ class PolicyDecision:
     # caller (main.py) can report it back to the Agent Runtime. True when
     # no entry matched (denied calls never reach a model anyway).
     allow_external_context: bool = True
+    # ADR-0340 (WP-32): mirrors the matched entry's subject_field so
+    # main.py can perform the *.self.* ownership check after this
+    # group-level decision already allowed the call. None when the
+    # capability has no self/any distinction.
+    subject_field: Optional[str] = None
 
 
 def evaluate(
@@ -298,4 +311,5 @@ def evaluate(
         reason="allowed",
         mcp_server=entry.mcp_server,
         allow_external_context=entry.allow_external_context,
+        subject_field=entry.subject_field,
     )

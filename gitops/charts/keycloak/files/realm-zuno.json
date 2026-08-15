@@ -202,6 +202,42 @@
                             "rag-ingestion ACL group \u2014 grants run-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
+                },
+                {
+                    "name": "confluence-archi-satellite",
+                    "path": "/consultant/confluence-archi-satellite",
+                    "attributes": {
+                        "description": [
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-archi-openshift",
+                    "path": "/consultant/confluence-archi-openshift",
+                    "attributes": {
+                        "description": [
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-archi-openshift-ai",
+                    "path": "/consultant/confluence-archi-openshift-ai",
+                    "attributes": {
+                        "description": [
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
+                },
+                {
+                    "name": "confluence-archi-keycloak",
+                    "path": "/consultant/confluence-archi-keycloak",
+                    "attributes": {
+                        "description": [
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                        ]
+                    }
                 }
             ]
         },
@@ -228,46 +264,18 @@
             "path": "/board",
             "attributes": {
                 "description": [
-                    "Board / architects business role \u2014 grants Confluence/Drive/Gmail/sales-db/web-search/SMTP tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
+                    "Board / Direction business role \u2014 grants Confluence/Drive/Gmail/sales-db/web-search/SMTP tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access. ADR-0340/WP-32: the ADR-0330 confluence-archi-* architect-tier subgroups relocated to /consultant so `board` consistently means Direction, never a technical-skill container."
                 ]
-            },
-            "subGroups": [{
-                    "name": "confluence-archi-satellite",
-                    "path": "/board/confluence-archi-satellite",
-                    "attributes": {
-                        "description": [
-                            "rag-ingestion ACL group \u2014 grants architect-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
-                        ]
-                    }
-                },
-                {
-                    "name": "confluence-archi-openshift",
-                    "path": "/board/confluence-archi-openshift",
-                    "attributes": {
-                        "description": [
-                            "rag-ingestion ACL group \u2014 grants architect-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
-                        ]
-                    }
-                },
-                {
-                    "name": "confluence-archi-openshift-ai",
-                    "path": "/board/confluence-archi-openshift-ai",
-                    "attributes": {
-                        "description": [
-                            "rag-ingestion ACL group \u2014 grants architect-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
-                        ]
-                    }
-                },
-                {
-                    "name": "confluence-archi-keycloak",
-                    "path": "/board/confluence-archi-keycloak",
-                    "attributes": {
-                        "description": [
-                            "rag-ingestion ACL group \u2014 grants architect-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
-                        ]
-                    }
-                }
-            ]
+            }
+        },
+        {
+            "name": "cdp",
+            "path": "/cdp",
+            "attributes": {
+                "description": [
+                    "ADR-0340/WP-32: project-manager business role \u2014 read-scoped Workday access (self.read + any.read, never any.update) plus the same Confluence/Drive/Gmail/Calendar/Meet rights as consultant inside authorized agents (see the ADR's access-intent table); does not by itself grant any frontend access."
+                ]
+            }
         },
         {
             "name": "admin",
@@ -360,7 +368,12 @@
                 "/consultant",
                 "/consultant/confluence-build-satellite",
                 "/consultant/confluence-run-satellite",
-                "/agent_tekos"
+                "/consultant/confluence-archi-satellite",
+                "/consultant/confluence-archi-openshift",
+                "/consultant/confluence-archi-openshift-ai",
+                "/consultant/confluence-archi-keycloak",
+                "/agent_tekos",
+                "/agent_arkos"
             ],
             "credentials": [{
                 "type": "password",
@@ -504,10 +517,6 @@
             },
             "groups": [
                 "/board",
-                "/board/confluence-archi-satellite",
-                "/board/confluence-archi-openshift",
-                "/board/confluence-archi-openshift-ai",
-                "/board/confluence-archi-keycloak",
                 "/agent_arkos"
             ],
             "credentials": [{
@@ -528,10 +537,6 @@
             },
             "groups": [
                 "/board",
-                "/board/confluence-archi-satellite",
-                "/board/confluence-archi-openshift",
-                "/board/confluence-archi-openshift-ai",
-                "/board/confluence-archi-keycloak",
                 "/agent_arkos"
             ],
             "credentials": [{

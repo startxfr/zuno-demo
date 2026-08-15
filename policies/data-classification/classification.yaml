@@ -54,3 +54,9 @@ data_domains:
   sales-data: C2
   financial-data: C3
   hr-data: C3
+  # ADR-0340 (WP-32): Workday employee-profile capabilities
+  # (policies/tools/tool-policy.yaml's workday.profile.* entries) - the
+  # same tier as hr-data above (both "HR... data" per this level's own
+  # description), named after its own source like `confluence`/
+  # `sales-data` rather than reusing the generic `hr-data` key.
+  workday: C3
