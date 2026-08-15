@@ -27,7 +27,7 @@ Migration/evolution and Review evidence.
 
 ## Related ADRs
 
-- [ADR-0113](0113-provide-an-aiagent-kubernetes-crd-and-operator.md)
+- [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md)
 - [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md)
 - [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
 - [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md)

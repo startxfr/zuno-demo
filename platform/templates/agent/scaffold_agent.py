@@ -53,7 +53,7 @@ Usage:
         --tile-description "New-hire onboarding Q&A, for consultants."
 
 Every `--knowledge`/`--tool` value must already be a real logical
-knowledge domain / tool capability this platform declares (ADR-0306:
+knowledge domain / tool capability this platform declares (ADR-0410:
 "existing knowledge domains and capabilities only, no new external
 systems") - this module does not validate that itself (platform/docs/
 check_knowledge_refs.py and platform/supply-chain/validate_okf_bundle.py
@@ -135,7 +135,7 @@ zuno:
     notes: >-
       Scaffolded by platform/templates/agent/ (ADR-0307/WP-41) - reuses
       the retrieve_reason_respond shape and existing knowledge/tool
-      capabilities only, no new external systems (ADR-0306).
+      capabilities only, no new external systems (ADR-0410).
   access:
     # ADR-0040: agent entitlement group, orthogonal to the
     # `{spec.business_role}` business role that governs tool/data
@@ -189,7 +189,7 @@ zuno:
 
 {spec.primary_task_title} using {spec.title}'s declared knowledge domains
 and tool capabilities, all reused from the existing platform catalog
-(ADR-0306 - no new knowledge domain or external backend for a
+(ADR-0410 - no new knowledge domain or external backend for a
 template-scaffolded agent).
 
 This is the task Agent Runtime's generic chat dispatch (`POST
@@ -236,7 +236,7 @@ def render_chart_yaml(spec: AgentSpec) -> str:
     return f"""apiVersion: v2
 name: {spec.name}
 description: >-
-  ADR-0306/ADR-0307 (WP-41): renders a single AIAgent CR that the
+  ADR-0410/ADR-0307 (WP-41): renders a single AIAgent CR that the
   aiagent-operator reconciles into {spec.title}'s frontend (portal + chat
   UI) and BFF Deployment/Service/Route in the shared zuno-ai-run
   namespace - scaffolded from platform/templates/agent/, CR-managed from
@@ -250,7 +250,7 @@ appVersion: "0.1.0"
 def render_chart_values_yaml(spec: AgentSpec) -> str:
     knowledge_lines = "\n".join(f"  - {k}" for k in spec.knowledge_domains)
     tool_lines = "\n".join(f"  - {t}" for t in spec.tools)
-    return f"""# ADR-0306/ADR-0307 (WP-41): scaffolded by platform/templates/agent/ -
+    return f"""# ADR-0410/ADR-0307 (WP-41): scaffolded by platform/templates/agent/ -
 # see gitops/charts/arkos/values.yaml's own comment for why this chart
 # carries only CR-population fields, never platform-wide constants
 # (those live once, in gitops/charts/aiagent-operator/).
@@ -307,7 +307,7 @@ toolCapabilities:
 
 
 def render_chart_aiagent_yaml(spec: AgentSpec) -> str:
-    return f"""# ADR-0306/ADR-0307 (WP-41 scaffold): the ONLY resource this chart
+    return f"""# ADR-0410/ADR-0307 (WP-41 scaffold): the ONLY resource this chart
 # renders - see gitops/charts/arkos/templates/aiagent.yaml's own comment
 # for the full ownership-model rationale (identical here).
 apiVersion: zuno.zuno.ai/v1alpha1
@@ -388,7 +388,7 @@ spec:
 
 def render_app_d1(spec: AgentSpec, sync_wave: int) -> str:
     return f"""---
-# {spec.title}'s frontend + BFF (ADR-0306/ADR-0307/WP-41, sixth agent,
+# {spec.title}'s frontend + BFF (ADR-0410/ADR-0307/WP-41, sixth agent,
 # scaffolded from platform/templates/agent/). Depends on the
 # {spec.name}-frontend confidential OIDC client from keycloak (see this
 # agent's own keycloak-fragment.json) and on
@@ -427,7 +427,7 @@ def render_eval_readme(spec: AgentSpec) -> str:
     return f"""# {spec.title} Evaluation
 
 The 20 acceptance scenarios and the 75% pass-threshold report for
-{spec.title} (ADR-0306/ADR-0307/WP-41, scaffolded from
+{spec.title} (ADR-0410/ADR-0307/WP-41, scaffolded from
 platform/templates/agent/). `run_scenarios.py`/`run_acceptance_gate.py`
 here are thin `AGENT={spec.name}` wrappers around the canonical, shared
 implementation in `evaluations/tekos/` (ADR-0342); `scenarios.yaml`,
@@ -539,7 +539,7 @@ def render_security_checks_py(spec: AgentSpec) -> str:
     # every path/CR/persona name below keeps the real hyphenated slug.
     py_name = spec.name.replace("-", "_")
     return f'''#!/usr/bin/env python3
-"""Security-negative checks for {spec.title} (ADR-0306/ADR-0307/WP-41,
+"""Security-negative checks for {spec.title} (ADR-0410/ADR-0307/WP-41,
 scaffolded from platform/templates/agent/). Only the checks generic
 enough to apply to any agent are generated here - identity propagation
 (ADR-0032/0033) and the two-directional ADR-0040 entitlement/business-role
@@ -548,7 +548,7 @@ dependency at all. A hand-authored slice typically adds its own
 narrative-specific checks on top (see evaluations/advantage/
 security_checks.py for an example) - this scaffold deliberately doesn't
 invent one, since {spec.title} declares no cross-domain boundary to prove
-(ADR-0306: reuses existing knowledge/capabilities only).
+(ADR-0410: reuses existing knowledge/capabilities only).
 
 This cannot be executed in the sandbox this repo was built in (no live
 cluster) - written to be genuinely runnable once one exists, same as
@@ -871,7 +871,7 @@ scenarios:
 def render_keycloak_fragment(spec: AgentSpec) -> str:
     fragment = {
         "_comment": (
-            f"ADR-0306/ADR-0307 (WP-41) scaffold output - NOT auto-merged. "
+            f"ADR-0410/ADR-0307 (WP-41) scaffold output - NOT auto-merged. "
             f"A human merges the relevant pieces into "
             f"gitops/charts/keycloak/files/realm-zuno.json by hand (see "
             f"agents/{spec.name}/NEXT_STEPS.md), the same way every prior "

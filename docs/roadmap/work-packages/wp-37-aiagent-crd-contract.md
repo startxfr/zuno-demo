@@ -149,4 +149,4 @@ None — contract validation is repo-provable. (Cluster behavior is WP-38's.)
 
 ## Out of scope / deferred
 
-- The operator/controller implementation and ADR-0113's closure (WP-38).
+- The operator/controller implementation and ADR-0350's closure (WP-38).

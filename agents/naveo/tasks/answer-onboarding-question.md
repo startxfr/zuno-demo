@@ -18,7 +18,7 @@ zuno:
 
 Answer an onboarding question using Naveo's declared knowledge domains
 and tool capabilities, all reused from the existing platform catalog
-(ADR-0306 - no new knowledge domain or external backend for a
+(ADR-0410 - no new knowledge domain or external backend for a
 template-scaffolded agent).
 
 This is the task Agent Runtime's generic chat dispatch (`POST

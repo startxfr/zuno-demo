@@ -1,4 +1,4 @@
-# WP-38: AIAgent operator implementation (promotes ADR-0308; closes ADR-0113)
+# WP-38: AIAgent operator implementation (promotes ADR-0308; closes ADR-0350)
 
 - **State:** Repo work merged (2026-08-15); cluster reconciliation pending.
   Step 0 promoted ADR-0308 verbatim from its `docs/adr/0300-v0.3-roadmap.md`
@@ -81,10 +81,10 @@
   `go build/vet/test ./...` clean; `validate_contract.py` still exit 0;
   `helm lint` clean on both touched charts; `check_build_matrix.py`
   (11 entries) and `check_docs.py` PASS; all four `day1_*.yml --syntax-check`
-  clean. ADR-0113 stays `Proposed` with a dated `## Evolution` pointer
+  clean. ADR-0350 stays `Proposed` with a dated `## Evolution` pointer
   note (the Decision text itself is immutable) rather than moving to
   `Implemented` until ADR-0308 itself reaches `Implemented`.
-- **ADRs:** ADR-0308 (Proposed -> To be implemented -> Partially implemented merged here -> Implemented after cluster reconciliation); ADR-0113 (Proposed -> Implemented alongside it, once ADR-0308 closes)
+- **ADRs:** ADR-0308 (Proposed -> To be implemented -> Partially implemented merged here -> Implemented after cluster reconciliation); ADR-0350 (Proposed -> Implemented alongside it, once ADR-0308 closes)
 - **Depends on:** WP-37 (merged)
 - **Blocks:** WP-41
 - **Estimated files touched:** ~15
@@ -114,7 +114,7 @@ status conditions), within the contract's hard boundaries.
   a defined, safe lifecycle that doesn't unexpectedly delete shared data or
   secrets; existing plain-manifest agents migrate incrementally, no flag
   day.
-- [docs/adr/0113-provide-an-aiagent-kubernetes-crd-and-operator.md](../../adr/0113-provide-an-aiagent-kubernetes-crd-and-operator.md)
+- [docs/adr/0350-provide-an-aiagent-kubernetes-crd-and-operator.md](../../adr/0350-provide-an-aiagent-kubernetes-crd-and-operator.md)
   — the original decision this implements.
 
 ## Preconditions (verify before starting)
@@ -201,10 +201,10 @@ status conditions), within the contract's hard boundaries.
 
 - After repo merge: ADR-0308 →
   `Partially implemented (controller, boundaries, tests and Arkos migration merged; cluster reconciliation pending)`;
-  ADR-0113 stays `Proposed` with a dated pointer note; index rows to match;
+  ADR-0350 stays `Proposed` with a dated pointer note; index rows to match;
   tracker → `Operator pending`.
 - After cluster verification: ADR-0308 →
-  `Implemented - see \`operator/aiagent-operator/\`.`; ADR-0113 →
+  `Implemented - see \`operator/aiagent-operator/\`.`; ADR-0350 →
   `Implemented - see ADR-0327/ADR-0308 and \`operator/aiagent-operator/\`.`;
   index rows `Implemented`; tracker → `Done`; MEMORY.md dated bullet.
 

@@ -53,7 +53,7 @@
   vars:
     gitops_app_name: "zuno-finage-d0"
 
-# ADR-0306/ADR-0307 (WP-41): deleting the Application deletes the AIAgent
+# ADR-0410/ADR-0307 (WP-41): deleting the Application deletes the AIAgent
 # CR; the operator's owner references then garbage-collect every
 # generated resource - no per-resource cleanup needed here.
 - name: "agents | delete the naveo ArgoCD Application (d1)"

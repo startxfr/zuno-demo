@@ -40,7 +40,7 @@ Each agent has a dedicated frontend and BFF deployment while consuming shared pl
   namespaces, access-gated portal tiles — no running workflow yet.
   Business-functional builds move to v1; see
   `platform/architecture/agent-platform-separation.md`.
-- The AIAgent CRD/operator is retargeted to v1 (ADR-0113).
+- The AIAgent CRD/operator is retargeted to v1 (ADR-0350).
 
 ## Repository principles
 

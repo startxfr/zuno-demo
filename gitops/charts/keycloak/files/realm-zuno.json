@@ -761,7 +761,7 @@
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "ADR-0040 negative-test fixture (ADR-0306/ADR-0307/WP-41): agent_naveo entitlement without any business role - Naveo reuses the existing consultant role (no new business role for a sixth demo agent), so the converse case reuses the existing consultant-role-only-user-01 fixture rather than adding a redundant one"
+                    "ADR-0040 negative-test fixture (ADR-0410/ADR-0307/WP-41): agent_naveo entitlement without any business role - Naveo reuses the existing consultant role (no new business role for a sixth demo agent), so the converse case reuses the existing consultant-role-only-user-01 fixture rather than adding a redundant one"
                 ]
             },
             "groups": [
@@ -1073,7 +1073,7 @@
         {
             "clientId": "naveo-frontend",
             "name": "Naveo frontend (onboarding)",
-            "description": "Confidential client for the Naveo onboarding-assistant agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0306/ADR-0307/WP-41: sixth demo agent, scaffolded from platform/templates/agent/ - proves self-service onboarding produces the same real, working shape as every hand-built agent, never a placeholder public-SPA entry)",
+            "description": "Confidential client for the Naveo onboarding-assistant agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0410/ADR-0307/WP-41: sixth demo agent, scaffolded from platform/templates/agent/ - proves self-service onboarding produces the same real, working shape as every hand-built agent, never a placeholder public-SPA entry)",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,

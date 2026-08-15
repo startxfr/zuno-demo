@@ -28,7 +28,7 @@ zuno:
     notes: >-
       Scaffolded by platform/templates/agent/ (ADR-0307/WP-41) - reuses
       the retrieve_reason_respond shape and existing knowledge/tool
-      capabilities only, no new external systems (ADR-0306).
+      capabilities only, no new external systems (ADR-0410).
   access:
     # ADR-0040: agent entitlement group, orthogonal to the
     # `consultant` business role that governs tool/data

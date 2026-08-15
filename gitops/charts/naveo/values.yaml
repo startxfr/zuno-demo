@@ -1,4 +1,4 @@
-# ADR-0306/ADR-0307 (WP-41): scaffolded by platform/templates/agent/ -
+# ADR-0410/ADR-0307 (WP-41): scaffolded by platform/templates/agent/ -
 # see gitops/charts/arkos/values.yaml's own comment for why this chart
 # carries only CR-population fields, never platform-wide constants
 # (those live once, in gitops/charts/aiagent-operator/).

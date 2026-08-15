@@ -77,4 +77,4 @@ Same check set as WP-35 with `finage` substituted, plus:
 
 ## Out of scope / deferred
 
-- Sixth-agent onboarding template (WP-41 / ADR-0306/0307).
+- Sixth-agent onboarding template (WP-41 / ADR-0410/0307).

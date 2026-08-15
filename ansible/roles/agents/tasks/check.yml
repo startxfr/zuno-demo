@@ -55,7 +55,7 @@
     - advantage
     - finage
     - arkos
-    # ADR-0306/ADR-0307 (WP-41): the sixth agent, scaffolded from
+    # ADR-0410/ADR-0307 (WP-41): the sixth agent, scaffolded from
     # platform/templates/agent/ - same real-bundle-but-status-placeholder
     # posture as the four above until its own gate passes.
     - naveo
@@ -287,7 +287,7 @@
   ansible.builtin.debug:
     msg: "Finage frontend healthy at https://{{ _agents_finage_host }}/healthz (evaluations/finage/ gate not run here - pending human scenario review)."
 
-# ADR-0306/ADR-0307 (WP-41): Naveo's frontend/BFF are deployed via the
+# ADR-0410/ADR-0307 (WP-41): Naveo's frontend/BFF are deployed via the
 # aiagent-operator reconciling its AIAgent CR (gitops/charts/naveo renders
 # only the CR) once gitops/apps/naveo syncs, so it deserves the same
 # reachability proof every other agent gets - but never the acceptance

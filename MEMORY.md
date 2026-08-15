@@ -447,7 +447,7 @@ under `docs/adr/`.
   `security_checks.py` and `gate_checks.py` (both 100% mandatory) into one
   exit code. `components/{agent-runtime,mcp-gateway}/tests/test_auth.py`
   prove expired/untrusted-key JWTs are rejected, fully offline.
-- **ADR-0113** (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
+- **ADR-0350** (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
   deploys as a plain `Deployment`.
 - **Deployment sequencing** (ADR-0056): `make day0|d0
   <check|install|configure|all> [component]` (cluster prerequisites) +

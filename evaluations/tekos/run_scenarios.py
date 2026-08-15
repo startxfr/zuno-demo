@@ -138,7 +138,7 @@ def auth_headers(persona: str) -> Dict[str, str]:
 def portal_lists_all_agents(s: Dict[str, Any]) -> ScenarioResult:
     resp = httpx.get(FRONTEND_URL, headers=auth_headers(s["persona"]), timeout=10, follow_redirects=True)
     body = resp.text
-    # naveo: sixth agent (ADR-0306/WP-41b) - the portal auto-discovers
+    # naveo: sixth agent (ADR-0410/WP-41b) - the portal auto-discovers
     # tiles from the OKF bundles baked into the frontend image, so this
     # list only needs the agent slug, no frontend code change.
     agents = ["comage", "tekos", "advantage", "finage", "arkos", "naveo"]

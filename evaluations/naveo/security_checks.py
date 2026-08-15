@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Security-negative checks for Naveo (ADR-0306/ADR-0307/WP-41,
+"""Security-negative checks for Naveo (ADR-0410/ADR-0307/WP-41,
 scaffolded from platform/templates/agent/). Only the checks generic
 enough to apply to any agent are generated here - identity propagation
 (ADR-0032/0033) and the two-directional ADR-0040 entitlement/business-role
@@ -8,7 +8,7 @@ dependency at all. A hand-authored slice typically adds its own
 narrative-specific checks on top (see evaluations/advantage/
 security_checks.py for an example) - this scaffold deliberately doesn't
 invent one, since Naveo declares no cross-domain boundary to prove
-(ADR-0306: reuses existing knowledge/capabilities only).
+(ADR-0410: reuses existing knowledge/capabilities only).
 
 This cannot be executed in the sandbox this repo was built in (no live
 cluster) - written to be genuinely runnable once one exists, same as

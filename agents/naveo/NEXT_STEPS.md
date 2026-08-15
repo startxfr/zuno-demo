@@ -6,7 +6,7 @@ below); 7-8 remain - the same human-review + live-gate bar every
 hand-built agent clears.
 
 1. ~~**Review/adjust the prose**~~ DONE (WP-41b): the scaffolded persona
-   was kept - a deliberately simple synthetic persona (ADR-0306:
+   was kept - a deliberately simple synthetic persona (ADR-0410:
    "synthetic persona, existing knowledge domains and capabilities only")
    whose prompt file additionally gained the OKF `type: prompt`
    frontmatter the generator originally omitted (a real generator bug the
@@ -22,7 +22,7 @@ hand-built agent clears.
 3. ~~**Add policy entries**~~ DONE (WP-41b) - as zero edits: `consultant`
    was ALREADY in `allowed_groups` for every declared tool
    (search_confluence, web_search, list_drive_files) and knowledge domain
-   (knowledge.tech, knowledge.project) - the cleanest possible ADR-0306
+   (knowledge.tech, knowledge.project) - the cleanest possible ADR-0410
    proof that a template agent composes existing capabilities without
    widening any policy.
 4. ~~**Register the GitOps Application**~~ DONE (WP-41b): sync-wave -96
@@ -37,5 +37,5 @@ hand-built agent clears.
 8. **Operator**: deploy via the `AIAgent` CR (needs the aiagent-operator
    deployed first - WP-38's own pending cluster step), run the 75% gate,
    flip `agents/naveo/agent.okf.md`'s `zuno.status` to `active` -
-   discharges ADR-0306, and the template flow having produced it
+   discharges ADR-0410, and the template flow having produced it
    discharges ADR-0307.

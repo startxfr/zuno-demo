@@ -95,7 +95,7 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
 
-# ADR-0306/ADR-0307 (WP-41): Naveo, the sixth agent, scaffolded from
+# ADR-0410/ADR-0307 (WP-41): Naveo, the sixth agent, scaffolded from
 # platform/templates/agent/ - its chart renders an AIAgent CR the
 # aiagent-operator reconciles (never raw manifests), so this Application
 # additionally depends on the aiagent-operator component having synced

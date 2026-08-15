@@ -1,5 +1,5 @@
 ---
-# Naveo's frontend + BFF (ADR-0306/ADR-0307/WP-41, sixth agent,
+# Naveo's frontend + BFF (ADR-0410/ADR-0307/WP-41, sixth agent,
 # scaffolded from platform/templates/agent/). Depends on the
 # naveo-frontend confidential OIDC client from keycloak (see this
 # agent's own keycloak-fragment.json) and on

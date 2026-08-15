@@ -1,7 +1,7 @@
 # Naveo Evaluation
 
 The 20 acceptance scenarios and the 75% pass-threshold report for
-Naveo (ADR-0306/ADR-0307/WP-41, scaffolded from
+Naveo (ADR-0410/ADR-0307/WP-41, scaffolded from
 platform/templates/agent/). `run_scenarios.py`/`run_acceptance_gate.py`
 here are thin `AGENT=naveo` wrappers around the canonical, shared
 implementation in `evaluations/tekos/` (ADR-0342); `scenarios.yaml`,

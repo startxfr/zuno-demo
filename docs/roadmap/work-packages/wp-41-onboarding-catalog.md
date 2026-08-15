@@ -1,4 +1,4 @@
-# WP-41: Self-service onboarding and catalog expansion (promotes ADR-0307 + ADR-0306)
+# WP-41: Self-service onboarding and catalog expansion (promotes ADR-0307 + ADR-0410)
 
 - **State:** Part A merged (2026-08-15); Part B (sixth agent) next.
   **Part A** promoted ADR-0307 verbatim and delivered
@@ -35,7 +35,7 @@
   one function name, keeping the real slug everywhere else).
   `python3 platform/docs/check_docs.py` PASS.
 
-  **Part B merged (2026-08-15)**: promoted ADR-0306 verbatim and
+  **Part B merged (2026-08-15)**: promoted ADR-0410 verbatim and
   generated **Naveo** (onboarding assistant for new team members - a
   synthetic persona per the ADR's own constraint) with the real
   generator, unmodified: `agents/naveo/` (retrieve_reason_respond shape,
@@ -58,7 +58,7 @@
   new externalsecret + keycloak.yaml vault-file mount + two Vault seeds.
   **Policy entries: zero edits needed** - `consultant` was already in
   every declared tool's and knowledge domain's allowed_groups, the
-  cleanest possible ADR-0306 proof that a template agent composes
+  cleanest possible ADR-0410 proof that a template agent composes
   existing capabilities without widening any policy. Platform wiring:
   `naveo` added to build-publish.yml's sign-okf-bundles matrix, to
   `ansible/roles/agents` install/uninstall/precheck + check.yml
@@ -80,7 +80,7 @@
   as the same bar every hand-built agent clears. **Human review
   checkpoint (persona + scenarios) and the live deployment gate remain
   open** - both need the cluster and the user.
-- **ADRs:** ADR-0307, ADR-0306 (both Partially implemented - template/workflow/sixth-agent definition merged; deployment gate pending)
+- **ADRs:** ADR-0307, ADR-0410 (both Partially implemented - template/workflow/sixth-agent definition merged; deployment gate pending)
 - **Depends on:** WP-38 (merged — the operator is the onboarding substrate); all four slices merged
 - **Estimated files touched:** ~10
 
@@ -91,14 +91,14 @@
 
 Promote both stubs, then: (Part A, ADR-0307) an agent template/scaffold +
 validation workflow so a team can define a new agent as a reviewed PR;
-(Part B, ADR-0306) a sixth demo agent created purely from that template,
+(Part B, ADR-0410) a sixth demo agent created purely from that template,
 proving the platform onboards beyond the initial five.
 
 ## ADR references
 
 Stubs (verbatim, from `docs/adr/0300-v0.3-roadmap.md`):
 - ADR-0307: "Provide controlled templates, validation and workflows for teams to define new agents."
-- ADR-0306: "Demonstrate that the generic platform supports broader enterprise agent onboarding."
+- ADR-0410: "Demonstrate that the generic platform supports broader enterprise agent onboarding."
 
 ## Preconditions
 
@@ -123,7 +123,7 @@ Stubs (verbatim, from `docs/adr/0300-v0.3-roadmap.md`):
    ADR-0027/0028 gates as the first five — self-service changes who
    authors the definition, never the acceptance bar." Related: 0306, 0326,
    0327, 0308, 0106.
-2. `docs/adr/0306-expand-the-agent-catalog-beyond-the-initial-five-agents.md`
+2. `docs/adr/0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md`
    (same header pattern). Decision: promotion sentence + stub text, then:
    "Prove ADR-0307's path by onboarding a sixth demo agent (synthetic
    persona, existing knowledge domains and capabilities only, no new
@@ -164,7 +164,7 @@ domains or external backends for the sixth agent.
 
 1. User: review the sixth agent's persona + scenarios.
 2. Operator: deploy via its CR, run the 75% gate, flip to `active` —
-   discharges ADR-0306; the template flow having produced it discharges
+   discharges ADR-0410; the template flow having produced it discharges
    ADR-0307.
 
 ## Status updates (then re-run check_docs.py)
@@ -172,7 +172,7 @@ domains or external backends for the sixth agent.
 - After merge: both →
   `Partially implemented (template, validation workflow and sixth-agent definition merged; deployment gate pending)`;
   after the gate: ADR-0307 → `Implemented - see \`platform/templates/agent/\`.`;
-  ADR-0306 → `Implemented - see the sixth agent under \`agents/\`.`;
+  ADR-0410 → `Implemented - see the sixth agent under \`agents/\`.`;
   index rows + tracker + MEMORY.md accordingly.
 
 ## Out of scope / deferred
