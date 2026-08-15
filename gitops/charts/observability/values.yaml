@@ -63,3 +63,27 @@ collector:
 # collector's own enablement since the alerts are meaningless without it.
 alerting:
   enabled: true
+
+# ADR-0109/WP-24: "metrics expose now - indexed_at ... with alerting
+# against domain objectives" - one alert per domain, threshold in
+# seconds, mirroring that domain's own knowledge/<domain>/domain.yaml
+# freshness.operation_classes.semantic-read.max_staleness (a human-
+# maintained mirror, the same pattern rag-ingestion's STALE_AFTER chart
+# value already established). Gated on collector.enabled the same way
+# prometheusrule-slo.yaml is - and, like that rule, safe to enable ahead
+# of the underlying zuno_rag_freshness_lag_seconds metric being confirmed
+# reachable by a live scraper (an absent metric evaluates to "no series",
+# not an error - see prometheusrule-slo.yaml's own header comment; this
+# rule carries the identical unverified-scrape-path caveat).
+freshnessLag:
+  enabled: true
+  domains:
+    tech:
+      thresholdSeconds: 604800   # 7d
+    sales:
+      thresholdSeconds: 14400    # 4h
+    adv:
+      thresholdSeconds: 86400    # 1d
+    # sxa-legacy intentionally absent: exempt from freshness enforcement
+    # (WP-24/ADR-0206) - no lag alert makes sense for an on-demand
+    # point-in-time snapshot domain.

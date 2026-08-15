@@ -645,6 +645,13 @@ chunking:
   preserveCodeBlocks: true
   preserveTables: true
 
+# knowledge.tech's freshness window (WP-24 / ADR-0109 / ADR-0205): mirrors
+# knowledge/tech/domain.yaml's freshness.operation_classes.semantic-read.
+# max_staleness - a human-maintained mirror, the same pattern
+# schedule.cron/freshness.objective already established. "<int>d/h/m" or
+# "none" (never compute stale_after for this domain's chunks).
+staleAfter: 7d
+
 corpus:
   rawPrefix: raw
   normalizedPrefix: normalized
@@ -728,6 +735,9 @@ domains:
       enabled: true
       cron: "0 0 */4 * * *"
       timezone: Europe/Paris
+    # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/sales/domain.yaml's
+    # freshness.operation_classes.semantic-read.max_staleness.
+    staleAfter: 4h
   adv:
     enabled: false
     fetchStages: [fetch-aramis]
@@ -757,6 +767,9 @@ domains:
       enabled: true
       cron: "0 0 3 * * *"
       timezone: Europe/Paris
+    # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/adv/domain.yaml's
+    # freshness.operation_classes.semantic-read.max_staleness.
+    staleAfter: 1d
   sxa-legacy:
     enabled: false
     fetchStages: [load-sxa-dump]
@@ -777,6 +790,10 @@ domains:
     # Manual refresh: make d1 install rag-ingestion (see README).
     schedule:
       enabled: false
+    # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/sxa-legacy/domain.yaml's
+    # exempt_from_freshness_enforcement - never compute a stale_after for
+    # this domain's chunks.
+    staleAfter: none
 
 # Runtime image is built imperatively by the day1-build Ansible role
 # (ansible/roles/rag_ingestion_build, ansible/tasks/apply_openshift_build.yml)

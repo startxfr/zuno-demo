@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app import config
 from app.db import get_pool
 from app.embeddings import embed_query
+from app.telemetry import record_freshness_lag
 
 logger = logging.getLogger("rag_service.search")
 
@@ -38,8 +39,104 @@ _LANGUAGE_BOOST = 0.01
 # A stale document (metadata.stale_after in the past) is down-ranked, not
 # excluded outright - it may still be the only source for a question, and
 # the caller (Agent Runtime) can decide what to do with `stale: true` on
-# the result rather than this service silently hiding it.
+# the result rather than this service silently hiding it. This is the
+# floor of _freshness_decay_factor's continuous decay below (WP-24) and
+# also the fallback used when a stale doc's own metadata doesn't carry a
+# parseable stale_after to grade severity from - unchanged value/meaning
+# from the original binary penalty, tests/test_search_filters.py depends
+# on the exact constant.
 _STALE_PENALTY_FACTOR = 0.5
+
+# ADR-0205/WP-24: once a doc has been stale for this many days, freshness
+# decay bottoms out - never fully zeroed (a very old source may still be
+# the only answer), but never ranked as if it just barely missed its
+# staleness window either. Chosen as a full quarter: distinguishing "just
+# went stale" from "extremely old" only matters over that kind of horizon
+# for this corpus's freshness objectives (weekly..on-demand, see
+# knowledge/*/domain.yaml).
+_FRESHNESS_DECAY_FLOOR = 0.15
+_FRESHNESS_DECAY_FULL_DAYS = 90
+
+# ADR-0205: a chunk whose provenance is a real, independently-checkable
+# URL is a stronger citation than one carrying only a synthetic/fixture
+# marker (ADR-0025) - a light weight, not a hard filter, since fixture
+# content is still legitimate corpus content for this demo.
+_PROVENANCE_URL_WEIGHT = 1.0
+_PROVENANCE_UNVERIFIABLE_WEIGHT = 0.95
+
+# ADR-0205/WP-24: a chunk in an operational (non-immutable-legacy) domain
+# that carries neither `indexed_at` nor `stale_after` predates this WP's
+# metadata enforcement (components/rag-ingestion's validate stage now
+# requires both on every new/changed operational chunk) - trust scoring
+# treats it the same way ADR-0202/ADR-0203 treat an untrusted
+# classification: never silently trust it, down-rank hard and flag it
+# (`freshness_untrusted: true`) rather than either dropping it or ranking
+# it as if its freshness were known. `knowledge.sxa-legacy` is the one
+# domain WP-22/ADR-0206 declared exempt (a point-in-time dump snapshot,
+# not a continuously-refreshed operational source).
+_IMMUTABLE_LEGACY_DOMAINS = {"knowledge.sxa-legacy"}
+_FRESHNESS_UNTRUSTED_PENALTY_FACTOR = 0.05
+
+
+def _provenance_weight(metadata: Dict[str, Any]) -> float:
+    provenance = metadata.get("provenance")
+    if not provenance:
+        # No provenance recorded at all is a different, non-penalized case
+        # from a provenance value that IS present but isn't a URL (a known
+        # fixture/synthetic marker, ADR-0025) - only the latter is a known
+        # weaker citation. Also the no-op every caller that never sets
+        # `metadata` at all (this repo's synthetic ranking-unit-test docs)
+        # gets, by construction (`metadata or {}` upstream -> `{}` -> no
+        # provenance key -> here).
+        return _PROVENANCE_URL_WEIGHT
+    if isinstance(provenance, str) and provenance.startswith(("http://", "https://")):
+        return _PROVENANCE_URL_WEIGHT
+    return _PROVENANCE_UNVERIFIABLE_WEIGHT
+
+
+def _freshness_decay_factor(is_stale: bool, metadata: Optional[Dict[str, Any]]) -> float:
+    """Continuous decay once a doc is stale, replacing the previous flat
+    penalty with one that sinks progressively staler content further -
+    never below `_FRESHNESS_DECAY_FLOOR`, never exclusionary. Falls back
+    to the original flat `_STALE_PENALTY_FACTOR` when there is no
+    `metadata` dict at all, or no parseable `stale_after` to grade
+    severity from (a doc can be known-stale via `_is_stale` without this
+    function being able to say how stale) - this fallback is also what
+    keeps this function's output identical to the pre-WP-24 behavior for
+    every existing caller that never passes a metadata dict."""
+    if not is_stale:
+        return 1.0
+    stale_after = (metadata or {}).get("stale_after")
+    if not stale_after:
+        return _STALE_PENALTY_FACTOR
+    parsed = _parse_stale_after(stale_after)
+    if parsed is None:
+        return _STALE_PENALTY_FACTOR
+    days_stale = (_dt.datetime.now(_dt.timezone.utc) - parsed).days
+    if days_stale <= 0:
+        return _STALE_PENALTY_FACTOR
+    fraction = min(days_stale / _FRESHNESS_DECAY_FULL_DAYS, 1.0)
+    return _STALE_PENALTY_FACTOR - (_STALE_PENALTY_FACTOR - _FRESHNESS_DECAY_FLOOR) * fraction
+
+
+def _is_freshness_untrusted(domain: str, metadata: Dict[str, Any]) -> bool:
+    if domain in _IMMUTABLE_LEGACY_DOMAINS:
+        return False
+    return not metadata.get("indexed_at") and not metadata.get("stale_after")
+
+
+def _record_freshness_lag(doc: Dict[str, Any]) -> None:
+    """ADR-0109/WP-24 lag metric: only for chunks actually returned to a
+    caller (post-ranking/truncation) - recording it for every over-fetched
+    candidate row would skew the histogram with results nobody saw."""
+    indexed_at = (doc.get("metadata") or {}).get("indexed_at")
+    if not indexed_at:
+        return
+    parsed = _parse_stale_after(indexed_at)  # same generic ISO datetime parser
+    if parsed is None:
+        return
+    lag_seconds = (_dt.datetime.now(_dt.timezone.utc) - parsed).total_seconds()
+    record_freshness_lag(doc["domain"], max(lag_seconds, 0.0))
 
 
 def _filter_clause(
@@ -136,15 +233,32 @@ def _text_query(filter_sql: str) -> str:
     """
 
 
+def _parse_stale_after(stale_after: str) -> Optional[_dt.datetime]:
+    """ADR-0205/WP-24: stale_after must support sub-day granularity (the
+    sales domain's hours-scale freshness objective, knowledge/sales/
+    domain.yaml) - datetime.fromisoformat (Python 3.11+) parses both a
+    bare date (e.g. "2027-01-01", the pre-WP-24 fixture convention -
+    treated as midnight) and a full ISO datetime with an offset/"Z"
+    suffix, so this stays backward compatible with every value written
+    before this WP without a migration."""
+    try:
+        parsed = _dt.datetime.fromisoformat(stale_after)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_dt.timezone.utc)
+    return parsed
+
+
 def _is_stale(metadata: Dict[str, Any]) -> bool:
     stale_after = metadata.get("stale_after")
     if not stale_after:
         return False
-    try:
-        return _dt.date.fromisoformat(stale_after) < _dt.date.today()
-    except ValueError:
-        logger.warning("metadata.stale_after=%r is not an ISO date, ignoring", stale_after)
+    parsed = _parse_stale_after(stale_after)
+    if parsed is None:
+        logger.warning("metadata.stale_after=%r is not an ISO date/datetime, ignoring", stale_after)
         return False
+    return parsed < _dt.datetime.now(_dt.timezone.utc)
 
 
 def _row_to_doc(row) -> Dict[str, Any]:
@@ -172,21 +286,38 @@ def _row_to_doc(row) -> Dict[str, Any]:
         # domain-scoped query and this default never disagree about what a
         # tagless row belongs to.
         "domain": metadata.get("domain", "knowledge.tech"),
+        # ADR-0205/WP-24: computed from the real metadata dict here (not in
+        # _apply_soft_adjustments) so a caller building `doc` any other way
+        # (there is exactly one: the synthetic fixtures in
+        # tests/test_search_filters.py) never has this key at all, which is
+        # exactly the "we don't know" signal _apply_soft_adjustments' fallback
+        # relies on to stay backward compatible.
+        "freshness_untrusted": _is_freshness_untrusted(metadata.get("domain", "knowledge.tech"), metadata),
     }
 
 
 def _apply_soft_adjustments(fused: Dict[str, float], docs_by_id: Dict[str, Dict[str, Any]], language: Optional[str]) -> None:
-    """Applies ADR-0046's soft language preference and staleness penalty
-    in place, after fusion so both ranked lists' contributions are already
-    combined before either adjustment. A standalone function so
+    """Applies ADR-0046's soft language preference plus ADR-0205/WP-24's
+    trust scoring (provenance weight, freshness decay, freshness-untrusted
+    penalty) in place, after fusion so both ranked lists' contributions
+    are already combined before any adjustment. A standalone function so
     tests/test_search_filters.py can exercise the ranking behavior with
-    synthetic docs, without a real database.
+    synthetic docs, without a real database - every WP-24 addition below
+    reads from keys (`metadata`, `freshness_untrusted`) that
+    app/search.py:_row_to_doc always sets on a real result but a minimal
+    synthetic test doc need not, and each falls back to a no-op (weight
+    1.0 / flat _STALE_PENALTY_FACTOR / not untrusted) when absent -
+    exactly the pre-WP-24 behavior, so older tests keep their exact
+    expected values.
     """
     for doc_id, doc in docs_by_id.items():
         if language and doc["language"] == language:
             fused[doc_id] += _LANGUAGE_BOOST
-        if doc["stale"]:
-            fused[doc_id] *= _STALE_PENALTY_FACTOR
+        metadata = doc.get("metadata")
+        fused[doc_id] *= _provenance_weight(metadata or {})
+        fused[doc_id] *= _freshness_decay_factor(doc["stale"], metadata)
+        if doc.get("freshness_untrusted"):
+            fused[doc_id] *= _FRESHNESS_UNTRUSTED_PENALTY_FACTOR
 
 
 async def hybrid_search(
@@ -268,6 +399,7 @@ async def hybrid_search(
     results = []
     for doc_id in ranked_ids:
         doc = docs_by_id[doc_id]
+        _record_freshness_lag(doc)
         results.append(
             {
                 "id": doc["id"],
@@ -281,6 +413,7 @@ async def hybrid_search(
                 "version": doc["version"],
                 "stale": doc["stale"],
                 "domain": doc["domain"],
+                "freshness_untrusted": doc["freshness_untrusted"],
             }
         )
 

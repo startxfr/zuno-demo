@@ -47,3 +47,6 @@ data:
   CORPUS_INCREMENTAL: {{ .Values.corpus.incremental | quote }}
   CORPUS_HASH_ALGORITHM: {{ .Values.corpus.hashAlgorithm | quote }}
   CORPUS_DELETE_ORPHANS: {{ .Values.corpus.deleteOrphans | quote }}
+  # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/tech/domain.yaml's
+  # freshness.operation_classes.semantic-read.max_staleness.
+  STALE_AFTER: {{ .Values.staleAfter | quote }}

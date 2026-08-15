@@ -35,10 +35,11 @@ OTEL_ENDPOINT = os.getenv(
 _tracer: Optional[trace.Tracer] = None
 _search_counter = None
 _result_count_histogram = None
+_freshness_lag_histogram = None
 
 
 def init_telemetry(service_name: str = "rag-service") -> None:
-    global _tracer, _search_counter, _result_count_histogram
+    global _tracer, _search_counter, _result_count_histogram, _freshness_lag_histogram
 
     resource = Resource.create({"service.name": service_name})
 
@@ -66,8 +67,23 @@ def init_telemetry(service_name: str = "rag-service") -> None:
     _result_count_histogram = meter.create_histogram(
         "zuno.rag_result_count", description="Number of hybrid-search results returned per query"
     )
+    # ADR-0109/WP-24: "metrics expose now - indexed_at ... with alerting
+    # against domain objectives" - one histogram, sliced by the `domain`
+    # attribute at record time (see app/search.py:record_freshness_lag),
+    # rather than one metric per domain - domains are data, not a fixed
+    # set this module should know about.
+    _freshness_lag_histogram = meter.create_histogram(
+        "zuno.rag_freshness_lag_seconds",
+        unit="s",
+        description="Age (now - metadata.indexed_at) of each returned chunk, labeled by domain",
+    )
 
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
+
+
+def record_freshness_lag(domain: str, lag_seconds: float) -> None:
+    if _freshness_lag_histogram is not None:
+        _freshness_lag_histogram.record(lag_seconds, {"domain": domain})
 
 
 @contextmanager

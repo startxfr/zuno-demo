@@ -34,3 +34,7 @@ class ChatResponse(BaseModel):
     # disconnect, explicit "continue" action) to resume this exact
     # workflow from its last checkpoint instead of starting a new one.
     run_id: str
+    # ADR-0205/WP-24: "indexed" | "live" | "both" | "none" - whether this
+    # answer's context came from indexed retrieval, a live capability
+    # call, both, or neither. See app/graph/nodes.py:_compute_source_mode.
+    source_mode: str = "indexed"

@@ -673,3 +673,38 @@ under `docs/adr/`.
   defense in depth; untagged legacy rows default to `knowledge.tech`. Both
   ADRs fully repo-provable — no operator follow-up. Physical bindings/
   per-domain databases are WP-21; `stale_after` enforcement is WP-24.
+
+- **2026-08-15 (ADR-0205 + ADR-0109, WP-24)**: freshness routing and trust
+  scoring, both ADRs fully repo-provable (mocked live tools) — no operator
+  follow-up. Split the old conflated `last_modified` metadata field into
+  `source_modified_at` (the source's own signal — Confluence's
+  `lastUpdated`, Salesforce's `LastModifiedDate`, Aramis' `updated_at`, a
+  best-effort HTTP `Last-Modified` header for product docs, or `fetched_at`
+  as a last resort) and `indexed_at` (the pipeline's own clock at normalize
+  time); `stale_after` is now computed from each domain's `STALE_AFTER`
+  chart value in `gitops/charts/rag-ingestion/values.yaml`, mirroring the
+  new `freshness.operation_classes.{semantic-read,current-state-read}.
+  max_staleness` blocks in every `knowledge/<domain>/domain.yaml`
+  (validated by `check_knowledge_refs.py`). `rag-ingestion`'s validate
+  stage fails closed on any operational-domain chunk missing the trio
+  (`knowledge.sxa-legacy` exempt). `rag-service`'s `_is_stale` now parses
+  full ISO datetimes (was date-only) for sales' hours-scale window;
+  `_apply_soft_adjustments` gained provenance weight (real URL vs.
+  fixture-marker provenance), continuous freshness decay (replacing the
+  old flat `_STALE_PENALTY_FACTOR` — same constant, now a floor) and a
+  `freshness_untrusted` flag + heavy rank-last penalty for chunks missing
+  `indexed_at`/`stale_after` — mirrored in `ogx_provider.py` for provider
+  parity. Agent Runtime's `_live_read_trigger_reason` (feeding
+  `should_call_tools`) fires on an explicit current-state question, a
+  policy-marked freshness-sensitive domain (`knowledge.sales`), or a
+  retrieved doc past its `stale_after`; `source_mode`
+  (`indexed`/`live`/`both`/`none`) is computed in `respond_node` from what
+  actually contributed to the answer (never from what was merely
+  attempted), returned in `ChatResponse` and the SSE `done` event, and
+  traced via a new `agent_graph_run` OTel span
+  (`app/telemetry.py:graph_run_span`). Write-path invariant tests (no
+  write-shaped SQL/HTTP verb in any retrieval code path) added to
+  rag-service, rag-ingestion and agent-runtime. New per-domain
+  `zuno.rag_freshness_lag_seconds` histogram plus a gated
+  `PrometheusRule` (`gitops/charts/observability`) alerting each domain
+  against its own freshness objective.

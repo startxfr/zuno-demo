@@ -94,6 +94,11 @@
               "cron": {"type": "string"},
               "timezone": {"type": "string"}
             }
+          },
+          "staleAfter": {
+            "type": "string",
+            "pattern": "^(\\d+[dhm]|none)$",
+            "description": "WP-24/ADR-0109: mirrors this domain's knowledge/<domain>/domain.yaml freshness.operation_classes.semantic-read.max_staleness."
           }
         }
       }

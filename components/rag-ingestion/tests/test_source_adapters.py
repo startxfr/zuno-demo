@@ -6,8 +6,10 @@ Run:
     cd components/rag-ingestion && .venv/bin/python tests/test_source_adapters.py
 """
 import os
+import re
 import sys
 import unittest.mock as mock
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -16,8 +18,11 @@ from rag_ingestion import (  # noqa: E402
     SOURCE_ADAPTERS,
     STAGES,
     IngestionConfig,
+    _parse_duration_spec,
+    _parse_http_last_modified,
     _run_source_adapter,
     stage_normalize,
+    stage_validate,
 )
 
 
@@ -57,9 +62,10 @@ def _config(**env):
 
 
 class _FakeResponse:
-    def __init__(self, payload=None, text=""):
+    def __init__(self, payload=None, text="", headers=None):
         self._payload = payload
         self.text = text
+        self.headers = headers or {}
 
     def raise_for_status(self):
         return None
@@ -362,6 +368,171 @@ def test_normalize_defaults_missing_domain_to_the_run_domain():
     assert store.json["normalized/old1.json"]["metadata"]["domain"] == "knowledge.tech"
 
 
+# --- WP-24 (ADR-0205/ADR-0109): freshness metadata --------------------------
+
+
+def test_parse_duration_spec_supports_days_hours_minutes_and_none():
+    assert _parse_duration_spec("7d").days == 7
+    assert _parse_duration_spec("4h").total_seconds() == 4 * 3600
+    assert _parse_duration_spec("5m").total_seconds() == 5 * 60
+    assert _parse_duration_spec("none") is None
+    assert _parse_duration_spec(None) is None
+    assert _parse_duration_spec("") is None
+
+
+def test_parse_duration_spec_rejects_a_malformed_value():
+    try:
+        _parse_duration_spec("banana")
+        raise AssertionError("expected SystemExit")
+    except SystemExit as exc:
+        assert "not a valid duration spec" in str(exc)
+
+
+def test_parse_http_last_modified_handles_valid_missing_and_malformed():
+    assert _parse_http_last_modified("Wed, 21 Oct 2015 07:28:00 GMT") == "2015-10-21T07:28:00Z"
+    assert _parse_http_last_modified(None) is None
+    assert _parse_http_last_modified("") is None
+    assert _parse_http_last_modified("not a valid http-date") is None
+
+
+def _normalize_one(config, raw_record):
+    store = FakeStore()
+    store.json["manifests/changeset.json"] = {
+        "new": ["doc1"], "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+    }
+    store.json["raw/doc1.json"] = raw_record
+    stage_normalize(config, store)
+    return store.json["normalized/doc1.json"]["metadata"]
+
+
+def test_normalize_computes_indexed_at_and_stale_after_from_the_duration_spec():
+    config = _config(INGESTION_DOMAIN="knowledge.sales", STALE_AFTER="4h")
+    raw = {
+        "doc_id": "doc1", "url": "https://sf.test/1", "title": "Deal", "text": "Name: Deal",
+        "domain": "knowledge.sales", "source_type": "salesforce-object", "classification": "C2",
+        "acl_groups": [], "provenance": "https://sf.test/1",
+        "last_modified": "2026-08-14T10:00:00Z",
+    }
+    metadata = _normalize_one(config, raw)
+    assert metadata["source_modified_at"] == "2026-08-14T10:00:00Z"
+    assert metadata["indexed_at"]
+    indexed_dt = datetime.strptime(metadata["indexed_at"], "%Y-%m-%dT%H:%M:%SZ")
+    stale_dt = datetime.strptime(metadata["stale_after"], "%Y-%m-%dT%H:%M:%SZ")
+    assert (stale_dt - indexed_dt) == timedelta(hours=4)
+
+
+def test_normalize_omits_stale_after_for_sxa_legacy_regardless_of_spec():
+    # Even a configured duration must not apply to the exempt domain -
+    # the domain check comes first (ADR-0206's on-demand-only objective).
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy", STALE_AFTER="7d")
+    raw = {
+        "doc_id": "doc1", "url": "sxa-dump://affaire", "title": "affaire", "text": "CREATE TABLE...",
+        "domain": "knowledge.sxa-legacy", "source_type": "sxa-dump", "classification": "C3",
+        "acl_groups": [], "provenance": "sxa-dump snapshot 2026-08",
+    }
+    metadata = _normalize_one(config, raw)
+    assert "stale_after" not in metadata
+    assert metadata["source_modified_at"] is None  # no last_modified, no fetched_at either
+
+
+def test_normalize_omits_stale_after_when_no_duration_is_configured():
+    config = _config(INGESTION_DOMAIN="knowledge.tech")  # STALE_AFTER unset
+    raw = {
+        "doc_id": "doc1", "url": "https://docs.test/x", "title": "Doc",
+        "raw_html": "<html><body><main><p>Hello.</p></main></body></html>",
+        "domain": "knowledge.tech", "source_type": "product-doc", "classification": "C1", "acl_groups": [],
+        "fetched_at": "2026-08-15T00:00:00Z", "provenance": "https://docs.test/x",
+    }
+    metadata = _normalize_one(config, raw)
+    assert "stale_after" not in metadata
+    assert metadata["source_modified_at"] == "2026-08-15T00:00:00Z"  # fetched_at fallback
+
+
+class _FakeValidateCursor:
+    def execute(self, *_a, **_kw):
+        pass
+
+    def fetchone(self):
+        return (1, 0)  # total=1, missing_embedding=0 - the DB-side check always "passes"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+
+class _FakeValidateConn:
+    def cursor(self):
+        return _FakeValidateCursor()
+
+    def close(self):
+        pass
+
+
+def _validate_store_with(metadata: dict) -> FakeStore:
+    store = FakeStore()
+    store.json["manifests/changeset.json"] = {
+        "new": ["doc1"], "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+    }
+    store.json["normalized/doc1.chunks.json"] = {
+        "doc_id": "doc1", "url": "https://example.test/1", "title": "Doc", "metadata": metadata,
+        "chunks": [],
+    }
+    return store
+
+
+def test_stage_validate_fails_closed_on_an_operational_chunk_missing_freshness_metadata():
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _validate_store_with({"domain": "knowledge.tech"})  # missing all three fields
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
+        try:
+            stage_validate(config, store)
+            raise AssertionError("expected SystemExit")
+        except SystemExit as exc:
+            assert "freshness" in str(exc) or "validation" in str(exc)
+
+
+def test_stage_validate_passes_a_complete_operational_chunk():
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _validate_store_with({
+        "domain": "knowledge.tech",
+        "source_modified_at": "2026-08-01T00:00:00Z",
+        "indexed_at": "2026-08-15T00:00:00Z",
+        "stale_after": "2026-08-22T00:00:00Z",
+    })
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
+        stage_validate(config, store)  # must not raise
+
+
+def test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement():
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy")
+    store = _validate_store_with({"domain": "knowledge.sxa-legacy"})  # missing all three, exempt
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
+        stage_validate(config, store)  # must not raise
+
+
+# --- WP-24 write-path invariant ---------------------------------------------
+
+
+def test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system():
+    """ADR-0205: "RAG stays write-free - a mutation of a source system
+    goes through a live tool capability, never through indexed
+    retrieval/ingestion." The fetch stages here only ever read from
+    Confluence/Salesforce/Aramis; the sole requests.post in this file is
+    _embed_batch's call to the embedding service (a compute call, not a
+    source-system mutation) - this test pins that down structurally so a
+    future fetch-stage edit can't silently start writing back to a
+    source."""
+    import inspect
+
+    for adapter in SOURCE_ADAPTERS.values():
+        source = inspect.getsource(adapter.fetch)
+        assert not re.search(r"requests\.(post|put|patch|delete)\s*\(", source), (
+            f"{adapter.stage} contains a write-shaped HTTP call - fetch stages must stay read-only"
+        )
+
+
 TESTS = [
     test_every_fetch_stage_has_an_adapter_bound_to_one_domain,
     test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write,
@@ -375,6 +546,16 @@ TESTS = [
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
     test_normalize_carries_domain_technology_and_extensions_into_metadata,
     test_normalize_defaults_missing_domain_to_the_run_domain,
+    test_parse_duration_spec_supports_days_hours_minutes_and_none,
+    test_parse_duration_spec_rejects_a_malformed_value,
+    test_parse_http_last_modified_handles_valid_missing_and_malformed,
+    test_normalize_computes_indexed_at_and_stale_after_from_the_duration_spec,
+    test_normalize_omits_stale_after_for_sxa_legacy_regardless_of_spec,
+    test_normalize_omits_stale_after_when_no_duration_is_configured,
+    test_stage_validate_fails_closed_on_an_operational_chunk_missing_freshness_metadata,
+    test_stage_validate_passes_a_complete_operational_chunk,
+    test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement,
+    test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system,
 ]
 
 

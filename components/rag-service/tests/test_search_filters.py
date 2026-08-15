@@ -17,12 +17,19 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
+import datetime as _dt
+
 from app.search import (  # noqa: E402
+    _FRESHNESS_UNTRUSTED_PENALTY_FACTOR,
     _LANGUAGE_BOOST,
+    _PROVENANCE_UNVERIFIABLE_WEIGHT,
     _STALE_PENALTY_FACTOR,
     _apply_soft_adjustments,
     _filter_clause,
+    _freshness_decay_factor,
+    _is_freshness_untrusted,
     _is_stale,
+    _row_to_doc,
 )
 
 
@@ -78,12 +85,85 @@ def test_stale_penalty_demotes_without_zeroing() -> None:
     assert 0 < fused["stale"] < fused["fresh"]
 
 
+def _row(metadata: dict, doc_id: str = "1") -> dict:
+    return {
+        "id": doc_id, "source": f"https://example.test/{doc_id}", "title": "Doc",
+        "content": "some content", "metadata": metadata,
+    }
+
+
+def test_fresh_beats_stale_at_equal_similarity() -> None:
+    """WP-24/ADR-0205 acceptance: two chunks fused to the same base score,
+    one past its stale_after and one not - the fresh one must rank
+    strictly ahead once trust scoring is applied, real metadata this time
+    (not the flag-only synthetic fixtures above)."""
+    fresh = _row_to_doc(_row({"stale_after": "2999-01-01", "indexed_at": "2026-08-01T00:00:00Z"}, "fresh"))
+    stale = _row_to_doc(_row({"stale_after": "2020-01-01", "indexed_at": "2026-08-01T00:00:00Z"}, "stale"))
+    fused = {"fresh": 0.05, "stale": 0.05}
+    docs_by_id = {"fresh": fresh, "stale": stale}
+    _apply_soft_adjustments(fused, docs_by_id, language=None)
+    assert fused["stale"] < fused["fresh"]
+    assert fused["stale"] > 0
+
+
+def test_missing_freshness_metadata_ranks_last_and_flags() -> None:
+    """A chunk in an operational domain with neither indexed_at nor
+    stale_after (pre-dates WP-24's ingestion enforcement) must be flagged
+    freshness_untrusted and ranked well below an equally-scored chunk that
+    does carry freshness metadata - never dropped, just de-prioritized."""
+    known = _row_to_doc(_row({"indexed_at": "2026-08-01T00:00:00Z"}, "known"))
+    unknown = _row_to_doc(_row({}, "unknown"))
+    assert unknown["freshness_untrusted"] is True
+    assert known["freshness_untrusted"] is False
+    fused = {"known": 0.05, "unknown": 0.05}
+    docs_by_id = {"known": known, "unknown": unknown}
+    _apply_soft_adjustments(fused, docs_by_id, language=None)
+    assert fused["unknown"] < fused["known"]
+    assert fused["unknown"] == 0.05 * _FRESHNESS_UNTRUSTED_PENALTY_FACTOR
+
+
+def test_sxa_legacy_is_exempt_from_the_freshness_untrusted_flag() -> None:
+    assert _is_freshness_untrusted("knowledge.sxa-legacy", {}) is False
+    assert _is_freshness_untrusted("knowledge.tech", {}) is True
+    assert _is_freshness_untrusted("knowledge.tech", {"stale_after": "2999-01-01"}) is False
+
+
+def test_freshness_decay_worsens_the_longer_a_chunk_has_been_stale() -> None:
+    today = _dt.date.today()
+    just_stale = (today - _dt.timedelta(days=1)).isoformat()
+    long_stale = (today - _dt.timedelta(days=365)).isoformat()
+    just_factor = _freshness_decay_factor(True, {"stale_after": just_stale})
+    long_factor = _freshness_decay_factor(True, {"stale_after": long_stale})
+    assert 0 < long_factor < just_factor <= _STALE_PENALTY_FACTOR
+
+
+def test_provenance_weight_prefers_a_real_url_over_a_fixture_marker() -> None:
+    # indexed_at set on both so neither trips the freshness_untrusted
+    # penalty - isolating the provenance-weight effect being tested here.
+    url_doc = _row_to_doc(_row(
+        {"provenance": "https://docs.example.test/page", "indexed_at": "2026-08-01T00:00:00Z"}, "url"
+    ))
+    fixture_doc = _row_to_doc(_row(
+        {"provenance": "zuno-demo-fixture", "indexed_at": "2026-08-01T00:00:00Z"}, "fixture"
+    ))
+    fused = {"url": 0.05, "fixture": 0.05}
+    docs_by_id = {"url": url_doc, "fixture": fixture_doc}
+    _apply_soft_adjustments(fused, docs_by_id, language=None)
+    assert fused["fixture"] == 0.05 * _PROVENANCE_UNVERIFIABLE_WEIGHT
+    assert fused["fixture"] < fused["url"]
+
+
 TESTS = [
     test_filter_clause_with_no_filters_still_enforces_acl,
     test_filter_clause_with_product_and_version_uses_sequential_placeholders,
     test_is_stale,
     test_language_boost_reorders_a_near_tie,
     test_stale_penalty_demotes_without_zeroing,
+    test_fresh_beats_stale_at_equal_similarity,
+    test_missing_freshness_metadata_ranks_last_and_flags,
+    test_sxa_legacy_is_exempt_from_the_freshness_untrusted_flag,
+    test_freshness_decay_worsens_the_longer_a_chunk_has_been_stale,
+    test_provenance_weight_prefers_a_real_url_over_a_fixture_marker,
 ]
 
 

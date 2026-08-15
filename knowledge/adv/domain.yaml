@@ -23,6 +23,14 @@ freshness:
     Aramis project state changes at a pace between tech's documentation
     cadence and sales' hours-scale cadence; the exact schedule is a
     per-deployment operational choice, not a fixed platform decision.
+  # Allowed staleness per operation class (WP-24 / ADR-0109) - between
+  # tech's and sales' windows, matching this domain's own cadence
+  # position above.
+  operation_classes:
+    semantic-read:
+      max_staleness: 1d
+    current-state-read:
+      max_staleness: 1h
 
 classification:
   default_by_source_type:

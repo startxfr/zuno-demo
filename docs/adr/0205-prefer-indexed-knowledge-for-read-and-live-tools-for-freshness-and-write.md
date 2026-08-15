@@ -1,6 +1,6 @@
 # ADR-0205: Prefer indexed knowledge for read and live tools for freshness and write
 
-- **Status:** To be implemented
+- **Status:** Implemented - see `components/rag-service/app/search.py`, `components/agent-runtime/app/`.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

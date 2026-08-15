@@ -117,6 +117,21 @@ def test_row_to_result_computes_staleness_via_shared_helper() -> None:
     assert doc["stale"] is True
 
 
+def test_row_to_result_flags_freshness_untrusted_via_shared_helper() -> None:
+    """WP-24/ADR-0205: same freshness-untrusted rule as
+    app/search.py:_row_to_doc, computed through the shared
+    _is_freshness_untrusted helper - schema parity between the two
+    providers is the ADR-0322 acceptance bar (this module's docstring)."""
+    untrusted = ogx_provider._row_to_result({"file_id": "x", "attributes": {}})
+    assert untrusted["freshness_untrusted"] is True
+
+    trusted = ogx_provider._row_to_result({"file_id": "y", "attributes": {"indexed_at": "2026-08-01T00:00:00Z"}})
+    assert trusted["freshness_untrusted"] is False
+
+    exempt = ogx_provider._row_to_result({"file_id": "z", "attributes": {"domain": "knowledge.sxa-legacy"}})
+    assert exempt["freshness_untrusted"] is False
+
+
 def test_ogx_search_without_endpoint_fails_loudly() -> None:
     _reset_provider_env(RAG_PROVIDER="ogx")
 
@@ -224,6 +239,7 @@ TESTS = [
     test_row_to_result_maps_openai_vector_store_shape,
     test_row_to_result_defaults_untagged_classification_to_c1,
     test_row_to_result_computes_staleness_via_shared_helper,
+    test_row_to_result_flags_freshness_untrusted_via_shared_helper,
     test_ogx_search_without_endpoint_fails_loudly,
     test_ogx_search_calls_the_documented_vector_store_search_url,
     test_ogx_search_applies_client_side_acl_and_product_filters_and_truncates_to_top_k,

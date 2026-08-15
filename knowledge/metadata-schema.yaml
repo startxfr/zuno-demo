@@ -94,7 +94,13 @@ common:
       The point past which this chunk should be treated as stale for
       ranking/trust-scoring purposes (WP-24 / ADR-0205), derived from the
       owning domain's freshness objective
-      (`knowledge/<domain>/domain.yaml`'s `freshness:` block).
+      (`knowledge/<domain>/domain.yaml`'s `freshness.operation_classes.
+      semantic-read.max_staleness`). A full ISO 8601 datetime (with an
+      offset or "Z"), not a bare date - components/rag-service/app/
+      search.py:_parse_stale_after accepts a bare date too (pre-WP-24
+      fixtures, treated as midnight UTC) but every value WP-24's ingestion
+      writes carries real sub-day precision, since knowledge.sales'
+      hours-scale objective needs it.
 
 domains:
   tech:

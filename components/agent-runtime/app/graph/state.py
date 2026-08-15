@@ -19,6 +19,16 @@ class RetrievedDoc(TypedDict, total=False):
     product: Optional[str]
     version: Optional[str]
     stale: bool
+    # ADR-0205/WP-24: which knowledge domain this doc came from - drives
+    # the freshness-sensitive-domain live-read trigger
+    # (app/graph/nodes.py:_live_read_trigger_reason). total=False because
+    # legacy/mocked callers may not populate it.
+    domain: str
+    # ADR-0205/WP-24: True when this chunk predates ingestion's metadata
+    # enforcement and its real freshness is unknown - rag-service already
+    # ranks it last; the runtime surfaces the same signal rather than
+    # silently trusting an untagged doc.
+    freshness_untrusted: bool
 
 
 class Citation(TypedDict):
@@ -56,3 +66,17 @@ class AgentState(TypedDict, total=False):
     # forces the model call to local-only inference regardless of what
     # effective_classification's own SaaS-eligibility would otherwise allow.
     local_only_required: bool
+
+    # ADR-0205/WP-24: why should_call_tools decided to trigger (or not) a
+    # live capability call this turn - "no silent substitution": recorded
+    # even when the trigger fired but no live capability was actually
+    # available/successful (tool_call_node's own errors list still
+    # explains that separately), so a trace/log always shows what was
+    # attempted, not just what ultimately succeeded.
+    live_read_trigger_reason: Optional[str]
+    # ADR-0205/WP-24 acceptance: "traces show whether a response used
+    # indexed knowledge, live verification, or both" - computed by
+    # respond_node from what actually ended up in the final answer
+    # (retrieved_docs / tool_results), never from what was merely
+    # attempted. One of "indexed" | "live" | "both" | "none".
+    source_mode: str

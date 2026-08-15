@@ -21,7 +21,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from app.auth import CallerIdentity, validate_token
 from app.graph.build import build_graph
 from app.schemas import ChatRequest, ChatResponse
-from app.telemetry import init_telemetry
+from app.telemetry import graph_run_span, init_telemetry
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("agent_runtime")
@@ -205,7 +205,10 @@ async def tekos_chat(
         )
 
     try:
-        final_state = await graph.ainvoke(initial_state, config=config)
+        with graph_run_span(payload.session_id) as recorder:
+            final_state = await graph.ainvoke(initial_state, config=config)
+            recorder.source_mode = final_state.get("source_mode", "none")
+            recorder.live_read_trigger_reason = final_state.get("live_read_trigger_reason")
     except Exception as exc:
         logger.error("graph execution failed for session=%s request_id=%s: %s", payload.session_id, request_id, exc)
         raise HTTPException(status_code=500, detail=f"agent workflow failed: {exc}") from exc
@@ -214,6 +217,7 @@ async def tekos_chat(
         reply=final_state.get("reply", ""),
         citations=final_state.get("citations", []),
         run_id=run_id,
+        source_mode=final_state.get("source_mode", "indexed"),
     )
 
 
@@ -244,6 +248,7 @@ async def _stream_chat(
     yield _sse("start", {"request_id": request_id, "run_id": run_id})
 
     citations: Any = []
+    source_mode = "indexed"
     try:
         async for event in graph.astream_events(initial_state, config=config, version="v2"):
             kind = event.get("event")
@@ -260,9 +265,12 @@ async def _stream_chat(
             elif kind == "on_chain_end" and name == "respond":
                 output = event["data"].get("output") or {}
                 citations = output.get("citations", [])
+                # ADR-0205/WP-24: same field the non-streaming response
+                # carries - the streaming path must not silently omit it.
+                source_mode = output.get("source_mode", "indexed")
     except Exception as exc:
         logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
         yield _sse("error", {"message": str(exc)})
         return
 
-    yield _sse("done", {"citations": citations})
+    yield _sse("done", {"citations": citations, "source_mode": source_mode})

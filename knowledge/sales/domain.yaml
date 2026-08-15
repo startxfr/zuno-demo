@@ -34,6 +34,18 @@ freshness:
     Salesforce records (opportunity status, quote state) change during a
     business day; a weekly cadence would make the domain stale for its own
     purpose.
+  # Allowed staleness per operation class (WP-24 / ADR-0109). A normal
+  # semantic sales question tolerates the ingestion cadence itself
+  # (ADR-0205 acceptance: answered from knowledge.sales, no live call);
+  # current-state-read is deliberately tight - a question asking for the
+  # CURRENT value of a mutable Salesforce field (stage, amount) must
+  # trigger live verification almost immediately once indexed data could
+  # plausibly be stale, per ADR-0205's own acceptance bullet.
+  operation_classes:
+    semantic-read:
+      max_staleness: 4h
+    current-state-read:
+      max_staleness: 5m
 
 classification:
   default_by_source_type:

@@ -32,7 +32,8 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -75,6 +76,43 @@ TECHNOLOGY_BY_PRODUCT_SLUG = {
     "red-hat-build-of-keycloak": "keycloak",
 }
 
+# ADR-0205/WP-24: the domains an operational-source freshness enforcement
+# applies to are every domain EXCEPT these - a mirror of
+# components/rag-service/app/search.py's own _IMMUTABLE_LEGACY_DOMAINS
+# constant. The two are intentionally maintained separately: ingestion and
+# rag-service are independently built/deployed images with no shared
+# Python package between them (the same reason the technology map above
+# and knowledge/tech/domain.yaml's vocabulary are a documented, manually
+# kept-in-sync pair rather than one shared source file).
+_IMMUTABLE_LEGACY_DOMAINS = {"knowledge.sxa-legacy"}
+_REQUIRED_FRESHNESS_FIELDS = ("source_modified_at", "indexed_at", "stale_after")
+
+_DURATION_RE = re.compile(r"^(\d+)([dhm])$")
+
+
+def _parse_duration_spec(spec: Optional[str]) -> Optional[timedelta]:
+    """Parses a knowledge/<domain>/domain.yaml-mirroring duration spec
+    ("7d", "4h", "5m") from the STALE_AFTER chart value into a timedelta;
+    "none"/absent (knowledge.sxa-legacy's on-demand objective, and any
+    domain that simply hasn't set one) means "never compute stale_after
+    for this run's chunks" - not "compute it as zero", which would mark
+    everything stale immediately."""
+    if not spec or spec.strip().lower() == "none":
+        return None
+    match = _DURATION_RE.match(spec.strip())
+    if not match:
+        raise SystemExit(
+            f"STALE_AFTER={spec!r} is not a valid duration spec - expected "
+            "'<int>d', '<int>h', '<int>m', or 'none'"
+        )
+    amount, unit = int(match.group(1)), match.group(2)
+    if unit == "d":
+        return timedelta(days=amount)
+    if unit == "h":
+        return timedelta(hours=amount)
+    return timedelta(minutes=amount)
+
+
 DOC_LINK_PATTERN = re.compile(r"/(html|html-single)/")
 MAX_DISCOVERED_LINKS = 50
 HTTP_TIMEOUT_SECONDS = 30
@@ -110,6 +148,13 @@ class IngestionConfig:
     # corpus bucket itself (ADR-0025: no dump ever lives in git).
     sxa_dump_s3_key: Optional[str]
     sxa_snapshot_id: Optional[str]
+
+    # ADR-0205/WP-24: this run's domain's freshness objective, realized as
+    # a duration spec ("7d"/"4h"/"5m"/"none") - see _parse_duration_spec.
+    # Mirrors knowledge/<domain>/domain.yaml's freshness.operation_classes.
+    # semantic-read.max_staleness (a human-maintained mirror, the same
+    # pattern WP-22 established for schedule.cron / freshness.objective).
+    stale_after_spec: Optional[str]
 
     s3_endpoint: str
     s3_bucket: str
@@ -194,6 +239,7 @@ def load_config() -> IngestionConfig:
         aramis_token=os.environ.get("ARAMIS_TOKEN"),
         sxa_dump_s3_key=os.environ.get("SXA_DUMP_S3_KEY"),
         sxa_snapshot_id=os.environ.get("SXA_SNAPSHOT_ID"),
+        stale_after_spec=os.environ.get("STALE_AFTER"),
         s3_endpoint=os.environ.get("S3_ENDPOINT", ""),
         s3_bucket=_env("S3_BUCKET", required=True),
         s3_region=os.environ.get("S3_REGION", ""),
@@ -298,6 +344,23 @@ def doc_id_for(url: str) -> str:
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_http_last_modified(value: Optional[str]) -> Optional[str]:
+    """ADR-0205/WP-24: best-effort source_modified_at signal for product
+    docs - docs.redhat.com pages carry no other last-modified field this
+    pipeline can read. Many pages omit this header entirely (returns None
+    then, same as if it were never attempted) - stage_normalize's fallback
+    to fetched_at covers that case, documented there."""
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _normalize_language(code: Optional[str]) -> str:
@@ -447,6 +510,7 @@ def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
                 "fetched_at": _utcnow_iso(),
                 "sha256": hashlib.sha256(page.text.encode("utf-8")).hexdigest(),
                 "provenance": url,
+                "last_modified": _parse_http_last_modified(page.headers.get("Last-Modified")),
             }
             technology = TECHNOLOGY_BY_PRODUCT_SLUG.get(source["productSlug"])
             if technology:
@@ -964,20 +1028,42 @@ def stage_normalize(config: IngestionConfig, store: CorpusStore) -> None:
         if not text.strip():
             logger.warning("normalize: %s produced no text after cleanup, skipping", raw["url"])
             continue
+        domain = raw.get("domain") or config.domain
+        # ADR-0205/WP-24: distinct fields, not the old conflated
+        # `last_modified` - source_modified_at is the SOURCE's own
+        # modification signal when the adapter captured one (Confluence's
+        # history.lastUpdated.when, Salesforce's LastModifiedDate, Aramis'
+        # updated_at/modified, or a best-effort HTTP Last-Modified header
+        # for product docs - see _fetch_redhat); when a source genuinely
+        # exposes none, `fetched_at` is the best available lower bound,
+        # not an invented value. indexed_at is always this pipeline's own
+        # clock at normalize time, independent of whatever the source
+        # reported - the two are only ever equal by coincidence now.
+        indexed_at_dt = datetime.now(timezone.utc)
+        indexed_at = indexed_at_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         metadata = {
             # ADR-0202/ADR-0204: records written before the domain field
             # existed are knowledge.tech by construction - the only domain
             # this pipeline ever served (same default rag-service applies).
-            "domain": raw.get("domain") or config.domain,
+            "domain": domain,
             "product": raw.get("product"),
             "version": raw.get("version"),
             "language": _normalize_language(raw.get("language")),
             "source_type": raw.get("source_type"),
             "classification": raw.get("classification", "C1"),
             "acl_groups": raw.get("acl_groups") or [],
-            "last_modified": raw.get("last_modified") or raw.get("fetched_at"),
+            "source_modified_at": raw.get("last_modified") or raw.get("fetched_at"),
+            "indexed_at": indexed_at,
             "provenance": raw.get("provenance") or raw.get("url"),
         }
+        # ADR-0205/WP-24: derived from this run's domain freshness
+        # objective (STALE_AFTER, mirroring knowledge/<domain>/domain.yaml)
+        # - omitted entirely (never set to a fake value) when the domain
+        # has no configured window, e.g. knowledge.sxa-legacy's on-demand
+        # objective (_IMMUTABLE_LEGACY_DOMAINS).
+        stale_duration = _parse_duration_spec(config.stale_after_spec)
+        if domain not in _IMMUTABLE_LEGACY_DOMAINS and stale_duration is not None:
+            metadata["stale_after"] = (indexed_at_dt + stale_duration).strftime("%Y-%m-%dT%H:%M:%SZ")
         if raw.get("technology"):
             metadata["technology"] = raw["technology"]
         # Per-domain metadata extensions (ADR-0202's metadata-schema.yaml)
@@ -1276,13 +1362,32 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
         return
 
     touched_urls = set()
+    freshness_failures = []
     for doc_id in changeset["new"] + changeset["changed"]:
         record = store.get_json(f"{config.normalized_prefix}/{doc_id}.chunks.json")
-        if record:
-            touched_urls.add(record["url"])
+        if not record:
+            continue
+        touched_urls.add(record["url"])
+
+        # ADR-0205/WP-24: operational-source chunks must carry the full
+        # freshness trio - checked against THIS run's own normalized state
+        # (the source of truth for what stage_normalize just computed),
+        # not re-derived from the database. knowledge.sxa-legacy is exempt
+        # (an immutable point-in-time snapshot, WP-22/ADR-0206) - every
+        # other domain fails closed on a missing field rather than
+        # silently indexing untrusted-forever content.
+        metadata = record.get("metadata") or {}
+        domain = metadata.get("domain", "knowledge.tech")
+        if domain not in _IMMUTABLE_LEGACY_DOMAINS:
+            missing = [f for f in _REQUIRED_FRESHNESS_FIELDS if not metadata.get(f)]
+            if missing:
+                freshness_failures.append(
+                    f"{record['url']}: domain '{domain}' chunk missing required freshness "
+                    f"metadata: {', '.join(missing)}"
+                )
 
     conn = _pg_connect(config)
-    failures = []
+    failures = list(freshness_failures)
     try:
         with conn.cursor() as cur:
             for url in touched_urls:

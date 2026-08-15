@@ -1,0 +1,57 @@
+{{- /*
+ADR-0109/WP-24: one alert per domain in .Values.freshnessLag.domains,
+firing when that domain's average retrieval-time lag (now - metadata.
+indexed_at, rag-service's app/telemetry.py:record_freshness_lag) exceeds
+its own freshness objective for sustained period - the domain is failing
+to meet the promise knowledge/<domain>/domain.yaml itself states. Same
+schema (monitoring.coreos.com/v1, confirmed live) and same "referencing
+an absent metric evaluates to 'no series', not an error" safety as
+templates/prometheusrule-slo.yaml - this rule carries the identical
+unverified-scrape-path caveat that one documents (whether OpenShift's
+User Workload Monitoring actually discovers the OTel Collector's :8889
+Prometheus exporter endpoint is a separate, live-cluster question this
+rule does not depend on to be schema-correct).
+
+Metric name (zuno_rag_freshness_lag_seconds_sum/_count) follows the same
+dots-to-underscores best-effort convention prometheusrule-slo.yaml's
+zuno_bff_requests_total already uses ahead of live confirmation - the
+OTel histogram is named zuno.rag_freshness_lag_seconds in
+components/rag-service/app/telemetry.py.
+*/ -}}
+{{- if and .Values.collector.enabled .Values.freshnessLag.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zuno-rag-freshness-lag
+  namespace: zuno-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  groups:
+    - name: zuno-rag-freshness-lag
+      rules:
+{{- range $domain, $spec := .Values.freshnessLag.domains }}
+        - alert: RagFreshnessLagExceeded{{ $domain | title | replace "-" "" }}
+          expr: >-
+            (
+              sum(rate(zuno_rag_freshness_lag_seconds_sum{domain="knowledge.{{ $domain }}"}[30m]))
+              /
+              sum(rate(zuno_rag_freshness_lag_seconds_count{domain="knowledge.{{ $domain }}"}[30m]))
+            ) > {{ $spec.thresholdSeconds }}
+          for: 15m
+          labels:
+            severity: ticket
+            adr: ADR-0109
+            domain: "knowledge.{{ $domain }}"
+          annotations:
+            summary: "knowledge.{{ $domain }} retrieval lag exceeds its own freshness objective"
+            description: >-
+              Average (now - indexed_at) for knowledge.{{ $domain }} chunks
+              returned over the last 30 minutes has exceeded this domain's
+              own freshness objective ({{ $spec.thresholdSeconds }}s, see
+              knowledge/{{ $domain }}/domain.yaml's freshness.
+              operation_classes.semantic-read.max_staleness) for at least
+              15 minutes - ingestion for this domain is falling behind its
+              own promise.
+{{- end }}
+{{- end }}

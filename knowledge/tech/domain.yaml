@@ -39,6 +39,23 @@ freshness:
   rationale: >-
     Product documentation and Confluence architecture/build/run content
     change on a documentation-release cadence, not continuously.
+  # Allowed staleness per operation class (WP-24 / ADR-0109): how long an
+  # indexed answer may lag the source before Agent Runtime's live-read
+  # trigger prefers/adds a live capability call over the indexed chunk
+  # alone. semantic-read (most questions) tolerates the documentation
+  # release cadence itself; current-state-read (an explicit "what does it
+  # say right now" ask) tolerates only a day - still indexed-first, since
+  # there is no live "current state" concept for documentation the way
+  # there is for a Salesforce field. Mirrored operationally as
+  # gitops/charts/rag-ingestion's STALE_AFTER chart value for this domain
+  # (components/rag-ingestion/src/rag_ingestion.py computes stale_after
+  # from semantic-read's window - the two are kept in sync manually, the
+  # same pattern schedule.cron/objective already established).
+  operation_classes:
+    semantic-read:
+      max_staleness: 7d
+    current-state-read:
+      max_staleness: 1d
 
 classification:
   default_by_source_type:

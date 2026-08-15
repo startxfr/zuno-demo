@@ -58,6 +58,12 @@ PHYSICAL_IDENTIFIER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# WP-24 (ADR-0109): freshness.operation_classes shape - a duration like
+# "7d"/"4h"/"5m" or the literal "none" (never/no computed window, the
+# knowledge.sxa-legacy convention).
+MAX_STALENESS_RE = re.compile(r"^(\d+[dhm]|none)$")
+REQUIRED_OPERATION_CLASSES = ("semantic-read", "current-state-read")
+
 # Excludes source-file references like `app/knowledge.py` (a "/" right
 # before "knowledge" means a path component, not a domain reference) and
 # common non-domain file extensions immediately after the dot - no real
@@ -133,6 +139,26 @@ def check_domain_descriptors() -> List[Finding]:
         expected_id = f"knowledge.{domain_dir.name}"
         if doc.get("id") != expected_id:
             findings.append(Finding("domain_descriptors", f"{label}: id {doc.get('id')!r} does not match directory-derived id {expected_id!r}"))
+
+        # WP-24 (ADR-0109): every domain's freshness block must declare an
+        # allowed-staleness window per operation class - the thresholds
+        # Agent Runtime's live-read trigger and rag-service's ingestion-
+        # side enforcement are meant to come from (not code, per this
+        # WP's ADR-0109 binding addition).
+        freshness = doc.get("freshness")
+        if isinstance(freshness, dict):
+            operation_classes = freshness.get("operation_classes")
+            if not isinstance(operation_classes, dict):
+                findings.append(Finding("domain_descriptors", f"{label}: freshness.operation_classes is missing or not a mapping"))
+            else:
+                for op_class in REQUIRED_OPERATION_CLASSES:
+                    entry = operation_classes.get(op_class)
+                    if not isinstance(entry, dict) or "max_staleness" not in entry:
+                        findings.append(Finding("domain_descriptors", f"{label}: freshness.operation_classes.{op_class}.max_staleness is missing"))
+                        continue
+                    value = entry["max_staleness"]
+                    if not isinstance(value, str) or not MAX_STALENESS_RE.match(value):
+                        findings.append(Finding("domain_descriptors", f"{label}: freshness.operation_classes.{op_class}.max_staleness={value!r} must be '<int>d', '<int>h', '<int>m', or 'none'"))
 
         for lineno, line in enumerate(text.splitlines(), start=1):
             # Only the YAML content is checked, never comment text - a

@@ -39,6 +39,16 @@ freshness:
   rationale: >-
     The source is a point-in-time dump snapshot, not a live system - there
     is nothing to poll on a schedule.
+  # "none" (WP-24 / ADR-0109): a chunk here never carries a computed
+  # stale_after and never trips the "freshness untrusted" trust-scoring
+  # penalty (components/rag-service/app/search.py) - exempt_from_
+  # freshness_enforcement above states the same rule for the ingestion
+  # metadata-enforcement side of WP-24.
+  operation_classes:
+    semantic-read:
+      max_staleness: none
+    current-state-read:
+      max_staleness: none
 
 classification:
   default_by_source_type:

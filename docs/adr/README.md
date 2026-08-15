@@ -78,7 +78,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v0.1 | Partially implemented | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | v0.1 | Partially implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Partially implemented | Automate model evaluation with LM-Eval |
-| [ADR-0109](0100-v0.1-roadmap.md#adr-0109-implement-source-freshness-and-trust-scoring) | v0.1 | Proposed | Implement source freshness and trust scoring |
+| [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | v0.1 | Implemented | Implement source freshness and trust scoring |
 | [ADR-0110](0100-v0.1-roadmap.md#adr-0110-automate-document-acl-synchronization) | v0.1 | Proposed | Automate document ACL synchronization |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | v0.1 | Partially implemented | Implement production-grade backup and recovery |
@@ -96,7 +96,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v0.2 | Implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v0.2 | Implemented | Enforce knowledge authorization as policy intersection |
 | [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Partially implemented | Generalize the RAG platform to multiple isolated knowledge domains |
-| [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | v0.2 | To be implemented | Prefer indexed knowledge for read and live tools for freshness and write |
+| [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | v0.2 | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.2 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v0.2 | To be implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | To be implemented | Introduce project-scoped agent memory |

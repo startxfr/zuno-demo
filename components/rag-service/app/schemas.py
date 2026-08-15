@@ -58,6 +58,12 @@ class SearchResult(BaseModel):
     # app/search.py:_row_to_doc), the same convention the domain filter
     # itself uses.
     domain: str = "knowledge.tech"
+    # ADR-0205/WP-24: true when an operational-domain chunk carries neither
+    # `indexed_at` nor `stale_after` - it predates this WP's ingestion
+    # metadata enforcement and its real freshness is unknown, never
+    # trusted by default. Distinct from `stale` (a known, expired
+    # freshness window) - this is "we don't know", not "we know it's old".
+    freshness_untrusted: bool = False
 
 
 class SearchResponse(BaseModel):

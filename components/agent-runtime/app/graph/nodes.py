@@ -48,6 +48,18 @@ _TOOL_TRIGGER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# ADR-0205/WP-24: domains whose current-state-read freshness window is
+# tight enough (knowledge/<domain>/domain.yaml's freshness.
+# operation_classes.current-state-read.max_staleness) that ANY retrieval
+# from them should prefer/add a live capability call, regardless of
+# whether the specific chunk retrieved happens to be individually stale -
+# "policy-marked freshness-sensitive source" (ADR-0205's live-read
+# trigger). A human-maintained mirror of that descriptor field, the same
+# pattern rag-ingestion's STALE_AFTER chart value already established
+# (this runtime does not mount knowledge/ at runtime, only
+# policies/knowledge/knowledge-policy.yaml - see app/knowledge.py).
+_FRESHNESS_SENSITIVE_DOMAINS = {"knowledge.sales"}
+
 # Mirrors policies/data-classification/classification.yaml's data_domains
 # (Track B is the source of truth; these are not independently authored
 # here - see that file's comments for the full policy). ADR-0034: the
@@ -192,9 +204,30 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     return {"retrieved_docs": docs, "effective_classification": effective_classification}
 
 
+def _live_read_trigger_reason(state: AgentState) -> Optional[str]:
+    """ADR-0205/WP-24 live-read trigger: any ONE of (1) an explicit user
+    current-state ask, (2) a policy-marked freshness-sensitive domain
+    among the retrieved docs, or (3) a retrieved doc whose stale_after has
+    already been exceeded, is enough to prefer/add a live capability call
+    over indexed retrieval alone. Returns the reason (for tracing and
+    "no silent substitution" - state.live_read_trigger_reason records
+    this even when tool_call_node then finds no live capability actually
+    available) or None when nothing triggers.
+    """
+    if _TOOL_TRIGGER_PATTERN.search(state.get("message", "")):
+        return "explicit current-state question"
+    for doc in state.get("retrieved_docs", []):
+        domain = doc.get("domain")
+        if domain in _FRESHNESS_SENSITIVE_DOMAINS:
+            return f"retrieved from freshness-sensitive domain '{domain}'"
+        if doc.get("stale"):
+            return f"retrieved document '{doc.get('source')}' exceeded its freshness window"
+    return None
+
+
 def should_call_tools(state: AgentState) -> str:
     """Conditional edge selector: decides whether the tool_call node runs."""
-    if _TOOL_TRIGGER_PATTERN.search(state.get("message", "")):
+    if _live_read_trigger_reason(state) is not None:
         return "tool_call"
     return "reason"
 
@@ -222,9 +255,15 @@ async def tool_call_node(state: AgentState) -> Dict[str, Any]:
     from the task, this degrades to "no tool context" locally instead of
     making a call the gateway would deny anyway.
     """
+    # ADR-0205/WP-24: recorded regardless of what follows - "no silent
+    # substitution" means the trace/state always shows WHY a live call was
+    # attempted, even if (as below) it then turns out no live capability
+    # is actually available for this turn.
+    trigger_reason = _live_read_trigger_reason(state)
+
     if "search_confluence" not in _ANSWER_TASK.allowed_tools:
         logger.warning("search_confluence is not in tekos's answer-technical-question.allowed_tools; skipping tool call")
-        return {"tool_results": {}}
+        return {"tool_results": {}, "live_read_trigger_reason": trigger_reason}
 
     escalated = _escalate(
         state.get("effective_classification", TEKOS_BASE_CLASSIFICATION), CONFLUENCE_CLASSIFICATION
@@ -240,12 +279,17 @@ async def tool_call_node(state: AgentState) -> Dict[str, Any]:
         )
     except McpClientError as exc:
         logger.warning("MCP Gateway tool call failed, continuing without live tool context: %s", exc)
-        return {"tool_results": {}, "errors": state.get("errors", []) + [f"tool_call: {exc}"]}
+        return {
+            "tool_results": {},
+            "errors": state.get("errors", []) + [f"tool_call: {exc}"],
+            "live_read_trigger_reason": trigger_reason,
+        }
 
     allow_external_context = result.get("external_model_policy", {}).get("allow_context", True)
     update: Dict[str, Any] = {
         "tool_results": {"search_confluence": result},
         "effective_classification": escalated,
+        "live_read_trigger_reason": trigger_reason,
     }
     if not allow_external_context:
         update["local_only_required"] = True
@@ -319,9 +363,29 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
     return {"reply": reply_text, "provider_used": provider.name}
 
 
+def _compute_source_mode(state: AgentState) -> str:
+    """ADR-0205 acceptance: "traces show whether a response used indexed
+    knowledge, live verification, or both" - computed from what actually
+    ended up contributing to this answer (non-empty retrieved_docs /
+    non-empty live tool results), never from whether a live call was
+    merely attempted (state.live_read_trigger_reason covers that
+    separately) - "no silent substitution" means the two must never be
+    conflated."""
+    used_indexed = bool(state.get("retrieved_docs"))
+    confluence = state.get("tool_results", {}).get("search_confluence") or {}
+    used_live = bool(confluence.get("result", {}).get("results"))
+    if used_indexed and used_live:
+        return "both"
+    if used_live:
+        return "live"
+    if used_indexed:
+        return "indexed"
+    return "none"
+
+
 async def respond_node(state: AgentState) -> Dict[str, Any]:
-    """Assembles the final `{reply, citations}` contract from retrieved
-    docs and any live tool results, de-duplicated.
+    """Assembles the final `{reply, citations, source_mode}` contract from
+    retrieved docs and any live tool results, de-duplicated.
     """
     citations = [
         {"source": doc["source"], "title": doc["title"]} for doc in state.get("retrieved_docs", [])
@@ -339,4 +403,4 @@ async def respond_node(state: AgentState) -> Dict[str, Any]:
             seen.add(key)
             deduped.append(citation)
 
-    return {"citations": deduped}
+    return {"citations": deduped, "source_mode": _compute_source_mode(state)}

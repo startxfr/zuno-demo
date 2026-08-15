@@ -60,13 +60,15 @@ OAuth/ABAC relative to Zuno's authorization boundary.
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import os
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app.search import _is_stale
+from app.search import _is_freshness_untrusted, _is_stale, _parse_stale_after
+from app.telemetry import record_freshness_lag
 
 logger = logging.getLogger("rag_service.ogx_provider")
 
@@ -166,6 +168,13 @@ def _row_to_result(row: Dict[str, Any]) -> Dict[str, Any]:
         "stale": _is_stale(attributes),
         # ADR-0202: same untagged-row default as app/search.py:_row_to_doc.
         "domain": attributes.get("domain", "knowledge.tech"),
+        # ADR-0205/WP-24: same rule as app/search.py:_row_to_doc - schema
+        # parity between providers is the ADR-0322 acceptance bar (this
+        # module's docstring), not ranking-algorithm parity, so this
+        # module surfaces the flag without re-ranking OGX's own ordering.
+        "freshness_untrusted": _is_freshness_untrusted(
+            attributes.get("domain", "knowledge.tech"), attributes
+        ),
         "_attributes": attributes,  # internal only, stripped before return
     }
 
@@ -220,8 +229,17 @@ async def ogx_search(
     filtered = []
     for row in rows:
         doc = _row_to_result(row)
-        if not _passes_filters(doc.pop("_attributes"), product, version, caller_groups, domains, technology):
+        attributes = doc.pop("_attributes")
+        if not _passes_filters(attributes, product, version, caller_groups, domains, technology):
             continue
+        # ADR-0109/WP-24: only for results actually returned - same rule
+        # as app/search.py:_record_freshness_lag.
+        indexed_at = attributes.get("indexed_at")
+        if indexed_at:
+            parsed = _parse_stale_after(indexed_at)
+            if parsed is not None:
+                lag_seconds = (_dt.datetime.now(_dt.timezone.utc) - parsed).total_seconds()
+                record_freshness_lag(doc["domain"], max(lag_seconds, 0.0))
         filtered.append(doc)
         if len(filtered) >= top_k:
             break
