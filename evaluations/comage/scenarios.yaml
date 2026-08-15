@@ -4,7 +4,7 @@
 # README.md for required environment variables and personas).
 #
 # `persona` values are anonymized synthetic usernames from
-# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `sales-user-01`/
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `sale-01`/
 # `-02` hold both the `sales` business role (governs tool/data permissions
 # inside Comage, per agent.okf.md's own body prose) and the `agent_comage`
 # entitlement group (ADR-0040) - see security_checks.py for the negative
@@ -18,7 +18,7 @@ scenarios:
   - id: 1
     title: Portal loads all agent tiles
     type: portal_lists_all_agents
-    persona: sales-user-01
+    persona: sale-01
 
   - id: 2
     title: Unauthenticated request to the portal redirects to login
@@ -27,27 +27,27 @@ scenarios:
   - id: 3
     title: Sales persona can authenticate and the token carries the expected group claims
     type: keycloak_login
-    persona: sales-user-01
+    persona: sale-01
     expect_groups: [sales, agent_comage]
 
   - id: 4
     title: Comage tile is enabled for a sales-group, agent_comage-entitled user
     type: portal_tile_state
-    persona: sales-user-01
+    persona: sale-01
     agent: comage
     expect_enabled: true
 
   - id: 5
     title: Comage tile is disabled for a non-entitled user (board persona)
     type: portal_tile_state
-    persona: board-user-01
+    persona: board-01
     agent: comage
     expect_enabled: false
 
   - id: 6
     title: Placeholder agent tile (Advantage) shows "coming soon" for any user
     type: portal_tile_state
-    persona: sales-user-01
+    persona: sale-01
     agent: advantage
     expect_enabled: false
     expect_placeholder: true
@@ -55,26 +55,26 @@ scenarios:
   - id: 7
     title: An ordinary deal-status question returns a reply with citations
     type: chat_basic_qa
-    persona: sales-user-01
+    persona: sale-01
     message: "What's the status of the Acme Renewal deal and does it have a client PO yet?"
 
   - id: 8
     title: First-token latency is under the 6-second interactive objective
     type: chat_first_token_latency
-    persona: sales-user-02
+    persona: sale-02
     message: "Summarize the Acme Renewal opportunity."
     max_seconds: 6
 
   - id: 9
     title: Streaming chat emits token events followed by a done event
     type: chat_streaming_sse
-    persona: sales-user-01
+    persona: sale-01
     message: "Summarize the Acme Renewal deal in one sentence."
 
   - id: 10
     title: A current-value question triggers a live Salesforce read, visible in citations
     type: chat_triggers_tool
-    persona: sales-user-01
+    persona: sale-01
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
     expect_tool: salesforce.opportunity.read
     # ADR-0326/WP-33: Comage's live_read_tool is Salesforce, not
@@ -90,7 +90,7 @@ scenarios:
   - id: 12
     title: MCP Gateway denies a Salesforce tool call outside the caller's allowed groups
     type: mcp_gateway_denied
-    persona: board-user-01
+    persona: board-01
     tool: salesforce.opportunity.read
     arguments: { query: "Acme Renewal" }
     expect_status: 403
@@ -98,7 +98,7 @@ scenarios:
   - id: 13
     title: MCP Gateway returns 404 for an unknown tool name
     type: mcp_gateway_unknown_tool
-    persona: sales-user-01
+    persona: sale-01
     tool: does_not_exist
     expect_status: 404
 
@@ -119,12 +119,12 @@ scenarios:
   - id: 17
     title: BFF rejects a JWT with the wrong audience
     type: bff_rejects_wrong_audience
-    persona: sales-user-01
+    persona: sale-01
 
   - id: 18
     title: MCP Gateway denies sxa.opportunity.search for check-deal-status, which doesn't declare it even though compare-historical-deals does (ADR-0036 task_rights factor narrows the agent's own declaration)
     type: mcp_gateway_denied
-    persona: sales-user-01
+    persona: sale-01
     tool: sxa.opportunity.search
     arguments: { }
     expect_status: 403

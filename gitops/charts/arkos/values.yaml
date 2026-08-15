@@ -56,13 +56,15 @@ bff:
       memory: 256Mi
   oidcAudience: arkos-frontend
 
-# ADR-0040: agent entitlement group, orthogonal to the `board` business
-# role that governs tool/data permissions inside Arkos - matches
-# agents/arkos/agent.okf.md's own zuno.access.groups.
+# ADR-0040: agent entitlement group, orthogonal to the `consultant`
+# business role that governs tool/data permissions inside Arkos
+# (ADR-0349 moved Arkos's audience from board to the consultant
+# architect tier) - matches agents/arkos/agent.okf.md's own
+# zuno.access.groups.
 groups:
   entitlementGroup: agent_arkos
   businessRoles:
-    - board
+    - consultant
 
 # Union of every agents/arkos/tasks/*.md file's own allowed_knowledge -
 # the deployment-time binding requirement, not the per-task grant (that

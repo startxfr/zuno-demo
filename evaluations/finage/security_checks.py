@@ -80,7 +80,7 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
     """
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
-        headers=auth_headers("finance-user-01"),
+        headers=auth_headers("finance-01"),
         json={"session_id": "sec-check-1", "message": "What invoices are outstanding for the Acme account?"},
         timeout=30,
     )
@@ -95,7 +95,7 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
 def runtime_ignores_mismatched_user_sub() -> CheckResult:
     """ADR-0033: a request body's user_sub is informational only - the
     Runtime must derive the authoritative subject from the validated token,
-    not this field. Submitting a token for a real persona (finance-user-01)
+    not this field. Submitting a token for a real persona (finance-01)
     with a body user_sub claiming to be an unrelated, nonexistent identity
     must not be rejected or otherwise change the outcome (impersonation via
     the body field is impossible because the field is never trusted).
@@ -105,7 +105,7 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers("finance-user-01"),
+        headers=auth_headers("finance-01"),
         json={
             "session_id": "sec-check-2",
             "user_sub": forged_sub,
@@ -173,7 +173,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     resp = httpx.post(
         f"{AI_GATEWAY_URL}/v1/chat/completions",
         headers={
-            **auth_headers("finance-user-01"),
+            **auth_headers("finance-01"),
             "X-Zuno-Data-Classification": "C2",
             "X-Zuno-Local-Only": "true",
         },

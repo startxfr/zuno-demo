@@ -1,6 +1,6 @@
 # ADR-0349: Restructure demo personas, ocp-* cluster-access groups and two new agents
 
-- **Status:** Proposed
+- **Status:** Partially implemented (realm restructure, ocp-* RBAC, ArgoCD policy, soursage/cognos and evaluation renames merged; realm re-apply + live RBAC/ArgoCD/login verification pending)
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team
@@ -124,6 +124,19 @@ Two cluster-admin paths exist after this change: the `ocp-paas-ops` group and th
 ## Implementation state
 
 This ADR records an agreed architectural change from the 2026-08-14 persona review. No implementation is claimed by this ADR. The status remains `Proposed` until the realm, RBAC, ArgoCD, Vault-seed, OKF and evaluation changes land through follow-up work packages and `make check` demonstrates the behavior described here.
+
+### Implementation note (2026-08-15)
+
+The repo side is merged, in two commits (soursage/cognos first, then the persona/RBAC restructure). Because this ADR was written on 2026-08-14 — before WP-33 through WP-42 landed — four deliberate, documented deviations reconcile it with what the repository had become by implementation time; none changes the ADR's direction:
+
+1. **`finance-01`/`finance-02` are kept** (renamed from `finance-user-0N`, still `/finance` + `/agent_finage`). The ADR removed them when Finage was a placeholder; WP-36 then made Finage a real agent whose tools gate on the `finance` role and whose 20-scenario suite authenticates finance personas — removing every `finance` member would have orphaned a working slice. The ADR's own reasoning ("/finance survives because tool-policy references it") extends naturally to keeping the members that exercise it.
+2. **All 11 ADR-0040 negative-test fixtures are kept**, not just the two the ADR names — WP-31/33/35/36/41 each added an entitlement-only (and most a role-only) fixture that its agent's own `security_checks.py` authenticates. Same "no other persona can exercise this check" logic the ADR itself applied to `consultant-role-only-user-01`.
+3. **`consultant-01` additionally holds `/agent_naveo` and the persona/client model covers naveo/soursage/cognos** — Naveo (WP-41) postdates the ADR's matrix; the two new agents' clients follow the original public-SPA placeholder pattern the ADR describes via "comage pattern" (comage has since become confidential, as every built agent's frontend must be).
+4. **Arkos's audience followed the archi-tier move**: with the `confluence-archi-*` subgroups under `/consultant` and `agent_arkos` carried by `consultant-01/02` (this ADR's own matrix gives `board-01/02` no `agent_arkos`), Arkos's business role is now `consultant` — its bundle/chart/CR-sample prose and its evaluation suite moved accordingly, and the advantage/finage "tile disabled for a board persona" negative scenarios were repointed at genuinely non-entitled personas since `board-01` now legitimately holds `agent_advantage`/`agent_finage`. The `/board`→`/consultant` archi-group migration itself had already landed via WP-32.
+
+Also merged: the four `ocp-*` groups + `/recrut` (old `admin`/`zuno-admin`/`aidev`/`aiops` groups and `platform-admin-01`/`zuno-admin-01` removed), the `openshift-rbac-groups` chart rewiring (`ocp-paas-ops`→cluster-admin, `ocp-paas-dev`→cluster-reader, `ocp-ai-dev`→edit and `ocp-ai-ops`→admin ranged over the discovered namespace set), the ArgoCD `rbac.policy` block from §5, `zuno_admin_demo_personas_root_password: "secretdemerde"` decoupled in `auto.yml`, the 107 persona-reference renames across all six evaluation suites, and the doc-count refresh (`ansible/roles/keycloak/README.md`, `externalsecret-demo-personas.yaml`, `platform/identity/README.md`, `MEMORY.md`).
+
+Remaining to close (live): realm re-apply (`KeycloakRealmImport` is create-only — re-provision or apply via the admin API on an existing cluster), delete the stale `admin`/`zuno-admin`/`aidev`/`aiops` `Group` objects, delete + re-seed `zuno/keycloak/demo-personas` for the new init password, then verify: an `ocp-paas-ops` login reaches cluster-admin + ArgoCD `role:admin`, `ocp-paas-dev` reads cluster-wide + syncs zuno apps, the AI profiles get their namespace-scoped roles, a renamed persona receives mail at its plus-address, and `make check` passes with the renamed personas.
 
 See [Standard clauses](README.md#standard-clauses) for Acceptance criteria, Migration/evolution and Review evidence.
 

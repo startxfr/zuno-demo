@@ -1,8 +1,9 @@
 apiVersion: v2
 name: openshift-rbac-groups
 description: >-
-  ADR-0320: static RBAC bindings for the platform/cluster-operator
-  Keycloak groups (admin, zuno-admin, aidev, aiops) - OpenShift OAuth
+  ADR-0349 (ex ADR-0320): static RBAC bindings for the cluster-access
+  Keycloak groups (ocp-paas-ops, ocp-paas-dev, ocp-ai-dev, ocp-ai-ops) -
+  OpenShift OAuth
   already syncs Group membership from the token's groups claim on every
   login (mappingMethod: add), so these bindings need no active
   reconciliation, only to exist; GitOps re-applies them whenever the

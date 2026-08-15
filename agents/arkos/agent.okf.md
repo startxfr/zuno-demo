@@ -28,8 +28,12 @@ zuno:
       Placeholder pending v1 build; C3 anticipated because sovereign-marked
       DAT workflows are local-model-only per MEMORY.md section 5.
   access:
-    # ADR-0040: agent entitlement group, orthogonal to the `board` business
-    # role that governs tool/data permissions inside Arkos.
+    # ADR-0040: agent entitlement group, orthogonal to the `consultant`
+    # business role that governs tool/data permissions inside Arkos
+    # (ADR-0349: architects are the consultant tier - the
+    # confluence-archi-* skill subgroups live under /consultant - so
+    # Arkos's audience moved from board to consultant; `board` means
+    # Direction only).
     groups:
       - agent_arkos
   ui:
@@ -62,9 +66,12 @@ ceiling is the union of its one task's own `zuno.allowed_knowledge` -
 today `[knowledge.tech, knowledge.project]`.
 
 Access group is `agent_arkos` (ADR-0040 entitlement dimension, orthogonal
-to the `board` business role that governs tool/data permissions inside
-Arkos once active - see `policies/tools/tool-policy.yaml`'s
-`drive.document.*`/`confluence.page.*` entries): DATs are reviewed and
-approved at board level, so `board` gates what an already-entitled Arkos
-session can actually do, matching every other agent's ADR-0040 dimension
-split.
+to the `consultant` business role that governs tool/data permissions
+inside Arkos once active - see `policies/tools/tool-policy.yaml`'s
+`drive.document.*`/`confluence.page.*` entries, both of which list
+`consultant`). ADR-0349 moved Arkos's audience from board to the
+consultant architect tier (the `confluence-archi-*` skill subgroups live
+under `/consultant`; `board` means Direction only) - DATs are still
+*reviewed* at board level as a business process, but the role gating an
+already-entitled Arkos session is `consultant`, matching every other
+agent's ADR-0040 dimension split.

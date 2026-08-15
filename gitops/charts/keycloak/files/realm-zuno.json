@@ -332,90 +332,112 @@
             }
         },
         {
-            "name": "admin",
-            "path": "/admin",
+            "name": "recrut",
+            "path": "/recrut",
             "attributes": {
                 "description": [
-                    "ADR-0320 platform-administrator profile \u2014 bound to cluster-admin via gitops/charts/openshift-rbac-groups; orthogonal to the agent_<name>/business-role dimensions above, gates cluster/Console access, not agent-app access"
+                    "ADR-0349 recruiting business role \u2014 gates future Soursage tools in policies/tools/tool-policy.yaml (no entries yet, same reserved posture /finance had before Finage); does not by itself grant any frontend access"
                 ]
             }
         },
         {
-            "name": "zuno-admin",
-            "path": "/zuno-admin",
+            "name": "ocp-paas-ops",
+            "path": "/ocp-paas-ops",
             "attributes": {
                 "description": [
-                    "ADR-0320 Zuno-administrator profile \u2014 bound to the admin ClusterRole in every namespace labeled zuno.io/managed=true"
+                    "ADR-0349 cluster-access dimension (replaces ADR-0320's admin/zuno-admin) \u2014 bound to cluster-admin via gitops/charts/openshift-rbac-groups and to role:admin in ArgoCD; orthogonal to the agent_<name>/business-role dimensions above, gates cluster/Console access, not agent-app access"
                 ]
             }
         },
         {
-            "name": "aidev",
-            "path": "/aidev",
+            "name": "ocp-paas-dev",
+            "path": "/ocp-paas-dev",
             "attributes": {
                 "description": [
-                    "ADR-0320 AI-developer profile \u2014 bound to edit in zuno-ai-build"
+                    "ADR-0349 cluster-access dimension \u2014 bound to cluster-reader (read everything cluster-wide, write nothing) and to the zuno-paas-dev ArgoCD role (get/sync on zuno applications)"
                 ]
             }
         },
         {
-            "name": "aiops",
-            "path": "/aiops",
+            "name": "ocp-ai-dev",
+            "path": "/ocp-ai-dev",
             "attributes": {
                 "description": [
-                    "ADR-0320 AI-Ops profile \u2014 bound to edit in zuno-ai-build and zuno-ai-run"
+                    "ADR-0349 cluster-access dimension (replaces ADR-0320's aidev) \u2014 bound to edit as RoleBindings over the live-discovered zuno.io/managed=true namespace set; no ClusterRole"
+                ]
+            }
+        },
+        {
+            "name": "ocp-ai-ops",
+            "path": "/ocp-ai-ops",
+            "attributes": {
+                "description": [
+                    "ADR-0349 cluster-access dimension (replaces ADR-0320's aiops and zuno-admin's per-namespace admin) \u2014 bound to admin as RoleBindings over the live-discovered zuno.io/managed=true namespace set; no ClusterRole"
                 ]
             }
         }
     ],
-    "users": [{
-            "username": "sales-user-01",
-            "email": "sales-user-01@zuno-demo.internal",
+    "users": [
+        {
+            "username": "sale-01",
+            "email": "dev+zuno-sale01@startx.fr",
+            "firstName": "Sale01",
+            "lastName": "FrontOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Sales"
+                    "Sales Representative"
                 ]
             },
             "groups": [
                 "/sales",
-                "/agent_comage"
+                "/agent_comage",
+                "/agent_finage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "sales-user-02",
-            "email": "sales-user-02@zuno-demo.internal",
+            "username": "sale-02",
+            "email": "dev+zuno-sale02@startx.fr",
+            "firstName": "Sale02",
+            "lastName": "FrontOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Sales Management"
+                    "Sales Representative"
                 ]
             },
             "groups": [
                 "/sales",
-                "/agent_comage"
+                "/agent_comage",
+                "/agent_soursage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "consultant-user-01",
-            "email": "consultant-user-01@zuno-demo.internal",
+            "username": "consultant-01",
+            "email": "dev+zuno-consultant01@startx.fr",
+            "firstName": "Consultant01",
+            "lastName": "FrontOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Technical Consultant"
+                    "Technical Consultant (architect tier)"
                 ]
             },
             "groups": [
@@ -426,41 +448,55 @@
                 "/consultant/confluence-archi-openshift",
                 "/consultant/confluence-archi-openshift-ai",
                 "/consultant/confluence-archi-keycloak",
+                "/agent_comage",
                 "/agent_tekos",
                 "/agent_arkos",
                 "/agent_naveo"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "consultant-user-02",
-            "email": "consultant-user-02@zuno-demo.internal",
+            "username": "consultant-02",
+            "email": "dev+zuno-consultant02@startx.fr",
+            "firstName": "Consultant02",
+            "lastName": "FrontOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Technical Consultant"
+                    "Technical Consultant (architect tier)"
                 ]
             },
             "groups": [
                 "/consultant",
                 "/consultant/confluence-build-openshift",
                 "/consultant/confluence-build-openshift-ai",
-                "/agent_tekos"
+                "/consultant/confluence-archi-satellite",
+                "/consultant/confluence-archi-openshift",
+                "/consultant/confluence-archi-openshift-ai",
+                "/consultant/confluence-archi-keycloak",
+                "/agent_tekos",
+                "/agent_arkos"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "consultant-user-03",
-            "email": "consultant-user-03@zuno-demo.internal",
+            "username": "consultant-03",
+            "email": "dev+zuno-consultant03@startx.fr",
+            "firstName": "Consultant03",
+            "lastName": "FrontOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
@@ -474,131 +510,282 @@
                 "/consultant/confluence-run-keycloak",
                 "/agent_tekos"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "adv-user-01",
-            "email": "adv-user-01@zuno-demo.internal",
+            "username": "adv-01",
+            "email": "dev+zuno-adv01@startx.fr",
+            "firstName": "ADV1",
+            "lastName": "MiddleOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Sales Administration"
+                    "Sales Administrator (ADV)"
                 ]
             },
             "groups": [
                 "/adv",
                 "/agent_advantage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "adv-user-02",
-            "email": "adv-user-02@zuno-demo.internal",
+            "username": "adv-02",
+            "email": "dev+zuno-adv02@startx.fr",
+            "firstName": "ADV2",
+            "lastName": "MiddleOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Sales Administration"
+                    "Sales Administrator (ADV)"
                 ]
             },
             "groups": [
                 "/adv",
                 "/agent_advantage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "finance-user-01",
-            "email": "finance-user-01@zuno-demo.internal",
+            "username": "finance-01",
+            "email": "dev+zuno-finance01@startx.fr",
+            "firstName": "Finance01",
+            "lastName": "MiddleOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Finance"
+                    "Finance Analyst"
                 ]
             },
             "groups": [
                 "/finance",
                 "/agent_finage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "finance-user-02",
-            "email": "finance-user-02@zuno-demo.internal",
+            "username": "finance-02",
+            "email": "dev+zuno-finance02@startx.fr",
+            "firstName": "Finance02",
+            "lastName": "MiddleOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Finance"
+                    "Finance Analyst"
                 ]
             },
             "groups": [
                 "/finance",
                 "/agent_finage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "board-user-01",
-            "email": "board-user-01@zuno-demo.internal",
+            "username": "board-01",
+            "email": "dev+zuno-board01@startx.fr",
+            "firstName": "Board1",
+            "lastName": "BackOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Board Member"
+                    "Board / Direction"
                 ]
             },
             "groups": [
                 "/board",
-                "/agent_arkos"
+                "/agent_advantage",
+                "/agent_finage",
+                "/agent_cognos"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
-            "username": "board-user-02",
-            "email": "board-user-02@zuno-demo.internal",
+            "username": "board-02",
+            "email": "dev+zuno-board02@startx.fr",
+            "firstName": "Board2",
+            "lastName": "BackOffice",
             "enabled": true,
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "Board Member"
+                    "Board / Direction"
                 ]
             },
             "groups": [
                 "/board",
-                "/agent_arkos"
+                "/agent_advantage",
+                "/agent_finage",
+                "/agent_cognos"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
+        },
+        {
+            "username": "recrut-01",
+            "email": "dev+zuno-recrut01@startx.fr",
+            "firstName": "Recrut01",
+            "lastName": "BackOffice",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "Recruiter"
+                ]
+            },
+            "groups": [
+                "/recrut",
+                "/agent_comage",
+                "/agent_soursage"
+            ],
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
+        },
+        {
+            "username": "ai-dev-01",
+            "email": "dev+zuno-aidev01@startx.fr",
+            "firstName": "AI_Dev",
+            "lastName": "BackOffice",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "AI Developer"
+                ]
+            },
+            "groups": [
+                "/ocp-ai-dev",
+                "/agent_tekos"
+            ],
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
+        },
+        {
+            "username": "ai-ops-01",
+            "email": "dev+zuno-aiops01@startx.fr",
+            "firstName": "AI_Ops",
+            "lastName": "BackOffice",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "AI Operations"
+                ]
+            },
+            "groups": [
+                "/ocp-ai-ops",
+                "/agent_tekos"
+            ],
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
+        },
+        {
+            "username": "paas-dev-01",
+            "email": "dev+zuno-paasdev01@startx.fr",
+            "firstName": "PaaS_Dev",
+            "lastName": "BackOffice",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "PaaS Developer"
+                ]
+            },
+            "groups": [
+                "/ocp-paas-dev",
+                "/agent_tekos"
+            ],
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
+        },
+        {
+            "username": "paas-ops-01",
+            "email": "dev+zuno-paasops01@startx.fr",
+            "firstName": "PaaS_Ops",
+            "lastName": "BackOffice",
+            "enabled": true,
+            "emailVerified": true,
+            "attributes": {
+                "jobTitle": [
+                    "PaaS Operations"
+                ]
+            },
+            "groups": [
+                "/ocp-paas-ops",
+                "/agent_tekos"
+            ],
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "tekos-entitlement-only-user-01",
@@ -613,11 +800,13 @@
             "groups": [
                 "/agent_tekos"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "consultant-role-only-user-01",
@@ -632,11 +821,13 @@
             "groups": [
                 "/consultant"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "arkos-entitlement-only-user-01",
@@ -651,11 +842,13 @@
             "groups": [
                 "/agent_arkos"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "board-role-only-user-01",
@@ -664,17 +857,19 @@
             "emailVerified": true,
             "attributes": {
                 "jobTitle": [
-                    "ADR-0040 negative-test fixture (ADR-0326/WP-31): board business role without agent_arkos entitlement"
+                    "ADR-0040 negative-test fixture: board business role without any agent entitlement - originally Arkos's converse case (ADR-0326/WP-31); since ADR-0349 moved Arkos to the consultant tier, forward-reserved for Cognos (board-audience agent, no agent_cognos here)"
                 ]
             },
             "groups": [
                 "/board"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "comage-entitlement-only-user-01",
@@ -689,11 +884,13 @@
             "groups": [
                 "/agent_comage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "sales-role-only-user-01",
@@ -708,11 +905,13 @@
             "groups": [
                 "/sales"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "advantage-entitlement-only-user-01",
@@ -727,11 +926,13 @@
             "groups": [
                 "/agent_advantage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "adv-role-only-user-01",
@@ -746,11 +947,13 @@
             "groups": [
                 "/adv"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "finage-entitlement-only-user-01",
@@ -765,11 +968,13 @@
             "groups": [
                 "/agent_finage"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "finance-role-only-user-01",
@@ -784,11 +989,13 @@
             "groups": [
                 "/finance"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         },
         {
             "username": "naveo-entitlement-only-user-01",
@@ -803,87 +1010,13 @@
             "groups": [
                 "/agent_naveo"
             ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
-        },
-        {
-            "username": "platform-admin-01",
-            "email": "platform-admin-01@zuno-demo.internal",
-            "enabled": true,
-            "emailVerified": true,
-            "attributes": {
-                "jobTitle": [
-                    "ADR-0320 platform-administrator demo persona"
-                ]
-            },
-            "groups": [
-                "/admin"
-            ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
-        },
-        {
-            "username": "zuno-admin-01",
-            "email": "zuno-admin-01@zuno-demo.internal",
-            "enabled": true,
-            "emailVerified": true,
-            "attributes": {
-                "jobTitle": [
-                    "ADR-0320 Zuno-administrator demo persona"
-                ]
-            },
-            "groups": [
-                "/zuno-admin"
-            ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
-        },
-        {
-            "username": "ai-dev-01",
-            "email": "ai-dev-01@zuno-demo.internal",
-            "enabled": true,
-            "emailVerified": true,
-            "attributes": {
-                "jobTitle": [
-                    "ADR-0320 AI-developer demo persona"
-                ]
-            },
-            "groups": [
-                "/aidev"
-            ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
-        },
-        {
-            "username": "ai-ops-01",
-            "email": "ai-ops-01@zuno-demo.internal",
-            "enabled": true,
-            "emailVerified": true,
-            "attributes": {
-                "jobTitle": [
-                    "ADR-0320 AI-Ops demo persona"
-                ]
-            },
-            "groups": [
-                "/aiops"
-            ],
-            "credentials": [{
-                "type": "password",
-                "value": "${vault.demo_personas_password}",
-                "temporary": false
-            }]
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "${vault.demo_personas_password}",
+                    "temporary": false
+                }
+            ]
         }
     ],
     "clients": [{

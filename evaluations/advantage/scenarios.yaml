@@ -4,7 +4,7 @@
 # see README.md for required environment variables and personas).
 #
 # `persona` values are anonymized synthetic usernames from
-# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `adv-user-01`/
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `adv-01`/
 # `-02` hold both the `adv` business role (governs tool/data permissions
 # inside Advantage, per agent.okf.md's own body prose) and the
 # `agent_advantage` entitlement group (ADR-0040) - see security_checks.py
@@ -19,7 +19,7 @@ scenarios:
   - id: 1
     title: Portal loads all agent tiles
     type: portal_lists_all_agents
-    persona: adv-user-01
+    persona: adv-01
 
   - id: 2
     title: Unauthenticated request to the portal redirects to login
@@ -28,27 +28,30 @@ scenarios:
   - id: 3
     title: ADV persona can authenticate and the token carries the expected group claims
     type: keycloak_login
-    persona: adv-user-01
+    persona: adv-01
     expect_groups: [adv, agent_advantage]
 
   - id: 4
     title: Advantage tile is enabled for an adv-group, agent_advantage-entitled user
     type: portal_tile_state
-    persona: adv-user-01
+    persona: adv-01
     agent: advantage
     expect_enabled: true
 
   - id: 5
-    title: Advantage tile is disabled for a non-entitled user (board persona)
+    # ADR-0349: was board-01 - board-01 now HOLDS agent_advantage
+    # (the ADR's own persona matrix), so a sales persona (no
+    # agent_advantage) carries this negative proof instead.
+    title: Advantage tile is disabled for a non-entitled user (sales persona)
     type: portal_tile_state
-    persona: board-user-01
+    persona: sale-01
     agent: advantage
     expect_enabled: false
 
   - id: 6
     title: Placeholder agent tile (Finage) shows "coming soon" for any user
     type: portal_tile_state
-    persona: adv-user-01
+    persona: adv-01
     agent: finage
     expect_enabled: false
     expect_placeholder: true
@@ -56,20 +59,20 @@ scenarios:
   - id: 7
     title: A project/delivery question returns a reply with citations
     type: chat_basic_qa
-    persona: adv-user-01
+    persona: adv-01
     message: "What's the current status of the Acme delivery project?"
 
   - id: 8
     title: First-token latency is under the 6-second interactive objective
     type: chat_first_token_latency
-    persona: adv-user-02
+    persona: adv-02
     message: "Summarize the Acme delivery project."
     max_seconds: 6
 
   - id: 9
     title: Streaming chat emits token events followed by a done event
     type: chat_streaming_sse
-    persona: adv-user-01
+    persona: adv-01
     message: "Summarize the Acme delivery project in one sentence."
 
   - id: 10
@@ -80,14 +83,14 @@ scenarios:
   - id: 11
     title: MCP Gateway returns 404 for an unknown tool name
     type: mcp_gateway_unknown_tool
-    persona: adv-user-01
+    persona: adv-01
     tool: does_not_exist
     expect_status: 404
 
   - id: 12
     title: MCP Gateway denies a live Salesforce capability - Advantage never declares it, provably not inheriting Comage's capabilities
     type: mcp_gateway_denied
-    persona: adv-user-01
+    persona: adv-01
     tool: salesforce.opportunity.read
     arguments: { query: "Acme" }
     expect_status: 403
@@ -95,7 +98,7 @@ scenarios:
   - id: 13
     title: MCP Gateway denies a legacy SXA/sales capability - Advantage never declares it, provably not inheriting Comage's capabilities
     type: mcp_gateway_denied
-    persona: adv-user-01
+    persona: adv-01
     tool: sxa.customer.read
     arguments: { customer_id: 1 }
     expect_status: 403
@@ -117,12 +120,12 @@ scenarios:
   - id: 17
     title: BFF rejects a JWT with the wrong audience
     type: bff_rejects_wrong_audience
-    persona: adv-user-01
+    persona: adv-01
 
   - id: 18
     title: MCP Gateway denies a Confluence capability no Advantage task declares (ADR-0036 agent_declaration factor)
     type: mcp_gateway_denied
-    persona: adv-user-01
+    persona: adv-01
     tool: confluence.page.search
     arguments: { query: "OpenShift AI GPU sizing" }
     expect_status: 403

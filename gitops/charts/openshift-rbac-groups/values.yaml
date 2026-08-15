@@ -8,5 +8,6 @@ roleBindings:
 # a live k8s_info lookup at apply time (ADR-0048-style: discover, don't
 # duplicate the 12-namespace list by hand in a second place) - never
 # hand-set. A namespace missing this label is silently excluded from
-# zuno-admin RBAC, which is intended behavior (ADR-0320's Consequences).
+# ocp-ai-dev/ocp-ai-ops RBAC (ADR-0349, ex ADR-0320's zuno-admin), which
+# is intended behavior.
 zunoManagedNamespaces: []

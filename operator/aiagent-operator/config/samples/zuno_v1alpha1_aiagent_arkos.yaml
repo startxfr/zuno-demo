@@ -46,7 +46,8 @@ spec:
   groups:
     entitlementGroup: agent_arkos
     businessRoles:
-      - board
+      # ADR-0349: Arkos's audience is the consultant architect tier.
+      - consultant
   knowledgeDomains:
     - knowledge.tech
     - knowledge.project

@@ -1,71 +1,47 @@
 {{- if .Values.roleBindings.enabled }}
+{{- /*
+ADR-0349 (replaces ADR-0320's zuno-admin/aidev/aiops bindings): both AI
+profiles are RoleBindings ranged over the live-discovered
+zuno.io/managed=true namespace set (the existing discover-don't-duplicate
+mechanism in ansible/roles/openshift_rbac_groups/tasks/install.yml,
+covering the zuno-*, redhat-ods-* and rhoai-* platform namespaces) -
+neither receives any ClusterRole. ocp-ai-dev -> edit, ocp-ai-ops ->
+admin; zuno-admin's old per-namespace admin role is covered by the
+combination of ocp-paas-ops (full cluster) and ocp-ai-ops (admin on the
+AI namespaces), so it has no successor binding here.
+*/}}
 {{- range .Values.zunoManagedNamespaces }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: zuno-admin-admin
+  name: zuno-ocp-ai-dev-edit
   namespace: {{ . }}
   labels:
     zuno.io/managed-by: argocd
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: zuno-admin
+    name: ocp-ai-dev
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-ocp-ai-ops-admin
+  namespace: {{ . }}
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ocp-ai-ops
 roleRef:
   kind: ClusterRole
   name: admin
   apiGroup: rbac.authorization.k8s.io
 ---
 {{- end }}
-# aidev/aiops are deliberately pointed at the platform's real, already-
-# purposed build/runtime namespaces, not new dedicated sandboxes - an
-# accepted, documented trade-off (ADR-0320's Decision/Security
-# considerations), not an oversight.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: zuno-aidev-edit
-  namespace: zuno-ai-build
-  labels:
-    zuno.io/managed-by: argocd
-subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: aidev
-roleRef:
-  kind: ClusterRole
-  name: edit
-  apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: zuno-aiops-edit
-  namespace: zuno-ai-build
-  labels:
-    zuno.io/managed-by: argocd
-subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: aiops
-roleRef:
-  kind: ClusterRole
-  name: edit
-  apiGroup: rbac.authorization.k8s.io
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: zuno-aiops-edit
-  namespace: zuno-ai-run
-  labels:
-    zuno.io/managed-by: argocd
-subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: aiops
-roleRef:
-  kind: ClusterRole
-  name: edit
-  apiGroup: rbac.authorization.k8s.io
 {{- end }}

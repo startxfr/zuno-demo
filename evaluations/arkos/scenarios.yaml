@@ -4,7 +4,7 @@
 # README.md for required environment variables and personas).
 #
 # `persona` values are anonymized synthetic usernames from
-# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `board-user-01`/
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `consultant-01`/
 # `-02` hold both the `board` business role (governs tool/data permissions
 # inside Arkos, per agent.okf.md's own body prose) and the `agent_arkos`
 # entitlement group (ADR-0040) - see security_checks.py for the negative
@@ -19,36 +19,36 @@ scenarios:
   - id: 1
     title: Portal loads all agent tiles
     type: portal_lists_all_agents
-    persona: board-user-01
+    persona: consultant-01
 
   - id: 2
     title: Unauthenticated request to the portal redirects to login
     type: portal_requires_login
 
   - id: 3
-    title: Board persona can authenticate and the token carries the expected group claims
+    title: Consultant persona can authenticate and the token carries the expected group claims
     type: keycloak_login
-    persona: board-user-01
-    expect_groups: [board, agent_arkos]
+    persona: consultant-01
+    expect_groups: [consultant, agent_arkos]
 
   - id: 4
-    title: Arkos tile is enabled for a board-group, agent_arkos-entitled user
+    title: Arkos tile is enabled for a consultant-group, agent_arkos-entitled user
     type: portal_tile_state
-    persona: board-user-01
+    persona: consultant-01
     agent: arkos
     expect_enabled: true
 
   - id: 5
     title: Arkos tile is disabled for a non-entitled user (sales persona)
     type: portal_tile_state
-    persona: sales-user-01
+    persona: sale-01
     agent: arkos
     expect_enabled: false
 
   - id: 6
     title: Placeholder agent tiles (Comage) show "coming soon" for any user
     type: portal_tile_state
-    persona: sales-user-01
+    persona: sale-01
     agent: comage
     expect_enabled: false
     expect_placeholder: true
@@ -56,26 +56,26 @@ scenarios:
   - id: 7
     title: Drafting a DAT returns a reply with citations
     type: chat_basic_qa
-    persona: board-user-01
+    persona: consultant-01
     message: "Draft a DAT for the OpenShift AI GPU sizing project"
 
   - id: 8
     title: First-token latency is under the 6-second interactive objective
     type: chat_first_token_latency
-    persona: board-user-02
+    persona: consultant-02
     message: "Draft a DAT for the Keycloak SSO migration project"
     max_seconds: 6
 
   - id: 9
     title: Streaming chat emits token events followed by a done event
     type: chat_streaming_sse
-    persona: board-user-01
+    persona: consultant-01
     message: "Summarize what a DAT is in one sentence."
 
   - id: 10
     title: Drafting a DAT includes live Confluence context in its citations
     type: chat_triggers_tool
-    persona: board-user-01
+    persona: consultant-01
     message: "Draft a DAT for the OpenShift AI GPU sizing project"
     expect_tool: confluence.page.search
 
@@ -87,7 +87,7 @@ scenarios:
   - id: 12
     title: MCP Gateway denies a tool call outside the caller's allowed groups
     type: mcp_gateway_denied
-    persona: sales-user-01
+    persona: sale-01
     tool: confluence.page.read
     arguments: { page_id: "1" }
     expect_status: 403
@@ -95,7 +95,7 @@ scenarios:
   - id: 13
     title: MCP Gateway returns 404 for an unknown tool name
     type: mcp_gateway_unknown_tool
-    persona: board-user-01
+    persona: consultant-01
     tool: does_not_exist
     expect_status: 404
 
@@ -116,12 +116,12 @@ scenarios:
   - id: 17
     title: BFF rejects a JWT with the wrong audience
     type: bff_rejects_wrong_audience
-    persona: board-user-01
+    persona: consultant-01
 
   - id: 18
     title: MCP Gateway denies a tool Arkos's task doesn't declare (ADR-0036 agent_declaration factor)
     type: mcp_gateway_denied
-    persona: board-user-01
+    persona: consultant-01
     tool: get_customer
     arguments: { customer_id: 1 }
     expect_status: 403

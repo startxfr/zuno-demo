@@ -10,9 +10,12 @@ describes are built by `ansible/roles/keycloak` / `gitops/charts/keycloak`
 ## 1. The JWT and its `groups` claim
 
 Every agent frontend authenticates its user against one Keycloak realm,
-`zuno`, using its own public OIDC client (`comage-frontend`,
-`tekos-frontend`, `advantage-frontend`, `finage-frontend`,
-`arkos-frontend` - standard authorization-code flow, no client secret).
+`zuno`, using its own OIDC client (`tekos-frontend`, `arkos-frontend`,
+`comage-frontend`, `advantage-frontend`, `finage-frontend`,
+`naveo-frontend` - all confidential, server-side authorization-code
+exchange with a Vault-held client secret since each agent's real
+frontend shipped; `soursage-frontend`/`cognos-frontend` remain public
+SPA placeholders until those ADR-0349 agents are built).
 Keycloak issues a standard OIDC access token (JWT) for the authenticated
 user. Every client has a per-client protocol mapper
 (`oidc-group-membership-mapper`, `full.path: true`) that adds a `groups`
@@ -21,8 +24,8 @@ claim to the access token, ID token and userinfo response:
 ```json
 {
   "sub": "3fabc12e-...-b2a1",
-  "preferred_username": "consultant-user-01",
-  "email": "consultant-user-01@zuno-demo.internal",
+  "preferred_username": "consultant-01",
+  "email": "dev+zuno-consultant01@startx.fr",
   "groups": ["/consultant", "/agent_tekos"],
   "iss": "https://keycloak.<cluster-apps-domain>/realms/zuno",
   "aud": "tekos-frontend",

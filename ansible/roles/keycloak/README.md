@@ -13,10 +13,13 @@ renders:
   `ansible/confidential.yml` by `ansible/roles/vault/tasks/install.yml` -
   falls back to an empty placeholder until that file's values are
   filled in);
-- the `KeycloakRealmImport` CR carrying the `zuno` realm: 10 groups (5
-  `agent_<name>` entitlement groups plus 5 business-role groups, one with a
-  `sales_admin` subgroup), 13 anonymized fixture users, 5 per-agent OIDC
-  clients and the `google` identity-provider broker. See
+- the `KeycloakRealmImport` CR carrying the `zuno` realm (ADR-0349
+  restructure): 8 `agent_<name>` entitlement groups, 8 business-role
+  groups (one with a `sales_admin` subgroup, `recrut` reserved), 4
+  `ocp-*` cluster-access groups, 27 anonymized fixture users (16 named
+  personas + 11 negative-test fixtures), 8 per-agent OIDC clients (6
+  confidential for the built agents, 2 public placeholders for
+  soursage/cognos) and the `google` identity-provider broker. See
   `gitops/charts/keycloak/files/realm-zuno.json`.
 
 Two integration notes:
@@ -255,15 +258,21 @@ downstream services consume.
 
 ## Fixture users
 
-13 anonymized synthetic personas: `sales-user-0{1,2}`,
-`consultant-user-0{1,2,3}`, `adv-user-0{1,2}`, `finance-user-0{1,2}`,
-`board-user-0{1,2}` (each holding both its business group and its
-matching `agent_<name>` entitlement group), plus two
-entitlement/business-role negative-test fixtures:
-`tekos-entitlement-only-user-01` (`agent_tekos` only, no business role) and
-`consultant-role-only-user-01` (`consultant` only, no `agent_tekos`). No
-username, email or job title in `realm-zuno.json` identifies a real person,
-and no password is stored in Git.
+27 anonymized synthetic personas (ADR-0349 restructure). 16 named
+personas: `sale-0{1,2}`, `consultant-0{1,2,3}`, `adv-0{1,2}`,
+`finance-0{1,2}` (kept beyond the ADR's own table - WP-36 made Finage a
+real finance-role-gated agent after the ADR was written), `board-0{1,2}`,
+`recrut-01`, `ai-dev-01`, `ai-ops-01`, `paas-dev-01`, `paas-ops-01` -
+each with a plus-addressed real mailbox (`dev+zuno-<user>@startx.fr`, so
+SMTP/password-reset flows are demonstrable while staying non-nominative,
+ADR-0041 intact) and a `FrontOffice`/`MiddleOffice`/`BackOffice`
+organizational tier in `lastName`. Plus 11 entitlement/business-role
+negative-test fixtures (`<agent>-entitlement-only-user-01` /
+`<role>-role-only-user-01`, unchanged `@zuno-demo.internal` emails) -
+one pair per built agent's own security checks. No username, email or
+job title in `realm-zuno.json` identifies a real person, and no password
+is stored in Git (the initialization default is Vault-seeded, ADR-0349
+§3).
 
 ## What's unverified against a real cluster
 

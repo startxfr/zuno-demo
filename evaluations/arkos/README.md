@@ -72,9 +72,11 @@ for a C2 request that would otherwise be SaaS-eligible, the two-dimension
 group model is enforced server-side in both directions using two new
 fixture personas mirroring Tekos's own (`arkos-entitlement-only-user-01`:
 `agent_arkos` entitlement but no business role, denied `confluence.page.search`
-by the MCP Gateway with 403; `board-role-only-user-01`: `board` business
-role but no `agent_arkos` entitlement, denied by the BFF itself with 403
-before the request ever reaches the Agent Runtime), and a direct call to
+by the MCP Gateway with 403; `consultant-role-only-user-01`: `consultant`
+business role but no `agent_arkos` entitlement, denied by the BFF itself
+with 403 before the request ever reaches the Agent Runtime - ADR-0349
+moved Arkos's audience from board to the consultant tier, so the shared
+consultant fixture now carries this converse case), and a direct call to
 `sales-db-mcp` that bypasses the MCP Gateway entirely is denied by the
 server itself (401) - a platform-wide (ADR-0037), not Arkos-specific,
 boundary this gate still verifies.

@@ -98,9 +98,20 @@ spec:
         enabled: false
   rbac:
     defaultPolicy: ''
+    # ADR-0349 §5: Keycloak-derived groups reach ArgoCD through the
+    # existing Dex openShiftOAuth delegation (scopes: '[groups]' below) -
+    # no ArgoCD OIDC client exists in the realm. The ocp-paas-ops ->
+    # role:admin line is required, not redundant: only
+    # system:cluster-admins/cluster-admins mapped to role:admin before,
+    # and Keycloak-derived groups never matched either name. zuno-paas-dev
+    # is a custom read+sync role for the PaaS-developer profile.
     policy: |
       g, system:cluster-admins, role:admin
       g, cluster-admins, role:admin
+      p, role:zuno-paas-dev, applications, get, zuno/*, allow
+      p, role:zuno-paas-dev, applications, sync, zuno/*, allow
+      g, ocp-paas-dev, role:zuno-paas-dev
+      g, ocp-paas-ops, role:admin
     scopes: '[groups]'
   repo:
     resources:

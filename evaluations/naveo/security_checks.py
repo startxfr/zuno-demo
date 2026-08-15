@@ -45,7 +45,7 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
     """
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
-        headers=auth_headers("consultant-user-01"),
+        headers=auth_headers("consultant-01"),
         json={"session_id": "sec-check-1", "message": "Where do I find the onboarding checklist?"},
         timeout=30,
     )
@@ -63,7 +63,7 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers("consultant-user-01"),
+        headers=auth_headers("consultant-01"),
         json={"session_id": "sec-check-2", "user_sub": forged_sub, "message": "Where do I find the onboarding checklist?"},
         timeout=30,
     )

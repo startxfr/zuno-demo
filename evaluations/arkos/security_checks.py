@@ -2,7 +2,11 @@
 """Security-negative checks for Arkos, mirroring evaluations/tekos/
 security_checks.py's structure with ADR-0040's entitlement/business-role
 fixtures substituted for Arkos's own (`arkos-entitlement-only-user-01`/
-`board-role-only-user-01`) and the Confluence policy check retargeted at
+`consultant-role-only-user-01` - ADR-0349 moved Arkos's audience from
+board to the consultant architect tier, so the shared consultant
+role-only fixture now carries the converse case; the old
+`board-role-only-user-01` fixture stays in the realm, forward-reserved
+for Cognos) and the Confluence policy check retargeted at
 the canonical `confluence.page.*` capability IDs Arkos's task declares
 (rather than Tekos's legacy `search_confluence` tool name - both resolve
 to the same policy entries, ADR-0116's migration-alias guarantee, but
@@ -82,7 +86,7 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
     """
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
-        headers=auth_headers("board-user-01"),
+        headers=auth_headers("consultant-01"),
         json={"session_id": "sec-check-1", "message": "Draft a DAT for a test project."},
         timeout=30,
     )
@@ -97,7 +101,7 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
 def runtime_ignores_mismatched_user_sub() -> CheckResult:
     """ADR-0033: a request body's user_sub is informational only - the
     Runtime must derive the authoritative subject from the validated token,
-    not this field. Submitting a token for a real persona (board-user-01)
+    not this field. Submitting a token for a real persona (consultant-01)
     with a body user_sub claiming to be an unrelated, nonexistent identity
     must not be rejected or otherwise change the outcome (impersonation via
     the body field is impossible because the field is never trusted).
@@ -105,7 +109,7 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers("board-user-01"),
+        headers=auth_headers("consultant-01"),
         json={
             "session_id": "sec-check-2",
             "user_sub": forged_sub,
@@ -162,7 +166,7 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     resp = httpx.post(
         f"{AI_GATEWAY_URL}/v1/chat/completions",
         headers={
-            **auth_headers("board-user-01"),
+            **auth_headers("consultant-01"),
             "X-Zuno-Data-Classification": "C2",
             "X-Zuno-Local-Only": "true",
         },
@@ -200,16 +204,17 @@ def entitlement_without_business_role_denied_confluence() -> CheckResult:
 
 
 def business_role_without_entitlement_denied_by_bff() -> CheckResult:
-    """ADR-0040: the converse case. board-role-only-user-01 holds the
-    board business role (would pass the MCP Gateway's group check for
-    confluence.page.search) but lacks agent_arkos entitlement. The BFF's
+    """ADR-0040: the converse case. consultant-role-only-user-01 holds
+    the consultant business role (would pass the MCP Gateway's group check
+    for confluence.page.search; ADR-0349 made consultants Arkos's
+    audience) but lacks agent_arkos entitlement. The BFF's
     server-side entitlement check (components/agent-bff/main.go) must deny
     the call with 403 before it ever reaches the Agent Runtime, proving
     business role alone never substitutes for agent entitlement.
     """
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
-        headers=auth_headers("board-role-only-user-01"),
+        headers=auth_headers("consultant-role-only-user-01"),
         json={"session_id": "sec-check-3", "message": "Draft a DAT for a test project."},
         timeout=30,
     )

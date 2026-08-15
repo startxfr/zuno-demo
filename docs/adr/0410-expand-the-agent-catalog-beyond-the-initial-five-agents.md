@@ -1,9 +1,10 @@
-# ADR-0306: Expand the agent catalog beyond the initial five agents
+# ADR-0410: Expand the agent catalog beyond the initial five agents
 
 - **Status:** Partially implemented (template, validation workflow and sixth-agent definition merged; deployment gate pending)
-- **Target:** v0.3
+- **Target:** v0.4
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
+- **Renumbered:** formerly ADR-0306 (2026-08-15 move to the v0.4 stream)
 
 ## Decision
 

@@ -21,7 +21,14 @@ zuno_admin_postgresql_root_password: "{{ zuno_admin_password }}"
 zuno_admin_keycloak_root_password: "{{ zuno_admin_password }}"
 zuno_admin_keycloak_postgresql_root_password: "{{ zuno_admin_password }}"
 zuno_admin_rag_postgresql_root_password: "{{ zuno_admin_password }}"
-zuno_admin_demo_personas_root_password: "{{ zuno_admin_password }}"
+# ADR-0349 §3: the demo personas' INITIAL password, deliberately decoupled
+# from zuno_admin_password - a demo-grade initialization value, treated as
+# compromised from day one (each persona's live password diverges in
+# Keycloak's own database after first change; Vault only ever holds this
+# init default). Seeding is idempotent (ADR-0345): an existing install
+# keeps its old seeded value until the operator deletes
+# zuno/keycloak/demo-personas and re-runs the seed.
+zuno_admin_demo_personas_root_password: "secretdemerde"
 zuno_admin_tekos_frontend_token: "{{ zuno_admin_token }}"
 zuno_admin_mcp_gateway_token: "{{ zuno_admin_token }}"
 zuno_admin_tekos_session_token: "{{ zuno_admin_token }}"

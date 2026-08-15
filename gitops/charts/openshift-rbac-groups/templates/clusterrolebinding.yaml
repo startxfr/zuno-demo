@@ -1,24 +1,45 @@
 {{- if .Values.clusterRoleBinding.enabled }}
-# Deliberate, explicit grant of unrestricted cluster access - not an
-# oversight (ADR-0320's Security considerations: "should be reviewed if
+# ADR-0349 (replaces ADR-0320's `admin` group binding): deliberate,
+# explicit grant of unrestricted cluster access - not an oversight
+# (ADR-0320's Security considerations carry over: "should be reviewed if
 # this profile's real-world membership ever grows beyond a small trusted
-# set"). Subject is a bare Kubernetes RBAC Group name ("admin", not
-# "/admin") because the "openshift" Keycloak client's groups protocol
-# mapper uses full.path: false (see gitops/charts/keycloak/files/
-# realm-zuno.json) - OpenShift's OAuth Group sync creates Group objects
-# named exactly as the claim delivers them.
+# set"). Subject is a bare Kubernetes RBAC Group name ("ocp-paas-ops",
+# not "/ocp-paas-ops") because the "openshift" Keycloak client's groups
+# protocol mapper uses full.path: false (see gitops/charts/keycloak/
+# files/realm-zuno.json) - OpenShift's OAuth Group sync creates Group
+# objects named exactly as the claim delivers them.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: zuno-admin-cluster-admin
+  name: zuno-ocp-paas-ops-cluster-admin
   labels:
     zuno.io/managed-by: argocd
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: admin
+    name: ocp-paas-ops
 roleRef:
   kind: ClusterRole
   name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+# ADR-0349: cluster-wide READ for the PaaS-developer profile - an
+# accepted, explicit grant (cluster-reader exposes nodes, operators and
+# most CRs, but writes nothing). ArgoCD-side read/sync rights come from
+# the zuno-paas-dev ArgoCD role (ansible/roles/argocd), not from this
+# binding.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zuno-ocp-paas-dev-cluster-reader
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ocp-paas-dev
+roleRef:
+  kind: ClusterRole
+  name: cluster-reader
   apiGroup: rbac.authorization.k8s.io
 {{- end }}

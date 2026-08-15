@@ -1,11 +1,11 @@
-# ADR-0113: Provide an AIAgent Kubernetes CRD and operator
+# ADR-0350: Provide an AIAgent Kubernetes CRD and operator
 
 - **Status:** Proposed
-- **Target:** v0.1
+- **Target:** v0.3
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
-- **Renumbered:** formerly ADR-0026 (2026-08-13 roadmap reorganization)
-- **Retargeted:** moved from v0 to v0.1 on 2026-08-04. The v0 demo deploys each agent as a plain Kubernetes `Deployment` applied by ArgoCD (see ADR-0022); the AIAgent CRD/operator remains the intended v0.1 evolution once the platform hosts more than the single Tekos vertical slice and reconciliation logic earns its cost.
+- **Renumbered:** formerly ADR-0026 (2026-08-13 roadmap reorganization), then ADR-0113 (2026-08-15 move to the v0.3 stream)
+- **Retargeted:** moved from v0 to v0.1 on 2026-08-04, then from v0.1 to v0.3 on 2026-08-15 - the decision is delivered by the v0.3 stream (ADR-0327 contract, ADR-0308 operator), so it now lives there. The v0 demo deploys each agent as a plain Kubernetes `Deployment` applied by ArgoCD (see ADR-0022); the AIAgent CRD/operator remains the intended v0.1 evolution once the platform hosts more than the single Tekos vertical slice and reconciliation logic earns its cost.
 
 ## Decision
 

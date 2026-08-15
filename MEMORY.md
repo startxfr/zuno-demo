@@ -344,11 +344,15 @@ under `docs/adr/`.
   + run) from one credential (OpenShift API + cluster-admin token), via
   ArgoCD + External Secrets Operator + self-bootstrapping Vault
   (ADR-0022/0024/0056).
-- **Identity**: `zuno` Keycloak realm, 13 anonymized synthetic personas
-  (ADR-0041 — no nominative identity/hardcoded password in git; shared
-  password vault-generated at `zuno/keycloak/demo-personas`) across all
-  five agents' groups, real Google IdP federation (ADR-0014), and the
-  policy-intersection files `policies/tools/tool-policy.yaml` +
+- **Identity**: `zuno` Keycloak realm, 27 anonymized synthetic personas
+  (ADR-0349 restructure: 16 named personas with plus-addressed real
+  mailboxes `dev+zuno-<user>@startx.fr` + 11 negative-test fixtures;
+  ADR-0041 — no nominative identity/hardcoded password in git; shared
+  INIT password vault-seeded at `zuno/keycloak/demo-personas`, live
+  values diverge in Keycloak's own DB) across all eight agents' groups
+  plus the four `ocp-*` cluster-access groups, real Google IdP
+  federation (ADR-0014), and the policy-intersection files
+  `policies/tools/tool-policy.yaml` +
   `policies/data-classification/classification.yaml`.
 - **Data**: from-scratch PostgreSQL-native SXA schema (`data/sxa/schema/`,
   §10), synthetic fixtures, sales-db MCP server.
