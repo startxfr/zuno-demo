@@ -1,0 +1,45 @@
+# Mirrors operator/aiagent-operator/config/rbac/leader_election_role.yaml
+# exactly - kubebuilder's own static (not marker-generated) permissions
+# for the manager's leader-election lease and event recording, namespace-
+# scoped to where the operator itself runs. Only meaningful once
+# .Values.replicas > 1 (values.yaml's own comment); left on unconditionally
+# since it is a no-op correctness property at replicas: 1.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aiagent-operator-leader-election
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aiagent-operator-leader-election
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aiagent-operator-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: aiagent-operator
+    namespace: {{ .Values.namespace }}

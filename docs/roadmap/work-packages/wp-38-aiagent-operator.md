@@ -1,7 +1,90 @@
 # WP-38: AIAgent operator implementation (promotes ADR-0308; closes ADR-0113)
 
-- **State:** Not started
-- **ADRs:** ADR-0308 (Proposed -> To be implemented -> Partially implemented -> Implemented); ADR-0113 (Proposed -> Implemented alongside it)
+- **State:** Repo work merged (2026-08-15); cluster reconciliation pending.
+  Step 0 promoted ADR-0308 verbatim from its `docs/adr/0300-v0.3-roadmap.md`
+  stub. Controller (`operator/aiagent-operator/internal/controller/`):
+  `AIAgentReconciler.Reconcile` generates exactly CONTRACT.md's resource
+  set for each CR - two ServiceAccounts, frontend/BFF Deployments+Services,
+  a Route (`route.openshift.io/v1`, via an `unstructured.Unstructured`
+  object - no new typed Go dependency), a frontend ExternalSecret
+  (`external-secrets.io/v1beta1`, same unstructured approach, Vault paths
+  derived by convention from `agentName` alone), a BFF-scoped
+  NetworkPolicy, and an OKF-reference ConfigMap - every one field-for-field
+  templated from the real merged Tekos/Arkos/Comage chart manifests
+  (`internal/controller/resources.go`, pure builder functions, unit-tested
+  with zero cluster I/O in `resources_test.go`). Every generated object
+  carries a controller owner reference (`applyOwned`), so delete/suspend is
+  plain Kubernetes garbage collection - no finalizer. In-code defense in
+  depth (CONTRACT.md's "reject cross-namespace refs and inline secrets"):
+  `targetNamespace` is re-checked against an explicit allowlist
+  (`OperatorConfig.AllowedTargetNamespaces`, default `["zuno-ai-run"]`)
+  before a single resource is generated - the Go type system already makes
+  a secret-shaped or genuinely cross-namespace field impossible to express
+  in the first place. `status.conditions` always carries the five
+  ADR-0327 types (`ConfigValid`/`OKFReady`/`FrontendReady`/`BFFReady`/
+  `RuntimeBindingReady`, named constants in `api/v1alpha1/aiagent_types.go`);
+  `RuntimeBindingReady` does a pure read-only presence check against three
+  well-known shared-platform Service names (never creates/owns them);
+  Route/ExternalSecret creation degrades gracefully (a condition, not a
+  panic) if those foreign CRDs aren't installed yet, verified directly in
+  envtest via two minimal test-only CRD fixtures under
+  `config/crd/test-fixtures/` (never real upstream CRDs - see their own
+  header comments) rather than skipped. RBAC
+  (`config/rbac/role.yaml`, regenerated via `make manifests` from
+  `+kubebuilder:rbac` markers) is scoped to exactly the resource kinds the
+  reconciler touches - no wildcard, no cluster-scoped kind. Tests (D8: plain
+  `testing` + Gomega's matcher library via `gomega.NewWithT`, not a Ginkgo
+  BDD suite - `suite_test.go` replaces kubebuilder's generated Ginkgo
+  bootstrap with a `TestMain`-based real envtest control plane) - all 13
+  pass against a genuine kube-apiserver+etcd: create->owned resources with
+  owner refs; drift (an out-of-band edit reverted on next reconcile);
+  invalid namespace rejected with zero resources generated; delete's
+  structural half (envtest runs no garbage-collector controller, so this
+  proves owner-reference correctness rather than faking cascade-delete
+  coverage this environment cannot exercise - documented explicitly in the
+  test's own comment, an honest gap matching this repo's established
+  pattern); condition-transition-time semantics. Migration proof: Arkos
+  (`gitops/charts/arkos/`) now renders exactly one AIAgent CR
+  (`templates/aiagent.yaml`) instead of six raw manifests
+  (deployment/service/route/serviceaccounts/networkpolicy/externalsecret,
+  removed - see git history); Tekos is deliberately untouched, proving
+  plain-manifest and CR-managed agents coexist with no flag day.
+  `gitops/charts/aiagent-operator/` (new chart: CRD copied verbatim from
+  the generated `config/crd/bases/`, ClusterRole/ClusterRoleBinding
+  mirroring `config/rbac/role.yaml`, a separate namespace-scoped
+  leader-election Role/RoleBinding mirroring kubebuilder's own static
+  `leader_election_role.yaml`, and the manager Deployment - deliberately
+  the one chart in this repo with `automountServiceAccountToken: true`,
+  since reconciling CRs genuinely requires the Kubernetes API) +
+  `gitops/apps/aiagent-operator/` (sync-wave -106, earlier than every
+  agent chart's own -103-or-later, so Argo CD's wave-based health gate
+  sequences the operator before any CR-managed agent). New
+  `ansible/roles/aiagent_operator_build/` (mirrors `rag_ingestion_build`'s
+  one-task pattern - kubebuilder's own generated Dockerfile already used a
+  distroless non-root base, no hardening changes needed) and real
+  `ansible/roles/aiagent_operator/` (install/uninstall/precheck, mirrors
+  `ansible/roles/mcp`'s shape); root `Makefile`'s `DAY1_BUILD_COMPONENTS`/
+  `DAY1_RUN_COMPONENTS` both gained `aiagent-operator`; new build-matrix
+  entry in `.github/workflows/build-publish.yml`.
+  `ansible/roles/agents/tasks/check.yml` gained a `status.conditions`
+  consumption block for the Arkos AIAgent CR specifically (this repo's
+  only CR-managed agent) - surfaced via `kubernetes.core.k8s_info`, hard-
+  failing only on `ConfigValid: False` (a genuine spec problem) and never
+  on a transiently-False readiness condition, which is expected mid-
+  reconcile. `platform/security/check_workload_hardening.py`: removed
+  `arkos` from `DEPLOYMENT_CHARTS` (it no longer renders a raw Deployment -
+  the generated one's hardening is proven by `resources_test.go` instead,
+  documented inline) and added `aiagent-operator` proactively, plus a new
+  `AUTOMOUNT_TOKEN_EXEMPT_DEPLOYMENTS` allow-list (mirroring the existing
+  `READONLY_ROOTFS_EXEMPT_CONTAINERS` pattern) for its one deliberate
+  `automountServiceAccountToken: true` exception - 188/188 checks pass.
+  `go build/vet/test ./...` clean; `validate_contract.py` still exit 0;
+  `helm lint` clean on both touched charts; `check_build_matrix.py`
+  (11 entries) and `check_docs.py` PASS; all four `day1_*.yml --syntax-check`
+  clean. ADR-0113 stays `Proposed` with a dated `## Evolution` pointer
+  note (the Decision text itself is immutable) rather than moving to
+  `Implemented` until ADR-0308 itself reaches `Implemented`.
+- **ADRs:** ADR-0308 (Proposed -> To be implemented -> Partially implemented merged here -> Implemented after cluster reconciliation); ADR-0113 (Proposed -> Implemented alongside it, once ADR-0308 closes)
 - **Depends on:** WP-37 (merged)
 - **Blocks:** WP-41
 - **Estimated files touched:** ~15

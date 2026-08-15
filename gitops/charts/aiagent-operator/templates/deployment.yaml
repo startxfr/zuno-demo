@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiagent-operator
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aiagent-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aiagent-operator
+    spec:
+      serviceAccountName: aiagent-operator
+      priorityClassName: zuno-workload-default
+      # Deliberate exception to every other chart's automountServiceAccountToken:
+      # false - this is the one workload in this repo whose whole job is
+      # calling the Kubernetes API (see clusterrole.yaml's own comment).
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --leader-elect={{ .Values.leaderElection }}
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: healthz
+              containerPort: 8081
+          env:
+            - name: CLUSTER_BASE_DOMAIN
+              value: {{ .Values.clusterBaseDomain | quote }}
+            - name: AGENT_RUNTIME_BASE_URL
+              value: {{ .Values.agentRuntimeBaseUrl | quote }}
+            - name: REDIS_ADDR
+              value: {{ .Values.redisAddr | quote }}
+            - name: SESSION_MAX_LIFETIME_SECONDS
+              value: {{ .Values.sessionMaxLifetimeSeconds | quote }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

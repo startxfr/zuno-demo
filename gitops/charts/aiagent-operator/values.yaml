@@ -1,0 +1,36 @@
+# Cluster-specific; must be overridden per environment and kept in sync
+# with the cluster_base_domain Ansible inventory variable, same as every
+# agent chart's own global.clusterBaseDomain.
+clusterBaseDomain: apps.mycluster.example.com
+
+namespace: zuno-ai-run
+
+image:
+  # Built by the "aiagent-operator" build component into zuno-ai-build's
+  # ImageStream, pulled cross-namespace into zuno-ai-run via the
+  # system:image-puller RoleBinding.
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/aiagent-operator
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Only meaningful above replicas: 1 - kept on by default since it is a
+# free correctness property (a single replica is trivially "elected").
+leaderElection: true
+
+# Fixed in-cluster coordinates every reconciled agent shares -
+# operator/aiagent-operator/internal/controller/config.go's own
+# DefaultOperatorConfig() mirrors these exact values; only
+# clusterBaseDomain above genuinely varies per cluster.
+agentRuntimeBaseUrl: "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"
+redisAddr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
+sessionMaxLifetimeSeconds: "43200"

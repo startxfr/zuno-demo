@@ -141,6 +141,49 @@
   ansible.builtin.debug:
     msg: "Arkos frontend healthy at https://{{ _agents_arkos_host }}/healthz (evaluations/arkos/ gate not run here - pending human scenario review)."
 
+# ADR-0327's own acceptance bullet ("status.conditions provides useful
+# readiness/error state consumed by `make check`") discharged here, for
+# Arkos specifically - this repo's one CR-managed agent (WP-38 migration
+# proof; every other agent above stays plain-manifest and has no AIAgent
+# CR to read conditions from). Surfaced, not hard-gated: FrontendReady/
+# BFFReady/OKFReady/RuntimeBindingReady being transiently False during a
+# normal reconcile is expected and must not fail `make check` the way the
+# reachability probe above does - only a genuinely invalid spec
+# (ConfigValid: False, which the operator only ever sets for a spec
+# problem, never a timing one) fails this block.
+- name: "agents | fetch the Arkos AIAgent CR status"
+  kubernetes.core.k8s_info:
+    api_version: zuno.zuno.ai/v1alpha1
+    kind: AIAgent
+    name: arkos
+    namespace: zuno-ai-run
+  register: _agents_arkos_cr
+  failed_when: false
+
+- name: "agents | report the Arkos AIAgent CR's status.conditions"
+  ansible.builtin.debug:
+    msg: "{{ item.type }}: {{ item.status }} ({{ item.reason | default('') }})"
+  loop: "{{ _agents_arkos_cr.resources[0].status.conditions | default([]) }}"
+  loop_control:
+    label: "{{ item.type }}"
+  when: (_agents_arkos_cr.resources | default([])) | length > 0
+
+- name: "agents | warn if the Arkos AIAgent CR was not found (operator/CR not yet synced)"
+  ansible.builtin.debug:
+    msg: "No arkos AIAgent CR found in zuno-ai-run yet - confirm gitops/apps/aiagent-operator and gitops/apps/arkos have both synced."
+  when: (_agents_arkos_cr.resources | default([])) | length == 0
+
+- name: "agents | fail the check if the Arkos AIAgent CR reports ConfigValid: False"
+  ansible.builtin.fail:
+    msg: >-
+      arkos AIAgent CR's ConfigValid condition is False:
+      {{ (_agents_arkos_cr.resources[0].status.conditions | default([]))
+         | selectattr('type', 'equalto', 'ConfigValid') | map(attribute='message') | list }}
+  when: >-
+    (_agents_arkos_cr.resources | default([])) | length > 0 and
+    (_agents_arkos_cr.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'ConfigValid') | map(attribute='status') | list | first | default('Unknown')) == 'False'
+
 # ADR-0326 (WP-33): Comage's frontend/BFF are deployed (gitops/apps/comage)
 # once this Application syncs, so it deserves the same reachability proof
 # Arkos gets - but never the acceptance gate (Layers 1-3): its scenarios

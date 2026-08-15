@@ -1,0 +1,10 @@
+apiVersion: v2
+name: aiagent-operator
+description: >-
+  ADR-0327/ADR-0308: reconciles zuno.zuno.ai/v1alpha1 AIAgent custom
+  resources into per-agent frontend/BFF/OKF-reference/NetworkPolicy/
+  ServiceAccount/RBAC resources. See operator/aiagent-operator/CONTRACT.md
+  for the ownership boundary.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,33 @@
+---
+# ADR-0327/ADR-0308 (WP-38): the AIAgent CRD + operator manager. Must sync
+# before any agent chart that has migrated to a CR (gitops/apps/arkos/
+# application-d1.yaml's own sync-wave -103 is deliberately later than this
+# Application's -106) - Argo CD waits for this Application's resources to
+# report Healthy (the CRD is immediately Healthy; the manager Deployment's
+# own readiness probe gates the rest) before advancing to a later wave.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-aiagent-operator-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-106"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/aiagent-operator
+    helm:
+      releaseName: zuno-aiagent-operator-d1
+      values: |
+        clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

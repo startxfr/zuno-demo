@@ -1,9 +1,10 @@
 apiVersion: v2
 name: arkos
 description: >-
-  Arkos frontend (portal + chat UI) and BFF: plain Kubernetes
-  Deployment/Service/Route (frontend) and Deployment/Service (BFF) in the
-  shared zuno-ai-run namespace.
+  ADR-0327/ADR-0308 (WP-38): renders a single AIAgent CR that the
+  aiagent-operator reconciles into Arkos's frontend (portal + chat UI) and
+  BFF Deployment/Service/Route in the shared zuno-ai-run namespace - this
+  repo's migration proof from plain-manifest to CR-managed.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

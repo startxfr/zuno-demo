@@ -1,0 +1,27 @@
+---
+# No Day0 content for aiagent-operator; see gitops/apps/README.md's -d0/-d1 convention.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-aiagent-operator-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-107"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+    helm:
+      releaseName: zuno-aiagent-operator-d0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

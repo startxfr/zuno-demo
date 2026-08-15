@@ -12,6 +12,7 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
   domain: zuno.ai
   group: zuno
   kind: AIAgent

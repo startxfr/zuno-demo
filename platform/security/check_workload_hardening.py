@@ -43,10 +43,6 @@ DEPLOYMENT_CHARTS = [
     # list happened to be updated for at the time it was written.
     "mcp-confluence",
     "rag-service",
-    # ADR-0326/WP-31 added this chart without updating this list too - the
-    # exact same gap, found and closed here (WP-33) rather than left for a
-    # future audit to rediscover.
-    "arkos",
     # ADR-0326/WP-33
     "comage",
     "mcp-salesforce",
@@ -55,6 +51,19 @@ DEPLOYMENT_CHARTS = [
     "advantage",
     # ADR-0326/WP-36 - closes the four-agent generalization.
     "finage",
+    # ADR-0327/ADR-0308 (WP-38): the operator's own manager Deployment -
+    # added proactively, same lesson as advantage/finage above.
+    "aiagent-operator",
+    # NOTE: "arkos" was here (WP-31/33) but was REMOVED at WP-38: Arkos's
+    # chart no longer renders a raw Deployment at all - it renders a
+    # single AIAgent CR (gitops/charts/arkos/templates/aiagent.yaml) that
+    # the aiagent-operator reconciles into the equivalent Deployment at
+    # runtime. That generated Deployment's hardening is proven by
+    # operator/aiagent-operator/internal/controller/resources_test.go's
+    # unit tests instead (e.g. TestDesiredFrontendDeployment_ImageAndEnv
+    # asserts ReadOnlyRootFilesystem/AllowPrivilegeEscalation), not by
+    # `helm template` here - there is no longer a rendered Deployment in
+    # this chart for this script to find.
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;
@@ -63,6 +72,15 @@ DEPLOYMENT_CHARTS = [
 # check (ADR-0052 Security considerations: "Exceptions require an ADR or
 # security waiver with compensating controls").
 READONLY_ROOTFS_EXEMPT_CONTAINERS: Dict[str, str] = {}
+
+# Deployments where automountServiceAccountToken: true is INTENTIONAL -
+# every workload above is a pure HTTP service with no Kubernetes API
+# calls of its own, so `false` is the correct baseline for all of them.
+# aiagent-operator (ADR-0327/ADR-0308) is the one deliberate exception in
+# this repo: reconciling AIAgent CRs into per-agent resources IS calling
+# the Kubernetes API, so its ServiceAccount token must be mounted - see
+# gitops/charts/aiagent-operator/templates/deployment.yaml's own comment.
+AUTOMOUNT_TOKEN_EXEMPT_DEPLOYMENTS = {"aiagent-operator/aiagent-operator"}
 
 
 @dataclass
@@ -122,9 +140,11 @@ def check_deployment_chart(chart: str, findings: Findings) -> None:
             f"{chart}/{dep_name}: pod securityContext.seccompProfile.type RuntimeDefault",
             pod_sc.get("seccompProfile", {}).get("type") == "RuntimeDefault",
         )
+        automount_exempt = f"{chart}/{dep_name}" in AUTOMOUNT_TOKEN_EXEMPT_DEPLOYMENTS
         findings.check(
-            f"{chart}/{dep_name}: automountServiceAccountToken is false",
-            pod_spec.get("automountServiceAccountToken") is False,
+            f"{chart}/{dep_name}: automountServiceAccountToken is "
+            + ("true (exempt: calls the Kubernetes API)" if automount_exempt else "false"),
+            pod_spec.get("automountServiceAccountToken") is (True if automount_exempt else False),
         )
         findings.check(
             f"{chart}/{dep_name}: dedicated serviceAccountName set",

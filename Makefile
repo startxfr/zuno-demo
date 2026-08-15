@@ -23,8 +23,8 @@ DAY0_VERBS := check install uninstall reconcile all
 # Day 0 component everywhere else in this Makefile - only its
 # quota/network-policy overlay is Day 1, see
 # ansible/roles/namespaces/README.md.
-DAY1_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp agents mlops
-DAY1_BUILD_COMPONENTS := mcp rag rag-ingestion agent ai-gateway mlops
+DAY1_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp aiagent-operator agents mlops
+DAY1_BUILD_COMPONENTS := mcp rag rag-ingestion agent ai-gateway mlops aiagent-operator
 DAY1_VERBS := check install build uninstall all
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))

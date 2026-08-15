@@ -76,6 +76,15 @@ jobs:
           - name: mlops
             dockerfile: components/mlops/Containerfile
             context: .
+          # ADR-0327/ADR-0308/WP-38: first-party Go module, own go.mod
+          # (not part of the repo-root Python/Node build surface any other
+          # entry here belongs to) - context is its own directory since
+          # the Dockerfile only ever needs operator/aiagent-operator/'s
+          # own go.mod/go.sum/source, unlike the "context: ." entries
+          # above that bake in files outside their component directory.
+          - name: aiagent-operator
+            dockerfile: operator/aiagent-operator/Dockerfile
+            context: operator/aiagent-operator
     steps:
       - uses: actions/checkout@v4
 

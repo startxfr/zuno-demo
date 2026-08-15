@@ -1,7 +1,12 @@
 ---
-# Arkos's frontend + BFF (ADR-0326/WP-31, second real agent). Depends on
-# the arkos-frontend confidential OIDC client from keycloak, same as
-# gitops/apps/api's own Tekos Application.
+# Arkos's frontend + BFF (ADR-0326/WP-31, second real agent; ADR-0327/
+# ADR-0308/WP-38 migrated it to CR-managed - see gitops/charts/arkos/
+# templates/aiagent.yaml). Depends on the arkos-frontend confidential
+# OIDC client from keycloak, same as gitops/apps/api's own Tekos
+# Application, AND on gitops/apps/aiagent-operator/application-d1.yaml
+# (sync-wave -106, earlier than this Application's own -103) having
+# already reconciled the AIAgent CRD + operator manager - this chart's
+# only resource is a CR the operator must exist to act on.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,11 +22,6 @@ spec:
     path: gitops/charts/arkos
     helm:
       releaseName: zuno-arkos-d1
-      values: |
-        global:
-          # Substituted with the real cluster domain by
-          # ansible/tasks/apply_gitops_app.yml.
-          clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

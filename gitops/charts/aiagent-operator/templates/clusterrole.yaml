@@ -1,0 +1,60 @@
+# Mirrors operator/aiagent-operator/config/rbac/role.yaml exactly (kept
+# in sync by hand - regenerate via `make manifests` in that directory and
+# copy the `rules:` block here whenever a +kubebuilder:rbac marker
+# changes). Cluster-scoped because AIAgent CRs may be reconciled from any
+# namespace Argo CD places them in, but the rule set itself only ever
+# names the specific resource kinds the reconciler actually creates -
+# never a wildcard, never a cluster-scoped resource kind (Nodes,
+# Namespaces, ClusterRoles, ...).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aiagent-operator
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "serviceaccounts", "services"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["zuno.zuno.ai"]
+    resources: ["aiagents"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["zuno.zuno.ai"]
+    resources: ["aiagents/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["zuno.zuno.ai"]
+    resources: ["aiagents/status"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aiagent-operator
+  labels:
+    app.kubernetes.io/name: aiagent-operator
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aiagent-operator
+subjects:
+  - kind: ServiceAccount
+    name: aiagent-operator
+    namespace: {{ .Values.namespace }}
