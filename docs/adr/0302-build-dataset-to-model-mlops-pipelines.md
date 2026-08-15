@@ -1,6 +1,6 @@
 # ADR-0302: Build dataset-to-model MLOps pipelines
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (pipeline, roles and tests merged; GPU pipeline run and adapter promotion pending)
 - **Target:** v0.3
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team

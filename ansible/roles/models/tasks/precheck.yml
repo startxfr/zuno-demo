@@ -91,6 +91,90 @@
       gitops/charts/models's maas.enabled value) or has not synced yet.
   when: (_models_maasmodelrefs.resources | default([]) | length) == 0
 
+# ADR-0301 (WP-34 Part B): reports whether every LoRA adapter declared in
+# gitops/charts/models's loraAdapters values is actually loaded and
+# healthy on the running vLLM predictor. Diagnostic only, never gates
+# _state_is_installed below - same posture as the LMEvalJob/MaaS blocks
+# above: an undeclared or unloaded adapter is a real gap an operator
+# needs to see, but it doesn't mean the base model deployment itself is
+# unhealthy. Reads the declared set from the ServingRuntime's own
+# zuno.io/lora-adapter-classifications annotation (templates/
+# servingruntime.yaml) rather than re-parsing values.yaml, so this check
+# always agrees with what's actually deployed, not what's merely
+# checked in. UNVERIFIED against a live cluster: vLLM's OpenAI-compatible
+# /v1/models endpoint is assumed to list loaded LoRA module names
+# alongside the base model id (the documented behavior for
+# --enable-lora) - confirm against the real predictor and correct this
+# task if the response shape differs.
+- name: "models | look up the ServingRuntime's declared LoRA adapters"
+  kubernetes.core.k8s_info:
+    api_version: serving.kserve.io/v1alpha1
+    kind: ServingRuntime
+    namespace: "{{ models_lmeval_namespace | default('zuno-ai-run') }}"
+    name: "{{ models_serving_runtime_name | default('vllm-runtime') }}"
+  register: _models_servingruntime
+  ignore_errors: true
+
+- name: "models | parse the declared adapter set"
+  ansible.builtin.set_fact:
+    _models_declared_adapters: >-
+      {{
+        (_models_servingruntime.resources | default([{}]) | first
+        ).metadata.annotations['zuno.io/lora-adapter-classifications']
+        | default('[]') | from_json
+      }}
+  when: (_models_servingruntime.resources | default([]) | length) > 0
+
+- name: "models | note no LoRA adapters are declared"
+  ansible.builtin.debug:
+    msg: >-
+      No zuno.io/lora-adapter-classifications annotation found (or the
+      ServingRuntime itself hasn't synced) - no LoRA adapters are
+      declared for this deployment (ADR-0301, opt-in via
+      gitops/charts/models's loraAdapters value, default empty).
+  when: (_models_declared_adapters | default([]) | length) == 0
+
+- name: "models | query the predictor's loaded models"
+  ansible.builtin.uri:
+    url: "http://{{ models_predictor_service | default('qwen25-7b-instruct-predictor') }}.{{ models_lmeval_namespace | default('zuno-ai-run') }}.svc.cluster.local:8080/v1/models"
+    method: GET
+    status_code: [200]
+    return_content: true
+  register: _models_loaded_models
+  ignore_errors: true
+  when: (_models_declared_adapters | default([]) | length) > 0
+
+- name: "models | report each declared adapter's loaded/healthy state"
+  ansible.builtin.debug:
+    msg: >-
+      LoRA adapter {{ item.name }} (classification={{ item.classification }}):
+      {{ 'loaded and healthy' if item.name in
+         ((_models_loaded_models.json.data | default([])) | map(attribute='id') | list)
+         else 'NOT found in the predictor''s /v1/models response - check the pod logs '
+         + '(likely cause: nothing has downloaded this adapter to ' + item.path + ' yet, '
+         + 'see values.yaml''s own loraAdapters comment)' }}
+  loop: "{{ _models_declared_adapters | default([]) }}"
+  loop_control:
+    label: "{{ item.name | default('?') }}"
+  when: >-
+    (_models_declared_adapters | default([]) | length) > 0
+    and (_models_loaded_models is defined)
+    and (_models_loaded_models.status | default(0)) == 200
+
+- name: "models | note the predictor's /v1/models could not be reached"
+  ansible.builtin.debug:
+    msg: >-
+      Could not confirm declared LoRA adapters are loaded: the predictor's
+      /v1/models endpoint did not respond 200
+      (got {{ _models_loaded_models.status | default('no response') }}).
+      Confirm gitops/apps/models has synced and the predictor pod is Ready.
+  when: >-
+    (_models_declared_adapters | default([]) | length) > 0
+    and (
+      (_models_loaded_models is not defined)
+      or (_models_loaded_models.status | default(0)) != 200
+    )
+
 - name: "models | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:

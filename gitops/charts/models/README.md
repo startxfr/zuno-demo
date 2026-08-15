@@ -87,3 +87,41 @@ Consumed by `gitops/charts/rag-ingestion`'s `embedding.endpoint`
 (fetch-time chunk embedding, from `zuno-ai-build`) and available to
 `rag-service` for query-time embedding (from `zuno-data`) - both allowed
 by `templates/networkpolicy-embedding.yaml`.
+
+## LoRA adapter serving (ADR-0301, WP-34 Part B)
+
+`values.yaml`'s `loraAdapters` list is additive and default-empty:
+vLLM's native multi-LoRA support (`--enable-lora`/`--lora-modules`) on
+the SAME chat-model `ServingRuntime`/`InferenceService` above, never a
+second deployment per adapter (ADR-0301 point 1). Each entry names the
+OpenShift AI Model Registry model/version it came from
+(`components/mlops`'s `push-registry` stage, ADR-0302 point 6), the
+filesystem `path` vLLM reads it from, and its inherited classification
+(ADR-0301 point 4). Which adapter (if any) actually applies to a given
+request is static config here - dynamic, per-request selection is
+ADR-0303/WP-39's own scope, not this chart's.
+
+**Adapter download is not wired up yet** - unlike the chat model's own
+PVC + `job-model-download.yaml` predownload, nothing in this chart moves
+a registered adapter onto the pod's filesystem at the declared `path`.
+An operator promoting an adapter today must also arrange for it to land
+there (a follow-up PVC/init-container, deliberately out of this WP's own
+~4-file scope) before it actually serves traffic.
+
+**Classification gate**: `values.schema.json` and
+`templates/servingruntime.yaml`'s own template-time `fail` both reject
+any `loraAdapters[]` entry with `classification` other than `C1` while
+`maas.enabled` is `true` (ADR-0201 publishes this same InferenceService
+externally, making it an externally-eligible serving path) - a C2/C3
+adapter must never widen ADR-0021's C1/C2/C3 routing. Two independent
+enforcements (schema + template) so the rule holds even for a caller that
+renders this chart without schema validation.
+
+`ansible/roles/models/tasks/precheck.yml` reads the declared adapter set
+back off the ServingRuntime's own `zuno.io/lora-adapter-classifications`
+annotation (never re-parsing `values.yaml`, so it always agrees with
+what's actually deployed) and queries the predictor's `/v1/models`
+endpoint to report whether each one is actually loaded - diagnostic only,
+UNVERIFIED against a live cluster (no GPU/vLLM instance in this repo's
+sandbox to confirm the exact `/v1/models` response shape with LoRA
+modules loaded).

@@ -1,6 +1,6 @@
 # ADR-0301: Introduce LoRA and PEFT model customization
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (serving configuration and classification gating merged; GPU pipeline run and adapter promotion pending)
 - **Target:** v0.3
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team

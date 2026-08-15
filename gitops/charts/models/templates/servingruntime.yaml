@@ -1,5 +1,22 @@
 # Namespace-scoped ServingRuntime, not ClusterServingRuntime, to keep this
 # scoped to zuno-ai-run rather than the cluster-wide catalog.
+{{- /* ADR-0301 point 4 / ADR-0034: a C2/C3-classified adapter may only be
+loaded into a serving path an agent is already authorized to reach under
+ADR-0021's C1/C2/C3 routing - it must never widen that routing. This
+ServingRuntime backs the LOCAL vLLM InferenceService; when
+maas.enabled publishes that same InferenceService externally
+(gitops/charts/models/templates/maas.yaml, ADR-0201), it becomes an
+externally-eligible serving path, and no C2/C3 adapter may attach to it -
+see values.schema.json for the same rule expressed as a values-schema
+constraint (defense in depth: this template-time fail catches it even
+for a caller that renders this chart without schema validation). */}}
+{{- if .Values.maas.enabled }}
+{{- range .Values.loraAdapters }}
+{{- if ne .classification "C1" }}
+{{- fail (printf "loraAdapters[%s].classification=%s cannot attach while maas.enabled is true (externally-eligible serving path) - ADR-0301 point 4/ADR-0021" .name .classification) }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: serving.kserve.io/v1alpha1
 kind: ServingRuntime
 metadata:
@@ -11,6 +28,14 @@ metadata:
     # Must sync before inferenceservice.yaml, which references this runtime by
     # name.
     argocd.argoproj.io/sync-wave: "-5"
+{{- if .Values.loraAdapters }}
+    # ADR-0034: classification propagates to the adapter, not just its
+    # outputs - recorded here per-adapter so it's inspectable (`oc get
+    # servingruntime -o yaml`) without needing components/mlops's own
+    # train_manifest.json/S3 state. A future ADR-0303 dynamic-selection
+    # read of "which adapters exist at what classification" starts here.
+    zuno.io/lora-adapter-classifications: {{ .Values.loraAdapters | mustToJson | quote }}
+{{- end }}
 spec:
   supportedModelFormats:
     - name: vLLM
@@ -28,6 +53,21 @@ spec:
         # 8080 - verified on-cluster: without this, vLLM serves on 8000
         # while everything else probes 8080, so the pod never goes Ready.
         - --port=8080
+{{- if .Values.loraAdapters }}
+        # ADR-0301 point 1: vLLM's own native multi-LoRA support, additive
+        # to this same ServingRuntime/InferenceService - never a second
+        # deployment per adapter. UNVERIFIED against a live cluster (no
+        # GPU/vLLM instance in this repo's sandbox to confirm the exact
+        # flag syntax against the pinned image.vllm build) - confirm with
+        # `--help` on the resolved vLLM image and correct if this
+        # cluster's vLLM version expects a different --lora-modules shape
+        # (e.g. the newer JSON-per-module form) before relying on it.
+        - --enable-lora
+        - --lora-modules
+        {{- range .Values.loraAdapters }}
+        - {{ printf "%s=%s" .name .path | quote }}
+        {{- end }}
+{{- end }}
       ports:
         - containerPort: 8080
           protocol: TCP

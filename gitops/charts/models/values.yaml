@@ -29,6 +29,45 @@ resources:
 minReplicas: 1
 maxReplicas: 1
 
+# ADR-0301 (WP-34 Part B): vLLM native multi-LoRA, additive to the same
+# ServingRuntime/InferenceService above - NOT a second deployment per
+# adapter (point 1). Adapter selection is static here (point 2); which
+# adapter a request actually uses is ADR-0303/WP-39's scope, not this
+# one's. Default empty - no adapter attaches unless explicitly listed.
+# Each entry:
+#   name               - the vLLM --lora-modules module name (also what a
+#                         future ADR-0303 request would reference).
+#   registryModelName / registryModelVersion - the OpenShift AI Model
+#                         Registry name/version this adapter was
+#                         registered under (components/mlops's
+#                         push-registry stage, ADR-0302 point 6) - never
+#                         an unversioned/untracked location (point 3).
+#   path               - where vLLM reads the adapter FROM on this pod's
+#                         filesystem. UNVERIFIED against a live cluster:
+#                         no adapter-download mechanism exists yet in
+#                         this chart (unlike modelStorage's own
+#                         job-model-download.yaml for the base model) -
+#                         an operator promoting an adapter today must
+#                         also arrange for it to land at this path (e.g.
+#                         a follow-up PVC/init-container, out of this
+#                         WP's own ~4-file estimate) before this actually
+#                         serves traffic.
+#   classification     - C1/C2/C3 (ADR-0301 point 4/ADR-0034): inherited
+#                         from the adapter's own training dataset
+#                         (components/mlops's train_manifest.json). Gated
+#                         below and in values.schema.json - a C2/C3
+#                         adapter cannot attach to a serving path with
+#                         maas.enabled (externally-eligible).
+loraAdapters: []
+# Example (uncomment and fill in once an adapter has been trained,
+# evaluated and registered - see components/mlops/README's own pipeline
+# stages):
+#   - name: comage-lora
+#     registryModelName: comage-lora
+#     registryModelVersion: run-0001
+#     path: /mnt/loras/comage-lora
+#     classification: C2
+
 # Predownloads the chat model into a PVC (via templates/job-model-download.yaml)
 # instead of storageUri: hf://, which downloads straight into the GPU
 # node's ephemeral root disk on every pod (re)start. Verified on-cluster:
