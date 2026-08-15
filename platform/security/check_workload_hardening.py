@@ -43,6 +43,13 @@ DEPLOYMENT_CHARTS = [
     # list happened to be updated for at the time it was written.
     "mcp-confluence",
     "rag-service",
+    # ADR-0326/WP-31 added this chart without updating this list too - the
+    # exact same gap, found and closed here (WP-33) rather than left for a
+    # future audit to rediscover.
+    "arkos",
+    # ADR-0326/WP-33
+    "comage",
+    "mcp-salesforce",
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;

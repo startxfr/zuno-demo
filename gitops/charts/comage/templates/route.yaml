@@ -1,0 +1,22 @@
+# Fixed hostname (comage.routeHost helper): the OIDC redirect URI and
+# Keycloak client's registered redirect URI both depend on it.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: comage-frontend
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/agent: comage
+    app.kubernetes.io/component: frontend
+  annotations:
+    argocd.argoproj.io/sync-wave: "105"
+spec:
+  host: {{ include "comage.routeHost" . }}
+  to:
+    kind: Service
+    name: comage-frontend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

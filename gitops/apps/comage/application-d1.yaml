@@ -1,0 +1,33 @@
+---
+# Comage's frontend + BFF (ADR-0326/WP-33, third real agent). Depends on
+# the comage-frontend confidential OIDC client from keycloak, same as
+# gitops/apps/arkos's own Application.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-comage-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-101"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/comage
+    helm:
+      releaseName: zuno-comage-d1
+      values: |
+        global:
+          # Substituted with the real cluster domain by
+          # ansible/tasks/apply_gitops_app.yml.
+          clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
