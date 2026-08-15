@@ -56,7 +56,8 @@ from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
 from app.clients import project_memory_client  # noqa: E402
 from app.clients.model_router import ProviderCandidate  # noqa: E402
-from app.graph import nodes  # noqa: E402
+from app.graph import arkos_nodes, nodes  # noqa: E402
+from app.graph.build import GraphFactory  # noqa: E402
 from app.graph.shapes.retrieve_reason_respond import build as build_graph  # noqa: E402
 from app.main import extract_memory_endpoint  # noqa: E402
 
@@ -292,9 +293,173 @@ async def test_extraction_is_refused_for_a_run_with_no_project_id() -> None:
         nodes._model_router.invoke_with_fallback = saved_invoke
 
 
+async def test_arkos_retrieves_tekos_written_project_memory_through_its_own_shape() -> None:
+    """The ADR-0209 cross-agent acceptance bullet this WP-28 test
+    originally deferred, closed here by WP-31/ADR-0342: Tekos states a
+    project fact on its own retrieve_reason_respond shape, extraction
+    persists it, and Arkos - a structurally different shape,
+    plan_draft_write, registered on the SAME running GraphFactory
+    instance - retrieves it back for the same project_id through its own
+    task/prompt/capabilities. Proves knowledge.project sharing is
+    agent/shape-agnostic, not something only Tekos's own code path can do.
+    """
+    factory = GraphFactory(MemorySaver())
+    identity = _identity("alice", groups=["consultant"])
+
+    backing_store = {"written_facts": None}
+    write_calls = []
+
+    async def fake_write_project_memory(**kwargs):
+        write_calls.append(kwargs)
+        backing_store["written_facts"] = kwargs["facts"]
+        return {"facts_written": len(kwargs["facts"]), "memories_written": len(kwargs["memories"])}
+
+    tekos_search_calls = []
+
+    async def fake_tekos_search(**kwargs):
+        tekos_search_calls.append(kwargs)
+        return []  # nothing written yet during Tekos's own turn
+
+    arkos_search_calls = []
+
+    async def fake_arkos_search(**kwargs):
+        arkos_search_calls.append(kwargs)
+        domains = kwargs.get("domains") or []
+        if "knowledge.project" in domains and backing_store["written_facts"]:
+            return [
+                {
+                    "id": "proj-mem-1",
+                    "source": "project-memory:demo-001",
+                    "title": "cloud_provider",
+                    "snippet": "The demo-001 project runs on AWS across three environments.",
+                    "score": 0.95,
+                    "classification": "C1",
+                    "domain": "knowledge.project",
+                    "stale": False,
+                }
+            ]
+        return []
+
+    async def fake_tekos_invoke(**kwargs):
+        messages = kwargs.get("messages") or []
+        system_text = messages[0].content if messages else ""
+        if "durable, engagement-scoped memory" in system_text:
+            return (
+                _FakeModelResult(
+                    json.dumps(
+                        {
+                            "facts": [{"key": "cloud_provider", "value": "AWS"}],
+                            "memories": [
+                                {
+                                    "kind": "fact",
+                                    "text": "The demo-001 project runs on AWS across three environments.",
+                                }
+                            ],
+                        }
+                    )
+                ),
+                None,
+            )
+        return _FakeModelResult("Noted - AWS, across three environments."), ProviderCandidate(name="ai-gateway")
+
+    async def fake_arkos_invoke(**kwargs):
+        return (
+            _FakeModelResult("# DAT - demo-001\n\nThe demo-001 project runs on AWS."),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        return {"result": {"id": "fake-doc-id", "url": "https://docs.google.com/document/d/fake-doc-id/edit"}}
+
+    saved = {
+        "tekos_search": nodes.search,
+        "tekos_invoke": nodes._model_router.invoke_with_fallback,
+        "arkos_search": arkos_nodes.search,
+        "arkos_invoke": arkos_nodes._model_router.invoke_with_fallback,
+        "arkos_invoke_tool": arkos_nodes.invoke_tool,
+        "write": project_memory_client.write_project_memory,
+    }
+    nodes.search = fake_tekos_search
+    nodes._model_router.invoke_with_fallback = fake_tekos_invoke
+    arkos_nodes.search = fake_arkos_search
+    arkos_nodes._model_router.invoke_with_fallback = fake_arkos_invoke
+    arkos_nodes.invoke_tool = fake_invoke_tool
+    project_memory_client.write_project_memory = fake_write_project_memory
+
+    try:
+        # --- Tekos states the fact, on retrieve_reason_respond -------------
+        tekos_graph = factory.graph_for_shape("retrieve_reason_respond")
+        run_id_1 = "run-tekos-demo-001"
+        final_1 = await tekos_graph.ainvoke(
+            {
+                "session_id": "s1",
+                "user_sub": "alice",
+                "groups": ["consultant"],
+                "bearer_token": "t",
+                "message": "We run this project on AWS, across three environments: dev, staging, prod.",
+                "request_id": "req-1",
+                "project_id": "demo-001",
+                "retrieved_docs": [],
+                "tool_results": {},
+                "errors": [],
+            },
+            config={"configurable": {"thread_id": run_id_1}},
+        )
+        assert final_1["reply"]
+
+        # --- Explicit extraction (session end) ------------------------------
+        fake_request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(graph_factory=factory)))
+        extraction_result = await extract_memory_endpoint(
+            agent="tekos", run_id=run_id_1, request=fake_request, identity=identity
+        )
+        assert extraction_result["facts_written"] == 1
+        assert len(write_calls) == 1
+        assert write_calls[0]["project_id"] == "demo-001"
+
+        # --- Arkos retrieves the SAME project's memory through its OWN
+        # shape, same GraphFactory instance, never having seen Tekos's
+        # turn. -----------------------------------------------------------
+        arkos_graph = factory.graph_for_shape("plan_draft_write")
+        assert arkos_graph is not tekos_graph
+        run_id_2 = "run-arkos-demo-001"
+        final_2 = await arkos_graph.ainvoke(
+            {
+                "session_id": "s2",
+                "user_sub": "alice",
+                "groups": ["consultant"],
+                "bearer_token": "t",
+                "message": "draft a DAT for the demo-001 project",
+                "request_id": "req-2",
+                "project_id": "demo-001",
+                "retrieved_docs": [],
+                "tool_results": {},
+                "errors": [],
+            },
+            config={"configurable": {"thread_id": run_id_2}},
+        )
+
+        project_calls = [c for c in arkos_search_calls if "knowledge.project" in (c.get("domains") or [])]
+        assert project_calls, "arkos's retrieve_node never requested knowledge.project"
+        assert project_calls[-1]["project_id"] == "demo-001"
+        assert project_calls[-1]["caller_sub"] == "alice"
+
+        assert any(doc.get("domain") == "knowledge.project" for doc in final_2["retrieved_docs"])
+        assert final_2["document_draft"]
+        assert final_2["drive_doc_url"] == "https://docs.google.com/document/d/fake-doc-id/edit"
+        assert "demo-001" in final_2["reply"] or final_2["drive_doc_url"] in final_2["reply"]
+    finally:
+        nodes.search = saved["tekos_search"]
+        nodes._model_router.invoke_with_fallback = saved["tekos_invoke"]
+        arkos_nodes.search = saved["arkos_search"]
+        arkos_nodes._model_router.invoke_with_fallback = saved["arkos_invoke"]
+        arkos_nodes.invoke_tool = saved["arkos_invoke_tool"]
+        project_memory_client.write_project_memory = saved["write"]
+
+
 TESTS = [
     test_tekos_demo_001_store_and_retrieve_across_sessions,
     test_extraction_is_refused_for_a_run_with_no_project_id,
+    test_arkos_retrieves_tekos_written_project_memory_through_its_own_shape,
 ]
 
 

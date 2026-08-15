@@ -1,4 +1,7 @@
-"""LangGraph state schema for the Tekos workflow (ADR-0018)."""
+"""LangGraph state schema (ADR-0018), shared across every graph shape
+(ADR-0342) - Tekos's retrieve_reason_respond and Arkos's plan_draft_write
+both read/write this one TypedDict, each populating only the fields its
+own nodes use."""
 
 from __future__ import annotations
 
@@ -89,3 +92,21 @@ class AgentState(TypedDict, total=False):
     # (retrieved_docs / tool_results), never from what was merely
     # attempted. One of "indexed" | "live" | "both" | "none".
     source_mode: str
+
+    # ADR-0342/WP-31: Arkos's plan_draft_write shape only - a short,
+    # deterministic plan (document topic/title) produced by plan_node,
+    # consumed by retrieve_node (topic-driven query) and draft_node
+    # (document title). Absent/unused by retrieve_reason_respond. Named
+    # `doc_plan` rather than `plan` - LangGraph reserves state-key names
+    # matching a node name (the shape's own node IS literally named
+    # "plan"), and the two collide if given the same string.
+    doc_plan: Dict[str, Any]
+    # The drafted document body, produced by draft_node and consumed by
+    # write_node - None when drafting failed (see draft_node's own
+    # provider-failure handling, mirroring reason_node's). Named
+    # `document_draft` rather than `draft` for the same node-name-collision
+    # reason as `doc_plan` above (the shape's own node is named "draft").
+    document_draft: Optional[str]
+    # The Drive document URL write_node persisted the draft to, when the
+    # write succeeded - None if the write failed or wasn't attempted.
+    drive_doc_url: Optional[str]

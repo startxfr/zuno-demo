@@ -161,3 +161,30 @@ def evaluate_knowledge(
         authorized.append(domain)
 
     return KnowledgeDecision(authorized_domains=authorized, denied=denied)
+
+
+def resolve_authorized_domains(
+    store: KnowledgePolicyStore,
+    agent_declared: List[str],
+    task_allowed: List[str],
+    caller_groups: List[str],
+    project_id: Optional[str],
+) -> KnowledgeDecision:
+    """ADR-0342 (WP-31): wraps evaluate_knowledge() with the one per-turn
+    gate every graph shape's own retrieve node applies on top of it
+    (ADR-0209) - knowledge.project without a project_id THIS turn is
+    authorized-but-meaningless (rag-service's fail-closed membership check
+    needs both), so it's stripped from the authorized set here rather
+    than each shape's retrieve node re-implementing this same fail-safe
+    rule independently. The knowledge-policy intersection above may still
+    have authorized it (the task declares it); this is a separate,
+    per-turn gate on top - not a widening of what evaluate_knowledge()
+    already decided.
+    """
+    decision = evaluate_knowledge(store, agent_declared, task_allowed, caller_groups)
+    if not project_id and "knowledge.project" in decision.authorized_domains:
+        decision = KnowledgeDecision(
+            authorized_domains=[d for d in decision.authorized_domains if d != "knowledge.project"],
+            denied=decision.denied,
+        )
+    return decision

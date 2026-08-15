@@ -20,10 +20,13 @@ from typing import Callable, Dict
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
-from app.graph.shapes import retrieve_reason_respond
+from app.graph.shapes import plan_draft_write, retrieve_reason_respond
 
 ShapeBuilder = Callable[[BaseCheckpointSaver], CompiledStateGraph]
 
 SHAPE_BUILDERS: Dict[str, ShapeBuilder] = {
     "retrieve_reason_respond": retrieve_reason_respond.build,
+    # ADR-0342/WP-31: Arkos's shape - the first proof this registry holds
+    # more than one workflow.
+    "plan_draft_write": plan_draft_write.build,
 }

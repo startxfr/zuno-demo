@@ -53,12 +53,30 @@ def test_tekos_loads_from_the_real_bundle() -> None:
 
 
 def test_placeholder_agents_declare_no_tools() -> None:
+    """Still-genuinely-placeholder agents (their coming-soon stub task has
+    an empty allowed_tools list by construction, ADR-0036) declare no
+    tools. Arkos is a special case since WP-31: its real task bundle and
+    graph shape are merged, but `status` deliberately stays `placeholder`
+    until the operator confirms the live acceptance gate passes (WP-31's
+    own Status-updates section) - it now legitimately DOES declare real
+    tools while still reporting placeholder status, which is exactly the
+    point being tested for the other three."""
     registry = AgentRegistry(agents_dir=str(REAL_AGENTS_DIR))
-    for name in ("comage", "advantage", "finage", "arkos"):
+    for name in ("comage", "advantage", "finage"):
         agent = registry.get(name)
         assert agent is not None, name
         assert agent.status == "placeholder"
         assert agent.declared_tools() == []
+
+    arkos = registry.get("arkos")
+    assert arkos is not None
+    assert arkos.status == "placeholder"
+    assert arkos.declared_tools() == [
+        "confluence.page.read",
+        "confluence.page.search",
+        "drive.document.create",
+        "drive.document.update",
+    ]
 
 
 _FIXTURE_TASK_V1 = """---

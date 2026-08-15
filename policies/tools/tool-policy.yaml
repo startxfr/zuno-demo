@@ -128,6 +128,27 @@ tools:
       - consultant
       - board
 
+  # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same
+  # allowed_groups as the existing read capability above (no narrower
+  # write-specific role exists yet in this demo's threat model; WP-32's
+  # self/any-scoped capability pattern is introduced for a different
+  # domain, Workday, not retrofitted here).
+  - tool: drive.document.create
+    capability: drive.document.create
+    mcp_server: google-workspace
+    min_classification: C1
+    allowed_groups:
+      - consultant
+      - board
+
+  - tool: drive.document.update
+    capability: drive.document.update
+    mcp_server: google-workspace
+    min_classification: C1
+    allowed_groups:
+      - consultant
+      - board
+
   - tool: read_gmail
     capability: gmail.message.read
     mcp_server: google-workspace

@@ -18,8 +18,9 @@ sources: []
 zuno:
   name: arkos
   status: placeholder
+  graph_shape: plan_draft_write
   tasks:
-    - coming-soon
+    - draft-architecture-testimonial
   model:
     preferred_classification: C3
     notes: >-
@@ -39,14 +40,30 @@ zuno:
 
 # Arkos
 
-v0 scope: status is `placeholder` - this bundle and this portal tile are
-the only things that exist for Arkos in v0 (ADR-0007). No dedicated
-namespace is reserved (ADR-0329, supersedes ADR-0023): a future active
-Arkos deployment would run in the shared `zuno-ai-run` namespace.
-`tasks/coming-soon.md` describes the intended v1 build from
-`agents/arkos/README.md` and `MEMORY.md` sections 8-9. Access group is
-`board` per ADR-0040's business-role dimension - intentional, not the
-`agent_arkos` entitlement group: DATs are reviewed and approved at board
-level, so tool/data permissions inside Arkos are gated on `board`
-membership rather than on the broader (and orthogonal) architects'
-entitlement to the agent itself.
+ADR-0326 (WP-31): Arkos's real OKF task bundle, graph shape and deployment
+surface are now merged - `status` stays `placeholder` until the operator
+confirms the live acceptance gate passes (WP-31's own Status-updates
+section; ADR-0326's "moves placeholder -> active only after the full
+common completion pattern passes"), so the portal keeps rendering
+"coming soon" and Agent Runtime's generic dispatch keeps 404ing
+`/v1/agents/arkos/chat` until that flip happens. No dedicated namespace is
+reserved (ADR-0329, supersedes ADR-0023): Arkos's frontend/BFF deploy into
+the shared `zuno-ai-run` namespace, same as Tekos.
+
+`zuno.graph_shape: plan_draft_write` (ADR-0342) names Agent Runtime's
+LangGraph workflow module for Arkos's chat turns - plan, retrieve
+(`knowledge.tech` + `knowledge.project`), draft, write (Drive) -
+structurally distinct from Tekos's `retrieve_reason_respond` shape,
+proving the graph-shape mechanism WP-30 built generalizes past one
+hardcoded workflow. Arkos has no agent-level `zuno.allowed_knowledge`
+field either (ADR-0203), for the same reason Tekos doesn't: its knowledge
+ceiling is the union of its one task's own `zuno.allowed_knowledge` -
+today `[knowledge.tech, knowledge.project]`.
+
+Access group is `agent_arkos` (ADR-0040 entitlement dimension, orthogonal
+to the `board` business role that governs tool/data permissions inside
+Arkos once active - see `policies/tools/tool-policy.yaml`'s
+`drive.document.*`/`confluence.page.*` entries): DATs are reviewed and
+approved at board level, so `board` gates what an already-entitled Arkos
+session can actually do, matching every other agent's ADR-0040 dimension
+split.

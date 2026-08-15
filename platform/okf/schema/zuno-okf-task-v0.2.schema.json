@@ -41,7 +41,11 @@
               "list_open_opportunities",
               "get_quote",
               "web_search",
-              "send_technical_report_email"
+              "send_technical_report_email",
+              "confluence.page.read",
+              "confluence.page.search",
+              "drive.document.create",
+              "drive.document.update"
             ]
           },
           "uniqueItems": true

@@ -162,6 +162,27 @@ bindings:
     provider_tool: list_drive_files
     auth_mode: delegated-user
 
+  # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same in-process
+  # demo backend as drive.document.search above, extended with two more
+  # operations rather than a new standalone server (no live Google
+  # Workspace tenant is reachable from this environment either way). Each
+  # gets its own `handler` name because app/downstream.py dispatches
+  # purely by that field to a single-purpose function - see
+  # app/handlers/drive.py's handle_create/handle_update.
+  - capability: drive.document.create
+    backend: google-workspace
+    transport: in-process
+    handler: drive_create
+    provider_tool: create_document
+    auth_mode: delegated-user
+
+  - capability: drive.document.update
+    backend: google-workspace
+    transport: in-process
+    handler: drive_update
+    provider_tool: update_document
+    auth_mode: delegated-user
+
   - capability: gmail.message.read
     aliases: [read_gmail]
     backend: google-workspace

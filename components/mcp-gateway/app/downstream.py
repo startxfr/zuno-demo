@@ -49,6 +49,12 @@ MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 # reaches which handler is the registry's decision, not this module's).
 IN_PROCESS_HANDLERS = {
     "drive": drive.handle,
+    # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same module,
+    # two more single-purpose handler names (see app/handlers/drive.py's
+    # own docstring for why one name maps to one function here rather than
+    # branching inside a shared handle()).
+    "drive_create": drive.handle_create,
+    "drive_update": drive.handle_update,
     "gmail": gmail.handle,
     "web_search": web_search.handle,
     "email_report": email_report.handle,

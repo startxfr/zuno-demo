@@ -14,7 +14,7 @@ from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
 from app.graph.state import AgentState
-from app.knowledge import KnowledgePolicyStore, evaluate_knowledge
+from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
 from app.registry import AgentRegistry
 
 logger = logging.getLogger("agent_runtime.graph")
@@ -157,21 +157,14 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     caller_groups = state.get("groups", [])
     project_id = state.get("project_id")
 
-    decision = evaluate_knowledge(
+    decision = resolve_authorized_domains(
         store=_knowledge_store,
         agent_declared=_TEKOS.declared_knowledge(),
         task_allowed=_ANSWER_TASK.allowed_knowledge,
         caller_groups=caller_groups,
+        project_id=project_id,
     )
     authorized_domains = decision.authorized_domains
-    if not project_id and "knowledge.project" in authorized_domains:
-        # ADR-0209: knowledge.project without a project_id on this turn is
-        # meaningless (rag-service's membership check needs both) -
-        # requesting it anyway would just be a guaranteed-empty domain in
-        # the fan-out, not a useful "try anyway". The knowledge-policy
-        # intersection above still ran and may have authorized it (the
-        # task declares it); this is a separate, per-turn gate on top.
-        authorized_domains = [d for d in authorized_domains if d != "knowledge.project"]
 
     if not authorized_domains:
         logger.warning(
