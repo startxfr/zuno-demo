@@ -207,6 +207,30 @@ domains:
     - name: business_unit
       type: string
       required: false
+
+  project:
+    - name: project_id
+      type: string
+      required: true
+      description: >-
+        The engagement this memory belongs to (WP-28/ADR-0209) - the
+        domain-defining field: every knowledge.project chunk carries one,
+        checked against the project_memberships table at retrieval time
+        (fail closed, no row = deny), the same acl_groups-style
+        intersection pattern every other domain already uses.
+    - name: agent
+      type: string
+      required: true
+      description: Which agent's task produced this memory (e.g. tekos, arkos) - project memory is cross-agent by design (ADR-0209), so this is provenance, not a filter.
+    - name: session_id
+      type: string
+      required: false
+      description: The conversation session the extraction step summarized this memory from - audit/provenance only, never a retrieval filter.
+    - name: memory_kind
+      type: string
+      required: false
+      enum: [fact, decision, constraint, action]
+      description: What kind of durable content the extraction step identified - never "raw_turn" (ADR-0209 forbids persisting verbatim conversation turns into this domain).
     - name: date
       type: string
       format: date

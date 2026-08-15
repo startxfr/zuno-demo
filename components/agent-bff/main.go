@@ -55,6 +55,10 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 type apiChatRequest struct {
 	SessionID string `json:"session_id"`
 	Message   string `json:"message"`
+	// ADR-0209: optional - forwarded to the Agent Runtime as-is, same
+	// identity-propagation pattern as ADR-0032/0033. This BFF never
+	// validates project membership itself.
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 // apiChatResponse is the frontend-facing response body (see README.md).
@@ -125,6 +129,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			SessionID: req.SessionID,
 			UserSub:   claims.Subject, // informational only (ADR-0033); the Runtime derives identity from the forwarded token, not this field
 			Message:   req.Message,
+			ProjectID: req.ProjectID, // ADR-0209: forwarded as-is, this BFF does not validate project membership
 		}
 
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {

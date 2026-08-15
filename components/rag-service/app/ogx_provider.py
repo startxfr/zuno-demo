@@ -67,7 +67,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app.search import _is_freshness_untrusted, _is_stale, _parse_stale_after
+from app.search import _PROJECT_DOMAIN, _is_freshness_untrusted, _is_stale, _parse_stale_after
 from app.telemetry import record_freshness_lag
 
 logger = logging.getLogger("rag_service.ogx_provider")
@@ -188,6 +188,8 @@ async def ogx_search(
     caller_groups: Optional[List[str]] = None,
     domains: Optional[List[str]] = None,
     technology: Optional[str] = None,
+    project_id: Optional[str] = None,
+    caller_sub: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Same signature/return shape as app/search.py:hybrid_search - see
     that function's docstring and this module's docstring for the contract
@@ -198,7 +200,24 @@ async def ogx_search(
     provider - out of scope for a parity prototype whose acceptance bar is
     metadata/ACL/classification/citation parity, not ranking-algorithm
     parity (ADR-0322 acceptance criteria).
+
+    ADR-0209: `project_id`/`caller_sub` are accepted for signature parity
+    with hybrid_search but knowledge.project is refused outright
+    (OgxProviderError) rather than silently served - this prototype has no
+    SQL access to project_memberships (it talks to an external vector
+    store API, not a PostgreSQL pool), so it cannot perform the
+    fail-closed membership check hybrid_search does. Serving
+    knowledge.project without that check would be a real authorization
+    gap, not a acceptable parity shortcut.
     """
+    if domains and _PROJECT_DOMAIN in domains:
+        raise OgxProviderError(
+            "knowledge.project is not supported by the OGX provider prototype - "
+            "it has no project_memberships access to perform ADR-0209's fail-closed "
+            "membership check (RAG_PROVIDER=ogx is opt-in; use the default pgvector "
+            "provider for knowledge.project until this is implemented)"
+        )
+
     if not OGX_BASE_URL or not OGX_VECTOR_STORE_ID:
         raise OgxProviderError(
             "RAG_PROVIDER=ogx but OGX_BASE_URL/OGX_VECTOR_STORE_ID is not set - "

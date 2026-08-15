@@ -1,0 +1,70 @@
+# Knowledge domain: project (ADR-0209)
+#
+# Caller-supplied, per-engagement memory scope open to any agent -
+# explicitly distinct from `knowledge.adv` (Aramis-sourced ADV *business*
+# knowledge, a fixed source pipeline). `knowledge.project` has no source
+# ingestion pipeline at all: content is written directly by Agent
+# Runtime's memory-extraction step (components/agent-runtime/app/memory.py,
+# WP-28), never by components/rag-ingestion. NO physical database names,
+# service endpoints, secrets or credentials belong in this file - see
+# platform/bindings/knowledge/bindings.yaml (ADR-0204, WP-21/WP-28) for
+# the physical binding.
+
+id: knowledge.project
+title: Project-scoped agent memory
+description: >-
+  Durable, cross-session, cross-agent memory scoped to an explicit
+  engagement (`project_id`) - structured project state and semantic
+  project memories, both extracted from conversations rather than
+  ingested from an external source. Session/conversation history itself
+  (raw turns) is never part of this domain - see WP-08's checkpointer
+  store for that, a deliberately separate concern (ADR-0209).
+
+taxonomy:
+  source_classes:
+    - project-extraction   # WP-28 memory-extraction step, the only writer
+
+  # `project_id` is the mandatory, domain-specific metadata field every
+  # chunk here carries in addition to ADR-0202's common contract
+  # (domain, source, classification, acl_groups, provenance, ...) - see
+  # knowledge/metadata-schema.yaml's `domains.project` entry.
+  record_dimensions:
+    - project_id
+    - agent
+    - session
+
+freshness:
+  # Not a scheduled ingestion cadence (ADR-0105 doesn't apply - there is
+  # no source pipeline to schedule): memory becomes available the moment
+  # extraction runs (session end / explicit checkpoint), so there is no
+  # staleness window the way an externally-ingested domain has one.
+  # indexed_at is still stamped at extraction time (so this domain's
+  # chunks are never wrongly flagged freshness_untrusted by
+  # components/rag-service/app/search.py's trust scoring), but no
+  # stale_after decay applies.
+  objective: on-write
+  rationale: >-
+    Project memory is written synchronously by the extraction step at
+    session end, not fetched on a schedule - "freshness" here means
+    "was extraction run", not "how long since the last ingestion pass".
+  operation_classes:
+    semantic-read:
+      max_staleness: none
+    current-state-read:
+      max_staleness: none
+
+classification:
+  default_by_source_type:
+    project-extraction: C2   # inherited from the source conversation, never downgraded (ADR-0209) - this is a floor, not a ceiling
+
+policy_ref: policies/knowledge/knowledge-policy.yaml
+
+related_adrs:
+  - ADR-0032   # propagate trusted identity end to end (project_id follows the same pattern)
+  - ADR-0034   # compute effective classification from the complete context
+  - ADR-0035   # prevent restricted internal context from reaching external models
+  - ADR-0046   # metadata-aware RAG retrieval + acl_groups filter, reused for membership
+  - ADR-0202   # introduce logical knowledge domains
+  - ADR-0203   # enforce knowledge authorization as policy intersection
+  - ADR-0204   # multi-domain RAG platform generalization (WP-21)
+  - ADR-0209   # introduce project-scoped agent memory

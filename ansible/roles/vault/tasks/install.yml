@@ -383,6 +383,15 @@
         username: ragadv
         password: "{{ zuno_admin_rag_adv_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      rag-project/postgresql-app:
+        # knowledge.project's rag-project database (ADR-0209/WP-28) - see
+        # rag-sales/postgresql-app above. Unlike the other four domain
+        # databases, this one has no rag-ingestion source adapter to seed
+        # credentials for elsewhere - only rag-service and Agent Runtime
+        # ever connect to it.
+        username: ragproject
+        password: "{{ zuno_admin_rag_project_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"

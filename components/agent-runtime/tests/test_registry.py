@@ -41,11 +41,14 @@ def test_tekos_loads_from_the_real_bundle() -> None:
     # ADR-0203: declared_knowledge() is the union of every task's own
     # allowed_knowledge, mirroring declared_tools() exactly - there is no
     # separate agent-level field.
-    assert set(tekos.declared_knowledge()) == {"knowledge.tech"}
+    assert set(tekos.declared_knowledge()) == {"knowledge.tech", "knowledge.project"}
 
     task = tekos.tasks["answer-technical-question"]
     assert task.allowed_tools == ["search_confluence", "web_search"]
-    assert task.allowed_knowledge == ["knowledge.tech"]
+    # ADR-0209 (WP-28): knowledge.project added alongside knowledge.tech -
+    # the task can retrieve project memory too, gated per-turn on an
+    # actual project_id being present (app/graph/nodes.py:retrieve_node).
+    assert task.allowed_knowledge == ["knowledge.tech", "knowledge.project"]
     assert task.prompt and "Tekos" in task.prompt
 
 

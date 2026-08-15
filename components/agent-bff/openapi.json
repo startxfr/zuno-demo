@@ -89,7 +89,8 @@
         "required": ["session_id", "message"],
         "properties": {
           "session_id": { "type": "string", "description": "Caller-generated correlation ID for this chat session." },
-          "message": { "type": "string", "minLength": 1 }
+          "message": { "type": "string", "minLength": 1 },
+          "project_id": { "type": "string", "description": "ADR-0209: scopes this turn to a project's durable, cross-session, cross-agent memory (knowledge.project). Optional - omitted or empty means no project memory is read or written for this turn. Propagated to the Agent Runtime exactly as received, following the same identity-propagation pattern as ADR-0032/0033 - this BFF never validates or resolves project membership itself." }
         }
       },
       "Citation": {

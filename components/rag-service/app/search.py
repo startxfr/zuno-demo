@@ -139,6 +139,9 @@ def _record_freshness_lag(doc: Dict[str, Any]) -> None:
     record_freshness_lag(doc["domain"], max(lag_seconds, 0.0))
 
 
+_PROJECT_DOMAIN = "knowledge.project"
+
+
 def _filter_clause(
     start_index: int,
     product: Optional[str],
@@ -146,6 +149,7 @@ def _filter_clause(
     caller_groups: List[str],
     domains: Optional[List[str]] = None,
     technology: Optional[str] = None,
+    project_id: Optional[str] = None,
 ) -> Tuple[str, List[Any]]:
     """Builds an " AND ..." SQL fragment applied identically to both the
     vector and full-text candidate queries: ADR-0046's deterministic
@@ -169,6 +173,13 @@ def _filter_clause(
     ADR-0202: technology is a hard filter (like product/version), not a
     ranking preference - the one canonical cross-source key that lets a
     query combine official web documentation and Confluence chunks.
+
+    ADR-0209: project_id, when given, is a hard filter scoped to the
+    knowledge.project pool specifically (the caller must only pass it
+    when actually querying that domain's pool - see hybrid_search's
+    per-domain filter construction below) - a fresh rag-project database
+    can hold more than one project's memory, so without this a query for
+    project A could return project B's chunks alongside it.
     """
     clauses = []
     params: List[Any] = []
@@ -192,6 +203,10 @@ def _filter_clause(
             f"OR (NOT (metadata ? 'domain') AND 'knowledge.tech' = ANY(${idx}::text[])))"
         )
         params.append(domains)
+        idx += 1
+    if project_id:
+        clauses.append(f"metadata ->> 'project_id' = ${idx}")
+        params.append(project_id)
         idx += 1
 
     # A document with no acl_groups key, an empty array, or a null value is
@@ -320,6 +335,37 @@ def _apply_soft_adjustments(fused: Dict[str, float], docs_by_id: Dict[str, Dict[
             fused[doc_id] *= _FRESHNESS_UNTRUSTED_PENALTY_FACTOR
 
 
+class ProjectMembershipDenied(RuntimeError):
+    """ADR-0209: raised when the caller has no project_memberships row for
+    the requested project_id - fail closed, distinct from "no live pool"
+    only so tests/logs can tell the two apart; both currently surface as a
+    generic error to the HTTP layer (app/main.py's broad except)."""
+
+
+async def _check_project_membership(
+    pool, project_id: str, caller_sub: Optional[str], caller_groups: List[str]
+) -> None:
+    """ADR-0209 Security considerations: "missing membership... must fail
+    closed" - checked BEFORE the project domain's pool is ever queried for
+    content, same ordering as every other authorization gate in this
+    codebase (decide, then act). A row matching the caller's own sub OR
+    any of their groups is sufficient (mirrors _filter_clause's acl_groups
+    `?|` intersection semantics, applied here as a row-existence check
+    against project_memberships instead of a jsonb array)."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT 1 FROM project_memberships WHERE project_id = $1 "
+            "AND (subject = $2 OR group_name = ANY($3::text[])) LIMIT 1",
+            project_id,
+            caller_sub or "",
+            caller_groups,
+        )
+    if row is None:
+        raise ProjectMembershipDenied(
+            f"caller is not a member of project '{project_id}' - denied (ADR-0209, fail closed)"
+        )
+
+
 async def hybrid_search(
     query: str,
     top_k: int,
@@ -329,6 +375,8 @@ async def hybrid_search(
     caller_groups: Optional[List[str]] = None,
     domains: Optional[List[str]] = None,
     technology: Optional[str] = None,
+    project_id: Optional[str] = None,
+    caller_sub: Optional[str] = None,
 ) -> Dict[str, Any]:
     """ADR-0204 (WP-21): domains selects which per-domain database pool(s)
     (app/bindings.py's KnowledgeBindingRegistry, app/db.py's pool registry)
@@ -345,13 +393,18 @@ async def hybrid_search(
     returning partial results from whichever domains happen to be up -
     "no silent partial results" applies to domain availability the same
     way ADR-0205 later applies it to freshness/source substitution.
+
+    ADR-0209 (WP-28): when `knowledge.project` is among `domains`,
+    `project_id`/`caller_sub` are required (raises RuntimeError otherwise
+    - a malformed call, not a legitimate "nothing authorized" case; Agent
+    Runtime's own retrieve_node never sends knowledge.project without
+    both) and the project_memberships fail-closed check runs before that
+    domain's pool is queried for any content.
     """
     caller_groups = caller_groups or []
     effective_domains = list(domains) if domains else ["knowledge.tech"]
     top_k = max(1, min(top_k, config.MAX_TOP_K))
     fetch_n = max(top_k * 4, 20)  # over-fetch each ranked list before fusion
-
-    filter_sql, filter_params = _filter_clause(3, product, version, caller_groups, effective_domains, technology)
 
     vector_used = False
     fused: Dict[str, float] = {}
@@ -379,6 +432,20 @@ async def hybrid_search(
             # the same posture the pre-ADR-0204 single pool already had
             # (it simply had nothing to be partial about).
             raise RuntimeError(f"no live database pool for requested domain '{domain}'")
+
+        domain_project_id = None
+        if domain == _PROJECT_DOMAIN:
+            if not project_id or not caller_sub:
+                raise RuntimeError(
+                    "knowledge.project requested without project_id/caller_sub - "
+                    "both are required for the fail-closed membership check"
+                )
+            await _check_project_membership(pool, project_id, caller_sub, caller_groups)
+            domain_project_id = project_id
+
+        filter_sql, filter_params = _filter_clause(
+            3, product, version, caller_groups, effective_domains, technology, domain_project_id
+        )
 
         async with pool.acquire() as conn:
             if embedding is not None:

@@ -85,6 +85,12 @@ spec:
             - /sql/003_rag_metadata.sql
             - -f
             - /sql/004_rag_chunking.sql
+            {{- if eq .domain "project" }}
+            # ADR-0209/WP-28: project_state + project_memberships - only
+            # knowledge.project's database needs these.
+            - -f
+            - /sql/005_project_memory.sql
+            {{- end }}
             {{- if .seed }}
             - -f
             - /sql/seed.sql

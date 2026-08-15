@@ -59,4 +59,7 @@ data:
 
     \connect {{ .Values.ragAdvDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.ragAdvDatabase.owner }};
+
+    \connect {{ .Values.ragProjectDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.ragProjectDatabase.owner }};
 {{- end }}

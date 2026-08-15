@@ -8,6 +8,7 @@ zuno:
     - web_search
   allowed_knowledge:
     - knowledge.tech
+    - knowledge.project
 ---
 
 # Answer a technical question

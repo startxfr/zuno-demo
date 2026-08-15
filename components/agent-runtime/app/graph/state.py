@@ -47,6 +47,11 @@ class AgentState(TypedDict, total=False):
     # the MaaS adapter) as X-Zuno-Request-Id for usage/trace correlation -
     # see app/main.py's _request_id and app/clients/model_router.py.
     request_id: str
+    # ADR-0209/WP-28: scopes this turn to a project's durable memory
+    # (knowledge.project) - forwarded on every RAG call this turn makes
+    # (app/clients/rag_client.py) and to the extraction endpoint at
+    # session end. None/absent means no project memory involvement.
+    project_id: Optional[str]
 
     # Node outputs, accumulated as the graph runs
     retrieved_docs: List[RetrievedDoc]

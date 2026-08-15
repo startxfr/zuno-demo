@@ -11,10 +11,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-from app import db, ogx_provider
+from app import db, ogx_provider, project_memory
 from app.bindings import KnowledgeBindingRegistry
-from app.schemas import SearchRequest, SearchResponse
-from app.search import hybrid_search
+from app.schemas import (
+    ProjectMemoryWriteRequest,
+    ProjectMemoryWriteResponse,
+    SearchRequest,
+    SearchResponse,
+)
+from app.search import ProjectMembershipDenied, hybrid_search
 from app.telemetry import init_telemetry, search_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -91,6 +96,8 @@ async def search(payload: SearchRequest) -> SearchResponse:
                     caller_groups=payload.caller_groups,
                     domains=payload.domains,
                     technology=payload.technology,
+                    project_id=payload.project_id,
+                    caller_sub=payload.caller_sub,
                 )
             else:
                 result = await hybrid_search(
@@ -102,9 +109,42 @@ async def search(payload: SearchRequest) -> SearchResponse:
                     caller_groups=payload.caller_groups,
                     domains=payload.domains,
                     technology=payload.technology,
+                    project_id=payload.project_id,
+                    caller_sub=payload.caller_sub,
                 )
         except Exception as exc:
             logger.error("search failed for query=%r (provider=%s): %s", payload.query, call.provider, exc)
             raise HTTPException(status_code=500, detail=f"search failed: {exc}") from exc
         call.result_count = len(result.get("results", []))
     return SearchResponse(**result)
+
+
+@app.post("/v1/project-memory/write", response_model=ProjectMemoryWriteResponse)
+async def write_project_memory(payload: ProjectMemoryWriteRequest) -> ProjectMemoryWriteResponse:
+    """ADR-0209 (WP-28): persists one memory-extraction step's output -
+    Agent Runtime's only path for writing knowledge.project content (see
+    app/project_memory.py's module docstring for why this stays a
+    rag-service-owned write, not a direct database credential handed to
+    the runtime). Fail closed: no project_memberships row for
+    (project_id, caller_sub/caller_groups) denies the whole write before
+    either table is touched (403, distinct from every other failure mode
+    here which is a 500 - the one place this service returns a domain-
+    specific authorization status rather than a generic error).
+    """
+    try:
+        result = await project_memory.write_project_memory(
+            project_id=payload.project_id,
+            caller_sub=payload.caller_sub,
+            caller_groups=payload.caller_groups,
+            agent=payload.agent,
+            session_id=payload.session_id,
+            classification=payload.classification,
+            facts=[f.model_dump() for f in payload.facts],
+            memories=[m.model_dump() for m in payload.memories],
+        )
+    except ProjectMembershipDenied as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("project-memory write failed for project_id=%r: %s", payload.project_id, exc)
+        raise HTTPException(status_code=500, detail=f"project-memory write failed: {exc}") from exc
+    return ProjectMemoryWriteResponse(**result)

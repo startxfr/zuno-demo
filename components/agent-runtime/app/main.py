@@ -19,7 +19,10 @@ from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.auth import CallerIdentity, validate_token
+from app.clients import project_memory_client
 from app.graph.build import build_graph
+from app.graph.nodes import TEKOS_BASE_CLASSIFICATION, _TEKOS, _model_router
+from app.memory import MemoryExtractionError, extract_memory
 from app.schemas import ChatRequest, ChatResponse
 from app.telemetry import graph_run_span, init_telemetry
 
@@ -143,6 +146,10 @@ def _initial_state(payload: ChatRequest, identity: CallerIdentity, request_id: s
         # model-call trace/usage record can be joined back to this exact
         # chat turn.
         "request_id": request_id,
+        # ADR-0209/WP-28: forwarded as received - this runtime does not
+        # itself validate project membership (rag-service does, fail
+        # closed, at retrieval time).
+        "project_id": payload.project_id,
         "retrieved_docs": [],
         "tool_results": {},
         "errors": [],
@@ -180,6 +187,104 @@ async def _resolve_run_id(graph, payload: ChatRequest, identity: CallerIdentity)
         raise HTTPException(status_code=403, detail="this workflow run belongs to a different user")
 
     return payload.run_id
+
+
+async def _build_transcript(graph, run_id: str) -> str:
+    """ADR-0209: reconstructs the full conversation for this run_id from
+    every checkpoint LangGraph recorded for it (oldest first) -
+    AgentState's message/reply channels hold only the latest turn each,
+    not a running history, so a single checkpoint read (like
+    _resolve_run_id's) would only ever see the last exchange."""
+    config = {"configurable": {"thread_id": run_id}}
+    turns = []
+    async for checkpoint_tuple in graph.checkpointer.alist(config):
+        channel_values = checkpoint_tuple.checkpoint.get("channel_values") or {}
+        message = channel_values.get("message")
+        reply = channel_values.get("reply")
+        if message:
+            turns.append(f"User: {message}")
+        if reply:
+            turns.append(f"Assistant: {reply}")
+    turns.reverse()  # alist() yields newest-first
+    return "\n".join(turns)
+
+
+@app.post("/v1/agents/tekos/runs/{run_id}/extract-memory")
+async def extract_memory_endpoint(
+    run_id: str,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> Dict[str, Any]:
+    """ADR-0209 (WP-28): the explicit extraction step - session end or an
+    explicit checkpoint, never automatic per-turn. Reuses
+    _resolve_run_id's ownership check (404 unknown run, 403 wrong
+    subject) since this endpoint reads the exact same checkpoint state,
+    then requires the run to actually carry a project_id (a run with none
+    has nothing to extract INTO - knowledge.project is per-project, not a
+    default bucket).
+    """
+    graph = request.app.state.tekos_graph
+    config = {"configurable": {"thread_id": run_id}}
+    tuple_ = await graph.checkpointer.aget_tuple(config)
+    if tuple_ is None:
+        raise HTTPException(status_code=404, detail=f"no workflow run found for run_id '{run_id}'")
+
+    channel_values = tuple_.checkpoint.get("channel_values") or {}
+    stored_sub = channel_values.get("user_sub")
+    if stored_sub != identity.sub:
+        logger.warning("refused to extract memory for run_id=%s: belongs to a different subject", run_id)
+        raise HTTPException(status_code=403, detail="this workflow run belongs to a different user")
+
+    project_id = channel_values.get("project_id")
+    if not project_id:
+        raise HTTPException(
+            status_code=400, detail="this run has no project_id - nothing to extract memory into"
+        )
+
+    transcript = await _build_transcript(graph, run_id)
+    if not transcript.strip():
+        return {"facts_written": 0, "memories_written": 0, "note": "empty transcript, nothing to extract"}
+
+    # ADR-0034: the highest classification reached across this run's
+    # turns, monotonically escalated by _escalate - never re-derived or
+    # downgraded here.
+    classification = channel_values.get("effective_classification", TEKOS_BASE_CLASSIFICATION)
+
+    try:
+        facts, memories = await extract_memory(
+            model_router=_model_router,
+            transcript=transcript,
+            classification=classification,
+            bearer_token=identity.token,
+        )
+    except MemoryExtractionError as exc:
+        # ADR-0209 Operational considerations: logged, not silently
+        # treated as "nothing worth remembering" - surfaced as a 502 so
+        # the caller can retry rather than assume success.
+        logger.error("memory extraction failed for run_id=%s project_id=%s: %s", run_id, project_id, exc)
+        raise HTTPException(status_code=502, detail=f"memory extraction failed: {exc}") from exc
+
+    if not facts and not memories:
+        return {"facts_written": 0, "memories_written": 0, "note": "nothing durable identified"}
+
+    try:
+        result = await project_memory_client.write_project_memory(
+            project_id=project_id,
+            caller_sub=identity.sub,
+            caller_groups=identity.groups,
+            agent=_TEKOS.name,
+            session_id=channel_values.get("session_id"),
+            classification=classification,
+            facts=facts,
+            memories=memories,
+        )
+    except project_memory_client.ProjectMembershipDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except project_memory_client.ProjectMemoryClientError as exc:
+        logger.error("project-memory write failed for run_id=%s project_id=%s: %s", run_id, project_id, exc)
+        raise HTTPException(status_code=502, detail=f"project-memory write failed: {exc}") from exc
+
+    return result
 
 
 @app.post("/v1/agents/tekos/chat")

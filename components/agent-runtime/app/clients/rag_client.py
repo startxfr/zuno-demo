@@ -26,6 +26,8 @@ async def search(
     caller_groups: Optional[List[str]] = None,
     domains: Optional[List[str]] = None,
     technology: Optional[str] = None,
+    project_id: Optional[str] = None,
+    caller_sub: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """ADR-0046: product/version are deterministic pre-ranking filters
     (set by app/graph/nodes.py:_extract_product_version when the user's
@@ -55,6 +57,16 @@ async def search(
         body["domains"] = domains
     if technology:
         body["technology"] = technology
+    # ADR-0209: required by rag-service whenever knowledge.project is
+    # among `domains` - a fail-closed membership check needs both to know
+    # WHICH project and WHO is asking. Sent whenever present regardless
+    # of whether knowledge.project is actually requested this call: it's
+    # inert if knowledge.project isn't in `domains`, and this keeps the
+    # forwarding logic here simple (no need to special-case).
+    if project_id:
+        body["project_id"] = project_id
+    if caller_sub:
+        body["caller_sub"] = caller_sub
 
     try:
         async with httpx.AsyncClient(timeout=RAG_TIMEOUT_SECONDS) as client:

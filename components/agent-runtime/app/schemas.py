@@ -20,6 +20,13 @@ class ChatRequest(BaseModel):
     # restart. Resuming with a token belonging to a different subject than
     # the one the run was started under is refused (see app/main.py).
     run_id: Optional[str] = Field(default=None, min_length=1)
+    # ADR-0209: scopes this turn to a project's durable, cross-session,
+    # cross-agent memory (knowledge.project). Optional/omitted - no
+    # project_id means no project memory is read or written this turn.
+    # Forwarded from components/agent-bff's own optional ChatRequest.
+    # project_id field, following the same identity-propagation pattern
+    # ADR-0032/0033 already use.
+    project_id: Optional[str] = Field(default=None, min_length=1)
 
 
 class Citation(BaseModel):

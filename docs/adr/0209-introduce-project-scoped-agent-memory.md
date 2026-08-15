@@ -1,6 +1,6 @@
 # ADR-0209: Introduce project-scoped agent memory
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (domain, propagation, membership enforcement, extraction and Tekos end-to-end merged; cross-agent Arkos scenario pending WP-31)
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

@@ -155,6 +155,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     product, version = _extract_product_version(state["message"])
     language = _detect_language(state["message"])
     caller_groups = state.get("groups", [])
+    project_id = state.get("project_id")
 
     decision = evaluate_knowledge(
         store=_knowledge_store,
@@ -162,7 +163,17 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
         task_allowed=_ANSWER_TASK.allowed_knowledge,
         caller_groups=caller_groups,
     )
-    if not decision.authorized_domains:
+    authorized_domains = decision.authorized_domains
+    if not project_id and "knowledge.project" in authorized_domains:
+        # ADR-0209: knowledge.project without a project_id on this turn is
+        # meaningless (rag-service's membership check needs both) -
+        # requesting it anyway would just be a guaranteed-empty domain in
+        # the fan-out, not a useful "try anyway". The knowledge-policy
+        # intersection above still ran and may have authorized it (the
+        # task declares it); this is a separate, per-turn gate on top.
+        authorized_domains = [d for d in authorized_domains if d != "knowledge.project"]
+
+    if not authorized_domains:
         logger.warning(
             "no knowledge domain authorized for this call, skipping retrieval: %s", decision.denied
         )
@@ -180,7 +191,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             version=version,
             language=language,
             caller_groups=caller_groups,
-            domains=decision.authorized_domains,
+            domains=authorized_domains,
             # ADR-0202/WP-22: _extract_product_version's values ("openshift",
             # "openshift-ai") ARE canonical technology_vocabulary entries
             # (knowledge/tech/domain.yaml), so the same detection doubles as
@@ -188,6 +199,8 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             # Confluence chunks - the per-source `product` vocabulary never
             # did (its deprecation as a filter key is flagged for v0.3).
             technology=product,
+            project_id=project_id,
+            caller_sub=state.get("user_sub"),
         )
     except RagClientError as exc:
         logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)

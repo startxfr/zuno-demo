@@ -111,6 +111,19 @@ knowledgeDomains:
     vaultPath: rag-adv/postgresql-app
     secretName: rag-service-db-ragadv
     seed: false
+  # knowledge.project (ADR-0209/WP-28) - unlike the four domains above,
+  # this one has no rag-ingestion schedule to wait on (no source
+  # pipeline writes here at all, see knowledge/project/domain.yaml) -
+  # still ships disabled by default because its database/credentials are
+  # provisioned by the same WP-21 operator step as every other domain.
+  - domain: project
+    enabled: false
+    database: rag-project
+    schema: rag
+    envPrefix: RAGPROJECT
+    vaultPath: rag-project/postgresql-app
+    secretName: rag-service-db-ragproject
+    seed: false
 
 # OpenAI-compatible embeddings endpoint - see README "Embedding backend".
 embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings

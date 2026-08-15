@@ -77,3 +77,13 @@ bindings:
       schema: rag
       credential_env_prefix: RAGADV
     ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.adv"
+
+  - domain: knowledge.project
+    database:
+      name: rag-project
+      schema: rag
+      credential_env_prefix: RAGPROJECT
+    # No rag-ingestion source (WP-28/ADR-0209): this domain's only writer
+    # is Agent Runtime's memory-extraction step, not a scheduled source
+    # adapter - see knowledge/project/domain.yaml.
+    ingestion_config_ref: "components/agent-runtime/app/memory.py (WP-28 extraction step, not rag-ingestion)"

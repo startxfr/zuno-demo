@@ -87,3 +87,21 @@ domains:
       - adv
       - board
     min_classification: C2
+
+  knowledge.project:
+    # ADR-0209 (WP-28): "any entitled agent may declare
+    # knowledge.project; membership decides access." Every real
+    # business-role group is listed here deliberately - this domain has
+    # no fixed business-role restriction the way the other four do, so
+    # this factor (5) must never be the actual gate. The real, per-
+    # engagement gate is a SIXTH factor beyond ADR-0203's five,
+    # enforced by rag-service directly against the project_memberships
+    # table (data/rag/schema/005_project_memory.sql) at query time -
+    # fail closed, no membership row for the caller's sub OR any of
+    # their groups = deny, same posture as every other factor here.
+    allowed_groups:
+      - consultant
+      - board
+      - sales
+      - adv
+      - finance

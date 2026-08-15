@@ -4,7 +4,7 @@
 //
 //	POST /v1/agents/{agent}/chat
 //	  headers: Authorization: Bearer <end-user token>
-//	  body:  {"session_id": string, "user_sub": string, "message": string}
+//	  body:  {"session_id": string, "user_sub": string, "message": string, "project_id": string (optional, ADR-0209)}
 //	  reply: {"reply": string, "citations": [{"source": string, "title": string}]}
 //
 // The Authorization header carries the same validated bearer token the BFF
@@ -42,6 +42,10 @@ type ChatRequest struct {
 	SessionID string `json:"session_id"`
 	UserSub   string `json:"user_sub"`
 	Message   string `json:"message"`
+	// ADR-0209: optional - see components/agent-runtime/app/schemas.py's
+	// ChatRequest.project_id. Empty means no project memory is read or
+	// written for this turn.
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 // ChatResponse is the Agent Runtime's documented response body.
