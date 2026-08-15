@@ -55,6 +55,11 @@ type AIAgentReconciler struct {
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
+// VERIFIED live (2026-08-15): setting spec.host on a Route additionally
+// requires create on routes/custom-host, or the apiserver rejects the
+// write with "spec.host: Forbidden" (envtest cannot catch this - no
+// OpenShift route admission plugin there).
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes/custom-host,verbs=create
 // +kubebuilder:rbac:groups=external-secrets.io,resources=externalsecrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile drives one AIAgent CR toward the resource set CONTRACT.md

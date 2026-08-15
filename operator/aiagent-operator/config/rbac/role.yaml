@@ -67,6 +67,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - route.openshift.io
+  resources:
+  - routes/custom-host
+  verbs:
+  - create
+- apiGroups:
   - zuno.zuno.ai
   resources:
   - aiagents
