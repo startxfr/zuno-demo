@@ -1022,7 +1022,7 @@
     "clients": [{
             "clientId": "comage-frontend",
             "name": "Comage frontend (sales)",
-            "description": "Confidential client for the Comage sales agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-33: flipped from the placeholder public-SPA entry to match Tekos/Arkos's real, working shape - components/agent-frontend requires OIDC_CLIENT_SECRET and has no public/PKCE-only code path)",
+            "description": "Confidential client for the Comage sales agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-33; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
@@ -1110,7 +1110,7 @@
         {
             "clientId": "advantage-frontend",
             "name": "Advantage frontend (sales admin)",
-            "description": "Confidential client for the Advantage sales-admin agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-35: flipped from the placeholder public-SPA entry to match Tekos/Arkos/Comage's real, working shape - components/agent-frontend requires OIDC_CLIENT_SECRET and has no public/PKCE-only code path)",
+            "description": "Confidential client for the Advantage sales-admin agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-35; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
@@ -1154,7 +1154,7 @@
         {
             "clientId": "finage-frontend",
             "name": "Finage frontend (finance)",
-            "description": "Confidential client for the Finage finance agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-36: flipped from the placeholder public-SPA entry to match every other agent's real, working shape - components/agent-frontend requires OIDC_CLIENT_SECRET and has no public/PKCE-only code path)",
+            "description": "Confidential client for the Finage finance agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-36; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
@@ -1198,7 +1198,7 @@
         {
             "clientId": "arkos-frontend",
             "name": "Arkos frontend (architects)",
-            "description": "Confidential client for the Arkos architects agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-31: flipped from the placeholder public-SPA entry to match Tekos's real, working shape - components/agent-frontend requires OIDC_CLIENT_SECRET and has no public/PKCE-only code path)",
+            "description": "Confidential client for the Arkos architects agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-31; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
@@ -1242,7 +1242,7 @@
         {
             "clientId": "naveo-frontend",
             "name": "Naveo frontend (onboarding)",
-            "description": "Confidential client for the Naveo onboarding-assistant agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0410/ADR-0307/WP-41: sixth demo agent, scaffolded from platform/templates/agent/ - proves self-service onboarding produces the same real, working shape as every hand-built agent, never a placeholder public-SPA entry)",
+            "description": "Confidential client for the Naveo onboarding-assistant agent \u2014 sixth demo agent scaffolded from platform/templates/agent/ (ADR-0410/ADR-0307/WP-41), server-side OIDC code exchange, namespace zuno-ai-run",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
@@ -1328,7 +1328,7 @@
         {
             "clientId": "cognos-frontend",
             "name": "Cognos frontend (board financial/strategic)",
-            "description": "Public SPA client for the Cognos board-only financial and strategic agent \u2014 namespace zuno-ai-run (ADR-0349 §6 placeholder pattern: identity footprint only, no runtime; flipped to a confidential client like every active agent's own frontend once Cognos is actually built)",
+            "description": "Public SPA client for the Cognos board-only agent \u2014 identity footprint only, no runtime (ADR-0349 §6 placeholder; becomes confidential once Cognos is built), namespace zuno-ai-run",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": true,
