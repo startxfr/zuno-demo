@@ -55,14 +55,15 @@ def test_tekos_loads_from_the_real_bundle() -> None:
 def test_placeholder_agents_declare_no_tools() -> None:
     """Still-genuinely-placeholder agents (their coming-soon stub task has
     an empty allowed_tools list by construction, ADR-0036) declare no
-    tools. Arkos is a special case since WP-31: its real task bundle and
-    graph shape are merged, but `status` deliberately stays `placeholder`
-    until the operator confirms the live acceptance gate passes (WP-31's
-    own Status-updates section) - it now legitimately DOES declare real
-    tools while still reporting placeholder status, which is exactly the
-    point being tested for the other three."""
+    tools. Arkos and Comage are special cases since WP-31/WP-33: their
+    real task bundles and graph shapes are merged, but `status`
+    deliberately stays `placeholder` until the operator confirms the live
+    acceptance gate passes (WP-31/WP-33's own Status-updates sections) -
+    they now legitimately DO declare real tools while still reporting
+    placeholder status, which is exactly the point being tested for the
+    remaining two."""
     registry = AgentRegistry(agents_dir=str(REAL_AGENTS_DIR))
-    for name in ("comage", "advantage", "finage"):
+    for name in ("advantage", "finage"):
         agent = registry.get(name)
         assert agent is not None, name
         assert agent.status == "placeholder"
@@ -76,6 +77,19 @@ def test_placeholder_agents_declare_no_tools() -> None:
         "confluence.page.search",
         "drive.document.create",
         "drive.document.update",
+    ]
+
+    comage = registry.get("comage")
+    assert comage is not None
+    assert comage.status == "placeholder"
+    assert comage.declared_tools() == [
+        "salesforce.opportunity.read",
+        "web_search",
+        "salesforce.opportunity.update",
+        "sxa.opportunity.search",
+        "sxa.aggregate.revenue-by-year",
+        "list_drive_files",
+        "read_gmail",
     ]
 
 

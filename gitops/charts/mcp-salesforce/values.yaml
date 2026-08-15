@@ -1,0 +1,30 @@
+# Must match mcp-gateway's binding registry entry (endpoint.default:
+# http://salesforce-mcp.zuno-ai-run.svc:8000) in
+# platform/bindings/tools/tool-bindings.yaml.
+namespace: zuno-ai-run
+
+# Built by the "mcp" build component into zuno-ai-build's ImageStream, pulled
+# cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-salesforce
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# ADR-0208 service-identity: one shared Salesforce technical identity for
+# every caller (the gateway's own ADR-0011 intersection authorizes the
+# actual caller before this identity is ever used).
+credentials:
+  vaultPath: salesforce/technical
+  secretName: salesforce-technical-credentials
+  secretStoreName: vault-backend
+  refreshInterval: 1h

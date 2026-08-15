@@ -71,6 +71,13 @@ class TaskDefinition:
     # same ceiling/narrowing semantics.
     allowed_knowledge: List[str] = field(default_factory=list)
     prompt: Optional[str] = None
+    # ADR-0342/WP-33: which of this task's own allowed_tools entries
+    # app/graph/nodes.py:_make_tool_call_node's conditional live-read
+    # branch invokes (Tekos: confluence.page.search; Comage: a Salesforce
+    # read) - explicit, git-reviewed configuration, never inferred or
+    # derived from caller/state data. None means this task's shape never
+    # attempts a live read (tool_call_node degrades to a no-op).
+    live_read_tool: Optional[str] = None
 
 
 @dataclass
@@ -86,6 +93,15 @@ class AgentDefinition:
     # runtime workflow exists yet, ADR-0007) - see that module's
     # validate_shapes() for the fail-fast rule this field feeds.
     graph_shape: Optional[str] = None
+    # ADR-0342/WP-33: which of this agent's declared tasks its chat route
+    # actually executes - required so two agents can share one shape
+    # (e.g. Comage reusing Tekos's retrieve_reason_respond) with
+    # GraphFactory still resolving the right task's prompt/allowed_tools/
+    # allowed_knowledge for each. An agent may declare more tasks than
+    # this (v1 catalog entries with no live route yet, same as Tekos's
+    # own find-relevant-docs/check-my-drive-docs) - this field names only
+    # the one the shape is built against. None for `placeholder` agents.
+    primary_task: Optional[str] = None
 
     def declared_tools(self) -> List[str]:
         """Union of every task's allowed_tools - ADR-0011 factor 1 (agent
@@ -201,6 +217,7 @@ class AgentRegistry:
             rag_top_k=int(rag.get("top_k", 5)),
             tasks=tasks,
             graph_shape=zuno.get("graph_shape"),
+            primary_task=zuno.get("primary_task"),
         )
 
     def _load_task(self, task_name: str, agent_dir: Path) -> TaskDefinition:
@@ -224,6 +241,7 @@ class AgentRegistry:
             allowed_tools=list(zuno.get("allowed_tools", [])),
             allowed_knowledge=list(zuno.get("allowed_knowledge", [])),
             prompt=prompt,
+            live_read_tool=zuno.get("live_read_tool"),
         )
 
     def get(self, name: str) -> Optional[AgentDefinition]:

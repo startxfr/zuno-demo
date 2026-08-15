@@ -71,6 +71,16 @@ zuno_jira_url: "xxxxxx"       # e.g. https://your-company.atlassian.net
 zuno_jira_email: "xxxxxx"
 zuno_jira_token: "xxxxxx"
 
+# --- Salesforce (technical identity for the salesforce MCP server,
+# ADR-0326/WP-33 - Comage's live opportunity read/create/update) ------------
+# Create a Connected App in Salesforce Setup, enable OAuth, and mint a
+# long-lived access token for a dedicated integration user (or a refresh
+# flow of your choosing - this demo only stores the resulting bearer
+# token). Auth is a single bearer token (HTTP Authorization header).
+zuno_salesforce_enabled: false
+zuno_salesforce_url: "xxxxxx"           # e.g. https://your-domain.my.salesforce.com
+zuno_salesforce_access_token: "xxxxxx"
+
 # --- RAG corpus S3 bucket (rag-ingestion's raw/normalized/manifest storage -
 # bucket/region/endpoint are chart config, not secret: see
 # gitops/charts/rag-ingestion/values.yaml's s3: block) -----------------------

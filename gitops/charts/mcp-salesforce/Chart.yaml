@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-salesforce
+description: Live Salesforce Opportunity MCP server (ADR-0326/WP-33) - read, create, update.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

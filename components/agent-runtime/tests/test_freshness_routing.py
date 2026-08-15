@@ -140,15 +140,25 @@ def test_the_answer_task_never_declares_a_write_capable_tool() -> None:
         )
 
 
-def test_tool_call_node_source_hardcodes_search_confluence_not_a_variable_tool_name() -> None:
-    """Structural guard: tool_call_node's invoke_tool call must name
-    search_confluence as a literal, not build a tool name from caller
-    input or retrieved content - the only way this node could ever
-    invoke a write tool is if that changed."""
+def test_tool_call_node_source_binds_tool_name_from_task_config_not_caller_input() -> None:
+    """Structural guard: tool_call_node's invoke_tool call must name a
+    tool bound from task.live_read_tool (trusted OKF config, closed over
+    once per agent/task by _make_tool_call_node at graph-build time) -
+    never built from caller input, request state, or retrieved content.
+    WP-33 generalized the old literal 'tool_name="search_confluence"'
+    string (so Comage's tool_call_node can bind a Salesforce tool
+    instead), but this guard's original intent - the tool name can't be
+    caller-controlled, so this node could never be tricked into invoking
+    a write tool - must survive that generalization."""
     import inspect
 
-    source = inspect.getsource(nodes.tool_call_node)
-    assert 'tool_name="search_confluence"' in source
+    factory_source = inspect.getsource(nodes._make_tool_call_node)
+    assert "live_read_tool = task.live_read_tool" in factory_source
+
+    node_source = inspect.getsource(nodes.tool_call_node)
+    assert "tool_name=live_read_tool" in node_source
+    assert 'state["live_read_tool"]' not in node_source
+    assert 'state.get("live_read_tool"' not in node_source
 
 
 TESTS = [
@@ -163,7 +173,7 @@ TESTS = [
     test_source_mode_none_when_nothing_contributed,
     test_source_mode_ignores_an_empty_confluence_result_as_not_live,
     test_the_answer_task_never_declares_a_write_capable_tool,
-    test_tool_call_node_source_hardcodes_search_confluence_not_a_variable_tool_name,
+    test_tool_call_node_source_binds_tool_name_from_task_config_not_caller_input,
 ]
 
 

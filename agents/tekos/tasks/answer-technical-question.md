@@ -6,6 +6,7 @@ zuno:
   allowed_tools:
     - search_confluence
     - web_search
+  live_read_tool: search_confluence
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project

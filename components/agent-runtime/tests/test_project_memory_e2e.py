@@ -57,9 +57,17 @@ from app.auth import CallerIdentity  # noqa: E402
 from app.clients import project_memory_client  # noqa: E402
 from app.clients.model_router import ProviderCandidate  # noqa: E402
 from app.graph import arkos_nodes, nodes  # noqa: E402
+from app.graph.arkos_nodes import _ARKOS  # noqa: E402
 from app.graph.build import GraphFactory  # noqa: E402
-from app.graph.shapes.retrieve_reason_respond import build as build_graph  # noqa: E402
+from app.graph.nodes import _ANSWER_TASK, _TEKOS  # noqa: E402
+from app.graph.shapes.retrieve_reason_respond import build as _build_retrieve_reason_respond  # noqa: E402
 from app.main import extract_memory_endpoint  # noqa: E402
+
+
+def build_graph(checkpointer):
+    """Tekos-bound convenience wrapper (ADR-0342/WP-33: build() is now
+    agent/task-parameterized so Comage can reuse this same shape)."""
+    return _build_retrieve_reason_respond(checkpointer, _TEKOS, _ANSWER_TASK)
 
 
 def _identity(sub: str, groups) -> CallerIdentity:
@@ -388,7 +396,7 @@ async def test_arkos_retrieves_tekos_written_project_memory_through_its_own_shap
 
     try:
         # --- Tekos states the fact, on retrieve_reason_respond -------------
-        tekos_graph = factory.graph_for_shape("retrieve_reason_respond")
+        tekos_graph = factory.graph_for(_TEKOS)
         run_id_1 = "run-tekos-demo-001"
         final_1 = await tekos_graph.ainvoke(
             {
@@ -419,7 +427,7 @@ async def test_arkos_retrieves_tekos_written_project_memory_through_its_own_shap
         # --- Arkos retrieves the SAME project's memory through its OWN
         # shape, same GraphFactory instance, never having seen Tekos's
         # turn. -----------------------------------------------------------
-        arkos_graph = factory.graph_for_shape("plan_draft_write")
+        arkos_graph = factory.graph_for(_ARKOS)
         assert arkos_graph is not tekos_graph
         run_id_2 = "run-arkos-demo-001"
         final_2 = await arkos_graph.ainvoke(

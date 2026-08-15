@@ -65,6 +65,9 @@ jobs:
           - name: mcp-confluence
             dockerfile: components/mcp-servers/confluence/Dockerfile
             context: components/mcp-servers/confluence
+          - name: mcp-salesforce
+            dockerfile: components/mcp-servers/salesforce/Dockerfile
+            context: components/mcp-servers/salesforce
     steps:
       - uses: actions/checkout@v4
 

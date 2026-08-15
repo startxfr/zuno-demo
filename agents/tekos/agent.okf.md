@@ -21,6 +21,7 @@ zuno:
   name: tekos
   status: active
   graph_shape: retrieve_reason_respond
+  primary_task: answer-technical-question
   tasks:
     - answer-technical-question
     - find-relevant-docs

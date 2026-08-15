@@ -37,13 +37,23 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import a
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 os.environ.setdefault("AGENTS_DIR", str(_REPO_ROOT / "agents"))
 
+from langgraph.checkpoint.base import BaseCheckpointSaver  # noqa: E402
 from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
+from langgraph.graph.state import CompiledStateGraph  # noqa: E402
 
 import app.main as main_module  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
-from app.graph.shapes.retrieve_reason_respond import build as build_graph  # noqa: E402
+from app.graph.nodes import _ANSWER_TASK, _TEKOS  # noqa: E402
+from app.graph.shapes.retrieve_reason_respond import build as _build  # noqa: E402
 from app.main import _checkpoint_conninfo, _resolve_run_id  # noqa: E402
 from app.schemas import ChatRequest  # noqa: E402
+
+
+def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
+    """Tekos-bound convenience wrapper (ADR-0342/WP-33: build() is now
+    agent/task-parameterized so Comage can reuse this same shape) - every
+    call site below only ever needs Tekos's own graph."""
+    return _build(checkpointer, _TEKOS, _ANSWER_TASK)
 
 
 def _identity(sub: str) -> CallerIdentity:

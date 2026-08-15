@@ -19,6 +19,7 @@ zuno:
   name: arkos
   status: placeholder
   graph_shape: plan_draft_write
+  primary_task: draft-architecture-testimonial
   tasks:
     - draft-architecture-testimonial
   model:

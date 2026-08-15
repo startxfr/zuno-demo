@@ -1,0 +1,27 @@
+# salesforce-mcp must accept traffic ONLY from the MCP Gateway, not other
+# same-namespace pods (e.g. agent-runtime) - same reasoning as
+# gitops/charts/mcp-confluence's NetworkPolicy. The app also validates the
+# X-Zuno-Gateway-Token shared secret as defense in depth.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: salesforce-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: salesforce-mcp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mcp-gateway
+      ports:
+        - protocol: TCP
+          port: 8000

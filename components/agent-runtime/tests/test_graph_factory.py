@@ -35,14 +35,33 @@ import app.main as main_module  # noqa: E402
 from app.graph.build import GraphFactory, UnknownGraphShapeError, known_shapes, validate_shapes  # noqa: E402
 from app.graph.shapes import SHAPE_BUILDERS  # noqa: E402
 from app.graph.state import AgentState  # noqa: E402
-from app.registry import AgentDefinition, AgentRegistry  # noqa: E402
+from app.registry import AgentDefinition, AgentRegistry, TaskDefinition  # noqa: E402
 
 
-def _build_fixture_echo(checkpointer):
+def _fixture_agent(name: str, shape: str) -> AgentDefinition:
+    """A minimal but complete fixture: a real (if trivial) task + a
+    resolvable primary_task, since GraphFactory.graph_for() (ADR-0342/
+    WP-33) now requires both to build a shape's nodes, not just a shape
+    name."""
+    task = TaskDefinition(name="do-a-thing", title="Do a thing", description="", allowed_tools=[])
+    return AgentDefinition(
+        name=name,
+        status="active",
+        preferred_classification="C1",
+        rag_top_k=5,
+        tasks={"do-a-thing": task},
+        graph_shape=shape,
+        primary_task="do-a-thing",
+    )
+
+
+def _build_fixture_echo(checkpointer, agent=None, task=None):
     """The minimal test-only second shape the WP-30 brief asks for: a
     single node, structurally nothing like Tekos's retrieve/tool_call/
     reason/respond flow, proving GraphFactory doesn't special-case the
-    real shape's topology."""
+    real shape's topology. Accepts (and ignores) agent/task like every
+    shape builder must (ADR-0342/WP-33's uniform interface) - this
+    fixture shape needs no real OKF binding."""
 
     async def echo_node(state):
         return {"reply": f"echo: {state['message']}", "citations": [], "source_mode": "none"}
@@ -54,7 +73,7 @@ def _build_fixture_echo(checkpointer):
     return graph.compile(checkpointer=checkpointer)
 
 
-def _build_fixture_uppercase(checkpointer):
+def _build_fixture_uppercase(checkpointer, agent=None, task=None):
     """A second, distinct fixture shape - used only to prove that
     switching which shape an agent declares is a config change, not a
     GraphFactory code change."""
@@ -120,9 +139,12 @@ def test_validate_shapes_still_rejects_a_placeholder_naming_an_unknown_shape() -
 
 
 def test_graph_factory_resolves_and_caches_the_real_tekos_shape() -> None:
+    registry = AgentRegistry()
+    tekos = registry.get("tekos")
+    assert tekos is not None
     factory = GraphFactory(MemorySaver())
-    first = factory.graph_for_shape("retrieve_reason_respond")
-    second = factory.graph_for_shape("retrieve_reason_respond")
+    first = factory.graph_for(tekos)
+    second = factory.graph_for(tekos)
     assert first is second  # compiled once, reused - never rebuilt per call
 
 
@@ -158,13 +180,7 @@ async def test_two_distinct_shapes_serve_on_one_running_instance() -> None:
         tekos = registry.get("tekos")
         assert tekos is not None and tekos.graph_shape == "retrieve_reason_respond"
 
-        fixture_agent = AgentDefinition(
-            name="fixture-agent",
-            status="active",
-            preferred_classification="C1",
-            rag_top_k=5,
-            graph_shape="fixture_echo",
-        )
+        fixture_agent = _fixture_agent("fixture-agent", "fixture_echo")
 
         tekos_graph = factory.graph_for(tekos)
         fixture_graph = factory.graph_for(fixture_agent)
@@ -201,13 +217,7 @@ async def test_switching_a_fixture_agents_shape_is_config_only() -> None:
     SHAPE_BUILDERS["fixture_uppercase"] = _build_fixture_uppercase
     try:
         factory = GraphFactory(MemorySaver())
-        fixture_agent = AgentDefinition(
-            name="fixture-agent",
-            status="active",
-            preferred_classification="C1",
-            rag_top_k=5,
-            graph_shape="fixture_echo",
-        )
+        fixture_agent = _fixture_agent("fixture-agent", "fixture_echo")
 
         first_graph = factory.graph_for(fixture_agent)
         first_result = await first_graph.ainvoke(

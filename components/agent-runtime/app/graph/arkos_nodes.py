@@ -23,7 +23,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
-from app.graph.nodes import CONFLUENCE_CLASSIFICATION, _escalate
+from app.graph.nodes import _LIVE_READ_CLASSIFICATION, _escalate
 from app.graph.state import AgentState
 from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
 from app.registry import AgentRegistry
@@ -149,7 +149,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     if "confluence.page.search" not in _DRAFT_TASK.allowed_tools:
         return update
 
-    escalated = _escalate(effective_classification, CONFLUENCE_CLASSIFICATION)
+    escalated = _escalate(effective_classification, _LIVE_READ_CLASSIFICATION)
     try:
         result = await invoke_tool(
             tool_name="confluence.page.search",

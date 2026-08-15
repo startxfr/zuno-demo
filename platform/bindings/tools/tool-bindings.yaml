@@ -152,6 +152,38 @@ bindings:
     provider_tool: update_page
     auth_mode: service-identity
 
+  # --- salesforce: real MCP server (ADR-0326/WP-33), streamable-HTTP
+  #     transport - same shape as confluence above, templated from it.
+  - capability: salesforce.opportunity.read
+    backend: salesforce
+    transport: streamable-http
+    endpoint:
+      env: SALESFORCE_MCP_URL
+      default: "http://salesforce-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: read_opportunity
+    auth_mode: service-identity
+
+  - capability: salesforce.opportunity.create
+    backend: salesforce
+    transport: streamable-http
+    endpoint:
+      env: SALESFORCE_MCP_URL
+      default: "http://salesforce-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: create_opportunity
+    auth_mode: service-identity
+
+  - capability: salesforce.opportunity.update
+    backend: salesforce
+    transport: streamable-http
+    endpoint:
+      env: SALESFORCE_MCP_URL
+      default: "http://salesforce-mcp.zuno-ai-run.svc:8000"
+      path: /mcp
+    provider_tool: update_opportunity
+    auth_mode: service-identity
+
   # --- demo-mode in-process handlers (replaced by real servers as their
   #     integrations land) ---
   - capability: drive.document.search

@@ -587,6 +587,25 @@
     and zuno_jira_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# ADR-0326/WP-33: the salesforce MCP server (components/mcp-servers/
+# salesforce) - real code and a real consumer (Comage's live opportunity
+# read/create/update), unlike Jira above. Single bearer access token
+# rather than email+token Basic Auth (Salesforce's own REST API
+# convention, ADR-0208 service-identity).
+- name: "vault | seed the Salesforce technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/salesforce/technical
+      url={{ zuno_salesforce_url | quote }} access_token={{ zuno_salesforce_access_token | quote }}
+      enabled={{ (zuno_salesforce_enabled | default(false)) | quote }}"
+  when: >-
+    zuno_salesforce_url | default('xxxxxx') != 'xxxxxx'
+    and zuno_salesforce_access_token | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 # ADR-0204/ADR-0105 (WP-22): source credentials for the knowledge.sales
 # and knowledge.adv ingestion adapters (gitops/charts/rag-ingestion's
 # domains.sales.salesforce / domains.adv.aramis ExternalSecrets). Property
@@ -718,6 +737,7 @@
     - confluence/technical
     - quay/registry
     - jira/technical
+    - salesforce/technical
   loop_control:
     loop_var: secret_path
     label: "{{ secret_path }}"
@@ -744,7 +764,8 @@
   ansible.builtin.debug:
     msg: >-
       zuno/google-oauth/client, zuno/smtp/technical, zuno/confluence/technical,
-      zuno/quay/registry and/or zuno/jira/technical are still placeholders -
+      zuno/quay/registry, zuno/jira/technical and/or zuno/salesforce/technical
+      are still placeholders -
       the corresponding value(s) in ansible/confidential.yml are still the
       "xxxxxx" sentinel from confidential.example.yml. Fill them in and
       re-run `make d0 install vault` (this role re-seeds from

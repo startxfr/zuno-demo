@@ -91,6 +91,11 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
         },
+        "primary_task": {
+          "description": "[ZUNO EXT] ADR-0342/WP-33: which entry in `tasks` above this agent's chat route actually executes - required for GraphFactory to resolve the right task's prompt/allowed_tools/allowed_knowledge when two agents share one graph_shape (e.g. Comage reusing retrieve_reason_respond). An agent may declare more tasks than this (v1 catalog entries with no live route yet); this names only the one the shape is built against. Not enforced `required` here for the same reason as graph_shape - a `placeholder` agent may omit it.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
         "rag": {
           "description": "ADR-0039: RAG retrieval parameters consumed by Agent Runtime's retrieve node - config, not code, so changing this changes runtime behavior without a source change.",
           "type": "object",
