@@ -1,0 +1,139 @@
+# Finage acceptance scenarios (ADR-0027: 20 scenarios per agent; ADR-0028:
+# 75% pass threshold). Run with `python3 run_scenarios.py` (a thin
+# AGENT=finage wrapper around evaluations/tekos/run_scenarios.py - see
+# README.md for required environment variables and personas).
+#
+# `persona` values are anonymized synthetic usernames from
+# gitops/charts/keycloak/files/realm-zuno.json (ADR-0041). `finance-user-01`/
+# `-02` hold both the `finance` business role (governs tool/data permissions
+# inside Finage, per agent.okf.md's own body prose) and the `agent_finage`
+# entitlement group (ADR-0040) - see security_checks.py for the negative
+# tests covering entitlement without business role and vice versa
+# (`finage-entitlement-only-user-01`/`finance-role-only-user-01`, mirroring
+# the prior slices' own ADR-0040 negative-test pattern). `type` selects
+# which handler in evaluations/tekos/run_scenarios.py executes the
+# scenario - each type's exact behavior is documented there, not
+# duplicated here.
+
+scenarios:
+  - id: 1
+    title: Portal loads all five agent tiles
+    type: portal_lists_all_agents
+    persona: finance-user-01
+
+  - id: 2
+    title: Unauthenticated request to the portal redirects to login
+    type: portal_requires_login
+
+  - id: 3
+    title: Finance persona can authenticate and the token carries the expected group claims
+    type: keycloak_login
+    persona: finance-user-01
+    expect_groups: [finance, agent_finage]
+
+  - id: 4
+    title: Finage tile is enabled for a finance-group, agent_finage-entitled user
+    type: portal_tile_state
+    persona: finance-user-01
+    agent: finage
+    expect_enabled: true
+
+  - id: 5
+    title: Finage tile is disabled for a non-entitled user (board persona)
+    type: portal_tile_state
+    persona: board-user-01
+    agent: finage
+    expect_enabled: false
+
+  - id: 6
+    title: Arkos tile still shows "coming soon" for any user (its own status flip is independent of Finage's)
+    type: portal_tile_state
+    persona: finance-user-01
+    agent: arkos
+    expect_enabled: false
+    expect_placeholder: true
+
+  - id: 7
+    title: A finance/billing question returns a reply with citations
+    type: chat_basic_qa
+    persona: finance-user-01
+    message: "What invoices are outstanding for the Acme account?"
+
+  - id: 8
+    title: First-token latency is under the 6-second interactive objective
+    type: chat_first_token_latency
+    persona: finance-user-02
+    message: "Summarize the Acme account's billing status."
+    max_seconds: 6
+
+  - id: 9
+    title: Streaming chat emits token events followed by a done event
+    type: chat_streaming_sse
+    persona: finance-user-01
+    message: "Summarize the Acme account's billing status in one sentence."
+
+  - id: 10
+    title: RAG retrieval contributes at least one citation for a project-memory topic
+    type: rag_retrieval_has_citation
+    query: "Acme account billing and delivery notes"
+
+  - id: 11
+    title: MCP Gateway returns 404 for an unknown tool name
+    type: mcp_gateway_unknown_tool
+    persona: finance-user-01
+    tool: does_not_exist
+    expect_status: 404
+
+  - id: 12
+    title: MCP Gateway denies a live Salesforce capability - Finage never declares it, provably not inheriting Comage's capabilities
+    type: mcp_gateway_denied
+    persona: finance-user-01
+    tool: salesforce.opportunity.read
+    arguments: { query: "Acme" }
+    expect_status: 403
+
+  - id: 13
+    title: MCP Gateway denies a Comage-only legacy SXA pipeline-search capability - Finage never declares it, least privilege beyond just invoicing
+    type: mcp_gateway_denied
+    persona: finance-user-01
+    tool: sxa.opportunity.search
+    arguments: {}
+    expect_status: 403
+
+  - id: 14
+    title: C3-classified requests fail closed when no SaaS provider is eligible
+    type: model_router_fails_closed
+    classification: C3
+
+  - id: 15
+    title: C1-classified requests try the local model first
+    type: model_router_prefers_local
+    classification: C1
+
+  - id: 16
+    title: BFF rejects a chat request with no bearer token
+    type: bff_rejects_missing_jwt
+
+  - id: 17
+    title: BFF rejects a JWT with the wrong audience
+    type: bff_rejects_wrong_audience
+    persona: finance-user-01
+
+  - id: 18
+    title: MCP Gateway denies sxa.aggregate.revenue-by-year for the live answer-finance-question task, which declares no sxa.* tool at all (ADR-0036 task_rights factor narrows the agent's own declaration)
+    type: mcp_gateway_denied
+    persona: finance-user-01
+    tool: sxa.aggregate.revenue-by-year
+    arguments: { year: 2026 }
+    expect_status: 403
+
+  - id: 19
+    title: No placeholder agents remain with zero live workloads - Finage closes the four-agent generalization
+    type: agent_isolation_placeholder_empty
+    namespace: zuno-ai-run
+    agents: []
+
+  - id: 20
+    title: Every service's health endpoint returns 200
+    type: health_endpoints_all_ok
+    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service, sales-db-mcp]

@@ -128,10 +128,14 @@ scenarios:
     expect_status: 403
 
   - id: 19
-    title: Remaining placeholder agents have no live workloads in the shared zuno-ai-run namespace
+    title: No placeholder agents remain with zero live workloads - Finage closes the four-agent generalization
     type: agent_isolation_placeholder_empty
     namespace: zuno-ai-run
-    agents: [finage]
+    # ADR-0326/WP-36: finage dropped - its frontend/BFF are now genuinely
+    # deployed (gitops/apps/finage), same reasoning as advantage's own
+    # removal from evaluations/comage/scenarios.yaml's scenario 19. No
+    # agent remains with zero live workloads.
+    agents: []
 
   - id: 20
     title: Every service's health endpoint returns 200

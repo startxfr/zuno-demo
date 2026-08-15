@@ -133,9 +133,12 @@ scenarios:
     # placeholder any more even though each OKF `status` stays
     # `placeholder` until its own operator gate confirms it. See
     # evaluations/{arkos,comage,advantage}/scenarios.yaml's own scenario
-    # 19 for the isolation check scoped to the agent that remains
-    # genuinely placeholder at that point.
-    agents: [finage]
+    # 19 for the isolation check scoped to the agent that remained
+    # genuinely placeholder at that point. ADR-0326/WP-36: finage now
+    # dropped too, closing the four-agent generalization - no agent
+    # remains with zero live workloads, so this list is empty (a
+    # vacuously-true pass, not a removed check).
+    agents: []
 
   - id: 20
     title: Every service's health endpoint returns 200

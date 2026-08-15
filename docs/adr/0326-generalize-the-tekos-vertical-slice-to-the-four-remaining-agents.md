@@ -1,6 +1,6 @@
 # ADR-0326: Generalize the Tekos vertical slice to the four remaining agents
 
-- **Status:** Partially implemented (Arkos, Comage and Advantage slices merged, 3 of 4; all three cluster gates pending)
+- **Status:** Partially implemented (Arkos, Comage, Advantage and Finage slices merged, 4 of 4; all four cluster gates pending - closes to Implemented once every gate passes and every agent flips to `active`)
 - **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
