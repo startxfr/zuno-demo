@@ -10,7 +10,7 @@
 
 scenarios:
   - id: 1
-    title: Portal loads all six agent tiles
+    title: Portal loads all agent tiles
     type: portal_lists_all_agents
     persona: consultant-user-01
 
@@ -123,7 +123,12 @@ scenarios:
     title: Remaining placeholder agents have no live workloads in the shared zuno-ai-run namespace
     type: agent_isolation_placeholder_empty
     namespace: zuno-ai-run
-    agents: []
+    # ADR-0349 (soursage/cognos): the vacuously-true empty list this
+    # check briefly held once every prior agent shipped its own chart is
+    # real again - these two placeholder agents have identity footprints
+    # and portal tiles but no chart/workloads at all, exactly what this
+    # isolation check was built to prove.
+    agents: [soursage, cognos]
 
   - id: 20
     title: Every service's health endpoint returns 200

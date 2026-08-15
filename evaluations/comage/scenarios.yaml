@@ -16,7 +16,7 @@
 
 scenarios:
   - id: 1
-    title: Portal loads all five agent tiles
+    title: Portal loads all agent tiles
     type: portal_lists_all_agents
     persona: sales-user-01
 
@@ -139,7 +139,12 @@ scenarios:
     # scenario 19. ADR-0326/WP-36: finage now dropped too, closing the
     # four-agent generalization - no agent remains with zero live
     # workloads.
-    agents: []
+    # ADR-0349 (soursage/cognos): the vacuously-true empty list this
+    # check briefly held once every prior agent shipped its own chart is
+    # real again - these two placeholder agents have identity footprints
+    # and portal tiles but no chart/workloads at all, exactly what this
+    # isolation check was built to prove.
+    agents: [soursage, cognos]
 
   - id: 20
     title: Every service's health endpoint returns 200

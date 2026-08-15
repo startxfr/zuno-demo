@@ -36,6 +36,14 @@
             "naveo-frontend": [{
                 "name": "access",
                 "description": "Grants sign-in access to the Naveo (onboarding) agent frontend"
+            }],
+            "soursage-frontend": [{
+                "name": "access",
+                "description": "Grants sign-in access to the Soursage (recruiting) agent frontend"
+            }],
+            "cognos-frontend": [{
+                "name": "access",
+                "description": "Grants sign-in access to the Cognos (board financial/strategic) agent frontend"
             }]
         }
     },
@@ -119,6 +127,34 @@
             },
             "clientRoles": {
                 "naveo-frontend": [
+                    "access"
+                ]
+            }
+        },
+        {
+            "name": "agent_soursage",
+            "path": "/agent_soursage",
+            "attributes": {
+                "description": [
+                    "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Soursage frontend, independent of business role (ADR-0349 §6 placeholder agent)"
+                ]
+            },
+            "clientRoles": {
+                "soursage-frontend": [
+                    "access"
+                ]
+            }
+        },
+        {
+            "name": "agent_cognos",
+            "path": "/agent_cognos",
+            "attributes": {
+                "description": [
+                    "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Cognos frontend, independent of business role (ADR-0349 §6 placeholder agent)"
+                ]
+            },
+            "clientRoles": {
+                "cognos-frontend": [
                     "access"
                 ]
             }
@@ -1113,6 +1149,90 @@
             }],
             "secret": "${vault.naveo_frontend_client_secret}",
             "clientAuthenticatorType": "client-secret"
+        },
+        {
+            "clientId": "soursage-frontend",
+            "name": "Soursage frontend (recruiting)",
+            "description": "Public SPA client for the Soursage recruiting agent \u2014 namespace zuno-ai-run (ADR-0349 §6 placeholder pattern: identity footprint only, no runtime; flipped to a confidential client like every active agent's own frontend once Soursage is actually built)",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": true,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "rootUrl": "https://soursage.apps.mycluster.example.com",
+            "redirectUris": [
+                "https://soursage.apps.mycluster.example.com/*"
+            ],
+            "webOrigins": [
+                "https://soursage.apps.mycluster.example.com"
+            ],
+            "attributes": {
+                "agent.namespace": "zuno-ai-run",
+                "post.logout.redirect.uris": "https://soursage.apps.mycluster.example.com/*"
+            },
+            "defaultClientScopes": [
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "protocolMappers": [{
+                "name": "groups",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-group-membership-mapper",
+                "consentRequired": false,
+                "config": {
+                    "full.path": "true",
+                    "id.token.claim": "true",
+                    "access.token.claim": "true",
+                    "userinfo.token.claim": "true",
+                    "claim.name": "groups"
+                }
+            }]
+        },
+        {
+            "clientId": "cognos-frontend",
+            "name": "Cognos frontend (board financial/strategic)",
+            "description": "Public SPA client for the Cognos board-only financial and strategic agent \u2014 namespace zuno-ai-run (ADR-0349 §6 placeholder pattern: identity footprint only, no runtime; flipped to a confidential client like every active agent's own frontend once Cognos is actually built)",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": true,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "rootUrl": "https://cognos.apps.mycluster.example.com",
+            "redirectUris": [
+                "https://cognos.apps.mycluster.example.com/*"
+            ],
+            "webOrigins": [
+                "https://cognos.apps.mycluster.example.com"
+            ],
+            "attributes": {
+                "agent.namespace": "zuno-ai-run",
+                "post.logout.redirect.uris": "https://cognos.apps.mycluster.example.com/*"
+            },
+            "defaultClientScopes": [
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "protocolMappers": [{
+                "name": "groups",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-group-membership-mapper",
+                "consentRequired": false,
+                "config": {
+                    "full.path": "true",
+                    "id.token.claim": "true",
+                    "access.token.claim": "true",
+                    "userinfo.token.claim": "true",
+                    "claim.name": "groups"
+                }
+            }]
         },
         {
             "clientId": "openshift",

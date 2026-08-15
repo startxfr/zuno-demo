@@ -110,6 +110,23 @@ def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
     ]
 
 
+def test_genuine_placeholder_agents_declare_no_tools() -> None:
+    """ADR-0349 §6 resurrected the case this file's own history says
+    briefly ceased to exist (WP-36a's rename note): soursage and cognos
+    are GENUINELY-placeholder agents - identity footprint + coming-soon
+    bundle only, no runtime, no chart. A placeholder of that original
+    kind has zero tool-call capability by construction (ADR-0036), and
+    no graph shape either (nothing for GraphFactory to build)."""
+    registry = AgentRegistry(agents_dir=str(REAL_AGENTS_DIR))
+
+    for name in ("soursage", "cognos"):
+        agent = registry.get(name)
+        assert agent is not None, f"{name} bundle failed to load"
+        assert agent.status == "placeholder"
+        assert agent.declared_tools() == [], f"{name} must declare zero tools while genuinely placeholder"
+        assert agent.graph_shape is None, f"{name} must declare no graph shape (no runtime workflow exists)"
+
+
 _FIXTURE_TASK_V1 = """---
 okf_version: v0.2
 type: task
@@ -196,6 +213,7 @@ def test_changing_the_bundle_changes_resolved_behavior_with_no_code_change() -> 
 TESTS = [
     test_tekos_loads_from_the_real_bundle,
     test_placeholder_agents_declare_their_real_tool_ceiling,
+    test_genuine_placeholder_agents_declare_no_tools,
     test_changing_the_bundle_changes_resolved_behavior_with_no_code_change,
 ]
 
