@@ -113,7 +113,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0306](0306-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.3 | Partially implemented | Expand the agent catalog beyond the initial five agents |
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.3 | Partially implemented | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Partially implemented | Expand agent lifecycle management through the AIAgent Operator |
-| [ADR-0309](0300-v0.3-roadmap.md#adr-0309-introduce-policy-driven-autonomous-optimization) | v0.3 | Proposed | Introduce policy-driven autonomous optimization |
+| [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v0.3 | Partially implemented | Introduce policy-driven autonomous optimization |
 | [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) | v0 | Implemented | Manage static Kubernetes resources as per-role kustomize directories |
 | [ADR-0311](0311-stop-applying-the-root-app-of-apps-from-ansible.md) | v0 | Implemented | Stop applying the root App-of-Apps from Ansible bootstrap tasks |
 | [ADR-0312](0312-route-operator-installs-through-argocd-applications.md) | v0 | Implemented | Route operator installs through ArgoCD Applications |

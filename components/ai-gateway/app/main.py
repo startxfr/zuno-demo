@@ -23,6 +23,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from app import semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.model_routing_policy import AdapterDeclaration, ModelRoutingPolicy
+from app.optimizer import OptimizationRefused, TuningController
 from app.providers import chat_model_for
 from app.routing import ProviderCandidate, RoutingError, RoutingTable
 from app.schemas import (
@@ -50,6 +51,7 @@ app = FastAPI(
 
 routing_table = RoutingTable()
 model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
+tuning_controller = TuningController()  # ADR-0309 (WP-42) - inert unless the policy enables it
 
 _ROLE_TO_MESSAGE = {"system": SystemMessage, "user": HumanMessage, "assistant": AIMessage}
 
@@ -70,13 +72,75 @@ async def readyz() -> JSONResponse:
 
 @app.post("/admin/reload-routing")
 async def reload_routing() -> Dict[str, Any]:
-    """Operational escape hatch: re-reads provider-routing.yaml and
-    policies/model-routing/model-routing-policy.yaml from disk without a
-    pod restart (mirrors mcp-gateway's /admin/reload-policy).
+    """Operational escape hatch: re-reads provider-routing.yaml,
+    policies/model-routing/model-routing-policy.yaml and
+    policies/optimization/optimization-policy.yaml from disk without a
+    pod restart (mirrors mcp-gateway's /admin/reload-policy). Reloading
+    an optimization policy whose kill_switch flipped to true engages the
+    kill immediately (TuningController.reload_policy's own behavior).
     """
     routing_table.reload()
     model_routing_policy.reload()
+    tuning_controller.reload_policy()
     return {"loaded": routing_table.loaded}
+
+
+# --------------------------------------------------------------------------
+# ADR-0309 (WP-42) - bounded autonomous tuning admin surface. These
+# endpoints are the operator's window into the tuner: the audit trail,
+# outcome reporting (live monitoring feeds the observed window metrics
+# in), and the kill switch. Only reachable in-cluster (this service has
+# no public Route; NetworkPolicy admits agent-runtime + the acceptance
+# gate only), same trust model as /admin/reload-routing above.
+# --------------------------------------------------------------------------
+
+
+@app.get("/admin/optimizer/audit")
+async def optimizer_audit() -> Dict[str, Any]:
+    return {
+        "enabled": tuning_controller.policy.enabled,
+        "kill_switch": tuning_controller.policy.kill_switch,
+        "audit": tuning_controller.audit_log(),
+    }
+
+
+@app.post("/admin/optimizer/outcome")
+async def optimizer_outcome(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Reports the observed evaluation-window metrics; the controller
+    auto-rolls-back every open action on a trigger breach."""
+    rolled_back = tuning_controller.report_outcome(
+        error_rate=float(payload.get("error_rate", 0.0)),
+        quality=payload.get("quality"),
+    )
+    return {"rolled_back": [e.parameter for e in rolled_back]}
+
+
+@app.post("/admin/optimizer/kill")
+async def optimizer_kill() -> Dict[str, Any]:
+    reverted = tuning_controller.kill()
+    return {"reverted": [e.parameter for e in reverted]}
+
+
+@app.post("/admin/optimizer/apply")
+async def optimizer_apply(payload: Dict[str, Any]) -> JSONResponse:
+    """Applies one recommendation (evaluations/routing_report.py's own
+    entry format, or {parameter: cache_ttl, value: N}) within the
+    governance policy. Refusals are 403 - a definitive no, not a retry
+    hint."""
+    try:
+        if payload.get("parameter") == "cache_ttl":
+            entry = tuning_controller.apply_cache_ttl(int(payload["value"]), evidence=payload)
+        elif payload.get("parameter") == "routing":
+            entry = tuning_controller.apply_routing_override(
+                agent=payload["agent"], task=payload["task"], adapter=payload["adapter"], evidence=payload,
+            )
+        else:
+            return JSONResponse({"error": f"unknown parameter {payload.get('parameter')!r}"}, status_code=422)
+    except OptimizationRefused as exc:
+        return JSONResponse({"refused": str(exc)}, status_code=403)
+    except (KeyError, ValueError) as exc:
+        return JSONResponse({"error": f"malformed recommendation: {exc}"}, status_code=422)
+    return JSONResponse({"applied": entry.parameter, "old": entry.old_value, "new": entry.new_value})
 
 
 def _to_langchain_messages(messages: List[ChatMessage]) -> List[Any]:
@@ -123,6 +187,18 @@ async def chat_completions(
     # narrows `candidates`, only picks which model name a `local`
     # candidate uses once the fallback loop reaches it.
     adapter_decl = model_routing_policy.adapter_for(x_zuno_agent, x_zuno_task)
+
+    # ADR-0309 (WP-42): the tuning controller's runtime override is
+    # consulted strictly AFTER the Git-declared policy resolved, and the
+    # controller itself only ever holds overrides drawn from the
+    # optimization policy's pre-approved-equivalents list - so this can
+    # swap between human-approved equivalent candidates, never introduce
+    # a new one, and never bypass the classification guard downstream
+    # (providers.chat_model_for re-checks candidate.kind regardless of
+    # where the adapter name came from).
+    override = tuning_controller.adapter_override(x_zuno_agent, x_zuno_task)
+    if override:
+        adapter_decl = AdapterDeclaration(adapter=override, classification=adapter_decl.classification if adapter_decl else "C1")
 
     messages = _to_langchain_messages(payload.messages)
 

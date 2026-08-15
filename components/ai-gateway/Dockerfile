@@ -21,10 +21,15 @@ COPY components/ai-gateway/app ./app
 # this directory is ever absent (every request just uses the base model,
 # never a startup failure).
 COPY policies/model-routing ./policies/model-routing
+# ADR-0309/WP-42: the autonomous-optimization governance policy - same
+# graceful degradation (absent file = autonomy fully disabled, the
+# fail-safe direction).
+COPY policies/optimization ./policies/optimization
 
 ENV PYTHONUNBUFFERED=1 \
     PROVIDER_ROUTING_PATH=/app/config/provider-routing.yaml \
-    MODEL_ROUTING_POLICY_PATH=/app/policies/model-routing/model-routing-policy.yaml
+    MODEL_ROUTING_POLICY_PATH=/app/policies/model-routing/model-routing-policy.yaml \
+    OPTIMIZATION_POLICY_PATH=/app/policies/optimization/optimization-policy.yaml
 
 # provider-routing.yaml is NOT baked into the image: it is mounted at
 # /app/config/provider-routing.yaml from the `zuno-provider-routing`

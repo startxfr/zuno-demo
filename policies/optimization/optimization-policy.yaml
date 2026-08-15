@@ -1,0 +1,54 @@
+# ADR-0309 (WP-42): the governance policy for bounded autonomous
+# optimization - consumed by components/ai-gateway/app/optimizer.py.
+# This file enumerates EXACTLY which parameters may be auto-tuned, their
+# allowed ranges, the evaluation window and the rollback triggers.
+# Anything not enumerated here is out of autonomous scope entirely and
+# stays a human-reviewed PR (ADR-0304); classification and authorization
+# policies are never auto-tunable regardless of what this file says
+# (enforced structurally in optimizer.py's own denylist, tested - a
+# policy edit here cannot widen autonomy onto them).
+#
+# kill_switch: true disables ALL autonomy in one configuration change -
+# the tuner refuses every new action and reverts anything currently
+# applied. Autonomy also stays off while `enabled: false` (the shipped
+# default: the operator flips it deliberately, per scope, after the
+# WP-42 brief's own observed-cycle sign-off - never on by default).
+enabled: false
+kill_switch: false
+
+# How long an applied change is monitored before it's considered settled,
+# and what reverts it automatically inside that window.
+evaluation_window_seconds: 3600
+rollback_triggers:
+  # Revert if the observed error rate over the window exceeds this.
+  max_error_rate: 0.05
+  # Revert if the observed quality signal (same [0,1] scenario_rate scale
+  # as policies/model-routing/model-routing-policy.yaml's own
+  # quality_floor objectives) drops below this.
+  quality_floor: 0.75
+
+scopes:
+  # Scope 1: semantic-cache TTL (ADR-0104's runtime surface, WP-09).
+  # The tuner may set the effective TTL anywhere inside [min, max]
+  # seconds; a recommendation outside the range is refused, never
+  # clamped (clamping would silently apply a change nobody recommended).
+  cache_ttl:
+    enabled: true
+    min_seconds: 300
+    max_seconds: 86400
+
+  # Scope 2: routing choice between PRE-APPROVED EQUIVALENT model/adapter
+  # candidates only. Each entry lists candidates a human has already
+  # judged interchangeable for the given agent/task - the tuner may swap
+  # between them (e.g. on a cost/latency recommendation) but can never
+  # introduce a candidate not listed here. Empty today: no two
+  # deployed candidates have been judged equivalent yet (there is only
+  # the base model - WP-34's GPU adapter training hasn't run), so the
+  # routing scope has nothing it could legally do. Populate via a normal
+  # reviewed PR once real alternatives exist.
+  routing:
+    enabled: true
+    pre_approved_equivalents: []
+    # - agent: comage
+    #   task: check-deal-status
+    #   candidates: [comage-lora-v1, comage-lora-v2]

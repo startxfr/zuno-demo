@@ -1,7 +1,52 @@
 # WP-42: Policy-driven autonomous optimization (promotes ADR-0309)
 
-- **State:** Not started
-- **ADRs:** ADR-0309 (Proposed -> To be implemented -> Partially implemented -> Implemented)
+- **State:** Repo work merged (2026-08-15); observed live autonomy cycle +
+  user sign-off pending - **the roadmap's final WP; this closes the
+  v0.1-v0.3 repo work.** Step 0 promoted ADR-0309 verbatim. New
+  `policies/optimization/optimization-policy.yaml` + README: ships
+  `enabled: false` (autonomy off until the operator's own per-scope
+  sign-off), `kill_switch`, an evaluation window, rollback triggers
+  (max_error_rate 0.05 / quality_floor 0.75 - the same [0,1]
+  scenario_rate scale WP-40's objectives use), and exactly two scopes:
+  `cache_ttl` (min/max seconds range) and `routing`
+  (`pre_approved_equivalents: []` - empty today, since no two deployed
+  candidates have been human-judged interchangeable yet; only a reviewed
+  PR can add pairs). Tuning controller (D12: in-process ai-gateway
+  extension, no 12th component -
+  `components/ai-gateway/app/optimizer.py`): `TuningController` applies
+  in-range recommendations to the RUNTIME configuration surface only -
+  `semantic_cache.set_runtime_ttl_override()` (a new seam; the effective
+  TTL reverts to the deployment value on pod restart, and the one
+  Redis-write site now reads `effective_ttl_seconds()`), and a runtime
+  adapter-override map `app/main.py` consults strictly AFTER the
+  Git-declared model-routing policy resolves (the override can only ever
+  hold values drawn from the pre-approved-equivalents list, and WP-39's
+  own `chat_model_for()` guard re-checks candidate.kind downstream
+  regardless of where an adapter name came from). Never writes to Git.
+  Hard structural guarantee beyond the policy file: a code-level
+  `_FORBIDDEN_PARAMETERS` denylist means classification/authorization
+  can never be auto-tuned even by a mis-edited policy. Every applied
+  change records a complete audit entry (parameter, old/new, the
+  recommendation evidence verbatim, timestamps, status) and registers
+  its own rollback closure; `report_outcome()` auto-reverts every open
+  action on a trigger breach; `kill()` (or `kill_switch: true` on a
+  policy reload) refuses all new actions AND reverts everything applied,
+  in one step. Admin surface (`/admin/optimizer/{audit,outcome,kill,apply}`,
+  in-cluster only - same trust model as `/admin/reload-routing`, which
+  now also reloads this policy and honors a kill_switch flip
+  immediately). Dockerfile bakes `policies/optimization/` in (absent
+  file = autonomy fully disabled, the fail-safe direction). Tests
+  (`tests/test_optimizer.py`, 14): every one of the brief's named cases -
+  out-of-range refused (never clamped), classification/authorization
+  untouchable, rollback on simulated regression (error-rate AND
+  quality-floor variants), kill switch halts + reverts, audit entries
+  complete - plus policy-loader defaults, the real shipped policy file's
+  own values, and kill-via-reload. Full ai-gateway suite (6 files) green;
+  the WP-39/40/42 test files are now all wired into lint.yml's
+  ai-gateway test step (39/40's were an omission caught here).
+  `check_docs.py` PASS; `check_workload_hardening.py` 188/188;
+  `check_build_matrix.py` PASS (no new component).
+- **ADRs:** ADR-0309 (Partially implemented merged here -> Implemented after the observed live cycle + user sign-off)
 - **Depends on:** WP-40 (merged + live loop done); WP-09 (cache tuning surface)
 - **Estimated files touched:** ~7
 

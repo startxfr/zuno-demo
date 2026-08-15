@@ -40,6 +40,24 @@ logger = logging.getLogger("ai_gateway.semantic_cache")
 
 SEMANTIC_CACHE_ENABLED = os.getenv("SEMANTIC_CACHE_ENABLED", "false").strip().lower() == "true"
 SEMANTIC_CACHE_TTL_SECONDS = int(os.getenv("SEMANTIC_CACHE_TTL_SECONDS", "3600"))
+
+# ADR-0309 (WP-42): the one cache parameter the bounded tuning controller
+# (app/optimizer.py) may mutate at runtime - None means "use the
+# deployment-time value above". Runtime configuration only, never
+# persisted: a pod restart always reverts to SEMANTIC_CACHE_TTL_SECONDS.
+_runtime_ttl_override: "int | None" = None
+
+
+def effective_ttl_seconds() -> int:
+    return _runtime_ttl_override if _runtime_ttl_override is not None else SEMANTIC_CACHE_TTL_SECONDS
+
+
+def set_runtime_ttl_override(ttl_seconds: "int | None") -> None:
+    """Only app/optimizer.py calls this, after its own policy-range
+    validation - the setter itself stays dumb on purpose (single
+    enforcement point, in the tuner, tested there)."""
+    global _runtime_ttl_override
+    _runtime_ttl_override = ttl_seconds
 EMBEDDING_SERVICE_URL = os.getenv(
     "EMBEDDING_SERVICE_URL", "http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings"
 )
@@ -154,6 +172,6 @@ async def get_cached_response(cache_key: str) -> Optional[Dict[str, Any]]:
 async def set_cached_response(cache_key: str, response: Dict[str, Any]) -> None:
     try:
         client = _redis_client()
-        await client.set(cache_key, json.dumps(response), ex=SEMANTIC_CACHE_TTL_SECONDS)
+        await client.set(cache_key, json.dumps(response), ex=effective_ttl_seconds())
     except Exception as exc:  # noqa: BLE001
         logger.warning("semantic cache write failed (response already served to the caller): %s", exc)
