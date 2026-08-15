@@ -58,6 +58,12 @@ spec:
               value: {{ .database | quote }}
             - name: PGOPTIONS
               value: "-c search_path={{ .schema }}"
+            # Direct-to-primary requires TLS (PGO pg_hba hostssl) - same
+            # live finding as app/db.py's ssl="require"; psql honors
+            # PGSSLMODE, and PGOPTIONS above is fine against real Postgres
+            # (it was PgBouncer that rejected startup options).
+            - name: PGSSLMODE
+              value: require
             - name: PGUSER
               valueFrom:
                 secretKeyRef:
