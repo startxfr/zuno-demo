@@ -1,0 +1,122 @@
+nameOverride: ""
+fullnameOverride: ""
+
+platform:
+  namespace: zuno-ai-build
+  createNamespace: false
+
+serviceAccount:
+  create: true
+  name: ""
+
+images:
+  mlops:
+    repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mlops
+    tag: latest
+    pullPolicy: IfNotPresent
+
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  storeRef:
+    kind: ClusterSecretStore
+    name: vault-backend
+
+# Same bucket/credential convention components/rag-ingestion already
+# established (ADR-0330) - not a new storage system (ADR-0302 point 3).
+s3:
+  type: aws
+  endpoint: ""
+  bucket: zuno-corpus
+  region: us-east-1
+  pathStyle: false
+  secretName: mlops-s3-credentials
+  externalSecret:
+    remoteKey: rag/s3 # ADR-0302 point 3: same bucket/credential rag-ingestion uses
+    accessKeyProperty: accessKeyId
+    secretKeyProperty: secretAccessKey
+
+artifacts:
+  datasetPrefix: mlops/datasets
+  modelPrefix: mlops/models
+  evalPrefix: mlops/evaluations
+  registryPrefix: mlops/registrations
+
+# Read-only access to document_embeddings (rag-service's own table,
+# ADR-0015) - this pipeline never writes to Postgres (ADR-0302 point 2).
+postgres:
+  host: zuno-postgresql-rw.zuno-data.svc.cluster.local
+  port: 5432
+  database: rag-tech
+  schema: public
+  sslmode: require
+  secretName: mlops-postgres-credentials
+  externalSecret:
+    remoteKey: rag/postgres/tech # read-only reuse of rag-ingestion's own tech-domain credential
+    usernameProperty: username
+    passwordProperty: password
+
+evaluations:
+  # ADR-0302 point 5: baked into the image at
+  # /opt/app-root/src/evaluations (components/mlops/Containerfile).
+  dir: /opt/app-root/src/evaluations
+
+# ADR-0301 point 3 / D5 (docs/adr/0301, 0302 dated progress notes): the
+# real Helm value (gitops/charts/openshift-ai/values.yaml's
+# modelregistry.registriesNamespace), not the zuno-ai-build those two
+# ADRs' original Decision text assumed before ADR-0331's reversion.
+modelRegistry:
+  namespace: rhoai-model-registries
+  url: "" # empty means the in-cluster default (see files/pipeline.py.tpl)
+
+pipelineServer:
+  manage: true
+  name: mlops-dspa
+  pipelineStore: kubernetesPlatform
+  cacheEnabled: true
+  metadataDatabase:
+    mode: embeddedMariaDB
+    externalMySQL:
+      host: ""
+      port: "3306"
+      username: ""
+      database: ""
+      secretName: mlops-dspa-mysql-credentials
+      externalSecret:
+        remoteKey: mlops/dspa-mysql
+        passwordProperty: password
+
+pipeline:
+  name: mlops
+  version: v1
+  displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
+  description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
+  createPipelineResource: true
+
+# One entry per candidate agent (ADR-0301 point 5: Comage is the starting
+# candidate). Deliberately a flat map, not per-agent Pipeline CR variants
+# the way rag-ingestion's domains: map is (each mlops run already takes
+# --agent as a runtime parameter to the SAME pipeline DAG, not a
+# structurally different DAG per agent - prepare-dataset/train-lora/
+# evaluate/push-registry never change shape per agent, only their
+# knowledgeDomains/baseModel inputs do).
+agents:
+  comage:
+    enabled: true
+    knowledgeDomains: [knowledge.sales, knowledge.project]
+    baseModel: ibm-granite/granite-3.1-2b-instruct
+    loraR: 8
+    loraAlpha: 16
+    loraDropout: 0.05
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+networkPolicy:
+  enabled: true
+  egressCidrs: []

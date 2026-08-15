@@ -1,0 +1,27 @@
+# One ConfigMap per enabled candidate agent (values.yaml's agents: map) -
+# MLOPS_AGENT and its training parameters are baked in at chart-render
+# time, same "one env contract per run-target" pattern
+# gitops/charts/rag-ingestion/templates/domain-configmaps.yaml uses for
+# its own per-domain ConfigMaps. MLOPS_RUN_ID is deliberately NOT here -
+# it varies per pipeline run, passed as a CLI argument instead (see
+# files/pipeline.py.tpl).
+{{- range $name, $agent := .Values.agents }}
+{{- if $agent.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mlops.fullname" $ }}-config-{{ $name }}
+  namespace: {{ $.Values.platform.namespace }}
+  labels:
+    {{- include "mlops.labels" $ | nindent 4 }}
+    zuno.io/mlops-agent: {{ $name | quote }}
+data:
+  MLOPS_AGENT: {{ $name | quote }}
+  MLOPS_KNOWLEDGE_DOMAINS: {{ $agent.knowledgeDomains | join "," | quote }}
+  MLOPS_BASE_MODEL: {{ $agent.baseModel | quote }}
+  MLOPS_LORA_R: {{ $agent.loraR | quote }}
+  MLOPS_LORA_ALPHA: {{ $agent.loraAlpha | quote }}
+  MLOPS_LORA_DROPOUT: {{ $agent.loraDropout | quote }}
+{{- end }}
+{{- end }}

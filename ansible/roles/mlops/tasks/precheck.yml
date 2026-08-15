@@ -1,4 +1,40 @@
 ---
-- name: "mlops | precheck scaffold"
-  ansible.builtin.debug:
-    msg: "Precheck contract registered for mlops; implementation tasks are pending."
+# State detection (never fails). "Installed" requires both Applications
+# Synced+Healthy and the mlops-dspa DataSciencePipelinesApplication CR
+# Ready - same shape as ansible/roles/rag_ingestion/tasks/precheck.yml.
+- name: "mlops | check the mlops Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mlops-d0"
+
+- name: "mlops | save the d0 check result"
+  ansible.builtin.set_fact:
+    _mlops_d0_installed: "{{ _state_check_result }}"
+
+- name: "mlops | check the mlops Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mlops-d1"
+
+- name: "mlops | look up the mlops-dspa DataSciencePipelinesApplication"
+  kubernetes.core.k8s_info:
+    api_version: datasciencepipelinesapplications.opendatahub.io/v1
+    kind: DataSciencePipelinesApplication
+    namespace: zuno-ai-build
+    name: mlops-dspa
+  register: _mlops_dspa_lookup
+
+- name: "mlops | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _mlops_d0_installed
+        and _state_check_result
+        and (_mlops_dspa_lookup.resources | default([]) | length) > 0
+        and (_mlops_dspa_lookup.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+             | first | default('False')) == 'True'
+      }}
+
+- name: "mlops | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

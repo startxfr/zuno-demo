@@ -1,0 +1,8 @@
+{{- if .Values.platform.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.platform.namespace }}
+  labels:
+    opendatahub.io/dashboard: "true"
+{{- end }}

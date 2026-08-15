@@ -1,0 +1,22 @@
+# Build from the REPOSITORY ROOT (not this directory), same pattern as
+# components/agent-runtime/Dockerfile - this image bakes in
+# evaluations/<agent>/ (ADR-0302 point 5: the `evaluate` stage runs the
+# target agent's own quality_gate.py/run_acceptance_gate.py rather than a
+# parallel harness):
+#
+#   docker build -f components/mlops/Containerfile -t zuno/mlops:local .
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+USER 0
+COPY components/mlops/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm -f /tmp/requirements.txt
+
+COPY components/mlops/src/mlops.py /opt/app-root/src/mlops.py
+COPY components/mlops/mlops-run /opt/app-root/src/mlops-run
+RUN chmod 0755 /opt/app-root/src/mlops-run
+COPY evaluations /opt/app-root/src/evaluations
+
+USER 1001
+WORKDIR /opt/app-root/src
+ENTRYPOINT ["/opt/app-root/src/mlops-run"]

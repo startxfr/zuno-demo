@@ -85,6 +85,17 @@ ArgoCD sync is the expected recovery path, without touching the
 underlying `InferenceService`/`ServingRuntime`. Adapter loading/serving
 health becomes part of `make d1 check models` once implemented.
 
+## Evolution (2026-08-15)
+
+Point 3's Model Registry reference used this Decision text's original
+`zuno-ai-build` namespace assumption, written before ADR-0331's
+reversion. The live `gitops/charts/openshift-ai/values.yaml`
+(`modelregistry.registriesNamespace`) is `rhoai-model-registries`, RHOAI's
+own true default - `components/mlops/`'s push-registry stage (WP-34)
+reads this from the real Helm value via an env var
+(`MODEL_REGISTRY_NAMESPACE`), never hardcoding either string, so this
+correction needs no further ADR/code change to stay accurate.
+
 See [Standard clauses](README.md#standard-clauses) for Context,
 Consequences, Migration/evolution and Acceptance criteria.
 

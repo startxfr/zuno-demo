@@ -1,0 +1,14 @@
+apiVersion: v2
+name: mlops
+description: OpenShift AI dataset-to-model MLOps pipeline (ADR-0301/ADR-0302) - LoRA/PEFT adapter training and registration
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.29.0-0"
+keywords:
+  - openshift-ai
+  - kubeflow-pipelines
+  - lora
+  - peft
+  - model-registry
+  - external-secrets

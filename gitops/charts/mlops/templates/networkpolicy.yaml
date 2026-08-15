@@ -1,0 +1,36 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mlops.fullname" . }}-default-deny-ingress
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "mlops.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      pipelines.kubeflow.org/v2_component: "true"
+  policyTypes:
+    - Ingress
+  ingress: []
+{{- if .Values.networkPolicy.egressCidrs }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mlops.fullname" . }}-egress
+  namespace: {{ .Values.platform.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      pipelines.kubeflow.org/v2_component: "true"
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+{{- range .Values.networkPolicy.egressCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+{{- end }}
+{{- end }}
+{{- end }}

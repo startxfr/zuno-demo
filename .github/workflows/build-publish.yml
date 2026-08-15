@@ -68,6 +68,14 @@ jobs:
           - name: mcp-salesforce
             dockerfile: components/mcp-servers/salesforce/Dockerfile
             context: components/mcp-servers/salesforce
+          # ADR-0302/WP-34: unlike rag-ingestion (its own image is built
+          # exclusively via the in-cluster OpenShift BuildConfig,
+          # ansible/roles/rag_ingestion_build), mlops's own WP explicitly
+          # asks for this image to also be published through this
+          # workflow's build matrix.
+          - name: mlops
+            dockerfile: components/mlops/Containerfile
+            context: .
     steps:
       - uses: actions/checkout@v4
 

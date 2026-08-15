@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mlops.fullname" . }}-config
+  namespace: {{ .Values.platform.namespace }}
+  labels:
+    {{- include "mlops.labels" . | nindent 4 }}
+data:
+  S3_ENDPOINT: {{ include "mlops.s3Endpoint" . | quote }}
+  S3_BUCKET: {{ .Values.s3.bucket | quote }}
+  S3_REGION: {{ .Values.s3.region | quote }}
+  S3_PATH_STYLE: {{ .Values.s3.pathStyle | quote }}
+  S3_DATASET_PREFIX: {{ .Values.artifacts.datasetPrefix | quote }}
+  S3_MODEL_PREFIX: {{ .Values.artifacts.modelPrefix | quote }}
+  S3_EVAL_PREFIX: {{ .Values.artifacts.evalPrefix | quote }}
+  S3_REGISTRY_PREFIX: {{ .Values.artifacts.registryPrefix | quote }}
+  PGHOST: {{ .Values.postgres.host | quote }}
+  PGPORT: {{ .Values.postgres.port | quote }}
+  PGDATABASE: {{ .Values.postgres.database | quote }}
+  PGSCHEMA: {{ .Values.postgres.schema | quote }}
+  PGSSLMODE: {{ .Values.postgres.sslmode | quote }}
+  MLOPS_EVALUATIONS_DIR: {{ .Values.evaluations.dir | quote }}
+  # ADR-0301 point 3 / D5: the real Helm value, never the ADRs' original
+  # stale zuno-ai-build (see values.yaml's own modelRegistry.namespace
+  # comment).
+  MODEL_REGISTRY_NAMESPACE: {{ .Values.modelRegistry.namespace | quote }}
+  MODEL_REGISTRY_URL: {{ .Values.modelRegistry.url | quote }}

@@ -1,8 +1,138 @@
 ---
-- name: "mlops | prepare scaffold"
-  ansible.builtin.debug:
-    msg: "Preparation contract registered for mlops; implementation tasks are pending."
+# No OLM operator of its own - the DataSciencePipelinesApplication/Pipeline
+# CRDs this chart uses come from openshift_ai's aipipelines component
+# (day0), so -d0 is a documented no-op, same pattern as
+# ansible/roles/rag_ingestion/tasks/install.yml (ADR-0302 point 1 reuses
+# that exact mechanism).
+- name: "mlops | apply the mlops GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mlops"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-mlops-d0"
 
-- name: "mlops | configure scaffold"
+- name: "mlops | apply the mlops GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mlops"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-mlops-d1"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# UNVERIFIED against a live cluster - same caveat
+# ansible/roles/rag_ingestion/tasks/install.yml documents for its own
+# rag-dspa wait: assumes a standard status.conditions entry of type
+# "Ready". Re-check with `oc get dspa mlops-dspa -n zuno-ai-build -o yaml`
+# against the target cluster and adjust if the operator uses a different
+# field.
+- name: "mlops | wait for the mlops-dspa DataSciencePipelinesApplication to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: datasciencepipelinesapplications.opendatahub.io/v1
+    kind: DataSciencePipelinesApplication
+    namespace: zuno-ai-build
+    name: mlops-dspa
+  register: _mlops_dspa
+  until: >-
+    (_mlops_dspa.resources | default([]) | length) > 0 and
+    (_mlops_dspa.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 60
+  delay: 15
+
+- name: "mlops | configure summary (DSPA)"
   ansible.builtin.debug:
-    msg: "Configuration contract registered for mlops; implementation tasks are pending."
+    msg: >-
+      mlops-dspa DataSciencePipelinesApplication has reported Ready in
+      zuno-ai-build. The pipeline itself is triggered manually by the
+      operator (`oc create -f <run-spec>` against the DSPA's KFP API, or
+      the OpenShift AI dashboard) once per candidate agent/base-model
+      combination - unlike rag-ingestion, MLOps training runs are not
+      continuously recurring (ADR-0302's own scope: one pipeline run
+      produces one candidate adapter for human-reviewed promotion), so
+      this role does not attempt recurring-run activation the way
+      ansible/roles/rag_ingestion does.
+
+# --- KFP pipeline-upload confirmation (best-effort, UNVERIFIED against a
+# live cluster) -------------------------------------------------------
+# Confirms the Pipeline CR's identity is actually queryable through the
+# DSPA's own v2beta1 HTTP API - the "KFP pipeline upload" half of this
+# WP's own Goal statement - without creating a recurring run (see the
+# debug message above for why). A failure here only skips this
+# confirmation step, never fails the rest of `make d1 install mlops`.
+- name: "mlops | resolve the caller's OpenShift bearer token for the DSPA API"
+  ansible.builtin.command: oc whoami -t
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  register: _mlops_oc_token
+  changed_when: false
+  ignore_errors: true
+
+- name: "mlops | look up the mlops-dspa API server Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: zuno-ai-build
+    # ds-pipeline-<dspa-name> is the DSPA operator's own Route-naming
+    # convention (unverified against a live cluster - confirm with `oc
+    # get route -n zuno-ai-build`, same assumption
+    # ansible/roles/rag_ingestion/tasks/install.yml documents).
+    name: "ds-pipeline-mlops-dspa"
+  register: _mlops_dspa_route
+  ignore_errors: true
+
+- name: "mlops | confirm the mlops pipeline is registered on the DSPA API"
+  when: >-
+    (_mlops_dspa_route.resources | default([]) | length) > 0 and
+    (_mlops_oc_token.stdout | default('') | trim) != ''
+  block:
+    - name: "mlops | list pipelines on the DSPA API server"
+      ansible.builtin.uri:
+        url: "https://{{ _mlops_dspa_route.resources[0].spec.host }}/apis/v2beta1/pipelines"
+        headers:
+          Authorization: "Bearer {{ _mlops_oc_token.stdout | trim }}"
+        validate_certs: false
+        status_code: [200]
+        return_content: true
+      register: _mlops_pipelines_list
+
+    - name: "mlops | fail loudly if the mlops pipeline is not registered"
+      ansible.builtin.fail:
+        msg: >-
+          No pipeline named "mlops" found via the DSPA API - the Pipeline
+          CR (gitops/charts/mlops/templates/pipeline.yaml) may not have
+          synced yet, or KFP has not finished indexing it. Re-run `make
+          d1 install mlops` once ArgoCD reports the Application Healthy.
+      when: >-
+        not ((_mlops_pipelines_list.json.pipelines | default([]))
+             | selectattr('display_name', 'defined')
+             | selectattr('display_name', 'equalto', 'mlops')
+             | list | length > 0)
+
+    - name: "mlops | configure summary (pipeline registered)"
+      ansible.builtin.debug:
+        msg: "mlops pipeline confirmed registered on the mlops-dspa KFP API."
+  rescue:
+    - name: "mlops | pipeline-registration confirmation failed - not fatal"
+      ansible.builtin.debug:
+        msg: >-
+          Could not confirm pipeline registration via the DSPA API (see
+          the task output above for the actual HTTP error). This does
+          not block the rest of the install - confirm manually via the
+          OpenShift AI dashboard instead.
+          WP-07-UNVERIFIED-ASSUMPTION(1/1) Route naming: assumed the DSPA
+          API server Route is named "ds-pipeline-mlops-dspa". Confirm
+          with `oc get route -n zuno-ai-build | grep ds-pipeline` and
+          correct the "look up the mlops-dspa API server Route" task
+          above if it differs.
+
+- name: "mlops | skip pipeline-registration confirmation if the Route or token could not be resolved"
+  ansible.builtin.debug:
+    msg: >-
+      Skipping pipeline-registration confirmation: could not resolve
+      {{ 'the DSPA Route' if (_mlops_dspa_route.resources | default([]) | length) == 0 else 'an OpenShift bearer token (oc whoami -t)' }}.
+      Confirm manually via the OpenShift AI dashboard, or re-run `make d1
+      install mlops` once `oc login` is active and the Route exists.
+  when: >-
+    (_mlops_dspa_route.resources | default([]) | length) == 0 or
+    (_mlops_oc_token.stdout | default('') | trim) == ''

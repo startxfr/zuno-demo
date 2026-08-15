@@ -1,0 +1,15 @@
+boto3>=1.40,<2
+psycopg[binary]>=3.2,<4
+requests>=2.32,<3
+PyYAML>=6.0,<7
+httpx>=0.27,<0.28
+# GPU/training-only - imported lazily inside _run_lora_training so every
+# other stage (and this component's own unit tests) never need these
+# installed. CPU wheels are enough for MLOPS_CPU_SAFE=true; a real
+# training run targets a CUDA-capable node (the operator's own GPU
+# cluster, ADR-0301/0302's own explicit scope boundary).
+torch>=2.4,<3
+transformers>=4.44,<5
+peft>=0.13,<1
+datasets>=2.21,<3
+accelerate>=0.34,<1

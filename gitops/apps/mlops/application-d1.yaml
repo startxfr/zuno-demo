@@ -1,0 +1,26 @@
+---
+# The mlops dataset-to-model pipeline (ADR-0301/ADR-0302, WP-34).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mlops-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-131"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mlops
+    helm:
+      releaseName: zuno-mlops-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-build
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
