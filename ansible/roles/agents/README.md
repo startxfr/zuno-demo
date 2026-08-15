@@ -1,11 +1,15 @@
 # agents
 
-Applies the Tekos frontend/BFF workloads GitOps Applications
-(`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008). This is Day 1's
-`agents` component (ADR-0056) - `precheck.yml` reports (never fails)
-whether the `zuno-api-d0`/`zuno-api-d1` Applications are Synced+Healthy.
-No operator involved, so all of this component's content is `-d1` -
-`zuno-api-d0` is a no-op (see `gitops/apps/README.md`).
+Applies each real agent's frontend/BFF workloads GitOps Application:
+Tekos's (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008) and, since
+WP-31 (ADR-0326), Arkos's (`gitops/apps/arkos` → `gitops/charts/arkos`,
+kept a distinct app-directory name rather than reusing `api`'s legacy
+name so a third/fourth agent's Application doesn't have to fight over
+it). This is Day 1's `agents` component (ADR-0056) - `precheck.yml`
+reports (never fails) whether every one of the `zuno-{api,arkos}-{d0,d1}`
+Applications is Synced+Healthy. No operator involved, so all of this
+component's content is `-d1` - the `-d0` Applications are no-ops (see
+`gitops/apps/README.md`).
 
 Namespace creation used to live in this role too (a separate
 `gitops/apps/agents` → `gitops/charts/namespaces` Application apply); it
@@ -27,12 +31,21 @@ in place. It structurally validates the four catalog-only agents'
 `agent.okf.md` OKF v0.2 Markdown bundles (ADR-0038 -
 `okf_version`/`type`/`zuno.status: placeholder`) - v0 formalizes Tekos as
 the only mandatory end-to-end business path (ADR-0031), but catalog-only is
-not the same as unchecked - then does a basic HTTP reachability smoke test
-against the Tekos frontend's `/healthz` route, then hands off to
-`run_acceptance_gate.yml`, which runs `evaluations/tekos/`'s full gate
-(the 20-scenario acceptance evaluation at a 75% threshold, ADR-0027/0028,
-plus every mandatory security-negative check, ADR-0032/0033/0034/0035/
-0037/0040) as a one-shot in-cluster Job in `zuno-ai-run` - see that file's own
-header comment for why a Job (most of what the gate calls has no
-OpenShift Route) and for the "acceptance-gate" workload identity's narrow
-NetworkPolicy allowances.
+not the same as unchecked. Arkos (ADR-0326/WP-31) deliberately stays in
+that same structural-check loop even though its bundle/graph-shape/chart
+are all real now: `zuno.status` stays `placeholder` until the operator
+confirms the live acceptance gate passes, so it still correctly reports
+`placeholder` here. The check then does a basic HTTP reachability smoke
+test against both the Tekos AND Arkos frontends' `/healthz` routes (Arkos
+gets a smoke test, never its behavioral gate - `evaluations/arkos/`
+requires the human scenario review WP-31's brief gates on first), then
+hands off to `run_acceptance_gate.yml`, which runs `evaluations/tekos/`'s
+full gate (the 20-scenario acceptance evaluation at a 75% threshold,
+ADR-0027/0028, plus every mandatory security-negative check,
+ADR-0032/0033/0034/0035/0037/0040) as a one-shot in-cluster Job in
+`zuno-ai-run` - see that file's own header comment for why a Job (most of
+what the gate calls has no OpenShift Route) and for the "acceptance-gate"
+workload identity's narrow NetworkPolicy allowances. Once Arkos's own
+scenarios are reviewed and its status flips to `active`, running its own
+`evaluations/arkos/run_acceptance_gate.py` the same way becomes the
+operator's job, not this role's default automatic path.

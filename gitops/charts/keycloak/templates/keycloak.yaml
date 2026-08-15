@@ -99,6 +99,15 @@ spec:
                       - key: client_secret
                         path: zuno_tekos_frontend_client_secret
                 - secret:
+                    # ADR-0326 (WP-31): arkos-frontend flipped to a
+                    # confidential client, same shape as tekos-frontend
+                    # above.
+                    name: arkos-frontend-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_arkos_frontend_client_secret
+                - secret:
                     name: demo-personas-password
                     optional: true
                     items:

@@ -1,0 +1,64 @@
+# Cluster-specific; must be overridden per environment and kept in sync
+# with the cluster_base_domain Ansible inventory variable.
+global:
+  clusterBaseDomain: apps.mycluster.example.com
+
+namespace: zuno-ai-run
+
+# Both images are built by the "agent" build component into
+# zuno-ai-build's ImageStream, pulled cross-namespace into zuno-ai-run
+# via the system:image-puller RoleBinding.
+image:
+  registry: image-registry.openshift-image-registry.svc:5000
+  frontendRepository: zuno-ai-build/agent-frontend
+  bffRepository: zuno-ai-build/agent-bff
+  tag: latest
+  pullPolicy: IfNotPresent
+
+frontend:
+  replicas: 1
+  route:
+    # Empty means "arkos.<global.clusterBaseDomain>" (see
+    # templates/_helpers.tpl). Must be predictable: the OIDC redirect URI
+    # and Keycloak client's registered redirect URI both depend on it.
+    host: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  oidcClientId: arkos-frontend
+  activeAgent: arkos
+
+bff:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  agentName: arkos
+  oidcAudience: arkos-frontend
+  # In-cluster Agent Runtime Service, deployed to zuno-ai-run (same
+  # namespace as this chart's own workloads) by gitops/charts/agent-runtime.
+  agentRuntimeBaseUrl: "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"
+
+# Vault paths this chart's ExternalSecrets resolve.
+vault:
+  oidcClientSecretPath: zuno/keycloak/arkos-frontend
+  sessionSecretPath: zuno/arkos/frontend-session
+  redisSecretPath: zuno/redis/session-store
+
+# ADR-0042: server-side session store (gitops/charts/redis, zuno-auth namespace).
+redis:
+  addr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
+  sessionMaxLifetimeSeconds: "43200" # 12h
+
+keycloak:
+  issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
+  # matches the Keycloak CR's actual Route hostname, see
+  # gitops/charts/keycloak/templates/keycloak.yaml

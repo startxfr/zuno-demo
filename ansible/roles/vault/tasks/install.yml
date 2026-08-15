@@ -402,6 +402,18 @@
       client_secret: "{{ zuno_admin_tekos_frontend_token |
         default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
+# ADR-0326 (WP-31): Arkos's own confidential OIDC client - same
+# single-secret shape as tekos-frontend above, its own Vault path since
+# each agent frontend is a distinct Keycloak client (gitops/charts/arkos).
+- name: "vault | generate and seed the arkos-frontend confidential OIDC client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: keycloak/arkos-frontend
+    vault_seed_fields:
+      client_secret: "{{ zuno_admin_arkos_frontend_token |
+        default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+
 # ADR-0320: the "openshift" client backing the cluster OAuth identity
 # provider - same single-secret shape as tekos-frontend above.
 - name: "vault | generate and seed the openshift OIDC client secret (idempotent)"
@@ -446,6 +458,17 @@
     vault_seed_fields:
       hmac_secret: "{{ zuno_admin_tekos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
       encryption_key: "{{ zuno_admin_tekos_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
+
+# ADR-0326 (WP-31): Arkos's own frontend session secret - same shape/
+# idempotency-guard reasoning as tekos/frontend-session above.
+- name: "vault | generate and seed the Arkos frontend session HMAC secret and encryption key (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: arkos/frontend-session
+    vault_seed_fields:
+      hmac_secret: "{{ zuno_admin_arkos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+      encryption_key: "{{ zuno_admin_arkos_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
 
 - name: "vault | generate and seed the Redis session-store password (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
