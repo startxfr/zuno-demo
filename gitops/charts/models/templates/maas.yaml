@@ -44,7 +44,17 @@ spec:
         resources:
           {{- toYaml .Values.maas.llmInferenceService.resources | nindent 10 }}
   router:
-    gateway: {}
+    # VERIFIED live (2026-08-16): an empty gateway: {} does NOT auto-create
+    # or reuse an existing Gateway on this RHOAI build - it defaults to a
+    # hardcoded expected name (openshift-ingress/openshift-ai-inference)
+    # that ODH would provision itself but hasn't on this cluster
+    # ("RefsInvalid: Managed HTTPRoute references non-existent Gateway").
+    # Points explicitly at the real, live, PROGRAMMED maas-default-gateway
+    # (gitops/charts/openshift-ai/templates/maas-gateway.yaml) instead.
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
     route: {}
     scheduler: {}
 ---
