@@ -37,6 +37,10 @@ spec:
           # Substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
+          # Production cutover (2026-08-16): staging rehearsal proved all
+          # three Certificates issue and validate (Ready:True) with the
+          # IAM identity and DNS-01 self-check both working end to end.
+          certificatesIssuer: letsencrypt-route53
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
