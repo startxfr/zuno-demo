@@ -1,8 +1,15 @@
-# Grants the acceptance-gate Job (same zuno-ai-run namespace as this
-# chart's own workloads) ingress to the BFF, additive to the namespace-wide
-# default-deny baseline the frontend already relies on. No namespaceSelector
-# needed: an ingress `from` peer with only a podSelector matches same-
-# namespace pods.
+# Grants the advantage-frontend Deployment (the real chat path) and the
+# acceptance-gate Job ingress to the BFF, additive to the namespace-wide
+# default-deny baseline. No namespaceSelector needed: an ingress `from`
+# peer with only a podSelector matches same-namespace pods.
+#
+# VERIFIED live 2026-08-16 (Tekos incident): this policy previously only
+# listed acceptance-gate, so the frontend's own calls to the BFF were
+# silently dropped by the implicit default-deny (Kubernetes denies
+# everything not explicitly allowed once any NetworkPolicy selects a
+# pod) - every real chat turn timed out at the TCP level. The
+# acceptance-gate suite never caught this because it calls the BFF
+# directly, bypassing the frontend.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -21,6 +28,10 @@ spec:
     - Ingress
   ingress:
     - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: frontend
+              zuno.io/agent: advantage
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: acceptance-gate

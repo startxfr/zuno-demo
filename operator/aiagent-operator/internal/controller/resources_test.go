@@ -161,13 +161,15 @@ func TestDesiredOKFReferenceConfigMap_CarriesBindings(t *testing.T) {
 	require.Equal(t, "search_confluence,web_search", cm.Data["toolCapabilities"])
 }
 
-func TestDesiredBFFNetworkPolicy_ScopedToAcceptanceGate(t *testing.T) {
+func TestDesiredBFFNetworkPolicy_AllowsFrontendAndAcceptanceGate(t *testing.T) {
 	agent := sampleAgent()
 
 	np := desiredBFFNetworkPolicy(agent)
 	require.Len(t, np.Spec.Ingress, 1)
-	require.Len(t, np.Spec.Ingress[0].From, 1)
-	require.Equal(t, "acceptance-gate", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels["app.kubernetes.io/name"])
+	require.Len(t, np.Spec.Ingress[0].From, 2)
+	require.Equal(t, "frontend", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[labelComponent])
+	require.Equal(t, agent.Spec.AgentName, np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[labelAgent])
+	require.Equal(t, "acceptance-gate", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app.kubernetes.io/name"])
 }
 
 func TestToCoreResources_EmptyStaysEmpty(t *testing.T) {

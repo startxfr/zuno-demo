@@ -287,9 +287,18 @@ func desiredService(agent *zunov1alpha1.AIAgent, component string) *corev1.Servi
 	}
 }
 
+// desiredBFFNetworkPolicy grants the agent's own frontend (the real chat
+// path) and the acceptance-gate Job ingress to the BFF. VERIFIED live
+// 2026-08-16 (Tekos incident): this previously only listed acceptance-gate,
+// so the frontend's own calls to the BFF were silently dropped by the
+// implicit default-deny (Kubernetes denies everything not explicitly
+// allowed once any NetworkPolicy selects a pod) - every real chat turn
+// timed out at the TCP level. The acceptance-gate suite never caught this
+// because it calls the BFF directly, bypassing the frontend.
 func desiredBFFNetworkPolicy(agent *zunov1alpha1.AIAgent) *networkingv1.NetworkPolicy {
 	name := agent.Spec.AgentName + "-bff"
 	podSelector := map[string]string{labelComponent: "bff", labelAgent: agent.Spec.AgentName}
+	frontendSelector := map[string]string{labelComponent: "frontend", labelAgent: agent.Spec.AgentName}
 	tcp := corev1.ProtocolTCP
 	port := intstr.FromInt(containerPort)
 	return &networkingv1.NetworkPolicy{
@@ -302,9 +311,10 @@ func desiredBFFNetworkPolicy(agent *zunov1alpha1.AIAgent) *networkingv1.NetworkP
 			PodSelector: metav1.LabelSelector{MatchLabels: podSelector},
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 			Ingress: []networkingv1.NetworkPolicyIngressRule{{
-				From: []networkingv1.NetworkPolicyPeer{{
-					PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app.kubernetes.io/name": "acceptance-gate"}},
-				}},
+				From: []networkingv1.NetworkPolicyPeer{
+					{PodSelector: &metav1.LabelSelector{MatchLabels: frontendSelector}},
+					{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app.kubernetes.io/name": "acceptance-gate"}}},
+				},
 				Ports: []networkingv1.NetworkPolicyPort{{Protocol: &tcp, Port: &port}},
 			}},
 		},
