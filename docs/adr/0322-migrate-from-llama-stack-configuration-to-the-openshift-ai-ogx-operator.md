@@ -1,7 +1,7 @@
 # ADR-0322: Migrate from Llama Stack configuration to the OpenShift AI OGX Operator
 
 - **Status:** Partially implemented (DSC migration, health checks, OGX provider and parity tests merged; live reconciliation confirmed 2026-08-14 via `make d0 install openshift-ai` - `llamastackoperator` absent, `ogx.managementState: Managed` reconciled; OGX server corpus proof and live provider-parity run still pending, deferred by operator decision, roadmap WP-06)
-- **Target:** v0/v0.1
+- **Target:** v0.1
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) and [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) for OGX product mapping and implementation lifecycle

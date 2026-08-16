@@ -65,7 +65,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | v0 | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | v0 | Implemented | Make make check an end-to-end acceptance and security gate |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
-| [ADR-0055](0055-repository-review-change-set-index.md) | v0/v0.1 | Implemented | Repository review change-set index |
+| [ADR-0055](0055-repository-review-change-set-index.md) | v0.1 | Implemented | Repository review change-set index |
 | [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | v0 | Implemented | Restructure deployment into Day 0 / Day 1 sequencing |
 
 ## version 0.1
@@ -127,14 +127,14 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0319](0319-target-openshift-4-22.md) | v0 | Implemented | Target OpenShift 4.22 |
 | [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md) | v0 | Superseded by ADR-0332 (Deprecated) | Pre-provision OpenShift users, RBAC and Console favorites via Keycloak |
 | [ADR-0321](0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md) | v0 | Implemented | Delegate Kueue lifecycle to the Red Hat build of Kueue Operator |
-| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0/v0.1 | Partially implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
+| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0.1 | Partially implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
 | [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | Implemented | Establish canonical generated and validated platform documentation |
 | [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v0.3 | Partially implemented | Generalize the Tekos vertical slice to the four remaining agents |
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | Implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | Superseded by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
-| [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0/v0.1 | Partially implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
+| [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0.1 | Partially implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
 | [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | v0 | Implemented | Revert OpenShift AI to the default applications namespace |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v0.3 | Partially implemented | Extend business-role authorization with CDP and scoped capabilities |

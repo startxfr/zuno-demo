@@ -1,7 +1,7 @@
 # ADR-0330: Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access
 
 - **Status:** Partially implemented
-- **Target:** v0/v0.1
+- **Target:** v0.1
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team
 
