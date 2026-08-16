@@ -155,6 +155,11 @@
                   items:
                     - key: security_checks.py
                       path: security_checks.py
+                    # The shared runner resolves scenarios.yaml per-agent
+                    # too (run_scenarios.py: "its scenarios.yaml lives in
+                    # ITS directory").
+                    - key: scenarios.yaml
+                      path: scenarios.yaml
 
 - name: "acceptance-gate | wait for the Job to reach a terminal state"
   kubernetes.core.k8s_info:
