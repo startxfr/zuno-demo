@@ -136,10 +136,25 @@
                 volumeMounts:
                   - name: gate
                     mountPath: /gate
+                  # WP-31 parameterized run_acceptance_gate.py to load
+                  # security checks from <script-dir>/<AGENT>/ - ConfigMap
+                  # keys can't contain '/', so the same ConfigMap is
+                  # mounted a second time, projecting only that one file
+                  # into the per-agent subdirectory the script resolves
+                  # (VERIFIED live 2026-08-16: FileNotFoundError
+                  # /gate/tekos/security_checks.py otherwise).
+                  - name: gate-agent
+                    mountPath: /gate/tekos
             volumes:
               - name: gate
                 configMap:
                   name: acceptance-gate-scripts
+              - name: gate-agent
+                configMap:
+                  name: acceptance-gate-scripts
+                  items:
+                    - key: security_checks.py
+                      path: security_checks.py
 
 - name: "acceptance-gate | wait for the Job to reach a terminal state"
   kubernetes.core.k8s_info:
