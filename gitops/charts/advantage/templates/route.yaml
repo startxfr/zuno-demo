@@ -10,6 +10,8 @@ metadata:
     app.kubernetes.io/component: frontend
   annotations:
     argocd.argoproj.io/sync-wave: "105"
+    haproxy.router.openshift.io/timeout: {{ .Values.frontend.route.timeout | quote }}
+    haproxy.router.openshift.io/timeout-tunnel: {{ .Values.frontend.route.timeoutTunnel | quote }}
 spec:
   host: {{ include "advantage.routeHost" . }}
   to:

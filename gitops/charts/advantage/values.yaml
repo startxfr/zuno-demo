@@ -26,6 +26,14 @@ frontend:
     # templates/_helpers.tpl). Must be predictable: the OIDC redirect URI
     # and Keycloak client's registered redirect URI both depend on it.
     host: ""
+    # Router default backend timeout is ~30s - well under agent-bff's own
+    # 120s streaming / 55s sync budget (components/agent-bff/main.go), so
+    # a real chat turn gets cut off by the Router before the app's own
+    # generous timeouts ever engage (same gap that produced Tekos's 504,
+    # VERIFIED live 2026-08-16). 150s gives ~30s margin past the 120s
+    # streaming ceiling.
+    timeout: 150s
+    timeoutTunnel: 150s
   resources:
     requests:
       cpu: 100m
