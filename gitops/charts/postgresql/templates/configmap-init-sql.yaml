@@ -39,7 +39,15 @@ data:
     \connect {{ .Values.keycloakDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.keycloakDatabase.owner }};
 
+    -- CREATE EXTENSION needs superuser; every embeddings-bearing database
+    -- must get it here, NOT in the per-domain schema-apply Jobs (those run
+    -- as the unprivileged domain owner role - VERIFIED live 2026-08-15:
+    -- zuno-rag-schema-apply-tech failed with "permission denied to create
+    -- extension \"vector\"" / "Must be superuser"). Same once-at-bootstrap
+    -- caveat as the GRANTs above: on an existing cluster these statements
+    -- must be applied by hand once for each database added after bootstrap.
     \connect {{ .Values.ragTechDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragTechDatabase.owner }};
 
     \connect {{ .Values.maasDatabase.name }}
@@ -49,17 +57,22 @@ data:
     GRANT ALL ON SCHEMA public TO {{ .Values.checkpointDatabase.owner }};
 
     \connect {{ .Values.ogxDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ogxDatabase.owner }};
 
     \connect {{ .Values.ragSalesDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragSalesDatabase.owner }};
 
     \connect {{ .Values.ragSxaLegacyDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragSxaLegacyDatabase.owner }};
 
     \connect {{ .Values.ragAdvDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragAdvDatabase.owner }};
 
     \connect {{ .Values.ragProjectDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragProjectDatabase.owner }};
 {{- end }}
