@@ -42,7 +42,17 @@ resources:
     cpu: "1"
     memory: 1Gi
 
-keycloakIssuer: https://keycloak-zuno.apps.mycluster.example.com/realms/zuno
+# apps.mycluster.example.com is the substitution placeholder
+# (ansible/tasks/apply_gitops_app.yml rewrites it in the Application
+# manifest, which passes it back here via helm values - same pattern as
+# gitops/charts/tekos). VERIFIED live (2026-08-15): the previous
+# hardcoded keycloak-zuno.apps.mycluster.example.com default shipped
+# as-is (no Application passed a value) AND used the retired
+# keycloak-zuno.<domain> host alias - JWT validation failed on its
+# first real exercise with an unresolvable JWKS hostname.
+clusterBaseDomain: apps.mycluster.example.com
+# Empty means "https://keycloak.<clusterBaseDomain>/realms/zuno".
+keycloakIssuer: ""
 ragServiceUrl: http://rag-service.zuno-data.svc:8080
 mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
 

@@ -15,6 +15,11 @@ spec:
     path: gitops/charts/mcp-gateway
     helm:
       releaseName: zuno-mcp-d1
+      values: |
+        # Substituted by ansible/tasks/apply_gitops_app.yml (same
+        # pattern as gitops/apps/api) - feeds the chart's derived
+        # keycloak issuer.
+        clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

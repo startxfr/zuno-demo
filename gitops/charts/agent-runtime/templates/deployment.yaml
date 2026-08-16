@@ -48,7 +48,7 @@ spec:
               containerPort: 8080
           env:
             - name: KEYCLOAK_ISSUER
-              value: {{ .Values.keycloakIssuer | quote }}
+              value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
             - name: RAG_SERVICE_URL
               value: {{ .Values.ragServiceUrl | quote }}
             - name: MCP_GATEWAY_URL

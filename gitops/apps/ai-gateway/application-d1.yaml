@@ -16,6 +16,11 @@ spec:
     path: gitops/charts/ai-gateway
     helm:
       releaseName: zuno-ai-gateway-d1
+      values: |
+        # Substituted by ansible/tasks/apply_gitops_app.yml (same
+        # pattern as gitops/apps/api) - feeds the chart's derived
+        # keycloak issuer.
+        clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
