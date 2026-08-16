@@ -170,6 +170,7 @@ func desiredFrontendDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) 
 	env := []corev1.EnvVar{
 		{Name: "ACTIVE_AGENT", Value: agent.Spec.AgentName},
 		{Name: "KEYCLOAK_ISSUER_URL", Value: cfg.keycloakIssuerURL()},
+		{Name: "KEYCLOAK_JWKS_URL", Value: cfg.KeycloakJWKSURL},
 		{Name: "OIDC_CLIENT_ID", Value: agent.Spec.Frontend.OIDCClientID},
 		{Name: "SELF_BASE_URL", Value: "https://" + routeHost(agent, cfg)},
 		{Name: "BFF_BASE_URL", Value: "http://" + agent.Spec.AgentName + "-bff." + agent.Spec.TargetNamespace + ".svc.cluster.local:8080"},
@@ -222,6 +223,7 @@ func desiredBFFDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) *apps
 	env := []corev1.EnvVar{
 		{Name: "AGENT_NAME", Value: agent.Spec.AgentName},
 		{Name: "KEYCLOAK_ISSUER_URL", Value: cfg.keycloakIssuerURL()},
+		{Name: "KEYCLOAK_JWKS_URL", Value: cfg.KeycloakJWKSURL},
 		{Name: "OIDC_AUDIENCE", Value: agent.Spec.BFF.OIDCAudience},
 		{Name: "AGENT_RUNTIME_BASE_URL", Value: cfg.AgentRuntimeBaseURL},
 	}

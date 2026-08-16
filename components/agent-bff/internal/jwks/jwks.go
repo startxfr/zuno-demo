@@ -65,12 +65,18 @@ const cacheTTL = 10 * time.Minute
 
 // NewVerifier builds a Verifier for the given issuer. audience is the
 // expected `aud`/`azp` claim (the frontend client ID that requested the
-// token); pass "" to skip audience checking.
-func NewVerifier(issuerURL, audience string) *Verifier {
+// token); pass "" to skip audience checking. jwksURL optionally overrides
+// where the key set is fetched (issuerURL stays the iss comparison
+// string); empty derives Keycloak's conventional
+// <issuer>/protocol/openid-connect/certs.
+func NewVerifier(issuerURL, jwksURL, audience string) *Verifier {
 	issuerURL = strings.TrimRight(issuerURL, "/")
+	if jwksURL == "" {
+		jwksURL = issuerURL + "/protocol/openid-connect/certs"
+	}
 	return &Verifier{
 		issuerURL:  issuerURL,
-		certsURL:   issuerURL + "/protocol/openid-connect/certs",
+		certsURL:   jwksURL,
 		audience:   audience,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}

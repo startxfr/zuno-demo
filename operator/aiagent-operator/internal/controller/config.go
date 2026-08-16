@@ -31,6 +31,13 @@ type OperatorConfig struct {
 	// derived from this one, exactly like the chart helpers.
 	ClusterBaseDomain string
 
+	// KeycloakJWKSURL is where the BFFs actually fetch the JWKS, while
+	// keycloakIssuerURL() stays the iss-claim comparison string - the
+	// external Route's certificate chains to Vault's internal root CA,
+	// absent from container trust stores (VERIFIED live 2026-08-16), so
+	// the in-cluster Keycloak Service is the reliable fetch path.
+	KeycloakJWKSURL string
+
 	// AgentRuntimeBaseURL, RedisAddr, SessionMaxLifetimeSeconds: fixed
 	// in-cluster coordinates for shared platform services, identical
 	// across every agent (see gitops/charts/tekos/values.yaml).
@@ -75,6 +82,7 @@ func getenvDefault(key, def string) string {
 func DefaultOperatorConfig() OperatorConfig {
 	return OperatorConfig{
 		ClusterBaseDomain:         getenvDefault("CLUSTER_BASE_DOMAIN", "apps.mycluster.example.com"),
+		KeycloakJWKSURL:           getenvDefault("KEYCLOAK_JWKS_URL", "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs"),
 		AgentRuntimeBaseURL:       getenvDefault("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
 		RedisAddr:                 getenvDefault("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
 		SessionMaxLifetimeSeconds: getenvDefault("SESSION_MAX_LIFETIME_SECONDS", "43200"),

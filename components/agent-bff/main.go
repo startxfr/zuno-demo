@@ -27,7 +27,7 @@ func main() {
 		log.Fatalf("agent-bff: configuration error: %v", err)
 	}
 
-	verifier := jwks.NewVerifier(cfg.KeycloakIssuerURL, cfg.OIDCAudience)
+	verifier := jwks.NewVerifier(cfg.KeycloakIssuerURL, cfg.KeycloakJWKSURL, cfg.OIDCAudience)
 	runtimeClient := runtime.NewClient(cfg.AgentRuntimeBaseURL, cfg.AgentName)
 
 	mux := http.NewServeMux()

@@ -25,6 +25,17 @@ type Config struct {
 	// validation against <issuer>/protocol/openid-connect/certs.
 	KeycloakIssuerURL string
 
+	// KeycloakJWKSURL optionally overrides where the JWKS is actually
+	// fetched from, while KeycloakIssuerURL stays the iss-claim comparison
+	// string. VERIFIED live (2026-08-16): the external Route's certificate
+	// chains to Vault's internal root CA, absent from the container's
+	// trust store, so fetching JWKS via the issuer URL fails TLS
+	// verification and every token is rejected as invalid - the in-cluster
+	// Keycloak Service (plain HTTP by Keycloak's own edge-termination
+	// design, inside the mesh/NetworkPolicy boundary) is the reliable
+	// path. Same two-variable seam as the Python services' auth.py.
+	KeycloakJWKSURL string
+
 	// OIDCAudience is the expected `aud`/`azp` claim on incoming access
 	// tokens - the frontend's client ID, since the frontend is the token's
 	// original requesting party (contract: <agent>-frontend).
@@ -45,6 +56,7 @@ func Load() (*Config, error) {
 		ListenAddr:          getenv("LISTEN_ADDR", ":8080"),
 		AgentName:           getenv("AGENT_NAME", "tekos"),
 		KeycloakIssuerURL:   getenv("KEYCLOAK_ISSUER_URL", ""),
+		KeycloakJWKSURL:     getenv("KEYCLOAK_JWKS_URL", ""),
 		OIDCAudience:        getenv("OIDC_AUDIENCE", "tekos-frontend"),
 		AgentRuntimeBaseURL: getenv("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
 	}
