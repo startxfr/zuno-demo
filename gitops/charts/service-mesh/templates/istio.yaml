@@ -25,9 +25,24 @@ spec:
       networkPolicy:
         enabled: true
       proxy:
+        # 2026-08-16: was failureThreshold: 4 (unexplained since this
+        # component's first commit) - at this probe's own periodSeconds=1/
+        # timeoutSeconds=3, that gave every sidecar only a ~4s budget to
+        # bootstrap before kubelet killed it, well short of how long Envoy
+        # can actually take to complete cert issuance + its first xDS sync
+        # under real control-plane load - VERIFIED live: every freshly
+        # admitted pod's istio-proxy (tekos-frontend and, independently,
+        # agent-runtime) crash-looped on this probe for 20+ minutes,
+        # consistently killed ~3-4s in, on multiple nodes, both before and
+        # after an unrelated cert-manager-webhook blip resolved. 600 is
+        # Istio's own stock default for this field (~10min ceiling, only
+        # actually consumed if boot is unusually slow) - restores the
+        # intended generous first-boot grace period; ADR-0343's
+        # "Operational considerations" already flagged this exact symptom
+        # on maas-api-key-cleanup and deferred this same tuning.
         startupProbe:
           enabled: true
-          failureThreshold: 4
+          failureThreshold: 600
         # 2026-08-15: Istio's stock sidecar default (2-core/1Gi limit,
         # requests.cpu=100m/requests.memory=128Mi) was never right-sized for
         # this cluster - VERIFIED live: it alone put redhat-ods-applications
