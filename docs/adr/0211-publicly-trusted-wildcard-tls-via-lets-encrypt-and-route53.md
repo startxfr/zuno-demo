@@ -1,6 +1,24 @@
 # ADR-0211: Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01
 
-- **Status:** Partially implemented (issuers, Vault seed, Certificates and consumer patches merged behind flags; staging rehearsal, production cutover and consumer flips pending)
+- **Status:** Implemented - see `gitops/charts/cert-manager/`, `gitops/apps/cert-manager/application-d1.yaml`
+
+## Implementation note (2026-08-16)
+
+Live rollout on demo222 completed end to end: staging rehearsal issued
+all three Certificates, production cutover (`letsencrypt-route53`)
+re-issued them with real Let's Encrypt chains, and the consumer flags
+(router default cert, API server named cert, Keycloak ingress) all
+flipped. Verified with plain `curl`/`openssl` (no `-k`, no custom CA) -
+Console, Keycloak and `api.demo222.startx.fr:6443` all serve trusted
+chains (`C=US, O=Let's Encrypt`). Two real defects found and fixed along
+the way: the values rewrite that introduced `certificatesIssuer`
+accidentally dropped `vaultServiceName`, letting a pruning sync delete
+the live `vault-issuer` (every internal certificate's issuer) -
+restored; and cert-manager's DNS-01 self-check walked to the AWS IPI
+installer's private-zone NS records (unreachable `awsdns` names) and
+never validated even though the public TXT was already visible -
+`controllerConfig.overrideArgs` now forces the self-check through public
+recursive resolvers, the documented split-horizon-DNS fix.
 - **Target:** v0.2
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

@@ -1,6 +1,41 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (governance manifests, key lifecycle, correlation and guards merged; live MaaS verification pending)
+- **Status:** Partially implemented (governance manifests, key lifecycle, correlation and guards merged; live MaaS verification blocked on a real architecture gap, see 2026-08-16 note)
+
+## Implementation note (2026-08-16)
+
+Attempted the live rollout on demo222; the chart's own flagged `# CONFIRM`
+on `modelRef.kind: ExternalModel` is now resolved by direct schema
+inspection (`oc explain`), and the answer blocks activation as designed
+rather than confirming it:
+
+- `ExternalModel.spec.externalProviderRefs[].ref` points at an
+  `ExternalProvider`, whose `spec.endpoint` is documented as *"FQDN of
+  the external provider (no scheme or path), e.g. `api.openai.com`,
+  `bedrock.amazonaws.com`"* and requires `spec.auth`
+  (simple/sigv4/oauth2, all required fields). This is genuinely built
+  for authenticated third-party SaaS backends, not our own internal,
+  already-unauthenticated OpenAI-compatible vLLM Service - confirming
+  the chart's own suspicion rather than resolving it in `ExternalModel`'s
+  favor.
+- The alternative, `modelRef.kind: LLMInferenceService`, would deploy a
+  second full GPU-bound serving stack (`serving.kserve.io/v1alpha2`,
+  confirmed installed) - this cluster has one L4 per node, both already
+  committed to the classic InferenceServices `qwen25-7b-instruct` and
+  `embeddings`; not schedulable without more GPU capacity or migrating
+  the existing model off first.
+- `MaaSSubscription.spec.modelRefs[].name/namespace` requires an
+  existing `MaaSModelRef`, so the governance-plane objects (subscription
+  differentiation, `MaaSAuthPolicy` denial proof) cannot be exercised
+  independently of resolving model publication first.
+
+Not flipping `maas.enabled` while the only two schema-legal options are
+either a real architecture misuse or a GPU capacity requirement neither
+this session nor the repo's current hardware envelope can satisfy -
+this is a genuine operator/user decision (accept a second GPU node, or
+get an OpenShift AI 3.5 documentation confirmation that `ExternalModel`
+intentionally supports internal cluster-local endpoints), not a
+credential or code gap.
 - **Target:** v0.2
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
