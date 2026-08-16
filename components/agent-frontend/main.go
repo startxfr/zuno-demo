@@ -183,12 +183,13 @@ func callbackHandler(oidcClient *oidc.Client, sessions *session.Manager) http.Ha
 		}
 
 		sess := session.Session{
-			Subject:     claims.Subject,
-			Email:       claims.Email,
-			Groups:      claims.Groups,
-			AccessToken: tokens.AccessToken,
-			IDToken:     tokens.IDToken,
-			ExpiresAt:   expiresAt,
+			Subject:      claims.Subject,
+			Email:        claims.Email,
+			Groups:       claims.Groups,
+			AccessToken:  tokens.AccessToken,
+			IDToken:      tokens.IDToken,
+			RefreshToken: tokens.RefreshToken,
+			ExpiresAt:    expiresAt,
 		}
 		if err := sessions.Save(w, sess); err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -201,7 +202,10 @@ func callbackHandler(oidcClient *oidc.Client, sessions *session.Manager) http.Ha
 
 func logoutHandler(oidcClient *oidc.Client, sessions *session.Manager, selfBaseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sess, _ := sessions.Load(r)
+		sess, err := sessions.Load(r)
+		if err != nil {
+			log.Printf("agent-frontend: no active session at logout: %v", err)
+		}
 		sessions.Clear(w, r)
 
 		idTokenHint := ""

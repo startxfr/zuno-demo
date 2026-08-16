@@ -165,8 +165,12 @@ func (c *Client) EndSessionURL(idTokenHint, postLogoutRedirectURL string) (strin
 		return postLogoutRedirectURL, nil
 	}
 	q := url.Values{
-		"id_token_hint":            {idTokenHint},
 		"post_logout_redirect_uri": {postLogoutRedirectURL},
+	}
+	if idTokenHint != "" {
+		q.Set("id_token_hint", idTokenHint)
+	} else {
+		q.Set("client_id", c.ClientID)
 	}
 	return d.EndSessionEndpoint + "?" + q.Encode(), nil
 }
