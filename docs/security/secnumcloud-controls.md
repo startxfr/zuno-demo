@@ -12,7 +12,7 @@ against a live deployment, not re-derivable from the repo alone),
 |---|---|---|
 | Non-root, no privilege escalation, all capabilities dropped, seccomp `RuntimeDefault`, read-only root filesystem, dedicated ServiceAccount, no auto-mounted SA token unless needed | `enforced-in-ci` | `platform/security/check_workload_hardening.py` (ADR-0052), run in `.github/workflows/lint.yml`'s `helm` job |
 | Every first-party Deployment chart is covered by the checker above | `enforced-in-ci` | `check_workload_hardening.py`'s `DEPLOYMENT_CHARTS` list - must be updated whenever a new chart is added |
-| Deployed pods actually run under OpenShift's restricted SCC as claimed | `gap` | no live cluster verification exists in this repository's tooling |
+| Deployed pods actually run under OpenShift's restricted SCC as claimed | `enforced-on-cluster` (2026-08-16) | verified live on demo222: every sampled first-party pod (agent-runtime, ai-gateway, mcp-gateway, tekos-bff, arkos-frontend) carries `openshift.io/scc: restricted-v2` |
 
 ## Supply chain
 
@@ -41,7 +41,7 @@ against a live deployment, not re-derivable from the repo alone),
 | Platform namespaces (`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-monitoring`, `zuno-ai-platform`, `zuno-ai-build`, `zuno-mesh`) get a default-deny-other-namespaces baseline with explicit allow-lists | `enforced-in-ci` | `gitops/charts/namespaces/templates/networkpolicy-platform.yaml` |
 | `zuno-ai-run` is excluded from the platform baseline (a namespace-wide same-namespace allow would defeat per-workload isolation, e.g. `mcp-sales-db`) | `enforced-in-ci` (2026-08-14) | `skipNetworkPolicy: true` on the `zuno-ai-run` entry in `gitops/charts/namespaces/values.yaml`, confirmed via `helm template --set policy.enabled=true` |
 | MCP servers require a workload-identity token in addition to NetworkPolicy | `enforced-in-ci` (tested) | `X-Zuno-Gateway-Token` middleware, every `components/mcp-servers/*/server.py` (ADR-0037); each server's `tests/test_mcp_protocol.py` |
-| Deployed NetworkPolicies actually block traffic as rendered (not just as authored) | `gap` | no live cluster verification exists in this repository's tooling |
+| Deployed NetworkPolicies actually block traffic as rendered (not just as authored) | `enforced-on-cluster` (2026-08-16) | verified live on demo222 in both directions: mcp-gateway (allow-listed) → sales-db-mcp:8000 returns 200; tekos-frontend (not allow-listed) → the same endpoint is dropped (curl exit 28 timeout) |
 
 ## Data
 

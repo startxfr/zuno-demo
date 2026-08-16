@@ -40,7 +40,7 @@ zuno_atlassian_confluence_enabled: false
 #   1. Create API token, preferring a scoped (Confluence read-only) token.
 #   2. Copy it immediately - shown once, cannot be recovered later.
 # Auth is email+token (HTTP Basic); email must match the token's account.
-zuno_atlassian_confluence_url: "xxxxxx"     # e.g. https://your-company.atlassian.net/wiki
+zuno_atlassian_confluence_url: "xxxxxx"     # site ROOT incl. scheme, e.g. https://your-company.atlassian.net (no /wiki - the server appends /wiki/rest/api itself)
 zuno_atlassian_confluence_email: "xxxxxx"
 zuno_atlassian_confluence_token: "xxxxxx"
 
@@ -121,3 +121,18 @@ zuno_llm_provider_anthropic_api_key: "xxxxxx"
 zuno_llm_provider_mistral_api_key: "xxxxxx"
 
 zuno_admin_mainpwd: "AbcdeF_Ghi123"
+
+# --- Aramis (adv-domain source API for rag-ingestion's fetch-aramis
+# adapter, ADR-0204/WP-22 - fields read by ansible/roles/vault/tasks/
+# install.yml's aramis seed, previously undocumented here) ----------------
+zuno_aramis_base_url: "xxxxxx"     # e.g. https://aramis.example.com/api
+zuno_aramis_token: "xxxxxx"
+zuno_aramis_enabled: false
+
+# --- OpenShift AI MaaS gateway API key (ADR-0201/WP-27) ------------------
+# Minted by MaaS itself once a MaaSSubscription/key-request flow runs on
+# the live cluster (Vault path maas/gateway-api-key; consumed by
+# ai-gateway's ExternalSecret llm-provider-maas, which only renders once
+# maasAdapter.enabled is true). Chicken-and-egg by design: enable MaaS,
+# mint the key via its API, paste it here, re-run `make d0 install vault`.
+zuno_maas_gateway_api_key: "xxxxxx"

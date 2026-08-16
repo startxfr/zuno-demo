@@ -808,6 +808,34 @@ under `docs/adr/`.
 
 ### Dated entries (roadmap work packages, v0.3)
 
+- **2026-08-16 (live-cluster verification session on demo222)**: first
+  real end-to-end exercise of the v0.1-v0.3 stack. Verified live: full
+  ADR-0349 realm (27 users, ocp-* RBAC matrix via real Keycloak-IdP
+  logins, ArgoCD role mapping), aiagent-operator reconciling Arkos+Naveo
+  CRs (all 5 conditions True, owner-ref GC + selfHeal recreate),
+  WP-21 two live domains with distinct credentials + hybrid search incl.
+  the vector arm, first full grounded chat (5 citations, local qwen),
+  Tekos gate: security 7/7 + gate-checks 1/1 PASS, scenarios 14/20 (70%).
+  ~30 commits of live-found fixes - the big ones: Keycloak 25/26
+  behavioral changes (varchar(255) import abort, vault-file `__`
+  escaping, import-time vs runtime secret resolution, `basic` scope for
+  sub, self-audience mappers, required firstName/lastName), stale
+  hardcoded issuers + JWKS-over-Route TLS in all 4 services (new
+  KEYCLOAK_JWKS_URL seam), served-model-name vs canonical model id split,
+  PgBouncer vs search_path/prepared statements (direct-to-primary),
+  pgvector text-format serialization, AsyncPostgresSaver single-connection
+  wedge (pooled), fleet-wide pullPolicy Always (stale :latest cache),
+  redhat-ods-applications mesh/quota recovery, acceptance-gate Job
+  environment (HOME, per-agent ConfigMap projections, internal CA).
+  Remaining gate failures are scenario-design/harness/credential items
+  (portal Bearer-session contract, `oc` binary in harness, sales-db
+  reachability-by-design, Atlassian Confluence product access for the
+  token identity, BFF 55s timeout vs non-streaming completion latency),
+  not platform defects. Credential-blocked: Route53 (ADR-0211 flips),
+  Salesforce, Aramis, rag-S3, MaaS key. OGX corpus proof (WP-06) not yet
+  attempted live.
+
+
 - **2026-08-15 (ADR-0327, WP-37)**: `zuno.zuno.ai/v1alpha1 AIAgent` CRD
   reconciliation contract — first commit against a brand-new Kubebuilder
   v4 (Go + controller-runtime) scaffold in `operator/aiagent-operator/`,
