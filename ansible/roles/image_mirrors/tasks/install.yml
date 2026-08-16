@@ -1,0 +1,143 @@
+---
+# Mirrors every public-registry base/runtime image this platform depends on
+# into zuno-ai-build ImageStreams (referencePolicy: Local makes the internal
+# registry cache/pull-through each image), so BuildConfigs and Deployments in
+# other namespaces pull the local copy instead of hitting docker.io/quay.io/
+# gcr.io/registry.redhat.io directly. Runs right after "namespaces" in Day 0
+# (which already creates zuno-ai-build - see gitops/charts/namespaces/
+# values.yaml) because vault/redis need their mirrored images before Day 1
+# build ever runs apply_openshift_build.yml.
+#
+# The two digest-pinned images (ubi9-ubi-minimal, odh-kserve-storage-
+# initializer-rhel9) use importPolicy.scheduled: false so the mirror never
+# silently drifts from the pinned digest - ADR-0051's intent, extended to
+# the mirror itself. quay.io/modh/vllm is intentionally not mirrored here:
+# ADR-0048 has Ansible discover and override the real serving image from the
+# live OpenShift AI catalog at apply time, so the static values.yaml
+# fallback is never what's actually deployed.
+- name: "image_mirrors | apply the base/runtime image mirrors"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_image_mirror.yml"
+  vars:
+    mirror_name: "{{ mirror_stream.name }}"
+    mirror_tags: "{{ mirror_stream.tags }}"
+  loop:
+    - name: golang
+      tags:
+        - name: "1.22"
+          from: {kind: DockerImage, name: "docker.io/library/golang:1.22"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+        - name: "1.24"
+          from: {kind: DockerImage, name: "docker.io/library/golang:1.24"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+        - name: "1.26"
+          from: {kind: DockerImage, name: "docker.io/library/golang:1.26"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: node
+      tags:
+        - name: "20-alpine"
+          from: {kind: DockerImage, name: "docker.io/library/node:20-alpine"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: python
+      tags:
+        - name: "3.11-slim"
+          from: {kind: DockerImage, name: "docker.io/library/python:3.11-slim"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+        - name: "3.12-slim"
+          from: {kind: DockerImage, name: "docker.io/library/python:3.12-slim"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: ubi9-ubi-minimal
+      tags:
+        - name: "9"
+          from:
+            kind: DockerImage
+            name: "registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221"
+          importPolicy: {scheduled: false}
+          referencePolicy: {type: Local}
+    - name: ubi9-python-311
+      tags:
+        - name: latest
+          from: {kind: DockerImage, name: "registry.access.redhat.com/ubi9/python-311:latest"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: distroless-static
+      tags:
+        - name: nonroot
+          from: {kind: DockerImage, name: "gcr.io/distroless/static:nonroot"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: vault
+      tags:
+        - name: "1.17.2"
+          from: {kind: DockerImage, name: "docker.io/hashicorp/vault:1.17.2"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: bitnami-kubectl
+      tags:
+        - name: "1.31"
+          from: {kind: DockerImage, name: "docker.io/bitnami/kubectl:1.31"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: bitnami-redis
+      tags:
+        - name: "8.10.0"
+          from: {kind: DockerImage, name: "registry-1.docker.io/bitnami/redis:8.10.0"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: postgres
+      tags:
+        - name: "16-bookworm"
+          from: {kind: DockerImage, name: "docker.io/library/postgres:16-bookworm"}
+          importPolicy: {scheduled: true}
+          referencePolicy: {type: Local}
+    - name: odh-kserve-storage-initializer-rhel9
+      tags:
+        - name: rhel9
+          from:
+            kind: DockerImage
+            name: "registry.redhat.io/rhoai/odh-kserve-storage-initializer-rhel9@sha256:166184c520c7821bacbedd05736938b58edc9cc2edc6071bfbc1105a4316aef5"
+          importPolicy: {scheduled: false}
+          referencePolicy: {type: Local}
+  loop_control:
+    loop_var: "mirror_stream"
+    label: "{{ mirror_stream.name }}"
+
+# Grants cross-namespace image-pull access to every namespace that runs a
+# mirrored image. This mirrors apply_openshift_build.yml's identical grant
+# for zuno-ai-build's build-output images (both idempotently apply the same
+# RoleBinding shape from two call sites, matching this repo's existing
+# tolerance for that - see the zuno-ai-build Namespace itself, applied by
+# both the "namespaces" role and apply_openshift_build.yml). Needed here
+# specifically because vault/redis (Day 0) need pull access before Day 1
+# build ever runs apply_openshift_build.yml.
+- name: "image_mirrors | grant image-pull access to the namespaces that run mirrored images"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "zuno-ai-build-image-puller-{{ rbname }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      subjects:
+        - kind: Group
+          apiGroup: rbac.authorization.k8s.io
+          name: "system:serviceaccounts:{{ rbname }}"
+      roleRef:
+        kind: ClusterRole
+        name: system:image-puller
+        apiGroup: rbac.authorization.k8s.io
+  loop:
+    - zuno-ai-run
+    - zuno-data
+    - zuno-vault
+    - zuno-auth
+  loop_control:
+    loop_var: "rbname"

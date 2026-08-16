@@ -1,0 +1,27 @@
+---
+# Applies one ImageStream in zuno-ai-build that mirrors a public-registry
+# image, so BuildConfigs/Deployments/Jobs pull the cached copy from the
+# in-cluster registry instead of the public registry directly.
+# `referencePolicy.type: Local` (see `oc explain imagestream.spec.tags.
+# referencePolicy`) is what makes the internal registry proxy/cache the pull
+# instead of just passing the upstream reference through.
+- name: "image-mirror | validate required vars are set"
+  ansible.builtin.assert:
+    that:
+      - mirror_name is defined
+      - mirror_tags is defined
+    fail_msg: "apply_image_mirror.yml requires 'mirror_name' and 'mirror_tags' to be set by the including role"
+
+- name: "image-mirror | apply the ImageStream: {{ mirror_name }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: image.openshift.io/v1
+      kind: ImageStream
+      metadata:
+        name: "{{ mirror_name }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        tags: "{{ mirror_tags }}"

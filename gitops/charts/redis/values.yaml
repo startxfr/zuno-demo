@@ -9,6 +9,25 @@ redis:
         # gitops/charts/vault's "global.openshift: true" for the
         # hashicorp/vault chart, Bitnami's own equivalent.
         adaptSecurityContext: force
+    security:
+      # Bitnami's chart hard-fails NOTES.txt rendering
+      # (common.errors.insecureImages) whenever image.registry/repository
+      # don't match its own known-image list - expected here since
+      # image.repository below intentionally points at the zuno-ai-build
+      # mirror instead of Bitnami's registry. See
+      # https://github.com/bitnami/charts/issues/30850.
+      allowInsecureImages: true
+
+  # Mirrored through the zuno-ai-build ImageStream (ansible/roles/
+  # image_mirrors), sourced from registry-1.docker.io/bitnami/redis:8.10.0
+  # (the chart's own declared appVersion, pinned explicitly here since it
+  # needs one concrete tag to mirror). Bitnami's chart default otherwise
+  # leaves this unset and floats to whatever registry-1.docker.io/bitnami/
+  # redis:latest resolves to at deploy time.
+  image:
+    registry: image-registry.openshift-image-registry.svc:5000
+    repository: zuno-ai-build/bitnami-redis
+    tag: "8.10.0"
 
   # Demo scale: this is a session cache, not the platform's durable data
   # store (that's PostgreSQL/pgvector, ADR-0015) - standalone, not

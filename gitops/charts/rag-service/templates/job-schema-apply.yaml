@@ -46,7 +46,9 @@ spec:
       priorityClassName: zuno-platform-weak
       containers:
         - name: psql
-          image: postgres:16-bookworm
+          # Mirrored through the zuno-ai-build ImageStream (ansible/roles/
+          # image_mirrors), sourced from docker.io/library/postgres:16-bookworm.
+          image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgres:16-bookworm
           command:
             - psql
           env:

@@ -20,7 +20,10 @@ servedModelName: qwen2.5-7b-instruct
 image:
   # Fallback for `helm template`/standalone testing only; ansible always
   # overrides this at apply time with the image published by the installed
-  # OpenShift AI catalog.
+  # OpenShift AI catalog. Intentionally NOT mirrored by ansible/roles/
+  # image_mirrors: the real deployed image is discovered live (ADR-0048),
+  # so this static fallback is never what's actually running - mirroring it
+  # wouldn't reduce real quay.io traffic.
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 
@@ -101,7 +104,10 @@ modelStorage:
   # KServe controller already generates for the hf:// init container
   # (read off the live InferenceService's generated pod spec) - unlike
   # image.vllm (ADR-0048), this is not (yet) discovered at deploy time.
-  initializerImage: registry.redhat.io/rhoai/odh-kserve-storage-initializer-rhel9@sha256:166184c520c7821bacbedd05736938b58edc9cc2edc6071bfbc1105a4316aef5
+  # Mirrored through the zuno-ai-build ImageStream (ansible/roles/
+  # image_mirrors, tag "rhel9", importPolicy.scheduled: false so the
+  # mirror stays pinned to this exact digest).
+  initializerImage: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-kserve-storage-initializer-rhel9:rhel9
 
 # Additive second model: text embeddings for rag-ingestion (see
 # gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and

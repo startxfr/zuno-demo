@@ -7,7 +7,12 @@
 # an ordinary redeploy of this runtime:
 #
 #   docker build -f components/agent-runtime/Dockerfile -t zuno/agent-runtime:local .
-FROM python:3.11-slim AS base
+#
+# FROM image below pulls through the zuno-ai-build ImageStream mirror
+# (ansible/roles/image_mirrors), not docker.io directly - a local
+# `docker build` therefore needs network access to the cluster's internal
+# registry route.
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim AS base
 
 WORKDIR /app
 

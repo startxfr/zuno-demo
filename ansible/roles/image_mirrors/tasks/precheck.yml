@@ -1,0 +1,33 @@
+---
+# State detection (never fails).
+- name: "image_mirrors | look up ImageStreams in zuno-ai-build"
+  kubernetes.core.k8s_info:
+    api_version: image.openshift.io/v1
+    kind: ImageStream
+    namespace: zuno-ai-build
+  register: _image_mirrors_lookup
+
+- name: "image_mirrors | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        (_image_mirrors_expected | difference(
+          _image_mirrors_lookup.resources | default([]) | map(attribute='metadata.name') | list
+        ) | length) == 0
+      }}
+  vars:
+    _image_mirrors_expected:
+      - golang
+      - node
+      - python
+      - ubi9-ubi-minimal
+      - ubi9-python-311
+      - distroless-static
+      - vault
+      - bitnami-kubectl
+      - bitnami-redis
+      - postgres
+      - odh-kserve-storage-initializer-rhel9
+
+- name: "image_mirrors | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

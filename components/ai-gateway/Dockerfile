@@ -8,7 +8,12 @@
 # components/mcp-gateway/Dockerfile and components/agent-runtime/Dockerfile
 # already follow (see their own header comments) - a policy change ships
 # as an ordinary redeploy of this gateway, same as those two.
-FROM python:3.11-slim AS base
+#
+# FROM image below pulls through the zuno-ai-build ImageStream mirror
+# (ansible/roles/image_mirrors), not docker.io directly - a local
+# `docker build` therefore needs network access to the cluster's internal
+# registry route.
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim AS base
 
 WORKDIR /app
 

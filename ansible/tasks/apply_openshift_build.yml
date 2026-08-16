@@ -46,7 +46,9 @@
 
 # Grants cross-namespace image-pull access to the namespaces that run these
 # images. Applied here, not by the Day 0 namespaces role, since zuno-ai-build
-# doesn't exist until a build first runs.
+# doesn't exist until a build first runs. zuno-vault/zuno-auth are included
+# for symmetry with the identical grant ansible/roles/image_mirrors applies
+# at Day 0 (both idempotently apply the same RoleBinding shape).
 - name: "openshift-build | grant image-pull access to the namespaces that run these images"
   kubernetes.core.k8s:
     state: present
@@ -69,6 +71,8 @@
   loop:
     - zuno-ai-run
     - zuno-data
+    - zuno-vault
+    - zuno-auth
   loop_control:
     loop_var: "rbname"
 

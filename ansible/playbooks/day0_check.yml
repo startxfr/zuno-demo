@@ -10,6 +10,7 @@
       - argocd
       - admin_context
       - namespaces
+      - image_mirrors
       - openshift_rbac_groups
       - vault
       - cert_manager

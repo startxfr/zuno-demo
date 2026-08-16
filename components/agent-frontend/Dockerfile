@@ -6,19 +6,24 @@
 # at deploy time.
 #
 #   docker build -f components/agent-frontend/Dockerfile -t zuno/agent-frontend:dev .
+#
+# FROM images below pull through the zuno-ai-build ImageStream mirrors
+# (ansible/roles/image_mirrors), not the public registries directly - a
+# local `docker build` therefore needs network access to the cluster's
+# internal registry route, not just docker.io/registry.access.redhat.com.
 
 # ADR-0044: reproducible frontend toolchain (Vite) producing static PatternFly
 # React assets at build time - see components/agent-frontend/web. `npm ci`
 # installs exactly what package-lock.json pins, not whatever `npm install`
 # would resolve at build time, for a reproducible image.
-FROM node:20-alpine AS webbuild
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/node:20-alpine AS webbuild
 WORKDIR /src/web
 COPY components/agent-frontend/web/package.json components/agent-frontend/web/package-lock.json ./
 RUN npm ci
 COPY components/agent-frontend/web/ ./
 RUN npm run build
 
-FROM golang:1.24 AS build
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.24 AS build
 WORKDIR /src
 COPY components/agent-frontend/go.mod ./
 RUN go mod download
@@ -26,10 +31,13 @@ COPY components/agent-frontend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/agent-frontend .
 
 # Pinned to ubi9/ubi-minimal 9.8 by digest rather than :latest (ADR-0051
-# gap 5) - re-pin deliberately (skopeo inspect --format '{{.Digest}}'
+# gap 5) - the digest pin now lives on the zuno-ai-build/ubi9-ubi-minimal:9
+# ImageStream tag (importPolicy.scheduled: false, see
+# ansible/roles/image_mirrors/tasks/install.yml); re-pin deliberately there
+# (skopeo inspect --format '{{.Digest}}'
 # docker://registry.access.redhat.com/ubi9/ubi-minimal:latest) when a
 # base-image update is wanted, rather than letting it float.
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ubi9-ubi-minimal:9
 RUN microdnf install -y shadow-utils && \
     useradd -u 1001 -r -g 0 -d /app -s /sbin/nologin zuno && \
     microdnf remove -y shadow-utils && microdnf clean all

@@ -1,5 +1,7 @@
-# Build the manager binary
-FROM golang:1.26 AS builder
+# Build the manager binary. FROM images below pull through the zuno-ai-build
+# ImageStream mirrors (ansible/roles/image_mirrors), not the public
+# registries directly.
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -23,7 +25,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/distroless-static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

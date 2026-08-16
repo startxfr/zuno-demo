@@ -3,18 +3,26 @@
 # agent.okf.md OKF bundles to bake in).
 #
 #   docker build -t zuno/agent-bff:dev components/agent-bff
+#
+# FROM images below pull through the zuno-ai-build ImageStream mirrors
+# (ansible/roles/image_mirrors), not the public registries directly - a
+# local `docker build` therefore needs network access to the cluster's
+# internal registry route, not just docker.io/registry.access.redhat.com.
 
-FROM golang:1.22 AS build
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.22 AS build
 WORKDIR /src
 COPY go.mod ./
 COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/agent-bff .
 
 # Pinned to ubi9/ubi-minimal 9.8 by digest rather than :latest (ADR-0051
-# gap 5) - re-pin deliberately (skopeo inspect --format '{{.Digest}}'
+# gap 5) - the digest pin now lives on the zuno-ai-build/ubi9-ubi-minimal:9
+# ImageStream tag (importPolicy.scheduled: false, see
+# ansible/roles/image_mirrors/tasks/install.yml); re-pin deliberately there
+# (skopeo inspect --format '{{.Digest}}'
 # docker://registry.access.redhat.com/ubi9/ubi-minimal:latest) when a
 # base-image update is wanted, rather than letting it float.
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ubi9-ubi-minimal:9
 RUN microdnf install -y shadow-utils && \
     useradd -u 1001 -r -g 0 -d /app -s /sbin/nologin zuno && \
     microdnf remove -y shadow-utils && microdnf clean all

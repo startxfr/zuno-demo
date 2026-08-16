@@ -15,7 +15,12 @@
 # ADR-0036/0038: also bakes in agents/ (the OKF v0.2 Markdown bundles) so
 # app/agent_declarations.py can enforce the agent_declaration/task_rights
 # factors - same reasoning, same reload path (/admin/reload-policy).
-FROM python:3.11-slim AS base
+#
+# FROM image below pulls through the zuno-ai-build ImageStream mirror
+# (ansible/roles/image_mirrors), not docker.io directly - a local
+# `docker build` therefore needs network access to the cluster's internal
+# registry route.
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim AS base
 
 WORKDIR /app
 

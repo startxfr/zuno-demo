@@ -18,10 +18,12 @@ vault:
   server:
     priorityClassName: zuno-platform-critical
     image:
-      # Fully qualified: the unqualified "hashicorp/vault" short name resolves
-      # to a Red Hat Connect registry requiring a paid pull secret this
-      # cluster doesn't have. docker.io serves the same image without it.
-      repository: docker.io/hashicorp/vault
+      # Mirrored through the zuno-ai-build ImageStream (ansible/roles/
+      # image_mirrors), sourced from docker.io/hashicorp/vault: the
+      # unqualified "hashicorp/vault" short name resolves to a Red Hat
+      # Connect registry requiring a paid pull secret this cluster doesn't
+      # have, so the mirror's own `from` explicitly uses docker.io.
+      repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/vault
       tag: "1.17.2"
     standalone:
       enabled: true
@@ -76,6 +78,8 @@ backup:
     # is simpler and more robust here than hand-rolling curl+REST calls -
     # same "don't reinvent what a well-known tool already does correctly"
     # reasoning as reusing gate_checks.py logic elsewhere in this
-    # roadmap. Fully qualified, pinned tag (ADR-0115).
-    repository: docker.io/bitnami/kubectl
+    # roadmap. Fully qualified, pinned tag (ADR-0115). Mirrored through the
+    # zuno-ai-build ImageStream (ansible/roles/image_mirrors), sourced from
+    # docker.io/bitnami/kubectl.
+    repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/bitnami-kubectl
     tag: "1.31"
