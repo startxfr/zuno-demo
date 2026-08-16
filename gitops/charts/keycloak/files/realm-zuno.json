@@ -1071,6 +1071,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "comage-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1116,6 +1126,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "tekos-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1161,6 +1181,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "advantage-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1206,6 +1236,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "finage-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1251,6 +1291,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "arkos-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1296,6 +1346,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "naveo-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1341,6 +1401,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "soursage-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1384,6 +1454,16 @@
                 "email"
             ],
             "protocolMappers": [{
+                "name": "audience-self",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "cognos-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
