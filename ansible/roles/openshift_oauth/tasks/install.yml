@@ -144,6 +144,10 @@
 # GitOps-applied (gitops/charts/openshift-oauth/templates/
 # cluster-trusted-ca.yaml) since the ConfigMap *name* isn't
 # cluster-specific - only this ConfigMap's data-write belongs in Ansible.
+# Skipped entirely when Keycloak's live cert has no ca.crt (ACME/Let's
+# Encrypt - already in every system trust store, nothing private to
+# distribute cluster-wide) - VERIFIED live 2026-08-16, same finding as
+# openID.ca above.
 - name: "openshift_oauth | copy the Vault PKI root into openshift-config as user-ca-bundle (key ca-bundle.crt) for cluster-wide trust"
   kubernetes.core.k8s:
     state: present
@@ -155,6 +159,16 @@
         namespace: openshift-config
       data:
         ca-bundle.crt: "{{ _openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode }}"
+  when: "'ca.crt' in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))"
+
+- name: "openshift_oauth | remove the stale user-ca-bundle when Keycloak's live cert no longer needs a custom trust anchor"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: user-ca-bundle
+    namespace: openshift-config
+  when: "'ca.crt' not in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))"
 
 # ADR-0347: removes the ADR-0346 artifact this superseded - nothing else
 # references the old name, and keeping it around would be misleading
