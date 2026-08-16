@@ -63,7 +63,12 @@ async def _connect_one(binding: KnowledgeBinding) -> None:
             min_size=config.PG_POOL_MIN_SIZE,
             max_size=config.PG_POOL_MAX_SIZE,
             init=_init_connection,
-            server_settings={"search_path": binding.schema},
+            # <schema>,public not just <schema> - the vector extension's
+            # objects live in public (databaseInitSQL creates it with the
+            # default search_path), so a bare per-domain search_path can't
+            # resolve the vector type/operators at query time (VERIFIED
+            # live 2026-08-15 via the schema-apply Job's identical failure).
+            server_settings={"search_path": f"{binding.schema},public"},
             # VERIFIED live (2026-08-15, WP-21): connecting direct to the
             # PGO primary (required because PgBouncer's transaction pooling
             # rejects the search_path startup option above) needs TLS -

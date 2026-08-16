@@ -56,8 +56,13 @@ spec:
               value: {{ $.Values.pg.port | quote }}
             - name: PGDATABASE
               value: {{ .database | quote }}
+            # {{ .schema }},public not just {{ .schema }} - VERIFIED live
+            # (2026-08-15): the vector extension's objects live in public
+            # (databaseInitSQL creates it with the default search_path), so
+            # a bare per-domain search_path can't resolve the vector type
+            # ("type \"vector\" does not exist" at 002_pgvector.sql).
             - name: PGOPTIONS
-              value: "-c search_path={{ .schema }}"
+              value: "-c search_path={{ .schema }},public"
             # Direct-to-primary requires TLS (PGO pg_hba hostssl) - same
             # live finding as app/db.py's ssl="require"; psql honors
             # PGSSLMODE, and PGOPTIONS above is fine against real Postgres
