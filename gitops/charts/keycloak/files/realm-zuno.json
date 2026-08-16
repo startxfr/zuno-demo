@@ -1042,6 +1042,7 @@
                 "post.logout.redirect.uris": "https://comage.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1086,6 +1087,7 @@
                 "post.logout.redirect.uris": "https://tekos.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1130,6 +1132,7 @@
                 "post.logout.redirect.uris": "https://advantage.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1174,6 +1177,7 @@
                 "post.logout.redirect.uris": "https://finage.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1218,6 +1222,7 @@
                 "post.logout.redirect.uris": "https://arkos.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1262,6 +1267,7 @@
                 "post.logout.redirect.uris": "https://naveo.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1306,6 +1312,7 @@
                 "post.logout.redirect.uris": "https://soursage.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1348,6 +1355,7 @@
                 "post.logout.redirect.uris": "https://cognos.apps.mycluster.example.com/*"
             },
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
@@ -1386,6 +1394,7 @@
                 "https://oauth-openshift.apps.mycluster.example.com"
             ],
             "defaultClientScopes": [
+                "basic",
                 "web-origins",
                 "profile",
                 "roles",
