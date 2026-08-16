@@ -128,7 +128,15 @@ type bffChatRequest struct {
 // return as plain JSON regardless of the request's Accept header) falls
 // back to the synchronous JSON path unchanged.
 func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) http.HandlerFunc {
-	client := &http.Client{Timeout: 60 * time.Second}
+	// httpClient bounds the synchronous JSON path only.
+	httpClient := &http.Client{Timeout: 60 * time.Second}
+	// streamClient has no fixed Timeout (unlike httpClient) - matching
+	// agent-bff/internal/runtime/client.go's identical split, since
+	// http.Client.Timeout bounds the entire request including reading a
+	// streamed body, which would silently truncate a long-but-healthy SSE
+	// turn. Cancellation for this path is purely context-driven
+	// (ADR-0045 "client cancellation") via r.Context().
+	streamClient := &http.Client{}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -182,8 +190,10 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 		// their own logs and the "start" SSE event.
 		requestID := reqid.FromHeaderOrNew(r.Header)
 		bffReq.Header.Set(reqid.Header, requestID)
+		client := httpClient
 		if wantsStream {
 			bffReq.Header.Set("Accept", "text/event-stream")
+			client = streamClient
 		}
 
 		resp, err := client.Do(bffReq)
