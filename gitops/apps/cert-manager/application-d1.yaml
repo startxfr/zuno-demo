@@ -21,6 +21,12 @@ spec:
           enabled: true
         issuer:
           enabled: true
+        # Required by the vault-issuer template (issuer.enabled AND
+        # vaultServiceName) - dropped by mistake in the ADR-0211 edit,
+        # which let a pruning sync delete the vault-issuer ClusterIssuer
+        # live (2026-08-16); every internal certificate (Keycloak TLS,
+        # istio-csr chain) renews through it.
+        vaultServiceName: zuno-vault
         # ADR-0211: ships disabled - the operator flips `enabled: true`
         # here (a normal reviewed Git change) once the aws/route53-dns01
         # Vault seed exists, then follows the staged rollout documented
