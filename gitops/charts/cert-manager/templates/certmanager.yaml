@@ -9,5 +9,19 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "20"
+{{- if .Values.acme.enabled }}
+spec:
+  # VERIFIED live (2026-08-16, ADR-0211 staging rehearsal): on an AWS IPI
+  # cluster the VPC resolver serves the installer's PRIVATE hosted zone,
+  # whose NS records are unreachable awsdns names - cert-manager's DNS-01
+  # self-check walked to them and got REFUSED forever while the public TXT
+  # was already world-visible. Forcing the self-check through public
+  # recursive resolvers is the documented fix for split-horizon DNS.
+  controllerConfig:
+    overrideArgs:
+      - --dns01-recursive-nameservers=8.8.8.8:53,1.1.1.1:53
+      - --dns01-recursive-nameservers-only
+{{- else }}
 spec: {}
+{{- end }}
 {{- end }}
