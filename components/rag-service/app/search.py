@@ -428,7 +428,7 @@ async def hybrid_search(
     # "invalid input for query argument $1 ... expected str, got list" on
     # every similarity query, silently degrading hybrid search to
     # text-only).
-    if embedding is not None:
+    if isinstance(embedding, (list, tuple)):
         embedding = "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 
     for domain in effective_domains:
