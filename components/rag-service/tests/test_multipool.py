@@ -201,7 +201,9 @@ def test_connect_one_creates_a_pool_with_per_domain_credentials_and_search_path(
         assert captured["database"] == "rag-tech"
         assert captured["user"] == "ragtech"
         assert captured["password"] == "secret"
-        assert captured["server_settings"] == {"search_path": "rag"}
+        # <schema>,public: the vector extension lives in public (see
+        # app/db.py's comment - live finding, 2026-08-15).
+        assert captured["server_settings"] == {"search_path": "rag,public"}
     finally:
         db._pools.pop("knowledge.tech", None)
         os.environ.pop("TESTOK_PGUSER", None)
