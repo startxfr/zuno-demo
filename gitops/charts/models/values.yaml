@@ -182,7 +182,8 @@ maas:
   # operator step (see the WP-27 brief's follow-up section), same
   # "manifests exist, live verification pending" posture as
   # maasAdapter.enabled in gitops/charts/ai-gateway.
-  enabled: false
+  # Enabled 2026-08-16: 3rd GPU node ready, LLMInferenceService path built.
+  enabled: true
 
   modelRef:
     name: qwen25-7b-instruct-maas
