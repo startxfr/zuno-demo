@@ -53,41 +53,67 @@
       check `oc get co ingress` before re-running.
   when: (_openshift_oauth_router_ca.resources | default([]) | length) == 0
 
-# ADR-0347: the actual trust anchor for the live Keycloak route - the
-# cert-manager-issued Secret behind Ingress "zuno" (zuno-auth), ADR-0316.
-- name: "openshift_oauth | look up the Keycloak serving CA (keycloak-tls in zuno-auth)"
+# ADR-0347/ADR-0211: the actual trust anchor for the live Keycloak route -
+# whichever Secret the keycloak chart's own Ingress currently references
+# (zuno-auth), not a hardcoded name. VERIFIED live (2026-08-16): flipping
+# ingress.acmeWildcardTLS switches the Ingress's tls[].secretName from
+# keycloak-tls (Vault pki/ mount, root CN=zuno-demo.internal) to
+# keycloak-wildcard-tls (cert-manager ACME, Let's Encrypt) without this
+# role knowing - the authentication clusteroperator went Degraded
+# (OAuthServerConfigObservationDegraded, "certificate signed by unknown
+# authority") because keycloak-serving-ca kept bundling the now-stale
+# Vault root while Keycloak served a Let's Encrypt chain. Reading the
+# Ingress's own secretName keeps this self-correcting across either mode.
+- name: "openshift_oauth | look up the Keycloak Ingress to find its live TLS secret name"
+  kubernetes.core.k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: Ingress
+    name: "{{ zuno_keycloak_cr_name | default('zuno') }}"
+    namespace: zuno-auth
+  register: _openshift_oauth_keycloak_ingress
+
+- name: "openshift_oauth | fail loudly if the Keycloak Ingress isn't available"
+  ansible.builtin.fail:
+    msg: >-
+      Ingress {{ zuno_keycloak_cr_name | default('zuno') }} (zuno-auth) not
+      found - keycloak is not installed or not reconciled; check
+      `make d0 check keycloak` before re-running.
+  when: (_openshift_oauth_keycloak_ingress.resources | default([]) | length) == 0
+
+- name: "openshift_oauth | look up the Secret the Keycloak Ingress actually references"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
-    name: keycloak-tls
+    name: "{{ _openshift_oauth_keycloak_ingress.resources[0].spec.tls[0].secretName }}"
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ca
 
-- name: "openshift_oauth | record the missing keycloak-tls finding before failing"
+- name: "openshift_oauth | record the missing/not-ready TLS secret finding before failing"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
   vars:
     blocked_finding:
       component: openshift-oauth
-      resource: "Secret/keycloak-tls (zuno-auth)"
+      resource: "Secret/{{ _openshift_oauth_keycloak_ingress.resources[0].spec.tls[0].secretName }} (zuno-auth)"
       state: "NotFound"
-      cause: "cert-manager has not yet issued the keycloak Ingress certificate (ADR-0316) - keycloak is not installed or not reconciled"
-      solution: "Verify the vault-issuer ClusterIssuer is Ready and the keycloak Ingress exists, then re-run"
+      cause: "cert-manager has not yet issued the certificate the keycloak Ingress currently references"
+      solution: "Verify the relevant ClusterIssuer is Ready and the Certificate is Ready, then re-run"
       auto_fix: "make d0 reconcile keycloak"
-  when: >-
-    (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
-    or 'ca.crt' not in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))
+  when: (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
 
-- name: "openshift_oauth | fail loudly if the Keycloak serving CA isn't available to copy"
+- name: "openshift_oauth | fail loudly if the Keycloak serving TLS secret isn't available to copy"
   ansible.builtin.fail:
     msg: >-
-      Secret keycloak-tls (zuno-auth) not found or missing key ca.crt -
-      cert-manager's vault-issuer must have issued the keycloak Ingress
-      certificate first; check `make d0 check keycloak` before re-running.
-  when: >-
-    (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
-    or 'ca.crt' not in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))
+      Secret {{ _openshift_oauth_keycloak_ingress.resources[0].spec.tls[0].secretName }}
+      (zuno-auth) not found - cert-manager must have issued it first;
+      check `make d0 check keycloak` before re-running.
+  when: (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
 
-- name: "openshift_oauth | copy the Keycloak + router CAs into openshift-config as keycloak-serving-ca (key ca.crt) for openID.ca"
+# ACME-issued Secrets (Let's Encrypt via cert-manager) carry only
+# tls.crt/tls.key, no separate ca.crt - the chain is already in every
+# standard system trust store, so no custom entry is needed for that leg.
+# Vault-issued Secrets (vault-issuer) do carry ca.crt (a private root no
+# system store knows), which must be bundled explicitly.
+- name: "openshift_oauth | copy the Keycloak (if privately-issued) + router CAs into openshift-config as keycloak-serving-ca (key ca.crt) for openID.ca"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -98,8 +124,11 @@
         namespace: openshift-config
       data:
         ca.crt: >-
-          {{ (_openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode)
-             + "\n"
+          {{ (
+               (_openshift_oauth_keycloak_ca.resources[0].data['ca.crt'] | b64decode) + "\n"
+               if 'ca.crt' in (_openshift_oauth_keycloak_ca.resources[0].data | default({}))
+               else ''
+             )
              + (_openshift_oauth_router_ca.resources[0].data['ca-bundle.crt']) }}
 
 # ADR-0347: cluster-wide complement to openID.ca above (defense in depth) -
