@@ -10,6 +10,14 @@ configMapGenerator:
       - security_checks.py=../../../../../evaluations/tekos/security_checks.py
       - gate_checks.py=../../../../../evaluations/tekos/gate_checks.py
       - run_acceptance_gate.py=../../../../../evaluations/tekos/run_acceptance_gate.py
+      # Repo policy files the checks read relative to their own resolved
+      # location (security_checks.py: repo_root=parents[2] -> /gate;
+      # gate_checks.py: parents[2] -> /) - projected into those exact
+      # paths by the Job's volume items (VERIFIED live 2026-08-16:
+      # FileNotFoundError on both without these).
+      - classification.yaml=../../../../../policies/data-classification/classification.yaml
+      - tool-policy.yaml=../../../../../policies/tools/tool-policy.yaml
+      - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
 generatorOptions:
   disableNameSuffixHash: true
   labels:

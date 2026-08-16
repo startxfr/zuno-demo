@@ -21,6 +21,42 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/namespace"
 
+# The Routes this gate dials (Keycloak, agent frontends) chain to Vault's
+# internal root CA, absent from any stock container trust store. The
+# authoritative in-cluster copy is the same one the cluster OAuth trusts
+# for its Keycloak IdP (openshift-config/keycloak-serving-ca, created by
+# ansible/roles/openshift_oauth) - copied here into a zuno-ai-run
+# ConfigMap the Job can mount (VERIFIED live 2026-08-16: every HTTPS
+# scenario failed CERTIFICATE_VERIFY_FAILED before this).
+- name: "acceptance-gate | read the platform's internal root CA from openshift-config"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: openshift-config
+    name: keycloak-serving-ca
+  register: _gate_ca_cm
+
+- name: "acceptance-gate | fail if the internal root CA ConfigMap is missing"
+  ansible.builtin.fail:
+    msg: >-
+      openshift-config/keycloak-serving-ca not found - run
+      `make d0 install openshift-oauth` first (it publishes the internal
+      root CA the platform's Routes chain to).
+  when: (_gate_ca_cm.resources | default([]) | length) == 0
+
+- name: "acceptance-gate | copy the internal root CA into a zuno-ai-run ConfigMap the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: acceptance-gate-ca
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        ca.crt: "{{ _gate_ca_cm.resources[0].data['ca.crt'] }}"
+
 - name: "acceptance-gate | read the demo-persona password from zuno-auth (ADR-0041)"
   kubernetes.core.k8s_info:
     kind: Secret
@@ -106,7 +142,21 @@
                 command:
                   - sh
                   - -c
-                  - "pip install --quiet --no-cache-dir -r /gate/requirements.txt && python3 /gate/run_acceptance_gate.py"
+                  # After pip (which must keep the public CA bundle to
+                  # reach PyPI), the platform's internal root CA is
+                  # appended to certifi's bundle (httpx verifies against
+                  # certifi) and SSL_CERT_FILE points urllib at the same
+                  # combined bundle - every Route this gate dials
+                  # (Keycloak, the agent frontends) chains to Vault's
+                  # internal root, absent from any stock trust store
+                  # (VERIFIED live 2026-08-16: every HTTPS scenario failed
+                  # CERTIFICATE_VERIFY_FAILED without this).
+                  - >-
+                    pip install --quiet --no-cache-dir -r /gate/requirements.txt &&
+                    CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
+                    cat /gate-ca/ca.crt >> "$CERTIFI" &&
+                    export SSL_CERT_FILE="$CERTIFI" &&
+                    python3 /gate/run_acceptance_gate.py
                 workingDir: /gate
                 env:
                   - name: PYTHONUNBUFFERED
@@ -145,6 +195,17 @@
                   # /gate/tekos/security_checks.py otherwise).
                   - name: gate-agent
                     mountPath: /gate/tekos
+                  # security_checks.py resolves repo_root as parents[2] of
+                  # its own resolved path (/gate) - the policy files it
+                  # reads land under /gate/policies via items sub-paths.
+                  - name: gate-policies
+                    mountPath: /gate/policies
+                  # gate_checks.py's parents[2] resolves to / - its
+                  # provider-routing read lands at /platform/ai-gateway.
+                  - name: gate-platform
+                    mountPath: /platform/ai-gateway
+                  - name: gate-ca
+                    mountPath: /gate-ca
             volumes:
               - name: gate
                 configMap:
@@ -160,6 +221,23 @@
                     # ITS directory").
                     - key: scenarios.yaml
                       path: scenarios.yaml
+              - name: gate-policies
+                configMap:
+                  name: acceptance-gate-scripts
+                  items:
+                    - key: classification.yaml
+                      path: data-classification/classification.yaml
+                    - key: tool-policy.yaml
+                      path: tools/tool-policy.yaml
+              - name: gate-platform
+                configMap:
+                  name: acceptance-gate-scripts
+                  items:
+                    - key: provider-routing.yaml
+                      path: provider-routing.yaml
+              - name: gate-ca
+                configMap:
+                  name: acceptance-gate-ca
 
 - name: "acceptance-gate | wait for the Job to reach a terminal state"
   kubernetes.core.k8s_info:
