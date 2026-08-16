@@ -218,14 +218,23 @@ maas:
     # embeddings/qwen predictors (same zone-pinning pattern
     # gitops/charts/models already uses for those two).
     zone: eu-west-2c
+    # Smaller than the classic qwen predictor's 24Gi/32Gi (g6.4xlarge,
+    # 16vCPU/64GiB) - VERIFIED live (2026-08-16): the new node is a
+    # g6.2xlarge (8vCPU/32GiB, ~28.7Gi allocatable), half the instance
+    # size. 24Gi request alone exceeded total allocatable once the
+    # router-scheduler pod + daemonsets' own ~6.8Gi baseline is counted
+    # ("FailedScheduling: Insufficient memory"). 16Gi/20Gi leaves
+    # headroom; system RAM mainly needs to cover the vLLM engine/
+    # tokenizer/request buffers, not the model weights (those live in
+    # GPU VRAM).
     resources:
       requests:
         cpu: "4"
-        memory: 24Gi
+        memory: 16Gi
         nvidia.com/gpu: "1"
       limits:
         cpu: "8"
-        memory: 32Gi
+        memory: 20Gi
         nvidia.com/gpu: "1"
 
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
