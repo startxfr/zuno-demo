@@ -96,8 +96,15 @@ knowledgeDomains:
     vaultPath: rag/postgresql-app
     secretName: rag-service-db-ragtech
     seed: true
+  # Enabled 2026-08-15 (WP-21 operator follow-up executed live): the
+  # ragsales Vault credential is seeded, the rag-sales database + role
+  # exist on the PGO cluster, and the one-time superuser
+  # GRANT/CREATE EXTENSION documented by configmap-init-sql.yaml has been
+  # applied - discharging the ADR-0204 acceptance criterion "at least two
+  # domains run on the same reusable RAG code without sharing database
+  # credentials" (tech above + sales here, distinct roles).
   - domain: sales
-    enabled: false
+    enabled: true
     database: rag-sales
     schema: rag
     envPrefix: RAGSALES
