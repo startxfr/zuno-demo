@@ -186,57 +186,46 @@ maas:
 
   modelRef:
     name: qwen25-7b-instruct-maas
-    # CONFIRM on the live cluster (WP-27 follow-up) - two real bridging
-    # options exist, neither a clean fit, and OpenShift AI 3.5's own
-    # documentation should decide between them:
-    #
-    #   1. modelRef.kind: LLMInferenceService (serving.kserve.io/v1alpha2,
-    #      confirmed installed) - the CRD MaaS's own schema seems to
-    #      expect for a "local" model, but it is a FULL SEPARATE serving
-    #      stack (model.uri, replicas, parallelism - no field references
-    #      an existing classic InferenceService), meaning publishing this
-    #      way would deploy a SECOND GPU-bound copy of the same model.
-    #      This cluster has exactly one GPU per node, both already
-    #      committed (see values.yaml's own resources block +
-    #      embeddingModel's) - not schedulable without more GPU capacity
-    #      or migrating the existing classic InferenceService off first
-    #      (a materially bigger, out-of-WP-27-scope change).
-    #   2. modelRef.kind: ExternalModel (maas.opendatahub.io/v1alpha1,
-    #      the CHOICE BELOW) - a much lighter resource (endpoint/provider/
-    #      targetModel/credentialRef, no GPU footprint of its own), but
-    #      its own CRD schema description says `endpoint` is "metadata for
-    #      downstream consumers... not used by the controller for
-    #      endpoint derivation" and its doc example is a third-party
-    #      hostname ("api.openai.com") - i.e. it reads as designed for
-    #      genuinely external SaaS providers, not confirmed to route
-    #      traffic to an internal cluster-local vLLM Service the way this
-    #      values block assumes. Chosen here only because it doesn't
-    #      duplicate GPU-bound infrastructure; VERIFY the resulting
-    #      MaaSModelRef actually serves real inference before relying on
-    #      it, and correct to option 1 (with a genuine capacity/migration
-    #      plan) if OpenShift AI 3.5 docs say ExternalModel cannot wrap an
-    #      internal endpoint.
-    kind: ExternalModel
-  externalModel:
-    # FQDN only, no scheme/path (CRD pattern-validated) - the existing
-    # classic InferenceService's own predictor Service (templates/
-    # inferenceservice.yaml), OpenAI-compatible per vLLM's own API.
-    endpoint: qwen25-7b-instruct-predictor.zuno-ai-run.svc.cluster.local
-    # CONFIRM: no enum in the CRD schema (free-form string, "identifies
-    # the API format and auth type") - "openai" is a guess matching vLLM's
-    # OpenAI-compatible surface, not confirmed against a live MaaS
-    # provider-resolver plugin list.
-    provider: openai
-    targetModel: qwen2.5-7b-instruct
-    # CRD-documented required shape: the referenced Secret MUST carry a
-    # data key literally named "api-key" (confirmed via the live CRD's
-    # OpenAPI schema description, 2026-08-15) - vLLM's own OpenAI-
-    # compatible server does not require a real key, so this is a
-    # placeholder value, not a real credential (ADR-0024: never a literal
-    # secret in this file - templates/maas.yaml renders it as a Secret,
-    # not an ExternalSecret, precisely because there is no real credential
-    # to resolve from Vault here).
-    credentialSecretName: qwen25-7b-instruct-maas-credential
+    # RESOLVED live 2026-08-16 (a 3rd GPU node - g6.2xlarge/L4, zone
+    # eu-west-2c - was added, freeing this decision): LLMInferenceService.
+    # ExternalModel was ruled out on its own schema, not just suspected -
+    # ExternalProvider.spec.endpoint is documented "FQDN of the external
+    # provider... e.g. api.openai.com" and spec.auth is required
+    # (simple/sigv4/oauth2), genuinely built for authenticated third-party
+    # SaaS, not our internal unauthenticated vLLM Service. Reusing the
+    # existing classic InferenceService's model PVC was considered and
+    # rejected: it's ReadWriteOnce, bound to zone eu-west-2b where that
+    # GPU is already fully committed - a second GPU-requesting pod can't
+    # land on the same node, and RWO EBS volumes can't attach cross-node.
+    # llmInferenceService below downloads its own copy via hf:// onto the
+    # new node instead (standard KServe LLMInferenceService pattern, see
+    # https://kserve.github.io/website/docs/model-serving/generative-inference/llmisvc/llmisvc-configuration).
+    kind: LLMInferenceService
+  llmInferenceService:
+    # RHOAI 3.5 EA2's own vLLM/CUDA preset (`oc get llminferenceserviceconfig
+    # -n redhat-ods-applications`, 2026-08-16) - supplies the serving image;
+    # everything below overrides/adds to it.
+    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    modelUri: hf://Qwen/Qwen2.5-7B-Instruct
+    # Served-model id MaaS callers use in the "model" field - independent
+    # canonical id from the classic InferenceService's own
+    # servedModelName (models.servedModelName), by design: this is a
+    # deliberately separate governed-access copy, not an alias for it.
+    servedModelName: qwen2.5-7b-instruct-maas
+    # Pins to the new GPU node's zone (g6.2xlarge/L4) - the other two
+    # zones' single GPU each are already committed to the classic
+    # embeddings/qwen predictors (same zone-pinning pattern
+    # gitops/charts/models already uses for those two).
+    zone: eu-west-2c
+    resources:
+      requests:
+        cpu: "4"
+        memory: 24Gi
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "8"
+        memory: 32Gi
+        nvidia.com/gpu: "1"
 
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
