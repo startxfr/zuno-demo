@@ -10,6 +10,28 @@ Disabled by default (.Values.maas.enabled: false) until a GPU node with
 spare capacity exists.
 */ -}}
 {{- if .Values.maas.enabled }}
+# VERIFIED live (2026-08-16): MaaSAuthPolicy's admission webhook rejected
+# the whole batch with "namespace zuno-ai-run is not enabled for MaaS
+# tenant resources. Create a Tenant CR in this namespace to enable it." -
+# not documented anywhere in this chart before hitting it live. Tenant is
+# namespace-scoped and CEL-enforced as a singleton named "default-tenant"
+# per namespace (v1alpha1). gatewayRef sets the tenant-wide default; the
+# LLMInferenceService's own router.gateway.refs below is still explicit
+# for clarity/defense-in-depth.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: Tenant
+metadata:
+  name: default-tenant
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  gatewayRef:
+    name: maas-default-gateway
+    namespace: openshift-ingress
+---
 # Its own GPU-bound serving stack (RESOLVED 2026-08-16 - see values.yaml's
 # maas.modelRef.kind comment for why ExternalModel/PVC-reuse were both
 # ruled out). baseRefs supplies the vLLM/CUDA image; model.uri triggers
