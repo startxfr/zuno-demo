@@ -50,6 +50,16 @@ resources:
 clusterBaseDomain: apps.mycluster.example.com
 # Empty means "https://keycloak.<clusterBaseDomain>/realms/zuno".
 keycloakIssuer: ""
+# JWKS is fetched over the in-cluster Service, not the external Route -
+# the issuer string above is only compared against the token's iss
+# claim, while this URL is what actually gets dialed (the two are
+# separate env vars in app/auth.py for exactly this). VERIFIED live
+# (2026-08-15): fetching via the Route fails TLS verification (the
+# chain ends at Vault's internal root CA, not in the container's
+# system store), and the in-cluster hop stays plain-HTTP by Keycloak's
+# own design (spec.http.httpEnabled, edge termination) inside the
+# mesh/NetworkPolicy boundary (zuno-auth allows zuno-ai-run).
+keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
 
 salesDbMcpUrl: http://sales-db-mcp.zuno-ai-run.svc:8000
 
