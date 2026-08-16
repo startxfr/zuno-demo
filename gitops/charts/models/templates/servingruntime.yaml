@@ -46,7 +46,7 @@ spec:
       imagePullPolicy: {{ .Values.image.pullPolicy }}
       args:
         - --model=/mnt/models
-        - --served-model-name={{ .Values.modelId }}
+        - --served-model-name={{ .Values.servedModelName }}
         - --max-model-len=8192
         # vLLM defaults to 8000; must match the containerPort below, which
         # the readiness probe, Service and NetworkPolicy all assume is

@@ -23,7 +23,7 @@ spec:
       imagePullPolicy: {{ .Values.image.pullPolicy }}
       args:
         - --model=/mnt/models
-        - --served-model-name={{ .Values.embeddingModel.modelId }}
+        - --served-model-name={{ .Values.embeddingModel.servedModelName }}
         # This vLLM version (0.21.0+rhaiv.10) removed --task in favor of
         # --runner/--convert - verified on-cluster: --task=embed fails
         # argparse with "unrecognized arguments" (vllm/config/model.py

@@ -6,8 +6,16 @@ namespace: zuno-ai-run
 servingRuntimeName: vllm-runtime
 inferenceServiceName: qwen25-7b-instruct
 
-# Must match agent-runtime's localModelName/localModelEndpoint.
+# The HF repository id the download Job pulls (hf://<modelId>).
 modelId: Qwen/Qwen2.5-7B-Instruct
+# The OpenAI-compatible API id vLLM serves (--served-model-name) - the
+# platform-wide canonical model id every consumer routes by
+# (platform/ai-gateway/provider-routing.yaml, ai-gateway's
+# LOCAL_MODEL_NAME, policies/model-routing, policies/optimization).
+# VERIFIED live (2026-08-16): serving under the HF id instead made
+# every local chat completion 404 ("The model `qwen2.5-7b-instruct`
+# does not exist") - the two ids are different concerns.
+servedModelName: qwen2.5-7b-instruct
 
 image:
   # Fallback for `helm template`/standalone testing only; ansible always
@@ -113,6 +121,10 @@ modelStorage:
 embeddingModel:
   servingRuntimeName: vllm-embedding-runtime
   inferenceServiceName: embeddings
+  # Same modelId (HF download) / servedModelName (API id) split as the
+  # chat model above - rag-service's EMBEDDING_MODEL_NAME expects the
+  # short canonical id.
+  servedModelName: bge-small-en-v1.5
   # BAAI/bge-small-en-v1.5, 384-dim: matches rag-service's existing
   # embeddingModelName default (gitops/charts/rag-service/values.yaml) -
   # same reasoning as the endpoint name above. Served via vLLM's pooling
