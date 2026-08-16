@@ -24,11 +24,13 @@ import (
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/session"
 )
 
-// tileConfig/config mirror web/src/shared/types.ts's PortalTile/PortalConfig
+// TileConfig/config mirror web/src/shared/types.ts's PortalTile/PortalConfig
 // field-for-field - kept in sync by hand, the same tradeoff already made
 // for the OKF Markdown bundle format elsewhere in this repo (ADR-0038)
 // rather than adding a schema-generation step to this small a project.
-type tileConfig struct {
+// TileConfig is exported so internal/profile can reuse BuildTiles's output
+// for the same per-agent access computation on the profile page.
+type TileConfig struct {
 	Name            string `json:"name"`
 	DisplayName     string `json:"displayName"`
 	TileDescription string `json:"tileDescription"`
@@ -41,11 +43,36 @@ type tileConfig struct {
 }
 
 type config struct {
-	SignedIn  bool         `json:"signedIn"`
-	Subject   string       `json:"subject"`
-	LoginURL  string       `json:"loginURL"`
-	LogoutURL string       `json:"logoutURL"`
-	Tiles     []tileConfig `json:"tiles"`
+	SignedIn        bool         `json:"signedIn"`
+	Subject         string       `json:"subject"`
+	UserDisplayName string       `json:"userDisplayName,omitempty"`
+	LoginURL        string       `json:"loginURL"`
+	LogoutURL       string       `json:"logoutURL"`
+	ProfileURL      string       `json:"profileURL"`
+	Tiles           []TileConfig `json:"tiles"`
+}
+
+// BuildTiles computes the per-agent tile view (access-gating, ADR-0038) for
+// a signed-in-or-not session. Shared by Handler (all agents, for the
+// portal grid) and internal/profile.Handler (the same computation, viewed
+// as "your entitlements" on the profile page).
+func BuildTiles(agents []okf.Agent, sess *session.Session) []TileConfig {
+	tiles := make([]TileConfig, 0, len(agents))
+	for _, a := range agents {
+		authorized := sess != nil && a.AllowsAnyGroup(sess.Groups)
+		tiles = append(tiles, TileConfig{
+			Name:            a.Zuno.Name,
+			DisplayName:     a.Zuno.UI.DisplayName,
+			TileDescription: a.Zuno.UI.TileDescription,
+			Color:           a.Zuno.UI.Color,
+			Icon:            a.Zuno.UI.Icon,
+			Status:          a.Zuno.Status,
+			Authorized:      authorized,
+			Clickable:       a.IsActive() && authorized,
+			Href:            "/" + a.Zuno.Name,
+		})
+	}
+	return tiles
 }
 
 const pageTemplate = `<!doctype html>
@@ -80,28 +107,17 @@ func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset) 
 		sess, _ := sessions.Load(r)
 
 		cfg := config{
-			LoginURL:  "/login",
-			LogoutURL: "/logout",
+			LoginURL:   "/login",
+			LogoutURL:  "/logout",
+			ProfileURL: "/profile",
 		}
 		if sess != nil {
 			cfg.SignedIn = true
 			cfg.Subject = sess.Subject
+			cfg.UserDisplayName = sess.DisplayName()
 		}
 
-		for _, a := range agents {
-			authorized := sess != nil && a.AllowsAnyGroup(sess.Groups)
-			cfg.Tiles = append(cfg.Tiles, tileConfig{
-				Name:            a.Zuno.Name,
-				DisplayName:     a.Zuno.UI.DisplayName,
-				TileDescription: a.Zuno.UI.TileDescription,
-				Color:           a.Zuno.UI.Color,
-				Icon:            a.Zuno.UI.Icon,
-				Status:          a.Zuno.Status,
-				Authorized:      authorized,
-				Clickable:       a.IsActive() && authorized,
-				Href:            "/" + a.Zuno.Name,
-			})
-		}
+		cfg.Tiles = BuildTiles(agents, sess)
 
 		// json.Marshal (the package-level function, unlike a custom
 		// Encoder) HTML-escapes '<', '>' and '&' by default - safe to embed

@@ -20,6 +20,7 @@ import (
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/oidc"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/okf"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/portal"
+	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/profile"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/session"
 )
 
@@ -64,6 +65,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("agent-frontend: %v", err)
 	}
+	profileAsset, err := manifest.Entry("src/profile/main.tsx")
+	if err != nil {
+		log.Fatalf("agent-frontend: %v", err)
+	}
 
 	oidcClient := oidc.NewClient(cfg.KeycloakIssuerURL, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCRedirectURL)
 
@@ -99,6 +104,7 @@ func main() {
 	mux.Handle(staticBase, http.StripPrefix(staticBase, http.FileServer(http.Dir(cfg.WebDistDir))))
 
 	mux.HandleFunc("/", portal.Handler(agents, sessions, portalAsset))
+	mux.HandleFunc("/profile", profile.Handler(agents, sessions, profileAsset))
 
 	mux.HandleFunc("/login", loginHandler(oidcClient, sessions))
 	mux.HandleFunc("/callback", callbackHandler(oidcClient, sessions))
@@ -183,13 +189,14 @@ func callbackHandler(oidcClient *oidc.Client, sessions *session.Manager) http.Ha
 		}
 
 		sess := session.Session{
-			Subject:      claims.Subject,
-			Email:        claims.Email,
-			Groups:       claims.Groups,
-			AccessToken:  tokens.AccessToken,
-			IDToken:      tokens.IDToken,
-			RefreshToken: tokens.RefreshToken,
-			ExpiresAt:    expiresAt,
+			Subject:           claims.Subject,
+			Email:             claims.Email,
+			PreferredUsername: claims.PreferredUsername,
+			Groups:            claims.Groups,
+			AccessToken:       tokens.AccessToken,
+			IDToken:           tokens.IDToken,
+			RefreshToken:      tokens.RefreshToken,
+			ExpiresAt:         expiresAt,
 		}
 		if err := sessions.Save(w, sess); err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)

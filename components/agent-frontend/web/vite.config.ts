@@ -20,6 +20,7 @@ export default defineConfig({
       input: {
         portal: resolve(__dirname, "src/portal/main.tsx"),
         chat: resolve(__dirname, "src/chat/main.tsx"),
+        profile: resolve(__dirname, "src/profile/main.tsx"),
       },
     },
   },

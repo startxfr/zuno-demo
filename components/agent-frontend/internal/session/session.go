@@ -28,13 +28,14 @@ const cookieName = "zuno_session"
 // Session is the authenticated state stored server-side, keyed by the
 // opaque ID the browser holds.
 type Session struct {
-	Subject      string    `json:"sub"`
-	Email        string    `json:"email,omitempty"`
-	Groups       []string  `json:"groups"`
-	AccessToken  string    `json:"access_token"`
-	IDToken      string    `json:"id_token"`
-	RefreshToken string    `json:"refresh_token,omitempty"`
-	ExpiresAt    time.Time `json:"expires_at"`
+	Subject           string    `json:"sub"`
+	Email             string    `json:"email,omitempty"`
+	PreferredUsername string    `json:"preferred_username,omitempty"`
+	Groups            []string  `json:"groups"`
+	AccessToken       string    `json:"access_token"`
+	IDToken           string    `json:"id_token"`
+	RefreshToken      string    `json:"refresh_token,omitempty"`
+	ExpiresAt         time.Time `json:"expires_at"`
 }
 
 // Expired reports whether the session's access token has already expired
@@ -42,6 +43,19 @@ type Session struct {
 // see Refresher).
 func (s Session) Expired() bool {
 	return time.Now().After(s.ExpiresAt)
+}
+
+// DisplayName returns the best available human-readable name for the
+// session: preferred_username, falling back to email, then the raw
+// subject (sub) claim if neither is present.
+func (s Session) DisplayName() string {
+	if s.PreferredUsername != "" {
+		return s.PreferredUsername
+	}
+	if s.Email != "" {
+		return s.Email
+	}
+	return s.Subject
 }
 
 // Refresher exchanges a refresh token for a new token set. Implemented by

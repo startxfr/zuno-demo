@@ -19,17 +19,39 @@ export interface PortalTile {
 export interface PortalConfig {
   signedIn: boolean;
   subject: string;
+  // Best-available human-readable name (session.Session.DisplayName():
+  // preferred_username, falling back to email, then subject) - only
+  // meaningful when signedIn.
+  userDisplayName: string;
   loginURL: string;
   logoutURL: string;
+  profileURL: string;
   tiles: PortalTile[];
 }
 
 export interface ChatConfig {
+  // The AGENT's display name (e.g. "Tekos") - not the signed-in user's.
   displayName: string;
   subject: string;
+  // The signed-in USER's display name - see PortalConfig.userDisplayName.
+  userDisplayName: string;
   homeURL: string;
   logoutURL: string;
+  profileURL: string;
   // Same-origin path this page's Go server proxies to the BFF
   // (components/agent-frontend/internal/chat/chat.go's APIHandler).
   apiURL: string;
+}
+
+// Shape of the JSON config Go injects for the read-only /profile page
+// (components/agent-frontend/internal/profile/profile.go).
+export interface ProfileConfig {
+  userDisplayName: string;
+  subject: string;
+  email: string;
+  groups: string[];
+  homeURL: string;
+  logoutURL: string;
+  profileURL: string;
+  tiles: PortalTile[];
 }

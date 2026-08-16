@@ -23,6 +23,7 @@ import {
 import { Flex, FlexItem } from "@patternfly/react-core";
 import type { ChatConfig } from "../shared/types";
 import { SSEParser } from "../shared/sse";
+import { UserMenu } from "../shared/UserMenu";
 import type {
   ChatMessage,
   Citation,
@@ -180,12 +181,11 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
             <Toolbar>
               <ToolbarContent>
                 <ToolbarItem>
-                  <Content component={ContentVariants.small}>{config.subject}</Content>
-                </ToolbarItem>
-                <ToolbarItem>
-                  <Button variant="link" component="a" href={config.logoutURL}>
-                    Sign out
-                  </Button>
+                  <UserMenu
+                    userDisplayName={config.userDisplayName}
+                    profileURL={config.profileURL}
+                    logoutURL={config.logoutURL}
+                  />
                 </ToolbarItem>
               </ToolbarContent>
             </Toolbar>

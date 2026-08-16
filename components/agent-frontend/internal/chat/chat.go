@@ -49,8 +49,13 @@ var tmpl = template.Must(template.New("chat").Parse(pageTemplate))
 type chatConfig struct {
 	DisplayName string `json:"displayName"`
 	Subject     string `json:"subject"`
-	HomeURL     string `json:"homeURL"`
-	LogoutURL   string `json:"logoutURL"`
+	// UserDisplayName is the signed-in USER's display name (see
+	// session.Session.DisplayName) - not to be confused with DisplayName
+	// above, which is the AGENT's display name (e.g. "Tekos").
+	UserDisplayName string `json:"userDisplayName"`
+	HomeURL         string `json:"homeURL"`
+	LogoutURL       string `json:"logoutURL"`
+	ProfileURL      string `json:"profileURL"`
 	// ApiURL is this same-origin page's own chat endpoint (ADR-0044:
 	// "keep runtime API endpoint injection from environment into
 	// JavaScript context") - always "/api/chat" today, but the React
@@ -83,11 +88,13 @@ func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset)
 		}
 
 		cfg := chatConfig{
-			DisplayName: agent.Zuno.UI.DisplayName,
-			Subject:     sess.Subject,
-			HomeURL:     "/",
-			LogoutURL:   "/logout",
-			ApiURL:      "/api/chat",
+			DisplayName:     agent.Zuno.UI.DisplayName,
+			Subject:         sess.Subject,
+			UserDisplayName: sess.DisplayName(),
+			HomeURL:         "/",
+			LogoutURL:       "/logout",
+			ProfileURL:      "/profile",
+			ApiURL:          "/api/chat",
 		}
 		configJSON, err := json.Marshal(cfg) // HTML-escaped by default - see portal.go's comment
 		if err != nil {
