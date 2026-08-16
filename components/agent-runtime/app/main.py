@@ -106,8 +106,25 @@ async def lifespan(app: FastAPI):
         return
 
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg.rows import dict_row
+    from psycopg_pool import AsyncConnectionPool
 
-    async with AsyncPostgresSaver.from_conn_string(conninfo) as checkpointer:
+    # A connection POOL, not from_conn_string - VERIFIED live (2026-08-16):
+    # from_conn_string opens ONE psycopg async connection shared by every
+    # concurrent graph run, which fails with "another command is already in
+    # progress" under any request concurrency and leaves the connection
+    # permanently wedged (every subsequent chat 500s until pod restart).
+    # kwargs mirror what from_conn_string sets internally (the saver
+    # requires autocommit + dict_row; prepare_threshold=None avoids
+    # server-side prepared statements, PgBouncer-safe if the host ever
+    # changes back).
+    async with AsyncConnectionPool(
+        conninfo,
+        min_size=1,
+        max_size=int(os.getenv("CHECKPOINT_POOL_MAX_SIZE", "10")),
+        kwargs={"autocommit": True, "prepare_threshold": None, "row_factory": dict_row},
+    ) as pool:
+        checkpointer = AsyncPostgresSaver(pool)
         await checkpointer.setup()  # idempotent - creates the checkpoint tables on first run
         app.state.graph_factory = GraphFactory(checkpointer)
         logger.info("Postgres-backed checkpointing enabled at %s:%s/%s", CHECKPOINT_PGHOST, CHECKPOINT_PGPORT, CHECKPOINT_PGDATABASE)
