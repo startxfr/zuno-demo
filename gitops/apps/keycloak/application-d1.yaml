@@ -27,6 +27,10 @@ spec:
         clusterBaseDomain: apps.mycluster.example.com
         adminSecretName: keycloak-admin
         googleOAuthSecretName: google-oauth-client
+        ingress:
+          # ADR-0211 consumer flip (2026-08-16): the keycloak-wildcard-tls
+          # Certificate is confirmed Ready with a real Let's Encrypt chain.
+          acmeWildcardTLS: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-auth
