@@ -422,6 +422,14 @@ async def hybrid_search(
             fused[doc["id"]] = fused.get(doc["id"], 0.0) + 1.0 / (_RRF_K + rank)
 
     embedding = await embed_query(query)
+    # asyncpg has no codec for the vector type: with the $1::vector cast in
+    # _vector_query, the parameter must arrive in pgvector's text format
+    # ("[0.1,0.2,...]"), not as a Python list (VERIFIED live 2026-08-16:
+    # "invalid input for query argument $1 ... expected str, got list" on
+    # every similarity query, silently degrading hybrid search to
+    # text-only).
+    if embedding is not None:
+        embedding = "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 
     for domain in effective_domains:
         pool = get_pool(domain)
