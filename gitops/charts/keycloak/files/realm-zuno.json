@@ -789,6 +789,8 @@
         },
         {
             "username": "tekos-entitlement-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "tekos-entitlement-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -810,6 +812,8 @@
         },
         {
             "username": "consultant-role-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "consultant-role-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -831,6 +835,8 @@
         },
         {
             "username": "arkos-entitlement-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "arkos-entitlement-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -852,6 +858,8 @@
         },
         {
             "username": "board-role-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "board-role-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -873,6 +881,8 @@
         },
         {
             "username": "comage-entitlement-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "comage-entitlement-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -894,6 +904,8 @@
         },
         {
             "username": "sales-role-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "sales-role-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -915,6 +927,8 @@
         },
         {
             "username": "advantage-entitlement-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "advantage-entitlement-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -936,6 +950,8 @@
         },
         {
             "username": "adv-role-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "adv-role-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -957,6 +973,8 @@
         },
         {
             "username": "finage-entitlement-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "finage-entitlement-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -978,6 +996,8 @@
         },
         {
             "username": "finance-role-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "finance-role-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
@@ -999,6 +1019,8 @@
         },
         {
             "username": "naveo-entitlement-only-user-01",
+            "firstName": "Fixture",
+            "lastName": "NegativeTest",
             "email": "naveo-entitlement-only-user-01@zuno-demo.internal",
             "enabled": true,
             "emailVerified": true,
