@@ -111,6 +111,14 @@
                 env:
                   - name: PYTHONUNBUFFERED
                     value: "1"
+                  # VERIFIED live (2026-08-16): under the restricted SCC the
+                  # pod runs as a random UID with no HOME, so pip's implicit
+                  # --user fallback tries /.local and dies with EACCES -
+                  # point both at the pod's writable /tmp instead.
+                  - name: HOME
+                    value: /tmp
+                  - name: PYTHONUSERBASE
+                    value: /tmp/.pyuser
                   - name: KEYCLOAK_URL
                     value: "https://keycloak.{{ cluster_base_domain }}"
                   - name: FRONTEND_URL
