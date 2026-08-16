@@ -198,7 +198,7 @@ func desiredFrontendDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) 
 					Containers: []corev1.Container{{
 						Name:            "frontend",
 						Image:           imageString(agent.Spec.Frontend.Image),
-						ImagePullPolicy: corev1.PullIfNotPresent,
+						ImagePullPolicy: corev1.PullAlways,
 						SecurityContext: containerSecurityContext(),
 						Ports:           []corev1.ContainerPort{{Name: "http", ContainerPort: containerPort}},
 						Env:             env,
@@ -244,7 +244,7 @@ func desiredBFFDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) *apps
 					Containers: []corev1.Container{{
 						Name:            "bff",
 						Image:           imageString(agent.Spec.BFF.Image),
-						ImagePullPolicy: corev1.PullIfNotPresent,
+						ImagePullPolicy: corev1.PullAlways,
 						SecurityContext: containerSecurityContext(),
 						Ports:           []corev1.ContainerPort{{Name: "http", ContainerPort: containerPort}},
 						Env:             env,
