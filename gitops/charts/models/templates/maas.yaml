@@ -78,12 +78,12 @@ spec:
         - name: maas-default-gateway
           namespace: openshift-ingress
     route: {}
-    # No scheduler: {} - VERIFIED live (2026-08-16): it provisions an
-    # InferencePool (Gateway API Inference Extension), which needs
-    # ENABLE_GATEWAY_API_INFERENCE_EXTENSION set cluster-wide in istiod
-    # ("InferencePool is not enabled") - a mesh-wide config change out of
-    # scope for a single-replica model with no cross-replica scheduling to
-    # do. Plain gateway+route is sufficient here.
+    # scheduler: {} is not optional here - VERIFIED live (2026-08-16): the
+    # controller's own defaulting always adds it to a gateway-enabled
+    # LLMInferenceService regardless of what this manifest sends, so it
+    # needs ENABLE_GATEWAY_API_INFERENCE_EXTENSION set on istiod
+    # (gitops/charts/service-mesh) rather than trying to opt out.
+    scheduler: {}
 ---
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSModelRef

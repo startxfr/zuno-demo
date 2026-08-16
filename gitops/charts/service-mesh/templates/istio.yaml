@@ -51,6 +51,15 @@ spec:
     pilot:
       env:
         ENABLE_CA_SERVER: "false"
+        # ADR-0201/WP-27 (2026-08-16): required for LLMInferenceService's
+        # router.scheduler (Gateway API Inference Extension InferencePool) -
+        # VERIFIED live, the CRD's own defaulting always adds
+        # spec.router.scheduler: {} to a gateway-enabled LLMInferenceService
+        # (removing it from our own manifest had no effect), and the
+        # generated HTTPRoute stayed NotReady with "InferencePool is not
+        # enabled" until this flag is set. Additive/off-by-default feature
+        # gate, no effect on existing Istio routing for anything else.
+        ENABLE_GATEWAY_API_INFERENCE_EXTENSION: "true"
     # redhat-ods-applications is namespace-injected (istio-injection: enabled,
     # gitops/charts/namespaces), but these two RHOAI-managed workloads are
     # rejected by EVERY SCC once istio's init containers (proxy uid
