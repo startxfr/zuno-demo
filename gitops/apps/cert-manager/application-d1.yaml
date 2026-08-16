@@ -27,7 +27,7 @@ spec:
         # in gitops/charts/cert-manager/values.yaml's acme comment
         # (staging rehearsal -> production issuer -> consumer flags).
         acme:
-          enabled: false
+          enabled: true
           # Substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
