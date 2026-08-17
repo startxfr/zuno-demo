@@ -40,15 +40,43 @@
 
 - name: "nvidia_gpu | extract the ClusterPolicy example from the CSV's alm-examples"
   ansible.builtin.set_fact:
+    _nvidia_gpu_policy_spec_base: >-
+      {{
+        (_nvidia_gpu_csv.resources[0].metadata.annotations['alm-examples'] | from_json
+         | selectattr('kind', 'equalto', 'ClusterPolicy') | list)[0].spec
+      }}
+
+# ADR-0351 overlay on the CSV's default spec:
+#  - mig.strategy mixed: the permanent GPU node runs the all-balanced
+#    partition (2x 1g.24gb + 1x 2g.48gb, gitops/charts/machines) while the
+#    burst node keeps its whole GPU - only the mixed strategy can advertise
+#    nvidia.com/mig-* slices and plain nvidia.com/gpu side by side.
+#  - daemonsets.tolerations: every GPU-operator operand only tolerates
+#    nvidia.com/gpu:NoSchedule by default (verified live 2026-08-17) -
+#    without a zuno.io/gpu-burst toleration the driver/device-plugin never
+#    start on the tainted burst node, which then never advertises its GPU
+#    and can never serve a training pod. nvidia.com/gpu is restated
+#    defensively in case the operator replaces rather than appends its
+#    implicit default when this list is set.
+# A live `oc patch clusterpolicy` is NOT an alternative: zuno-nvidia-gpu-d1
+# has selfHeal and owns the spec through its helm values - the day-2 path
+# for any strategy change is re-running this role.
+- name: "nvidia_gpu | overlay the zuno ClusterPolicy overrides and serialize"
+  ansible.builtin.set_fact:
     # Serialized to a YAML string with `to_nice_yaml`, not left as a Jinja
     # dict: the chart's template inserts .Values.gpu.spec as a raw string
     # via `nindent`, which fails on a nested mapping.
     _nvidia_gpu_default_policy_spec: >-
       {{
-        (
-          (_nvidia_gpu_csv.resources[0].metadata.annotations['alm-examples'] | from_json
-           | selectattr('kind', 'equalto', 'ClusterPolicy') | list)[0].spec
-        ) | to_nice_yaml
+        _nvidia_gpu_policy_spec_base
+        | combine({
+            'mig': {'strategy': 'mixed'},
+            'daemonsets': {'tolerations': [
+              {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
+              {'key': 'zuno.io/gpu-burst', 'operator': 'Exists', 'effect': 'NoSchedule'}
+            ]}
+          }, recursive=True)
+        | to_nice_yaml
       }}
 
 # Applies the ClusterPolicy operand with the discovered spec - the role
