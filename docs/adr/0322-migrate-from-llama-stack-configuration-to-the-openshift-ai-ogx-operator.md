@@ -1,6 +1,6 @@
 # ADR-0322: Migrate from Llama Stack configuration to the OpenShift AI OGX Operator
 
-- **Status:** Partially implemented (DSC migration, health checks, OGX provider and parity tests merged; live reconciliation confirmed 2026-08-14 via `make d0 install openshift-ai` - `llamastackoperator` absent, `ogx.managementState: Managed` reconciled; OGX server corpus proof and live provider-parity run still pending, deferred by operator decision, roadmap WP-06)
+- **Status:** Partially implemented (DSC migration, health checks, OGX provider and parity tests merged; live reconciliation confirmed 2026-08-14 via `make d0 install openshift-ai`, re-confirmed 2026-08-17 - `llamastackoperator` absent from `gitops/`/`ansible/`, live `DataScienceCluster` carries `status.conditions[type=OGXReady].status: "True"` (transitioned 2026-08-17T10:40:39Z) and `ogx.managementState: Managed`; OGX server corpus proof and live provider-parity run still pending, deliberately deferred by operator decision (confirmed again 2026-08-17: `ogxServer.enabled` stays `false`, `oc get ogxserver -A` returns none), roadmap WP-06)
 - **Target:** v0.1
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

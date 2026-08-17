@@ -925,3 +925,14 @@ under `docs/adr/`.
   WP only introduces the role, per-agent consumption is WP-33+. Repo
   acceptance re-run clean: `test_workday_ownership.py` 9/9,
   `check_docs.py` PASS. ADR-0340 → Implemented.
+
+- **2026-08-17 (ADR-0322, WP-06)**: re-verified, made no repo or live
+  changes. Repo acceptance checks re-run clean (`llamastackoperator`
+  grep empty, `helm template`/`helm lint` on `openshift-ai` with
+  `dataScienceCluster.enabled=true`, `pytest components/rag-service/tests/`
+  54/54, `day1_check.yml --syntax-check`, `check_docs.py`). Live
+  `DataScienceCluster` still shows `OGXReady: True` (2026-08-17T10:40:39Z).
+  `OGXServer` remains `enabled: false` — asked the user whether to flip it
+  and run the live corpus proof + provider-parity run now that cluster
+  access is available; they chose to keep the prior deliberate deferral.
+  ADR-0322 stays Partially implemented by choice, not by blocker.
