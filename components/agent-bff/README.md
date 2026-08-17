@@ -112,6 +112,7 @@ run from the repository root.
 | `KEYCLOAK_ISSUER_URL` | **yes** | `https://keycloak.apps.<cluster-domain>/realms/zuno` |
 | `OIDC_AUDIENCE` | no (default `tekos-frontend`) | Expected `aud`/`azp` claim on incoming tokens |
 | `AGENT_RUNTIME_BASE_URL` | no (default `http://agent-runtime.zuno-ai-run.svc.cluster.local:8080`) | Shared Agent Runtime in-cluster base URL |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | no (default `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318`) | Where OTLP metrics are sent (ADR-0029/ADR-0102, `internal/telemetry`) |
 
 No secret is configured here: JWKS is public key material fetched over
 HTTP, and this service holds no credential of its own (nothing to source
@@ -143,6 +144,12 @@ than pulling in a general-purpose JWT library for one narrow use.
 `components/agent-frontend/internal/reqid`'s UUIDv4 helper, rather than
 sharing a module across two independently deployed, independently
 versioned services.
+
+The one deliberate exception is `internal/telemetry` (ADR-0111, roadmap
+WP-12): it pulls in the OpenTelemetry Go SDK, matching every other
+service's own OTLP-to-the-shared-Collector pattern (ADR-0029) rather than
+hand-rolling a narrower auditable surface the way JWT verification gets -
+observability isn't a small, stable spec the way RS256/JWKS is.
 
 ## Build
 

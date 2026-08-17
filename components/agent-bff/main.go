@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,12 +20,20 @@ import (
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/jwks"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/reqid"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/runtime"
+	"github.com/startxfr/zuno-demo/components/agent-bff/internal/telemetry"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("agent-bff: configuration error: %v", err)
+	}
+
+	// ADR-0029/ADR-0102: metrics are additive observability, never a
+	// startup dependency - a Collector outage degrades to "no metrics",
+	// same posture the Python services' init_telemetry takes.
+	if _, err := telemetry.Init(context.Background(), "agent-bff"); err != nil {
+		log.Printf("agent-bff: telemetry init failed, continuing without metrics: %v", err)
 	}
 
 	verifier := jwks.NewVerifier(cfg.KeycloakIssuerURL, cfg.KeycloakJWKSURL, cfg.OIDCAudience)
@@ -36,13 +45,58 @@ func main() {
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           mux,
+		Handler:           metricsMiddleware(cfg.AgentName, mux),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	log.Printf("agent-bff: serving agent %q, listening on %s, Agent Runtime at %s", cfg.AgentName, cfg.ListenAddr, cfg.AgentRuntimeBaseURL)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("agent-bff: server error: %v", err)
+	}
+}
+
+// metricsMiddleware wraps every response in a statusRecorder and records
+// one zuno.bff.requests count per completed request, labeled by this
+// instance's agent and the final status code (ADR-0102's SLO indicator).
+// Wraps the whole mux rather than threading a counter call through every
+// error/success path inside chatHandler - chatHandler has too many exit
+// points (auth failures, body validation, streaming vs. synchronous) to
+// do that without missing one.
+func metricsMiddleware(agent string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		telemetry.RecordRequest(r.Context(), agent, strconv.Itoa(rec.status))
+	})
+}
+
+// statusRecorder captures the status code a handler ultimately writes.
+// Implements http.Flusher (delegating) so proxySSE's flush-per-chunk
+// streaming behavior is unaffected by this wrapper sitting in front of it.
+type statusRecorder struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	if !r.wroteHeader {
+		r.status = status
+		r.wroteHeader = true
+	}
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	// Mirrors net/http's own ResponseWriter contract: an implicit 200 if
+	// the handler writes a body without ever calling WriteHeader.
+	r.wroteHeader = true
+	return r.ResponseWriter.Write(b)
+}
+
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
 	}
 }
 

@@ -14,6 +14,29 @@ enforcement proof, the PostgreSQL/Vault restore drill (WP-13), and the SLO
 measurement/alerting prerequisites (missing `agent-bff` metric + unconfirmed
 `ServiceMonitor` scrape, WP-12). No further repo-side work closes any row in
 this matrix — the remainder is the live-cluster verification pass itself.
+
+## Correction (2026-08-18)
+
+The 2026-08-15 note above was wrong about the Availability SLO row: both
+of its "live-cluster-only" prerequisites turned out to be genuine
+repo-side gaps. `agent-bff` had zero metrics instrumentation - not
+unverified, simply absent - and no `ServiceMonitor` for the OTel
+Collector's `prometheus` exporter existed anywhere in the repo. Both are
+now closed: `components/agent-bff/internal/telemetry/` emits
+`zuno_bff_requests_total`, and
+`gitops/charts/observability/templates/servicemonitor-otel-collector.yaml`
+is confirmed live-scraping (`up{job="zuno-otel-collector-collector"} ==
+1"`, verified against the actual `monitoring.coreos.com/v1` Prometheus
+instance that evaluates the SLO alert rules, not the differently-scoped
+`monitoring.rhobs/v1` CRD group this cluster also has installed). See
+`docs/platform/slo.md`'s own 2026-08-18 note for the full detail. The
+Availability row stays `gap` pending the live 30-day measurement itself
+and confirming `zuno_bff_requests_total` reaches Prometheus once this
+change is built and deployed - genuinely live-cluster/time-only from
+here. Every other remaining `gap` row (restricted SCC, NetworkPolicy
+enforcement, the WP-13 restore drill, supply-chain signing) was
+re-checked this pass and does stay live-cluster/other-WP-only as the
+2026-08-15 note described.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

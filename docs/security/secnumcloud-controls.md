@@ -60,7 +60,7 @@ against a live deployment, not re-derivable from the repo alone),
 | Control | Status | Mechanism |
 |---|---|---|
 | Shared platform services run with production-oriented availability (replicas, PodDisruptionBudget, topology spread) | `enforced-in-ci` (2026-08-15) | PDB + `topologySpreadConstraints` on agent-runtime/ai-gateway/mcp-gateway/rag-service/Keycloak; PostgreSQL/Redis already replica/PDB-complete via PGO/Bitnami defaults; `check_workload_hardening.py`'s availability checks (ADR-0101 / WP-12) |
-| A measured 99.9% availability objective is defined and alerted on | `gap` (definition + alert rules exist, not yet measuring) | `docs/platform/slo.md` defines the SLO and ships `prometheusrule-slo.yaml` (disabled by default), but two prerequisites are still missing: `agent-bff` doesn't emit the `zuno_bff_requests_total` metric the query needs, and the OTel Collector's `prometheus` exporter is unconfirmed scraped by a live `ServiceMonitor`/`PodMonitor` (ADR-0102 / WP-12) |
+| A measured 99.9% availability objective is defined and alerted on | `gap` (both prerequisites now closed 2026-08-18; live 30-day measurement itself still pending) | `docs/platform/slo.md`: `agent-bff` now emits `zuno_bff_requests_total` (`components/agent-bff/internal/telemetry/`) and a `ServiceMonitor` scrapes the OTel Collector's `prometheus` exporter, confirmed live (`up{job="zuno-otel-collector-collector"} == 1` on `prometheus-k8s`) - `gitops/charts/observability/templates/servicemonitor-otel-collector.yaml` (ADR-0102 / WP-12) |
 
 ## How to update this matrix
 

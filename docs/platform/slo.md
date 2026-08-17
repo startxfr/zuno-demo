@@ -51,19 +51,42 @@ rules below use the standard 1h/5m and 6h/30m burn-rate window pairs
 recommended for a 99.9% SLO, not the raw 30d window directly - see
 `gitops/charts/observability/templates/prometheusrule-slo.yaml`.)
 
-## Current gap
+## Current gap (2026-08-18 update, ADR-0111)
 
-Two prerequisites are missing before the query above returns real data:
+Both prerequisites below were closed this pass - contrary to ADR-0111's
+own earlier note that "no further repo-side work closes any row" in the
+security control matrix, both turned out to be genuine repo-side gaps,
+not live-cluster-only verification:
 
-1. **`agent-bff` does not emit `zuno_bff_requests_total`** (or any HTTP
-   request-count/status metric) yet — no metrics instrumentation exists
-   there today.
-2. **The shared OTel Collector's metrics pipeline doesn't reach a
-   Prometheus-queryable backend.** It exported only to `debug` (stdout) -
-   this WP added a `prometheus` exporter
-   (`gitops/charts/observability/templates/opentelemetrycollector.yaml`,
-   `:8889/metrics`), but whether a `ServiceMonitor`/`PodMonitor` actually
-   scrapes it is unverified against a live cluster.
+1. **`agent-bff` now emits the counter** - `internal/telemetry`
+   (`components/agent-bff/internal/telemetry/telemetry.go`) registers an
+   OTLP `zuno.bff.requests` counter (Prometheus name
+   `zuno_bff_requests_total`, matching the query above exactly), labeled
+   `agent`/`code`, incremented once per HTTP response by `main.go`'s new
+   `metricsMiddleware`. Same OTLP-push-to-the-shared-Collector pattern as
+   every Python service (ADR-0029), not a bespoke per-service `/metrics`
+   endpoint. Unit-tested (`internal/telemetry/telemetry_test.go`,
+   `main_test.go`) against a `ManualReader`; live emission depends on this
+   change actually being built and deployed (tracked below).
+2. **A `ServiceMonitor` for the Collector's `:8889` exporter now exists
+   and is confirmed scraping live** -
+   `gitops/charts/observability/templates/servicemonitor-otel-collector.yaml`,
+   `apiVersion: monitoring.coreos.com/v1` (verified against the actual
+   Prometheus instance that evaluates `prometheusrule-slo.yaml` - a
+   second, separate ServiceMonitor CRD group also exists on this cluster,
+   `monitoring.rhobs/v1`, watched by a *different* Prometheus; using it
+   here would have rendered successfully while never being scraped by the
+   one that matters). Confirmed live 2026-08-18:
+   `up{job="zuno-otel-collector-collector"} == 1` on `prometheus-k8s`.
+
+Remaining before ADR-0102 can claim "measured... on a live cluster":
+
+- Get item 1 built and deployed (`make d1 build agent` pulls from
+  `origin/main`, not local disk - requires this change to be pushed and a
+  fresh image rolled out) and confirm `zuno_bff_requests_total` itself
+  appears in Prometheus, not just the Collector's own `up` target.
+- Let the SLO measurement run over a real 30-day window and confirm the
+  burn-rate alerts evaluate without error.
 
 The PrometheusRule alerting rules below are shipped and schema-correct
 (disabled by default) — they simply won't fire until both gaps close;
@@ -85,13 +108,11 @@ single short spike while still catching a fast, severe burn quickly):
 
 ## Operator follow-up (not executable by the model)
 
-1. Instrument `agent-bff` with a `zuno_bff_requests_total`-equivalent
-   counter (status code + agent labels) - or confirm an existing/
-   alternative metric name and update the query above to match.
-2. Confirm the OpenTelemetryCollector's new `prometheus` exporter is
-   reachable (`oc get svc -n zuno-monitoring` for the Service/port the
-   operator creates) and add a `ServiceMonitor`/`PodMonitor` targeting
-   it once confirmed.
+1. ~~Instrument `agent-bff`~~ and ~~add a `ServiceMonitor`~~ - both done
+   2026-08-18, see "Current gap" above.
+2. Confirm `zuno_bff_requests_total` itself appears in Prometheus once
+   the instrumented `agent-bff` image is built and deployed (this repo's
+   `BuildConfig`s clone from `origin/main`, not local disk).
 3. Let the SLO measurement run over a real 30-day window and confirm the
    burn-rate alerts evaluate without error on the live monitoring stack.
    Only then does ADR-0102 satisfy its own "measured... on a live

@@ -1,0 +1,40 @@
+{{- /*
+ADR-0102/ADR-0111 (roadmap WP-12/WP-27's own note that this row was still
+open). Closes slo.md's second "Current gap" prerequisite: the OTel
+Collector's `prometheus` exporter (opentelemetrycollector.yaml, :8889) was
+reachable but nothing scraped it.
+
+apiVersion confirmed live against the actual Prometheus instance that
+evaluates prometheusrule-slo.yaml, not assumed: `monitoring.coreos.com/v1`
+`Prometheus/k8s` (openshift-monitoring) has both
+`ruleNamespaceSelector` and `serviceMonitorNamespaceSelector` matching
+`openshift.io/cluster-monitoring: "true"` - the label zuno-monitoring
+already carries. A second, separate ServiceMonitor CRD group
+(`monitoring.rhobs/v1`, used by gitops/charts/mesh-monitoring's
+istiod-monitor) also exists on this cluster but is watched by a different
+Prometheus - using it here would render successfully while never actually
+being scraped by the Prometheus that fires the SLO alerts, a silent gap
+this comment exists to prevent repeating.
+*/ -}}
+{{- if .Values.collector.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zuno-otel-collector-metrics
+  namespace: zuno-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zuno-otel-collector-collector
+  namespaceSelector:
+    matchNames:
+      - zuno-monitoring
+  endpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
+{{- end }}

@@ -9,7 +9,7 @@
 # local `docker build` therefore needs network access to the cluster's
 # internal registry route, not just docker.io/registry.access.redhat.com.
 
-FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.22 AS build
+FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.26 AS build
 WORKDIR /src
 COPY go.mod ./
 COPY . ./
