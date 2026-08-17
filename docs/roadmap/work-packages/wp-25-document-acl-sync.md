@@ -1,6 +1,7 @@
 # WP-25: Document ACL synchronization (promotes ADR-0110)
 
-- **State:** Operator pending (2026-08-15 — repo work merged: ADR-0110 promoted to a full record, honestly scoped to reconciliation against the platform's own declared `requiredGroups` config plus live page-existence re-listing (the brief's "re-reads current source authorization" corrected to reflect there is no live Confluence restrictions API in this repo — see the ADR's Decision text); new `reconcile-acls` stage (`components/rag-ingestion/src/rag_ingestion.py`) runs after `validate` over every indexed Confluence chunk (not just the run's changeset), updates `acl_groups` on drift, removes chunks whose source is no longer visible or in scope (fail closed), aborts with zero deletions on a listing failure, and gives the previously-unused `preserveAcl` field real meaning (false = confirm existence, never overwrite `acl_groups`); wired into the KFP DAG for every domain (a no-op where no Confluence source is configured) and CI. 7 fixture tests cover propagation, deletion, scope-narrowing, no-op-on-unchanged, fail-closed-on-outage, `preserveAcl: false`, and the no-sources no-op. Awaiting the operator follow-up below: change a real Confluence page's restrictions, trigger a run, verify the index reflects it.)
+- **State:** Operator pending (2026-08-17 — live attempt: ran `reconcile-acls` for real (not fixture-mocked) against the live Confluence API and the real `rag-tech` DB. Found the DB holds only seed/fixture rows (no real ingestion has ever run) and confirmed the configured `ARCH` space is genuinely empty on live Confluence (same real-space-key gap as WP-07). The run reached the real DELETE for the one fixture Confluence row - auth, live CQL listing, and DB connect all succeeded against real systems - then stopped on `ReadOnlySqlTransaction` because this session's ad hoc DB port-forward landed on a replica pod, not the primary; a retry against the primary was blocked by this session's own `oc port-forward` tooling permission, not by the code or cluster. See ADR-0110's 2026-08-17 note for the full trace. Repo work (below) unchanged from 2026-08-15.)
+- **State (2026-08-15, repo work):** ADR-0110 promoted to a full record, honestly scoped to reconciliation against the platform's own declared `requiredGroups` config plus live page-existence re-listing (the brief's "re-reads current source authorization" corrected to reflect there is no live Confluence restrictions API in this repo — see the ADR's Decision text); new `reconcile-acls` stage (`components/rag-ingestion/src/rag_ingestion.py`) runs after `validate` over every indexed Confluence chunk (not just the run's changeset), updates `acl_groups` on drift, removes chunks whose source is no longer visible or in scope (fail closed), aborts with zero deletions on a listing failure, and gives the previously-unused `preserveAcl` field real meaning (false = confirm existence, never overwrite `acl_groups`); wired into the KFP DAG for every domain (a no-op where no Confluence source is configured) and CI. 7 fixture tests cover propagation, deletion, scope-narrowing, no-op-on-unchanged, fail-closed-on-outage, `preserveAcl: false`, and the no-sources no-op.
 - **ADRs:** ADR-0110 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-21 (merged), WP-02 (merged — real Confluence access)
 - **Estimated files touched:** ~6
@@ -82,9 +83,19 @@ mandatory (authorization boundary).
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Operator: on cluster, change a real Confluence page's restrictions,
-   trigger a run, verify the index reflects it (update + removal cases) —
-   discharges the decision's live claim.
+1. Operator: supply real Confluence space keys/directories (same item
+   WP-07 tracks) — without them the live space is confirmed empty
+   (`space="ARCH"` → 0 results), so reconciliation has nothing real to
+   propagate an update onto.
+2. Operator: complete one real reconcile-acls write against the PG
+   *primary* (`zuno-postgresql-primary.zuno-data.svc`, e.g. via
+   `make d1 install rag-ingestion` or a properly-routed DB session) — the
+   2026-08-17 attempt proved everything up to this point live except the
+   final write, which hit a replica by accident of this session's ad hoc
+   port-forwarding.
+3. Operator: once real content exists, change a real Confluence page's
+   restrictions, trigger a run, verify the index reflects it (update +
+   removal cases) — discharges the decision's live claim.
 
 ## Status updates (then re-run check_docs.py)
 
