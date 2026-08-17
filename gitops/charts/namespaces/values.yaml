@@ -171,6 +171,11 @@ platformNamespaces:
       # dashboard-redirect) crash-looping on the istio-proxy startup probe
       # from the moment this default-deny policy first applied.
       - redhat-ods-applications
+      # VERIFIED live (2026-08-17): openshift-console's dynamic plugin proxy calls
+      # ossmconsole/kiali directly (ConsolePlugin backend + kiali proxy) - missing
+      # from this allowlist left the OSSM console plugin timing out
+      # ("context deadline exceeded") intermittently since this policy first applied.
+      - openshift-console
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
