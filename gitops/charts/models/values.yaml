@@ -225,7 +225,14 @@ maas:
     # -n redhat-ods-applications`, 2026-08-16) - supplies the serving image;
     # everything below overrides/adds to it.
     baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
-    modelUri: hf://Qwen/Qwen2.5-7B-Instruct
+    # RESOLVED 2026-08-18: switched from hf://Qwen/Qwen2.5-7B-Instruct
+    # after the storage-initializer's HF download hung mid-transfer on
+    # every attempt (see templates/maas.yaml's ExternalSecret comment for
+    # the full history). Model was downloaded once out-of-cluster and
+    # uploaded to the same bucket/credential rag-ingestion already uses
+    # for the RAG corpus (gitops/charts/rag-ingestion/values.yaml's s3:
+    # block), under a new prefix so it doesn't mix with corpus objects.
+    modelUri: s3://zuno-demo-rag-corpus/models/qwen2.5-7b-instruct/
     # Served-model id MaaS callers use in the "model" field - independent
     # canonical id from the classic InferenceService's own
     # servedModelName (models.servedModelName), by design: this is a
@@ -233,9 +240,22 @@ maas:
     servedModelName: qwen2.5-7b-instruct-maas
     # RESOLVED 2026-08-17: no zone pin here either, same reasoning as
     # modelStorage's comment above - this workload has no PVC to worry
-    # about (downloads its own copy via hf:// straight onto the node), so
-    # it only ever needed "any node with a GPU", never a specific zone.
+    # about (downloads its own copy straight onto the node), so it only
+    # ever needed "any node with a GPU", never a specific zone.
     # templates/maas.yaml nodeSelects on `nvidia.com/gpu.present: "true"`.
+    serviceAccountName: qwen25-7b-instruct-maas-s3
+    # Reuses rag-ingestion's existing S3 credential/bucket rather than a
+    # new IAM user - see templates/maas.yaml's ExternalSecret for how
+    # this gets translated into KServe's serving.kserve.io/s3-* Secret
+    # annotation convention.
+    s3:
+      endpoint: s3.eu-west-2.amazonaws.com
+      region: eu-west-2
+      secretName: qwen25-7b-instruct-maas-s3-credentials
+      externalSecret:
+        remoteKey: rag/s3
+        accessKeyProperty: accessKeyId
+        secretKeyProperty: secretAccessKey
     # Smaller than the classic qwen predictor's 24Gi/32Gi (g6.4xlarge,
     # 16vCPU/64GiB) - VERIFIED live (2026-08-16): the new node is a
     # g6.2xlarge (8vCPU/32GiB, ~28.7Gi allocatable), half the instance
@@ -260,25 +280,6 @@ maas:
         cpu: "8"
         memory: 20Gi
         nvidia.com/mig-1g.24gb: "1"
-    # VERIFIED live (2026-08-17): the auto-generated storage-initializer
-    # container ships with HF_HUB_ENABLE_HF_TRANSFER=1 and
-    # HF_XET_HIGH_PERFORMANCE=1 (8 concurrent range-gets) by default -
-    # the download stalled hard partway through every attempt (~956M,
-    # then ~2.0G on retry - a different byte count each time, so not a
-    # fixed-offset bug, more likely a race in the 8-way concurrent
-    # writer coordination) while basic HTTPS connectivity/throughput
-    # tested fine (100MB range fetched in 1.6s). The pod's own logs show
-    # continuous non-fatal PermissionErrors on the .incomplete/lock
-    # files this concurrent path manages (restricted-SCC UID can't
-    # chmod them) - plausible root cause for one of the 8 workers
-    # silently wedging. Forces the plain single-connection
-    # huggingface_hub downloader instead.
-    storageInitializerEnv:
-      - name: HF_HUB_ENABLE_HF_TRANSFER
-        value: "0"
-      - name: HF_XET_HIGH_PERFORMANCE
-        value: "0"
-
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
   # model via different token rate limits (MaaSSubscription has no

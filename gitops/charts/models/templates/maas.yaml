@@ -32,6 +32,61 @@ spec:
     name: maas-default-gateway
     namespace: openshift-ingress
 ---
+# RESOLVED 2026-08-18: the LLMInferenceService's own hf:// storage-
+# initializer hung mid-download on every attempt (3 separate stalls at
+# different byte offsets, single uninterrupted process each time - not a
+# network issue, an isolated 100MB ranged HTTPS test hit 65MB/s; disabling
+# the HF concurrent-transfer path didn't fix it either). Switched to
+# model.uri: s3:// instead (values below), reusing rag-ingestion's own S3
+# credential (same Vault path "rag/s3", same bucket, new prefix) rather
+# than provisioning new IAM. KServe's storage-initializer auto-detects S3
+# credentials via a Secret carrying the serving.kserve.io/s3-* annotations,
+# referenced through a ServiceAccount the LLMInferenceService points at
+# (spec.template.serviceAccountName below) - same mechanism classic
+# InferenceServices use, just wired by hand here since this is this
+# chart's first S3-backed model.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.maas.llmInferenceService.s3.secretName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: vault-backend
+  target:
+    name: {{ .Values.maas.llmInferenceService.s3.secretName }}
+    creationPolicy: Owner
+    template:
+      metadata:
+        annotations:
+          serving.kserve.io/s3-endpoint: {{ .Values.maas.llmInferenceService.s3.endpoint | quote }}
+          serving.kserve.io/s3-region: {{ .Values.maas.llmInferenceService.s3.region | quote }}
+          serving.kserve.io/s3-usehttps: "1"
+          serving.kserve.io/s3-verifyssl: "1"
+  data:
+    - secretKey: AWS_ACCESS_KEY_ID
+      remoteRef:
+        key: {{ .Values.maas.llmInferenceService.s3.externalSecret.remoteKey | quote }}
+        property: {{ .Values.maas.llmInferenceService.s3.externalSecret.accessKeyProperty | quote }}
+    - secretKey: AWS_SECRET_ACCESS_KEY
+      remoteRef:
+        key: {{ .Values.maas.llmInferenceService.s3.externalSecret.remoteKey | quote }}
+        property: {{ .Values.maas.llmInferenceService.s3.externalSecret.secretKeyProperty | quote }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.maas.llmInferenceService.serviceAccountName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+secrets:
+  - name: {{ .Values.maas.llmInferenceService.s3.secretName }}
+---
 # Its own GPU-bound serving stack (RESOLVED 2026-08-16 - see values.yaml's
 # maas.modelRef.kind comment for why ExternalModel/PVC-reuse were both
 # ruled out). baseRefs supplies the vLLM/CUDA image; model.uri triggers
@@ -59,20 +114,17 @@ spec:
     name: {{ .Values.maas.llmInferenceService.servedModelName | quote }}
   replicas: 1
   template:
-    # No PVC here (model.uri: hf:// downloads straight onto the node), so
+    # No PVC here (model.uri: s3:// downloads straight onto the node), so
     # unlike the classic predictor this only ever needed "any GPU node",
     # never a specific zone - see values.yaml's llmInferenceService
     # comment.
     nodeSelector:
       nvidia.com/gpu.present: "true"
+    serviceAccountName: {{ .Values.maas.llmInferenceService.serviceAccountName }}
     containers:
       - name: main
         resources:
           {{- toYaml .Values.maas.llmInferenceService.resources | nindent 10 }}
-    initContainers:
-      - name: storage-initializer
-        env:
-          {{- toYaml .Values.maas.llmInferenceService.storageInitializerEnv | nindent 10 }}
   router:
     # VERIFIED live (2026-08-16): an empty gateway: {} does NOT auto-create
     # or reuse an existing Gateway on this RHOAI build - it defaults to a
