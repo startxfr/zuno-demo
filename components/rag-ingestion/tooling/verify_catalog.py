@@ -44,7 +44,6 @@ DEFAULT_VALUES_PATH = (
     pathlib.Path(__file__).resolve().parents[3] / "gitops" / "charts" / "rag-ingestion" / "values.yaml"
 )
 TIMEOUT_SECONDS = 15
-USER_AGENT = "zuno-rag-ingestion-catalog-verify/1.0"
 
 
 def load_redhat_sources(values_path: pathlib.Path) -> List[Dict[str, Any]]:
@@ -61,15 +60,23 @@ def classify_url(url: str, session: Any) -> Tuple[str, str]:
     means `response.url` is already the final URL after every hop, so a
     mismatch against the requested `url` is exactly "this entry's
     documentationUrl should be updated" - the REDIRECT(final-url) case.
+
+    Deliberately sends no custom `User-Agent` (keeps `requests`' own
+    default). `docs.redhat.com` sits behind Akamai bot management: both a
+    distinctive tool UA (`zuno-rag-ingestion-catalog-verify/1.0`, the
+    original choice here) and a spoofed browser UA get a WAF 403 ("Access
+    Denied", edgesuite.net), while `requests`' own default UA and plain
+    `curl` both get a clean 200 - confirmed against the real site on
+    2026-08-17 (roadmap WP-07 operator follow-up). The earlier "HTTP 403"
+    finding in ADR-0330 was this UA choice, not a network/environment
+    block.
     """
     # Only HEAD's 405/501 triggers the GET fallback; GET's own result (on
     # either the first try or the fallback) always returns directly below -
     # there is no third method to fall back to.
     for method in ("HEAD", "GET"):
         try:
-            resp = session.request(
-                method, url, timeout=TIMEOUT_SECONDS, allow_redirects=True, headers={"User-Agent": USER_AGENT}
-            )
+            resp = session.request(method, url, timeout=TIMEOUT_SECONDS, allow_redirects=True)
         except requests.RequestException as exc:
             return "FAIL", f"{type(exc).__name__}: {exc}"
         if resp.status_code in (405, 501) and method == "HEAD":

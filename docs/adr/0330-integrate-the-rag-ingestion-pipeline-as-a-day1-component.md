@@ -1,6 +1,8 @@
 # ADR-0330: Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access
 
-- **Status:** Partially implemented
+- **Status:** Partially implemented - catalog now fully HTTP-verified
+  (2026-08-17); real Confluence space keys/directories and the live KFP
+  recurring-run/DSPA verification remain open, see the dated note below
 - **Target:** v0.1
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team
@@ -171,6 +173,61 @@ failure message, so a real cluster run's log output names exactly which
 assumption to check. None of this required live cluster/network access
 this environment doesn't have, so the ADR's status stays Partially
 implemented - the operator steps above remain the path to `Implemented`.
+
+## Live verification pass (2026-08-17, roadmap WP-07)
+
+This session had, for the first time, both `oc` access to the live target
+cluster (`api.demo222.startx.fr`) and outbound network egress. That changed
+two of the three "not executable by the model" items above:
+
+- **Catalog HTTP verification: done for real, and a real bug found in the
+  tool itself.** `verify_catalog.py` had always reported blanket HTTP 403,
+  attributed to environment/network restriction. Direct `curl` comparison
+  showed the actual cause: the tool's own distinctive `User-Agent`
+  (`zuno-rag-ingestion-catalog-verify/1.0`) - and even a spoofed browser
+  UA - trips `docs.redhat.com`'s Akamai bot manager into a WAF 403
+  ("Access Denied", edgesuite.net), while `requests`' own default UA and
+  plain `curl` both get a clean 200. Fixed by dropping the custom UA
+  entirely. Re-run against the real site: 32/34 `OK` on the first pass; the
+  2 `Migration Toolkit for Containers` entries came back HTTP 404 (the
+  inferred `migration_toolkit_for_containers` book path was wrong) and were
+  corrected to the real path, `migrating_from_version_3_to_4`, confirmed by
+  a second real run showing all 34/34 `OK`. All `# CONFIRM` markers are now
+  removed from `values.yaml` - the catalog is genuinely HTTP-confirmed, not
+  WebSearch-inferred.
+- **DSPA status-condition shape: now confirmed for real (read-only).**
+  `oc get datasciencepipelinesapplication rag-dspa -n zuno-ai-build -o
+  json` shows the real `.status.conditions` shape `make d1 check
+  rag-ingestion` depends on: a list of typed conditions (`DatabaseAvailable`,
+  `ObjectStoreAvailable`, `APIServerReady`, `PersistenceAgentReady`,
+  `ScheduledWorkflowReady`, `WorkflowControllerReady`, `MLMDProxyReady`,
+  `WebhookReady`, `ManagedPipelineValid`, `Ready`), each with
+  `type`/`status`/`reason`/`message`/`observedGeneration`/
+  `lastTransitionTime` - matching the generic Kubernetes conditions
+  convention this repo's other CR-status checks (e.g. `ansible/roles/
+  mariadb`) already assume.
+- **KFP recurring-run assumptions (Route naming, version ordering, payload
+  shape): still unverified, and now for a documented reason.** `rag-dspa`
+  itself is not Ready on this cluster right now - `DatabaseAvailable` is
+  `False` ("context deadline exceeded"), and consequently there is no API
+  server pod, Service or Route in `zuno-ai-build` for the three assumptions
+  to be checked against (`oc get route -n zuno-ai-build` returns nothing).
+  `mariadb.zuno-data.svc.cluster.local` and the `rag-pipeline-db` secret
+  both exist and look healthy, so the DB-reachability failure itself wasn't
+  root-caused this pass (read-only inspection only, per this round's scope
+  - fixing DSPA reconciliation is a separate concern from WP-07's catalog/
+  assumption-verification goal). Once `rag-dspa` reaches `Ready`, the three
+  `WP-07-UNVERIFIED-ASSUMPTION` rescue-path warnings in
+  `ansible/roles/rag_ingestion/tasks/install.yml` remain the mechanism to
+  confirm or correct them from a real recurring-run attempt.
+- **Confluence real space keys/directories: still open.** Not a technical
+  unknown - a business decision (which real Confluence spaces map to
+  satellite/openshift/openshift-ai/keycloak) not made yet this round; the
+  demo placeholders stay in `values.yaml`.
+
+Status stays **Partially implemented**: the catalog sub-item is now fully
+discharged, but real Confluence values and the live recurring-run/DSPA-health
+verification remain open.
 
 ## Security considerations
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """ADR-0330 tests for the catalog verification tool
-(tooling/verify_catalog.py). Mocks the HTTP layer - this tool is meant to
-run from a network that can reach docs.redhat.com, which this environment
-cannot (HTTP 403, see ADR-0330's "Follow-up implementation" section) - to
-prove the OK/REDIRECT/FAIL classification and report formatting.
+(tooling/verify_catalog.py). Mocks the HTTP layer so these run offline and
+deterministically, independent of docs.redhat.com's real availability - see
+the WP-07 roadmap brief's 2026-08-17 operator follow-up for the real,
+live-network run and its results.
 
 Same plain-function/no-pytest style as components/rag-service/tests/
 test_search_filters.py, still pytest-collectible (the WP-07 brief's

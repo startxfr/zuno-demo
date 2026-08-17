@@ -1,6 +1,6 @@
 # WP-07: rag-ingestion catalog and source completion
 
-- **State:** Repo work merged (2026-08-14 - `components/rag-ingestion/tooling/verify_catalog.py` HTTP-verification tool + tests added; every non-Satellite `redhat[]` entry now carries an explicit `# CONFIRM` marker; Confluence `spaces`/`directories` placeholders marked `# operator-supplied` in `values.yaml` and `values.schema.json` (no real space key invented); `install.yml`'s KFP recurring-run `rescue:` block now names its three UNVERIFIED assumptions individually. ADR-0330 stays Partially implemented - operator follow-up below unchanged.)
+- **State:** Operator pending (2026-08-17 - catalog HTTP verification done for real against the live cluster's network egress: fixed a real bug in `verify_catalog.py` itself - its distinctive User-Agent was tripping `docs.redhat.com`'s Akamai bot manager into a 403, not an environment network block; dropping the custom UA unblocked it. Re-run found 32/34 `OK`, 2 `Migration Toolkit for Containers` entries `FAIL`ing on a wrong inferred book path, corrected and reconfirmed 34/34 `OK`. All `# CONFIRM` markers removed from `values.yaml`. DSPA status-condition shape confirmed for real via `oc get datasciencepipelinesapplication rag-dspa -o json`. KFP recurring-run assumptions (Route naming, version ordering, payload shape) still unverified - not by choice this time but because `rag-dspa` itself isn't Ready on this cluster (`DatabaseAvailable=False`, no API server pod/Route/Service exists yet); root-causing that reconciliation failure was out of this pass's read-only-inspection scope. Confluence real space keys/directories remain a deferred operator/business decision, not supplied this round. ADR-0330 stays Partially implemented - see its dated 2026-08-17 note.)
 - **ADRs:** ADR-0330 (Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-22
@@ -80,21 +80,27 @@ Remaining work recorded by the ADR:
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Operator: run `python3 components/rag-ingestion/tooling/verify_catalog.py`
-   from a network that can reach `docs.redhat.com`; hand results back for the
-   mechanical values update (post-operator follow-up below).
+1. ~~Operator: run `python3 components/rag-ingestion/tooling/verify_catalog.py`
+   from a network that can reach `docs.redhat.com`~~ — **done 2026-08-17**
+   (this session had live network egress; also fixed a real bug in the tool
+   itself, see the State line above). 34/34 catalog entries HTTP-confirmed.
 2. Operator: supply the real Confluence space keys and `directories` for the
    four technologies (satellite, openshift, openshift-ai, keycloak) in the
-   environment-specific values.
-3. Operator: `make d1 install rag-ingestion` + `make d1 check rag-ingestion`
-   on a live cluster; confirm or correct the KFP recurring-run Route/version/
-   payload assumptions and the DSPA status-condition shape, then report the
-   corrections needed (if any) as a follow-up change.
+   environment-specific values. Still open — a business decision, not
+   technical.
+3. Operator: fix `rag-dspa`'s `DatabaseAvailable=False` reconciliation
+   failure in `zuno-ai-build` first (confirmed 2026-08-17 — `mariadb` and
+   the `rag-pipeline-db` secret both look healthy from outside the DSPA
+   operator, root cause not diagnosed this pass), then `make d1 install
+   rag-ingestion` + `make d1 check rag-ingestion` on the live cluster to
+   confirm or correct the KFP recurring-run Route/version/payload
+   assumptions (the DSPA status-condition shape itself is already confirmed
+   — see ADR-0330's 2026-08-17 note).
 
 ## Post-operator repo follow-up
 
-- Apply the catalog verification results: drop `CONFIRM` markers, fix
-  redirected URLs, remove dead entries.
+- ~~Apply the catalog verification results: drop `CONFIRM` markers, fix
+  redirected URLs, remove dead entries.~~ — **done 2026-08-17.**
 - Apply any KFP/DSPA assumption corrections the cluster run surfaced.
 
 ## Status updates (then re-run check_docs.py)

@@ -58,13 +58,13 @@ pipelineServer:
 #     Container Platform's docs. Modeled here as sub-entries under their
 #     parent product's own two latest versions, not invented version
 #     numbers.
-# Satellite 6.17/6.16 are confirmed (given directly). Every other entry
-# was re-verified 2026-08-13 via WebSearch (docs.redhat.com still returns
-# 403 to this environment's direct fetch tooling, so per-URL HTTP
-# confirmation still isn't possible - version numbers are WebSearch
-# cross-checked against release-notes/announcement pages instead). MTC
-# (entries versioned alongside OCP) is high-confidence but not directly
-# confirmed - flagged inline below.
+# Satellite 6.17/6.16 are confirmed (given directly). Every other entry was
+# HTTP-verified for real 2026-08-17 (roadmap WP-07 operator follow-up) via
+# `components/rag-ingestion/tooling/verify_catalog.py`: 32/34 OK on first
+# run, the 2 MTC entries came back HTTP 404 and were corrected to the real
+# book path (`migrating_from_version_3_to_4`, confirmed by re-running the
+# tool - see ADR-0330's dated implementation note). All 34 `redhat[]`
+# entries are now HTTP-confirmed; no `# CONFIRM` markers remain.
 # platform.openshiftVersion (4.22, ADR-0319) now matches the "latest"
 # redhat[] OCP entry below - both track the real current GA release.
 redhat:
@@ -90,7 +90,7 @@ redhat:
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
     version: "4.22"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/release_notes/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -99,7 +99,7 @@ redhat:
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
     version: "4.21"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/release_notes/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -108,7 +108,7 @@ redhat:
     product: "Red Hat OpenShift AI"
     productSlug: "red-hat-openshift-ai-self-managed"
     version: "3.5"                # matches platform.openshiftAIVersion above
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -117,7 +117,7 @@ redhat:
     product: "Red Hat OpenShift AI"
     productSlug: "red-hat-openshift-ai-self-managed"
     version: "3.4"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -126,7 +126,7 @@ redhat:
     product: "Red Hat build of Keycloak"
     productSlug: "red-hat-build-of-keycloak"
     version: "26.6"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/release_notes/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -135,7 +135,7 @@ redhat:
     product: "Red Hat build of Keycloak"
     productSlug: "red-hat-build-of-keycloak"
     version: "26.4"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.4/html-single/release_notes/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.4/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -144,7 +144,7 @@ redhat:
     product: "Red Hat Enterprise Linux"
     productSlug: "red-hat-enterprise-linux"
     version: "10"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -153,7 +153,7 @@ redhat:
     product: "Red Hat Enterprise Linux"
     productSlug: "red-hat-enterprise-linux"
     version: "9"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -162,7 +162,7 @@ redhat:
     product: "Red Hat Ansible Automation Platform"
     productSlug: "red-hat-ansible-automation-platform"
     version: "2.7"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -171,7 +171,7 @@ redhat:
     product: "Red Hat Ansible Automation Platform"
     productSlug: "red-hat-ansible-automation-platform"
     version: "2.6"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -180,7 +180,7 @@ redhat:
     product: "Red Hat Advanced Cluster Management for Kubernetes"
     productSlug: "red-hat-advanced-cluster-management"
     version: "2.17"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -189,7 +189,7 @@ redhat:
     product: "Red Hat Advanced Cluster Management for Kubernetes"
     productSlug: "red-hat-advanced-cluster-management"
     version: "2.16"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.16"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.16"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -198,7 +198,7 @@ redhat:
     product: "Red Hat Advanced Cluster Security for Kubernetes"
     productSlug: "red-hat-advanced-cluster-security"
     version: "4.11"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -207,7 +207,7 @@ redhat:
     product: "Red Hat Advanced Cluster Security for Kubernetes"
     productSlug: "red-hat-advanced-cluster-security"
     version: "4.10"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/release_notes/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/release_notes/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -216,7 +216,7 @@ redhat:
     product: "Red Hat Quay"
     productSlug: "red-hat-quay"
     version: "3.17"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_quay/3.17"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_quay/3.17"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -225,7 +225,7 @@ redhat:
     product: "Red Hat Quay"
     productSlug: "red-hat-quay"
     version: "3.16"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_quay/3.16"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_quay/3.16"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -234,7 +234,7 @@ redhat:
     product: "Red Hat OpenShift Data Foundation"
     productSlug: "red-hat-openshift-data-foundation"
     version: "4.22"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -243,7 +243,7 @@ redhat:
     product: "Red Hat OpenShift Data Foundation"
     productSlug: "red-hat-openshift-data-foundation"
     version: "4.21"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.21"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.21"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -252,7 +252,7 @@ redhat:
     product: "Red Hat Connectivity Link"
     productSlug: "red-hat-connectivity-link"
     version: "1.4"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -261,7 +261,7 @@ redhat:
     product: "Red Hat Connectivity Link"
     productSlug: "red-hat-connectivity-link"
     version: "1.3"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.3"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.3"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -270,7 +270,7 @@ redhat:
     product: "Migration Toolkit for Applications"
     productSlug: "migration-toolkit-for-applications"
     version: "8.2"
-    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -279,7 +279,7 @@ redhat:
     product: "Migration Toolkit for Applications"
     productSlug: "migration-toolkit-for-applications"
     version: "8.1"
-    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.1"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.1"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -288,7 +288,7 @@ redhat:
     product: "Migration Toolkit for Virtualization"
     productSlug: "migration-toolkit-for-virtualization"
     version: "2.11"
-    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -297,7 +297,7 @@ redhat:
     product: "Migration Toolkit for Virtualization"
     productSlug: "migration-toolkit-for-virtualization"
     version: "2.10"
-    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.10"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.10"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -306,7 +306,7 @@ redhat:
     product: "Red Hat OpenStack Services on OpenShift"      # relaunch of Red Hat OpenStack Platform (RHOSP -> RHOSO); this is the "latest" half of the OpenStack pair
     productSlug: "red-hat-openstack-services-on-openshift"
     version: "18.0"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -315,7 +315,7 @@ redhat:
     product: "Red Hat OpenStack Platform"                    # last classic-RHOSP release before the RHOSO rename; the "previous" half of the OpenStack pair
     productSlug: "red-hat-openstack-platform"
     version: "17.1"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -324,7 +324,7 @@ redhat:
     product: "OpenShift Virtualization"                      # replaces Red Hat Virtualization (RHV), which is EOL with no second version to pair - ships as an OpenShift Container Platform doc chapter, versioned alongside it
     productSlug: "openshift-virtualization"
     version: "4.22"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -333,7 +333,7 @@ redhat:
     product: "OpenShift Virtualization"
     productSlug: "openshift-virtualization"
     version: "4.21"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/virtualization/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/virtualization/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -342,7 +342,7 @@ redhat:
     product: "Red Hat Identity Management"                   # no independent version - a RHEL doc chapter; versioned alongside RHEL 10 above
     productSlug: "red-hat-identity-management"
     version: "10"
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/planning_identity_management/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/planning_identity_management/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -351,16 +351,16 @@ redhat:
     product: "Red Hat Identity Management"
     productSlug: "red-hat-identity-management"
     version: "9"                                             # versioned alongside RHEL 9 above
-    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/planning_identity_management/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/planning_identity_management/index"
     languages: [en-US]
     fetchMode: html
     include: []
     exclude: []
   - enabled: true
-    product: "Migration Toolkit for Containers"              # no independent version - an OpenShift Container Platform doc chapter; versioned alongside OCP 4.22 above. Inferred from OCP's own 4.22 GA + MTC's historical every-release cadence, not a directly-confirmed MTC 4.22 doc URL - CONFIRM before the first real fetch-redhat run.
+    product: "Migration Toolkit for Containers"              # no independent version - an OpenShift Container Platform doc chapter; versioned alongside OCP 4.22 above.
     productSlug: "migration-toolkit-for-containers"
     version: "4.22"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migration_toolkit_for_containers/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migrating_from_version_3_to_4/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -369,7 +369,7 @@ redhat:
     product: "Migration Toolkit for Containers"
     productSlug: "migration-toolkit-for-containers"
     version: "4.21"                                          # versioned alongside OCP 4.21 above - same inference caveat as 4.22 above
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/migration_toolkit_for_containers/index"  # CONFIRM - not yet HTTP-verified, see components/rag-ingestion/tooling/verify_catalog.py
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/migrating_from_version_3_to_4/index"
     languages: [en-US]
     fetchMode: html
     include: []
@@ -416,6 +416,11 @@ confluenceAuthDefault: &confluenceAuthDefault
 # replacing per environment (see examples/values-*.yaml, which show the
 # override shape but reuse the same placeholder space key, not real ones -
 # no real Confluence space key exists anywhere in this repo to copy).
+# Still open as of 2026-08-17 (roadmap WP-07 pass): real space keys/
+# directories for satellite/openshift/openshift-ai/keycloak were not
+# supplied this round - this is a business decision (which real Confluence
+# spaces map to which tech), not a technical unknown, so it stays a
+# placeholder rather than a guess.
 confluence:
   - enabled: true
     name: satellite-archi
