@@ -56,7 +56,7 @@ postgres:
   sslmode: require
   secretName: mlops-postgres-credentials
   externalSecret:
-    remoteKey: rag/postgres/tech # read-only reuse of rag-ingestion's own tech-domain credential
+    remoteKey: rag/postgresql-app # read-only reuse of rag-ingestion's own tech-domain credential (same path as rag-service/rag-ingestion's tech domain)
     usernameProperty: username
     passwordProperty: password
 
@@ -76,7 +76,7 @@ modelRegistry:
 pipelineServer:
   manage: true
   name: mlops-dspa
-  pipelineStore: kubernetesPlatform
+  pipelineStore: kubernetes
   cacheEnabled: true
   metadataDatabase:
     mode: embeddedMariaDB
