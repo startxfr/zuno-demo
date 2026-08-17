@@ -986,3 +986,20 @@ under `docs/adr/`.
   "rag is installed". ADR-0204 stays Partially implemented - WP-22
   (source adapters' live runs) is the remaining piece, out of this
   session's WP list.
+
+- **2026-08-17 (ADR-0114, WP-03)**: re-verified, made no repo or live
+  changes. Repo acceptance checks re-run clean (`py_compile`,
+  `pytest components/ai-gateway/` 58/58, `helm lint`, coverage doc
+  present, `check_docs.py`); `maasAdapter.enabled` correctly stays
+  `false`. Live MaaS comparison remains blocked - confirmed this is
+  ADR-0201's own capacity gap, not a WP-03 problem: `oc get nodes` shows
+  exactly one GPU-capable node, and its one `nvidia.com/gpu` is already
+  committed to the existing `qwen25-7b-instruct`/`embeddings` models
+  (ADR-0201's 2026-08-16 note). The MaaS-published
+  `qwen25-7b-instruct-maas-backend` LLMInferenceService (created live
+  since then, part of that same in-flight rollout - `MaaSModelRef` Pending,
+  two `MaaSSubscription`s exist) sits `FailedScheduling: Insufficient
+  nvidia.com/gpu`. Adding GPU capacity is a real infrastructure/cost
+  decision for the user, not something to do unilaterally while auditing
+  a WP - left untouched. Nothing left to attempt for WP-03 itself until
+  ADR-0201/WP-27 resolves that gap.

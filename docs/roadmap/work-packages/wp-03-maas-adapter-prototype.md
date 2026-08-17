@@ -1,6 +1,6 @@
 # WP-03: MaaS adapter prototype in the AI Gateway
 
-- **State:** Operator pending (2026-08-14 — repo work merged: adapter, chart wiring, tests, coverage doc; awaiting live MaaS comparison per the Operator/human follow-up section below)
+- **State:** Operator pending (2026-08-14 — repo work merged: adapter, chart wiring, tests, coverage doc; awaiting live MaaS comparison per the Operator/human follow-up section below. Re-verified 2026-08-17: repo acceptance checks re-run clean (`py_compile`, `pytest components/ai-gateway/` 58/58, `helm lint`, coverage doc present, `check_docs.py`). `maasAdapter.enabled` correctly stays `false`. Live comparison still blocked - not by a WP-03-side gap but by ADR-0201's own documented architecture/capacity blocker: this cluster has exactly one GPU node and its only `nvidia.com/gpu` is already committed to the existing local models, so the MaaS-published `qwen25-7b-instruct-maas-backend` LLMInferenceService this WP would compare against can't schedule (`FailedScheduling: Insufficient nvidia.com/gpu`). Resolving that is a real infrastructure/cost decision (add a GPU node) that belongs to ADR-0201/WP-27, not this WP - nothing further to attempt here until it lands.)
 - **ADRs:** ADR-0114 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-27
