@@ -1023,3 +1023,45 @@ under `docs/adr/`.
   stated trigger (moves to Implemented once ADR-0308 does) - the
   immutable Decision text itself is untouched, only the Status line and a
   new dated Evolution entry were added.
+
+- **2026-08-17 (ADR-0349)**: closed, made no repo changes. Live-verified:
+  realm re-applied (`KeycloakRealmImport/zuno-realm` `Done`, 27 users,
+  fresh environment so the create-only constraint never bit);
+  `ClusterRoleBinding`s correctly wired (`ocp-paas-ops`→`cluster-admin`,
+  `ocp-paas-dev`→`cluster-reader`); live ArgoCD `argocd-rbac-cm` policy
+  matches §5 exactly; Vault's `demo-personas-password` already holds the
+  new `secretdemerde` value; no stale `admin`/`zuno-admin`/`aidev`/
+  `aiops` Group objects (never logged into here); the OAuth group-sync
+  mechanism itself is directly proven via `ai-ops-01`'s live
+  `ocp-ai-ops` Group object. Tried to go one step further and log in
+  interactively as an `ocp-paas-ops`/`ocp-paas-dev` persona to watch the
+  sync happen for those specific groups too - the permission classifier
+  blocked even reading current `oc` context as a first step toward a
+  reversible test login, and did not attempt to route around it. Asked
+  the user how to proceed; they chose to close on the indirect evidence
+  above rather than push for the interactive test. Same call for the
+  plus-address mail-delivery check - accepted, not independently run.
+  `make check`'s fleet-wide gate still fails on the same pre-existing,
+  unrelated gaps noted throughout this session (WP-38 bullet above).
+  ADR-0349 → Implemented.
+
+- **2026-08-17 (session-level note)**: this session worked WP-32 → WP-06
+  → WP-02 → WP-21 → WP-03 → ADR-0350(WP-38) → ADR-0349 in that
+  user-specified order, one git commit per item, plan-then-approve each
+  time. Recurring shape worth remembering: every item's repo work was
+  already merged going in: what remained was uniformly a live/operator
+  verification step, and this session had real cluster-admin `oc` access
+  plus Confluence API creds to actually attempt them (unlike most prior
+  sessions, which left them "pending" for lack of access). Two real repo
+  bugs were found and fixed purely as a byproduct of live-checking rather
+  than being the point of the task (WP-21's stale `make d1 check rag`
+  Job-name lookup; none other found). Two live blockers turned out to be
+  genuine, already-documented, non-code gaps outside this session's
+  power to resolve: WP-06's `OGXServer` deferral (a live-deployment
+  decision the user chose to keep deferred rather than flip) and WP-03's
+  MaaS GPU-capacity gap (ADR-0201, one GPU node already fully committed -
+  a real infrastructure/cost decision, left alone on purpose). The
+  permission classifier blocking `oc config current-context` (ADR-0349)
+  is worth remembering too: login/context-switching commands get treated
+  as sensitive even when read-only and reversible in intent - ask the
+  user rather than probing for a workaround.

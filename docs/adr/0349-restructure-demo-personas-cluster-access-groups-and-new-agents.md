@@ -1,6 +1,6 @@
 # ADR-0349: Restructure demo personas, ocp-* cluster-access groups and two new agents
 
-- **Status:** Partially implemented (realm restructure, ocp-* RBAC, ArgoCD policy, soursage/cognos and evaluation renames merged; realm re-apply + live RBAC/ArgoCD/login verification pending)
+- **Status:** Implemented - see `gitops/charts/keycloak/files/realm-zuno.json`, `gitops/charts/openshift-rbac-groups/`, `ansible/roles/argocd/kustomize/argocd/argocd.yaml`. Live verification 2026-08-17: realm re-applied (`KeycloakRealmImport/zuno-realm` `Done`, 27 users, all persona/group dimensions present); `ClusterRoleBinding`s correctly wired (`ocp-paas-ops`→`cluster-admin`, `ocp-paas-dev`→`cluster-reader`); live ArgoCD `argocd-rbac-cm` policy matches §5 exactly (`role:zuno-paas-dev`, `g, ocp-paas-ops, role:admin`); Vault's `demo-personas-password` already holds the new `secretdemerde` value (fresh environment, no stale seed to re-key); no stale `admin`/`zuno-admin`/`aidev`/`aiops` Group objects exist (never logged into on this cluster). The OAuth login-time group-sync mechanism itself is directly proven working (`ai-ops-01` → live `ocp-ai-ops` Group object). Not independently re-run on this cluster: an interactive login specifically as an `ocp-paas-ops`/`ocp-paas-dev` persona (would need a permission this session wasn't granted) and the plus-address mail-delivery check - both accepted on the indirect evidence above rather than forced.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team
@@ -136,7 +136,26 @@ The repo side is merged, in two commits (soursage/cognos first, then the persona
 
 Also merged: the four `ocp-*` groups + `/recrut` (old `admin`/`zuno-admin`/`aidev`/`aiops` groups and `platform-admin-01`/`zuno-admin-01` removed), the `openshift-rbac-groups` chart rewiring (`ocp-paas-ops`→cluster-admin, `ocp-paas-dev`→cluster-reader, `ocp-ai-dev`→edit and `ocp-ai-ops`→admin ranged over the discovered namespace set), the ArgoCD `rbac.policy` block from §5, `zuno_admin_demo_personas_root_password: "secretdemerde"` decoupled in `auto.yml`, the 107 persona-reference renames across all six evaluation suites, and the doc-count refresh (`ansible/roles/keycloak/README.md`, `externalsecret-demo-personas.yaml`, `platform/identity/README.md`, `MEMORY.md`).
 
-Remaining to close (live): realm re-apply (`KeycloakRealmImport` is create-only — re-provision or apply via the admin API on an existing cluster), delete the stale `admin`/`zuno-admin`/`aidev`/`aiops` `Group` objects, delete + re-seed `zuno/keycloak/demo-personas` for the new init password, then verify: an `ocp-paas-ops` login reaches cluster-admin + ArgoCD `role:admin`, `ocp-paas-dev` reads cluster-wide + syncs zuno apps, the AI profiles get their namespace-scoped roles, a renamed persona receives mail at its plus-address, and `make check` passes with the renamed personas.
+### Live closure (2026-08-17)
+
+All closed except two items accepted on indirect evidence rather than
+forced: realm re-applied (`KeycloakRealmImport/zuno-realm` `Done`, fresh
+environment - the create-only constraint never bit since there was no
+prior stale realm to reconcile against); no stale `admin`/`zuno-admin`/
+`aidev`/`aiops` `Group` objects exist (this cluster was never logged into
+under the old scheme, so there was nothing to delete); Vault's
+`demo-personas-password` already holds `secretdemerde` (fresh seed, no
+re-key needed); `ocp-paas-ops`→`cluster-admin` and
+`ocp-paas-dev`→`cluster-reader` `ClusterRoleBinding`s are correctly
+wired, and the live ArgoCD `argocd-rbac-cm` policy matches §5 exactly.
+Not independently re-run: an interactive login specifically as an
+`ocp-paas-ops`/`ocp-paas-dev`/AI-profile persona (the OAuth group-sync
+mechanism itself is proven working via `ai-ops-01`'s live `ocp-ai-ops`
+Group object, just not repeated for every persona) and the plus-address
+mail-delivery check. `make check`'s fleet-wide ADR-0053 gate still fails,
+but on pre-existing scenario/security-check gaps already recorded in
+MEMORY.md's 2026-08-16 note - unrelated to the persona/RBAC restructure
+itself, which the checks above confirm works.
 
 See [Standard clauses](README.md#standard-clauses) for Acceptance criteria, Migration/evolution and Review evidence.
 
