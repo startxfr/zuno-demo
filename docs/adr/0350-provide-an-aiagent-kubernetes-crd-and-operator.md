@@ -1,6 +1,6 @@
 # ADR-0350: Provide an AIAgent Kubernetes CRD and operator
 
-- **Status:** Proposed
+- **Status:** Implemented - see ADR-0327/ADR-0308 and `operator/aiagent-operator/`.
 - **Target:** v0.3
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
@@ -13,6 +13,10 @@ Represent agent instances declaratively and reconcile required OpenShift resourc
 
 ## Evolution (2026-08-15)
 
-This decision is now implemented, in two steps rather than one: ADR-0327 defined the narrow `AIAgent` reconciliation contract first, and ADR-0308 (WP-38) implements the operator against that contract - controller, boundary enforcement, envtest suite and the Arkos migration proof are merged (`operator/aiagent-operator/`; `gitops/charts/arkos/` is now CR-managed). This record's own Status line stays `Proposed` rather than moving to `Implemented` directly: ADR-0308 is the ADR that actually carries the implementation status (`Partially implemented` pending live cluster reconciliation), and per the immutability boundary this Decision text is not rewritten to claim it. See ADR-0308's own Status line for the current, authoritative state; this ADR moves to `Implemented - see ADR-0327/ADR-0308 and operator/aiagent-operator/.` only once ADR-0308 itself reaches `Implemented`.
+This decision is now implemented, in two steps rather than one: ADR-0327 defined the narrow `AIAgent` reconciliation contract first, and ADR-0308 (WP-38) implements the operator against that contract - controller, boundary enforcement, envtest suite and the Arkos migration proof are merged (`operator/aiagent-operator/`; `gitops/charts/arkos/` is now CR-managed). This record's own Status line stayed `Proposed` while ADR-0308 was the ADR carrying the authoritative implementation status, per the immutability boundary (this Decision text is not rewritten to claim implementation itself).
+
+### Evolution (2026-08-17)
+
+ADR-0308 reached `Implemented` (cluster reconciliation confirmed live: `aiagent-operator` deployed and Ready, both the Arkos and Naveo `AIAgent` CRs show all five status conditions `True`), so per the trigger this record itself named above, this ADR's Status line now moves to `Implemented` too.
 
 See [Standard clauses](README.md#standard-clauses) for Context, Alternatives, Consequences, Security/Operational considerations, Migration/evolution and Related ADRs.

@@ -1,6 +1,21 @@
 # WP-38: AIAgent operator implementation (promotes ADR-0308; closes ADR-0350)
 
-- **State:** Repo work merged (2026-08-15); cluster reconciliation pending.
+- **State:** Done (2026-08-15 repo merge; cluster reconciliation confirmed
+  live 2026-08-17 - `aiagent-operator` deployed and Ready in `zuno-ai-run`;
+  both live `AIAgent` CRs, Arkos and Naveo, show all five status
+  conditions `True` (`ConfigValid`/`OKFReady`/`FrontendReady`/`BFFReady`/
+  `RuntimeBindingReady`). Repo acceptance re-run clean: `go build ./...`,
+  13/13 envtest suite (86.2% coverage on `internal/controller`),
+  `validate_contract.py` PASS, `check_build_matrix.py` PASS,
+  `check_workload_hardening.py` 189/189, `helm lint` on both touched
+  charts, `day1_check.yml --syntax-check`. `make d1 check agents` was also
+  run live: it exercises the full ADR-0053 fleet gate (all agents, not
+  just this WP's scope) and fails overall (13/20 scenarios, 6/7 security
+  checks) on pre-existing scenario-design/harness/credential gaps already
+  recorded in MEMORY.md's 2026-08-16 note - unrelated to the operator or
+  CR reconciliation, which the condition check above confirms works.
+  ADR-0308 → Implemented; ADR-0350 → Implemented, per this file's own
+  stated trigger now that ADR-0308 closed. Repo work merged (2026-08-15):
   Step 0 promoted ADR-0308 verbatim from its `docs/adr/0300-v0.3-roadmap.md`
   stub. Controller (`operator/aiagent-operator/internal/controller/`):
   `AIAgentReconciler.Reconcile` generates exactly CONTRACT.md's resource

@@ -1,6 +1,6 @@
 # ADR-0308: Expand agent lifecycle management through the AIAgent Operator
 
-- **Status:** Partially implemented (controller, boundaries, tests and Arkos migration merged; cluster reconciliation pending)
+- **Status:** Implemented - see `operator/aiagent-operator/`. Cluster reconciliation confirmed 2026-08-17: `aiagent-operator` deployed and Ready in `zuno-ai-run`; both live `AIAgent` CRs (Arkos and Naveo) show all five status conditions `True` (`ConfigValid`/`OKFReady`/`FrontendReady`/`BFFReady`/`RuntimeBindingReady`), confirming reconciliation, boundary enforcement and the migration proof all work against a real cluster, not just envtest. (The broader `make d1 check agents` ADR-0053 fleet gate still fails on pre-existing, unrelated scenario/security-check gaps across other agents - not an operator or CR-reconciliation defect; see MEMORY.md's 2026-08-16 note.)
 - **Target:** v0.3
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team

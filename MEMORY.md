@@ -1003,3 +1003,23 @@ under `docs/adr/`.
   decision for the user, not something to do unilaterally while auditing
   a WP - left untouched. Nothing left to attempt for WP-03 itself until
   ADR-0201/WP-27 resolves that gap.
+
+- **2026-08-17 (ADR-0308/ADR-0350, WP-38)**: closed the cluster-
+  reconciliation step this WP had left, made no repo changes. Repo
+  acceptance re-run clean (`go build ./...`, 13/13 envtest 86.2%
+  coverage, `validate_contract.py`, `check_build_matrix.py`,
+  `check_workload_hardening.py` 189/189, `helm lint`,
+  `day1_check.yml --syntax-check`). Live: `aiagent-operator` deployed and
+  Ready in `zuno-ai-run`; both `AIAgent` CRs (Arkos, Naveo) show all five
+  status conditions `True` - confirms the reconciler, boundary
+  enforcement and migration proof all work against a real cluster,
+  matching the 2026-08-16 session's finding and now re-verified.
+  `make d1 check agents` was also run: it's the full ADR-0053 fleet gate
+  (every agent, not just this WP), and it fails overall
+  (13/20 scenarios, 6/7 security checks) on the same pre-existing
+  scenario-design/harness/credential gaps the 2026-08-16 note already
+  recorded - not an operator or CR-reconciliation defect. ADR-0308 →
+  Implemented. ADR-0350 → Implemented too, per its own "Evolution" note's
+  stated trigger (moves to Implemented once ADR-0308 does) - the
+  immutable Decision text itself is untouched, only the Status line and a
+  new dated Evolution entry were added.
