@@ -260,6 +260,24 @@ maas:
         cpu: "8"
         memory: 20Gi
         nvidia.com/mig-1g.24gb: "1"
+    # VERIFIED live (2026-08-17): the auto-generated storage-initializer
+    # container ships with HF_HUB_ENABLE_HF_TRANSFER=1 and
+    # HF_XET_HIGH_PERFORMANCE=1 (8 concurrent range-gets) by default -
+    # the download stalled hard partway through every attempt (~956M,
+    # then ~2.0G on retry - a different byte count each time, so not a
+    # fixed-offset bug, more likely a race in the 8-way concurrent
+    # writer coordination) while basic HTTPS connectivity/throughput
+    # tested fine (100MB range fetched in 1.6s). The pod's own logs show
+    # continuous non-fatal PermissionErrors on the .incomplete/lock
+    # files this concurrent path manages (restricted-SCC UID can't
+    # chmod them) - plausible root cause for one of the 8 workers
+    # silently wedging. Forces the plain single-connection
+    # huggingface_hub downloader instead.
+    storageInitializerEnv:
+      - name: HF_HUB_ENABLE_HF_TRANSFER
+        value: "0"
+      - name: HF_XET_HIGH_PERFORMANCE
+        value: "0"
 
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published

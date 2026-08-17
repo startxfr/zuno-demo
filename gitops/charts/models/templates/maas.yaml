@@ -69,6 +69,10 @@ spec:
       - name: main
         resources:
           {{- toYaml .Values.maas.llmInferenceService.resources | nindent 10 }}
+    initContainers:
+      - name: storage-initializer
+        env:
+          {{- toYaml .Values.maas.llmInferenceService.storageInitializerEnv | nindent 10 }}
   router:
     # VERIFIED live (2026-08-16): an empty gateway: {} does NOT auto-create
     # or reuse an existing Gateway on this RHOAI build - it defaults to a
