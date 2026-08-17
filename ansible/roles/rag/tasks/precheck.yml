@@ -1,13 +1,25 @@
 ---
-# State detection (never fails). "Installed" requires both the one-shot
-# RAG metadata/fixtures Job's last run to have succeeded and the RAG
+# State detection (never fails). "Installed" requires every enabled
+# domain's one-shot schema-apply Job to have last succeeded and the RAG
 # service Application to be Synced+Healthy.
-- name: "rag | look up the RAG schema-apply Job"
+#
+# WP-21 (2026-08-17): the schema-apply Job used to be a single fixed
+# `zuno-rag-schema-apply`; the multi-domain core (gitops/charts/rag-service/
+# templates/job-schema-apply.yaml) renders one `zuno-rag-schema-apply-
+# <domain>` Job per enabled `knowledgeDomains` entry instead (it is the
+# only Job template in that chart, always labeled
+# app.kubernetes.io/name=rag-service), and this lookup was never updated
+# for that rename - it looked up a Job name that can no longer exist, so
+# `make d1 check rag` reported "NOT installed" unconditionally regardless
+# of real state. Fixed by matching on the label instead of a fixed name,
+# and requiring every returned Job to have succeeded (not just the first).
+- name: "rag | look up the RAG schema-apply Jobs (one per enabled domain)"
   kubernetes.core.k8s_info:
     api_version: batch/v1
     kind: Job
     namespace: zuno-data
-    name: zuno-rag-schema-apply
+    label_selectors:
+      - "app.kubernetes.io/name=rag-service"
   register: _rag_job_lookup
 
 - name: "rag | check the rag Application (d0)"
@@ -29,7 +41,13 @@
     _state_is_installed: >-
       {{
         (_rag_job_lookup.resources | default([]) | length) > 0
-        and (_rag_job_lookup.resources[0].status.succeeded | default(0)) > 0
+        and (_rag_job_lookup.resources
+             | rejectattr('status.succeeded', 'defined')
+             | list | length) == 0
+        and (_rag_job_lookup.resources
+             | selectattr('status.succeeded', 'defined')
+             | rejectattr('status.succeeded', 'greaterthan', 0)
+             | list | length) == 0
         and _rag_d0_installed
         and _state_check_result
       }}

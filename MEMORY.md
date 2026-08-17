@@ -965,3 +965,24 @@ under `docs/adr/`.
   `mcp-gateway/tests/test_auth_mode_enforcement.py::test_no_token_material_appears_in_the_audit_log_line`
   fails even in isolation (logging-capture issue, WP-26 territory) -
   pre-existing, unrelated to WP-32/WP-06/WP-02.
+
+- **2026-08-17 (ADR-0204, WP-21)**: closed WP-21's own scope, made one
+  real repo fix. Live-verified all four domain databases/roles exist on
+  the PGO cluster (`ragtech`/`ragsales`/`ragsxalegacy`/`ragadv`, each
+  ACL'd to only its own database - `\l` shows a single-role grant per
+  db); `rag-service` deployed and Healthy; `tech`+`sales` schema-apply
+  Jobs Complete (`sales.enabled: true` was already flipped live by a
+  prior 2026-08-15 session per `gitops/charts/rag-service/values.yaml`'s
+  own dated comment) - satisfies "two live domains, distinct credentials"
+  today. Found `make d1 check rag` reporting "rag is NOT installed"
+  despite all that: `ansible/roles/rag/tasks/precheck.yml` still looked
+  up a single hardcoded `zuno-rag-schema-apply` Job, a name WP-21 itself
+  retired when it switched to per-domain `zuno-rag-schema-apply-<domain>`
+  Jobs (`gitops/charts/rag-service/templates/job-schema-apply.yaml`,
+  the chart's only Job template) - the check had been silently broken
+  since the WP that introduced the rename. Fixed: match on the
+  `app.kubernetes.io/name=rag-service` label instead of a fixed name,
+  require every returned Job to have succeeded. Re-ran live: now reports
+  "rag is installed". ADR-0204 stays Partially implemented - WP-22
+  (source adapters' live runs) is the remaining piece, out of this
+  session's WP list.

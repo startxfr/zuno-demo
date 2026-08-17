@@ -1,6 +1,6 @@
 # ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
-- **Status:** Partially implemented (multi-domain retrieval core, bindings, per-domain databases and source adapters merged; live provisioning pending)
+- **Status:** Partially implemented (multi-domain retrieval core, bindings, per-domain databases and source adapters merged; WP-21's live provisioning confirmed 2026-08-17 - tech+sales domains live with distinct credentials, `make d1 check rag` reports installed after fixing a stale precheck.yml Job lookup; WP-22's live source-credential runs still pending)
   <!-- 2026-08-15: WP-22 merged part 2 - the source-adapter interface
   (fetch-redhat/fetch-confluence refactored, fetch-salesforce/fetch-aramis/
   load-sxa-dump added), per-domain pipeline targeting and ADR-0105 cadences.
