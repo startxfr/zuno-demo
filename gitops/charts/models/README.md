@@ -54,8 +54,9 @@ NVIDIA driver build artifacts (~7GB) at once.
 mount that PVC directly, with no download/storage-initializer step at pod
 start.
 
-The PVC and the download Job are both plain sync-wave resources (PVC wave
--20, Job wave -15, before the ServingRuntime's -5), not ArgoCD `PreSync`
+The PVC and the download Job are both plain sync-wave resources (both
+wave -15, before the ServingRuntime's -5 - sharing one wave is
+load-bearing, see `templates/pvc-model.yaml`'s deadlock note), not ArgoCD `PreSync`
 hooks - hooks would make ArgoCD delete and recreate the PVC (and its
 ~15GB downloaded model) on every resync. As plain, wave-ordered resources,
 ArgoCD only touches either object again when its own spec actually

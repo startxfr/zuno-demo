@@ -5,10 +5,16 @@
 # hook so it could share a sync-wave with job-model-download.yaml (its
 # first consumer, needed since gp3-csi is WaitForFirstConsumer) caused
 # ArgoCD to delete and recreate the PVC - and its ~15GB downloaded model -
-# on every resync. As a plain resource one wave ahead of the Job (-20 vs
-# -15), it binds via WaitForFirstConsumer once the Job's pod is scheduled,
-# same as before, but ArgoCD only touches this object when its own spec
-# actually changes.
+# on every resync. SAME sync-wave as the Job (-15), not one wave ahead:
+# VERIFIED live 2026-08-17 (ADR-0351 rollout) - with the PVC alone in an
+# earlier wave, a fresh create deadlocks the whole sync: ArgoCD's default
+# PVC health treats the (perfectly normal) WaitForFirstConsumer Pending
+# phase as Progressing and never advances to the wave holding the Job
+# whose pod is the only thing that can bind it ("waiting for healthy
+# state of /PersistentVolumeClaim/..."). In one shared wave ArgoCD
+# applies both objects (PVC before Job by its kind ordering), the Job's
+# pod schedules, the PVC binds, and the wave turns healthy. ArgoCD still
+# only touches this object when its own spec actually changes.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -17,7 +23,7 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-20"
+    argocd.argoproj.io/sync-wave: "-15"
 spec:
   accessModes:
     - ReadWriteOnce

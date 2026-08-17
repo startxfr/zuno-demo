@@ -1,6 +1,7 @@
 # One-time download of {{ .Values.modelId }} into pvc-model.yaml's PVC
 # (gp3-csi, WaitForFirstConsumer - this Job's pod is that first consumer,
-# which is why this must stay one sync-wave after the PVC's). Reuses the
+# which is why both share sync-wave -15: see pvc-model.yaml for the
+# verified deadlock when the PVC sat alone in an earlier wave). Reuses the
 # exact odh-kserve-storage-initializer image/args/env KServe's own hf://
 # init container already uses on this cluster (verified against the live
 # InferenceService's generated pod spec), so this is a plain one-off run of
