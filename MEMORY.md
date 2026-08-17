@@ -17,8 +17,14 @@ The MVP target is seven days with two contributors. Documentation and architectu
 - OpenShift Container Platform 4.22, AWS IPI.
 - Red Hat OpenShift AI 3.5 EA2.
 - Internet-connected cluster.
-- Two worker nodes, one NVIDIA L4 24 GB GPU per node.
-- NVIDIA GPU Operator deployed as a prerequisite.
+- Two CPU worker nodes; GPU capacity per ADR-0351: one permanent
+  g7e.4xlarge node (NVIDIA RTX PRO 6000 Blackwell 96GB, MIG-partitioned
+  `all-balanced` = 2x 1g.24gb + 1x 2g.48gb slices for the three inference
+  workloads) plus a scale-from-zero tainted burst node (whole GPU, for
+  training) and a replicas-0 AZ-failover MachineSet - all managed by
+  `gitops/charts/machines`.
+- NVIDIA GPU Operator deployed as a prerequisite (ClusterPolicy
+  `mig.strategy: mixed` via ansible overlay, ADR-0351).
 - OpenShift AI Operator and required dependencies deployed as prerequisites.
 - DataScienceCluster configured as part of platform preparation/configuration.
 - Keycloak, Vault, PostgreSQL and observability are demo prerequisites.
@@ -89,7 +95,12 @@ Local model families:
 - Qwen;
 - Llama.
 
-Variants are selected to fit NVIDIA L4 24 GB GPUs. OpenShift AI model serving is used for local inference. KServe, Models-as-a-Service and llm-d are included in the architecture where relevant to OpenShift AI 3.5 EA2 capabilities.
+Variants are selected to fit a 24 GB GPU memory envelope (originally
+NVIDIA L4 cards; since ADR-0351 the equivalent 1g.24gb MIG slices of the
+RTX PRO 6000, with the chat model on the roomier 2g.48gb slice).
+OpenShift AI model serving is used for local inference. KServe,
+Models-as-a-Service and llm-d are included in the architecture where
+relevant to OpenShift AI 3.5 EA2 capabilities.
 
 Approved external provider preference and default fallback order:
 
