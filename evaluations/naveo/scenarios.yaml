@@ -39,10 +39,10 @@ scenarios:
     expect_enabled: false
 
   - id: 6
-    title: Placeholder agent tiles (Arkos) show "coming soon" for any user
+    title: Placeholder agent tiles (Soursage) show "coming soon" for any user
     type: portal_tile_state
     persona: sale-01
-    agent: arkos
+    agent: soursage
     expect_enabled: false
     expect_placeholder: true
 
