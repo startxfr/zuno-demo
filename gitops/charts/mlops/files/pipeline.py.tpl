@@ -107,6 +107,31 @@ PIPELINES = {}
 def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
     dataset = configure(prepare_dataset(run_id=run_id), agent="{{ $name }}")
     trained = configure(train_lora(run_id=run_id).after(dataset), agent="{{ $name }}")
+    # ADR-0351: train-lora is the only stage that needs a GPU. It requests
+    # a whole nvidia.com/gpu, which only the scale-from-zero gpu-burst
+    # MachineSet provides (the permanent inference node is MIG-partitioned
+    # and advertises nvidia.com/mig-* only) - a run therefore triggers a
+    # 0->1 node scale-up and the node is reclaimed ~10min after the stage
+    # completes. The toleration matches the burst node's taint, which keeps
+    # every non-training pod off it so scale-down is never blocked.
+    trained.set_accelerator_type("{{ $root.Values.training.gpu.resource }}")
+    trained.set_accelerator_limit("{{ $root.Values.training.gpu.count }}")
+    trained.set_cpu_request("{{ $root.Values.training.resources.cpuRequest }}")
+    trained.set_cpu_limit("{{ $root.Values.training.resources.cpuLimit }}")
+    trained.set_memory_request("{{ $root.Values.training.resources.memoryRequest }}")
+    trained.set_memory_limit("{{ $root.Values.training.resources.memoryLimit }}")
+    kubernetes.add_node_selector(
+        trained,
+        label_key="{{ $root.Values.training.gpu.nodeSelector.key }}",
+        label_value="{{ $root.Values.training.gpu.nodeSelector.value }}",
+    )
+    kubernetes.add_toleration(
+        trained,
+        key="{{ $root.Values.training.gpu.toleration.key }}",
+        operator="Equal",
+        value="{{ $root.Values.training.gpu.toleration.value }}",
+        effect="{{ $root.Values.training.gpu.toleration.effect }}",
+    )
     # ADR-0302 point 5: evaluate must run (and pass) before push-registry
     # is even attempted - .after() enforces the DAG ordering; evaluate's
     # own non-zero exit on a failing gate (components/mlops/src/mlops.py)

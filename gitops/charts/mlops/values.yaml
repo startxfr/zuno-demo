@@ -113,13 +113,41 @@ agents:
     loraAlpha: 16
     loraDropout: 0.05
 
-resources:
-  requests:
-    cpu: 500m
-    memory: 1Gi
-  limits:
-    cpu: "2"
-    memory: 4Gi
+# ADR-0351: GPU wiring for the train-lora pipeline task - the ONLY stage
+# that needs a GPU. Before this, no task declared any resources at all
+# (an earlier flat `resources:` block here was referenced by no template -
+# dead config, removed): launched for real, train-lora would schedule on
+# any node and mlops.py's `torch.cuda.is_available()` fallback would
+# silently train on CPU even with MIG slices free.
+training:
+  gpu:
+    # A WHOLE GPU, not a MIG slice, on purpose: the burst node is
+    # MIG-disabled (gitops/charts/machines' zuno-gpu-burst-a) because the
+    # ClusterAutoscaler can only scale from zero for plain nvidia.com/gpu -
+    # this request is what triggers the 0->1 scale-up, and training gets
+    # the full 96GB.
+    resource: nvidia.com/gpu
+    count: "1"
+    # machine.startx.io/group is rendered into node labels by the machines
+    # chart's MachineSets. If the ClusterAutoscaler build turns out not to
+    # carry template labels into its simulated node during scale-from-zero,
+    # drop this selector - the toleration + GPU request already uniquely
+    # select the burst group (documented fallback, ADR-0351).
+    nodeSelector:
+      key: machine.startx.io/group
+      value: gpu-burst
+    toleration:
+      key: zuno.io/gpu-burst
+      value: "true"
+      effect: NoSchedule
+  # Explicit because zuno-ai-build (the DSPA namespace) has no LimitRange:
+  # without these the train pod would run wholly unbounded. cpuLimit 7 of
+  # the burst g7e.2xlarge's ~7.5 allocatable vCPU.
+  resources:
+    cpuRequest: "2"
+    memoryRequest: 12Gi
+    cpuLimit: "7"
+    memoryLimit: 24Gi
 
 networkPolicy:
   enabled: true

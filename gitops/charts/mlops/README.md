@@ -65,8 +65,15 @@ that file's own module docstring.
   step is required before an actual KFP run can be submitted from this
   source. Until then, the ConfigMap serves as the checked-in,
   version-controlled DAG definition an operator compiles locally
-  (`pip install kfp` + `python pipeline.py comage`) or via a follow-up
-  automated step.
+  (`pip install kfp kfp-kubernetes` + `python pipeline.py comage` -
+  `kfp-kubernetes` is required, the DAG uses its
+  `add_node_selector`/`add_toleration`/secret/ConfigMap helpers) or via a
+  follow-up automated step. Since ADR-0351 the train-lora task requests a
+  whole `nvidia.com/gpu` plus the `zuno.io/gpu-burst` toleration
+  (`values.yaml`'s `training:` block): a submitted run triggers the
+  scale-from-zero burst GPU node (`gitops/charts/machines`) and trains on
+  its full 96GB card, and the node is reclaimed ~10min after the stage
+  ends.
 - One env ConfigMap per enabled agent (`templates/agent-configmaps.yaml`)
   - `MLOPS_AGENT`/knowledge-domains/base-model/LoRA hyperparameters baked
     in per candidate; `MLOPS_RUN_ID` is deliberately NOT here since it
