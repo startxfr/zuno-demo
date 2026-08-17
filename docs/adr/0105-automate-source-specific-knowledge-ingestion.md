@@ -1,6 +1,6 @@
 # ADR-0105: Automate source-specific knowledge ingestion
 
-- **Status:** Partially implemented (per-source adapters and cadence configuration merged; live scheduled runs pending)
+- **Status:** Partially implemented (per-source adapters and cadence configuration merged; live scheduled runs pending on real Salesforce/Aramis credentials, see the 2026-08-17 note below)
 - **Target:** v0.1
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -29,6 +29,30 @@ KFP recurring runs. Manual refresh remains
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Consequences, Security/Operational considerations,
 Acceptance criteria and Review evidence.
+
+## Live verification check (2026-08-17, roadmap WP-22)
+
+With live `oc` access, confirmed the exact remaining blockers rather than
+leaving them generic:
+
+- `salesforce-technical-credentials` (`zuno-ai-run`) is a real
+  `SecretSyncedError: could not get secret data from provider` -
+  `ansible/roles/vault/tasks/install.yml` only seeds Vault's
+  `zuno/salesforce/technical` path when real `zuno_salesforce_url`/
+  `zuno_salesforce_access_token` values are supplied (the default is the
+  literal placeholder `xxxxxx`, deliberately never seeded). This is
+  working as designed, not a bug - it is waiting on real Salesforce
+  credentials.
+- No `ExternalSecret` for Aramis exists in the cluster at all yet -
+  credentials were never even attempted.
+- The full `components/rag-ingestion/` test suite (38 tests, including
+  the 22 source-adapter tests), `helm lint`/`helm template`, and
+  `check_knowledge_refs.py` all pass against the current repo state - no
+  repo-side gap found this pass.
+- Live per-domain runs and KFP recurring-schedule confirmation remain
+  additionally blocked on `rag-dspa` not being `Ready` on this cluster
+  (see ADR-0330's 2026-08-17 note, WP-07) - independent of the credential
+  gap above.
 
 ## Related ADRs
 
