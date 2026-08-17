@@ -107,4 +107,59 @@ spec:
   tls:
     termination: reencrypt
     insecureEdgeTerminationPolicy: Redirect
+---
+{{- /*
+RHOAI's ModelsAsService controller (Config.maas.opendatahub.io/default) deploys
+two Deployments into openshift-ingress for the IPP (Inference Payload Processing)
+pipeline: payload-processing and payload-pre-processing. Its sibling controller
+(owned by the ModelsAsService CR) only generates a matching NetworkPolicy for
+the "payload-processing" label - not for "payload-pre-processing" - even though
+openshift-ingress carries a namespace-wide deny-all NetworkPolicy
+(openshift-ingress-deny-all). Without an explicit allow, payload-pre-processing
+has no egress path to the kubernetes.default.svc ClusterIP its controller-runtime
+manager needs to watch ExternalProvider/ExternalModel CRs, so it CrashLoopBackOffs
+on "failed to get server groups: ... i/o timeout". This policy mirrors the
+operator-generated "payload-processing" NetworkPolicy for the missing label.
+VERIFIED live, 2026-08-17: RHOAI 3.5.0-ea.2. Revisit if a future RHOAI build
+generates this NetworkPolicy on its own.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payload-pre-processing
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  podSelector:
+    matchLabels:
+      app: payload-pre-processing
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: data-science-gateway
+      ports:
+        - port: 9004
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+      ports:
+        - port: 9005
+          protocol: TCP
+        - port: 9090
+          protocol: TCP
 {{- end }}
