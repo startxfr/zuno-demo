@@ -911,3 +911,17 @@ under `docs/adr/`.
   re-apply (ADR-0340), GPU pipeline run (ADR-0301/0302/0303), live
   benchmark+report loop (ADR-0304/0305), observed autonomy cycle +
   sign-off (ADR-0309 — closes the roadmap).
+
+- **2026-08-17 (ADR-0340, WP-32)**: closed the one operator step this WP
+  had left. `KeycloakRealmImport/zuno-realm` (namespace `zuno-auth`) was
+  already `Done` on the live cluster — ArgoCD (`zuno-keycloak-d0`/`d1`)
+  syncs directly from `origin/main`, and the realm content landed as part
+  of the 2026-08-16 live-cluster verification session's broader ADR-0349
+  realm apply, not a dedicated re-apply for this WP. Verified specifically
+  for WP-32 via the Keycloak admin REST API (no interactive login needed):
+  `/cdp` group exists; all four `confluence-archi-*` groups live under
+  `/consultant`, held by `consultant-01`/`consultant-02`; `board-01`/
+  `board-02` hold none of them. `cdp` has no member yet — expected, this
+  WP only introduces the role, per-agent consumption is WP-33+. Repo
+  acceptance re-run clean: `test_workday_ownership.py` 9/9,
+  `check_docs.py` PASS. ADR-0340 → Implemented.

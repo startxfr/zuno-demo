@@ -1,6 +1,6 @@
 # ADR-0340: Extend business-role authorization with CDP and scoped capabilities
 
-- **Status:** Partially implemented (policy and realm merged; realm re-apply pending)
+- **Status:** Implemented - see `gitops/charts/keycloak/files/realm-zuno.json`, `policies/` (WP-32; realm re-apply confirmed live 2026-08-17 - `cdp` group present, `confluence-archi-*` groups migrated to `/consultant` with `board-01`/`-02` no longer members)
 - **Target:** v0.3
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
