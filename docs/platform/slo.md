@@ -79,12 +79,28 @@ not live-cluster-only verification:
    one that matters). Confirmed live 2026-08-18:
    `up{job="zuno-otel-collector-collector"} == 1` on `prometheus-k8s`.
 
+**Confirmed end to end, 2026-08-18**: pushed, built (`oc start-build
+agent-bff`, from commit `8b2d210`), and rolled out to all six BFF
+Deployments (`tekos-bff`, `arkos-bff`, `comage-bff`, `advantage-bff`,
+`finage-bff`, `naveo-bff` - this codebase is shared platform-wide, not
+just Tekos/Arkos). `zuno_bff_requests_total` is real and queryable:
+
+```text
+zuno_bff_requests_total{agent="tekos",code="200"}   29
+zuno_bff_requests_total{agent="arkos",code="200"}   9
+... (all six agents present)
+```
+
+(`oc rollout restart` alone doesn't reliably work here - ArgoCD's
+`selfHeal: true` on the agent Applications reverted `arkos-bff`'s and
+`naveo-bff`'s restart within ~1s as drift, since the `restartedAt`
+annotation isn't tracked in Git. Deleting the running pod directly
+worked for both: `imagePullPolicy: Always` means the ReplicaSet's
+replacement pod re-pulls `:latest`, and pod deletion isn't something
+ArgoCD's Application-level diffing reverts.)
+
 Remaining before ADR-0102 can claim "measured... on a live cluster":
 
-- Get item 1 built and deployed (`make d1 build agent` pulls from
-  `origin/main`, not local disk - requires this change to be pushed and a
-  fresh image rolled out) and confirm `zuno_bff_requests_total` itself
-  appears in Prometheus, not just the Collector's own `up` target.
 - Let the SLO measurement run over a real 30-day window and confirm the
   burn-rate alerts evaluate without error.
 

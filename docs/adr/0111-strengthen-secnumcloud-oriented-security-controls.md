@@ -29,11 +29,13 @@ is confirmed live-scraping (`up{job="zuno-otel-collector-collector"} ==
 1"`, verified against the actual `monitoring.coreos.com/v1` Prometheus
 instance that evaluates the SLO alert rules, not the differently-scoped
 `monitoring.rhobs/v1` CRD group this cluster also has installed). See
-`docs/platform/slo.md`'s own 2026-08-18 note for the full detail. The
-Availability row stays `gap` pending the live 30-day measurement itself
-and confirming `zuno_bff_requests_total` reaches Prometheus once this
-change is built and deployed - genuinely live-cluster/time-only from
-here. Every other remaining `gap` row (restricted SCC, NetworkPolicy
+`docs/platform/slo.md`'s own 2026-08-18 note for the full detail,
+including the ArgoCD `selfHeal` vs. `oc rollout restart` conflict hit
+while rolling this out (fixed by deleting pods directly instead) -
+`zuno_bff_requests_total` is now confirmed real and queryable on
+`prometheus-k8s` across all six agent BFFs. The Availability row stays
+`gap` pending only the real 30-day measurement window - genuinely
+time-only from here. Every other remaining `gap` row (restricted SCC, NetworkPolicy
 enforcement, the WP-13 restore drill, supply-chain signing) was
 re-checked this pass and does stay live-cluster/other-WP-only as the
 2026-08-15 note described.
