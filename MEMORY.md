@@ -936,3 +936,32 @@ under `docs/adr/`.
   and run the live corpus proof + provider-parity run now that cluster
   access is available; they chose to keep the prior deliberate deferral.
   ADR-0322 stays Partially implemented by choice, not by blocker.
+
+- **2026-08-17 (ADR-0117, WP-02)**: re-verified, made no repo changes.
+  Repo acceptance checks re-run clean (`py_compile`, confluence server's
+  6/6 protocol tests, `check_build_matrix.py`, `check_workload_hardening.py`
+  189/189, `helm lint gitops/charts/mcp-confluence`, handler-removed check,
+  `check_docs.py`, atlassian-name grep in `agents/`). `confluence-mcp` is
+  deployed live and Healthy in `zuno-ai-run` (ArgoCD
+  `zuno-mcp-confluence-d0`/`d1`). Probed Confluence Cloud directly with the
+  live `zuno/confluence/technical` credential (`cl@startx.fr`, same
+  identity as env `CONFLUENCE_EMAIL`/`CONFLUENCE_API_TOKEN` in this
+  session): `403 "Request rejected because caller cannot access
+  Confluence"` from `startxfr.atlassian.net` - the credential resolves and
+  authenticates fine, but the identity has no Confluence product-access
+  grant on the Atlassian side. Same blocker the 2026-08-16 session
+  recorded; confirmed still open. Needs an Atlassian admin action (grant
+  Confluence product access to `cl@startx.fr`) outside this repo/session -
+  nothing further to attempt here until that lands.
+
+  Note in passing: two mcp-gateway test files
+  (`test_downstream_sales_db.py`, and confluence's own
+  `test_mcp_protocol.py`) are written as standalone async scripts (a
+  `TESTS = [...]` list + `_run_all()`/`main()`, invoked as
+  `python test_x.py`, not via pytest fixture injection) - intentional,
+  mirrored from the sales-db precedent, but pytest misreads their
+  `transport` parameter as a missing fixture and errors if you point
+  `pytest` at them directly. Run them as scripts instead. Separately,
+  `mcp-gateway/tests/test_auth_mode_enforcement.py::test_no_token_material_appears_in_the_audit_log_line`
+  fails even in isolation (logging-capture issue, WP-26 territory) -
+  pre-existing, unrelated to WP-32/WP-06/WP-02.

@@ -1,6 +1,6 @@
 # ADR-0117: Implement Confluence as the first real external MCP integration
 
-- **Status:** Partially implemented - real MCP server, binding registry wiring, chart, build/deploy plumbing and protocol tests merged (`components/mcp-servers/confluence/`, `platform/bindings/tools/tool-bindings.yaml`, `gitops/charts/mcp-confluence/`); live Confluence Cloud verification pending (2026-08-14, roadmap WP-02)
+- **Status:** Partially implemented - real MCP server, binding registry wiring, chart, build/deploy plumbing and protocol tests merged (`components/mcp-servers/confluence/`, `platform/bindings/tools/tool-bindings.yaml`, `gitops/charts/mcp-confluence/`); live Confluence Cloud verification pending (2026-08-14, roadmap WP-02). Re-verified 2026-08-17: `confluence-mcp` is deployed live in `zuno-ai-run` (ArgoCD `zuno-mcp-confluence-d0`/`d1`, Healthy); the `zuno/confluence/technical` credential (`cl@startx.fr`) resolves and authenticates, but Confluence Cloud itself returns `403 "Request rejected because caller cannot access Confluence"` - an Atlassian-side product-access grant on `startxfr.atlassian.net`, not a credential, code, or deployment gap. Blocked pending that access grant.
 - **Target:** v0.1
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
