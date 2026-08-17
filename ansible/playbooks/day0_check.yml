@@ -26,6 +26,7 @@
       - mariadb
       - tempo
       - keycloak
+      - machines
       - nfd
       - nvidia_gpu
       - connectivity_link

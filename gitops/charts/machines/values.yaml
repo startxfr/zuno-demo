@@ -1,0 +1,175 @@
+# Thin wrapper around the startx `cluster-machine` chart (vendored as a Helm
+# dependency, same pattern as gitops/charts/nvidia-gpu -> cluster-gpu).
+# All toggles stay false here; gitops/apps/machines/application-d0.yaml
+# (zuno-machines-d0) flips them, so `helm template` of the bare chart renders
+# nothing destructive.
+#
+# ADR-0351 background: this replaces the five hand-deployed
+# startx-cluster-machine-* Applications (deployed 2026-08-17 straight from
+# startxfr/helm-repository@devel, outside this repo). Every machine they
+# created Failed with "no security group found" because their cluster.id
+# parameter (def7f838-...) was not this cluster's real infra id - every AWS
+# tag filter and the IAM instance profile are derived from it.
+cluster-machine:
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: machines
+    app: machines
+
+  cluster:
+    # REAL infra id (`oc get infrastructure cluster -o jsonpath
+    # '{.status.infrastructureName}'`, verified 2026-08-17) - the IAM
+    # instance profile ({id}-worker-profile) and the kubernetes.io/cluster/
+    # {id}=owned AWS tag are derived from this by the subchart, and both
+    # match what the working IPI machinesets use.
+    id: demo222-kpkqk
+    region: eu-west-2
+    autoscaler:
+      enabled: false # flipped by zuno-machines-d0
+      # ClusterAutoscaler "default" (cluster singleton). Raw YAML string per
+      # the subchart's template (nindent of a string, like cluster-gpu's
+      # gpu.spec). Scale-down is the whole point (burst node must go away
+      # ~10min after training completes); maxNodeProvisionTime covers the
+      # ~8min g7e first boot + NVIDIA driver build.
+      spec: |
+        podPriorityThreshold: -10
+        maxNodeProvisionTime: 15m
+        scaleDown:
+          enabled: true
+          delayAfterAdd: 10m
+          delayAfterDelete: 1m
+          delayAfterFailure: 30s
+          unneededTime: 10m
+
+  machineSet:
+    enabled: false # flipped by zuno-machines-d0
+    # Common facts for all three groups (verified live/AWS 2026-08-17):
+    # - AMI ami-00667f67a54be771a: same RHCOS AMI the IPI workergpu
+    #   machinesets use.
+    # - securityGroupName demo222-kpkqk-node: the OCP 4.16+ CAPA installer
+    #   names worker SGs "{id}-node" (+ a second "{id}-lb" SG); there is NO
+    #   "{id}-worker-sg" (the subchart's default) on this cluster. The
+    #   subchart renders exactly one SG filter per group - the -lb SG only
+    #   carries 6443/22623 ingress used by API-target machines, so workers
+    #   ride on -node alone (validated at first boot of zuno-gpu-a).
+    # - subnet_name {id}-subnet-private-...: ditto, the subchart's default
+    #   ("{id}-private-...") does not exist here.
+    # - g7e exists ONLY in eu-west-2a and eu-west-2c (verified
+    #   describe-instance-type-offerings) - hence no "b" group anywhere.
+    # - 150GB gp3 root: the GPU-node lesson from gitops/charts/models
+    #   (75GB can't hold vLLM image + model download + driver artifacts).
+    list:
+      # Permanent inference node. g7e.4xlarge (16vCPU/128GiB, 1x RTX PRO
+      # 6000 Blackwell 96GB): the previous g7e.2xlarge's ~7.5 allocatable
+      # vCPU could not hold the three inference workloads' 8.5 vCPU of
+      # standing requests (ADR-0351 sizing analysis). Zone a on purpose:
+      # the qwen model PVC (gp3-csi, RWO, single-AZ) is zone-bound where
+      # its download Job runs - keeping the permanent node in "a" keeps
+      # that PVC valid.
+      - name: zuno-gpu-a
+        az: a
+        type: worker
+        group: gpu
+        ami: ami-00667f67a54be771a
+        instanceType: g7e.4xlarge
+        securityGroupName: demo222-kpkqk-node
+        subnet_name: demo222-kpkqk-subnet-private-eu-west-2a
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 1
+        # nvidia-mig-manager watches this label and partitions the GPU at
+        # first boot, while the node is still empty (no drain needed):
+        # all-balanced = 2x 1g.24gb + 1x 2g.48gb on RTX-PRO-6000-96GB
+        # (device 0x2BB510DE in default-mig-parted-config, verified live).
+        # Requires ClusterPolicy mig.strategy "mixed" - set by
+        # ansible/roles/nvidia_gpu's spec overlay.
+        additionnalsLabels: |-
+          nvidia.com/mig.config: all-balanced
+      # AZ-failover twin of zuno-gpu-a, in the only other zone offering
+      # g7e. Stays at 0 and is NOT autoscaled: the ClusterAutoscaler can
+      # only scale from zero for plain nvidia.com/gpu (via the
+      # capacity.cluster-autoscaler.kubernetes.io/gpu-count/gpu-type
+      # annotations) - nvidia.com/mig-* capacity is invisible to it, so
+      # Pending MIG-slice pods can never trigger this set. Failover is the
+      # one-command runbook in this chart's README.
+      - name: zuno-gpu-c
+        az: c
+        type: worker
+        group: gpu
+        ami: ami-00667f67a54be771a
+        instanceType: g7e.4xlarge
+        securityGroupName: demo222-kpkqk-node
+        subnet_name: demo222-kpkqk-subnet-private-eu-west-2c
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 0
+        additionnalsLabels: |-
+          nvidia.com/mig.config: all-balanced
+      # Burst training node, scale-from-zero (the MachineAutoscaler below).
+      # MIG stays DISABLED here - the whole 96GB GPU is advertised as
+      # nvidia.com/gpu: 1, the only resource shape the ClusterAutoscaler
+      # can scale from zero for (see zuno-gpu-c's comment) and the best
+      # shape for training anyway. g7e.2xlarge, not 4xlarge: same GPU
+      # either way, the LoRA trainer (granite 2b) needs neither 16 vCPU nor
+      # 128GiB, and burst hours are the only hours billed.
+      - name: zuno-gpu-burst-a
+        az: a
+        type: worker
+        group: gpu-burst
+        ami: ami-00667f67a54be771a
+        instanceType: g7e.2xlarge
+        securityGroupName: demo222-kpkqk-node
+        subnet_name: demo222-kpkqk-subnet-private-eu-west-2a
+        blockDevices: |-
+          - ebs:
+              encrypted: true
+              iops: 0
+              volumeSize: 150
+              volumeType: gp3
+        replicas: 0
+        additionnalsLabels: |-
+          nvidia.com/mig.config: all-disabled
+        # Keeps everything except the tolerating train pod (gitops/charts/
+        # mlops's training.gpu.toleration) off this node, so no stray pod
+        # ever blocks the autoscaler's scale-down. The NVIDIA GPU-operator
+        # daemonsets only tolerate nvidia.com/gpu by default (verified live
+        # 2026-08-17) - ansible/roles/nvidia_gpu's ClusterPolicy overlay
+        # adds a zuno.io/gpu-burst toleration to them, or the driver would
+        # never start here and the node would never advertise its GPU.
+        additionnalsTaints: |-
+          - key: zuno.io/gpu-burst
+            value: "true"
+            effect: NoSchedule
+
+  machineAutoscaler:
+    enabled: false # flipped by zuno-machines-d0
+    list:
+      - name: zuno-gpu-burst-a
+        # STRING "0" on purpose: the subchart renders
+        # `minReplicas: {{ .minReplicas | default 1 }}` and an integer 0 is
+        # falsy in Helm - it silently becomes 1 (a permanently-on burst
+        # node). The string "0" survives `default` and renders as a valid
+        # integer (verified by test render, 2026-08-17).
+        minReplicas: "0"
+        maxReplicas: 1
+
+  # Deliberately unused halves of the subchart - the retired
+  # startx-cluster-machine-* apps managed MachineConfig(Pool)s and
+  # MachineHealthChecks too; those stay out of scope here (the worker/infra
+  # MCPs they created were orphaned in place, see ADR-0351).
+  machineConfigPool:
+    enabled: false
+  machineConfig:
+    enabled: false
+  machineHealthCheck:
+    enabled: false

@@ -76,7 +76,7 @@ operator (plus its own singleton `CertManager` config CR); `-d1` applies a
 prepares (see that role's README). Consumed by `keycloak`'s Ingress and
 `connectivity-link`'s Certificate.
 
-**Vendored startx charts**: `nfd`, `nvidia-gpu`, `openshift-ai`,
+**Vendored startx charts**: `machines`, `nfd`, `nvidia-gpu`, `openshift-ai`,
 `cert-manager`, `keycloak`, `postgresql`, `connectivity-link`, `lws`,
 `jobset`, `kueue`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
 `mesh-monitoring`, `observability` and `tempo` vendor a chart from the
@@ -155,6 +155,7 @@ Directories present:
 | `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) - no operator, `-d0` is a no-op |
+| `machines` | local chart, `gitops/charts/machines` (ADR-0351 - `-d0`: startx `cluster-machine` dependency for the GPU MachineSets/MachineAutoscaler/ClusterAutoscaler, all cluster-scoped, no operator; `-d1` is a no-op - see that chart's README for the scale-from-zero and AZ-failover design) |
 | `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: startx `cluster-nfd` dependency, entirely - Namespace/OperatorGroup/Subscription; `-d1`: `cluster-nfd`'s own NodeFeatureDiscovery CR) |
 | `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: startx `cluster-gpu` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-gpu`'s own ClusterPolicy CR, spec injected once discovered - see that chart's README) |
 | `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: startx `cluster-ods` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-ods`'s own DataScienceCluster CR, spec overridden in full - RawDeployment, not startx's Serverless-dependent default) |

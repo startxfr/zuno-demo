@@ -1,0 +1,37 @@
+---
+# State detection (never fails).
+- name: "machines | check the machines Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-machines-d0"
+
+- name: "machines | save the d0 check result"
+  ansible.builtin.set_fact:
+    _machines_d0_installed: "{{ _state_check_result }}"
+
+- name: "machines | check the machines Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-machines-d1"
+
+- name: "machines | look up the permanent GPU MachineSet"
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+    name: zuno-gpu-a
+  register: _machines_gpu_a_lookup
+
+- name: "machines | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _machines_d0_installed
+        and _state_check_result
+        and (_machines_gpu_a_lookup.resources | default([]) | length) > 0
+        and (_machines_gpu_a_lookup.resources[0].status.availableReplicas | default(0)) ==
+            (_machines_gpu_a_lookup.resources[0].spec.replicas | default(-1))
+      }}
+
+- name: "machines | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

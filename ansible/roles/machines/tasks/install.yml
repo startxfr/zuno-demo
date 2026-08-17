@@ -1,0 +1,40 @@
+---
+# GPU capacity (ADR-0351): MachineSets + MachineAutoscaler + ClusterAutoscaler
+# via gitops/charts/machines. Ordered before nfd/nvidia_gpu in
+# day0_install.yml so the permanent GPU node exists (or is provisioning) by
+# the time nvidia_gpu waits for its ClusterPolicy to go ready.
+- name: "machines | apply the machines GitOps Application (d0: MachineSets/autoscalers)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "machines"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-machines-d0"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+- name: "machines | apply the machines GitOps Application (d1: noop placeholder)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "machines"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-machines-d1"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# First boot of a g7e node is ~8 min (EC2 boot + RHCOS ignition) and the
+# node only becomes schedulable for GPU work after the NVIDIA driver build,
+# but that later part is nvidia_gpu's wait, not this one's - here we only
+# wait for the Machine to be Running and the Node Ready.
+- name: "machines | wait for the permanent GPU MachineSet to have its node available"
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+    name: zuno-gpu-a
+  register: _machines_gpu_a
+  until: >-
+    (_machines_gpu_a.resources | default([]) | length) > 0 and
+    (_machines_gpu_a.resources[0].status.availableReplicas | default(0)) ==
+    (_machines_gpu_a.resources[0].spec.replicas | default(-1))
+  retries: 40
+  delay: 20

@@ -25,6 +25,9 @@
       - mariadb
       - tempo
       - keycloak
+      # machines before nfd/nvidia_gpu: the permanent GPU node should exist
+      # (or be provisioning) before nvidia_gpu's ClusterPolicy-ready wait.
+      - machines
       - nfd
       - nvidia_gpu
       - connectivity_link

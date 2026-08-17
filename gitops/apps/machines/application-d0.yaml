@@ -1,0 +1,50 @@
+---
+# GPU MachineSets + MachineAutoscaler + ClusterAutoscaler (ADR-0351). All
+# cluster-scoped Machine API CRs - the cluster's own machine-api/CAS
+# operators do the AWS calls, no new credentials or tooling enter the repo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-machines-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible orders
+    # `machines` before `nfd`/`nvidia_gpu` in day0_install.yml instead (the
+    # GPU node should exist before the ClusterPolicy-ready wait).
+    argocd.argoproj.io/sync-wave: "-208"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/machines
+    helm:
+      releaseName: zuno-machines-d0
+      values: |
+        cluster-machine:
+          cluster:
+            autoscaler:
+              enabled: true
+          machineSet:
+            enabled: true
+          machineAutoscaler:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-machine-api
+  # The ClusterAutoscaler owns the burst set's replicas (0<->1 around
+  # training runs) and the AZ-failover runbook scales zuno-gpu-c by hand -
+  # selfHeal must fight neither. RespectIgnoreDifferences is required for
+  # the ignoreDifferences to apply during sync, not just in the diff view.
+  ignoreDifferences:
+    - group: machine.openshift.io
+      kind: MachineSet
+      jsonPointers:
+        - /spec/replicas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false # openshift-machine-api always exists
+      - RespectIgnoreDifferences=true

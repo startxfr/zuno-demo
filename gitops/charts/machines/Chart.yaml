@@ -1,0 +1,14 @@
+apiVersion: v2
+name: machines
+description: >-
+  GPU MachineSets, MachineAutoscaler and ClusterAutoscaler for the demo
+  cluster (ADR-0351): one permanent MIG-partitioned inference node, one
+  manual AZ-failover MachineSet at 0, one scale-from-zero burst-training
+  MachineSet. Wraps the startx cluster-machine chart as a dependency.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: cluster-machine
+    version: "21.3.277"
+    repository: "alias:startx"

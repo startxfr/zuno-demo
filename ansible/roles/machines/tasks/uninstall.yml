@@ -1,0 +1,15 @@
+---
+# Reverse of install.yml. LOUD WARNING: deleting -d0 cascade-deletes the
+# MachineSets, which TERMINATES THE PERMANENT GPU NODE (and any burst/
+# failover node currently up) - every GPU workload in zuno-ai-run loses its
+# node. The gp3 model PVC survives (it is namespaced storage, not machine
+# state), but expect all inference Pending until capacity is reinstalled.
+- name: "machines | delete the machines GitOps Application (d1: noop placeholder)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-machines-d1"
+
+- name: "machines | delete the machines GitOps Application (d0: cascades MachineSets - terminates GPU nodes)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-machines-d0"

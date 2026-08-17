@@ -15,6 +15,10 @@
       - connectivity_link
       - nvidia_gpu
       - nfd
+      # machines after nvidia_gpu/nfd (reverse of install): tearing the GPU
+      # nodes away before the GPU operator uninstall would strand its
+      # node-scoped operands mid-delete.
+      - machines
       - keycloak
       - tempo
       - mariadb
