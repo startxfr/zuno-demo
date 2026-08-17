@@ -1,6 +1,42 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (governance manifests, key lifecycle, correlation and guards merged; live MaaS verification blocked on a real architecture gap, see 2026-08-16 note)
+- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; API-key lifecycle, usage-metric correlation and the AuthPolicy denial proof are still outstanding, see 2026-08-18 note)
+
+## Implementation note (2026-08-18)
+
+The `LLMInferenceService` path from the 2026-08-16 note is now live and
+verified end-to-end on demo222:
+
+- A 3rd GPU node was added and the model published as a
+  `serving.kserve.io/v1alpha2 LLMInferenceService`
+  (`qwen25-7b-instruct-maas-backend`) - `Ready=True` across all 8
+  sub-conditions, backing pod `2/2 Running`.
+- Its `hf://` download hung indefinitely on every attempt (verified not a
+  network issue); switched to `s3://`, hosting the model in the same
+  bucket/credential `rag-ingestion` already uses - see
+  `gitops/charts/models/templates/maas.yaml`'s ExternalSecret comment for
+  the full diagnosis.
+- Found and fixed a real architecture gap in the governance wiring: this
+  RHOAI 3.5 EA2 MaaS build centralizes `MaaSSubscription`/`MaaSAuthPolicy`
+  into an operator-generated `models-as-a-service` namespace
+  (`MAAS_SUBSCRIPTION_NAMESPACE` on the `maas-controller` Deployment) -
+  its tenant controller never reconciles anything created elsewhere, so
+  the two Keycloak-group subscriptions and the auth policy had to move
+  there (`MaaSModelRef` itself stays in `zuno-ai-run` alongside the
+  model - only Subscription/AuthPolicy are centralized).
+- Live result: `MaaSModelRef.status.phase: Ready`
+  ("Governed and runtime-healthy"), both `MaaSSubscription`s and the
+  `MaaSAuthPolicy` `Active`.
+
+Acceptance criteria bullet 1 (local model published and consumable
+through MaaS) is now met. Still open: an authenticated end-to-end request
+through the MaaS gateway with a real persona token (an in-cluster
+unauthenticated sanity call hit Istio's automatic mTLS interception, not
+a service defect - the platform's own health probes and the
+`MaaSModelRef`'s `RuntimeHealthy` condition already confirm the backend
+answers correctly), the `MaaSAuthPolicy` positive/negative denial proof,
+API-key lifecycle, and usage-metric correlation (bullets 2-6 of the
+Required v0.1 implementation list).
 
 ## Implementation note (2026-08-16)
 
