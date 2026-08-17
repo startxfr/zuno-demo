@@ -62,12 +62,17 @@ changes; the Job's pod, one wave later, is still `gp3-csi`'s first
 consumer, so `WaitForFirstConsumer` binding still works.
 
 Both the Job and the `InferenceService`'s predictor carry the same
-`nodeSelector: topology.kubernetes.io/zone: {{ .Values.modelStorage.zone }}`:
+`nodeSelector: nvidia.com/gpu.present: "true"` - not a specific zone.
 `gp3-csi` is single-AZ (EBS), so the PVC only mounts on nodes in the zone it
-bound in. This demo's GPU nodes currently span two zones -
-`values.yaml`'s `modelStorage.zone` pins both to the same one. Adding more
-GPU nodes for this model must keep them in that zone, or this needs
-per-zone PVCs/affinity instead of one shared value.
+bound in, but since `WaitForFirstConsumer` delays binding until the Job's
+pod is actually scheduled, the PVC always ends up bound in whichever zone
+that GPU node happens to be in - and the predictor, requiring a GPU node
+too, is then implicitly constrained to a matching node by the bound PV's
+own node-affinity. Neither template needs to know the zone name, and this
+keeps working unchanged as GPU nodes are added in other zones. (An earlier
+version of this chart hardcoded a zone value here - see `values.yaml`'s
+`modelStorage` comment for why that broke the moment the demo's GPU
+topology changed.)
 
 ## Second model: embeddings
 

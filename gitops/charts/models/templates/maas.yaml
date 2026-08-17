@@ -59,8 +59,12 @@ spec:
     name: {{ .Values.maas.llmInferenceService.servedModelName | quote }}
   replicas: 1
   template:
+    # No PVC here (model.uri: hf:// downloads straight onto the node), so
+    # unlike the classic predictor this only ever needed "any GPU node",
+    # never a specific zone - see values.yaml's llmInferenceService
+    # comment.
     nodeSelector:
-      topology.kubernetes.io/zone: {{ .Values.maas.llmInferenceService.zone | quote }}
+      nvidia.com/gpu.present: "true"
     containers:
       - name: main
         resources:

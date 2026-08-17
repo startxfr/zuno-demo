@@ -22,9 +22,12 @@ spec:
     maxReplicas: {{ .Values.maxReplicas }}
     # Must match job-model-download.yaml's nodeSelector: the PVC (RWO,
     # single-AZ EBS) binds in whichever zone that Job's pod lands in - see
-    # values.yaml's modelStorage comment.
+    # values.yaml's modelStorage comment. Neither hardcodes a zone: both
+    # just require a GPU-bearing node, so whichever zone the download Job
+    # happens to land its pod in, the PVC's resulting node-affinity keeps
+    # this predictor pinned to a matching (GPU) node in that same zone.
     nodeSelector:
-      topology.kubernetes.io/zone: {{ .Values.modelStorage.zone }}
+      nvidia.com/gpu.present: "true"
     model:
       modelFormat:
         name: vLLM

@@ -93,13 +93,17 @@ modelStorage:
   # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
   # PVC's first consumer) and the predictor must land in the same zone, or
   # the predictor's mount fails with a volume node-affinity conflict once
-  # the PVC is bound elsewhere. This demo's GPU nodes currently span two
-  # zones (verified on-cluster: one g6.2xlarge in eu-west-2a, one
-  # g6.4xlarge in eu-west-2b) - pin both to whichever zone has the GPU
-  # node you want this model on. Adding more GPU nodes for this model
-  # later must keep them in this same zone, or this needs per-zone
-  # PVCs/affinity instead of one shared value.
-  zone: eu-west-2b
+  # the PVC is bound elsewhere. RESOLVED 2026-08-17: no zone is pinned here
+  # anymore - a hardcoded value stopped matching the live GPU node's actual
+  # zone the moment the demo's GPU topology changed underneath it (this
+  # cluster is now down to one GPU node, in a third zone neither predictor
+  # nor MaaS backend was pinned to), which is exactly why both went
+  # Pending. Both job-model-download.yaml and inferenceservice.yaml now
+  # nodeSelect on the generic `nvidia.com/gpu.present: "true"` NFD label
+  # instead: WaitForFirstConsumer means the PVC only binds once the
+  # download Job's pod actually lands, so it always binds in whichever
+  # zone that GPU node turns out to be in - no zone value to keep in sync,
+  # and it keeps working as more GPU nodes are added in other zones.
   # Pinned to the odh-kserve-storage-initializer image this cluster's own
   # KServe controller already generates for the hf:// init container
   # (read off the live InferenceService's generated pod spec) - unlike
@@ -219,11 +223,11 @@ maas:
     # servedModelName (models.servedModelName), by design: this is a
     # deliberately separate governed-access copy, not an alias for it.
     servedModelName: qwen2.5-7b-instruct-maas
-    # Pins to the new GPU node's zone (g6.2xlarge/L4) - the other two
-    # zones' single GPU each are already committed to the classic
-    # embeddings/qwen predictors (same zone-pinning pattern
-    # gitops/charts/models already uses for those two).
-    zone: eu-west-2c
+    # RESOLVED 2026-08-17: no zone pin here either, same reasoning as
+    # modelStorage's comment above - this workload has no PVC to worry
+    # about (downloads its own copy via hf:// straight onto the node), so
+    # it only ever needed "any node with a GPU", never a specific zone.
+    # templates/maas.yaml nodeSelects on `nvidia.com/gpu.present: "true"`.
     # Smaller than the classic qwen predictor's 24Gi/32Gi (g6.4xlarge,
     # 16vCPU/64GiB) - VERIFIED live (2026-08-16): the new node is a
     # g6.2xlarge (8vCPU/32GiB, ~28.7Gi allocatable), half the instance
