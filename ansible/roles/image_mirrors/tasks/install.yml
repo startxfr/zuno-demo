@@ -79,14 +79,21 @@
           referencePolicy: {type: Local}
     - name: bitnami-kubectl
       tags:
+        # Bitnami stopped publishing pinned version tags under bitnami/* on
+        # Docker Hub (free tier now only carries a rolling "latest"); pinned
+        # historical tags live on in the frozen bitnamilegacy/* org instead.
         - name: "1.31"
-          from: {kind: DockerImage, name: "docker.io/bitnami/kubectl:1.31"}
+          from: {kind: DockerImage, name: "docker.io/bitnamilegacy/kubectl:1.31"}
           importPolicy: {scheduled: true}
           referencePolicy: {type: Local}
     - name: bitnami-redis
       tags:
-        - name: "8.10.0"
-          from: {kind: DockerImage, name: "registry-1.docker.io/bitnami/redis:8.10.0"}
+        # Same bitnamilegacy/* rationale as bitnami-kubectl above. 8.2.1 is
+        # the newest Redis version Bitnami ever published as a pinned tag
+        # (the legacy org was frozen 2025-08-22); the chart's own appVersion
+        # (8.10.0) is aspirational metadata, not a tag Bitnami ever shipped.
+        - name: "8.2.1"
+          from: {kind: DockerImage, name: "registry-1.docker.io/bitnamilegacy/redis:8.2.1"}
           importPolicy: {scheduled: true}
           referencePolicy: {type: Local}
     - name: postgres

@@ -9,7 +9,7 @@ description: >-
   with no OLM operator commonly available on this platform.
 type: application
 version: 0.1.0
-appVersion: "8.10.0"
+appVersion: "8.2.1"
 dependencies:
   - name: redis
     version: "28.0.2"
