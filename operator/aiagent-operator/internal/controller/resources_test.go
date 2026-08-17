@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	zunov1alpha1 "github.com/startxfr/zuno-demo/operator/aiagent-operator/api/v1alpha1"
@@ -103,6 +104,68 @@ func TestDesiredFrontendDeployment_RouteHostOverride(t *testing.T) {
 		}
 	}
 	t.Fatal("SELF_BASE_URL env var not found")
+}
+
+// ADR-0411: the frontend, unlike the BFF, must keep dialing Keycloak's
+// external Route (browser-facing redirects), so it needs a mounted CA
+// bundle + KEYCLOAK_CA_CERT_PATH rather than the BFF's internal-URL
+// workaround.
+func TestDesiredFrontendDeployment_MountsKeycloakCA(t *testing.T) {
+	agent := sampleAgent()
+	cfg := DefaultOperatorConfig()
+	require.NotEmpty(t, cfg.KeycloakCAConfigMapName, "default config must wire CA trust on by default, matching every hand-authored agent chart")
+
+	deploy := desiredFrontendDeployment(agent, cfg)
+	container := deploy.Spec.Template.Spec.Containers[0]
+
+	var caCertPath string
+	for _, e := range container.Env {
+		if e.Name == "KEYCLOAK_CA_CERT_PATH" {
+			caCertPath = e.Value
+		}
+	}
+	require.NotEmpty(t, caCertPath, "KEYCLOAK_CA_CERT_PATH env var not found")
+
+	var mount *corev1.VolumeMount
+	for i := range container.VolumeMounts {
+		if container.VolumeMounts[i].Name == "keycloak-ca" {
+			mount = &container.VolumeMounts[i]
+		}
+	}
+	require.NotNil(t, mount, "keycloak-ca volume mount not found")
+	require.True(t, mount.ReadOnly)
+	require.Equal(t, caCertPath, mount.MountPath+"/ca.crt")
+
+	var volume *corev1.Volume
+	for i := range deploy.Spec.Template.Spec.Volumes {
+		if deploy.Spec.Template.Spec.Volumes[i].Name == "keycloak-ca" {
+			volume = &deploy.Spec.Template.Spec.Volumes[i]
+		}
+	}
+	require.NotNil(t, volume, "keycloak-ca volume not found")
+	require.NotNil(t, volume.ConfigMap)
+	require.Equal(t, cfg.KeycloakCAConfigMapName, volume.ConfigMap.Name)
+}
+
+// Empty KeycloakCAConfigMapName must disable the volume/mount/env var
+// entirely, not just leave it pointing at a nonexistent ConfigMap.
+func TestDesiredFrontendDeployment_KeycloakCADisabledWhenConfigMapNameEmpty(t *testing.T) {
+	agent := sampleAgent()
+	cfg := DefaultOperatorConfig()
+	cfg.KeycloakCAConfigMapName = ""
+
+	deploy := desiredFrontendDeployment(agent, cfg)
+	container := deploy.Spec.Template.Spec.Containers[0]
+
+	for _, e := range container.Env {
+		require.NotEqual(t, "KEYCLOAK_CA_CERT_PATH", e.Name)
+	}
+	for _, m := range container.VolumeMounts {
+		require.NotEqual(t, "keycloak-ca", m.Name)
+	}
+	for _, v := range deploy.Spec.Template.Spec.Volumes {
+		require.NotEqual(t, "keycloak-ca", v.Name)
+	}
 }
 
 func TestDesiredBFFDeployment_NoSecretEnvVars(t *testing.T) {

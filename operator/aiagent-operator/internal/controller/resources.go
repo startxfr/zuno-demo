@@ -46,6 +46,13 @@ const (
 	priorityClass  = "zuno-workload-default"
 	containerPort  = 8080
 	healthzPath    = "/healthz"
+
+	// keycloakCAMountDir/keycloakCACertFile: ADR-0411. Matches every
+	// hand-authored agent chart's own frontend deployment.yaml exactly,
+	// so the same agent-frontend image behaves identically whether its
+	// Deployment is chart-rendered or operator-rendered.
+	keycloakCAMountDir = "/etc/pki/agent-frontend/keycloak-ca"
+	keycloakCACertFile = keycloakCAMountDir + "/ca.crt"
 )
 
 func commonLabels(agentName, component string) map[string]string {
@@ -180,6 +187,25 @@ func desiredFrontendDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) 
 		secretEnvVar("SESSION_HMAC_SECRET", name+"-secrets", "SESSION_HMAC_SECRET"),
 		secretEnvVar("SESSION_ENCRYPTION_KEY", name+"-secrets", "SESSION_ENCRYPTION_KEY"),
 		secretEnvVar("REDIS_PASSWORD", name+"-secrets", "REDIS_PASSWORD"),
+	}
+
+	// ADR-0411: unlike the BFF, the frontend's OIDC client must keep
+	// dialing Keycloak's external Route (browser-facing redirects), so it
+	// needs real CA trust rather than an internal-URL substitution. No
+	// optional:true - if the ConfigMap Ansible is supposed to have synced
+	// is missing, the pod should visibly fail to start, not silently run
+	// untrusted.
+	if cfg.KeycloakCAConfigMapName != "" {
+		env = append(env, corev1.EnvVar{Name: "KEYCLOAK_CA_CERT_PATH", Value: keycloakCACertFile})
+		volumes = append(volumes, corev1.Volume{
+			Name: "keycloak-ca",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cfg.KeycloakCAConfigMapName},
+				},
+			},
+		})
+		mounts = append(mounts, corev1.VolumeMount{Name: "keycloak-ca", MountPath: keycloakCAMountDir, ReadOnly: true})
 	}
 
 	return &appsv1.Deployment{

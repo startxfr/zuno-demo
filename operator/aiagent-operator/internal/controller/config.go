@@ -38,6 +38,19 @@ type OperatorConfig struct {
 	// the in-cluster Keycloak Service is the reliable fetch path.
 	KeycloakJWKSURL string
 
+	// KeycloakCAConfigMapName, if non-empty, names a ConfigMap (key
+	// ca.crt) in the agent's own target namespace that the frontend
+	// container mounts and trusts via KEYCLOAK_CA_CERT_PATH - ADR-0411.
+	// Unlike the BFF's KeycloakJWKSURL workaround, the frontend's OIDC
+	// relying-party flow must keep dialing Keycloak's external Route
+	// (AuthURL/EndSessionURL redirect the browser there), so it needs
+	// actual CA trust rather than an internal-URL substitution. Ansible's
+	// agents role syncs this ConfigMap from openshift-config/
+	// keycloak-serving-ca (the same source ADR-0347 established) into
+	// every agent's target namespace before this operator's first
+	// reconcile. Empty disables the volume/mount/env var entirely.
+	KeycloakCAConfigMapName string
+
 	// AgentRuntimeBaseURL, RedisAddr, SessionMaxLifetimeSeconds: fixed
 	// in-cluster coordinates for shared platform services, identical
 	// across every agent (see gitops/charts/tekos/values.yaml).
@@ -83,6 +96,7 @@ func DefaultOperatorConfig() OperatorConfig {
 	return OperatorConfig{
 		ClusterBaseDomain:         getenvDefault("CLUSTER_BASE_DOMAIN", "apps.mycluster.example.com"),
 		KeycloakJWKSURL:           getenvDefault("KEYCLOAK_JWKS_URL", "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs"),
+		KeycloakCAConfigMapName:   getenvDefault("KEYCLOAK_CA_CONFIGMAP_NAME", "agent-frontend-keycloak-ca"),
 		AgentRuntimeBaseURL:       getenvDefault("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
 		RedisAddr:                 getenvDefault("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
 		SessionMaxLifetimeSeconds: getenvDefault("SESSION_MAX_LIFETIME_SECONDS", "43200"),
