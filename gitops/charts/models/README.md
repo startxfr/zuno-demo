@@ -18,7 +18,8 @@ RHOAI published for the installed cluster/catalog, by reading `Template`
 objects in `redhat-ods-applications` (`oc get
 templates -n redhat-ods-applications | grep -i vllm` is the manual
 equivalent), preferring the CUDA-flavored template since this chart
-requests `nvidia.com/gpu`, and overrides this chart's default at apply
+requests GPU capacity (`nvidia.com/mig-*` slices since ADR-0351), and
+overrides this chart's default at apply
 time via the ArgoCD Application's `spec.source.helm.values` (see
 `ansible/tasks/apply_gitops_app.yml`'s `gitops_app_extra_helm_values`).
 Fails with a diagnostic (listing found templates) rather than silently
@@ -82,11 +83,14 @@ add a second, additive vLLM `ServingRuntime`/`InferenceService`
 (`granite-embedding`, `ibm-granite/granite-embedding-125m-english`,
 768-dim) serving embeddings via vLLM's `--task embed` mode, reusing the
 same `image.vllm` runtime image discovered for the chat model above.
-Requests `nvidia.com/gpu` like the chat model: the discovered/pinned
-`image.vllm` is a CUDA-only build, which crashes with "Failed to infer
-device type" if scheduled without a GPU. Has no `nodeSelector` of its own
-(unlike the chat model above), so it's free to land on whichever GPU node
-still has a free GPU.
+Requests GPU capacity like the chat model - a `nvidia.com/mig-1g.24gb`
+slice since ADR-0351, vs the chat model's `mig-2g.48gb`: the
+discovered/pinned `image.vllm` is a CUDA-only build, which crashes with
+"Failed to infer device type" if scheduled without a GPU. Has no
+`nodeSelector` of its own (unlike the chat model above), so it's free to
+land on whichever MIG-partitioned node has a free 24GB slice - by design
+the same permanent node as the chat model (the old full-GPU-era hard
+anti-affinity between the two was removed by ADR-0351).
 
 Consumed by `gitops/charts/rag-ingestion`'s `embedding.endpoint`
 (fetch-time chunk embedding, from `zuno-ai-build`) and available to

@@ -10,6 +10,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "-70"
 spec:
   hard:
-    requests.nvidia.com/gpu: {{ .Values.openshiftAi.gpuQuota.requestsGpu | quote }}
-    limits.nvidia.com/gpu: {{ .Values.openshiftAi.gpuQuota.limitsGpu | quote }}
+    {{- range $resource, $quantity := .Values.openshiftAi.gpuQuota.resources }}
+    requests.{{ $resource }}: {{ $quantity | quote }}
+    limits.{{ $resource }}: {{ $quantity | quote }}
+    {{- end }}
 {{- end }}

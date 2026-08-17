@@ -16,24 +16,13 @@ spec:
   predictor:
     minReplicas: {{ .Values.embeddingModel.minReplicas }}
     maxReplicas: {{ .Values.embeddingModel.maxReplicas }}
-    # Both models request one GPU each, and neither this nor the chat
-    # model's predictor pins to a specific zone anymore (both just require
-    # any GPU-bearing node - see values.yaml's modelStorage comment) - so
-    # without this anti-affinity they could both land on the *same* node,
-    # using up that node's only GPU while any other GPU node sits idle and
-    # unreachable to whichever model lost the race (verified on-cluster
-    # before this anti-affinity existed - the chat model's pod stayed
-    # Pending with "Insufficient nvidia.com/gpu" on its one allowed node
-    # while this one held it). Hostname-keyed anti-affinity against the
-    # chat model's own pods guarantees they never compete for the same
-    # node's GPU, regardless of how many GPU nodes/zones exist.
-    affinity:
-      podAntiAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                serving.kserve.io/inferenceservice: {{ .Values.inferenceServiceName }}
-            topologyKey: kubernetes.io/hostname
+    # No anti-affinity against the chat model anymore (ADR-0351): a hard
+    # hostname anti-affinity used to keep the two full-GPU pods from racing
+    # for one node's single nvidia.com/gpu, but under MIG they request
+    # *different, co-resident* slice resources (this one mig-1g.24gb, the
+    # chat model mig-2g.48gb) and packing all inference onto the one
+    # permanent GPU node is exactly the intended layout - the old
+    # constraint would forbid it outright.
     model:
       modelFormat:
         name: vLLM

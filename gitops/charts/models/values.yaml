@@ -27,15 +27,21 @@ image:
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 
+# ADR-0351: the chat model gets the permanent GPU node's single 2g.48gb
+# MIG slice (48GB - double the L4 it originally ran on, so more KV-cache/
+# context headroom), leaving the two 1g.24gb slices for embeddings and the
+# MaaS backend. Requires ClusterPolicy mig.strategy=mixed (ansible/roles/
+# nvidia_gpu) and the all-balanced partition on the node
+# (gitops/charts/machines).
 resources:
   requests:
     cpu: "4"
     memory: 24Gi
-    nvidia.com/gpu: "1"
+    nvidia.com/mig-2g.48gb: "1"
   limits:
     cpu: "8"
     memory: 32Gi
-    nvidia.com/gpu: "1"
+    nvidia.com/mig-2g.48gb: "1"
 
 minReplicas: 1
 maxReplicas: 1
@@ -151,15 +157,17 @@ embeddingModel:
   # pipeline like the chat model, whose fixed overhead OOMKilled the
   # container at a 2Gi limit (verified on-cluster, exit 137) despite the
   # model itself being tiny.
+  # ADR-0351: a 1g.24gb MIG slice - same 24GB a whole L4 gave this tiny
+  # encoder model before, now co-resident on the shared permanent GPU node.
   resources:
     requests:
       cpu: "500m"
       memory: 2Gi
-      nvidia.com/gpu: "1"
+      nvidia.com/mig-1g.24gb: "1"
     limits:
       cpu: "1"
       memory: 4Gi
-      nvidia.com/gpu: "1"
+      nvidia.com/mig-1g.24gb: "1"
   minReplicas: 1
   maxReplicas: 1
 
@@ -237,15 +245,21 @@ maas:
     # headroom; system RAM mainly needs to cover the vLLM engine/
     # tokenizer/request buffers, not the model weights (those live in
     # GPU VRAM).
+    # ADR-0351: a 1g.24gb MIG slice. Qwen2.5-7B bf16 is ~15GB of weights -
+    # inside 24GB that leaves ~6-7GB of KV cache at vLLM's default
+    # --gpu-memory-utilization, the same envelope this model targeted on an
+    # L4; verify the startup logs for CUDA OOM at rollout and lower the
+    # utilization/context flags (or swap slices with the chat model) if it
+    # ever gets tight.
     resources:
       requests:
         cpu: "4"
         memory: 16Gi
-        nvidia.com/gpu: "1"
+        nvidia.com/mig-1g.24gb: "1"
       limits:
         cpu: "8"
         memory: 20Gi
-        nvidia.com/gpu: "1"
+        nvidia.com/mig-1g.24gb: "1"
 
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published

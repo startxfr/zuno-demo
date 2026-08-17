@@ -292,19 +292,21 @@ platformNamespaces:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "2Gi" }
 
-# Caps GPU consumption at 3: the chat model (qwen25-7b-instruct) and the
-# embedding model (gitops/charts/models' embeddingModel) each request one
-# GPU - the embedding model's image.vllm build is CUDA-only, so it can't
-# run without one (ADR-0048 discovery prefers the CUDA-flavored template;
-# verified on-cluster: it crashes with "Failed to infer device type"
-# otherwise). Raised from 2 to 3 (2026-08-16): a 3rd GPU node
-# (g6.2xlarge/L4, zone eu-west-2c) was added for ADR-0201's MaaS-published
-# model copy (gitops/charts/models' maas.llmInferenceService) - VERIFIED
-# live, its pod was refused admission with "exceeded quota:
-# zuno-ai-run-gpu-cap... limited: requests.nvidia.com/gpu=2" until this
-# matched real capacity, same class of gap as the original 1->2 raise.
+# ADR-0351: MIG-aware GPU quota mirroring the permanent node's all-balanced
+# partition (2x 1g.24gb + 1x 2g.48gb on the RTX PRO 6000 Blackwell 96GB) -
+# one slice per inference workload: embeddings + the MaaS backend on the
+# 24GB slices, the qwen chat predictor on the 48GB one (gitops/charts/
+# models). Replaces the earlier whole-GPU count quota (1->2->3 as L4 nodes
+# were added through 2026-08-16; that history and its admission-refusal
+# evidence lives in git). nvidia.com/gpu is pinned to 0 on purpose: whole
+# GPUs only exist on the tainted gpu-burst node and belong to training in
+# zuno-ai-build (the DSPA namespace, which has no quota) - an inference
+# workload in zuno-ai-run asking for a full GPU is a config error this
+# refuses at admission.
 openshiftAi:
   namespace: zuno-ai-run
   gpuQuota:
-    requestsGpu: "3"
-    limitsGpu: "3"
+    resources:
+      nvidia.com/mig-1g.24gb: "2"
+      nvidia.com/mig-2g.48gb: "1"
+      nvidia.com/gpu: "0"
