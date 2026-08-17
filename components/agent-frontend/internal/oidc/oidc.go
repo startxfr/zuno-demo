@@ -20,6 +20,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -28,6 +30,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -61,14 +64,40 @@ type Client struct {
 // NewClient builds an OIDC client. Discovery is fetched lazily on first use
 // so a transient startup-time network hiccup against Keycloak doesn't crash
 // the frontend pod.
-func NewClient(issuerURL, clientID, clientSecret, redirectURL string) *Client {
+//
+// caCertPath, if non-empty, names a PEM file whose certificate is appended
+// to the system trust pool for every HTTPS call this client makes (ADR-0411,
+// sibling decision to ADR-0347) - needed because Keycloak's Route certificate
+// chains to Vault's internal PKI root, which no stock container trust store
+// carries. Empty (the default) leaves TLS verification exactly as it was
+// before this parameter existed - system pool only.
+func NewClient(issuerURL, clientID, clientSecret, redirectURL, caCertPath string) (*Client, error) {
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+
+	if caCertPath != "" {
+		pem, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading custom CA cert %q: %w", caCertPath, err)
+		}
+		pool, err := x509.SystemCertPool()
+		if err != nil || pool == nil {
+			pool = x509.NewCertPool()
+		}
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("no valid PEM certificate found in custom CA cert %q", caCertPath)
+		}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: pool}
+		httpClient.Transport = transport
+	}
+
 	return &Client{
 		IssuerURL:    strings.TrimRight(issuerURL, "/"),
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  redirectURL,
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
-	}
+		httpClient:   httpClient,
+	}, nil
 }
 
 func (c *Client) discover() (*Discovery, error) {

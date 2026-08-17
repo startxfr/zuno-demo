@@ -37,6 +37,15 @@ type Config struct {
 	// gitops/charts/keycloak/templates/keycloak.yaml.
 	KeycloakIssuerURL string
 
+	// KeycloakCACertPath, if set, names a PEM file this frontend's OIDC
+	// client additionally trusts (appended to the system pool) for every
+	// HTTPS call to KeycloakIssuerURL - ADR-0411. Needed because
+	// Keycloak's Route TLS cert chains to Vault's internal PKI root (see
+	// ADR-0347 for the same root's cluster-OAuth analog), which no stock
+	// container trust store carries. Empty (the default) leaves TLS
+	// verification exactly as it was before this field existed.
+	KeycloakCACertPath string
+
 	// OIDCClientID is the confidential client registered in the zuno realm
 	// for this agent, e.g. "tekos-frontend" (contract fixed by Track E's
 	// brief: <agent>-frontend).
@@ -102,18 +111,19 @@ type Config struct {
 // only where a default cannot leak a secret or silently misroute traffic.
 func Load() (*Config, error) {
 	cfg := &Config{
-		ListenAddr:        getenv("LISTEN_ADDR", ":8080"),
-		AgentsDir:         getenv("AGENTS_DIR", "/agents"),
-		ActiveAgent:       getenv("ACTIVE_AGENT", "tekos"),
-		KeycloakIssuerURL: getenv("KEYCLOAK_ISSUER_URL", ""),
-		OIDCClientID:      getenv("OIDC_CLIENT_ID", "tekos-frontend"),
-		OIDCClientSecret:  os.Getenv("OIDC_CLIENT_SECRET"),
-		OIDCRedirectURL:   getenv("OIDC_REDIRECT_URL", ""),
-		SelfBaseURL:       getenv("SELF_BASE_URL", ""),
-		BFFBaseURL:        getenv("BFF_BASE_URL", "http://tekos-bff.zuno-ai-run.svc.cluster.local:8080"),
-		WebDistDir:        getenv("WEB_DIST_DIR", "web/dist"),
-		RedisAddr:         getenv("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
-		RedisPassword:     os.Getenv("REDIS_PASSWORD"),
+		ListenAddr:         getenv("LISTEN_ADDR", ":8080"),
+		AgentsDir:          getenv("AGENTS_DIR", "/agents"),
+		ActiveAgent:        getenv("ACTIVE_AGENT", "tekos"),
+		KeycloakIssuerURL:  getenv("KEYCLOAK_ISSUER_URL", ""),
+		KeycloakCACertPath: getenv("KEYCLOAK_CA_CERT_PATH", ""),
+		OIDCClientID:       getenv("OIDC_CLIENT_ID", "tekos-frontend"),
+		OIDCClientSecret:   os.Getenv("OIDC_CLIENT_SECRET"),
+		OIDCRedirectURL:    getenv("OIDC_REDIRECT_URL", ""),
+		SelfBaseURL:        getenv("SELF_BASE_URL", ""),
+		BFFBaseURL:         getenv("BFF_BASE_URL", "http://tekos-bff.zuno-ai-run.svc.cluster.local:8080"),
+		WebDistDir:         getenv("WEB_DIST_DIR", "web/dist"),
+		RedisAddr:          getenv("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
+		RedisPassword:      os.Getenv("REDIS_PASSWORD"),
 	}
 
 	if cfg.KeycloakIssuerURL == "" {

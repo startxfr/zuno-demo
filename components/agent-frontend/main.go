@@ -70,7 +70,10 @@ func main() {
 		log.Fatalf("agent-frontend: %v", err)
 	}
 
-	oidcClient := oidc.NewClient(cfg.KeycloakIssuerURL, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCRedirectURL)
+	oidcClient, err := oidc.NewClient(cfg.KeycloakIssuerURL, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCRedirectURL, cfg.KeycloakCACertPath)
+	if err != nil {
+		log.Fatalf("agent-frontend: building OIDC client: %v", err)
+	}
 
 	// ADR-0042: server-side session store (Redis, encrypted at rest) -
 	// the opaque session-ID cookie resolves through this, never carrying

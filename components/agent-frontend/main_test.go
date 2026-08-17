@@ -127,7 +127,10 @@ func TestCallbackHandlerPersistsRefreshToken(t *testing.T) {
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	})
 
-	oidcClient := oidc.NewClient(issuer, "tekos-frontend", "secret", "https://tekos.example.com/callback")
+	oidcClient, err := oidc.NewClient(issuer, "tekos-frontend", "secret", "https://tekos.example.com/callback", "")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 
 	txn := oidc.AuthRequest{State: "test-state", CodeVerifier: "test-verifier"}
 	txnRec := httptest.NewRecorder()
@@ -186,7 +189,10 @@ func TestLogoutHandlerFallsBackToClientIDWhenSessionIsGone(t *testing.T) {
 	defer server.Close()
 	issuer = server.URL
 
-	oidcClient := oidc.NewClient(issuer, "tekos-frontend", "secret", "https://tekos.example.com/callback")
+	oidcClient, err := oidc.NewClient(issuer, "tekos-frontend", "secret", "https://tekos.example.com/callback", "")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/logout", nil)
 	rec := httptest.NewRecorder()
