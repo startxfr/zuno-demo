@@ -91,6 +91,28 @@
 - name: "agents | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
+# ADR-0411: every agent frontend's OIDC client trusts Keycloak's Route CA
+# via this one shared ConfigMap - if it's missing, every frontend's
+# /login will 502 "identity provider unreachable" even though the
+# /healthz probes below still report healthy (that endpoint never dials
+# Keycloak), so this deserves its own specific, actionable check rather
+# than surfacing only as an indirect login failure downstream.
+- name: "agents | check the shared Keycloak CA ConfigMap exists in zuno-ai-run"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: zuno-ai-run
+    name: agent-frontend-keycloak-ca
+  register: _agents_keycloak_ca_cm
+
+- name: "agents | fail the check if the shared Keycloak CA ConfigMap is missing"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-ai-run/agent-frontend-keycloak-ca ConfigMap not found - every
+      agent frontend's /login will fail with "identity provider
+      unreachable" (ADR-0411). Run `make d1 install agents` to resync it
+      from openshift-config/keycloak-serving-ca.
+  when: (_agents_keycloak_ca_cm.resources | default([]) | length) == 0
+
 - name: "agents | resolve the Tekos frontend route host"
   ansible.builtin.set_fact:
     _agents_tekos_host: "tekos.{{ cluster_base_domain }}"

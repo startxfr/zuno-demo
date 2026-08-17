@@ -10,6 +10,17 @@
     name: agent_build
     tasks_from: build
 
+# ADR-0411: every agent frontend (chart-rendered or, for arkos/naveo,
+# aiagent-operator-rendered) shares this one codebase and namespace, so
+# the CA it needs to trust Keycloak's Route only needs syncing once here
+# - before the first Application apply below, so no pod hits a transient
+# CreateContainerConfigError waiting on it.
+- name: "agents | sync the Keycloak serving CA into zuno-ai-run for every agent frontend's OIDC trust"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/sync_keycloak_serving_ca.yml"
+  vars:
+    sync_keycloak_ca_dest_namespace: zuno-ai-run
+    sync_keycloak_ca_dest_configmap_name: agent-frontend-keycloak-ca
+
 # Applies the Tekos frontend/BFF workloads GitOps Application; namespaces
 # are assumed to already exist (see precheck.yml). No OLM operator here -
 # all content is -d1; application-d0.yaml is a no-op.

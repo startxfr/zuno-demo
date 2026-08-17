@@ -74,3 +74,11 @@ keycloak:
   issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
   # matches the Keycloak CR's actual Route hostname, see
   # gitops/charts/keycloak/templates/keycloak.yaml
+  # ADR-0411: ConfigMap (this chart's own namespace, key ca.crt) holding
+  # the Vault PKI root that signs Keycloak's external Route - copied here
+  # by the "agents" Ansible role (ansible/tasks/sync_keycloak_serving_ca.yml)
+  # from openshift-config/keycloak-serving-ca, NOT rendered by this chart.
+  # Mounted read-only into the frontend so its OIDC relying-party client
+  # trusts the same chain the user's browser is redirected to. Empty
+  # disables the volume/mount/env var entirely.
+  caConfigMapName: agent-frontend-keycloak-ca

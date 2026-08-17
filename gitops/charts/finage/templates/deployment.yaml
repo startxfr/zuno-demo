@@ -44,6 +44,10 @@ spec:
               value: {{ .Values.frontend.activeAgent | quote }}
             - name: KEYCLOAK_ISSUER_URL
               value: {{ include "finage.keycloakIssuerUrl" . | quote }}
+            {{- if .Values.keycloak.caConfigMapName }}
+            - name: KEYCLOAK_CA_CERT_PATH
+              value: /etc/pki/agent-frontend/keycloak-ca/ca.crt
+            {{- end }}
             - name: OIDC_CLIENT_ID
               value: {{ .Values.frontend.oidcClientId | quote }}
             - name: SELF_BASE_URL
@@ -77,6 +81,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.keycloak.caConfigMapName }}
+            - name: keycloak-ca
+              mountPath: /etc/pki/agent-frontend/keycloak-ca
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -94,6 +103,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.keycloak.caConfigMapName }}
+        - name: keycloak-ca
+          configMap:
+            name: {{ .Values.keycloak.caConfigMapName }}
+        {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
