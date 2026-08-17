@@ -147,6 +147,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) | v0.1 | Implemented | Restructure demo personas, ocp-* cluster-access groups and two new agents |
 | [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Implemented | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | To be implemented (manifests merged 2026-08-17; live rollout pending) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
+| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 
 ## version 0.4
 
