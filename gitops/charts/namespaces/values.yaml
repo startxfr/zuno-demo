@@ -247,8 +247,18 @@ platformNamespaces:
     # controller-managers add ~11 real cores - ~27 cores of limits when
     # healthy, against the previous 16. Limits are overcommit (only
     # requests reserve node capacity), so 32 is headroom, not reservation.
+    # RESIZED live (2026-08-18): actual usage had grown to 9.07 CPU /
+    # 15.6Gi of REQUESTS (MaaS controller, model registry, gateway
+    # controllers... landed after the 2026-08-15 sizing) - over the old
+    # 8/12Gi cap, which a ResourceQuota only enforces on NEW pods, so
+    # everything kept running while every new admission was refused. First
+    # visible casualty: DSPO's ds-pipelines-webhook (150m/320Mi,
+    # "exceeded quota" FailedCreate), which silently blocked the whole
+    # rag-dspa KFP stack (WebhookReady=False) and with it all corpus
+    # ingestion. 12/20Gi = current real usage + the webhook + modest
+    # growth headroom, same overcommit reasoning as the limits line above.
     resourceQuota:
-      requests: { cpu: "8", memory: "12Gi" }
+      requests: { cpu: "12", memory: "20Gi" }
       limits: { cpu: "32", memory: "48Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
