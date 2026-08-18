@@ -8,14 +8,21 @@ those: the WP-54 quota-enforcement surface.
 
 ## Quota enforcement (ADR-0511, WP-54)
 
-`templates/quota-ratelimitpolicies.yaml` is a **generated file** — one
-Kuadrant `RateLimitPolicy` per quota class declared in
-`policies/quotas/quota-policy.yaml`, carrying the request-per-window
-limits for the user/group/project identity dimensions. Regenerate with
-`python3 platform/okf/generate_quota_enforcement.py`; drift fails the
-lint chain. Token budgets are deliberately NOT here — AI Gateway
-enforces them (`components/ai-gateway/app/quota.py`), because only the
-inference layer can meter tokens (ADR-0029).
+`templates/quota-ratelimitpolicies.yaml` is a **generated file** — a
+single Kuadrant `RateLimitPolicy` (named `zuno-quota`) carrying every
+quota class's request-per-window limits for the user/group/project
+identity dimensions, declared in `policies/quotas/quota-policy.yaml`.
+**One CR, not one per class**: Kuadrant allows only one policy of a
+given kind per `targetRef` at the same level — two separate
+`RateLimitPolicy` CRs both targeting the same `HTTPRoute` do not merge,
+the second silently "overrides" the first (`status.conditions[Enforced]
+= False, reason: Overridden` — hit live on this cluster, 2026-08-18,
+fixed by merging all classes into one CR's `limits` map, where each
+entry's own `when` predicate is what actually selects the class).
+Regenerate with `python3 platform/okf/generate_quota_enforcement.py`;
+drift fails the lint chain. Token budgets are deliberately NOT here —
+AI Gateway enforces them (`components/ai-gateway/app/quota.py`),
+because only the inference layer can meter tokens (ADR-0029).
 
 **Placement decision (WP-54, recorded 2026-08-18):** these policies live
 in this chart because it owns the Kuadrant plane, and the supported

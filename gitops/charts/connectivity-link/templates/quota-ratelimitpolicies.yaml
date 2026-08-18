@@ -2,17 +2,19 @@
 # GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:
 # policies/quotas/quota-policy.yaml. Regenerate with:
 #   python3 platform/okf/generate_quota_enforcement.py
-# One RateLimitPolicy per quota class; request-rate dimension only
-# (token budgets are enforced by AI Gateway - see
-# components/ai-gateway/app/quota_budgets.yaml). Rendered only when
-# .Values.quotaEnforcement.enabled is true AND the operator has
-# supplied the agent chat HTTPRoute this policy targets (see this
-# chart's README, WP-54 section).
+# ONE RateLimitPolicy for every quota class; request-rate dimension
+# only (token budgets are enforced by AI Gateway - see
+# components/ai-gateway/app/quota_budgets.yaml). Kuadrant allows only
+# one policy per targetRef at this level, so per-class limits share
+# one CR - each limit entry's own `when` predicate selects the class.
+# Rendered only when .Values.quotaEnforcement.enabled is true AND the
+# operator has supplied the agent chat HTTPRoute this policy targets
+# (see this chart's README, WP-54 section).
 ---
 apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
-  name: zuno-quota-intensive
+  name: zuno-quota
   namespace: {{ .Values.quotaEnforcement.routeNamespace }}
   labels:
     app.kubernetes.io/part-of: zuno-quota-enforcement
@@ -47,20 +49,6 @@ spec:
       when:
         - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
         - predicate: "has(request.headers['x-zuno-project-id'])"
----
-apiVersion: kuadrant.io/v1
-kind: RateLimitPolicy
-metadata:
-  name: zuno-quota-standard
-  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
-  labels:
-    app.kubernetes.io/part-of: zuno-quota-enforcement
-spec:
-  targetRef:
-    group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: {{ .Values.quotaEnforcement.routeName }}
-  limits:
     standard-user:
       rates:
         - limit: 60

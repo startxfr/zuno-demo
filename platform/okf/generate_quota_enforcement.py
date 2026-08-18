@@ -75,35 +75,44 @@ def _class_predicate(cls_name: str) -> str:
 
 
 def _render_rlp(classes: Dict[str, Dict]) -> str:
+    # Kuadrant allows exactly ONE policy of a given kind per targetRef at
+    # the same level (Gateway API direct policy attachment) - two
+    # RateLimitPolicy CRs both targeting the same HTTPRoute do not merge,
+    # the second "overrides" the first (status Enforced=False,
+    # reason=Overridden - confirmed live on this cluster, 2026-08-18).
+    # So this renders ONE RateLimitPolicy whose `limits` map holds every
+    # class's per-dimension entries together; each entry already carries
+    # its own `when` class-selector predicate, which is what actually
+    # differentiates standard vs intensive at request time.
     lines: List[str] = [
         "{{- if .Values.quotaEnforcement.enabled }}",
         f"# GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:",
         f"# policies/quotas/quota-policy.yaml. Regenerate with:",
         f"#   {REGEN_CMD}",
-        f"# One RateLimitPolicy per quota class; request-rate dimension only",
-        f"# (token budgets are enforced by AI Gateway - see",
-        f"# components/ai-gateway/app/quota_budgets.yaml). Rendered only when",
-        f"# .Values.quotaEnforcement.enabled is true AND the operator has",
-        f"# supplied the agent chat HTTPRoute this policy targets (see this",
-        f"# chart's README, WP-54 section).",
+        f"# ONE RateLimitPolicy for every quota class; request-rate dimension",
+        f"# only (token budgets are enforced by AI Gateway - see",
+        f"# components/ai-gateway/app/quota_budgets.yaml). Kuadrant allows only",
+        f"# one policy per targetRef at this level, so per-class limits share",
+        f"# one CR - each limit entry's own `when` predicate selects the class.",
+        f"# Rendered only when .Values.quotaEnforcement.enabled is true AND the",
+        f"# operator has supplied the agent chat HTTPRoute this policy targets",
+        f"# (see this chart's README, WP-54 section).",
+        "---",
+        "apiVersion: kuadrant.io/v1",
+        "kind: RateLimitPolicy",
+        "metadata:",
+        "  name: zuno-quota",
+        "  namespace: {{ .Values.quotaEnforcement.routeNamespace }}",
+        "  labels:",
+        "    app.kubernetes.io/part-of: zuno-quota-enforcement",
+        "spec:",
+        "  targetRef:",
+        "    group: gateway.networking.k8s.io",
+        "    kind: HTTPRoute",
+        "    name: {{ .Values.quotaEnforcement.routeName }}",
+        "  limits:",
     ]
     for cls_name, cls in sorted(classes.items()):
-        lines += [
-            "---",
-            "apiVersion: kuadrant.io/v1",
-            "kind: RateLimitPolicy",
-            "metadata:",
-            f"  name: zuno-quota-{cls_name}",
-            "  namespace: {{ .Values.quotaEnforcement.routeNamespace }}",
-            "  labels:",
-            "    app.kubernetes.io/part-of: zuno-quota-enforcement",
-            "spec:",
-            "  targetRef:",
-            "    group: gateway.networking.k8s.io",
-            "    kind: HTTPRoute",
-            "    name: {{ .Values.quotaEnforcement.routeName }}",
-            "  limits:",
-        ]
         for dim in ("user", "group", "project"):
             req = (cls.get("requests") or {}).get(dim) or {}
             predicates = [_class_predicate(cls_name)]
