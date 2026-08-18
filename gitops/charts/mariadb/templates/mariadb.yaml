@@ -33,6 +33,26 @@ spec:
   podMetadata:
     annotations:
       traffic.sidecar.istio.io/excludeInboundPorts: "3306"
+  # VERIFIED live 2026-08-18 (rag-dspa recovery, final layer): RHOAI's
+  # DSPO unconditionally propagates the ODH trusted-CA bundle to every
+  # DSPA component - MLMD starts with --mysql_config_sslrootcert and the
+  # KFP apiserver wraps its MySQL connections in TLS, no opt-out field -
+  # so a TLS-less MariaDB fatal-loops them both (podToPodTLS only governs
+  # component-to-component gRPC, not the MySQL client config). That
+  # bundle's first entry is the Vault PKI root (CN=zuno-demo.internal,
+  # the same root ADR-0347/0411 already trust platform-wide), so a server
+  # cert issued by cert-manager's vault-issuer chains correctly for DSP
+  # with zero DSPO-side config. required stays false: sales-db-mcp and
+  # the mariadb-operator's own connections keep speaking plaintext -
+  # MariaDB TLS is per-connection optional, only clients that ASK for TLS
+  # (the DSP components) get it.
+  tls:
+    enabled: true
+    required: false
+    serverCertIssuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: vault-issuer
   rootPasswordSecretKeyRef:
     name: mariadb-root-password
     key: password
