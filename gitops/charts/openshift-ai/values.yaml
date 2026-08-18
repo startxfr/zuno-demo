@@ -336,7 +336,12 @@ ogxServer:
   enabled: true
   name: zuno-ogx
   namespace: redhat-ods-applications
-  distribution: remote-vllm
+  # First live apply (2026-08-18) surfaced schema drift: the 3.5.0-ea.2
+  # admission webhook accepts only `rh` | `rh-dev` - the 2026-08-14
+  # oc-explain pass predated that validation. `rh` is the supported
+  # distribution; the remote-vllm/pgvector shapes below stay providers,
+  # not the distribution name.
+  distribution: rh
   replicas: 1
   credentials:
     vaultPath: ogx/postgresql-app
