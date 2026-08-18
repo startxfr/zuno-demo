@@ -10,9 +10,11 @@ yet, e.g. before an operator has run that domain's schema-apply).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import time
 from typing import Dict, Optional
 
 import asyncpg
@@ -24,6 +26,18 @@ logger = logging.getLogger("rag_service.db")
 
 _pools: Dict[str, asyncpg.Pool] = {}
 _pool_errors: Dict[str, str] = {}
+# Every binding connect_all ever resolved, kept so _retry_failed() can
+# re-attempt a domain that failed its startup connect (VERIFIED live
+# 2026-08-18: a cluster stop/start brought this pod up while PostgreSQL
+# was still in crash recovery - "the database system is starting up" -
+# and with connect-once-at-lifespan semantics every domain stayed dead
+# until a manual pod delete, taking all retrieval down with it).
+_bindings: Dict[str, KnowledgeBinding] = {}
+_retry_lock = asyncio.Lock()
+_last_retry_at = 0.0
+# Probe-driven retries (readyz fires every few seconds) must not hammer a
+# database that is genuinely down; one reconnect attempt per window.
+_RETRY_MIN_INTERVAL_SECONDS = 15.0
 
 
 async def _init_connection(conn: asyncpg.Connection) -> None:
@@ -100,7 +114,35 @@ async def connect_all(registry: KnowledgeBindingRegistry) -> None:
     for domain in registry.domains():
         binding = registry.resolve(domain)
         if binding is not None:
+            _bindings[domain] = binding
             await _connect_one(binding)
+
+
+async def _retry_failed() -> None:
+    """Re-attempts every domain still in _pool_errors, at most once per
+    _RETRY_MIN_INTERVAL_SECONDS across all callers. Piggy-backed on
+    ping_any() (the readiness probe is the heartbeat - no background task
+    to manage) and on the search path's own not-ready check, so a
+    PostgreSQL that comes up AFTER this pod (the 2026-08-18 restart
+    ordering) heals without a pod delete. Missing-credential domains are
+    retried too but only recover on a pod restart: container env is fixed
+    at start, so a late-arriving ExternalSecret can't appear here -
+    _connect_one just re-logs the same warning once per window."""
+    global _last_retry_at
+    if not _pool_errors:
+        return
+    async with _retry_lock:
+        now = time.monotonic()
+        if now - _last_retry_at < _RETRY_MIN_INTERVAL_SECONDS:
+            return
+        _last_retry_at = now
+        for domain in list(_pool_errors.keys()):
+            binding = _bindings.get(domain)
+            if binding is None:
+                continue
+            await _connect_one(binding)
+            if domain in _pools:
+                logger.info("domain %s recovered on reconnect retry", domain)
 
 
 async def disconnect_all() -> None:
@@ -143,8 +185,16 @@ async def ping_any() -> bool:
     /readyz semantics this service keeps: ready means "at least one
     configured domain can actually serve a query", not "every domain is
     up" (a domain whose schema-apply hasn't run yet must not take the
-    whole pod out of rotation)."""
+    whole pod out of rotation). Doubles as the reconnect heartbeat for
+    domains whose startup connect failed - see _retry_failed()."""
+    await _retry_failed()
     for domain in list(_pools.keys()):
         if await ping(domain):
             return True
     return False
+
+
+async def retry_failed_domains() -> None:
+    """Public wrapper for the search path (app/main.py): give failed
+    domains one interval-bounded reconnect chance before answering 503."""
+    await _retry_failed()
