@@ -183,6 +183,30 @@
   retries: 60
   delay: 10
 
+# VERIFIED live 2026-08-18: MySQL is a server-first protocol, and istio
+# protocol-sniffs any Service port with no declared protocol on BOTH the
+# inbound and the OUTBOUND (client-sidecar) side - in-mesh clients
+# (mariadb-operator itself, sales-db-mcp) deadlocked waiting for a
+# greeting their own sidecar was withholding (measured: zero bytes in
+# 15s; 0.02s once appProtocol was set). The chart-side halves of this fix
+# (gitops/charts/mariadb: podMetadata excludeInboundPorts + the
+# DestinationRule) cover the inbound/istio-TLS sides, but the Service
+# object is OWNED BY the mariadb-operator, whose CR has no port template
+# (oc explain mariadb.spec.service: type/LB/metadata only) - so the
+# appProtocol declaration has to be patched on after the operator creates
+# it. Idempotent; re-run after any operator upgrade that recreates the
+# Service.
+- name: "mariadb | declare port 3306 as opaque TCP for istio (server-first MySQL)"
+  kubernetes.core.k8s_json_patch:
+    api_version: v1
+    kind: Service
+    namespace: zuno-data
+    name: mariadb
+    patch:
+      - op: add
+        path: /spec/ports/0/appProtocol
+        value: tcp
+
 - name: "mariadb | configure summary"
   ansible.builtin.debug:
     msg: >-
