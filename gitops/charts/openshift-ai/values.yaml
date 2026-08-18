@@ -342,19 +342,30 @@ ogxServer:
   # remote-vllm/pgvector shapes below stay providers, not the distribution
   # name.
   #
-  # ogxServer.distribution is exactly one of name/image (the CRD's own
-  # mutually-exclusive shape). Switched to `image` this same day: the
-  # OGX operator's own in-process OCI-manifest-fetch client 401s against
-  # registry.redhat.io directly even with a valid cluster pull secret -
-  # pointing at the zuno-ai-build mirror (ansible/roles/image_mirrors)
-  # instead works around it if the operator's client honors ambient
-  # in-cluster ServiceAccount-token registry auth against the internal
-  # registry (WP-06/ADR-0322). UNVERIFIED live as of this comment - if
-  # this does NOT clear the reconciliation error, revert by commenting
-  # `image:` out and uncommenting `name: rh` below (the previously-working
-  # value); no template change needed either way.
+  # ROOT CAUSE (confirmed 2026-08-18 by reading the OGX operator's actual
+  # source, github.com/ogx-ai/ogx-k8s-operator pkg/config/oci_fetcher.go):
+  # its OCI-label-fetch client is anonymous-only by design ("Authentication:
+  # currently supports anonymous/public registry access") - it never sends
+  # credentials to ANY registry, so registry.redhat.io (401) and even our
+  # own internal mirror (400, confirmed live: OpenShift's internal registry
+  # returns 400 for a request with no Authorization header at all) both
+  # fail the same way. An internal-mirror attempt (ansible/roles/
+  # image_mirrors' odh-ogx-core-rhel9 entry) was tried first and kept -
+  # harmless, but it wasn't the fix. Real fix: distribution.image points
+  # at a real PUBLIC distribution image the anonymous fetcher can actually
+  # reach - verified live against Docker Hub's API:
+  # docker.io/ogxai/distribution-starter is anonymously pullable and
+  # carries the OCI labels the resolver needs
+  # (com.ogx.distribution.default-config, com.ogx.config.config.yaml).
+  # Pinned to the resolved single-platform (amd64) digest, not `:latest` -
+  # that tag is a multi-arch index with no direct `.config.digest`, which
+  # the fetcher can't parse (confirmed live: `:latest` returns
+  # application/vnd.oci.image.index.v1+json). Our own spec.providers/
+  # spec.storage below override the base image's own defaults regardless
+  # (operator's own merge logic, pkg/config/generator.go), so which
+  # distribution image supplies the base doesn't matter functionally.
   distribution:
-    image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-ogx-core-rhel9:rhel9
+    image: docker.io/ogxai/distribution-starter@sha256:f9d896ca72213f995ad34d7d0e5c2e853bdb1f261f4bf66b0a2a8d4605174818
     # name: rh
   replicas: 1
   credentials:
