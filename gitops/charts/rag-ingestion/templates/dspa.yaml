@@ -34,6 +34,19 @@ spec:
     mariaDB:
       deploy: true
 {{- else if eq .Values.pipelineServer.metadataDatabase.mode "externalMySQL" }}
+    # VERIFIED live 2026-08-18: the DSPO controller's pre-deploy DB probe
+    # runs in redhat-ods-applications, OUTSIDE the mesh - and mariadb-0
+    # (zuno-data, istio-injected since the service-mesh phase 2 rollout)
+    # never delivers the server-first MySQL greeting to a plaintext
+    # non-mesh client (12s, zero bytes; instant on localhost inside the
+    # pod), so the probe fails "context deadline exceeded" forever and
+    # the whole KFP stack never deploys. The pipeline pods themselves run
+    # in zuno-ai-build (istio-injected) and reach MariaDB through mesh
+    # mTLS exactly like mcp-sales-db already does - the probe is the ONLY
+    # non-mesh client, so it is disabled rather than un-meshing port 3306
+    # for everyone. A genuinely broken credential now surfaces as the
+    # apiserver pod's own crashloop/logs instead of the CR condition.
+    disableHealthCheck: true
     externalDB:
       host: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.host | quote }}
       port: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.port | quote }}
