@@ -573,6 +573,18 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
+- **2026-08-18 (WP-06 progress, ADR-0322 stays Partially implemented)**:
+  `ogxServer.enabled` flipped true - found and fixed real schema drift
+  (`distribution.name` must be `rh`, ea.2's webhook rejects
+  `remote-vllm`). The CR then creates, but hits a genuine RHOAI 3.5 EA2
+  operator limitation: its own OCI-manifest fetch to `registry.redhat.io`
+  401s even with valid cluster + SA-linked pull credentials -
+  `imagePullSecrets` don't wire into an operator's own in-process
+  registry client. Upstream/environment gap, not a repo gap; corpus
+  proof + provider-parity run stay blocked on it. [[demo222-argocd-oom-limitrange]]-adjacent:
+  another operator-vs-quota lesson from the same session (rhods-operator
+  needed the platform quota resized for its 3 replicas before this got
+  even this far).
 - **2026-08-18 (ADR-0330 closed, WP-07 Done)**: real Confluence space
   keys landed after a live space enumeration - `satellite`/`openshift`
   point at real space SXS's actual page trees (no archi/build/run
