@@ -228,9 +228,9 @@ spec:
     # is a safe bump, not a resize.
     resources:
       limits:
-        cpu: '1'
-        memory: 8Gi
+        cpu: 1800m
+        memory: 9Gi
       requests:
-        cpu: 500m
+        cpu: 700m
         memory: 4Gi
     sharding: {}
