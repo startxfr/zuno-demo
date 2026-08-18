@@ -39,3 +39,22 @@ generalize to any OLM-managed operator doing this:
    investigation, a fast-incrementing `default-base` release in `openshift-operators` looked like
    the smoking gun but actually belonged to the ServiceMesh (Sail) operator's `default` Istio CR,
    not mariadb-operator at all - a real, separate issue worth its own look, but not this one.
+5. **A cpu/memory bump alone may not fully fix it - check `oc logs`/`--previous`, not just
+   events.** Seen again on the same operator, later the same day (2026-08-18): after step 3's
+   `limits.cpu` bump the pod was still crash-looping (73 restarts/~10h), but this time the
+   container's own stdout - not the kubelet `Unhealthy`/`Killing` events from step 2 - had the
+   real story: `"error":"leader election lost"` immediately after
+   `client rate limiter Wait returned an error: context deadline exceeded`. This operator-sdk
+   Helm-operator watches *all* namespaces across every dependent kind (`ClusterRole`, `Role`,
+   `Service`, `ConfigMap`, `Deployment`, `ServiceAccount`, `ValidatingWebhookConfiguration`, ...)
+   with 16 reconcile workers; this cluster's client-side API throttling (visible in other
+   operators' logs too via the same "Waited ... due to client-side throttling" lines - a shared
+   cluster trait, not unique to this operator) occasionally delays the shared client's
+   leader-election lease-renewal call past its ~10s deadline, and controller-runtime exits(1)
+   rather than risk running unelected - fatal with only one replica to fail over to. The fix that
+   generalizes: scope `WATCH_NAMESPACE` (via the same `operator.subscription.operator.config.env`
+   mechanism in the component's `values.yaml`) down to only the namespace(s) that actually hold
+   the operator's activation CR - this cuts the reconcile-time API call volume feeding the
+   throttling. It doesn't replace step 3's cpu headroom, though: discovery/RESTMapper startup
+   cost isn't namespace-scoped, so a cluster with 400+ CRDs can still throttle during startup even
+   with the watch scoped down.
