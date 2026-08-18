@@ -59,3 +59,13 @@ capability WP-32 already registered) and a future LinkedIn capability -
 kept here so onboarding Soursage later is primarily a `status: active`
 flip plus real task implementation through the ADR-0307 template
 workflow (`platform/templates/agent/`), not a redesign.
+
+<!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; regenerate with: python3 platform/okf/generate_authorization_matrix.py -->
+
+## Authorization matrix
+
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_soursage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`.
+
+No capabilities declared: every task's `allowed_tools`/`allowed_knowledge` is empty, so this agent can invoke no tool and retrieve from no knowledge domain regardless of caller groups (the honest Stage-1 zero-capability state, ADR-0502).
+
+<!-- END GENERATED AUTHORIZATION MATRIX -->

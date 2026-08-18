@@ -75,3 +75,20 @@ under `/consultant`; `board` means Direction only) - DATs are still
 *reviewed* at board level as a business process, but the role gating an
 already-entitled Arkos session is `consultant`, matching every other
 agent's ADR-0040 dimension split.
+
+<!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; regenerate with: python3 platform/okf/generate_authorization_matrix.py -->
+
+## Authorization matrix
+
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_arkos`; model classification ceiling (ADR-0021): `C3`; status: `placeholder`.
+
+| Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
+|---|---|---|---|---|---|---|---|---|
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `confluence.page.read` | tool | `confluence.page.read` @ confluence | C2 | consultant, board, cdp | blocked | standard (implicit) | `tools/tool-policy.yaml` `confluence.page.read` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `confluence.page.search` | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | standard (implicit) | `tools/tool-policy.yaml` `search_confluence` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `drive.document.create` | tool | `drive.document.create` @ google-workspace | C1 | consultant, board, cdp | allowed | standard (implicit) | `tools/tool-policy.yaml` `drive.document.create` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `drive.document.update` | tool | `drive.document.update` @ google-workspace | C1 | consultant, board, cdp | allowed | standard (implicit) | `tools/tool-policy.yaml` `drive.document.update` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+
+<!-- END GENERATED AUTHORIZATION MATRIX -->

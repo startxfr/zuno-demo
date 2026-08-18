@@ -1,6 +1,6 @@
 # ADR-0503: Make each OKF bundle state its complete authorization contract
 
-- **Status:** Proposed
+- **Status:** Partially implemented (matrix merged for all 8 agents, WP-44 2026-08-18; deployment snapshots pending WP-45)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

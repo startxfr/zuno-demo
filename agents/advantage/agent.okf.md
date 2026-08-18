@@ -92,3 +92,21 @@ orthogonal to the `adv` business role that governs tool/data permissions
 inside Advantage once active - see `policies/tools/tool-policy.yaml`'s
 Drive/Gmail entries and `policies/knowledge/knowledge-policy.yaml`'s
 `knowledge.adv`/`knowledge.project` entries).
+
+<!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; regenerate with: python3 platform/okf/generate_authorization_matrix.py -->
+
+## Authorization matrix
+
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_advantage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`.
+
+| Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
+|---|---|---|---|---|---|---|---|---|
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `web_search` |
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `identify-new-business-with-po` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
+| `monthly-sales-report` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
+| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `list_drive_files` |
+| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `read_gmail` |
+
+<!-- END GENERATED AUTHORIZATION MATRIX -->

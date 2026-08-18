@@ -1,6 +1,15 @@
 # WP-44: OKF authorization matrix (promotes ADR-0503, matrix half)
 
-- **State:** Not started
+- **State:** Done (2026-08-18, Parts A+B in two commits). The generator
+  emits the matrix between HTML markers in the agent.okf.md body (never
+  the frontmatter, so the three service parsers are untouched); the
+  lint step runs `--check --all` (every agent must carry a current
+  section). Tamper test proven (edited cell → exit 1 → regenerated).
+  Notable finding: zero `(no groups — unusable)` rows across all 8
+  agents — every declared tool/domain has a non-empty `allowed_groups`,
+  so no policy gap needed recording. Cognos/Soursage render the honest
+  zero-capability sentence instead of an empty table. Quota column is
+  `standard (implicit)` pending WP-54, as briefed.
 - **ADRs:** ADR-0503 (with WP-45 completing its deployment half)
 - **Depends on:** WP-43
 - **Blocks:** WP-48, WP-54; soft-blocks WP-47 (tab schema rides the same validator)

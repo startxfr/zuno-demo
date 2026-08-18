@@ -54,7 +54,7 @@ jobs:
       - name: Validate knowledge-domain descriptors and references (ADR-0202/ADR-0203)
         run: python3 platform/docs/check_knowledge_refs.py
       - name: Verify generated authorization matrices match regeneration (ADR-0503)
-        run: python3 platform/okf/generate_authorization_matrix.py --check
+        run: python3 platform/okf/generate_authorization_matrix.py --check --all
       - name: Validate AIAgent CRD contract (ADR-0327)
         run: python3 operator/aiagent-operator/validate_contract.py
       - name: Lint OpenAPI contracts (ADR-0054)
