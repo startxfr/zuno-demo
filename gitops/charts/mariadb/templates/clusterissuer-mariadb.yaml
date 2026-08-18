@@ -1,0 +1,30 @@
+{{- if .Values.mariadbOperand.enabled }}
+# Dedicated issuer for the MariaDB server cert (see mariadb.yaml's tls
+# block): mariadb-operator requests a fixed wide SAN set (short service
+# names, *.mariadb-internal wildcards, localhost) that the shared
+# vault-issuer's pki/roles/cert-manager rightly refuses - this issuer
+# signs through the scoped pki/roles/mariadb instead (provisioned by
+# ansible/roles/vault's unseal-configure script, same isolation precedent
+# as pki/roles/istio). Same TokenRequest-based auth shape as
+# gitops/charts/cert-manager/templates/clusterissuer.yaml; the Vault
+# service name is stable platform infrastructure, referenced directly
+# like every other cross-namespace service in this chart's family.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: vault-issuer-mariadb
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-35"
+spec:
+  vault:
+    server: "http://zuno-vault.zuno-vault.svc:8200"
+    path: pki/sign/mariadb
+    auth:
+      kubernetes:
+        role: mariadb-issuer
+        mountPath: /v1/auth/kubernetes
+        serviceAccountRef:
+          name: cert-manager
+{{- end }}

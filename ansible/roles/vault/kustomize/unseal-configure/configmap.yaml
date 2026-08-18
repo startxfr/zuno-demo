@@ -101,6 +101,35 @@ data:
 
     echo "PKI engine and cert-manager-issuer role configured."
 
+    # Dedicated pki/roles/mariadb (same isolation rationale as
+    # pki/roles/istio below) - VERIFIED live 2026-08-18: mariadb-operator's
+    # server Certificate requests a FIXED wide SAN set (mariadb,
+    # mariadb.zuno-data, *.mariadb-internal..., mariadb-primary/-secondary
+    # variants, localhost) that pki/roles/cert-manager rightly refuses
+    # ("subject alternate name mariadb.zuno-data not allowed"). Widening
+    # the shared role to cover bare short names and localhost would loosen
+    # it for every consumer, so MariaDB gets its own scoped role instead,
+    # consumed by gitops/charts/mariadb's vault-issuer-mariadb
+    # ClusterIssuer. allow_wildcard_certificates is Vault's default true -
+    # required for the *.mariadb-internal SANs.
+    vault write pki/roles/mariadb \
+      allowed_domains="zuno-data,mariadb,mariadb-internal,mariadb-primary,mariadb-secondary,localhost,svc.cluster.local,svc" \
+      allow_subdomains=true \
+      allow_bare_domains=true \
+      require_cn=false \
+      key_type=any \
+      max_ttl=720h
+
+    printf 'path "pki/sign/mariadb" {\n  capabilities = ["create","update"]\n}\n' | vault policy write mariadb-issuer -
+
+    vault write auth/kubernetes/role/mariadb-issuer \
+      bound_service_account_names=cert-manager \
+      bound_service_account_namespaces=cert-manager \
+      policies=mariadb-issuer \
+      ttl=1h
+
+    echo "PKI mariadb role and mariadb-issuer configured."
+
     # Dedicated pki/roles/istio + istio-issuer role/policy, separate from
     # cert-manager's own role above, consumed by service_mesh's
     # vault-issuer-istio ClusterIssuer (that role never writes to Vault

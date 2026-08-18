@@ -52,7 +52,9 @@ spec:
     serverCertIssuerRef:
       group: cert-manager.io
       kind: ClusterIssuer
-      name: vault-issuer
+      # NOT the shared vault-issuer: the operator's fixed SAN set needs
+      # the scoped pki/roles/mariadb (templates/clusterissuer-mariadb.yaml).
+      name: vault-issuer-mariadb
   rootPasswordSecretKeyRef:
     name: mariadb-root-password
     key: password
