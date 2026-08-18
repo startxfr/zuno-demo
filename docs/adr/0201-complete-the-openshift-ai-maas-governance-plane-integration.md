@@ -1,8 +1,66 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; API-key lifecycle, usage-metric correlation and the AuthPolicy denial proof are still outstanding, see 2026-08-18 note)
+- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the actual authenticated end-to-end request is blocked on a platform-level mTLS gap in RHOAI's own MaaS payload-processing pipeline, see 2026-08-18 notes)
 
-## Implementation note (2026-08-18)
+## Implementation note (2026-08-18, part 2)
+
+Attempted the actual authenticated end-to-end request (acceptance bullets
+2-3: differentiated access, `MaaSAuthPolicy` denial) with real personas
+from the Keycloak realm (`tekos-entitlement-only-user-01`,
+`sales-role-only-user-01`, `finance-role-only-user-01` as the negative
+case - the chart's own `authPolicy` comment already named `finance` as
+the intended negative test). Found and fixed two real bugs in our own
+chart along the way, then hit a genuine platform limitation that stopped
+short of a full proof:
+
+1. **Fixed**: `gitops/charts/openshift-ai/templates/maas-gateway.yaml`'s
+   `maas-gateway-route` pointed `spec.to.name` at `maas-default-gateway`,
+   but Istio's Gateway API controller actually names the auto-deployed
+   Service `maas-default-gateway-istio` - the chart's own comment had
+   flagged this as unverified. Every external request through this Route
+   had 503'd since it was first applied; nothing had exercised it with a
+   real HTTP client before now.
+2. **Fixed**: the auto-provisioned gateway pod OOMKilled repeatedly (30
+   restarts in 13h) at Istio's stock gateway-proxy sizing (500m/256Mi) -
+   sized up via the same `infrastructure.parametersRef` ConfigMap
+   mechanism already used for the Service override.
+3. **Blocked** (platform-level, not our chart): with both fixes live, a
+   real OpenShift-token-authenticated request (confirmed via
+   `TokenReview` - `groups: ["agent_tekos", ...]` present and valid)
+   reaches the gateway but returns `500` before ever reaching the
+   `AuthPolicy`'s group-membership check. Root cause: an `EnvoyFilter`
+   (`payload-processing`, owned by RHOAI's own
+   `Config.maas.opendatahub.io/default` - empty spec by design, "reserved
+   for future configuration", no supported toggle) wires the gateway's
+   `ext_proc` filter to `payload-processing`/`payload-pre-processing`
+   pods in `openshift-ingress` via what Istio treats as a mesh-internal
+   (`outbound|9004|...`) cluster - but those pods are not mesh-injected
+   (`1/1`, confirmed no sidecar, namespace carries no `istio-injection`
+   label). The resulting TLS handshake resets
+   (`Connection_reset_by_peer`), and since the main `ipp` filter has
+   `failure_mode_allow: false` (unlike `ipp-pre`, which already fails
+   open), the whole request 500s. A quick pod-level
+   `sidecar.istio.io/inject: "true"` annotation on both Deployments did
+   not trigger injection (reverted, no lasting effect) - the namespace
+   itself isn't configured for opt-in pod-level injection. Broadening
+   mesh injection to all of `openshift-ingress` (which also hosts the
+   core OpenShift Router) was judged too broad-blast-radius to attempt
+   without explicit approval, and a live patch to force
+   `failure_mode_allow: true` on the RHOAI-owned EnvoyFilter was blocked
+   by the session's own safety guardrail as a security-adjacent ingress
+   change.
+
+This appears to be a genuine defect/gap in this RHOAI 3.5 EA2 build's own
+MaaS payload-processing pipeline (an early-access component), not
+something resolvable from this repo's gitops tree alone. Options for a
+future pass: (a) get explicit approval to sidecar-inject
+`payload-processing`/`payload-pre-processing` specifically (narrower than
+namespace-wide), (b) get explicit approval to force
+`failure_mode_allow: true` on the RHOAI-owned EnvoyFilter live (non-durable
+- would need reapplying if the `Config` controller ever reconciles it),
+or (c) file this as an upstream RHOAI EA defect and wait for a fix.
+
+## Implementation note (2026-08-18, part 1)
 
 The `LLMInferenceService` path from the 2026-08-16 note is now live and
 verified end-to-end on demo222:
