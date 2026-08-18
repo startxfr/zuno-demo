@@ -183,7 +183,10 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     if resp.status_code != 200:
         return CheckResult("ai_gateway_local_only_forces_local_provider", False, f"status={resp.status_code} body={resp.text[:200]}")
     provider = resp.json().get("zuno_provider")
-    ok = provider == "local"
+    # ADR-0412: two local providers exist (qwen + gpt-oss); the ADR-0035
+    # invariant is "a local provider answered", not the qwen name
+    # specifically (a preference or a fallback may pick the other one).
+    ok = provider in ("local", "local-gpt-oss")
     return CheckResult("ai_gateway_local_only_forces_local_provider", ok, f"zuno_provider={provider}")
 
 

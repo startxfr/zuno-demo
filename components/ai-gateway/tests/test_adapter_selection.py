@@ -38,10 +38,14 @@ def _reset_maas_env() -> None:
 
 
 def test_declared_adapter_overrides_local_model_name() -> None:
+    # serves_adapters: ADR-0412's intentional tightening - with two local
+    # runtimes an adapter only applies to the provider entry that declares
+    # it serves them (the qwen one); see test_two_local_providers.py for
+    # the negative case.
     _reset_maas_env()
     candidate = ProviderCandidate(name="local", kind="local")
     with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
-        providers.chat_model_for(candidate, {"model": "qwen2.5-7b-instruct"}, adapter="comage-lora")
+        providers.chat_model_for(candidate, {"model": "qwen2.5-7b-instruct", "serves_adapters": True}, adapter="comage-lora")
     (_, kwargs) = chat_openai.call_args
     assert kwargs["model"] == "comage-lora"
 

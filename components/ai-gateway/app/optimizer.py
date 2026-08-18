@@ -57,6 +57,10 @@ _FORBIDDEN_PARAMETERS = frozenset({
     "eligible_for",
     "entitlement",
     "authorization",
+    # ADR-0412: per-(agent,task) provider preference ordering is a
+    # git-reviewed policy (model-routing-policy.yaml `preferences:`),
+    # never an autonomous tuning surface.
+    "prefer",
 })
 
 

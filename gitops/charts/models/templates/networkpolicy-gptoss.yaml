@@ -1,0 +1,34 @@
+# ADR-0412: same precise ingress allow-list as networkpolicy.yaml, for the
+# gpt-oss-20b predictor. ai-gateway is this model's only intended caller
+# today (the local-gpt-oss provider entry); rag-service is kept in the
+# allow-list for symmetry with the qwen policy - this chart can't know
+# which role a given instance plays.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.gptOssModel.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  podSelector:
+    matchLabels:
+      serving.kserve.io/inferenceservice: {{ .Values.gptOssModel.inferenceServiceName }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ai-gateway
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-data
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rag-service
+      ports:
+        - protocol: TCP
+          port: 8080

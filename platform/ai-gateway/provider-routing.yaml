@@ -21,9 +21,23 @@
 #     cluster.
 #
 # Fallback order within a classification is the order providers appear in
-# this list (top to bottom); the local model is always tried first when
+# this list (top to bottom); the local models are always tried first when
 # eligible, matching MEMORY.md section 6's "local model plus approved
 # external provider fallback order: OpenAI, Gemini, Anthropic, Mistral".
+# Since ADR-0412 there are TWO local providers: `local` (qwen, the
+# default) then `local-gpt-oss` (the reasoning-preferred second local and
+# C3's first-ever fallback). A per-(agent,task) `preferences:` entry in
+# policies/model-routing/model-routing-policy.yaml may REORDER the
+# candidates that survive eligibility/local-only filtering (e.g. putting
+# local-gpt-oss first for reflexional tasks) - reorder only, it can never
+# add a provider this list's `eligible_for` filtered out.
+#
+# `serves_adapters` (optional, default false; ADR-0303): marks the ONE
+# local provider whose vLLM runtime registers gitops/charts/models'
+# loraAdapters. The gateway drops an adapter name for any candidate
+# without this flag - a LoRA module name must never be sent to a runtime
+# that doesn't serve it (gpt-oss's runtime deliberately has no
+# --enable-lora).
 #
 # `api_key_env` names the environment variable this provider's API key is
 # read from at runtime (populated by an ExternalSecret -- see
@@ -55,6 +69,19 @@ providers:
     kind: local
     model: qwen2.5-7b-instruct
     endpoint: http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+    # ADR-0303: loraAdapters register on this vLLM runtime only.
+    serves_adapters: true
+
+  # ADR-0412: second local model, reasoning-preferred via the
+  # model-routing policy's `preferences:` (it leads the chain only for
+  # tasks declared reflexional there; everything else keeps qwen first).
+  - name: local-gpt-oss
+    kind: local
+    model: gpt-oss-20b
+    endpoint: http://gpt-oss-20b-predictor.zuno-ai-run.svc:8080/v1
     temperature: 0.2
     timeout_seconds: 60
     eligible_for: [C1, C2, C3]

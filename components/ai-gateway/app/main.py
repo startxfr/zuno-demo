@@ -181,8 +181,14 @@ async def chat_completions(
     classification = x_zuno_data_classification.upper()
     local_only = x_zuno_local_only.strip().lower() == "true"
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
+    # ADR-0412: per-(agent,task) preference from the git-managed policy
+    # only (never the ADR-0309 autonomy surface - "prefer" is on the
+    # optimizer's code-level denylist). Only permutes the candidates that
+    # survive the eligibility/local-only filtering inside candidates_for -
+    # it can never widen what ADR-0021/0035 allow.
+    preference = model_routing_policy.preference_for(x_zuno_agent, x_zuno_task)
     try:
-        candidates = routing_table.candidates_for(classification, local_only=local_only)
+        candidates = routing_table.candidates_for(classification, local_only=local_only, prefer=preference)
     except RoutingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -227,11 +233,18 @@ async def chat_completions(
     )
 
 
-def _resolve_adapter(candidate: ProviderCandidate, adapter_decl: Optional[AdapterDeclaration]) -> Optional[str]:
-    """None unless the candidate is local and a declaration exists for
-    this request's (agent, task) - the same guard app/providers.py's
+def _resolve_adapter(
+    candidate: ProviderCandidate,
+    cfg: Dict[str, Any],
+    adapter_decl: Optional[AdapterDeclaration],
+) -> Optional[str]:
+    """None unless the candidate is local, its provider entry declares
+    `serves_adapters: true` (ADR-0412: with two local runtimes, only the
+    qwen one registers loraAdapters - a LoRA module name must never reach
+    a runtime that doesn't serve it), and a declaration exists for this
+    request's (agent, task) - the same guard app/providers.py's
     chat_model_for() re-checks itself (ADR-0303/WP-39 defense in depth)."""
-    if adapter_decl and candidate.kind == "local":
+    if adapter_decl and candidate.kind == "local" and cfg.get("serves_adapters", False):
         return adapter_decl.adapter
     return None
 
@@ -291,7 +304,7 @@ async def _invoke_with_fallback(
         # local AND a declaration exists - effective_model_name is what
         # actually gets served/traced/returned, always the adapter's own
         # name when one applies.
-        adapter_name = _resolve_adapter(candidate, adapter_decl)
+        adapter_name = _resolve_adapter(candidate, cfg, adapter_decl)
         effective_model_name = adapter_name or model_name
         try:
             with model_call_span(candidate.name, effective_model_name, classification, request_id, adapter=adapter_name) as call:
@@ -367,7 +380,7 @@ async def _stream_completion(
     for candidate in candidates:
         cfg = routing_table.provider_config(candidate.name)
         model_name = cfg.get("model", candidate.name)
-        adapter_name = _resolve_adapter(candidate, adapter_decl)
+        adapter_name = _resolve_adapter(candidate, cfg, adapter_decl)
         effective_model_name = adapter_name or model_name
         sent_any = False
         try:

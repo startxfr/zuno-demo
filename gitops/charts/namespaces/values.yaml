@@ -298,15 +298,21 @@ platformNamespaces:
 # 24GB slices, the qwen chat predictor on the 48GB one (gitops/charts/
 # models). Replaces the earlier whole-GPU count quota (1->2->3 as L4 nodes
 # were added through 2026-08-16; that history and its admission-refusal
-# evidence lives in git). nvidia.com/gpu is pinned to 0 on purpose: whole
-# GPUs only exist on the tainted gpu-burst node and belong to training in
-# zuno-ai-build (the DSPA namespace, which has no quota) - an inference
-# workload in zuno-ai-run asking for a full GPU is a config error this
-# refuses at admission.
+# evidence lives in git).
+# nvidia.com/gpu was pinned to 0 from ADR-0351 until ADR-0412: whole GPUs
+# only existed on the tainted gpu-burst node and belong to training in
+# zuno-ai-build (the DSPA namespace, which has no quota), so an inference
+# workload in zuno-ai-run asking for a full GPU was a config error this
+# refused at admission. ADR-0412 carves the ONE sanctioned exception: the
+# gpt-oss-20b predictor (gitops/charts/models gptOssModel) serves on the
+# unmanaged workergpu node's otherwise-idle full GPU because every MIG
+# slice above is taken. Exactly "1" - a second full-GPU request is still a
+# config error - and it returns to "0" the day that node goes away or the
+# model moves onto a MIG slice (see the ADR's remediation section).
 openshiftAi:
   namespace: zuno-ai-run
   gpuQuota:
     resources:
       nvidia.com/mig-1g.24gb: "2"
       nvidia.com/mig-2g.48gb: "1"
-      nvidia.com/gpu: "0"
+      nvidia.com/gpu: "1"

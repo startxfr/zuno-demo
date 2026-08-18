@@ -50,15 +50,22 @@ def chat_model_for(
     adapter: Optional[str] = None,
 ) -> BaseChatModel:
     via_maas = maas_adapter.should_use_maas(cfg, candidate.kind)
-    if adapter and (candidate.kind != "local" or via_maas):
+    if adapter and (candidate.kind != "local" or via_maas or not cfg.get("serves_adapters", False)):
         # LoRA adapters only serve on the direct local vLLM endpoint - not
-        # a non-local candidate, and not even the local candidate when
-        # ADR-0114's MaaS transport is in front of it (out of scope here;
+        # a non-local candidate, not the local candidate when ADR-0114's
+        # MaaS transport is in front of it (out of scope here;
         # gitops/charts/models' loraAdapters flags are a direct-vLLM
-        # mechanism MaaS's own CR wrapping doesn't expose).
+        # mechanism MaaS's own CR wrapping doesn't expose), and since
+        # ADR-0412 not a local candidate whose provider entry lacks
+        # `serves_adapters: true` either - with two local runtimes, only
+        # the qwen one registers loraAdapters, and sending a LoRA module
+        # name to a runtime that doesn't serve it would 404 every request.
+        # Default-false means the config-less degraded mode (no
+        # provider-routing.yaml loaded) also drops adapters now - the safe
+        # direction.
         logger.warning(
-            "ignoring adapter '%s' for candidate '%s' (kind=%s, via_maas=%s): LoRA adapters only serve on the direct local vLLM runtime (ADR-0303)",
-            adapter, candidate.name, candidate.kind, via_maas,
+            "ignoring adapter '%s' for candidate '%s' (kind=%s, via_maas=%s, serves_adapters=%s): LoRA adapters only serve on the direct qwen vLLM runtime (ADR-0303/ADR-0412)",
+            adapter, candidate.name, candidate.kind, via_maas, cfg.get("serves_adapters", False),
         )
         adapter = None
 

@@ -335,9 +335,13 @@ def model_router_fails_closed(s: Dict[str, Any]) -> ScenarioResult:
 
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     routing = yaml.safe_load((repo_root / "platform/ai-gateway/provider-routing.yaml").read_text())
-    c3_providers = [p["name"] for p in routing.get("providers", []) if "C3" in p.get("eligible_for", [])]
-    ok = c3_providers == ["local"]
-    return ScenarioResult(s["id"], s["title"], ok, f"C3-eligible providers={c3_providers}")
+    # ADR-0412: two local providers exist (qwen + gpt-oss), so the invariant
+    # is kind-based - every C3-eligible provider must be kind "local", and
+    # at least one must exist - rather than a hardcoded ["local"] name list.
+    c3_providers = [p for p in routing.get("providers", []) if "C3" in p.get("eligible_for", [])]
+    c3_names = [p["name"] for p in c3_providers]
+    ok = bool(c3_providers) and all(p.get("kind") == "local" for p in c3_providers)
+    return ScenarioResult(s["id"], s["title"], ok, f"C3-eligible providers={c3_names}")
 
 
 def model_router_prefers_local(s: Dict[str, Any]) -> ScenarioResult:

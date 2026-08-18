@@ -27,6 +27,68 @@ adapters: []
 #   adapter: comage-lora
 #   classification: C2
 
+# ADR-0412: per-(agent,task) PROVIDER PREFERENCE - an ordered list of
+# provider-routing.yaml provider names moved to the FRONT of the
+# candidate chain for that agent/task pair. Semantics (enforced by
+# components/ai-gateway/app/routing.py's _apply_preference):
+#   - applied AFTER classification eligibility + local-only filtering
+#     (ADR-0021/0035): a pure reorder of the surviving candidates, it can
+#     never resurrect a provider those hard constraints removed;
+#   - unlisted survivors follow in provider-routing.yaml order;
+#   - unknown provider names are warned about and ignored (the two files
+#     have independent lifecycles - this one is baked into the gateway
+#     image, provider-routing.yaml is a ConfigMap);
+#   - no entry for an (agent, task) = today's order, unchanged;
+#   - never auto-tunable (ADR-0309: `prefer` is on the optimizer's
+#     code-level denylist).
+#
+# The entries below implement the 2026-08-18 decision: reasoning-heavy
+# ("reflexional") tasks prefer the local gpt-oss-20b over qwen - it leads
+# the WHOLE chain (also ahead of SaaS on C1/C2 turns, consistent with the
+# platform's local-first doctrine), and on C3/local-only turns it makes
+# gpt-oss the primary with qwen as fallback. Task-content rationale lives
+# in the per-row comments; simple lookup/listing/transactional tasks are
+# deliberately absent (qwen stays their first candidate).
+preferences:
+  # Multi-doc synthesis with citations (tekos's primary task).
+  - agent: tekos
+    task: answer-technical-question
+    prefer: [local-gpt-oss, local]
+  # Plan->draft->write document workflow; C3 by agent seed - the flagship
+  # local-only reflexional case.
+  - agent: arkos
+    task: draft-architecture-testimonial
+    prefer: [local-gpt-oss, local]
+  # Multi-year comparison/analysis over C3 sxa-legacy data.
+  - agent: comage
+    task: compare-historical-deals
+    prefer: [local-gpt-oss, local]
+  # Project/bid synthesis.
+  - agent: advantage
+    task: answer-project-question
+    prefer: [local-gpt-oss, local]
+  # Detection + judgment over adv knowledge (PO within 3 rolling days).
+  - agent: advantage
+    task: identify-new-business-with-po
+    prefer: [local-gpt-oss, local]
+  # Margin analysis by state/customer/technology.
+  - agent: advantage
+    task: monthly-sales-report
+    prefer: [local-gpt-oss, local]
+  # Invoice-readiness evaluation over sxa financial data (C3-intended).
+  - agent: finage
+    task: identify-business-ready-to-invoice
+    prefer: [local-gpt-oss, local]
+  # Aggregation report over sxa financial data (C3-intended).
+  - agent: finage
+    task: monthly-invoice-report
+    prefer: [local-gpt-oss, local]
+  # Board-level strategic/financial work, C3 agent seed - forward-declared
+  # (cognos is a placeholder with no runtime route yet; inert until then).
+  - agent: cognos
+    task: coming-soon
+    prefer: [local-gpt-oss, local]
+
 # ADR-0304 (WP-40 Part B): per (agent, task) "task class" quality/cost/
 # latency objectives, consumed by evaluations/routing_report.py alongside
 # live ai-gateway metrics (ADR-0029) and evaluations/benchmarks/*.json

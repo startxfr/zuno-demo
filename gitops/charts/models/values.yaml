@@ -145,8 +145,9 @@ modelStorage:
 # prefix keeps weights and corpus objects apart. Layout is
 # <prefix>/<servedModelName>/: models/qwen2.5-7b-instruct/ (uploaded
 # out-of-cluster 2026-08-18 during the hf:// hang incident, see maas.yaml),
-# plus models/gpt-oss-20b/ and models/gpt-oss-120b/ (staged 2026-08-18,
-# not servable on this cluster's GPUs - transit storage only).
+# models/gpt-oss-20b/ (served by gptOssModel below since ADR-0412), and
+# models/gpt-oss-120b/ (NOT servable on this cluster's GPUs - transit
+# storage for the operator's own workstation only).
 modelsS3:
   bucket: zuno-demo-rag-corpus
   prefix: models
@@ -209,6 +210,50 @@ embeddingModel:
       cpu: "1"
       memory: 4Gi
       nvidia.com/mig-1g.24gb: "1"
+  minReplicas: 1
+  maxReplicas: 1
+
+# ADR-0412: third model - gpt-oss-20b as a second local CHAT model (the
+# reasoning-preferred local for the ai-gateway's per-(agent,task)
+# preferences, see policies/model-routing/model-routing-policy.yaml).
+# Same additive servingRuntime/inferenceService-pair pattern as
+# embeddingModel above (and the same flat-values rationale). S3-only:
+# unlike the qwen chat model there is no PVC/download-Job mode at all -
+# templates/inferenceservice-gptoss.yaml always reads
+# s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/ through its
+# own unconditional credentials pair
+# (templates/s3-serving-credentials-gptoss.yaml - deliberately NOT the
+# qwen SA, which only renders while modelStorage.downloadJob.enabled is
+# false).
+# GPU: a FULL nvidia.com/gpu, not a MIG slice - all three ADR-0351 slices
+# are taken (qwen chat, embeddings, MaaS backend), so ADR-0412 serves
+# this model on the unmanaged workergpu node's idle 96GB GPU. The full-GPU
+# request is also what steers scheduling there: it's the only node
+# advertising nvidia.com/gpu (the MIG node exposes only mig-* resources).
+# Requires the zuno-ai-run gpuQuota exception in
+# gitops/charts/namespaces/values.yaml (nvidia.com/gpu: "1", ADR-0412).
+gptOssModel:
+  servingRuntimeName: vllm-gpt-oss-runtime
+  inferenceServiceName: gpt-oss-20b
+  # Same modelId-vs-API-id split as the chat model; also the S3 directory
+  # name under modelsS3 (<prefix>/<servedModelName>/).
+  servedModelName: gpt-oss-20b
+  # 131k native; capped well below to bound KV growth while still giving
+  # reasoning tasks far more room than the qwen chat model's 8192.
+  maxModelLen: 32768
+  # cpu/memory sized to the workergpu node's actual headroom (~4 vCPU,
+  # ~50Gi free after daemonsets - verified live 2026-08-18); the 13.8GB
+  # MXFP4 weights live in GPU VRAM, system RAM only carries the vLLM
+  # engine/tokenizer/request buffers.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 12Gi
+      nvidia.com/gpu: "1"
+    limits:
+      cpu: "3"
+      memory: 16Gi
+      nvidia.com/gpu: "1"
   minReplicas: 1
   maxReplicas: 1
 

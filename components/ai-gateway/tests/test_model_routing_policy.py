@@ -28,6 +28,13 @@ def _write_policy(entries) -> str:
     return path
 
 
+def _write_policy_doc(doc) -> str:
+    fd, path = tempfile.mkstemp(suffix=".yaml")
+    with os.fdopen(fd, "w") as fh:
+        yaml.safe_dump(doc, fh)
+    return path
+
+
 def test_declared_adapter_is_resolved() -> None:
     path = _write_policy([{"agent": "comage", "task": "check-deal-status", "adapter": "comage-lora", "classification": "C2"}])
     try:
@@ -104,6 +111,83 @@ def test_default_classification_is_c1() -> None:
         os.unlink(path)
 
 
+# --- ADR-0412: preferences ------------------------------------------------
+
+
+def test_preference_is_resolved_in_order() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local-gpt-oss", "local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("arkos", "draft-architecture-testimonial") == ["local-gpt-oss", "local"]
+    finally:
+        os.unlink(path)
+
+
+def test_preference_absent_or_empty_key_returns_none() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local-gpt-oss"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("tekos", "answer-technical-question") is None
+        assert policy.preference_for("", "draft-architecture-testimonial") is None
+        assert policy.preference_for("arkos", "") is None
+    finally:
+        os.unlink(path)
+
+
+def test_malformed_preference_is_skipped_valid_ones_load() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "comage", "task": "compare-historical-deals"},  # missing prefer
+        {"agent": "comage", "task": "check-deal-status", "prefer": "local-gpt-oss"},  # not a list
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local-gpt-oss", "local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("comage", "compare-historical-deals") is None
+        assert policy.preference_for("comage", "check-deal-status") is None
+        assert policy.preference_for("arkos", "draft-architecture-testimonial") == ["local-gpt-oss", "local"]
+    finally:
+        os.unlink(path)
+
+
+def test_preference_returns_a_copy_not_the_loaded_list() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local-gpt-oss", "local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        first = policy.preference_for("arkos", "draft-architecture-testimonial")
+        first.append("mutated")
+        assert policy.preference_for("arkos", "draft-architecture-testimonial") == ["local-gpt-oss", "local"]
+    finally:
+        os.unlink(path)
+
+
+def test_missing_file_degrades_to_no_preferences_either() -> None:
+    policy = ModelRoutingPolicy("/nonexistent/model-routing-policy.yaml")
+    assert policy.preference_for("arkos", "draft-architecture-testimonial") is None
+
+
+def test_reload_picks_up_preference_changes() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("arkos", "draft-architecture-testimonial") == ["local"]
+        with open(path, "w") as fh:
+            yaml.safe_dump({"preferences": [
+                {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local-gpt-oss", "local"]},
+            ]}, fh)
+        policy.reload()
+        assert policy.preference_for("arkos", "draft-architecture-testimonial") == ["local-gpt-oss", "local"]
+    finally:
+        os.unlink(path)
+
+
 TESTS = [
     test_declared_adapter_is_resolved,
     test_undeclared_agent_task_returns_none,
@@ -112,6 +196,12 @@ TESTS = [
     test_missing_file_degrades_to_no_adapters_ever,
     test_reload_picks_up_a_changed_file,
     test_default_classification_is_c1,
+    test_preference_is_resolved_in_order,
+    test_preference_absent_or_empty_key_returns_none,
+    test_malformed_preference_is_skipped_valid_ones_load,
+    test_preference_returns_a_copy_not_the_loaded_list,
+    test_missing_file_degrades_to_no_preferences_either,
+    test_reload_picks_up_preference_changes,
 ]
 
 
