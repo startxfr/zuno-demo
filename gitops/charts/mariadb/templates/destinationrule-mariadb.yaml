@@ -1,0 +1,24 @@
+{{- if .Values.mariadbOperand.enabled }}
+# The mandatory other half of mariadb.yaml's excludeInboundPorts "3306"
+# (see the full server-first-protocol rationale there): with 3306 out of
+# sidecar interception, istio auto-mTLS on IN-MESH clients (e.g.
+# sales-db-mcp in zuno-ai-run) would still send mTLS to a port nothing
+# terminates TLS on. This pins client-side TLS OFF for this one host so
+# every consumer - meshed or not - speaks plaintext MySQL to it inside
+# the cluster network. First DestinationRule in this repo; the istio
+# control plane serves networking.istio.io/v1 (verified live 2026-08-18).
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: mariadb-plaintext
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  host: mariadb.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+{{- end }}

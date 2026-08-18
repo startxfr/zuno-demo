@@ -15,6 +15,24 @@ metadata:
     argocd.argoproj.io/sync-wave: "-30"
 spec:
   replicas: {{ .Values.cluster.replicas }}
+  # VERIFIED live 2026-08-18: MySQL is a SERVER-FIRST protocol, and the
+  # istio sidecar this pod gained with the zuno-data mesh phase never
+  # delivers the server greeting to a PLAINTEXT NON-MESH client (measured:
+  # TCP connects, zero greeting bytes after 12s; instant on localhost) -
+  # istio's protocol sniffing waits for client bytes that never come.
+  # MariaDB's real client mix cannot be fully meshed: RHOAI's DSP
+  # components (ds-pipeline apiserver/MLMD for rag-dspa) deploy WITHOUT
+  # sidecars and are not this repo's pods to inject - MLMD crash-looped on
+  # mysql_real_connect until this exclusion. 3306 is therefore deliberately
+  # taken OUT of sidecar interception (the sidecar stays for everything
+  # else); templates/destinationrule-mariadb.yaml is the mandatory other
+  # half - without it, in-mesh clients' auto-mTLS would send TLS to a now-
+  # plaintext port. The Service-port appProtocol alternative (keeps mTLS)
+  # is not expressible through this operator's CR (`oc explain
+  # mariadb.spec.service`, 2026-08-18: type/LB/metadata only, no ports).
+  podMetadata:
+    annotations:
+      traffic.sidecar.istio.io/excludeInboundPorts: "3306"
   rootPasswordSecretKeyRef:
     name: mariadb-root-password
     key: password
