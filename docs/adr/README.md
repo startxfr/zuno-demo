@@ -102,6 +102,9 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v0.2 | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | Implemented | Introduce project-scoped agent memory |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | v0.2 | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
+| [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) | v0.2 | Proposed | Introduce persistent, navigable chat conversations |
+| [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.2 | Proposed | Introduce role-based conversation sharing between colleagues |
+| [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) | v0.2 | Proposed | Refresh agent-frontend chrome: branding, footer and menu icons |
 
 ## version 0.3
 
