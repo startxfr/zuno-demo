@@ -66,3 +66,19 @@ grafana:
   enabled: false
 
 monitoringNamespace: zuno-monitoring
+
+# Runtime-discovered (ADR-0048 gitops_app_extra_helm_values), not
+# hand-edited into this checked-in file: the Prometheus GrafanaDatasource's
+# "Authorization: Bearer <token>" value, resolved by
+# ansible/roles/grafana/tasks/install.yml once
+# serviceaccount-prometheus-reader.yaml's token Secret is minted. Templated
+# in directly (not via GrafanaDatasource spec.valuesFrom/secretKeyRef) -
+# VERIFIED live, 2026-08-18: grafana-operator v5.24.0's valuesFrom
+# resolves into spec.datasource.secureJsonData's map correctly per its own
+# status (ApplySuccessful, fresh hash), but the resolved value never
+# reaches Grafana's API (secureJsonFields stayed empty even after a full
+# delete+recreate); a statically-inlined secureJsonData value in the same
+# spot works immediately. datasource-prometheus.yaml only renders once
+# this is non-empty (same two-phase pattern nvidia_gpu's ClusterPolicy
+# discovery uses), so the datasource is never created half-configured.
+prometheusReaderBearer: ""

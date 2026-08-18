@@ -1,4 +1,4 @@
-{{- if .Values.grafana.enabled }}
+{{- if and .Values.grafana.enabled .Values.prometheusReaderBearer }}
 # ADR-0029's model-usage metrics: zuno.model_calls/zuno.model_tokens/
 # zuno.model_cost_usd (components/ai-gateway/app/telemetry.py) and
 # zuno_bff_requests_total (components/agent-bff), scraped by prometheus-k8s
@@ -9,14 +9,14 @@
 # grafana-prometheus-reader ServiceAccount's cluster-monitoring-view token
 # (serviceaccount-prometheus-reader.yaml).
 #
-# The Authorization header (with its required "Bearer " scheme prefix, which
-# a raw ServiceAccount token Secret doesn't carry on its own) is resolved by
-# ansible/roles/grafana/tasks/install.yml into
-# grafana-prometheus-reader-bearer - a platform-issued session credential
-# handled directly by Ansible, the same precedent
-# ansible/roles/{mlops,rag_ingestion} already use for OpenShift bearer
-# tokens, not an application-generated credential subject to ADR-0024's
-# Vault-only rule.
+# secureJsonData.httpHeaderValue1 is templated in directly from
+# .Values.prometheusReaderBearer (see values.yaml's own comment) rather
+# than via spec.valuesFrom/secretKeyRef - VERIFIED live, 2026-08-18, that
+# valuesFrom does not actually deliver its resolved value into Grafana for
+# this nested secureJsonData path on grafana-operator v5.24.0, while an
+# inline value in the same spot works immediately. Only rendered once that
+# value is known (two-phase apply, same pattern nvidia_gpu's ClusterPolicy
+# discovery uses) so this datasource is never created half-configured.
 #
 # tlsSkipVerify: true is a documented demo-scope shortcut, same as
 # gitops/charts/tempo's `tls.insecure: true` - thanos-querier's serving
@@ -46,10 +46,6 @@ spec:
       httpHeaderName1: "Authorization"
       tlsSkipVerify: true
       timeInterval: "30s"
-  valuesFrom:
-    - targetPath: "secureJsonData.httpHeaderValue1"
-      valueFrom:
-        secretKeyRef:
-          name: grafana-prometheus-reader-bearer
-          key: Authorization
+    secureJsonData:
+      httpHeaderValue1: {{ .Values.prometheusReaderBearer | quote }}
 {{- end }}

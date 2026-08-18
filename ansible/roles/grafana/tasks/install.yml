@@ -34,30 +34,34 @@
   retries: 30
   delay: 5
 
-# The Authorization header value ("Bearer <token>") is derived here rather
-# than seeded in Vault: this is a platform-issued ServiceAccount session
-# token (minted by the cluster itself once serviceaccount-prometheus-reader.yaml
-# lands), the same class of live OpenShift bearer credential
-# ansible/roles/{mlops,rag_ingestion} already read directly - not an
-# application-generated secret subject to ADR-0024's Vault-only rule.
-# grafana-operator watches its GrafanaDatasource's referenced Secrets and
-# re-syncs on change, so this can run after datasource-prometheus.yaml's
-# first (necessarily secret-missing) reconcile attempt.
-- name: "grafana | derive the Prometheus datasource's Authorization Secret"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: grafana-prometheus-reader-bearer
-        namespace: zuno-monitoring
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      type: Opaque
-      stringData:
-        Authorization: "Bearer {{ _grafana_prom_token_secret.resources[0].data.token | b64decode }}"
+# The Authorization header value ("Bearer <token>") is passed straight
+# through to a second d1 apply (ADR-0048's gitops_app_extra_helm_values,
+# already used by models/nvidia_gpu for other runtime-discovered values)
+# rather than via GrafanaDatasource spec.valuesFrom/secretKeyRef - VERIFIED
+# live, 2026-08-18: valuesFrom's resolved value never reached Grafana for
+# this nested secureJsonData path on grafana-operator v5.24.0 (confirmed
+# via a full delete+recreate of the GrafanaDatasource, ruling out a stale
+# cache), while an inline value in the same spot worked immediately - see
+# gitops/charts/grafana/values.yaml's prometheusReaderBearer comment. This
+# is a platform-issued ServiceAccount session token (minted by the cluster
+# itself once serviceaccount-prometheus-reader.yaml lands), the same class
+# of live OpenShift bearer credential ansible/roles/{mlops,rag_ingestion}
+# already read directly - not an application-generated secret subject to
+# ADR-0024's Vault-only rule, and never written to git (gitops_app_extra_helm_values
+# patches the live Application object only).
+- name: "grafana | re-apply the grafana GitOps Application (d1) with the Prometheus datasource's Authorization value"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   no_log: true
+  vars:
+    gitops_component_name: "grafana"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-grafana-d1"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10
+    gitops_app_extra_helm_values:
+      grafana:
+        enabled: true
+      prometheusReaderBearer: "Bearer {{ _grafana_prom_token_secret.resources[0].data.token | b64decode }}"
 
 - name: "grafana | wait for the Grafana Deployment to be ready"
   kubernetes.core.k8s_info:
