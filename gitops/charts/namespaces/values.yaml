@@ -192,6 +192,13 @@ platformNamespaces:
       # from this allowlist left the OSSM console plugin timing out
       # ("context deadline exceeded") intermittently since this policy first applied.
       - openshift-console
+      # VERIFIED live (2026-08-18): grafana's mesh-prometheus GrafanaDatasource
+      # (gitops/charts/grafana/templates/datasource-mesh-prometheus.yaml) calls
+      # mesh-monitoring-prometheus.zuno-mesh.svc directly - missing from this
+      # allowlist left every network-mesh Grafana dashboard panel dark (8s
+      # connect timeout from the grafana pod), same failure class as the two
+      # entries above.
+      - zuno-monitoring
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
