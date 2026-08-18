@@ -696,7 +696,9 @@ schedule:
 
 pipeline:
   name: rag-corpus-ingestion
-  version: v0-2-0
+  # v0-3-0: forwards STALE_AFTER into stage pods (CONFIG_KEYS fix) - v0-2-0
+  # compiled without it and every chunk failed WP-24 freshness validation.
+  version: v0-3-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
