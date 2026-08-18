@@ -36,6 +36,26 @@ data:
         service.beta.openshift.io/serving-cert-secret-name: "maas-gateway-service-tls"
     spec:
       type: ClusterIP
+  # VERIFIED live (2026-08-18): the auto-provisioned gateway pod OOMKilled
+  # repeatedly (30 restarts in 13h, exitCode 137) at Istio's own default
+  # gateway-proxy sizing (500m/256Mi limit) - this pod terminates TLS,
+  # runs the Kuadrant AuthPolicy's OPA evaluation and routes all MaaS
+  # traffic, materially heavier than a plain sidecar. Same
+  # infrastructure.parametersRef ConfigMap mechanism as the `service` key
+  # above, keyed by resource kind, per Istio's Gateway API deployer.
+  deployment: |
+    spec:
+      template:
+        spec:
+          containers:
+            - name: istio-proxy
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -93,14 +113,14 @@ spec:
   host: maas.{{ .Values.maasGateway.clusterBaseDomain }}
   to:
     kind: Service
-    # Not maas-default-gateway-data-science-gateway-class (that was the old
-    # data-science-gateway-class naming pattern): Istio's Gateway API
-    # controller auto-deploys a Service named identically to the Gateway
-    # object itself for gatewayClassName: istio. Not yet verified against a
-    # live reconcile of this specific Gateway - confirm the real Service
-    # name once applied (`oc get svc -n openshift-ingress`) and correct this
-    # if Istio's actual behavior differs.
-    name: maas-default-gateway
+    # RESOLVED live (2026-08-18): Istio's Gateway API controller actually
+    # names the auto-deployed Service "<gateway-name>-istio", not identical
+    # to the Gateway object - confirmed via `oc get svc -n openshift-ingress`
+    # (maas-default-gateway-istio, not maas-default-gateway). The prior
+    # value here was never live-verified and silently 503'd every external
+    # request through this Route since it was first applied (the router
+    # couldn't resolve a same-named Service that doesn't exist).
+    name: maas-default-gateway-istio
     weight: 100
   port:
     targetPort: 443
