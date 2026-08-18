@@ -25,17 +25,25 @@
 # RateLimitPolicies in templates/quota-ratelimitpolicies.yaml (source:
 # policies/quotas/quota-policy.yaml via
 # platform/okf/generate_quota_enforcement.py - never edit that file by
-# hand). Default false, same as every other block here: enabling requires
-# the operator to first attach the agent chat path to a Gateway API
-# HTTPRoute (routeName/routeNamespace below) with JWT identity established
-# by an AuthPolicy - see this chart's README, WP-54 section, for the
-# placement decision and enable steps. Token budgets are NOT here: they
+# hand) PLUS the demo Gateway/HTTPRoute/AuthPolicy in
+# templates/quota-demo-gateway.yaml that gives them something to target
+# (Kuadrant's CRDs hard-reject any targetRef that isn't Gateway API - plain
+# OpenShift Routes, which is how every agent's real traffic is served
+# today, cannot be targeted at all). Scoped to Tekos on a dedicated demo
+# hostname; the real tekos-frontend Route is untouched. See this chart's
+# README, WP-54 section, for the live demo evidence and rollback
+# (enabled: false removes all of it via ArgoCD selfHeal). Token budgets
+# are NOT here: they
 # are enforced by AI Gateway (components/ai-gateway/app/quota_budgets.yaml,
 # generated from the same policy file).
 quotaEnforcement:
-  enabled: false
-  routeName: ""
+  enabled: true
+  routeName: tekos-quota-demo
   routeNamespace: zuno-ai-run
+  demoHostname: tekos-quota-demo.apps.demo222.startx.fr
+  demoBackendService: tekos-frontend
+  demoBackendPort: 8080
+  keycloakIssuerUrl: https://keycloak.apps.demo222.startx.fr/realms/zuno
 
 operator:
   enabled: false

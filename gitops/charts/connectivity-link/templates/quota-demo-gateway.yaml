@@ -1,0 +1,84 @@
+# ADR-0511/WP-54: the demo-scoped ingress path Kuadrant's RateLimitPolicy
+# (templates/quota-ratelimitpolicies.yaml) and AuthPolicy require - Kuadrant's
+# own CRDs hard-reject any targetRef that isn't Gateway API (confirmed against
+# the live CRD's x-kubernetes-validations: only Gateway/HTTPRoute/GRPCRoute),
+# and agent traffic today reaches pods via plain OpenShift Routes, which
+# Kuadrant cannot target at all. Rather than migrate agent ingress wholesale
+# (a real architecture decision with no ADR behind it yet), this renders a
+# SEPARATE, additional path for Tekos only, on its own hostname - the
+# existing tekos-frontend Route is completely untouched throughout.
+#
+# Reuses router-certs-default (the OpenShift Ingress Router's own wildcard
+# cert, CN=*.<cluster-apps-domain> in practice) rather than provisioning a
+# new cert-manager Certificate - same namespace as this Gateway, so no
+# ReferenceGrant is needed either.
+#
+# Rollback: set quotaEnforcement.enabled back to false and sync - ArgoCD's
+# selfHeal removes all three objects below (and the RateLimitPolicies in the
+# sibling template); nothing here is referenced by any other chart.
+{{- if .Values.quotaEnforcement.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: zuno-agent-gateway
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: router-certs-default
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.quotaEnforcement.routeNamespace }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Values.quotaEnforcement.routeName }}
+  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  parentRefs:
+    - name: zuno-agent-gateway
+      namespace: openshift-ingress
+  hostnames:
+    - {{ .Values.quotaEnforcement.demoHostname }}
+  rules:
+    - backendRefs:
+        - name: {{ .Values.quotaEnforcement.demoBackendService }}
+          port: {{ .Values.quotaEnforcement.demoBackendPort }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: {{ .Values.quotaEnforcement.routeName }}-jwt
+  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.quotaEnforcement.routeName }}
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          issuerUrl: {{ .Values.quotaEnforcement.keycloakIssuerUrl }}
+{{- end }}

@@ -27,22 +27,50 @@ co-edited by hand or by this chart). A BFF-side direct Limitador
 consult was rejected: it would move declared policy into per-agent Go
 code and bypass the compilation flow the platform already trusts.
 
-**Why disabled by default:** a `RateLimitPolicy` targets a Gateway API
-object, and agent chat traffic enters through OpenShift Routes today —
-there is no agent HTTPRoute for the policies to attach to yet. Enabling
-is an operator step:
+**Why a Gateway is required at all:** confirmed directly against the
+installed CRD (`oc get crd ratelimitpolicies.kuadrant.io -o json` →
+`x-kubernetes-validations`), not assumed — `targetRef.group` must be
+`gateway.networking.k8s.io` and `targetRef.kind` must be one of
+`HTTPRoute`/`GRPCRoute`/`Gateway`. A plain OpenShift `Route`
+(`route.openshift.io/v1`), which is how every agent's real traffic is
+served today, can never be a target. There is no way to attach
+Kuadrant enforcement to a Route.
 
-1. Attach the agent chat path to a gateway listener (Connectivity Link
-   gateway or equivalent) with an `HTTPRoute`, and establish JWT
-   identity on that route with a Kuadrant `AuthPolicy` (Keycloak `zuno`
-   realm issuer/JWKS) so the `auth.identity.*` counter expressions
-   resolve.
-2. Set `quotaEnforcement.enabled: true` and
-   `quotaEnforcement.routeName/routeNamespace` to that HTTPRoute.
-3. Verify: a demo user exceeding the per-user request limit receives an
-   explicit 429 from the gateway; `oc get limitador -n kuadrant-system
-   -o yaml` shows the compiled `zuno-quota-*` descriptors beside the
-   MaaS ones.
+**Live demo state (WP-54, 2026-08-18):** `templates/quota-demo-gateway.yaml`
+renders a dedicated demo path for Tekos, scoped to avoid touching real
+traffic at all:
+- `Gateway` `zuno-agent-gateway` (namespace `openshift-ingress`, class
+  `istio` — Sail/Istio already backs `GatewayClass istio` on this
+  cluster, confirmed live) reuses `router-certs-default`, the OpenShift
+  Ingress Router's own wildcard cert (`CN=*.apps.<cluster-domain>`,
+  confirmed via `openssl x509`) — same namespace as the Gateway, so no
+  `ReferenceGrant` and no new cert-manager `Certificate` to provision.
+  Neither pre-existing live Gateway (`data-science-gateway`,
+  `maas-default-gateway`) was reusable: the former's `allowedRoutes`
+  excludes `zuno-ai-run` and is ODH-operator-owned; the latter already
+  carries a conflicting deny-by-default `AuthPolicy`/`TokenRateLimitPolicy`
+  for MaaS.
+- `HTTPRoute` `tekos-quota-demo` (namespace `zuno-ai-run`) on a
+  **dedicated hostname**, `tekos-quota-demo.apps.<cluster-domain>` —
+  deliberately not the real `tekos.apps.<cluster-domain>` Route's
+  hostname, so the two ingress paths never contend for the same DNS
+  name and the live Route/Service are never at risk. Backend:
+  `tekos-frontend:8080`, the same Service the real Route already fronts.
+- `AuthPolicy` `tekos-quota-demo-jwt` establishes JWT identity from the
+  same Keycloak `zuno` realm issuer the frontend/BFF charts already
+  use, so `auth.identity.sub`/`auth.identity.groups` resolve for the
+  RateLimitPolicies.
+
+**Rollback:** set `quotaEnforcement.enabled: false` and push — ArgoCD's
+`selfHeal` removes all of it. Nothing outside this chart references any
+object rendered here.
+
+**Verification:** a demo persona's requests to
+`https://tekos-quota-demo.apps.<cluster-domain>/` should be rate-limited
+with an explicit `429` after the `standard` class's per-user limit (60
+req/5m); `oc get limitador -n kuadrant-system -o yaml` should show the
+compiled `zuno-quota-*` descriptors alongside the pre-existing MaaS
+ones. (Evidence recorded in `docs/roadmap/work-packages/wp-54-quota-policy-and-kuadrant-translation.md`'s State log once run.)
 
 Identity/key semantics (also in the generated file's header): user =
 `auth.identity.sub`; group = the caller's sorted group set joined with
