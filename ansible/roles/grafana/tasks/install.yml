@@ -1,0 +1,35 @@
+---
+# Visualization layer for ADR-0029's model-usage metrics/traces (Prometheus +
+# Tempo datasources, "Model consumption" dashboard), behind an oauth-proxy
+# sidecar authenticating against OpenShift's own (Keycloak-federated,
+# ADR-0320) OAuth server.
+- name: "grafana | apply the grafana GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "grafana"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-grafana-d0"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
+
+- name: "grafana | apply the grafana GitOps Application (d1: Grafana instance, datasources, dashboard)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "grafana"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-grafana-d1"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10
+
+- name: "grafana | wait for the Grafana Deployment to be ready"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-monitoring
+    name: grafana-deployment
+  register: _grafana_deploy
+  until: >-
+    (_grafana_deploy.resources | default([]) | length) > 0 and
+    (_grafana_deploy.resources[0].status.readyReplicas | default(0)) > 0
+  retries: 30
+  delay: 10

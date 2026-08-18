@@ -1,0 +1,40 @@
+---
+# Grafana operator install; the Grafana instance (datasources, dashboard) is
+# a separate Application (application-d1.yaml) applied after this one is
+# healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-grafana-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-158"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/grafana
+    helm:
+      releaseName: zuno-grafana-d0
+      values: |
+        project:
+          enabled: true
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-grafana-operator
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true # namespace isn't created elsewhere

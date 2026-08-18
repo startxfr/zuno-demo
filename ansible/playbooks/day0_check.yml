@@ -22,6 +22,7 @@
       - service_mesh
       - mesh_monitoring
       - kiali
+      - grafana
       - postgresql
       - mariadb
       - tempo
@@ -54,6 +55,7 @@
       - tempo
       - mesh_monitoring
       - kiali
+      - grafana
       - smtp
       - nfd
       - nvidia_gpu

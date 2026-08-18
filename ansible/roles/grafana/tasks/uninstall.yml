@@ -1,0 +1,18 @@
+---
+# Reverse of install.yml: delete -d1 first (avoids ArgoCD fighting a CR deletion),
+# then remove_operator.yml before -d0's own delete.
+- name: "grafana | delete the grafana GitOps Application (d1: instance, datasources, dashboard)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-grafana-d1"
+
+- name: "grafana | remove the operator (its owned CRDs - cascading the Grafana instance - then the CSV, then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: grafana-operator
+    operator_namespace: openshift-grafana-operator
+
+- name: "grafana | delete the grafana GitOps Application (d0: cascades the remaining OperatorGroup/Namespace)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-grafana-d0"

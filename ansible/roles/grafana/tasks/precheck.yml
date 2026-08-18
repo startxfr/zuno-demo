@@ -1,0 +1,35 @@
+---
+# State detection (never fails).
+- name: "grafana | check the grafana Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-grafana-d0"
+
+- name: "grafana | save the d0 check result"
+  ansible.builtin.set_fact:
+    _grafana_d0_installed: "{{ _state_check_result }}"
+
+- name: "grafana | check the grafana Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-grafana-d1"
+
+- name: "grafana | look up the Grafana Deployment"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-monitoring
+    name: grafana-deployment
+  register: _grafana_deploy_lookup
+
+- name: "grafana | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _grafana_d0_installed and _state_check_result
+        and (_grafana_deploy_lookup.resources | default([]) | length) > 0
+        and (_grafana_deploy_lookup.resources[0].status.readyReplicas | default(0)) > 0
+      }}
+
+- name: "grafana | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

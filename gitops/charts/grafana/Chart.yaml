@@ -1,0 +1,14 @@
+apiVersion: v2
+name: grafana
+description: >-
+  Grafana operator install plus the Grafana instance visualizing ADR-0029's
+  model-usage metrics (Prometheus) and traces (Tempo).
+type: application
+version: 0.1.0
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
+  - name: project
+    version: "21.3.277"
+    repository: "alias:startx"

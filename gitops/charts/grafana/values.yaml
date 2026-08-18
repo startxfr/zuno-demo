@@ -1,0 +1,68 @@
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart; grafana.enabled renders the
+# Grafana instance (CR, oauth-proxy Route/ServiceAccount, datasources,
+# dashboard). Shared by two ArgoCD Applications: operator
+# (zuno-grafana-d0, project+operator) and instance (zuno-grafana-d1,
+# grafana). All default false so `helm template`/`helm lint` render nothing.
+#
+# Package/channel confirmed against a live cluster's PackageManifest before
+# this chart was written - see
+# `oc get packagemanifest grafana-operator -n openshift-marketplace`.
+# Unlike every other operator this repo installs (kiali-ossm, tempo-product,
+# servicemeshoperator3, opentelemetry-product, cluster-observability-operator
+# are all redhat-operators), no redhat-operators/certified-operators grafana
+# package exists on this cluster - grafana-operator is Community Operators
+# only, published directly by Grafana Labs (the upstream project itself, not
+# a third party), and is the de-facto standard way to run Grafana on
+# Kubernetes/OpenShift. Accepted as a deliberate, documented exception to
+# the certified-operator preference rather than skipped.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: grafana
+    app: grafana
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-grafana-operator
+    display_name: Zuno Grafana Operator
+    description: "Community Grafana operator (Grafana Labs), installed by Zuno."
+    requester: zuno
+
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: grafana
+    app: grafana
+  subscription:
+    enabled: true
+    name: grafana-operator
+    namespace: openshift-grafana-operator
+    operator:
+      # Must be set explicitly, same name as subscription.name: the vendored
+      # `operator` chart defaults this to "codeready-workspaces", silently
+      # suppressing the fallback to subscription.name.
+      name: grafana-operator
+      channel: v5
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: community-operators
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: grafana-operator-group
+    namespace: openshift-grafana-operator
+    target: "all-ns"  # matches the original hand-authored spec: {}
+
+grafana:
+  enabled: false
+
+monitoringNamespace: zuno-monitoring

@@ -1,0 +1,39 @@
+---
+# Grafana instance (not the operator, see application-d0.yaml): the Grafana
+# CR, its oauth-proxy fronting Route/ServiceAccount, the Prometheus/Tempo
+# GrafanaDatasources and the "Model consumption" GrafanaDashboard.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-grafana-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-157"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/grafana
+    helm:
+      releaseName: zuno-grafana-d1
+      values: |
+        grafana:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-monitoring
+  ignoreDifferences:
+    # The Grafana operator defaults nearly every leaf under spec at runtime;
+    # without this, ArgoCD sees permanent drift and fights it (same reasoning
+    # as gitops/apps/kiali/application-d1.yaml for the Kiali CR).
+    - group: grafana.integreatly.org
+      kind: Grafana
+      jsonPointers:
+        - /spec
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

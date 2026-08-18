@@ -27,6 +27,7 @@
       - service_mesh
       - mesh_monitoring
       - kiali
+      - grafana
       - postgresql
       - mariadb
       - tempo
