@@ -180,6 +180,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | OKF v0.1 | Proposed | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | OKF v0.1 | Proposed | Define the agent tests directory structure and promotion gate |
 | [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Proposed | Open OKF tasks as concurrent per-agent frontend tabs |
+| [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | OKF v0.1 | Proposed | Define OKF quota policy enforced via Kuadrant |
+| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | OKF v0.1 | Proposed | Introduce project-bound tasks with Salesforce-verified context |
 
 ## Standard clauses
 
