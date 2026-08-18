@@ -8,6 +8,8 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "45"
+    image.openshift.io/triggers: |-
+      {{ include "rag-service.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "rag-service") }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:

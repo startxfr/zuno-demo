@@ -212,7 +212,45 @@ func (r *AIAgentReconciler) applyOwned(ctx context.Context, agent *zunov1alpha1.
 		return err
 	}
 	desired.SetResourceVersion(existing.GetResourceVersion())
+	preserveLiveImages(desired, existing)
 	return r.Update(ctx, desired)
+}
+
+// preserveLiveImages keeps an OpenShift image-change trigger
+// (image.openshift.io/triggers, ADR-0411 follow-up) in effect across
+// reconciles. This controller watches the Deployments it owns
+// (Owns(&appsv1.Deployment{}) in SetupWithManager), so the trigger
+// controller's own patch of spec.template.spec.containers[].image to a
+// resolved digest is itself the event that fires the next reconcile -
+// without this, that reconcile would immediately overwrite the digest
+// back to the floating :latest tag computed by imageString(), undoing
+// the trigger on every single push. If desired carries the trigger
+// annotation, copy each container's live image (last set either by this
+// function's own prior Create, or by the trigger controller) from
+// existing onto desired before Update, so this reconcile never reasserts
+// a stale image value. No-op for every non-Deployment resource type
+// applyOwned also handles.
+func preserveLiveImages(desired, existing client.Object) {
+	desiredDeploy, ok := desired.(*appsv1.Deployment)
+	if !ok {
+		return
+	}
+	if _, ok := desiredDeploy.Annotations["image.openshift.io/triggers"]; !ok {
+		return
+	}
+	existingDeploy, ok := existing.(*appsv1.Deployment)
+	if !ok {
+		return
+	}
+	live := make(map[string]string, len(existingDeploy.Spec.Template.Spec.Containers))
+	for _, c := range existingDeploy.Spec.Template.Spec.Containers {
+		live[c.Name] = c.Image
+	}
+	for i, c := range desiredDeploy.Spec.Template.Spec.Containers {
+		if img := live[c.Name]; img != "" {
+			desiredDeploy.Spec.Template.Spec.Containers[i].Image = img
+		}
+	}
 }
 
 func deploymentReady(ctx context.Context, c client.Client, desired *appsv1.Deployment) bool {

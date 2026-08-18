@@ -26,6 +26,10 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
+	"path"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -37,6 +41,42 @@ import (
 
 	zunov1alpha1 "github.com/startxfr/zuno-demo/operator/aiagent-operator/api/v1alpha1"
 )
+
+// imageTriggerNamespace is where every BuildConfig-produced ImageStream
+// lives, regardless of which namespace the consuming Deployment runs in
+// (see ansible/tasks/apply_openshift_build.yml).
+const imageTriggerNamespace = "zuno-ai-build"
+
+type imageTriggerFrom struct {
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+type imageTrigger struct {
+	From      imageTriggerFrom `json:"from"`
+	FieldPath string           `json:"fieldPath"`
+}
+
+// imageTriggerAnnotation builds the image.openshift.io/triggers
+// annotation (ADR-0411 follow-up): patches the named container's image
+// field directly from the ImageStreamTag whenever a fresh Build pushes
+// to it, so a rebuild rolls this Deployment with no manual pod deletion.
+// repository is "zuno-ai-build/<name>" (or a full registry/namespace/name
+// pullspec) - path.Base strips everything but the bare ImageStream name,
+// matching the chart-rendered Deployments' identical `base` Helm helper.
+func imageTriggerAnnotation(repository, tag, container string) map[string]string {
+	triggers := []imageTrigger{{
+		From: imageTriggerFrom{
+			Kind:      "ImageStreamTag",
+			Name:      path.Base(repository) + ":" + tag,
+			Namespace: imageTriggerNamespace,
+		},
+		FieldPath: fmt.Sprintf(`spec.template.spec.containers[?(@.name=="%s")].image`, container),
+	}}
+	b, _ := json.Marshal(triggers)
+	return map[string]string{"image.openshift.io/triggers": string(b)}
+}
 
 const (
 	labelAgent     = "zuno.io/agent"
@@ -209,7 +249,12 @@ func desiredFrontendDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) 
 	}
 
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: agent.Spec.TargetNamespace, Labels: labels},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   agent.Spec.TargetNamespace,
+			Labels:      labels,
+			Annotations: imageTriggerAnnotation(agent.Spec.Frontend.Image.Repository, agent.Spec.Frontend.Image.Tag, "frontend"),
+		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: replicasOrDefault(agent.Spec.Frontend.Replicas),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},
@@ -255,7 +300,12 @@ func desiredBFFDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) *apps
 	}
 
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: agent.Spec.TargetNamespace, Labels: labels},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   agent.Spec.TargetNamespace,
+			Labels:      labels,
+			Annotations: imageTriggerAnnotation(agent.Spec.BFF.Image.Repository, agent.Spec.BFF.Image.Tag, "bff"),
+		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: replicasOrDefault(agent.Spec.BFF.Replicas),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},

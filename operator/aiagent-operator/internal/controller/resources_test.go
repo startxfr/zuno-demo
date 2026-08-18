@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -166,6 +167,41 @@ func TestDesiredFrontendDeployment_KeycloakCADisabledWhenConfigMapNameEmpty(t *t
 	for _, v := range deploy.Spec.Template.Spec.Volumes {
 		require.NotEqual(t, "keycloak-ca", v.Name)
 	}
+}
+
+// ADR-0411 follow-up: both generated Deployments must carry a correctly
+// shaped image.openshift.io/triggers annotation, or a fresh Build never
+// rolls these pods without a manual `oc delete pod`.
+func TestDesiredFrontendDeployment_ImageTriggerAnnotation(t *testing.T) {
+	agent := sampleAgent()
+	cfg := DefaultOperatorConfig()
+
+	deploy := desiredFrontendDeployment(agent, cfg)
+	raw, ok := deploy.Annotations["image.openshift.io/triggers"]
+	require.True(t, ok, "image.openshift.io/triggers annotation not found")
+
+	var triggers []imageTrigger
+	require.NoError(t, json.Unmarshal([]byte(raw), &triggers))
+	require.Len(t, triggers, 1)
+	require.Equal(t, "ImageStreamTag", triggers[0].From.Kind)
+	require.Equal(t, "agent-frontend:latest", triggers[0].From.Name)
+	require.Equal(t, "zuno-ai-build", triggers[0].From.Namespace)
+	require.Equal(t, `spec.template.spec.containers[?(@.name=="frontend")].image`, triggers[0].FieldPath)
+}
+
+func TestDesiredBFFDeployment_ImageTriggerAnnotation(t *testing.T) {
+	agent := sampleAgent()
+	cfg := DefaultOperatorConfig()
+
+	deploy := desiredBFFDeployment(agent, cfg)
+	raw, ok := deploy.Annotations["image.openshift.io/triggers"]
+	require.True(t, ok, "image.openshift.io/triggers annotation not found")
+
+	var triggers []imageTrigger
+	require.NoError(t, json.Unmarshal([]byte(raw), &triggers))
+	require.Len(t, triggers, 1)
+	require.Equal(t, "agent-bff:latest", triggers[0].From.Name)
+	require.Equal(t, `spec.template.spec.containers[?(@.name=="bff")].image`, triggers[0].FieldPath)
 }
 
 func TestDesiredBFFDeployment_NoSecretEnvVars(t *testing.T) {

@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/component: frontend
   annotations:
     argocd.argoproj.io/sync-wave: "90"
+    image.openshift.io/triggers: |-
+      {{ include "finage.imageTrigger" (dict "repository" .Values.image.frontendRepository "tag" .Values.image.tag "container" "frontend") }}
 spec:
   replicas: {{ .Values.frontend.replicas }}
   selector:
@@ -119,6 +121,8 @@ metadata:
     app.kubernetes.io/component: bff
   annotations:
     argocd.argoproj.io/sync-wave: "90"
+    image.openshift.io/triggers: |-
+      {{ include "finage.imageTrigger" (dict "repository" .Values.image.bffRepository "tag" .Values.image.tag "container" "bff") }}
 spec:
   replicas: {{ .Values.bff.replicas }}
   selector:

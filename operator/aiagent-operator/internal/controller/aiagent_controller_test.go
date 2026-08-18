@@ -147,7 +147,9 @@ func TestReconcile_CreatesOwnedResourcesWithOwnerRefs(t *testing.T) {
 // TestReconcile_DriftIsReconciled proves the reconciler is idempotent and
 // self-healing: an out-of-band edit to a generated object is reverted on
 // the next reconcile, the same property Argo CD's own self-heal relies
-// on for the AIAgent CR itself.
+// on for the AIAgent CR itself. Drifts an env var, not the image field -
+// see TestReconcile_PreservesLiveImageAcrossReconciles for why the image
+// field is a deliberate, narrow exception to this (ADR-0411 follow-up).
 func TestReconcile_DriftIsReconciled(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
@@ -166,7 +168,7 @@ func TestReconcile_DriftIsReconciled(t *testing.T) {
 
 	var deploy appsv1.Deployment
 	require.NoError(t, k8sClient.Get(ctx, client.ObjectKey{Name: "test-drift-bff", Namespace: "zuno-ai-run"}, &deploy))
-	deploy.Spec.Template.Spec.Containers[0].Image = "someone-elses-image:mutated"
+	deploy.Spec.Template.Spec.Containers[0].Env[0].Value = "someone-elses-drifted-value"
 	require.NoError(t, k8sClient.Update(ctx, &deploy))
 
 	_, err = r.Reconcile(ctx, reconcileRequestFor(agent))
@@ -174,7 +176,52 @@ func TestReconcile_DriftIsReconciled(t *testing.T) {
 
 	var reconciled appsv1.Deployment
 	require.NoError(t, k8sClient.Get(ctx, client.ObjectKey{Name: "test-drift-bff", Namespace: "zuno-ai-run"}, &reconciled))
-	g.Expect(reconciled.Spec.Template.Spec.Containers[0].Image).To(Equal("reg/repo/bff:latest"))
+	g.Expect(reconciled.Spec.Template.Spec.Containers[0].Env[0].Value).To(Equal("test-drift"))
+}
+
+// TestReconcile_PreservesLiveImageAcrossReconciles is ADR-0411's own
+// proof: every generated Deployment carries image.openshift.io/triggers
+// (imageTriggerAnnotation), and this controller watches the Deployments
+// it owns - so without preserveLiveImages, the trigger controller's own
+// patch of the image field would be the very event that fires the next
+// reconcile, which would then immediately stomp it back to the floating
+// :latest tag. Simulates that patch directly (envtest runs no real
+// image-trigger controller) and confirms a subsequent reconcile leaves
+// the image alone while still correcting an unrelated drifted field -
+// proving the exception is scoped to the image only, not a blanket
+// "stop reconciling this Deployment" bug.
+func TestReconcile_PreservesLiveImageAcrossReconciles(t *testing.T) {
+	g := NewWithT(t)
+	ctx := context.Background()
+	ensureNamespace(t, "zuno-ai-run")
+
+	agent := &zunov1alpha1.AIAgent{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-image-trigger", Namespace: "zuno-ai-run"},
+		Spec:       testAgentSpec("test-image-trigger"),
+	}
+	require.NoError(t, k8sClient.Create(ctx, agent))
+	t.Cleanup(func() { _ = k8sClient.Delete(ctx, agent) })
+
+	r := newReconciler()
+	_, err := r.Reconcile(ctx, reconcileRequestFor(agent))
+	require.NoError(t, err)
+
+	var deploy appsv1.Deployment
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKey{Name: "test-image-trigger-frontend", Namespace: "zuno-ai-run"}, &deploy))
+	g.Expect(deploy.Annotations).To(HaveKey("image.openshift.io/triggers"))
+
+	const resolvedDigest = "reg/repo/frontend@sha256:deadbeef"
+	deploy.Spec.Template.Spec.Containers[0].Image = resolvedDigest
+	deploy.Spec.Template.Spec.Containers[0].Env[0].Value = "someone-elses-drifted-value"
+	require.NoError(t, k8sClient.Update(ctx, &deploy))
+
+	_, err = r.Reconcile(ctx, reconcileRequestFor(agent))
+	require.NoError(t, err)
+
+	var reconciled appsv1.Deployment
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKey{Name: "test-image-trigger-frontend", Namespace: "zuno-ai-run"}, &reconciled))
+	g.Expect(reconciled.Spec.Template.Spec.Containers[0].Image).To(Equal(resolvedDigest), "the trigger-patched image must survive a reconcile")
+	g.Expect(reconciled.Spec.Template.Spec.Containers[0].Env[0].Value).To(Equal("test-image-trigger"), "unrelated drift must still be corrected")
 }
 
 // TestReconcile_RejectsDisallowedNamespace proves the in-code defense in

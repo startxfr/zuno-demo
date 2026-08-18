@@ -8,6 +8,8 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "15"
+    image.openshift.io/triggers: |-
+      {{ include "mcp-gateway.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "mcp-gateway") }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
