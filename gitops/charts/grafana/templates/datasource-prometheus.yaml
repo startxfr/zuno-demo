@@ -1,0 +1,55 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0029's model-usage metrics: zuno.model_calls/zuno.model_tokens/
+# zuno.model_cost_usd (components/ai-gateway/app/telemetry.py) and
+# zuno_bff_requests_total (components/agent-bff), scraped by prometheus-k8s
+# via gitops/charts/observability's ServiceMonitor - confirmed-live
+# 2026-08-18 (docs/platform/slo.md). Queried through thanos-querier
+# in-cluster (not its external Route, for the same 100%-in-cluster style
+# every other datasource in this repo uses), Bearer-authenticated with the
+# grafana-prometheus-reader ServiceAccount's cluster-monitoring-view token
+# (serviceaccount-prometheus-reader.yaml).
+#
+# The Authorization header (with its required "Bearer " scheme prefix, which
+# a raw ServiceAccount token Secret doesn't carry on its own) is resolved by
+# ansible/roles/grafana/tasks/install.yml into
+# grafana-prometheus-reader-bearer - a platform-issued session credential
+# handled directly by Ansible, the same precedent
+# ansible/roles/{mlops,rag_ingestion} already use for OpenShift bearer
+# tokens, not an application-generated credential subject to ADR-0024's
+# Vault-only rule.
+#
+# tlsSkipVerify: true is a documented demo-scope shortcut, same as
+# gitops/charts/tempo's `tls.insecure: true` - thanos-querier's serving
+# cert chains to the cluster's service-ca, wiring that CA bundle in is a
+# fair follow-up, not done here.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  uid: prometheus
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  datasource:
+    name: Prometheus
+    type: prometheus
+    access: proxy
+    url: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+    isDefault: true
+    jsonData:
+      httpHeaderName1: "Authorization"
+      tlsSkipVerify: true
+      timeInterval: "30s"
+  valuesFrom:
+    - targetPath: "secureJsonData.httpHeaderValue1"
+      valueFrom:
+        secretKeyRef:
+          name: grafana-prometheus-reader-bearer
+          key: Authorization
+{{- end }}

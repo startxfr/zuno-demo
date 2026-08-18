@@ -1,0 +1,26 @@
+{{- if .Values.grafana.enabled }}
+# Distributed traces (model_call/tool_invoke/rag_search/agent_graph_run
+# spans, ADR-0029) from gitops/charts/tempo's Tempo - same in-cluster URL
+# gitops/charts/kiali/templates/kiali.yaml already uses.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: tempo
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  uid: tempo
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  datasource:
+    name: Tempo
+    type: tempo
+    access: proxy
+    url: "http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200"
+    jsonData:
+      httpMethod: "GET"
+{{- end }}

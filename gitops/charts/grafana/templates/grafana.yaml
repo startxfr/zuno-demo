@@ -1,0 +1,99 @@
+{{- if .Values.grafana.enabled }}
+# The Grafana instance. Sits behind an oauth-proxy sidecar authenticating
+# against OpenShift's own OAuth server (already Keycloak-federated,
+# ADR-0320) instead of Kiali's `auth.strategy: anonymous` demo shortcut -
+# same SSO as the OpenShift Console, no new Keycloak client needed.
+# `--openshift-sar` gates entry to accounts already granted RBAC on
+# {{ .Values.monitoringNamespace }} by gitops/charts/openshift-rbac-groups
+# (the cluster-admin `admin` group, and `zuno-admin`, which is bound to
+# `admin` on every `zuno.io/managed=true` namespace - `aiops` is NOT
+# included, its RBAC only covers zuno-ai-build/zuno-ai-run).
+#
+# `dashboards: "grafana"` is this instance's own label, matched by
+# datasource-prometheus.yaml/datasource-tempo.yaml/dashboard-model-consumption.yaml's
+# spec.instanceSelector.
+#
+# Field shapes (spec.route/service/deployment merge-by-name semantics,
+# default Service/Deployment/container names) confirmed against a live
+# grafana-operator v5.24.0 CRD/probe CR before this template was written -
+# see `oc explain grafana.spec` and its children.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: grafana
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    dashboards: "grafana"
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  config:
+    auth:
+      disable_login_form: "true"
+    "auth.proxy":
+      enabled: "true"
+      header_name: "X-Forwarded-User"
+      header_property: "username"
+      auto_sign_up: "true"
+      whitelist: "127.0.0.1"
+  # Operator auto-creates this Secret from the annotation below, populated
+  # by the cluster's service-ca operator - oauth-proxy's own serving cert.
+  service:
+    metadata:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: grafana-oauth-tls
+    spec:
+      ports:
+        - name: oauth-proxy
+          port: 8443
+          targetPort: oauth-proxy
+  # Named "grafana-route" (<CR name>-route) - matched by
+  # serviceaccount-oauth-proxy.yaml's redirectreference annotation.
+  route:
+    spec:
+      to:
+        kind: Service
+        name: grafana-service
+      port:
+        targetPort: oauth-proxy
+      tls:
+        termination: reencrypt
+        insecureEdgeTerminationPolicy: Redirect
+  deployment:
+    spec:
+      template:
+        spec:
+          serviceAccountName: grafana-oauth-proxy
+          containers:
+            - name: oauth-proxy
+              image: image-registry.openshift-image-registry.svc:5000/openshift/oauth-proxy:v4.4
+              args:
+                - --https-address=:8443
+                - --http-address=
+                - --provider=openshift
+                - --openshift-service-account=grafana-oauth-proxy
+                - --upstream=http://localhost:3000
+                - --tls-cert=/etc/tls/private/tls.crt
+                - --tls-key=/etc/tls/private/tls.key
+                - --cookie-secret=$(COOKIE_SECRET)
+                - --openshift-sar={"namespace":"{{ .Values.monitoringNamespace }}","resource":"pods","verb":"get"}
+                - --pass-user-headers=true
+                - --email-domain=*
+              env:
+                - name: COOKIE_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: grafana-oauth-cookie
+                      key: cookie_secret
+              ports:
+                - containerPort: 8443
+                  name: oauth-proxy
+              volumeMounts:
+                - name: grafana-oauth-tls
+                  mountPath: /etc/tls/private
+          volumes:
+            - name: grafana-oauth-tls
+              secret:
+                secretName: grafana-oauth-tls
+{{- end }}

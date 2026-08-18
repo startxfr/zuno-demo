@@ -21,6 +21,44 @@
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 
+- name: "grafana | wait for the Prometheus-reader ServiceAccount token to be minted"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-monitoring
+    name: grafana-prometheus-reader-token
+  register: _grafana_prom_token_secret
+  until: >-
+    (_grafana_prom_token_secret.resources | default([]) | length) > 0 and
+    ((_grafana_prom_token_secret.resources[0].data.token | default('')) | length > 0)
+  retries: 30
+  delay: 5
+
+# The Authorization header value ("Bearer <token>") is derived here rather
+# than seeded in Vault: this is a platform-issued ServiceAccount session
+# token (minted by the cluster itself once serviceaccount-prometheus-reader.yaml
+# lands), the same class of live OpenShift bearer credential
+# ansible/roles/{mlops,rag_ingestion} already read directly - not an
+# application-generated secret subject to ADR-0024's Vault-only rule.
+# grafana-operator watches its GrafanaDatasource's referenced Secrets and
+# re-syncs on change, so this can run after datasource-prometheus.yaml's
+# first (necessarily secret-missing) reconcile attempt.
+- name: "grafana | derive the Prometheus datasource's Authorization Secret"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: grafana-prometheus-reader-bearer
+        namespace: zuno-monitoring
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      stringData:
+        Authorization: "Bearer {{ _grafana_prom_token_secret.resources[0].data.token | b64decode }}"
+  no_log: true
+
 - name: "grafana | wait for the Grafana Deployment to be ready"
   kubernetes.core.k8s_info:
     api_version: apps/v1
