@@ -88,13 +88,29 @@ component-code package.
 
 ### Phase 2 — OKF v0.2: extraction
 
+Order rationale: strictly mirror (WP-48) → pin (WP-49) → cutover
+(WP-50), so image builds are never without a working content source;
+WP-51 (hooks) needs only the pin and runs in parallel with the cutover.
+The cross-repo single-writer clause is in force from WP-48's merge to
+WP-50's.
+
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
+| WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Not started | create zuno-okf repo + protection + CODEOWNERS (blocking precondition) |
+| WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Not started | read-only CI credential for zuno-okf; one signed-bundle verification |
+| WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Not started | one ArgoCD sync cycle + one evaluation run post-cutover |
+| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-49 (∥ WP-50) | Not started | none (deploys ride the next rollout) |
 
 ### Phase 3 — OKF v0.3: live reconciliation
 
+Order rationale: mounts before watching — WP-52 must be **Done** (live
+Naveo proof), not merely merged, before WP-53 starts; WP-53's Part B
+demo pair is the stream's closing proof.
+
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
+| WP-52 | [wp-52](work-packages/wp-52-mounted-okf-artifacts.md) | 0509 | WP-50, WP-51 | Not started | deploy operator + Naveo chart bump; mounted-content confirmation |
+| WP-53 | [wp-53](work-packages/wp-53-okf-live-reconciliation.md) | 0510 | WP-52 Done | Not started | two live demos (prompt propagation; ceiling violation); stream sign-off |
 
 ## Dependency graph
 

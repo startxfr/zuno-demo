@@ -320,6 +320,19 @@ WP state only; stub ADRs are promoted to full files (Step 0 of their brief)
 before implementation; every brief separates model-executable repo changes
 from operator/cluster steps.
 
+2026-08-18: the OKF stream opened as its own version line (ADR-0501,
+05xx band reserved; OKF v0.1 content excellence → OKF v0.2 extraction
+into a standalone `zuno-okf` repository → OKF v0.3 operator live
+reconciliation), tracked in `docs/roadmap/okf-roadmap.md` with WP-43 –
+WP-55 continuing the global WP series. Twelve ADRs (0501–0512) and all
+thirteen briefs authored as full files (no stub promotion — Step 0 in
+these briefs is only the Status flip). New conventions the stream adds:
+the cross-repo single-writer clause (from WP-48's merge to WP-50's,
+zuno-demo stays authoritative and zuno-okf is a mirror); ADR Target
+header values `OKF v0.1|v0.2|v0.3`; quota precedence project → user →
+group (ADR-0511); `project_required` tasks verify a Salesforce project
+binding fail-closed before any action (ADR-0512).
+
 ## 14. Explicitly deferred capabilities
 
 Main v2 candidates:
