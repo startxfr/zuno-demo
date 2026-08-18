@@ -1,6 +1,28 @@
 # WP-54: Quota policy and Kuadrant translation (promotes ADR-0511)
 
-- **State:** Not started
+- **State:** Operator pending (Parts A+B merged 2026-08-18, two
+  commits). **Placement decision (Part B step 5):** Kuadrant-native —
+  the generated per-class `RateLimitPolicy`s live in the
+  connectivity-link chart (it owns the Kuadrant plane), values-gated
+  off (`quotaEnforcement.enabled: false`) because agent chat enters
+  via OpenShift Routes today and RLPs need a Gateway API targetRef;
+  the live cluster shows the supported flow (policy CR → Kuadrant
+  operator → compiled Limitador descriptors — the MaaS token limits
+  already ride it, and the Limitador CR is operator-owned, never
+  co-edited). BFF-direct Limitador consult rejected (would move policy
+  into per-agent Go code). Token budgets: `app/quota.py` in ai-gateway
+  (in-process fixed-window ledger — single-replica demo scope; the
+  durable counter plane stays Limitador), checked pre-dispatch (429
+  with class/dimension/budget/window), consumed where usage is
+  metered. **Recorded gaps:** streaming responses carry no
+  usage_metadata (pre-existing — record_usage never ran there either),
+  so only non-streaming consumption is metered; the group counter keys
+  the full sorted group-set, not per-group; the
+  X-Zuno-Quota-Class/X-Zuno-Project-Id headers are accepted but no
+  caller sends them yet (agent-runtime wiring lands with WP-55/WP-47).
+  ai-gateway suite: 84 passed (python3.12 venv — NOTE: redis==8.1.0
+  needs ≥3.10, system 3.9 venv fails at install). helm lint clean;
+  enabled render = 2 RLPs, disabled = none.
 - **ADRs:** ADR-0511
 - **Depends on:** WP-44 Part A (matrix generator exists to grow the
   quota column)

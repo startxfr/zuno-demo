@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from app import semantic_cache
+from app import quota, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.model_routing_policy import AdapterDeclaration, ModelRoutingPolicy
 from app.optimizer import OptimizationRefused, TuningController
@@ -177,10 +177,25 @@ async def chat_completions(
     # span still carries a stable id even for a caller that never sends
     # one (never blank, always joinable to something).
     x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
+    # ADR-0511 (WP-54): quota class per the executing task's
+    # zuno.quota_class (absent = standard), and the ADR-0512 verified
+    # project binding - both only ever set platform-side (agent-runtime);
+    # the BFF strips inbound copies from end users. The same two headers
+    # key the Kuadrant request-rate dimension.
+    x_zuno_quota_class: str = Header(default="standard", alias="X-Zuno-Quota-Class"),
+    x_zuno_project_id: str = Header(default="", alias="X-Zuno-Project-Id"),
 ):
     classification = x_zuno_data_classification.upper()
     local_only = x_zuno_local_only.strip().lower() == "true"
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
+    quota_class = x_zuno_quota_class.strip() or "standard"
+    project_id = x_zuno_project_id.strip() or None
+    # ADR-0511: token-budget check BEFORE dispatch, on top of (never
+    # instead of) the classification/eligibility intersection below.
+    # Exhaustion is an explicit 429, never silent degradation.
+    denial = quota.ledger.check(quota_class, identity.sub, identity.groups, project_id)
+    if denial is not None:
+        return JSONResponse(denial.detail(), status_code=429)
     # ADR-0412: per-(agent,task) preference from the git-managed policy
     # only (never the ADR-0309 autonomy surface - "prefer" is on the
     # optimizer's code-level denylist). Only permutes the candidates that
@@ -231,6 +246,8 @@ async def chat_completions(
         raw_messages=payload.messages,
         request_id=request_id,
         adapter_decl=adapter_decl,
+        quota_class=quota_class,
+        project_id=project_id,
     )
 
 
@@ -262,6 +279,8 @@ async def _invoke_with_fallback(
     request_id: str,
     adapter_decl: Optional[AdapterDeclaration] = None,
     groups: Optional[List[str]] = None,
+    quota_class: str = "standard",
+    project_id: Optional[str] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -319,6 +338,14 @@ async def _invoke_with_fallback(
                 prompt_tokens = usage.get("input_tokens", 0)
                 completion_tokens = usage.get("output_tokens", 0)
                 call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+                # ADR-0511: attribute consumption per the precedence order
+                # (project first when bound, then user; group ceiling always).
+                # Streaming responses carry no usage_metadata today, so only
+                # this path consumes - same coverage as record_usage itself.
+                quota.ledger.consume(
+                    quota_class, caller_sub, groups, project_id,
+                    prompt_tokens + completion_tokens,
+                )
         except Exception as exc:
             logger.warning(
                 "provider '%s' failed for caller=%s, trying next fallback: %s",

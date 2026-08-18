@@ -55,6 +55,8 @@ jobs:
         run: python3 platform/docs/check_knowledge_refs.py
       - name: Validate quota policy and task quota-class references (ADR-0511)
         run: python3 platform/okf/validate_quota_policy.py
+      - name: Verify generated quota enforcement matches quota-policy.yaml (ADR-0511)
+        run: python3 platform/okf/generate_quota_enforcement.py --check
       - name: Verify generated authorization matrices match regeneration (ADR-0503)
         run: python3 platform/okf/generate_authorization_matrix.py --check --all
       - name: Verify deployment snapshots match their charts (ADR-0503)

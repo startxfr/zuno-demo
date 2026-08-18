@@ -1,0 +1,89 @@
+{{- if .Values.quotaEnforcement.enabled }}
+# GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:
+# policies/quotas/quota-policy.yaml. Regenerate with:
+#   python3 platform/okf/generate_quota_enforcement.py
+# One RateLimitPolicy per quota class; request-rate dimension only
+# (token budgets are enforced by AI Gateway - see
+# components/ai-gateway/app/quota_budgets.yaml). Rendered only when
+# .Values.quotaEnforcement.enabled is true AND the operator has
+# supplied the agent chat HTTPRoute this policy targets (see this
+# chart's README, WP-54 section).
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: zuno-quota-intensive
+  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.quotaEnforcement.routeName }}
+  limits:
+    intensive-user:
+      rates:
+        - limit: 10
+          window: 5m
+      counters:
+        - expression: 'auth.identity.sub'
+      when:
+        - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
+    intensive-group:
+      rates:
+        - limit: 60
+          window: 5m
+      counters:
+        - expression: 'auth.identity.groups.split(",").join("|")'
+      when:
+        - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
+    intensive-project:
+      rates:
+        - limit: 30
+          window: 5m
+      counters:
+        - expression: "request.headers['x-zuno-project-id']"
+      when:
+        - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
+        - predicate: "has(request.headers['x-zuno-project-id'])"
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: zuno-quota-standard
+  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.quotaEnforcement.routeName }}
+  limits:
+    standard-user:
+      rates:
+        - limit: 60
+          window: 5m
+      counters:
+        - expression: 'auth.identity.sub'
+      when:
+        - predicate: "!has(request.headers['x-zuno-quota-class']) || request.headers['x-zuno-quota-class'] == 'standard'"
+    standard-group:
+      rates:
+        - limit: 600
+          window: 5m
+      counters:
+        - expression: 'auth.identity.groups.split(",").join("|")'
+      when:
+        - predicate: "!has(request.headers['x-zuno-quota-class']) || request.headers['x-zuno-quota-class'] == 'standard'"
+    standard-project:
+      rates:
+        - limit: 300
+          window: 5m
+      counters:
+        - expression: "request.headers['x-zuno-project-id']"
+      when:
+        - predicate: "!has(request.headers['x-zuno-quota-class']) || request.headers['x-zuno-quota-class'] == 'standard'"
+        - predicate: "has(request.headers['x-zuno-project-id'])"
+{{- end }}

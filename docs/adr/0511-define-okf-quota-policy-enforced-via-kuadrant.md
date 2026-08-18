@@ -1,6 +1,6 @@
 # ADR-0511: Define OKF quota policy enforced via Kuadrant
 
-- **Status:** Proposed
+- **Status:** Partially implemented (WP-54 repo work merged 2026-08-18: quota-policy.yaml + schema + lint + matrix column + generated Kuadrant RateLimitPolicies in the connectivity-link chart, values-gated off + AI Gateway token-budget enforcement with tests; remaining: operator attaches the agent chat HTTPRoute + AuthPolicy and enables quotaEnforcement, then the live quota-denial demo)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

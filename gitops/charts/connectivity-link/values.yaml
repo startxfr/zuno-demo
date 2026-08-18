@@ -21,6 +21,22 @@
 # discovered by ansible and set via gitops_app_extra_helm_values on the -d0
 # apply (ADR-0048). templates/checks.yaml fails the render if either is
 # still empty once operator.enabled is true.
+# quotaEnforcement (ADR-0511/WP-54): renders the GENERATED per-class
+# RateLimitPolicies in templates/quota-ratelimitpolicies.yaml (source:
+# policies/quotas/quota-policy.yaml via
+# platform/okf/generate_quota_enforcement.py - never edit that file by
+# hand). Default false, same as every other block here: enabling requires
+# the operator to first attach the agent chat path to a Gateway API
+# HTTPRoute (routeName/routeNamespace below) with JWT identity established
+# by an AuthPolicy - see this chart's README, WP-54 section, for the
+# placement decision and enable steps. Token budgets are NOT here: they
+# are enforced by AI Gateway (components/ai-gateway/app/quota_budgets.yaml,
+# generated from the same policy file).
+quotaEnforcement:
+  enabled: false
+  routeName: ""
+  routeNamespace: zuno-ai-run
+
 operator:
   enabled: false
   context:

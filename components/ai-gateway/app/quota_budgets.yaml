@@ -1,0 +1,40 @@
+# GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:
+# policies/quotas/quota-policy.yaml (token-budget slice + precedence
+# + fail modes - what app/quota.py needs; request rates are enforced
+# by Kuadrant, not here). Regenerate with:
+#   python3 platform/okf/generate_quota_enforcement.py
+classes:
+  standard:
+    fail_mode: open
+    tokens:
+      user:
+        budget: 200000
+        window: 24h
+      group:
+        budget: 2000000
+        window: 24h
+      project:
+        budget: 1000000
+        window: 24h
+  intensive:
+    fail_mode: closed
+    tokens:
+      user:
+        budget: 500000
+        window: 24h
+      group:
+        budget: 5000000
+        window: 24h
+      project:
+        budget: 2500000
+        window: 24h
+precedence:
+  in_project_context:
+  - project
+  - user
+  - group
+  default:
+  - user
+  - group
+project_binding:
+  validity_window: 24h
