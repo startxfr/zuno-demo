@@ -292,8 +292,16 @@ class CorpusStore:
             "region_name": config.s3_region or None,
             "aws_access_key_id": config.aws_access_key_id,
             "aws_secret_access_key": config.aws_secret_access_key,
+            # Bounded timeouts + retries: in-cluster S3 transfers on this
+            # platform hang intermittently (seen live 2026-08-18 - an index
+            # run sat idle-in-transaction for minutes inside a get_json).
+            # botocore's legacy defaults can stall a stage for a long time;
+            # fail the call fast and let the retry mode handle transients.
             "config": BotoClientConfig(
-                s3={"addressing_style": "path" if config.s3_path_style else "auto"}
+                s3={"addressing_style": "path" if config.s3_path_style else "auto"},
+                connect_timeout=10,
+                read_timeout=60,
+                retries={"max_attempts": 4, "mode": "standard"},
             ),
         }
         if config.s3_endpoint:
@@ -1315,7 +1323,8 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
     deleted = 0
     try:
         with conn.cursor() as cur:
-            for doc_id in changeset["new"] + changeset["changed"]:
+            doc_ids = changeset["new"] + changeset["changed"]
+            for position, doc_id in enumerate(doc_ids, start=1):
                 record = store.get_json(f"{config.normalized_prefix}/{doc_id}.chunks.json")
                 if not record:
                     logger.warning("index-pgvector: chunk document %s missing, skipping", doc_id)
@@ -1350,6 +1359,17 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                         ),
                     )
                     indexed += 1
+                # Commit per document, not per run: the S3 get_json above can
+                # stall and a Patroni failover can kill the connection (both
+                # seen live 2026-08-18) - a single run-wide transaction lost
+                # every upserted row each time. The upsert makes partial
+                # progress safe to re-run.
+                conn.commit()
+                if position % 100 == 0:
+                    logger.info(
+                        "index-pgvector: %d/%d documents processed, %d chunk rows so far",
+                        position, len(doc_ids), indexed,
+                    )
 
             for url in changeset.get("deleted_urls", []):
                 cur.execute("DELETE FROM document_embeddings WHERE source = %s", (url,))
