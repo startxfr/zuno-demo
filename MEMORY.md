@@ -558,6 +558,15 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
+- **2026-08-18 (ADR-0117 closed, WP-02 Done)**: the Atlassian
+  product-access grant landed and the live e2e chain ran clean against
+  `startxfr.atlassian.net`: indexed `knowledge.tech` read (rag-service),
+  gateway `search`/`read` as real personas (tekos/arkos declarations),
+  gateway `create` correctly 403-denied (ADR-0011 — no agent declares
+  write), and all four provider tools verified against the real REST API
+  via service identity (create/update confined to the technical
+  identity's personal space, cleaned up after). ADR-0117 `Implemented`;
+  ADR-0043's status line records confluence as migrated.
 - **2026-08-14 (ADR-0106, WP-05)**: OKF bundles get a signing/validation
   pipeline. `platform/supply-chain/sign_okf_bundle.py` computes a
   deterministic sha256 digest and signs/verifies with keyless `cosign

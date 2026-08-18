@@ -1,6 +1,6 @@
 # ADR-0043: Use standard MCP protocol behind the Zuno MCP Gateway
 
-- **Status:** Implemented - see `components/mcp-gateway/app/downstream.py` (streamable-HTTP `mcp` SDK), `components/mcp-gateway/requirements.txt` (`mcp==2.0.0`), `tests/test_mcp_protocol.py`. Only the sales-db server/gateway have migrated; confluence/google-workspace/lucidchart/web-search MCP servers are still unimplemented (tracked under ADR-0326).
+- **Status:** Implemented - see `components/mcp-gateway/app/downstream.py` (streamable-HTTP `mcp` SDK), `components/mcp-gateway/requirements.txt` (`mcp==2.0.0`), `tests/test_mcp_protocol.py`. sales-db and confluence (`components/mcp-servers/confluence/`, migrated and live-verified 2026-08-18 per ADR-0117/WP-02) speak real MCP behind the gateway; google-workspace/lucidchart/web-search MCP servers are still unimplemented (tracked under ADR-0326).
 - **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
