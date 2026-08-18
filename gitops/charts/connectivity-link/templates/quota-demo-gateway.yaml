@@ -8,15 +8,41 @@
 # SEPARATE, additional path for Tekos only, on its own hostname - the
 # existing tekos-frontend Route is completely untouched throughout.
 #
-# Reuses router-certs-default (the OpenShift Ingress Router's own wildcard
-# cert, CN=*.<cluster-apps-domain> in practice) rather than provisioning a
-# new cert-manager Certificate - same namespace as this Gateway, so no
-# ReferenceGrant is needed either.
+# Ingress shape copied exactly from the two other live Gateway API
+# gateways on this cluster (data-science-gateway, maas-default-gateway):
+# infrastructure.parametersRef -> a ConfigMap requesting a ClusterIP
+# Service with an OpenShift service-serving-cert-signer annotation (the
+# platform auto-issues and rotates the TLS secret named there - no
+# cert-manager Certificate needed), fronted by an OpenShift Route
+# (reencrypt) on the router's own *.apps.<domain> wildcard DNS.
+#
+# First attempt (2026-08-18) skipped the ConfigMap and let the Gateway
+# default to a LoadBalancer Service - which provisioned a genuinely
+# separate AWS ELB with its own hostname, invisible to *.apps.<domain>
+# DNS (confirmed live: curl against the demo hostname 503'd because it
+# was hitting the OpenShift router, which has no Route for it - the new
+# ELB was a different address entirely). Fixed by matching the live
+# pattern instead of the Gateway API default.
 #
 # Rollback: set quotaEnforcement.enabled back to false and sync - ArgoCD's
-# selfHeal removes all three objects below (and the RateLimitPolicies in the
+# selfHeal removes every object below (and the RateLimitPolicy in the
 # sibling template); nothing here is referenced by any other chart.
 {{- if .Values.quotaEnforcement.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zuno-agent-gateway-config
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+data:
+  service: |
+    metadata:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: "zuno-agent-gateway-tls"
+    spec:
+      type: ClusterIP
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -27,6 +53,11 @@ metadata:
     app.kubernetes.io/part-of: zuno-quota-enforcement
 spec:
   gatewayClassName: istio
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: zuno-agent-gateway-config
   listeners:
     - name: https
       port: 443
@@ -35,7 +66,7 @@ spec:
         mode: Terminate
         certificateRefs:
           - kind: Secret
-            name: router-certs-default
+            name: zuno-agent-gateway-tls
       allowedRoutes:
         namespaces:
           from: Selector
@@ -45,6 +76,26 @@ spec:
                 operator: In
                 values:
                   - {{ .Values.quotaEnforcement.routeNamespace }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: zuno-agent-gateway
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  host: {{ .Values.quotaEnforcement.demoHostname }}
+  port:
+    targetPort: 443
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: zuno-agent-gateway-istio
+    weight: 100
+  wildcardPolicy: None
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

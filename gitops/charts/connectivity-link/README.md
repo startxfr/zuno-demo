@@ -45,28 +45,42 @@ Kuadrant enforcement to a Route.
 
 **Live demo state (WP-54, 2026-08-18):** `templates/quota-demo-gateway.yaml`
 renders a dedicated demo path for Tekos, scoped to avoid touching real
-traffic at all:
+traffic at all, copying the exact ingress shape the two pre-existing
+Gateways already use on this cluster (`data-science-gateway`,
+`maas-default-gateway`) rather than Gateway API's own defaults:
+- `ConfigMap` `zuno-agent-gateway-config` + Gateway
+  `infrastructure.parametersRef` request a **`ClusterIP`** Service with
+  `service.beta.openshift.io/serving-cert-secret-name` — OpenShift's
+  service-serving-cert-signer auto-issues and rotates the listener's
+  TLS secret, no cert-manager `Certificate` needed. **First attempt
+  skipped this ConfigMap** and let the Gateway default to a
+  `LoadBalancer` Service — which silently provisioned a genuinely
+  separate AWS ELB with its own hostname, invisible to
+  `*.apps.<cluster-domain>` DNS (confirmed live: the demo hostname
+  503'd — it was hitting the OpenShift router, which had no `Route`
+  for it, while the real traffic went to a different address
+  entirely). Caught and fixed before running the actual quota demo.
 - `Gateway` `zuno-agent-gateway` (namespace `openshift-ingress`, class
   `istio` — Sail/Istio already backs `GatewayClass istio` on this
-  cluster, confirmed live) reuses `router-certs-default`, the OpenShift
-  Ingress Router's own wildcard cert (`CN=*.apps.<cluster-domain>`,
-  confirmed via `openssl x509`) — same namespace as the Gateway, so no
-  `ReferenceGrant` and no new cert-manager `Certificate` to provision.
-  Neither pre-existing live Gateway (`data-science-gateway`,
-  `maas-default-gateway`) was reusable: the former's `allowedRoutes`
-  excludes `zuno-ai-run` and is ODH-operator-owned; the latter already
-  carries a conflicting deny-by-default `AuthPolicy`/`TokenRateLimitPolicy`
-  for MaaS.
-- `HTTPRoute` `tekos-quota-demo` (namespace `zuno-ai-run`) on a
-  **dedicated hostname**, `tekos-quota-demo.apps.<cluster-domain>` —
-  deliberately not the real `tekos.apps.<cluster-domain>` Route's
-  hostname, so the two ingress paths never contend for the same DNS
-  name and the live Route/Service are never at risk. Backend:
-  `tekos-frontend:8080`, the same Service the real Route already fronts.
+  cluster). Neither pre-existing live Gateway was reusable as a
+  parent: `data-science-gateway`'s `allowedRoutes` excludes
+  `zuno-ai-run` and is ODH-operator-owned; `maas-default-gateway`
+  already carries a conflicting deny-by-default
+  `AuthPolicy`/`TokenRateLimitPolicy` for MaaS.
+- `Route` `zuno-agent-gateway` (namespace `openshift-ingress`,
+  `termination: reencrypt`) on the router's own
+  `*.apps.<cluster-domain>` wildcard DNS, host
+  `tekos-quota-demo.apps.<cluster-domain>` — a **dedicated hostname**,
+  deliberately not the real `tekos.apps.<cluster-domain>` Route's, so
+  the two ingress paths never contend for the same DNS name and the
+  live Route/Service are never at risk.
+- `HTTPRoute` `tekos-quota-demo` (namespace `zuno-ai-run`) backing that
+  hostname inside the mesh, backend `tekos-frontend:8080` — the same
+  Service the real Route already fronts.
 - `AuthPolicy` `tekos-quota-demo-jwt` establishes JWT identity from the
   same Keycloak `zuno` realm issuer the frontend/BFF charts already
   use, so `auth.identity.sub`/`auth.identity.groups` resolve for the
-  RateLimitPolicies.
+  RateLimitPolicy.
 
 **Rollback:** set `quotaEnforcement.enabled: false` and push — ArgoCD's
 `selfHeal` removes all of it. Nothing outside this chart references any
