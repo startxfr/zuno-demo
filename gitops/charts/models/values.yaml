@@ -428,13 +428,20 @@ lmEval:
         - name: tokenizer_backend
           value: none
       taskNames: [mmlu]
-      # allowOnline flipped true 2026-08-18 (WP-10 live run): the mmlu
-      # dataset is fetched from Hugging Face by the eval pod itself and no
-      # offline dataset volume is provisioned on this cluster - with false
-      # the job cannot acquire its task data at all. Model access stays
-      # local (local-completions against the in-cluster predictor);
-      # allowCodeExecution stays false. In-cluster HF downloads are known
-      # to hang intermittently on this platform - the run is operator-
-      # watched, not fire-and-forget.
-      allowOnline: true
+      # allowOnline stays false: VERIFIED live 2026-08-18 it has no effect
+      # either way (the operator hardcodes the HF offline env vars
+      # regardless - see lmevaljob.yaml's dated comment). The real fix is
+      # datasetCachePvc below: mmlu's dataset (hails/mmlu_no_train, one
+      # HF `load_dataset(path, config)` call per of its 57 subject
+      # configs - NOT the "all" aggregate config, which has a real,
+      # separate bug returning 0 examples per split) is pre-cached by the
+      # operator into this PVC's HF_HOME before the job runs. Model access
+      # stays local (local-completions against the in-cluster predictor);
+      # allowCodeExecution stays false.
+      allowOnline: false
       allowCodeExecution: false
+      # Operator-populated PVC (see the WP-10 brief's operator follow-up
+      # for the exact prefetch procedure). Must exist and be pre-warmed
+      # before this job runs, or every task falls back to a live HF
+      # network call that the operator's own offline env vars will block.
+      datasetCachePvc: lmeval-hf-cache

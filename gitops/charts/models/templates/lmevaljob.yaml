@@ -39,29 +39,42 @@ spec:
   outputs:
     pvcManaged:
       size: {{ .pvcSize | default "5Gi" }}
-{{- if .allowOnline }}
-  # VERIFIED live 2026-08-18 (3.5.0-ea.2, v1.37.0 TrustyAI operator): a
-  # real operator bug - `allowOnline: true` above does NOT stop the pod
-  # from being rendered with HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1/
-  # HF_DATASETS_OFFLINE=1/HF_EVALUATE_OFFLINE=1 hardcoded, so the
-  # tokenizer/dataset download 404s regardless of the spec field. Direct
+{{- if .datasetCachePvc }}
+  # VERIFIED live 2026-08-18 (3.5.0-ea.2, v1.37.0 TrustyAI operator): TWO
+  # real, independent operator bugs make `allowOnline: true` non-functional
+  # - (1) the rendered pod hardcodes HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1/
+  # HF_DATASETS_OFFLINE=1/HF_EVALUATE_OFFLINE=1 regardless of the spec
+  # field, and (2) setting spec.pod.container.env to override those same
+  # names back to "0" does NOT take effect either - the operator's own
+  # values still win in the rendered pod (confirmed by direct inspection
+  # of the running pod's env after setting the override). Direct
   # reproduction from an ad hoc pod on the same image proved network/TLS/
-  # DNS all work fine and the exact AutoTokenizer.from_pretrained() call
-  # succeeds outside the job wrapper - the offline env vars are the sole
-  # cause. spec.pod.container.env is a real, documented override
-  # (`oc explain lmevaljob.spec.pod.container.env`); used here to force
-  # the four flags back to online for any job that opted in above.
+  # DNS all work fine outside the job wrapper - the hardcoded offline env
+  # is the sole cause, not the environment.
+  #
+  # Workaround that actually works: HF's offline mode only blocks network
+  # calls, not reads from an already-populated local cache. datasetCachePvc
+  # names a PVC pre-populated by the operator (see the WP-10 brief's
+  # operator follow-up for the exact prefetch procedure - one
+  # `load_dataset(path, config)` call per task config, into HF_HOME) and
+  # mounted here at HF_HOME; with the cache already warm, HF_*_OFFLINE=1
+  # is no longer a blocker at all - offline mode was the intended
+  # operating posture for this CRD all along, not the bug (only the
+  # non-functional allowOnline/env-override paths are bugs).
   pod:
+    # spec.pod.volumes (confirmed via `oc explain lmevaljob.spec.pod.volumes`)
+    # is a pod-level field, sibling to pod.container - not nested under it.
+    volumes:
+      - name: dataset-cache
+        persistentVolumeClaim:
+          claimName: {{ .datasetCachePvc }}
     container:
       env:
-        - name: HF_HUB_OFFLINE
-          value: "0"
-        - name: TRANSFORMERS_OFFLINE
-          value: "0"
-        - name: HF_DATASETS_OFFLINE
-          value: "0"
-        - name: HF_EVALUATE_OFFLINE
-          value: "0"
+        - name: HF_HOME
+          value: /cache/hf_home
+      volumeMounts:
+        - name: dataset-cache
+          mountPath: /cache
 {{- end }}
 {{- end }}
 {{- end }}
