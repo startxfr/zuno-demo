@@ -48,7 +48,54 @@
       {{ (_rag_ingestion_pipeline_versions.json.pipeline_versions | default([])
           | sort(attribute='created_at', reverse=true) | first).pipeline_version_id | default('') }}
 
-- name: "rag_ingestion | create or update the recurring run for {{ _rag_schedule_cm.data.DOMAIN }}"
+# VERIFIED live 2026-08-18 (WP-07 duplicate-schedule bug): this task used
+# to always POST a fresh create with no prior list-and-match step. KFP's
+# v2beta1 API does not enforce `display_name` uniqueness on recurring
+# runs, so re-running `make d1 install rag-ingestion` after the resolved
+# pipeline_version_id changed (e.g. a new pipeline version uploaded
+# between runs) silently created ANOTHER enabled recurring run on the same
+# cron instead of replacing the old one - two live duplicates were found
+# and cleaned up manually the day this was fixed. List existing recurring
+# runs first and reconcile by display_name instead of blindly creating.
+- name: "rag_ingestion | list existing recurring runs for {{ _rag_schedule_cm.data.DOMAIN }}"
+  ansible.builtin.uri:
+    url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns?page_size=100"
+    headers:
+      Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+    validate_certs: false
+    status_code: [200]
+    return_content: true
+  register: _rag_ingestion_existing_recurring_runs
+  when: _rag_ingestion_pipeline_version_id != ''
+
+- name: "rag_ingestion | split existing matches for '{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule' into current vs stale"
+  ansible.builtin.set_fact:
+    _rag_ingestion_current_recurring_runs: >-
+      {{ _rag_ingestion_existing_recurring_runs.json.recurringRuns | default([])
+         | selectattr('display_name', 'equalto', _rag_schedule_cm.data.PIPELINE_NAME ~ '-schedule')
+         | selectattr('pipeline_version_reference.pipeline_version_id', 'equalto', _rag_ingestion_pipeline_version_id)
+         | list }}
+    _rag_ingestion_stale_recurring_runs: >-
+      {{ _rag_ingestion_existing_recurring_runs.json.recurringRuns | default([])
+         | selectattr('display_name', 'equalto', _rag_schedule_cm.data.PIPELINE_NAME ~ '-schedule')
+         | rejectattr('pipeline_version_reference.pipeline_version_id', 'equalto', _rag_ingestion_pipeline_version_id)
+         | list }}
+  when: _rag_ingestion_pipeline_version_id != ''
+
+- name: "rag_ingestion | delete stale-version recurring run(s) for {{ _rag_schedule_cm.data.DOMAIN }}"
+  ansible.builtin.uri:
+    url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns/{{ item.recurring_run_id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+    validate_certs: false
+    status_code: [200]
+  loop: "{{ _rag_ingestion_stale_recurring_runs | default([]) }}"
+  loop_control:
+    label: "{{ item.recurring_run_id }} (stale version {{ item.pipeline_version_reference.pipeline_version_id | default('?') }})"
+  when: _rag_ingestion_pipeline_version_id != ''
+
+- name: "rag_ingestion | create the recurring run for {{ _rag_schedule_cm.data.DOMAIN }}"
   ansible.builtin.uri:
     url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns"
     method: POST
@@ -56,7 +103,7 @@
       Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
       Content-Type: application/json
     validate_certs: false
-    status_code: [200, 201, 409]
+    status_code: [200, 201]
     body_format: json
     body:
       display_name: "{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule"
@@ -80,14 +127,28 @@
       mode: ENABLE
       no_catchup: true
   register: _rag_ingestion_recurring_run
-  when: _rag_ingestion_pipeline_version_id != ''
+  when: >-
+    _rag_ingestion_pipeline_version_id != '' and
+    (_rag_ingestion_current_recurring_runs | default([]) | length) == 0
 
 - name: "rag_ingestion | recurring-run activation summary for {{ _rag_schedule_cm.data.DOMAIN }}"
   ansible.builtin.debug:
     msg: >-
+      {% if (_rag_ingestion_current_recurring_runs | default([]) | length) > 0 -%}
       KFP recurring run '{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule'
-      ({{ _rag_schedule_cm.data.DOMAIN }}, cron
-      '{{ _rag_schedule_cm.data.CRON }}') request returned HTTP
-      {{ _rag_ingestion_recurring_run.status | default('unknown') }}
-      (409 = already exists, treated as success).
+      ({{ _rag_schedule_cm.data.DOMAIN }}) already up to date at pipeline
+      version {{ _rag_ingestion_pipeline_version_id }} - no change made.{%-
+      elif (_rag_ingestion_stale_recurring_runs | default([]) | length) > 0 -%}
+      KFP recurring run '{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule'
+      ({{ _rag_schedule_cm.data.DOMAIN }}) replaced
+      {{ _rag_ingestion_stale_recurring_runs | length }} stale-version
+      entr{{ 'y' if (_rag_ingestion_stale_recurring_runs | length) == 1 else 'ies' }}
+      with a fresh one at pipeline version {{ _rag_ingestion_pipeline_version_id }}
+      (create returned HTTP {{ _rag_ingestion_recurring_run.status | default('unknown') }}).{%-
+      else -%}
+      KFP recurring run '{{ _rag_schedule_cm.data.PIPELINE_NAME }}-schedule'
+      ({{ _rag_schedule_cm.data.DOMAIN }}, cron '{{ _rag_schedule_cm.data.CRON }}')
+      created fresh at pipeline version {{ _rag_ingestion_pipeline_version_id }}
+      (HTTP {{ _rag_ingestion_recurring_run.status | default('unknown') }}).{%-
+      endif %}
   when: _rag_ingestion_pipeline_version_id != ''
