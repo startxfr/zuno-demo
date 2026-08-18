@@ -89,11 +89,19 @@ platformNamespaces:
     # added alongside zuno-ai-run/zuno-data so every meshed (istio-injection:
     # enabled) namespace's sidecars can export traces directly to the
     # collector (service-mesh component's OTel tracing provider).
+    # openshift-grafana-operator: the Grafana operator's controller calls
+    # back into its own managed Grafana instance's :3000 admin API
+    # (grafana-service) to provision datasources/dashboards - blocked by
+    # this default-deny policy otherwise (VERIFIED live, 2026-08-18:
+    # GrafanaReconciler's `failed to authenticate with instance` /
+    # `request canceled while waiting for connection` while same-namespace
+    # traffic to the same Service/port succeeded).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
       - zuno-auth
       - zuno-ai-build
+      - openshift-grafana-operator
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
