@@ -92,6 +92,31 @@ Gateways already use on this cluster (`data-science-gateway`,
   `auth.identity.sub`/`auth.identity.groups` resolve for the
   RateLimitPolicy.
 
+**Pre-existing platform bug found and fixed (2026-08-18):** even after
+the `jwksUrl` fix, every request 500'd with `server: istio-envoy`
+logging `kuadrant-wasm-shim: gRPC status code is not OK` — Envoy's
+ext_authz call to Authorino's gRPC listener itself, not an AuthConfig
+problem. Root cause: `templates/certificate.yaml`'s
+`authorino-server-tls` was issued via `vault-issuer` (the
+general-purpose cert-manager PKI role), which
+`gitops/charts/service-mesh/templates/clusterissuer-istio.yaml`'s own
+design comment says is **deliberately** excluded from the mesh's trust
+bundle ("isolates the mesh's SPIFFE trust root from general-purpose
+TLS certs") — confirmed via `openssl s_client`: TLS handshake
+succeeded, but `Verify return code: 21 (unable to verify the first
+certificate)`. Since every gRPC ext_authz caller is an Envoy mesh
+sidecar, and mesh sidecars trust only the SPIFFE root
+(`vault-issuer-istio`, the same root `cert-manager-istio-csr` issues
+mesh workload certs from), the fix is `certificate.yaml`'s
+`issuerRef.name: vault-issuer-istio` instead. **This affected every
+Kuadrant-protected route on the cluster already, not just this demo**
+— confirmed by curling the pre-existing, unrelated MaaS endpoint
+(`https://maas.apps.<cluster-domain>/v1/models`), which also 500'd
+identically before this fix. Authorino's TLS listener was turned on
+solely to satisfy a DataScienceCluster readiness precondition
+(`authorino.yaml`'s own comment); this JWT AuthPolicy was very
+plausibly the first time anything actually exercised it end-to-end.
+
 **Rollback:** set `quotaEnforcement.enabled: false` and push — ArgoCD's
 `selfHeal` removes all of it. Nothing outside this chart references any
 object rendered here.
