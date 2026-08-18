@@ -1,0 +1,35 @@
+{{- if .Values.kuadrant.enabled }}
+# Authorino's controller-manager metrics (controller_runtime_*/workqueue_*
+# reconciler health, plus auth_server_* auth-decision counters once real
+# traffic reaches an AuthPolicy - VERIFIED live, 2026-08-18: only the
+# former exist today, since the live "maas-gateway-auth" AuthPolicy's
+# traffic is currently blocked before reaching Authorino by ADR-0201's
+# noted mTLS gap). {{ .Values.operandNamespace }} already carries
+# openshift.io/cluster-monitoring: "true" (rendered by the vendored
+# `project` chart's own namespace.yaml), so prometheus-k8s picks this up
+# with no extra labeling - same scrape path
+# gitops/charts/observability/templates/servicemonitor-otel-collector.yaml
+# already confirmed live for this repo's other `monitoring.coreos.com/v1`
+# ServiceMonitors.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: authorino-metrics
+  namespace: {{ .Values.operandNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  selector:
+    matchLabels:
+      authorino-resource: authorino
+      app.kubernetes.io/component: metrics
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.operandNamespace }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- end }}

@@ -55,18 +55,36 @@ func main() {
 	}
 }
 
+// requestIdentity is a mutable box threaded through the request context so
+// chatHandler (which decodes the caller's JWT) and metricsMiddleware
+// (which records the metric, one layer further out) can share the
+// caller's identity without either one calling the other directly -
+// preserves metricsMiddleware's single-choke-point recording (see its own
+// comment below) while still giving RecordRequest ADR-0029's "by user"
+// dimension. Left zero-valued for requests that never reach a
+// successfully-verified token (e.g. /healthz, a bad/missing bearer token).
+type requestIdentity struct {
+	sub    string
+	groups []string
+}
+
+type ctxKeyIdentity struct{}
+
 // metricsMiddleware wraps every response in a statusRecorder and records
 // one zuno.bff.requests count per completed request, labeled by this
-// instance's agent and the final status code (ADR-0102's SLO indicator).
+// instance's agent, the final status code (ADR-0102's SLO indicator), and
+// (ADR-0029) the caller's user/groups once chatHandler has decoded them.
 // Wraps the whole mux rather than threading a counter call through every
 // error/success path inside chatHandler - chatHandler has too many exit
 // points (auth failures, body validation, streaming vs. synchronous) to
 // do that without missing one.
 func metricsMiddleware(agent string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity := &requestIdentity{}
+		r = r.WithContext(context.WithValue(r.Context(), ctxKeyIdentity{}, identity))
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		telemetry.RecordRequest(r.Context(), agent, strconv.Itoa(rec.status))
+		telemetry.RecordRequest(r.Context(), agent, strconv.Itoa(rec.status), identity.sub, identity.groups)
 	})
 }
 
@@ -153,6 +171,10 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			w.Header().Set("Content-Type", "application/json")
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
+		}
+		if identity, ok := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity); ok {
+			identity.sub = claims.Subject
+			identity.groups = claims.Groups
 		}
 
 		// ADR-0040: agent entitlement (agent_<name>) is a distinct,

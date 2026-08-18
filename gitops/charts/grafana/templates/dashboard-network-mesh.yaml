@@ -1,0 +1,134 @@
+{{- if .Values.grafana.enabled }}
+# Two distinct bandwidth signals on one dashboard, deliberately not merged
+# into a single panel: mesh-attributed traffic (Istio/Envoy byte counters,
+# per source/destination workload, via the "mesh-prometheus" datasource)
+# and raw pod/NIC counters (cAdvisor/node-exporter, via the "prometheus"
+# datasource that also backs dashboard-infra.yaml) - they come from two
+# separate Prometheus stacks that don't share a scrape scope, so they
+# can't be joined in one PromQL expression.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: network-mesh
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-network-mesh
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-network-mesh",
+      "title": "Network & mesh",
+      "description": "Istio/Envoy mesh traffic (mesh-prometheus datasource) and raw pod/node bandwidth (prometheus datasource).",
+      "tags": ["zuno", "network", "mesh"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Mesh requests (rate, by destination service/response code)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+              "expr": "sum by (destination_service_name, response_code) (rate(istio_requests_total[5m]))",
+              "legendFormat": "{{`{{destination_service_name}}`}} ({{`{{response_code}}`}})"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Mesh request latency p95 (by destination service)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "ms"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+              "expr": "histogram_quantile(0.95, sum by (le, destination_service_name) (rate(istio_request_duration_milliseconds_bucket[5m])))",
+              "legendFormat": "{{`{{destination_service_name}}`}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "mTLS coverage (rate, by connection security policy)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+              "expr": "sum by (connection_security_policy) (rate(istio_requests_total[5m]))",
+              "legendFormat": "{{`{{connection_security_policy}}`}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Mesh-attributed bandwidth (TCP bytes/s, by source->destination workload)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+              "expr": "sum by (source_workload, destination_workload) (rate(istio_tcp_sent_bytes_total[5m]))",
+              "legendFormat": "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (sent)"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+              "expr": "sum by (source_workload, destination_workload) (rate(istio_tcp_received_bytes_total[5m]))",
+              "legendFormat": "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (received)"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Mesh control plane health (istiod)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
+              "expr": "sum(rate(pilot_xds_pushes[5m]))",
+              "legendFormat": "xds pushes/s"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Raw pod/node bandwidth (bytes/s, by namespace - NOT mesh-attributed)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "sum by (namespace) (rate(container_network_transmit_bytes_total{namespace=~\"zuno-.*\"}[5m]))",
+              "legendFormat": "{{`{{namespace}}`}} (tx)"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "sum by (namespace) (rate(container_network_receive_bytes_total{namespace=~\"zuno-.*\"}[5m]))",
+              "legendFormat": "{{`{{namespace}}`}} (rx)"
+            }
+          ]
+        }
+      ]
+    }
+{{- end }}

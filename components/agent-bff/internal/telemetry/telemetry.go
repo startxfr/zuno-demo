@@ -69,14 +69,32 @@ func Init(ctx context.Context, serviceName string) (func(context.Context) error,
 // RecordRequest increments the request counter for one completed HTTP
 // response. A nil counter (Init not called, e.g. in tests that exercise
 // handlers directly) is a silent no-op rather than a panic.
-func RecordRequest(ctx context.Context, agent, code string) {
+//
+// user/groups (ADR-0029's "by user" bullet, never wired until now) are
+// empty for requests that never reached a successfully-verified token
+// (e.g. /healthz, a missing/invalid bearer token) - see main.go's
+// metricsMiddleware/chatHandler for how they're threaded through. A
+// Keycloak group membership is a list, but metric labels are scalar - one
+// point is recorded per group (accepted double-counting across a
+// `sum by (group)` rollup for a multi-group user, same demo-scope
+// trade-off components/ai-gateway/app/telemetry.py's model_call_span
+// documents for the identical shape).
+func RecordRequest(ctx context.Context, agent, code, user string, groups []string) {
 	if requestCounter == nil {
 		return
 	}
-	requestCounter.Add(ctx, 1, metric.WithAttributes(
-		attribute.String("agent", agent),
-		attribute.String("code", code),
-	))
+	groupList := groups
+	if len(groupList) == 0 {
+		groupList = []string{""}
+	}
+	for _, group := range groupList {
+		requestCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("agent", agent),
+			attribute.String("code", code),
+			attribute.String("user", user),
+			attribute.String("group", group),
+		))
+	}
 }
 
 // SetCounterForTest points requestCounter at a counter backed by a

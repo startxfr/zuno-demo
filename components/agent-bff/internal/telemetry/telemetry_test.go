@@ -28,10 +28,10 @@ func TestRecordRequestIncrementsByAgentAndCode(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 
-	RecordRequest(ctx, "tekos", "200")
-	RecordRequest(ctx, "tekos", "200")
-	RecordRequest(ctx, "tekos", "403")
-	RecordRequest(ctx, "arkos", "200")
+	RecordRequest(ctx, "tekos", "200", "alice", []string{"agent_tekos", "sales"})
+	RecordRequest(ctx, "tekos", "200", "alice", []string{"agent_tekos", "sales"})
+	RecordRequest(ctx, "tekos", "403", "bob", nil)
+	RecordRequest(ctx, "arkos", "200", "alice", []string{"agent_arkos"})
 
 	var got metricdata.ResourceMetrics
 	if err := reader.Collect(ctx, &got); err != nil {
@@ -48,12 +48,22 @@ func TestRecordRequestIncrementsByAgentAndCode(t *testing.T) {
 			for _, dp := range sum.DataPoints {
 				agent, _ := dp.Attributes.Value("agent")
 				code, _ := dp.Attributes.Value("code")
-				counts[agent.AsString()+"/"+code.AsString()] = dp.Value
+				user, _ := dp.Attributes.Value("user")
+				group, _ := dp.Attributes.Value("group")
+				key := agent.AsString() + "/" + code.AsString() + "/" + user.AsString() + "/" + group.AsString()
+				counts[key] = dp.Value
 			}
 		}
 	}
 
-	want := map[string]int64{"tekos/200": 2, "tekos/403": 1, "arkos/200": 1}
+	// One point per (agent, code, user, group) - a multi-group user
+	// (alice) is intentionally double-counted across her two groups.
+	want := map[string]int64{
+		"tekos/200/alice/agent_tekos": 2,
+		"tekos/200/alice/sales":       2,
+		"tekos/403/bob/":              1,
+		"arkos/200/alice/agent_arkos": 1,
+	}
 	for k, v := range want {
 		if counts[k] != v {
 			t.Errorf("counts[%q] = %d, want %d (all: %v)", k, counts[k], v, counts)
@@ -65,5 +75,5 @@ func TestRecordRequestNoopsWithoutInit(t *testing.T) {
 	SetCounterForTest(nil)
 	// Must not panic when Init was never called (e.g. a handler test that
 	// doesn't set up telemetry at all).
-	RecordRequest(context.Background(), "tekos", "200")
+	RecordRequest(context.Background(), "tekos", "200", "", nil)
 }
