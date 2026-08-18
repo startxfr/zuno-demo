@@ -61,13 +61,6 @@ providers:
       base_url: {{ .Values.ogxServer.vllmEndpoint }}
       max_tokens: 4096
       api_token: fake
-  # inline (local, no external connectivity/credentials needed) - kept
-  # because vector_stores.default_embedding_model/default_reranker_model
-  # below reference it.
-  - provider_id: sentence-transformers
-    provider_type: inline::sentence-transformers
-    config:
-      trust_remote_code: true
   vector_io:
   - provider_id: zuno-pgvector
     provider_type: remote::pgvector
@@ -173,12 +166,15 @@ server:
   port: 8321
 vector_stores:
   default_provider_id: zuno-pgvector
-  default_embedding_model:
-    provider_id: sentence-transformers
-    model_id: nomic-ai/nomic-embed-text-v1.5
-  default_reranker_model:
-    provider_id: sentence-transformers
-    model_id: Qwen/Qwen3-Reranker-0.6B
+  # default_embedding_model/default_reranker_model deliberately omitted:
+  # validated only `if not None` (ogx/core/stack.py's
+  # validate_vector_stores_config) against registered_resources.models,
+  # which this override leaves empty - WP-06's corpus-proof/provider-
+  # parity scope tests vector_io directly with pre-computed embeddings
+  # (matching rag-service's own pattern), not OGX's file-search/embed-at-
+  # rest convenience layer. Setting either without a matching model
+  # registration crashes startup (confirmed live: "Reranker model
+  # '.../Qwen3-Reranker-0.6B' not found. Available reranker models: []").
   file_search_params:
     header_template: 'file_search tool found {num_chunks} chunks:
 
