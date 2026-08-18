@@ -28,12 +28,16 @@ spec:
       {{- toYaml .taskNames | nindent 6 }}
   allowOnline: {{ .allowOnline | default false }}
   allowCodeExecution: {{ .allowCodeExecution | default false }}
-  # Operator-managed PVC, no size override - the CRD's own default
-  # applies. Switch to outputs.oci if results need to leave the cluster
-  # (e.g. for evaluations/quality_gate.py to read via CI rather than a
-  # Day 1 check - see ansible/roles/models/tasks/ for the read path this
-  # WP added).
+  # Operator-managed PVC. The size is REQUIRED in practice: the 3.5.0-ea.2
+  # TrustyAI operator (v1.37.0) panics reconciling an empty size
+  # (resource.MustParse("") in controllers/lmes/storage.go:35, verified
+  # live 2026-08-18 - the "CRD default applies" assumption this comment
+  # previously made does not hold). Switch to outputs.oci if results need
+  # to leave the cluster (e.g. for evaluations/quality_gate.py to read via
+  # CI rather than a Day 1 check - see ansible/roles/models/tasks/ for the
+  # read path this WP added).
   outputs:
-    pvcManaged: {}
+    pvcManaged:
+      size: {{ .pvcSize | default "5Gi" }}
 {{- end }}
 {{- end }}
