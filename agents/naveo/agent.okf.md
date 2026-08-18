@@ -59,3 +59,19 @@ roadmap WP-41). No dedicated namespace is reserved (ADR-0329): Naveo's
 frontend/BFF deploy into the shared `zuno-ai-run` namespace via the
 `zuno.zuno.ai/v1alpha1 AIAgent` CR the operator (ADR-0327/ADR-0308)
 reconciles - see `gitops/charts/naveo/templates/aiagent.yaml`.
+
+<!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; regenerate with: python3 platform/okf/generate_authorization_matrix.py -->
+
+## Authorization matrix
+
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_naveo`; model classification ceiling (ADR-0021): `C1`; status: `placeholder`.
+
+| Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
+|---|---|---|---|---|---|---|---|---|
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `search_confluence` (live-read) | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | standard (implicit) | `tools/tool-policy.yaml` `search_confluence` |
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `web_search` |
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `list_drive_files` |
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+
+<!-- END GENERATED AUTHORIZATION MATRIX -->
