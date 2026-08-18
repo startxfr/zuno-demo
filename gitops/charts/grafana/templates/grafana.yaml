@@ -36,7 +36,13 @@ spec:
       header_name: "X-Forwarded-User"
       header_property: "username"
       auto_sign_up: "true"
-      whitelist: "127.0.0.1"
+      # Both loopback families: VERIFIED live, 2026-08-18 - the oauth-proxy
+      # sidecar's --upstream=http://localhost:3000 resolves "localhost" to
+      # ::1 in this image, not 127.0.0.1, so a v4-only whitelist rejected
+      # every request with "[auth-proxy.invalid-ip] request ip is not in
+      # the configured accept list" (users landed on Grafana's own /login
+      # page - empty since disable_login_form above hides its form too).
+      whitelist: "127.0.0.1,::1"
   # Operator auto-creates this Secret from the annotation below, populated
   # by the cluster's service-ca operator - oauth-proxy's own serving cert.
   service:
