@@ -573,18 +573,33 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
-- **2026-08-18 (WP-06 progress, ADR-0322 stays Partially implemented)**:
-  `ogxServer.enabled` flipped true - found and fixed real schema drift
-  (`distribution.name` must be `rh`, ea.2's webhook rejects
-  `remote-vllm`). The CR then creates, but hits a genuine RHOAI 3.5 EA2
-  operator limitation: its own OCI-manifest fetch to `registry.redhat.io`
-  401s even with valid cluster + SA-linked pull credentials -
-  `imagePullSecrets` don't wire into an operator's own in-process
-  registry client. Upstream/environment gap, not a repo gap; corpus
-  proof + provider-parity run stay blocked on it. [[demo222-argocd-oom-limitrange]]-adjacent:
-  another operator-vs-quota lesson from the same session (rhods-operator
-  needed the platform quota resized for its 3 replicas before this got
-  even this far).
+- **2026-08-19 (WP-06: `zuno-ogx` fixed for real, ADR-0322 stays Partially
+  implemented pending corpus proof)**: three independent, real bugs in the
+  RHOAI 3.5 EA2 OGX operator, each confirmed by reading its actual
+  upstream Go/Python source (`github.com/ogx-ai/ogx-k8s-operator`,
+  `github.com/ogx-ai/ogx`), not guessed: (1) `distribution.name` webhook
+  enum is `rh|rh-dev` only, not `remote-vllm` (schema drift); (2) its
+  OCI-manifest-fetch client is anonymous-only by design - never sends
+  auth to ANY registry (registry.redhat.io 401, our own internal mirror
+  400, even a real public docker.io image 401 - Docker Hub enforces the
+  OAuth challenge this client never follows) - fixed with
+  `spec.overrideConfig`, bypassing OCI-label resolution entirely; (3)
+  `expandPgvectorProvider()` never sets a `persistence` field for
+  `remote::pgvector` - the CRD's typed field has no way to supply one
+  either, crashing the server at startup regardless of CR content. Also
+  found+removed a 4th crash: `vector_stores.default_embedding_model`/
+  `default_reranker_model` need a matching `registered_resources.models`
+  entry or they crash startup too. `zuno-ogx` is now genuinely healthy:
+  `2/2 Running`, `DeploymentReady`/`ServiceReady`/`HealthCheck` all
+  `True`, real pgvector connection confirmed live. Lesson: when a
+  Kubernetes operator's error message looks like a credentials/RBAC
+  problem, read its actual source before assuming - "imagePullSecrets
+  don't apply" turned out to be right for a completely different reason
+  (the client never sends auth to begin with) than the mirror-based fix
+  first assumed. [[demo222-argocd-oom-limitrange]]-adjacent: an earlier
+  operator-vs-quota lesson from the same session (rhods-operator needed
+  the platform quota resized for its 3 replicas before this got even this
+  far).
 - **2026-08-18 (WP-10 progress, ADR-0107/0108 stay Partially implemented)**:
   gated-promotion blocking half proven live twice via `make d1 check
   agents` (65-70% vs 75% threshold, real ADR-0053 gate). Found+fixed a
