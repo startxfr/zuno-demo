@@ -417,6 +417,16 @@ lmEval:
         # confirm `tokenizer` is a distinct, real field).
         - name: tokenizer
           value: Qwen/Qwen2.5-7B-Instruct
+        # VERIFIED live 2026-08-18: the 3.5.0-ea.2 TrustyAI operator's
+        # rendered pod hardcodes HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1
+        # regardless of allowOnline or spec.pod.container.env overrides
+        # (a second, independent operator bug from the pvcManaged one
+        # above - the documented override field does not take effect).
+        # tokenizer_backend=none skips the AutoTokenizer/HF network path
+        # entirely; TemplateAPI still scores via the API's own logprobs
+        # (echo=True), which is what local-completions actually needs.
+        - name: tokenizer_backend
+          value: none
       taskNames: [mmlu]
       # allowOnline flipped true 2026-08-18 (WP-10 live run): the mmlu
       # dataset is fetched from Hugging Face by the eval pod itself and no
