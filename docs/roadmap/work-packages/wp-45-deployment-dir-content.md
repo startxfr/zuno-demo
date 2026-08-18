@@ -1,6 +1,18 @@
 # WP-45: Real deployment/ directory content (completes ADR-0503)
 
-- **State:** Not started
+- **State:** Done (2026-08-18). One recorded generalization of the
+  brief: the "for Tekos" manifest-summary case applies to comage/
+  advantage/finage too — chart verification showed only Arkos renders
+  an `AIAgent` CR (Naveo too, but it is Stage 1 with no `deployment/`
+  dir, skipped by design); the generator auto-detects the shape from
+  the rendered docs, so only Arkos got `aiagent-snapshot.yaml` and the
+  four raw-chart agents got `manifest-summary.md`. Their deployment
+  READMEs state whether raw-manifest is deliberate (Tekos, coexistence
+  proof) or legacy-pending-promotion (the other three, PROMOTION.md
+  step 2). Tekos's Application pair is the legacy-named `zuno-api-*`
+  (`gitops/apps/api/`), handled via an override map in the generator.
+  Tamper test proven (edited replicas → exit 1 → regenerated). Lint
+  gains the blocking ADR-0503 snapshot-drift step.
 - **ADRs:** ADR-0503 (deployment half; WP-44 delivers the matrix half)
 - **Depends on:** WP-43
 - **Blocks:** WP-48

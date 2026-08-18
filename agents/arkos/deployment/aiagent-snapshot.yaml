@@ -1,0 +1,58 @@
+# GENERATED FILE (ADR-0503/WP-45) - do not edit.
+# Source: helm template gitops/charts/arkos (the AIAgent CR the
+# aiagent-operator reconciles, ADR-0327/ADR-0308). Regenerate with:
+#   python3 platform/okf/generate_deployment_snapshot.py
+apiVersion: zuno.zuno.ai/v1alpha1
+kind: AIAgent
+metadata:
+  name: arkos
+  namespace: zuno-ai-run
+  labels:
+    zuno.io/agent: arkos
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '90'
+spec:
+  agentName: arkos
+  targetNamespace: zuno-ai-run
+  okfBundleRef: agents/arkos
+  frontend:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-frontend
+      tag: latest
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    oidcClientId: arkos-frontend
+  bff:
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/agent-bff
+      tag: latest
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    oidcAudience: arkos-frontend
+  groups:
+    entitlementGroup: agent_arkos
+    businessRoles:
+    - consultant
+  knowledgeDomains:
+  - knowledge.tech
+  - knowledge.project
+  toolCapabilities:
+  - confluence.page.read
+  - confluence.page.search
+  - drive.document.create
+  - drive.document.update

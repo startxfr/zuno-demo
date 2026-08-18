@@ -40,7 +40,7 @@ arkos/
 ├── policies/            (stub)
 ├── rag/                 (stub)
 ├── tools/               (stub)
-├── deployment/          (stub until WP-45's ADR-0503 snapshot)
+├── deployment/          Generated ADR-0503 snapshot + README (WP-45)
 └── tests/               (stub until WP-46's ADR-0504 structure)
 ```
 
