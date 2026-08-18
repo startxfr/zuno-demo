@@ -934,11 +934,11 @@ human:
    `python3 platform/docs/check_knowledge_refs.py`,
    `python3 operator/aiagent-operator/validate_contract.py`,
    `python3 platform/docs/check_docs.py`.
-7. **Human review checkpoint**: review the 20 scenarios in
-   `evaluations/{spec.name}/scenarios.yaml` before any live gate run
-   counts (ADR-0326's own completion pattern).
-8. **Operator**: deploy via the `AIAgent` CR, run the 75% gate, flip
-   `agents/{spec.name}/agent.okf.md`'s `zuno.status` to `active`.
+7. **Promote** (ADR-0502): follow
+   `platform/templates/agent/PROMOTION.md` - the named Stage-1 -> Stage-2
+   checklist (scenario review, CR deploy, 75% gate, Stage-2 directory
+   content, `zuno.status: active`, README update). Steps 1-6 above are
+   its assumed scaffold-time baseline.
 """
 
 

@@ -1,0 +1,19 @@
+{
+  "_comment": "ADR-0410/ADR-0307 (WP-41) scaffold output - NOT auto-merged. A human merges the relevant pieces into gitops/charts/keycloak/files/realm-zuno.json by hand (see agents/soursage/NEXT_STEPS.md), the same way every prior agent's realm entries were added - see agent_arkos's own client/group/user entries in that file as the worked example.",
+  "client": {
+    "clientId": "soursage-frontend",
+    "name": "Soursage frontend",
+    "publicClient": false,
+    "secret": "${{vault.soursage_frontend_client_secret}}"
+  },
+  "group": {
+    "name": "agent_soursage",
+    "path": "/agent_soursage",
+    "clientRoles": {
+      "soursage-frontend": [
+        "access"
+      ]
+    }
+  },
+  "entitlement_only_fixture_user": "soursage-entitlement-only-user-01"
+}

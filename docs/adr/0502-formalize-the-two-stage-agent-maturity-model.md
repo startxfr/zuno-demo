@@ -1,6 +1,6 @@
 # ADR-0502: Formalize the two-stage agent maturity model
 
-- **Status:** Proposed
+- **Status:** Implemented - see `agents/*/README.md` and `platform/templates/agent/PROMOTION.md` (WP-43, 2026-08-18)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

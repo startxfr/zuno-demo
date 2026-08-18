@@ -176,7 +176,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | OKF v0.1 | Proposed | Establish the OKF stream with its own milestones and roadmap |
-| [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | OKF v0.1 | Proposed | Formalize the two-stage agent maturity model |
+| [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | OKF v0.1 | Implemented | Formalize the two-stage agent maturity model |
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | OKF v0.1 | Proposed | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | OKF v0.1 | Proposed | Define the agent tests directory structure and promotion gate |
 | [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Proposed | Open OKF tasks as concurrent per-agent frontend tabs |

@@ -333,6 +333,13 @@ header values `OKF v0.1|v0.2|v0.3`; quota precedence project → user →
 group (ADR-0511); `project_required` tasks verify a Salesforce project
 binding fail-closed before any action (ADR-0512).
 
+2026-08-18 (later): WP-43 Done, ADR-0502 Implemented — all eight agent
+READMEs now state stage/evolution/next-step, `platform/templates/agent/
+PROMOTION.md` is the named promotion checklist (generated NEXT_STEPS
+step 7 points at it), and Cognos/Soursage carry Stage-1 identity
+artifacts (generator run into a temp root via `write_all(repo_root=…)`;
+charts/evaluations deliberately deferred to build time).
+
 ## 14. Explicitly deferred capabilities
 
 Main v2 candidates:

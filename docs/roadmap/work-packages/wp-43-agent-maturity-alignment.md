@@ -1,6 +1,23 @@
 # WP-43: Agent maturity alignment (promotes ADR-0502)
 
-- **State:** Not started
+- **State:** Done (2026-08-18). Executed as briefed with one recorded
+  scope choice: the generator was run **into a temp root** (its
+  `write_all(repo_root=...)` parameter, unmodified code) and only the
+  identity artifacts (`keycloak-fragment.json`, `NEXT_STEPS.md`) were
+  taken into `agents/cognos|soursage/` — the generator has no
+  bundle-only flag and its full output would have violated this brief's
+  own "no gitops/ changes" rule and overwritten the hand-authored
+  bundles/`allowed_tools: []` tasks the brief says to keep. Both
+  NEXT_STEPS files were annotated in place (the WP-41b Naveo precedent)
+  to record identity-already-merged (ADR-0349) and
+  chart/evaluations-deliberately-deferred. `PROMOTION.md` authored;
+  generator's emitted NEXT_STEPS step 7 now points at it (old steps
+  7–8 folded); `test_scaffold_validate_discard.py` PASS after the
+  edit. All eight READMEs written/refreshed with stage + evolution +
+  next step (the four slice READMEs were also stale on task lists, not
+  just Finage's tasks README — all corrected against real
+  `zuno.tasks`). Validators: `validate_okf_bundle.py` (8 bundles),
+  `check_knowledge_refs.py`, `check_docs.py` all PASS.
 - **ADRs:** ADR-0502
 - **Depends on:** none (opens the OKF stream's Phase 1)
 - **Blocks:** WP-44, WP-45, WP-46, WP-48
