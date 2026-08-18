@@ -1,4 +1,4 @@
-{{- if .Values.quotaEnforcement.enabled }}
+{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
 # GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:
 # policies/quotas/quota-policy.yaml. Regenerate with:
 #   python3 platform/okf/generate_quota_enforcement.py

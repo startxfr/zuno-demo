@@ -94,7 +94,16 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
     # its own `when` class-selector predicate, which is what actually
     # differentiates standard vs intensive at request time.
     lines: List[str] = [
-        "{{- if .Values.quotaEnforcement.enabled }}",
+        # kuadrant.enabled, not just quotaEnforcement.enabled: this chart is
+        # rendered by BOTH the -d0 and -d1 ArgoCD Applications (operator
+        # install vs operand config); quotaEnforcement.enabled is a plain
+        # chart default with no per-Application override, so without this
+        # extra guard -d0 rendered these objects too, in the same explicit
+        # namespaces as -d1 - the two Applications then fought over
+        # ownership of the same live resources (ArgoCD SharedResourceWarning,
+        # confirmed live 2026-08-18, sync never settled). Only -d1 sets
+        # kuadrant.enabled: true.
+        "{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}",
         f"# GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:",
         f"# policies/quotas/quota-policy.yaml. Regenerate with:",
         f"#   {REGEN_CMD}",

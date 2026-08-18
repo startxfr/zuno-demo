@@ -27,7 +27,16 @@
 # Rollback: set quotaEnforcement.enabled back to false and sync - ArgoCD's
 # selfHeal removes every object below (and the RateLimitPolicy in the
 # sibling template); nothing here is referenced by any other chart.
-{{- if .Values.quotaEnforcement.enabled }}
+#
+# Guarded on kuadrant.enabled too, not just quotaEnforcement.enabled: this
+# chart is rendered by BOTH the -d0 and -d1 ArgoCD Applications, and
+# quotaEnforcement.enabled is a plain chart default with no per-Application
+# override - without this extra guard -d0 rendered these objects too, in
+# the same explicit namespaces as -d1, and the two Applications fought over
+# ownership of the same live resources (ArgoCD SharedResourceWarning,
+# confirmed live 2026-08-18, sync never settled). Only -d1 sets
+# kuadrant.enabled: true.
+{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
 ---
 apiVersion: v1
 kind: ConfigMap
