@@ -225,12 +225,15 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
     resourceQuota:
-      # Sized to the live rhods-operator deployment (VERIFIED 2026-08-18:
-      # requests 500m/256Mi, limits 500m/4Gi) plus room for OLM job pods.
-      # The previous 2Gi limits cap blocked the operator pod from being
-      # recreated at all (FailedCreate: exceeded quota) once it churned.
-      requests: { cpu: "1", memory: "1Gi" }
-      limits: { cpu: "2", memory: "6Gi" }
+      # Sized to the live rhods-operator deployment (VERIFIED 2026-08-18,
+      # second pass): 3.5.0-ea.2 runs replicas: 3, each pod requests
+      # 500m/256Mi with limits 500m/4Gi - so the deployment alone needs
+      # requests 1.5cpu/768Mi and limits 1.5cpu/12Gi. The earlier same-day
+      # fit (1cpu/1Gi requests, 2cpu/6Gi limits) was sized to a single
+      # replica and left the CSV Failed with 2 of 3 pods FailedCreate.
+      # Headroom on top covers OLM job pods.
+      requests: { cpu: "2", memory: "2Gi" }
+      limits: { cpu: "3", memory: "14Gi" }
     limitRange:
       defaultRequest: { cpu: "50m", memory: "128Mi" }
       default: { cpu: "500m", memory: "512Mi" }
