@@ -342,31 +342,34 @@ ogxServer:
   # remote-vllm/pgvector shapes below stay providers, not the distribution
   # name.
   #
-  # ROOT CAUSE (confirmed 2026-08-18 by reading the OGX operator's actual
-  # source, github.com/ogx-ai/ogx-k8s-operator pkg/config/oci_fetcher.go):
-  # its OCI-label-fetch client is anonymous-only by design ("Authentication:
-  # currently supports anonymous/public registry access") - it never sends
-  # credentials to ANY registry, so registry.redhat.io (401) and even our
-  # own internal mirror (400, confirmed live: OpenShift's internal registry
-  # returns 400 for a request with no Authorization header at all) both
-  # fail the same way. An internal-mirror attempt (ansible/roles/
-  # image_mirrors' odh-ogx-core-rhel9 entry) was tried first and kept -
-  # harmless, but it wasn't the fix. Real fix: distribution.image points
-  # at a real PUBLIC distribution image the anonymous fetcher can actually
-  # reach - verified live against Docker Hub's API:
-  # docker.io/ogxai/distribution-starter is anonymously pullable and
-  # carries the OCI labels the resolver needs
-  # (com.ogx.distribution.default-config, com.ogx.config.config.yaml).
-  # Pinned to the resolved single-platform (amd64) digest, not `:latest` -
-  # that tag is a multi-arch index with no direct `.config.digest`, which
-  # the fetcher can't parse (confirmed live: `:latest` returns
-  # application/vnd.oci.image.index.v1+json). Our own spec.providers/
-  # spec.storage below override the base image's own defaults regardless
-  # (operator's own merge logic, pkg/config/generator.go), so which
-  # distribution image supplies the base doesn't matter functionally.
+  # ROOT CAUSE (confirmed 2026-08-18/19 by reading the OGX operator's
+  # actual source, github.com/ogx-ai/ogx-k8s-operator pkg/config/
+  # oci_fetcher.go): its OCI-label-fetch client is anonymous-only by design
+  # ("Authentication: currently supports anonymous/public registry access")
+  # and never performs the WWW-Authenticate challenge/token exchange real
+  # registries require. Tried and ruled out live, in order: registry.
+  # redhat.io direct (401), an internal zuno-ai-build mirror (ansible/roles/
+  # image_mirrors' odh-ogx-core-rhel9 entry, kept - harmless - but 400, no
+  # Authorization header sent at all), and docker.io/ogxai/distribution-
+  # starter@sha256:f9d8... (a real, anonymously-pullable public image,
+  # confirmed via a properly token-authenticated fetch outside the
+  # operator) - still 401, because Docker Hub enforces the OAuth challenge
+  # even for public images and this client never follows it. No registry
+  # this client talks to directly can ever work.
+  #
+  # REAL FIX: templates/ogxserver.yaml's spec.baseConfig bypasses OCI-label
+  # resolution entirely (`oc explain ogxserver.spec.baseConfig`: "When set,
+  # this takes precedence over OCI label resolution") - the CRD's own
+  # documented, supported mechanism for exactly this. The ConfigMap it
+  # references (files/ogx-base-config.yaml) holds the real config.yaml
+  # content decoded from that same distribution-starter image's OCI labels
+  # (fetched once, properly, outside the operator). `distribution` below
+  # reverts to `rh` (satisfies the required field + admission webhook enum;
+  # no longer used for fetching once baseConfig is set) - our own
+  # spec.providers/spec.storage still override the base config's
+  # providers/storage regardless (operator's own merge logic).
   distribution:
-    image: docker.io/ogxai/distribution-starter@sha256:f9d896ca72213f995ad34d7d0e5c2e853bdb1f261f4bf66b0a2a8d4605174818
-    # name: rh
+    name: rh
   replicas: 1
   credentials:
     vaultPath: ogx/postgresql-app

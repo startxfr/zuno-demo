@@ -12,6 +12,23 @@ ogxserver -A` returns no resources today), so this is a schema-correct,
 not yet cluster-verified, manifest. Disabled by default.
 */ -}}
 {{- if .Values.ogxServer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ogx-base-config
+  namespace: {{ .Values.ogxServer.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    # OGXServer.spec.baseConfig requires this exact label on any ConfigMap
+    # it reads (`oc explain ogxserver.spec.baseConfig`) - same pattern as
+    # the pgvector password Secret's ogx.io/watch label below.
+    ogx.io/watch: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+data:
+  config.yaml: |
+{{ .Files.Get "files/ogx-base-config.yaml" | indent 4 }}
+---
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
@@ -62,6 +79,16 @@ spec:
     {{- with .Values.ogxServer.distribution.image }}
     image: {{ . }}
     {{- end }}
+  # spec.baseConfig takes precedence over distribution-image OCI-label
+  # resolution entirely (`oc explain ogxserver.spec.baseConfig`: "When set,
+  # this takes precedence over OCI label resolution") - the documented,
+  # supported bypass for the OGX operator's anonymous-only OCI-fetch client
+  # (WP-06/ADR-0322; see values.yaml's ogxServer.distribution comment for
+  # the full root-cause story). `distribution` above is still required by
+  # the CRD schema but is no longer used for fetching once this is set.
+  baseConfig:
+    name: ogx-base-config
+    key: config.yaml
   storage:
     sql:
       type: sqlite
