@@ -37,7 +37,7 @@ spec:
         - limit: 60
           window: 5m
       counters:
-        - expression: 'auth.identity.groups.split(",").join("|")'
+        - expression: 'auth.identity.groups.join("|")'
       when:
         - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
     intensive-project:
@@ -48,7 +48,7 @@ spec:
         - expression: "request.headers['x-zuno-project-id']"
       when:
         - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
-        - predicate: "has(request.headers['x-zuno-project-id'])"
+        - predicate: "'x-zuno-project-id' in request.headers"
     standard-user:
       rates:
         - limit: 60
@@ -56,15 +56,15 @@ spec:
       counters:
         - expression: 'auth.identity.sub'
       when:
-        - predicate: "!has(request.headers['x-zuno-quota-class']) || request.headers['x-zuno-quota-class'] == 'standard'"
+        - predicate: "!('x-zuno-quota-class' in request.headers) || request.headers['x-zuno-quota-class'] == 'standard'"
     standard-group:
       rates:
         - limit: 600
           window: 5m
       counters:
-        - expression: 'auth.identity.groups.split(",").join("|")'
+        - expression: 'auth.identity.groups.join("|")'
       when:
-        - predicate: "!has(request.headers['x-zuno-quota-class']) || request.headers['x-zuno-quota-class'] == 'standard'"
+        - predicate: "!('x-zuno-quota-class' in request.headers) || request.headers['x-zuno-quota-class'] == 'standard'"
     standard-project:
       rates:
         - limit: 300
@@ -72,6 +72,6 @@ spec:
       counters:
         - expression: "request.headers['x-zuno-project-id']"
       when:
-        - predicate: "!has(request.headers['x-zuno-quota-class']) || request.headers['x-zuno-quota-class'] == 'standard'"
-        - predicate: "has(request.headers['x-zuno-project-id'])"
+        - predicate: "!('x-zuno-quota-class' in request.headers) || request.headers['x-zuno-quota-class'] == 'standard'"
+        - predicate: "'x-zuno-project-id' in request.headers"
 {{- end }}

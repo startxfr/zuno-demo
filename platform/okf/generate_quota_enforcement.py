@@ -62,14 +62,23 @@ PROJECT_HEADER = "x-zuno-project-id"
 
 COUNTER_EXPRESSIONS = {
     "user": "auth.identity.sub",
-    "group": 'auth.identity.groups.split(",").join("|")',
+    # auth.identity mirrors the raw JWT claims - a JSON array claim like
+    # `groups` deserializes as a CEL list, not a string (confirmed by the
+    # live has()-bracket rejection above being the same class of "CEL
+    # environment is stricter than assumed" issue) - no .split() needed,
+    # only .join() to turn the list into one counter key.
+    "group": 'auth.identity.groups.join("|")',
     "project": f"request.headers['{PROJECT_HEADER}']",
 }
 
 
 def _class_predicate(cls_name: str) -> str:
+    # CEL's has() macro rejects bracket-index arguments (confirmed live:
+    # "invalid argument to has() macro" on has(request.headers['...'])) -
+    # hyphenated header names can't use has()'s dot-notation form either,
+    # so map-key presence uses CEL's `in` operator instead.
     if cls_name == "standard":
-        return (f"!has(request.headers['{CLASS_HEADER}']) || "
+        return (f"!('{CLASS_HEADER}' in request.headers) || "
                 f"request.headers['{CLASS_HEADER}'] == 'standard'")
     return f"request.headers['{CLASS_HEADER}'] == '{cls_name}'"
 
@@ -117,7 +126,7 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
             req = (cls.get("requests") or {}).get(dim) or {}
             predicates = [_class_predicate(cls_name)]
             if dim == "project":
-                predicates.append(f"has(request.headers['{PROJECT_HEADER}'])")
+                predicates.append(f"'{PROJECT_HEADER}' in request.headers")
             lines += [
                 f"    {cls_name}-{dim}:",
                 "      rates:",
