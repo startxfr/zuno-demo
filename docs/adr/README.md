@@ -183,6 +183,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | OKF v0.2 | Proposed | Extract OKF content into a standalone zuno-okf repository |
 | [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | OKF v0.2 | Proposed | Consume the zuno-okf repository through a single pinned reference |
 | [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | OKF v0.2 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
+| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | OKF v0.3 | Proposed | Deliver OKF content as mounted versioned artifacts |
+| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | OKF v0.3 | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 | [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | OKF v0.1 | Proposed | Define OKF quota policy enforced via Kuadrant |
 | [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | OKF v0.1 | Proposed | Introduce project-bound tasks with Salesforce-verified context |
 
