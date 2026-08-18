@@ -1233,7 +1233,18 @@ def _embed_batch(texts: list, config: IngestionConfig) -> list:
     headers = {"Content-Type": "application/json"}
     if config.embedding_api_token:
         headers["Authorization"] = f"Bearer {config.embedding_api_token}"
-    payload = {"model": config.embedding_model, "input": texts}
+    # truncate_prompt_tokens is a vLLM extension (ignored by rag-service's
+    # query path, which never nears the limit): without it one chunk over the
+    # model's max sequence length 400-fails its ENTIRE batch. Chunk budgets
+    # can't fully prevent that - the chunker counts cl100k tokens (~1.4-1.7x
+    # fewer than bge WordPiece) and preserved code blocks bypass the budget
+    # altogether. Verified live 2026-08-18: 13307/13324 chunks lost to
+    # shared-batch 400s (knowledge.tech run 3).
+    payload = {
+        "model": config.embedding_model,
+        "input": texts,
+        "truncate_prompt_tokens": -1,
+    }
     resp = requests.post(url, json=payload, headers=headers, timeout=60)
     resp.raise_for_status()
     body = resp.json()

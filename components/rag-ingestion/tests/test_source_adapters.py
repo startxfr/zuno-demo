@@ -533,6 +533,31 @@ def test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_syst
         )
 
 
+# --- embed request contract --------------------------------------------------
+
+
+def test_embed_batch_asks_the_server_to_truncate_oversized_chunks():
+    """One chunk past the embedding model's max sequence length must not be
+    able to 400-fail its whole batch (run 3, 2026-08-18: 13307/13324 chunks
+    lost that way - preserved code blocks exceed any chunker budget, so a
+    client-side budget alone can't prevent it). _embed_batch therefore always
+    sends vLLM's truncate_prompt_tokens=-1."""
+    config = _config()
+    captured = {}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        captured["url"] = url
+        captured["payload"] = json
+        return _FakeResponse({"data": [{"embedding": [0.0]} for _ in json["input"]]})
+
+    with mock.patch.object(rag_ingestion.requests, "post", side_effect=fake_post):
+        vectors = rag_ingestion._embed_batch(["a", "b"], config)
+    assert captured["url"] == "http://embeddings.test/v1/embeddings"
+    assert captured["payload"]["model"] == "test-model"
+    assert captured["payload"]["truncate_prompt_tokens"] == -1
+    assert len(vectors) == 2
+
+
 TESTS = [
     test_every_fetch_stage_has_an_adapter_bound_to_one_domain,
     test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write,
@@ -556,6 +581,7 @@ TESTS = [
     test_stage_validate_passes_a_complete_operational_chunk,
     test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement,
     test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system,
+    test_embed_batch_asks_the_server_to_truncate_oversized_chunks,
 ]
 
 

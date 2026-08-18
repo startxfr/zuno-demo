@@ -653,8 +653,14 @@ embedding:
 
 chunking:
   strategy: structural
-  maxTokens: 700
-  overlapTokens: 100
+  # Budget must fit embedding.model's max sequence length (bge-small-en-v1.5:
+  # 512), and the chunker counts cl100k tokens which run ~1.4-1.7x FEWER than
+  # bge's WordPiece on technical prose - 700 here meant 1000+ real tokens and
+  # vLLM 400-failed nearly every batch (run 3, 2026-08-18: 17/13324 chunks
+  # embedded). 320 cl100k =~ 450-540 WordPiece; the embed stage's
+  # truncate_prompt_tokens handles the tail that still crosses 512.
+  maxTokens: 320
+  overlapTokens: 64
   preserveCodeBlocks: true
   preserveTables: true
 
