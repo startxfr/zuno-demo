@@ -76,11 +76,19 @@ data:
     # which svc.cluster.local's allow_subdomains doesn't cover, so Vault
     # rejected the sign request with "subject alternate name ... not
     # allowed by this role" and the Certificate never issued.
+    # key_type=any (not Vault's rsa-only default) - VERIFIED live
+    # 2026-08-18: mariadb-operator's cert-manager Certificate requests an
+    # ECDSA key for the MariaDB server cert (ADR: DSP components verify
+    # MySQL TLS against the ODH CA bundle, whose first entry is this PKI
+    # root), and Vault refused to sign it with "role requires keys of
+    # type rsa". "any" keeps every existing RSA consumer working and
+    # admits EC requesters.
     vault write pki/roles/cert-manager \
       allowed_domains="zuno-demo.internal,svc.cluster.local,svc,${CLUSTER_BASE_DOMAIN}" \
       allow_subdomains=true \
       allow_bare_domains=true \
       require_cn=false \
+      key_type=any \
       max_ttl=720h
 
     printf 'path "pki/sign/cert-manager" {\n  capabilities = ["create","update"]\n}\n' | vault policy write cert-manager-issuer -
