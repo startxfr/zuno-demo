@@ -15,19 +15,20 @@ not yet cluster-verified, manifest. Disabled by default.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ogx-base-config
+  name: ogx-override-config
   namespace: {{ .Values.ogxServer.namespace }}
   labels:
     zuno.io/managed-by: argocd
-    # OGXServer.spec.baseConfig requires this exact label on any ConfigMap
-    # it reads (`oc explain ogxserver.spec.baseConfig`) - same pattern as
-    # the pgvector password Secret's ogx.io/watch label below.
+    # OGXServer.spec.overrideConfig requires this exact label on any
+    # ConfigMap it reads (`oc explain ogxserver.spec.overrideConfig`) -
+    # same pattern as the pgvector password Secret's ogx.io/watch label
+    # below.
     ogx.io/watch: "true"
   annotations:
     argocd.argoproj.io/sync-wave: "-5"
 data:
   config.yaml: |
-{{ .Files.Get "files/ogx-base-config.yaml" | indent 4 }}
+{{ tpl (.Files.Get "files/ogx-override-config.yaml.tpl") . | indent 4 }}
 ---
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
@@ -79,40 +80,38 @@ spec:
     {{- with .Values.ogxServer.distribution.image }}
     image: {{ . }}
     {{- end }}
-  # spec.baseConfig takes precedence over distribution-image OCI-label
-  # resolution entirely (`oc explain ogxserver.spec.baseConfig`: "When set,
-  # this takes precedence over OCI label resolution") - the documented,
-  # supported bypass for the OGX operator's anonymous-only OCI-fetch client
-  # (WP-06/ADR-0322; see values.yaml's ogxServer.distribution comment for
-  # the full root-cause story). `distribution` above is still required by
-  # the CRD schema but is no longer used for fetching once this is set.
-  baseConfig:
-    name: ogx-base-config
+  # spec.overrideConfig supplies a full, hand-authored config.yaml,
+  # bypassing BOTH OCI-label resolution (the operator's anonymous-only
+  # fetch client can't authenticate to any registry) AND the typed
+  # spec.providers pipeline (pkg/config/provider.go's expandPgvectorProvider
+  # never sets a `persistence` field, crashing the server at startup) - see
+  # files/ogx-override-config.yaml.tpl's header for the full story
+  # (WP-06/ADR-0322). `distribution` above is still required by the CRD
+  # schema but is unused once this is set. overrideConfig is mutually
+  # exclusive with providers/resources/storage/disabledAPIs/baseConfig, so
+  # none of those are set here anymore - the override file is now the
+  # single source for the pgvector/vllm provider config it used to
+  # generate.
+  overrideConfig:
+    name: ogx-override-config
     key: config.yaml
-  storage:
-    sql:
-      type: sqlite
-  providers:
-    vectorIo:
-      remote:
-        pgvector:
-          - id: zuno-pgvector
-            host: {{ .Values.ogxServer.pgvector.host }}
-            port: {{ .Values.ogxServer.pgvector.port }}
-            db: {{ .Values.ogxServer.pgvector.database }}
-            user: {{ .Values.ogxServer.pgvector.user }}
-            distanceMetric: COSINE
-            password:
-              name: ogx-pgvector-password
-              key: password
-    inference:
-      remote:
-        vllm:
-          - id: zuno-vllm
-            endpoint: {{ .Values.ogxServer.vllmEndpoint }}
   network:
     externalAccess:
       enabled: false
   workload:
     replicas: {{ .Values.ogxServer.replicas }}
+    # spec.providers can no longer carry the pgvector password (mutually
+    # exclusive with overrideConfig) - the override file's config.yaml
+    # references ${env.PGVECTOR_PASSWORD}, a real Llama-Stack-style runtime
+    # env-var substitution the server resolves at load time; this is the
+    # documented way to inject it (`oc explain
+    # ogxserver.spec.workload.overrides.env`), from the same
+    # ogx-pgvector-password Secret the typed-provider path already used.
+    overrides:
+      env:
+        - name: PGVECTOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ogx-pgvector-password
+              key: password
 {{- end }}
