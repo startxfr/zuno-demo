@@ -1,3 +1,12 @@
+{{- /*
+Only rendered in the legacy HF-predownload mode - gated by
+modelStorage.downloadJob.enabled together with pvc-model.yaml (never the
+Job alone: see that file's header and values.yaml's modelStorage comment).
+Default off at install time since 2026-08-18 (ansible
+zuno_models_download_enabled): the model is staged in modelsS3 and the
+predictor reads it straight from S3 instead.
+*/ -}}
+{{- if .Values.modelStorage.downloadJob.enabled }}
 # One-time download of {{ .Values.modelId }} into pvc-model.yaml's PVC
 # (gp3-csi, WaitForFirstConsumer - this Job's pod is that first consumer,
 # which is why both share sync-wave -15: see pvc-model.yaml for the
@@ -60,3 +69,4 @@ spec:
         - name: model-pvc
           persistentVolumeClaim:
             claimName: {{ .Values.inferenceServiceName }}-model
+{{- end }}

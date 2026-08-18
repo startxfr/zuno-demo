@@ -2,6 +2,20 @@
 - name: "models | discover the vLLM serving-runtime image (ADR-0048)"
   ansible.builtin.include_tasks: discover_vllm_image.yml
 
+# Same optional soft-read as ansible/roles/keycloak: confidential.yml is
+# where operator-facing flags/knobs live (zuno_models_download_enabled,
+# zuno_models_s3_bucket/_prefix), but every one of them has a default()
+# below, so the file's absence is fine.
+- name: "models | check for ansible/confidential.yml (optional, only for the zuno_models_* knobs)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _models_confidential_file
+
+- name: "models | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _models_confidential_file.stat.exists
+
 # No OLM operator involved - all content is -d1 (d0 is a no-op).
 - name: "models | apply the model serving GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -23,3 +37,18 @@
     gitops_app_extra_helm_values:
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
+      # Day 1 default is the S3 serving path (the chat model's weights are
+      # staged in the modelsS3 bucket since 2026-08-18): the HF->PVC
+      # predownload Job is opt-in via zuno_models_download_enabled: true.
+      # The chart's own default stays true so this deactivation only
+      # reaches the cluster through an ansible run, never through a bare
+      # ArgoCD sync of a chart commit (see the chart's modelStorage
+      # comment for what flipping it prunes/rolls).
+      modelStorage:
+        downloadJob:
+          enabled: "{{ zuno_models_download_enabled | default(false) | bool }}"
+      # Which bucket/directory contain the model weights
+      # (s3://<bucket>/<prefix>/<servedModelName>/).
+      modelsS3:
+        bucket: "{{ zuno_models_s3_bucket | default('zuno-demo-rag-corpus') }}"
+        prefix: "{{ zuno_models_s3_prefix | default('models') }}"

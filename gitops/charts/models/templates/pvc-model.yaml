@@ -1,3 +1,12 @@
+{{- /*
+Only rendered in the legacy HF-predownload mode - gated TOGETHER with
+job-model-download.yaml (and inferenceservice.yaml's storageUri branch) by
+modelStorage.downloadJob.enabled: a PVC without its consumer Job deadlocks
+a fresh sync (see the wave comment below), and with automated.prune an
+un-rendered PVC is deleted out from under the running predictor - so the
+three always flip as one unit. See values.yaml's modelStorage comment.
+*/ -}}
+{{- if .Values.modelStorage.downloadJob.enabled }}
 # Backs the chat model's storageUri: pvc:// (templates/inferenceservice.yaml)
 # instead of the GPU node's ephemeral disk - see values.yaml's modelStorage
 # comment. A normal sync-wave resource (not an ArgoCD PreSync hook, unlike
@@ -31,3 +40,4 @@ spec:
   resources:
     requests:
       storage: {{ .Values.modelStorage.size }}
+{{- end }}

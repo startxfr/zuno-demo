@@ -42,17 +42,40 @@ Depends on the `openshift_ai` role's `DataScienceCluster` having the
 (with `nfd` prepared first) being ready - all Day 0 components installed
 before `models` (a Day 1 component) in `ansible/playbooks/day0_install.yml`.
 
-## Chat model storage: PVC, not the node's ephemeral disk
+## Chat model storage: S3 by default, opt-in HF→PVC predownload
 
-`templates/pvc-model.yaml` + `templates/job-model-download.yaml` predownload
-the chat model into a PVC once, instead of `storageUri: hf://` (still used
-by the embedding model), which downloads straight into the GPU node's
-ephemeral root disk on every pod (re)start. The node's 75GB root volume
-can't hold the CUDA vLLM image (17.67GB) + a fresh ~15GB `hf://` download +
-NVIDIA driver build artifacts (~7GB) at once.
-`templates/inferenceservice.yaml`'s `storageUri: pvc://...` then has KServe
-mount that PVC directly, with no download/storage-initializer step at pod
-start.
+Since 2026-08-18 the chat model's weights are staged in S3
+(`s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/`, see
+`values.yaml`'s `modelsS3` block - same bucket/credential as
+rag-ingestion's corpus, `models/` prefix) and
+`modelStorage.downloadJob.enabled` picks how the predictor gets them:
+
+- **`false` (what `ansible/roles/models` passes by default, via
+  `zuno_models_download_enabled`)**: no PVC, no download Job.
+  `templates/inferenceservice.yaml` uses `storageUri: s3://...` with the
+  `ServiceAccount` + `serving.kserve.io/s3-*`-annotated Secret from
+  `templates/s3-serving-credentials.yaml` - the same mechanism (and Vault
+  `rag/s3` credential) the MaaS `LLMInferenceService` already uses in
+  `templates/maas.yaml`. KServe's storage-initializer downloads ~15GB
+  from same-region S3 onto the node at pod (re)start.
+- **`true` (chart default, so standalone `helm template` keeps the legacy
+  rendering)**: `templates/pvc-model.yaml` +
+  `templates/job-model-download.yaml` predownload the model from Hugging
+  Face into a PVC once, and `storageUri: pvc://...` mounts it with no
+  download step at pod start. This was the original design: the GPU
+  node's 75GB root volume couldn't hold the CUDA vLLM image (17.67GB) +
+  a fresh ~15GB `hf://` download + NVIDIA driver build artifacts (~7GB)
+  at once, and in-cluster HF transfers to ephemeral storage proved
+  unreliable besides (see `templates/maas.yaml`'s hang history).
+
+The flag flips the PVC, the Job and the `storageUri` **as one unit** -
+never gate the Job alone: with this app's `automated.prune` an
+un-rendered PVC is deleted under the running predictor, and a PVC
+rendered without its consumer Job deadlocks a fresh sync at wave -15
+(`templates/pvc-model.yaml`'s deadlock note). The embedding model is
+unaffected (still `storageUri: hf://`, ~130MB).
+
+The rest of this section documents the **`enabled: true`** (PVC) mode:
 
 The PVC and the download Job are both plain sync-wave resources (both
 wave -15, before the ServingRuntime's -5 - sharing one wave is

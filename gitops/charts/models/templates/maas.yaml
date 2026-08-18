@@ -63,19 +63,19 @@ spec:
     template:
       metadata:
         annotations:
-          serving.kserve.io/s3-endpoint: {{ .Values.maas.llmInferenceService.s3.endpoint | quote }}
-          serving.kserve.io/s3-region: {{ .Values.maas.llmInferenceService.s3.region | quote }}
+          serving.kserve.io/s3-endpoint: {{ .Values.modelsS3.endpoint | quote }}
+          serving.kserve.io/s3-region: {{ .Values.modelsS3.region | quote }}
           serving.kserve.io/s3-usehttps: "1"
           serving.kserve.io/s3-verifyssl: "1"
   data:
     - secretKey: AWS_ACCESS_KEY_ID
       remoteRef:
-        key: {{ .Values.maas.llmInferenceService.s3.externalSecret.remoteKey | quote }}
-        property: {{ .Values.maas.llmInferenceService.s3.externalSecret.accessKeyProperty | quote }}
+        key: {{ .Values.modelsS3.externalSecret.remoteKey | quote }}
+        property: {{ .Values.modelsS3.externalSecret.accessKeyProperty | quote }}
     - secretKey: AWS_SECRET_ACCESS_KEY
       remoteRef:
-        key: {{ .Values.maas.llmInferenceService.s3.externalSecret.remoteKey | quote }}
-        property: {{ .Values.maas.llmInferenceService.s3.externalSecret.secretKeyProperty | quote }}
+        key: {{ .Values.modelsS3.externalSecret.remoteKey | quote }}
+        property: {{ .Values.modelsS3.externalSecret.secretKeyProperty | quote }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -110,7 +110,11 @@ spec:
   baseRefs:
     - name: {{ .Values.maas.llmInferenceService.baseRef }}
   model:
-    uri: {{ .Values.maas.llmInferenceService.modelUri | quote }}
+    # <prefix>/<servedModelName>/ (the CLASSIC servedModelName - the S3
+    # directory holds the one shared copy both serving paths read; this
+    # LLMInferenceService's own -maas id below is only an API name). Same
+    # derivation as inferenceservice.yaml's S3 branch.
+    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.servedModelName }}/"
     name: {{ .Values.maas.llmInferenceService.servedModelName | quote }}
   replicas: 1
   template:

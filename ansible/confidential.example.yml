@@ -87,6 +87,21 @@ zuno_salesforce_access_token: "xxxxxx"
 zuno_rag_s3_access_key_id: "xxxxxx"
 zuno_rag_s3_secret_access_key: "xxxxxx"
 
+# --- Model weights storage (gitops/charts/models) ---------------------------
+# Not secrets - listed here because this file is where every ansible-driven
+# feature flag/S3 knob lives; all three have defaults in
+# ansible/roles/models/tasks/install.yml, so they may be omitted entirely.
+# zuno_models_download_enabled: re-enables the legacy Day 1 HF->PVC
+# predownload Job (qwen25-7b-instruct-model-download). Default false since
+# 2026-08-18: the chat model's weights are staged in the bucket below and
+# the predictor reads them straight from S3 (same rag/s3 Vault credential
+# as the RAG corpus - reuses zuno_rag_s3_* above, no extra secret).
+# zuno_models_s3_bucket/_prefix: which bucket and directory contain the
+# model weights, layout s3://<bucket>/<prefix>/<servedModelName>/.
+zuno_models_download_enabled: false
+zuno_models_s3_bucket: "zuno-demo-rag-corpus"
+zuno_models_s3_prefix: "models"
+
 # --- AWS Route53 DNS-01 (ADR-0211: Let's Encrypt wildcard TLS) --------------
 # Optional: leave "xxxxxx" and the aws/route53-dns01 Vault seed is skipped
 # (the ACME issuers then can't validate - gitops/charts/cert-manager's

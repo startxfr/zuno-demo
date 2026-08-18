@@ -94,6 +94,22 @@ loraAdapters: []
 # real deploy. A PVC survives pod restarts and isn't bounded by node disk
 # size.
 modelStorage:
+  # Feature flag (ansible passes zuno_models_download_enabled, default
+  # false since 2026-08-18 - the model is staged in modelsS3 below, so the
+  # HF predownload is opt-in, no longer a Day 1 step). Gates pvc-model.yaml
+  # and job-model-download.yaml TOGETHER and flips inferenceservice.yaml's
+  # storageUri in the same conditional - never gate the Job alone: with
+  # this app's automated.prune a skipped PVC gets deleted under the
+  # running predictor, and a PVC rendered without its consumer Job
+  # deadlocks a fresh sync at wave -15 (see pvc-model.yaml's header).
+  # true (chart default, so `helm template`/standalone keeps the legacy
+  # rendering): HF -> PVC predownload + storageUri: pvc://.
+  # false: the predictor reads s3://<modelsS3.bucket>/<modelsS3.prefix>/
+  # <servedModelName>/ through templates/s3-serving-credentials.yaml -
+  # the per-(re)start download cost above returns, but ~15GB from
+  # same-region S3, not a flaky HF transfer, and no single-AZ PVC pinning.
+  downloadJob:
+    enabled: true
   size: 30Gi
   storageClassName: gp3-csi
   # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
@@ -118,6 +134,31 @@ modelStorage:
   # image_mirrors, tag "rhel9", importPolicy.scheduled: false so the
   # mirror stays pinned to this exact digest).
   initializerImage: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-kserve-storage-initializer-rhel9:rhel9
+
+# Where model weights live in S3 (ansible: zuno_models_s3_bucket /
+# zuno_models_s3_prefix). Single source for every s3:// model reference in
+# this chart: the classic predictor's storageUri when
+# modelStorage.downloadJob.enabled is false, and the MaaS
+# LLMInferenceService's model.uri + credential annotations (maas.yaml).
+# Same bucket/credential (Vault "rag/s3") as rag-ingestion's corpus
+# (gitops/charts/rag-ingestion/values.yaml's s3: block) - the models/
+# prefix keeps weights and corpus objects apart. Layout is
+# <prefix>/<servedModelName>/: models/qwen2.5-7b-instruct/ (uploaded
+# out-of-cluster 2026-08-18 during the hf:// hang incident, see maas.yaml),
+# plus models/gpt-oss-20b/ and models/gpt-oss-120b/ (staged 2026-08-18,
+# not servable on this cluster's GPUs - transit storage only).
+modelsS3:
+  bucket: zuno-demo-rag-corpus
+  prefix: models
+  endpoint: s3.eu-west-2.amazonaws.com
+  region: eu-west-2
+  # Where the read credential lives in Vault (via the vault-backend
+  # ClusterSecretStore) - consumed by both s3-serving-credentials.yaml
+  # (classic predictor) and maas.yaml's ExternalSecret.
+  externalSecret:
+    remoteKey: rag/s3
+    accessKeyProperty: accessKeyId
+    secretKeyProperty: secretAccessKey
 
 # Additive second model: text embeddings for rag-ingestion (see
 # gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and
@@ -228,11 +269,11 @@ maas:
     # RESOLVED 2026-08-18: switched from hf://Qwen/Qwen2.5-7B-Instruct
     # after the storage-initializer's HF download hung mid-transfer on
     # every attempt (see templates/maas.yaml's ExternalSecret comment for
-    # the full history). Model was downloaded once out-of-cluster and
-    # uploaded to the same bucket/credential rag-ingestion already uses
-    # for the RAG corpus (gitops/charts/rag-ingestion/values.yaml's s3:
-    # block), under a new prefix so it doesn't mix with corpus objects.
-    modelUri: s3://zuno-demo-rag-corpus/models/qwen2.5-7b-instruct/
+    # the full history). The model.uri is no longer set here: maas.yaml
+    # derives s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/
+    # from the top-level modelsS3 block (the classic servedModelName,
+    # qwen2.5-7b-instruct - the S3 directory holds the one shared copy
+    # both serving paths read; the -maas suffix below is only an API id).
     # Served-model id MaaS callers use in the "model" field - independent
     # canonical id from the classic InferenceService's own
     # servedModelName (models.servedModelName), by design: this is a
@@ -247,15 +288,11 @@ maas:
     # Reuses rag-ingestion's existing S3 credential/bucket rather than a
     # new IAM user - see templates/maas.yaml's ExternalSecret for how
     # this gets translated into KServe's serving.kserve.io/s3-* Secret
-    # annotation convention.
+    # annotation convention. Endpoint/region and the Vault credential
+    # location come from the top-level modelsS3 block; only the
+    # maas-scoped Secret name stays here.
     s3:
-      endpoint: s3.eu-west-2.amazonaws.com
-      region: eu-west-2
       secretName: qwen25-7b-instruct-maas-s3-credentials
-      externalSecret:
-        remoteKey: rag/s3
-        accessKeyProperty: accessKeyId
-        secretKeyProperty: secretAccessKey
     # Smaller than the classic qwen predictor's 24Gi/32Gi (g6.4xlarge,
     # 16vCPU/64GiB) - VERIFIED live (2026-08-16): the new node is a
     # g6.2xlarge (8vCPU/32GiB, ~28.7Gi allocatable), half the instance
