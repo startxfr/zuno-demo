@@ -9,6 +9,16 @@ metadata:
     {{- include "rag-ingestion.labels" . | nindent 4 }}
 spec:
   dspVersion: v2
+  # VERIFIED live 2026-08-18 (rag-dspa recovery, after the DB-probe and
+  # istio-3306 fixes): DSPO defaults podToPodTLS to true, which makes BOTH
+  # MLMD (--mysql_config_sslrootcert=/dsp-custom-certs/dsp-ca.crt) and the
+  # apiserver demand TLS on their MySQL connections - but the external
+  # MariaDB (gitops/charts/mariadb, no spec.tls) serves none, so MLMD
+  # fatal-looped on mysql_real_connect and the apiserver on "[mysql]
+  # unexpected EOF" mid-handshake, indefinitely. The metadata path is
+  # in-cluster-only and NetworkPolicy-scoped; enabling MariaDB TLS with
+  # DSP's own CA is the eventual alternative if that posture changes.
+  podToPodTLS: false
   apiServer:
     deploy: true
     pipelineStore: {{ .Values.pipelineServer.pipelineStore }}

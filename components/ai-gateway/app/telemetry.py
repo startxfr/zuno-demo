@@ -21,7 +21,7 @@ import logging
 import os
 import time
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Iterator, List, Optional
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -54,10 +54,12 @@ _model_call_counter = None
 _token_counter = None
 _cost_counter = None
 _cache_lookup_counter = None
+_model_call_duration_histogram = None
 
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
+    global _model_call_duration_histogram
 
     resource = Resource.create({"service.name": service_name})
 
@@ -92,6 +94,11 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
         "zuno.semantic_cache_lookups",
         description="ADR-0104 semantic cache lookups, by outcome (hit/miss/unavailable)",
     )
+    _model_call_duration_histogram = meter.create_histogram(
+        "zuno.model_call_duration_ms",
+        unit="ms",
+        description="Model call latency, by provider/model/outcome - same attrs as zuno.model_calls",
+    )
 
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
 
@@ -121,6 +128,8 @@ def model_call_span(
     classification: str,
     request_id: Optional[str] = None,
     adapter: Optional[str] = None,
+    caller_sub: Optional[str] = None,
+    groups: Optional[List[str]] = None,
 ) -> Iterator["ModelCallRecorder"]:
     """Wraps one model invocation: records a span plus the
     zuno.model_calls / zuno.model_tokens / zuno.model_cost_usd metrics
@@ -143,6 +152,16 @@ def model_call_span(
     the resolved name, not the base model, whenever an adapter applied),
     so this attribute exists to make that fact unambiguous in a trace
     query without needing app/providers.py's own resolution logic.
+
+    `caller_sub`/`groups` (ADR-0029's "by user" bullet, never wired until
+    now): the validated Keycloak identity, already resolved by
+    app/main.py's `validate_token` dependency at every call site. A
+    Keycloak group membership is a list, but Prometheus/OTel metric labels
+    are scalar - one metric point is recorded per group (attributed
+    double-counting across a `sum by (group)` rollup for a multi-group
+    user is an accepted demo-scope trade-off, same class as this file's
+    other approximations; a user with zero groups still gets one point
+    with `group=""`).
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
@@ -154,6 +173,10 @@ def model_call_span(
             span.set_attribute("zuno.request_id", request_id)
         if adapter:
             span.set_attribute("zuno.adapter", adapter)
+        if caller_sub:
+            span.set_attribute("zuno.user_sub", caller_sub)
+        if groups:
+            span.set_attribute("zuno.groups", groups)
         recorder = ModelCallRecorder(provider=provider)
         try:
             yield recorder
@@ -167,19 +190,24 @@ def model_call_span(
             latency_ms = (time.monotonic() - start) * 1000.0
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", outcome)
-            attrs = {"provider": provider, "model": model, "outcome": outcome}
-            if _model_call_counter is not None:
-                _model_call_counter.add(1, attrs)
+            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or ""}
+            group_list = groups or [""]
+            for attrs_per_group in ({**attrs, "group": g} for g in group_list):
+                if _model_call_counter is not None:
+                    _model_call_counter.add(1, attrs_per_group)
+                if _model_call_duration_histogram is not None:
+                    _model_call_duration_histogram.record(latency_ms, attrs_per_group)
             if recorder.prompt_tokens or recorder.completion_tokens:
                 span.set_attribute("zuno.prompt_tokens", recorder.prompt_tokens)
                 span.set_attribute("zuno.completion_tokens", recorder.completion_tokens)
                 cost = _estimate_cost_usd(provider, recorder.prompt_tokens, recorder.completion_tokens)
                 span.set_attribute("zuno.estimated_cost_usd", cost)
-                if _token_counter is not None:
-                    _token_counter.add(recorder.prompt_tokens, {**attrs, "kind": "prompt"})
-                    _token_counter.add(recorder.completion_tokens, {**attrs, "kind": "completion"})
-                if _cost_counter is not None:
-                    _cost_counter.add(cost, attrs)
+                for attrs_per_group in ({**attrs, "group": g} for g in group_list):
+                    if _token_counter is not None:
+                        _token_counter.add(recorder.prompt_tokens, {**attrs_per_group, "kind": "prompt"})
+                        _token_counter.add(recorder.completion_tokens, {**attrs_per_group, "kind": "completion"})
+                    if _cost_counter is not None:
+                        _cost_counter.add(cost, attrs_per_group)
 
 
 class ModelCallRecorder:

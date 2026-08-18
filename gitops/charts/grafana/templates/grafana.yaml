@@ -54,6 +54,18 @@ spec:
         - name: oauth-proxy
           port: 8443
           targetPort: oauth-proxy
+  # Without this, SQLite state (datasources, dashboards, admin user) lives
+  # in the operator's default emptyDir and is wiped on every pod restart -
+  # see values.yaml's storage comment. Operator swaps its "grafana-data"
+  # volume source from emptyDir to this PVC automatically.
+  persistentVolumeClaim:
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ .Values.storage.size }}
+      storageClassName: {{ .Values.storage.storageClassName }}
   # Named "grafana-route" (<CR name>-route) - matched by
   # serviceaccount-oauth-proxy.yaml's redirectreference annotation.
   route:

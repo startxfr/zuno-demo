@@ -1,0 +1,30 @@
+{{- if .Values.grafana.enabled }}
+# Separate from the "prometheus" datasource (prometheus-k8s/thanos-querier):
+# gitops/charts/mesh-monitoring deploys its OWN, unrelated Prometheus
+# (monitoring.rhobs/v1 MonitoringStack, scoped to zuno-mesh, never scraped
+# by prometheus-k8s) carrying Istio/Envoy telemetry
+# (podmonitor-istio-proxy.yaml/servicemonitor-istiod.yaml). Same in-cluster
+# URL and no-auth style gitops/charts/kiali/templates/kiali.yaml already
+# uses for its own Prometheus integration.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: mesh-prometheus
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  uid: mesh-prometheus
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  datasource:
+    name: Mesh Prometheus
+    type: prometheus
+    access: proxy
+    url: "http://mesh-monitoring-prometheus.zuno-mesh.svc.cluster.local:9090"
+    jsonData:
+      timeInterval: "15s"
+{{- end }}

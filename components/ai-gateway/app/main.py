@@ -214,7 +214,7 @@ async def chat_completions(
 
     if payload.stream:
         return StreamingResponse(
-            _stream_completion(candidates, classification, messages, request_id, adapter_decl),
+            _stream_completion(candidates, classification, messages, request_id, adapter_decl, identity=identity),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -224,6 +224,7 @@ async def chat_completions(
         classification,
         messages,
         caller_sub=identity.sub,
+        groups=identity.groups,
         local_only=local_only,
         task_id=x_zuno_task,
         requested_model=payload.model,
@@ -260,6 +261,7 @@ async def _invoke_with_fallback(
     raw_messages: List[ChatMessage],
     request_id: str,
     adapter_decl: Optional[AdapterDeclaration] = None,
+    groups: Optional[List[str]] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -307,7 +309,10 @@ async def _invoke_with_fallback(
         adapter_name = _resolve_adapter(candidate, cfg, adapter_decl)
         effective_model_name = adapter_name or model_name
         try:
-            with model_call_span(candidate.name, effective_model_name, classification, request_id, adapter=adapter_name) as call:
+            with model_call_span(
+                candidate.name, effective_model_name, classification, request_id,
+                adapter=adapter_name, caller_sub=caller_sub, groups=groups,
+            ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 result = await model.ainvoke(messages)
                 usage = getattr(result, "usage_metadata", None) or {}
@@ -362,6 +367,7 @@ async def _stream_completion(
     messages: List[Any],
     request_id: str,
     adapter_decl: Optional[AdapterDeclaration] = None,
+    identity: Optional[CallerIdentity] = None,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -384,7 +390,12 @@ async def _stream_completion(
         effective_model_name = adapter_name or model_name
         sent_any = False
         try:
-            with model_call_span(candidate.name, effective_model_name, classification, request_id, adapter=adapter_name):
+            with model_call_span(
+                candidate.name, effective_model_name, classification, request_id,
+                adapter=adapter_name,
+                caller_sub=identity.sub if identity else None,
+                groups=identity.groups if identity else None,
+            ):
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 async for event in model.astream(messages):
                     token = getattr(event, "content", "") or ""
