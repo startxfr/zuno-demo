@@ -410,9 +410,12 @@ confluenceAuthDefault: &confluenceAuthDefault
 # consultants get build and run tiers separately.
 # Real space keys/directories supplied 2026-08-18 (roadmap WP-07, operator
 # decision "map what exists" after a live enumeration of all 42 spaces on
-# startxfr.atlassian.net):
-#   - satellite -> space SXS, page tree "SXS/Technologie : Satellite"
-#   - openshift -> space SXS, page tree "SXS/Technologie : Openshift"
+# startxfr.atlassian.net), corrected same day after a live re-check found
+# the content actually lives in space SXSI ("SXS Internal"), not SXS - see
+# ADR-0330's dated correction note for the full story, including why the
+# `directories` value below has no space-identifying segment:
+#   - satellite -> space SXSI, page tree "Procédures/Technologie : Satellite"
+#   - openshift -> space SXSI, page tree "Procédures/Technologie : Openshift"
 #   - openshift-ai, keycloak -> disabled: no real source tree exists for
 #     these technologies anywhere on the site. Re-enable with real values
 #     when content exists; never invent keys.
@@ -429,8 +432,8 @@ confluence:
     technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["SXS"]
-    directories: ["SXS/Technologie : Satellite"]
+    spaces: ["SXSI"]
+    directories: ["Procédures/Technologie : Satellite"]
     requiredGroups: ["confluence-archi-satellite"]
     includeAttachments: true
     preserveAcl: true
@@ -442,8 +445,8 @@ confluence:
     technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["SXS"]
-    directories: ["SXS/Technologie : Satellite"]
+    spaces: ["SXSI"]
+    directories: ["Procédures/Technologie : Satellite"]
     requiredGroups: ["confluence-build-satellite"]
     includeAttachments: true
     preserveAcl: true
@@ -455,8 +458,8 @@ confluence:
     technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["SXS"]
-    directories: ["SXS/Technologie : Satellite"]
+    spaces: ["SXSI"]
+    directories: ["Procédures/Technologie : Satellite"]
     requiredGroups: ["confluence-run-satellite"]
     includeAttachments: true
     preserveAcl: true
@@ -468,8 +471,8 @@ confluence:
     technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["SXS"]
-    directories: ["SXS/Technologie : Openshift"]
+    spaces: ["SXSI"]
+    directories: ["Procédures/Technologie : Openshift"]
     requiredGroups: ["confluence-archi-openshift"]
     includeAttachments: true
     preserveAcl: true
@@ -481,8 +484,8 @@ confluence:
     technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["SXS"]
-    directories: ["SXS/Technologie : Openshift"]
+    spaces: ["SXSI"]
+    directories: ["Procédures/Technologie : Openshift"]
     requiredGroups: ["confluence-build-openshift"]
     includeAttachments: true
     preserveAcl: true
@@ -494,8 +497,8 @@ confluence:
     technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["SXS"]
-    directories: ["SXS/Technologie : Openshift"]
+    spaces: ["SXSI"]
+    directories: ["Procédures/Technologie : Openshift"]
     requiredGroups: ["confluence-run-openshift"]
     includeAttachments: true
     preserveAcl: true
@@ -503,7 +506,7 @@ confluence:
     authentication: *confluenceAuthDefault
   - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
     # real Confluence source tree exists for this technology anywhere on
-    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # startxfr.atlassian.net (SXSI carries Technologie : Satellite/Openshift/
     # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
     # with real spaces/directories when such content exists; do not invent.
     enabled: false
@@ -521,7 +524,7 @@ confluence:
     authentication: *confluenceAuthDefault
   - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
     # real Confluence source tree exists for this technology anywhere on
-    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # startxfr.atlassian.net (SXSI carries Technologie : Satellite/Openshift/
     # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
     # with real spaces/directories when such content exists; do not invent.
     enabled: false
@@ -539,7 +542,7 @@ confluence:
     authentication: *confluenceAuthDefault
   - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
     # real Confluence source tree exists for this technology anywhere on
-    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # startxfr.atlassian.net (SXSI carries Technologie : Satellite/Openshift/
     # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
     # with real spaces/directories when such content exists; do not invent.
     enabled: false
@@ -557,7 +560,7 @@ confluence:
     authentication: *confluenceAuthDefault
   - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
     # real Confluence source tree exists for this technology anywhere on
-    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # startxfr.atlassian.net (SXSI carries Technologie : Satellite/Openshift/
     # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
     # with real spaces/directories when such content exists; do not invent.
     enabled: false
@@ -575,7 +578,7 @@ confluence:
     authentication: *confluenceAuthDefault
   - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
     # real Confluence source tree exists for this technology anywhere on
-    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # startxfr.atlassian.net (SXSI carries Technologie : Satellite/Openshift/
     # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
     # with real spaces/directories when such content exists; do not invent.
     enabled: false
@@ -593,7 +596,7 @@ confluence:
     authentication: *confluenceAuthDefault
   - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
     # real Confluence source tree exists for this technology anywhere on
-    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # startxfr.atlassian.net (SXSI carries Technologie : Satellite/Openshift/
     # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
     # with real spaces/directories when such content exists; do not invent.
     enabled: false

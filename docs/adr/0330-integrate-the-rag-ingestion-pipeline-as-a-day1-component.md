@@ -4,14 +4,15 @@
   (real space keys), `ansible/roles/rag_ingestion/tasks/recurring_run.yml`
   (live-verified KFP activation). Closed 2026-08-18 (roadmap WP-07): real
   Confluence space keys/directories supplied (satellite/openshift mapped
-  to real space SXS and its actual page trees; openshift-ai/keycloak
+  to real space SXSI and its actual page trees; openshift-ai/keycloak
   disabled - no real source tree exists for either); `rag-dspa` reconciled
   Ready and the live KFP recurring-run activation ran for real, finding
   and fixing two of the three previously-unverified assumptions (version
   ordering was oldest-first not newest-first; `max_concurrency` is
   required, not optional) before the real `rag-corpus-ingestion-schedule`
   recurring run was created and confirmed resolving the correct pipeline
-  version.
+  version. Same-day correction: the initial space mapping named `SXS`;
+  see "Confluence space correction (2026-08-18)" below.
 - **Target:** v0.1
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team
@@ -237,6 +238,42 @@ two of the three "not executable by the model" items above:
 Status stays **Partially implemented**: the catalog sub-item is now fully
 discharged, but real Confluence values and the live recurring-run/DSPA-health
 verification remain open.
+
+## Confluence space correction (2026-08-18)
+
+The same-day WP-07 close above named space `SXS` as the real mapping for
+satellite/openshift. A follow-up live check (`GET /wiki/api/v2/spaces` against
+`startxfr.atlassian.net`, using the already-materialized `rag-confluence`
+Secret's credentials) found this was wrong: the real technology documentation
+lives under a *different* space, **`SXSI`** ("SXS Internal", id `675643411`),
+inside a `Procédures` page (id `675643722`) whose six children are exactly
+`Technologie : Openshift/Terraform/Vault/AnsibleAutomationPlatform/Gitlab/Satellite`
+- no OpenShift AI, no Keycloak, so that part of the original decision stands.
+`SXS` (no "Internal", id `667667269`) turns out to *also* have a thinner,
+parallel `Technologie : Satellite`/`: Openshift` tree directly under its space
+home page - a separate, less-complete duplicate, not the intended source.
+
+This also surfaced a latent bug in how `directories` was being written.
+`_ancestor_path_matches` (`components/rag-ingestion/src/rag_ingestion.py:551-565`)
+splits `directories` entries on `/` and matches each segment, in order, against
+the fetched page's real Confluence **ancestor titles** - it never inspects the
+space key or name; space scoping is entirely separate, via `spaces:` (CQL). Live
+`expand=ancestors` calls show why the original `"SXS/Technologie : Satellite"`
+value worked at all: a leaf page under `SXS` has ancestors
+`["SXS", "Technologie : Satellite"]`, matching only because `SXS`'s space-home
+page happens to be titled exactly `"SXS"`. `SXSI`'s space-home page is titled
+`"SXS Internal"`, not `"SXSI"` - a naive `"SXSI/Technologie : Satellite"` rename
+would have ancestors `["SXS Internal", "Procédures", "Technologie : Satellite"]`
+and **never match**, silently ingesting zero documents. The corrected values
+drop the non-matching space-identifying segment entirely and rely on
+`spaces: ["SXSI"]` alone for space scoping:
+`directories: ["Procédures/Technologie : Satellite"]` and
+`["Procédures/Technologie : Openshift"]` - both confirmed, live, against the
+real ancestor chains above.
+
+`gitops/charts/rag-ingestion/values.yaml`'s `confluence[]` block is updated
+accordingly; no code change was needed since `_ancestor_path_matches` itself
+was already correct - only the data fed into it was wrong.
 
 ## Security considerations
 

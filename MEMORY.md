@@ -599,6 +599,21 @@ under `docs/adr/`.
   recurring_run.yml`, then a real live run created the real
   `rag-corpus-ingestion-schedule` recurring run resolving the correct
   version.
+- **2026-08-18 (ADR-0330 correction, same day)**: the WP-07 space mapping
+  above named `SXS`, but a follow-up live check (`GET /wiki/api/v2/spaces`)
+  found the real content is in a *different* space, `SXSI` ("SXS
+  Internal") - `satellite`/`openshift` now use `spaces: ["SXSI"]` with
+  `directories: ["Procédures/Technologie : Satellite"]` /
+  `["Procédures/Technologie : Openshift"]`. Also surfaced a latent bug:
+  `_ancestor_path_matches` (`components/rag-ingestion/src/
+  rag_ingestion.py:551-565`) matches `directories` segments against real
+  Confluence page-tree ancestor *titles* only - it never sees the space
+  key/name, so the old `"SXS/..."` value only worked because SXS's
+  space-home page happens to be titled exactly `"SXS"`; SXSI's is titled
+  `"SXS Internal"`, so a naive `"SXSI/..."` rename would have silently
+  matched zero pages. Fix: drop the space-identifying segment entirely
+  and let `spaces:` alone do space scoping. See ADR-0330's "Confluence
+  space correction" section.
 - **2026-08-18 (ADR-0114 superseded by ADR-0118, WP-03 Done)**: the
   WP-03 decision-risk clause fired - operator chose supersession. The
   AI Gateway stays the policy router; `maas_adapter.py` stays merged +
