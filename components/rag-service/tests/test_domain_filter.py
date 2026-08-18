@@ -46,6 +46,18 @@ def test_technology_filter_is_a_hard_filter_like_product_version() -> None:
     assert params == ["satellite", []]
 
 
+def test_technology_filter_grandfathers_rows_without_the_key() -> None:
+    """VERIFIED live 2026-08-18: the schema-apply fixture chunks carry no
+    technology key, and agent-runtime always sends technology alongside a
+    detected product - a strict `->> =` clause therefore returned ZERO
+    results for every question naming a product. Untagged rows must pass
+    the technology filter (same grandfathering the domains clause and
+    acl_groups clause already provide); a PRESENT-but-different value is
+    still excluded."""
+    sql, _ = _filter_clause(3, product=None, version=None, caller_groups=[], technology="satellite")
+    assert "NOT (metadata ? 'technology') OR metadata ->> 'technology' = $3" in sql
+
+
 def test_domain_and_technology_and_acl_compose() -> None:
     sql, params = _filter_clause(
         3, product=None, version=None, caller_groups=["board"], domains=["knowledge.tech"], technology="openshift"
@@ -90,6 +102,7 @@ TESTS = [
     test_no_domains_applies_no_domain_clause,
     test_domains_present_scopes_the_query_and_treats_untagged_rows_as_tech,
     test_technology_filter_is_a_hard_filter_like_product_version,
+    test_technology_filter_grandfathers_rows_without_the_key,
     test_domain_and_technology_and_acl_compose,
     test_row_to_doc_defaults_untagged_rows_to_knowledge_tech,
     test_row_to_doc_surfaces_explicit_domain,

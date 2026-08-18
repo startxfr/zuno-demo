@@ -173,6 +173,14 @@ def _filter_clause(
     ADR-0202: technology is a hard filter (like product/version), not a
     ranking preference - the one canonical cross-source key that lets a
     query combine official web documentation and Confluence chunks.
+    Rows WITHOUT a technology key are grandfathered through it (same
+    untagged-legacy-rows posture as the domains clause below): VERIFIED
+    live 2026-08-18 - the schema-apply fixture chunks carry
+    product/version but no technology, and since agent-runtime's
+    retrieve_node always sends technology alongside a detected product,
+    the strict `->> =` form returned ZERO results for every question
+    that named a product, exactly the "silently losing legacy tech
+    content" failure the domains clause's own comment warns about.
 
     ADR-0209: project_id, when given, is a hard filter scoped to the
     knowledge.project pool specifically (the caller must only pass it
@@ -194,7 +202,9 @@ def _filter_clause(
         params.append(version)
         idx += 1
     if technology:
-        clauses.append(f"metadata ->> 'technology' = ${idx}")
+        # Absent key passes (see the ADR-0202 grandfathering note above);
+        # a PRESENT-but-different technology is still excluded hard.
+        clauses.append(f"(NOT (metadata ? 'technology') OR metadata ->> 'technology' = ${idx})")
         params.append(technology)
         idx += 1
     if domains:
