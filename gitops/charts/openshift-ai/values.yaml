@@ -329,7 +329,11 @@ userWorkloadMonitoring:
 # document_embeddings table rag-service's own provider reads (see that
 # values file's ogxDatabase comment for why).
 ogxServer:
-  enabled: false
+  # Enabled 2026-08-18 (WP-06 operator follow-up): stands up the OGX
+  # data-plane API for the corpus proof + provider-parity run. All spec
+  # fields below were schema-verified 2026-08-14; this flip is the first
+  # live apply.
+  enabled: true
   name: zuno-ogx
   namespace: redhat-ods-applications
   distribution: remote-vllm
