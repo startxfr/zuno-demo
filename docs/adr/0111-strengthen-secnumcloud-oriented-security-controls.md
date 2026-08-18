@@ -39,6 +39,27 @@ time-only from here. Every other remaining `gap` row (restricted SCC, NetworkPol
 enforcement, the WP-13 restore drill, supply-chain signing) was
 re-checked this pass and does stay live-cluster/other-WP-only as the
 2026-08-15 note described.
+
+## Wave 1 closure pass (2026-08-18)
+
+WP-12 and WP-13 discharged for real: the restore drill ran live
+(PostgreSQL scratch-cluster restore verified identical to the primary
+in 203s; Vault snapshot restore verified in 39s - both rows flip to
+`enforced-on-cluster`), and the availability row closed on a short
+measured window by explicit operator decision (100.000% over the
+trailing 24h, both burn-rate alerts `health: ok`) plus a live failover
+drill across seven services. Three rows remain genuine `gap`s, all
+owned by WP-04/WP-05 and blocked on the same external dependency (a
+GitHub billing lock on `startxfr/zuno-demo` that fails every Actions
+job before it starts - not a repo-side gap):
+
+- Immutable chart image tags (no `latest`) - `platform/supply-chain/check_no_latest_tags.py`
+- First-party image signature verification - `platform/supply-chain/verify_signatures.py`
+- OKF bundle signature - `platform/supply-chain/sign_okf_bundle.py`
+
+Per WP-11's closure rule, ADR-0111 stays **Partially implemented** -
+these three rows are the entire remaining v0.1 gap set; the ADR reaches
+`Implemented` the moment WP-04/WP-05 close them.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

@@ -53,14 +53,15 @@ against a live deployment, not re-derivable from the repo alone),
 | Restricted-context (C2/C3, `external_model_policy.allow_context: false`) sources never reach an external model | `enforced-in-ci` (tested) | ADR-0035; `app/routing.py`'s `local_only` gate, `X-Zuno-Local-Only` propagation |
 | Public repository fixtures contain no real/nominative commercial data | `enforced-on-cluster` (human review, no automated scanner) | ADR-0025 |
 | Backup/recovery objectives are defined, mechanism configured and recency-checked | `enforced-in-ci` (2026-08-15) | `docs/platform/backup-recovery.md`; PostgreSQL pgBackRest (confirmed live) + `ansible/roles/postgresql/tasks/precheck.yml`; Vault CSI VolumeSnapshot `cronjob-backup.yaml` + `ansible/roles/vault/tasks/precheck.yml` (ADR-0112 / WP-13) |
-| A restore has actually been executed and RTO/RPO validated live | `gap` | ADR-0112 / WP-13 — documented runbook exists, drill unexecuted |
+| A restore has actually been executed and RTO/RPO validated live | `enforced-on-cluster` (2026-08-18) | `docs/platform/backup-recovery.md`'s drill records (ADR-0112 / WP-13): PostgreSQL scratch-cluster restore Ready in 203s, data verified identical to the live primary; Vault snapshot restore unsealed with the live key, known secret verified at 39s. Both well inside RTO ≤ 4h |
 
-## Availability (mechanism closed by WP-12; live measurement still pending)
+## Availability
 
 | Control | Status | Mechanism |
 |---|---|---|
 | Shared platform services run with production-oriented availability (replicas, PodDisruptionBudget, topology spread) | `enforced-in-ci` (2026-08-15) | PDB + `topologySpreadConstraints` on agent-runtime/ai-gateway/mcp-gateway/rag-service/Keycloak; PostgreSQL/Redis already replica/PDB-complete via PGO/Bitnami defaults; `check_workload_hardening.py`'s availability checks (ADR-0101 / WP-12) |
-| A measured 99.9% availability objective is defined and alerted on | `gap` (metric now flowing live end to end 2026-08-18; only the real 30-day measurement window is left) | `docs/platform/slo.md`: `zuno_bff_requests_total{agent,code}` confirmed real and queryable on `prometheus-k8s` across all six agent BFFs, via `components/agent-bff/internal/telemetry/` + `gitops/charts/observability/templates/servicemonitor-otel-collector.yaml` (ADR-0102 / WP-12) |
+| A measured 99.9% availability objective is defined and alerted on | `enforced-on-cluster` (2026-08-18, short window by operator decision) | `docs/platform/slo.md`: 100.000% measured at the BFF boundary over the trailing 24h (73,894 requests, zero 5xx), both burn-rate alerts evaluating `health: ok` on `prometheus-k8s` (ADR-0102 / WP-12). The 30-day series keeps accumulating (complete ~2026-09-17); closed on the available window per an explicit operator decision, recorded with the window length |
+| A failover drill has been executed against the shared platform services | `enforced-on-cluster` (2026-08-18) | `docs/platform/slo.md`'s drill table (ADR-0101 / WP-12): PostgreSQL primary failover 4.8s/5.7s-writable; scaled rag-service continuity 79/81 requests through a pod kill with the PDB holding; single-replica services recover in 31-65s |
 
 ## How to update this matrix
 
