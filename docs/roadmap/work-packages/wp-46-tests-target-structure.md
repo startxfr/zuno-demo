@@ -1,6 +1,16 @@
 # WP-46: Agent tests target structure (promotes ADR-0504)
 
-- **State:** Not started
+- **State:** Done (2026-08-18). Structure landed for the five agents
+  with `tests/` dirs (tekos, arkos, comage, advantage, finage): three
+  subdirs each with a keep-file README defining its suite scope, main
+  README stating the three-layer boundary + PROMOTION.md pointer. The
+  runner enforces the per-subdir READMEs as structure (a first draft
+  only checked dirs + main README — the brief's own delete-a-README
+  acceptance test caught it; fixed and re-proven: violation → exit 1).
+  Zero test content, as briefed (What-NOT-to-touch honored). Stage-1
+  agents untouched. PROMOTION.md step 4 already named ADR-0504 —
+  brief step 3 satisfied by WP-43, no edit needed. Lint gains the
+  blocking ADR-0504 step.
 - **ADRs:** ADR-0504
 - **Depends on:** WP-43
 - **Blocks:** WP-48

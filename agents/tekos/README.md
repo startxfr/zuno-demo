@@ -43,7 +43,7 @@ tekos/
 ├── rag/                 (stub)
 ├── tools/               (stub)
 ├── deployment/          Generated ADR-0503 snapshot + README (WP-45)
-└── tests/               (stub until WP-46's ADR-0504 structure)
+└── tests/               ADR-0504 structure (WP-46; suites fill at promotion)
 ```
 
 The earlier `agent.okf.yaml` (a single Kubernetes-style YAML file) was

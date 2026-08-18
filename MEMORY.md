@@ -340,6 +340,21 @@ step 7 points at it), and Cognos/Soursage carry Stage-1 identity
 artifacts (generator run into a temp root via `write_all(repo_root=…)`;
 charts/evaluations deliberately deferred to build time).
 
+2026-08-18 (later still): WP-44/WP-45/WP-46 Done — ADR-0503 and
+ADR-0504 Implemented. Three new generators/checkers in `platform/okf/`,
+each a blocking lint step: `generate_authorization_matrix.py`
+(`--check --all`; matrix section between HTML markers in the
+agent.okf.md body — frontmatter untouched, so the three service parsers
+are unaffected), `generate_deployment_snapshot.py` (helm-template-
+derived; auto-detects CR-managed vs raw chart — only Arkos renders an
+AIAgent CR; Tekos's Application pair is the legacy-named `zuno-api-*`),
+`run_agent_contract_tests.py` (structure gate; suites fill at
+promotion). Notable: zero `(no groups — unusable)` matrix rows across
+all 8 agents — no policy gaps. Next unblocked: WP-47A (task-tab
+contract), WP-54 (quota policy — its Part B has cluster-side Kuadrant
+work), then WP-48 (zuno-okf bootstrap, needs the operator-created
+repo).
+
 ## 14. Explicitly deferred capabilities
 
 Main v2 candidates:

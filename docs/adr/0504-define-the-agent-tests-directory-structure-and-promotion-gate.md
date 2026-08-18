@@ -1,6 +1,6 @@
 # ADR-0504: Define the agent tests directory structure and promotion gate
 
-- **Status:** Proposed
+- **Status:** Implemented - see `platform/okf/run_agent_contract_tests.py` and `agents/*/tests/` (WP-46, 2026-08-18; the ADR defines structure, not content - suites fill at promotion)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

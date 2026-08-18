@@ -1,3 +1,25 @@
-# Comage Tests
+# Comage Contract Tests (ADR-0504)
 
-Agent-specific tests assets will be maintained here.
+Per-agent, repo-side, static contract suites - run by
+`python3 platform/okf/run_agent_contract_tests.py` from the repository
+root (a blocking lint-chain step; test files are `test_*.py` under the
+three subdirectories, each executable standalone).
+
+Three-layer boundary (ADR-0504): **schema/structural** checks are
+platform-wide and live in `platform/supply-chain/` +
+`platform/okf/schema/` - never duplicated here; **contract** checks
+(this directory) are Comage-specific and need only repository files - no
+cluster, no credentials, no model calls; **behavioral** checks stay in
+`evaluations/comage/` (ADR-0027/ADR-0028, the shared ADR-0342 runner).
+
+- `contract/` - bundle-level self-consistency (declared tools/domains
+  exist in policy with non-empty group intersections; ADR-0503 matrix
+  and deployment snapshot are current)
+- `tasks/` - per-task assertions (live_read_tool within allowed_tools,
+  primary_task declared, ADR-0512 project_required marks well-formed)
+- `prompts/` - prompt lint (required OKF frontmatter, referenced by a
+  task, golden-format checks where a task defines one)
+
+No suites exist yet - filling them is a Stage-2 promotion criterion
+(`platform/templates/agent/PROMOTION.md` step 4), owned by whichever
+work promotes Comage, never left as empty stubs.
