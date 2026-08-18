@@ -23,5 +23,6 @@
     - bitnami-redis
     - postgres
     - odh-kserve-storage-initializer-rhel9
+    - odh-ogx-core-rhel9
   loop_control:
     loop_var: "mirror_stream_name"

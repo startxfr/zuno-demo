@@ -77,9 +77,19 @@ Gateways already use on this cluster (`data-science-gateway`,
 - `HTTPRoute` `tekos-quota-demo` (namespace `zuno-ai-run`) backing that
   hostname inside the mesh, backend `tekos-frontend:8080` — the same
   Service the real Route already fronts.
-- `AuthPolicy` `tekos-quota-demo-jwt` establishes JWT identity from the
-  same Keycloak `zuno` realm issuer the frontend/BFF charts already
-  use, so `auth.identity.sub`/`auth.identity.groups` resolve for the
+- `AuthPolicy` `tekos-quota-demo-jwt` establishes JWT identity using
+  `jwksUrl` — the internal Keycloak Service endpoint
+  (`http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs`),
+  **not** `issuerUrl` (OIDC discovery against the external Route).
+  First attempt used `issuerUrl` and Authorino 500'd every request:
+  in-cluster OIDC discovery against the externally-issued Keycloak
+  route cert failed with `x509: certificate signed by unknown
+  authority` (Authorino doesn't trust that CA) — the same class of
+  problem ADR-0347/ADR-0411 solve for other in-cluster consumers, and
+  the same split-brain issuer/JWKS default every other Keycloak
+  consumer chart in this repo already carries. The internal endpoint
+  is plain HTTP, sidestepping TLS trust entirely. Once fixed,
+  `auth.identity.sub`/`auth.identity.groups` resolve for the
   RateLimitPolicy.
 
 **Rollback:** set `quotaEnforcement.enabled: false` and push — ArgoCD's

@@ -110,6 +110,24 @@
             name: "registry.redhat.io/rhoai/odh-kserve-storage-initializer-rhel9@sha256:166184c520c7821bacbedd05736938b58edc9cc2edc6071bfbc1105a4316aef5"
           importPolicy: {scheduled: false}
           referencePolicy: {type: Local}
+    # WP-06/ADR-0322: the OGX operator's own in-process OCI-manifest-fetch
+    # client 401s against registry.redhat.io directly even with a valid
+    # cluster pull secret (verified live 2026-08-18 - imagePullSecrets on
+    # the operator's own ServiceAccount had no effect, since that governs
+    # kubelet pulls, not the operator's own registry HTTP client). Mirroring
+    # here and pointing OGXServer.spec.distribution.image at the internal
+    # copy instead (gitops/charts/openshift-ai) works around it if the
+    # operator's client honors ambient in-cluster ServiceAccount-token
+    # registry auth against the internal registry - see the RoleBinding
+    # grant below (redhat-ods-applications added for this).
+    - name: odh-ogx-core-rhel9
+      tags:
+        - name: rhel9
+          from:
+            kind: DockerImage
+            name: "registry.redhat.io/rhoai/odh-ogx-core-rhel9@sha256:fd71c3ed486398002dac8aa09e1e4162e2bf740d33e192e1bbc2f3233d4f766a"
+          importPolicy: {scheduled: false}
+          referencePolicy: {type: Local}
   loop_control:
     loop_var: "mirror_stream"
     label: "{{ mirror_stream.name }}"
@@ -146,5 +164,9 @@
     - zuno-data
     - zuno-vault
     - zuno-auth
+    # WP-06/ADR-0322: the OGX operator's controller pod and OGXServer's own
+    # data-plane pods both run here - needed to pull odh-ogx-core-rhel9
+    # above from the internal mirror.
+    - redhat-ods-applications
   loop_control:
     loop_var: "rbname"

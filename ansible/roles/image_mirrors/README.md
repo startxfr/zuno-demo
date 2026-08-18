@@ -2,7 +2,8 @@
 
 Mirrors every public-registry image this platform depends on (Go/Node/Python
 build bases, UBI9/distroless runtime bases, HashiCorp Vault, Bitnami
-kubectl/Redis, PostgreSQL, the RHOAI KServe storage-initializer) into
+kubectl/Redis, PostgreSQL, the RHOAI KServe storage-initializer, the RHOAI
+OGX core distribution image) into
 `ImageStream`s in `zuno-ai-build`, `referencePolicy: Local` on every tag so
 the in-cluster registry caches/pull-throughs each image on first use instead
 of every build or pod (re)start hitting `docker.io`/`quay.io`/`gcr.io`/
@@ -23,9 +24,14 @@ pod (re)starts, and gives every namespace a single, auditable place
 (`oc get imagestream -n zuno-ai-build`) to see exactly which upstream image
 + tag/digest every component is really running.
 
-Two mirrors (`ubi9-ubi-minimal`, `odh-kserve-storage-initializer-rhel9`) are
-imported by digest with `importPolicy.scheduled: false` so they never drift
-- the same digest-pinning intent as ADR-0051, extended to the mirror itself.
+Three mirrors (`ubi9-ubi-minimal`, `odh-kserve-storage-initializer-rhel9`,
+`odh-ogx-core-rhel9`) are imported by digest with `importPolicy.scheduled:
+false` so they never drift - the same digest-pinning intent as ADR-0051,
+extended to the mirror itself. `odh-ogx-core-rhel9` exists specifically to
+work around the OGX Operator's own in-process OCI-manifest-fetch client
+401ing against `registry.redhat.io` directly, even with a valid cluster
+pull secret (WP-06/ADR-0322) - `gitops/charts/openshift-ai`'s `OGXServer`
+points its `distribution.image` at this mirror instead.
 `quay.io/modh/vllm` (`gitops/charts/models`) is intentionally **not**
 mirrored: ADR-0048 has Ansible dynamically discover and override the real
 serving image from the live OpenShift AI catalog at apply time, so the

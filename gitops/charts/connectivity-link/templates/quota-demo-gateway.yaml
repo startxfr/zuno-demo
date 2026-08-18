@@ -131,5 +131,14 @@ spec:
     authentication:
       keycloak-jwt:
         jwt:
-          issuerUrl: {{ .Values.quotaEnforcement.keycloakIssuerUrl }}
+          # jwksUrl (direct fetch), not issuerUrl (OIDC discovery): Authorino
+          # runs in-cluster and does not trust the CA signing the externally-
+          # issued Keycloak route cert, so OIDC discovery against the
+          # external issuer 500'd with "certificate signed by unknown
+          # authority" (confirmed live, 2026-08-18) - the same class of
+          # problem ADR-0347/ADR-0411 solve for other in-cluster consumers.
+          # The internal JWKS Service endpoint is plain HTTP, sidestepping
+          # TLS trust entirely - the same split-brain issuer/JWKS default
+          # every other Keycloak consumer chart in this repo already uses.
+          jwksUrl: {{ .Values.quotaEnforcement.keycloakJwksUrl }}
 {{- end }}

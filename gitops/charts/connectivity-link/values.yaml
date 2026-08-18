@@ -43,7 +43,11 @@ quotaEnforcement:
   demoHostname: tekos-quota-demo.apps.demo222.startx.fr
   demoBackendService: tekos-frontend
   demoBackendPort: 8080
-  keycloakIssuerUrl: https://keycloak.apps.demo222.startx.fr/realms/zuno
+  # jwksUrl, not issuerUrl (OIDC discovery) - Authorino runs in-cluster and
+  # doesn't trust the CA signing the external Keycloak route's cert; the
+  # internal Service endpoint is plain HTTP, sidestepping TLS trust
+  # entirely (confirmed live, 2026-08-18 - see this chart's README).
+  keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
 
 operator:
   enabled: false

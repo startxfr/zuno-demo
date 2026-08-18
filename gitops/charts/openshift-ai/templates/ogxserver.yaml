@@ -56,7 +56,12 @@ metadata:
     argocd.argoproj.io/sync-wave: "5"
 spec:
   distribution:
-    name: {{ .Values.ogxServer.distribution }}
+    {{- with .Values.ogxServer.distribution.name }}
+    name: {{ . }}
+    {{- end }}
+    {{- with .Values.ogxServer.distribution.image }}
+    image: {{ . }}
+    {{- end }}
   storage:
     sql:
       type: sqlite

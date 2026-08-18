@@ -337,11 +337,25 @@ ogxServer:
   name: zuno-ogx
   namespace: redhat-ods-applications
   # First live apply (2026-08-18) surfaced schema drift: the 3.5.0-ea.2
-  # admission webhook accepts only `rh` | `rh-dev` - the 2026-08-14
-  # oc-explain pass predated that validation. `rh` is the supported
-  # distribution; the remote-vllm/pgvector shapes below stay providers,
-  # not the distribution name.
-  distribution: rh
+  # admission webhook accepts only `rh` | `rh-dev` for distribution.name -
+  # the 2026-08-14 oc-explain pass predated that validation; the
+  # remote-vllm/pgvector shapes below stay providers, not the distribution
+  # name.
+  #
+  # ogxServer.distribution is exactly one of name/image (the CRD's own
+  # mutually-exclusive shape). Switched to `image` this same day: the
+  # OGX operator's own in-process OCI-manifest-fetch client 401s against
+  # registry.redhat.io directly even with a valid cluster pull secret -
+  # pointing at the zuno-ai-build mirror (ansible/roles/image_mirrors)
+  # instead works around it if the operator's client honors ambient
+  # in-cluster ServiceAccount-token registry auth against the internal
+  # registry (WP-06/ADR-0322). UNVERIFIED live as of this comment - if
+  # this does NOT clear the reconciliation error, revert by commenting
+  # `image:` out and uncommenting `name: rh` below (the previously-working
+  # value); no template change needed either way.
+  distribution:
+    image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-ogx-core-rhel9:rhel9
+    # name: rh
   replicas: 1
   credentials:
     vaultPath: ogx/postgresql-app
