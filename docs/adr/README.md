@@ -86,10 +86,11 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | v0.1 | Partially implemented | Automate document ACL synchronization |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | v0.1 | Implemented | Implement production-grade backup and recovery |
-| [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Partially implemented | Use Zuno as a policy router in front of OpenShift AI MaaS |
+| [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Superseded by ADR-0118 | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.1 | Partially implemented | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v0.1 | Implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v0.1 | Implemented | Implement Confluence as the first real external MCP integration |
+| [ADR-0118](0118-keep-the-ai-gateway-as-policy-router-and-defer-maas-delegation.md) | v0.1 | Implemented | Keep the AI Gateway as policy router and defer MaaS delegation to the governance plane |
 
 ## version 0.2
 

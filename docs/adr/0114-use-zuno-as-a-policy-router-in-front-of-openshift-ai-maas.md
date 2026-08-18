@@ -1,6 +1,6 @@
 # ADR-0114: Use Zuno as a policy router in front of OpenShift AI MaaS
 
-- **Status:** Partially implemented - MaaS adapter prototype and coverage comparison merged (`components/ai-gateway/app/maas_adapter.py`, `docs/roadmap/evidence/adr-0114-maas-coverage.md`); live MaaS verification and cutover decision pending (WP-27). Re-checked 2026-08-17: still blocked on the same real capacity gap ADR-0201 recorded - the cluster has one GPU node and its only `nvidia.com/gpu` is already committed to the existing models, so `qwen25-7b-instruct-maas-backend` (the MaaS-published model this WP would compare against) sits `FailedScheduling: Insufficient nvidia.com/gpu`. `maasAdapter.enabled` stays `false` in `gitops/charts/ai-gateway/values.yaml`; nothing to attempt here until the GPU-capacity/architecture decision in ADR-0201 resolves.
+- **Status:** Superseded by [ADR-0118](0118-keep-the-ai-gateway-as-policy-router-and-defer-maas-delegation.md) (2026-08-18) - the adapter prototype and coverage comparison were delivered (WP-03), but the compare-then-delegate cutover cannot complete in v0.1: the authenticated MaaS path is blocked by an upstream RHOAI EA mTLS defect (ADR-0201 notes), and the delegation decision moves to ADR-0201/WP-27. Prior status for the record: Partially implemented - MaaS adapter prototype and coverage comparison merged (`components/ai-gateway/app/maas_adapter.py`, `docs/roadmap/evidence/adr-0114-maas-coverage.md`).
 - **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

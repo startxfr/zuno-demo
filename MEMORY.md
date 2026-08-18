@@ -573,6 +573,14 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
+- **2026-08-18 (ADR-0114 superseded by ADR-0118, WP-03 Done)**: the
+  WP-03 decision-risk clause fired - operator chose supersession. The
+  AI Gateway stays the policy router; `maas_adapter.py` stays merged +
+  default-off as the delegation seam; keep-vs-delegate and any cutover
+  move to ADR-0201/WP-27 once RHOAI's upstream MaaS payload-processing
+  mTLS defect is fixed (GPU capacity itself is resolved - 3rd node).
+  Never gate a v0.1 record on upstream product maturity again - that
+  was the actual lesson.
 - **2026-08-18 (ADR-0112 closed, WP-13 Done)**: both restore drills
   executed live. PostgreSQL: scratch cluster via
   `dataSource.postgresCluster` in zuno-data itself (PGO is
