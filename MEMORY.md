@@ -614,6 +614,25 @@ under `docs/adr/`.
   matched zero pages. Fix: drop the space-identifying segment entirely
   and let `spaces:` alone do space scoping. See ADR-0330's "Confluence
   space correction" section.
+- **2026-08-18 (downstream Confluence audit, same day)**: checked whether
+  the Tekos OKF bundle and the Keycloak-sourced ACL groups were aware of
+  the SXS->SXSI correction above. Both came back clean - `agents/tekos/`
+  never hardcodes a space/directory/technology assumption (`search_confluence`
+  is a dynamically-bound MCP capability, space/CQL decided server-side);
+  the 12 `confluence-{archi,build,run}-<tech>` Keycloak groups
+  (`gitops/charts/keycloak/files/realm-zuno.json`) carry no stale space
+  references. The audit did surface two stale `values.yaml` comments and
+  one stale ADR-0330 note, now corrected: (1) the group-hierarchy comment
+  still described the old `/board`+`/consultant` split - all 12 groups
+  actually live under `/consultant` since ADR-0340/WP-32; (2) the "source
+  has NO archi/build/run page-tree subdivision" comment was contradicted by
+  a real live sub-tree found under Satellite (`S0B`/`S0R` phase pages) -
+  reworded to acknowledge it exists but is deliberately unused, per operator
+  decision to keep tier separation purely access-control (not narrowing
+  `directories` per tier - the real split doesn't map cleanly to
+  archi/build/run anyway); (3) ADR-0330's "Evolution" section still called
+  the `/board` mapping "transitional" - marked resolved, referencing
+  ADR-0340/WP-32.
 - **2026-08-18 (ADR-0114 superseded by ADR-0118, WP-03 Done)**: the
   WP-03 decision-risk clause fired - operator chose supersession. The
   AI Gateway stays the policy router; `maas_adapter.py` stays merged +

@@ -309,6 +309,14 @@ For technical ingestion, Red Hat web documentation and Confluence must share a n
 
 The current demo mapping that places `confluence-archi-*` groups under `/board` is transitional. ADR-0340 reserves `board` for Direction; architecture/build/run are technical skill scopes, not executive business roles. Technical Confluence ACL groups should therefore be attached to authorized technical/CDP users without using `board` as a proxy for architect status.
 
+**Resolved (2026-08-18, WP-32):** no longer transitional. ADR-0340/WP-32
+relocated all four `confluence-archi-*` groups from `/board` to
+`/consultant`, verified live 2026-08-17 - `board-01`/`-02` no longer hold
+any `confluence-*` membership, `consultant-01`/`-02` hold all four archi
+groups plus their own build/run groups. All 12
+`confluence-{archi,build,run}-<tech>` groups now live under `/consultant`
+uniformly; `board` carries no `confluence-*` subgroup at all.
+
 See [Standard clauses](README.md#standard-clauses) for Context,
 Alternatives, Consequences, Migration/evolution and Acceptance criteria.
 

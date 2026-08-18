@@ -405,9 +405,11 @@ confluenceAuthDefault: &confluenceAuthDefault
 # access with no serving-side changes needed. One entry per
 # (tech x skill-tier) combination, matching the 12
 # confluence-{archi,build,run}-<tech> Keycloak groups 1:1
-# (gitops/charts/keycloak/files/realm-zuno.json's /board and /consultant
-# subGroups) - architects (archi) get one tier across all 4 techs;
-# consultants get build and run tiers separately.
+# (gitops/charts/keycloak/files/realm-zuno.json) - all 12 now live under
+# /consultant (ADR-0340/WP-32 relocated the four confluence-archi-* groups
+# out of /board, verified live 2026-08-17: board-01/-02 no longer members,
+# consultant-01/-02 hold all four archi groups plus their own build/run
+# groups); /board no longer carries any confluence-* subgroup.
 # Real space keys/directories supplied 2026-08-18 (roadmap WP-07, operator
 # decision "map what exists" after a live enumeration of all 42 spaces on
 # startxfr.atlassian.net), corrected same day after a live re-check found
@@ -419,12 +421,18 @@ confluenceAuthDefault: &confluenceAuthDefault
 #   - openshift-ai, keycloak -> disabled: no real source tree exists for
 #     these technologies anywhere on the site. Re-enable with real values
 #     when content exists; never invent keys.
-# The source has NO archi/build/run page-tree subdivision, so a tech's
-# three tier entries deliberately share its one real tree - the tiers
-# still differ in requiredGroups, which is what stamps acl_groups
-# (ADR-0046); tier separation is an access-control property here, not a
-# content-layout one. `directories` matches ordered ancestor-title
-# subsequences (see rag_ingestion.py's _ancestor_path_matches).
+# A real Build/Run phase sub-tree does exist further down (e.g. under
+# Satellite: "S0B : Phase de Build Satellite" with Architecture/Build/Check
+# children, "S0R : Phase de Run Satellite" with six Install/Maintain/
+# Improve/Repare/Relocate/Destroy children - live-checked 2026-08-18), but
+# it doesn't map cleanly 1:1 onto archi/build/run (S0B alone bundles
+# Architecture+Build+Check together) and is deliberately NOT used to narrow
+# `directories` per tier: a tech's three tier entries still share the one
+# `Procédures/Technologie : <tech>` tree, differing only in requiredGroups,
+# which is what stamps acl_groups (ADR-0046); tier separation stays an
+# access-control property here, not a content-layout one. `directories`
+# matches ordered ancestor-title subsequences (see rag_ingestion.py's
+# _ancestor_path_matches).
 confluence:
   - enabled: true
     name: satellite-archi
