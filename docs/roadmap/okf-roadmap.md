@@ -69,8 +69,22 @@ merged | Operator pending | Done`.
 
 ### Phase 1 — OKF v0.1: content excellence
 
+Order rationale: WP-43 (stages + READMEs) first — every later package
+writes into the structure it fixes. WP-44/45/46 are independent once it
+merges; WP-44 Part A unblocks the quota column (WP-54) and the tab
+schema (WP-47 soft). WP-54 → WP-55 is strict (the binding's validity
+window and precedence live in quota policy). WP-47 is the phase's only
+component-code package.
+
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
+| WP-43 | [wp-43](work-packages/wp-43-agent-maturity-alignment.md) | 0502 | — | Not started | none expected |
+| WP-44 | [wp-44](work-packages/wp-44-okf-authorization-matrix.md) | 0503 (matrix) | WP-43 | Not started | none expected |
+| WP-45 | [wp-45](work-packages/wp-45-deployment-dir-content.md) | 0503 (deployment) | WP-43 | Not started | none expected |
+| WP-46 | [wp-46](work-packages/wp-46-tests-target-structure.md) | 0504 | WP-43 | Not started | none expected |
+| WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Not started | rebuild/redeploy 3 components; tab demo |
+| WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Not started | apply generated chart; quota demo |
+| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-47A rec.) | Not started | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap) |
 
 ### Phase 2 — OKF v0.2: extraction
 
