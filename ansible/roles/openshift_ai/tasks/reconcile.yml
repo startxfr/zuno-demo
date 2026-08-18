@@ -107,8 +107,12 @@
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
     gitops_app_extra_helm_values:
       cluster-ods:
+        # Deliberately disabled: zuno-namespaces-d0 already owns/manages
+        # Namespace/redhat-ods-operator (ADR-0331) - see install.yml's
+        # matching comment. Must stay in sync with install.yml and
+        # application-d0.yaml's own value.
         project:
-          enabled: true
+          enabled: false
         operator:
           enabled: true
           subscription:
