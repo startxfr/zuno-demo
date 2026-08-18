@@ -135,8 +135,9 @@ def model_call_span(
     zuno.model_calls / zuno.model_tokens / zuno.model_cost_usd metrics
     (ADR-0029) once `.record_usage()` is called on the yielded recorder, or
     just the outcome/latency if the caller never has token counts (e.g. a
-    failed call, or a streaming call - see app/main.py's streaming path for
-    why token accounting is best-effort there).
+    failed call, or a candidate whose usage_metadata never populates - see
+    app/main.py's `_stream_completion`, which now calls `record_usage` too
+    for `stream_usage=True` candidates, VERIFIED live 2026-08-18).
 
     ADR-0201 (WP-27): `request_id` is the same X-Zuno-Request-Id
     agent-runtime mints per chat turn (app/main.py's `_request_id`,

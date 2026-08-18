@@ -94,6 +94,13 @@ def chat_model_for(
             model=adapter or cfg.get("model", os.getenv("LOCAL_MODEL_NAME", "qwen2.5-7b-instruct")),
             temperature=cfg.get("temperature", 0.2),
             timeout=cfg.get("timeout_seconds", 60),
+            # ADR-0029: lets a streamed call's terminal chunk carry
+            # usage_metadata (vLLM's OpenAI-compatible stream_options.
+            # include_usage extension) - see app/main.py's _stream_completion,
+            # which is the ONLY path real traffic ever takes (agent-runtime
+            # always calls via LangGraph's astream_events). Harmless on the
+            # non-streaming .ainvoke() path.
+            stream_usage=True,
         )
 
     if candidate.name == "openai":
@@ -103,6 +110,7 @@ def chat_model_for(
             model=cfg.get("model", "gpt-4o-mini"),
             api_key=os.getenv(cfg.get("api_key_env", "OPENAI_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
+            stream_usage=True,
         )
     if candidate.name == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI

@@ -267,6 +267,16 @@ def _resolve_adapter(
     return None
 
 
+def _usage_tokens(result: Any) -> tuple[int, int]:
+    """Shared by both the non-streaming (`result` is the final message) and
+    streaming (`result` is the chunks' `__add__`-accumulated final chunk,
+    see `_stream_completion`) paths - `usage_metadata` has the same shape
+    either way once ChatOpenAI's `stream_usage=True` is set
+    (app/providers.py)."""
+    usage = getattr(result, "usage_metadata", None) or {}
+    return usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+
+
 async def _invoke_with_fallback(
     candidates: List[ProviderCandidate],
     classification: str,
@@ -334,14 +344,15 @@ async def _invoke_with_fallback(
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 result = await model.ainvoke(messages)
-                usage = getattr(result, "usage_metadata", None) or {}
-                prompt_tokens = usage.get("input_tokens", 0)
-                completion_tokens = usage.get("output_tokens", 0)
+                prompt_tokens, completion_tokens = _usage_tokens(result)
                 call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
                 # ADR-0511: attribute consumption per the precedence order
                 # (project first when bound, then user; group ceiling always).
-                # Streaming responses carry no usage_metadata today, so only
-                # this path consumes - same coverage as record_usage itself.
+                # `_stream_completion` does NOT call this - since agent-runtime
+                # (the only real caller) always streams, ADR-0511 quota
+                # enforcement is effectively unmetered today. A known,
+                # separate gap from record_usage's own streaming coverage
+                # below (ADR-0029) - tracked as a follow-up, not fixed here.
                 quota.ledger.consume(
                     quota_class, caller_sub, groups, project_id,
                     prompt_tokens + completion_tokens,
@@ -422,13 +433,27 @@ async def _stream_completion(
                 adapter=adapter_name,
                 caller_sub=identity.sub if identity else None,
                 groups=identity.groups if identity else None,
-            ):
+            ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
+                # ADR-0029: accumulate chunks via AIMessageChunk.__add__ so the
+                # terminal usage-only chunk (vLLM/OpenAI's stream_options.
+                # include_usage extension, enabled in app/providers.py) merges
+                # into a message with populated usage_metadata - VERIFIED
+                # live 2026-08-18 this was the reason zuno.model_tokens/
+                # zuno.model_cost_usd had zero series in Grafana: every real
+                # chat turn streams (agent-runtime always does), and this
+                # path never read anything past `.content` before. That
+                # terminal chunk's content is always "", so it never reaches
+                # the `if token:` forward below - no wire-format change.
+                final_chunk = None
                 async for event in model.astream(messages):
+                    final_chunk = event if final_chunk is None else final_chunk + event
                     token = getattr(event, "content", "") or ""
                     if token:
                         sent_any = True
                         yield _sse_chunk(completion_id, created, effective_model_name, {"content": token})
+                prompt_tokens, completion_tokens = _usage_tokens(final_chunk)
+                call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
         except Exception as exc:
             logger.warning("provider '%s' failed mid-stream-setup: %s", candidate.name, exc)
             errors.append(f"{candidate.name}: {exc}")

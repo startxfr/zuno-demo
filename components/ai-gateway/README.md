@@ -161,9 +161,15 @@ metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`
 `model_call` span (provider, model, classification, latency, outcome) and,
 when the model response exposes `usage_metadata`, records prompt/completion
 token counts plus an estimated USD cost (`zuno.model_tokens` /
-`zuno.model_cost_usd` metrics). Streaming calls only record
-latency/outcome, since LangChain doesn't reliably surface
-`usage_metadata` mid-stream.
+`zuno.model_cost_usd` metrics). Streaming calls accumulate their chunks
+(`AIMessageChunk.__add__`) and read `usage_metadata` off the merged result,
+same as the non-streaming path - `app/providers.py`'s `ChatOpenAI(...,
+stream_usage=True)` is what makes the terminal chunk of an OpenAI/vLLM
+stream carry it (VERIFIED live 2026-08-18: before this, since agent-runtime
+always streams, `zuno.model_tokens`/`zuno.model_cost_usd` had zero series
+regardless of real traffic). `gemini`/`anthropic`/`mistral` candidates
+still record no usage either way - those LangChain classes have no
+equivalent flag.
 
 ## Local development
 

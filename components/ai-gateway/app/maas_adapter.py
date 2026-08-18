@@ -110,4 +110,7 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
         temperature=cfg.get("temperature", 0.2),
         timeout=cfg.get("timeout_seconds", 60),
         default_headers=default_headers,
+        # Same reasoning as app/providers.py's local/openai branches - keeps
+        # this dormant adapter from becoming a landmine once it's wired up.
+        stream_usage=True,
     )

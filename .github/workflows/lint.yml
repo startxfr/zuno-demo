@@ -166,6 +166,7 @@ jobs:
           python3 tests/test_model_routing_policy.py
           python3 tests/test_adapter_selection.py
           python3 tests/test_optimizer.py
+          python3 tests/test_stream_telemetry.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |
