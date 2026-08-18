@@ -406,6 +406,17 @@ lmEval:
           value: http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1/completions
         - name: model
           value: qwen2.5-7b-instruct
+        # VERIFIED live 2026-08-18: lm-eval-harness's TemplateAPI defaults
+        # to AutoTokenizer.from_pretrained(model) when `tokenizer` is
+        # unset - `model` here is the in-cluster served-model name, not a
+        # valid HF repo id, so that lookup 404s against huggingface.co
+        # ("qwen2.5-7b-instruct is not the path to a directory..."). The
+        # real public HF repo for the S3-hosted weights this predictor
+        # serves is Qwen/Qwen2.5-7B-Instruct (Inspected the image's own
+        # lm_eval.models.api_models.TemplateAPI.__init__ signature to
+        # confirm `tokenizer` is a distinct, real field).
+        - name: tokenizer
+          value: Qwen/Qwen2.5-7B-Instruct
       taskNames: [mmlu]
       # allowOnline flipped true 2026-08-18 (WP-10 live run): the mmlu
       # dataset is fetched from Hugging Face by the eval pod itself and no
