@@ -126,10 +126,44 @@ single short spike while still catching a fast, severe burn quickly):
 
 1. ~~Instrument `agent-bff`~~ and ~~add a `ServiceMonitor`~~ - both done
    2026-08-18, see "Current gap" above.
-2. Confirm `zuno_bff_requests_total` itself appears in Prometheus once
-   the instrumented `agent-bff` image is built and deployed (this repo's
-   `BuildConfig`s clone from `origin/main`, not local disk).
-3. Let the SLO measurement run over a real 30-day window and confirm the
-   burn-rate alerts evaluate without error on the live monitoring stack.
-   Only then does ADR-0102 satisfy its own "measured... on a live
-   cluster" acceptance bar.
+2. ~~Confirm `zuno_bff_requests_total` itself appears in Prometheus~~ -
+   done 2026-08-18 (same day, later pass): 1 aggregate series live on
+   `thanos-querier`, ~73,894 requests over the trailing 24h window.
+3. ~~Confirm the burn-rate alerts evaluate without error on the live
+   monitoring stack~~ - done 2026-08-18: both
+   `AgentPathErrorBudgetBurnFast`/`Slow` evaluate `health: ok`,
+   `state: inactive` on the cluster Prometheus (group
+   `zuno-agent-path-availability-slo`, 30s interval). The full 30-day
+   window continues to accumulate (complete ~2026-09-17); per the
+   operator's 2026-08-18 decision the measured short window below closes
+   ADR-0102's "measured and alerted on a live cluster" bar, with this
+   note recording the window length honestly.
+
+## Failover drill record + measured window (2026-08-18, WP-12)
+
+Measured availability at the BFF boundary over the trailing 24h window
+(all six agents' BFFs, `sum(increase(zuno_bff_requests_total...[24h]))`):
+**100.000%** - 73,894 requests, zero 5xx. Objective ≥ 99.9%: met on the
+available window; the 30-day series keeps accumulating.
+
+Failover drill, per service (pod deleted at T0, all timings measured
+live on the demo cluster; ArgoCD `selfHeal` intentionally bypassed by
+deleting pods, per the platform note in this file):
+
+| Service | Drill | Result |
+|---|---|---|
+| PostgreSQL (PGO, 3 instances) | primary pod deleted | new primary elected + Ready in **4.8s**, writable in **5.7s** (Patroni) |
+| rag-service (scaled to 2 for the drill, PDB `minAvailable: 1`) | 1 of 2 pods deleted under a 2 req/s probe | **79/81 requests OK**; 2 transient timeouts in the ~2.5s after the kill, continuous service on the surviving replica; PDB held |
+| mcp-gateway (1 replica) | pod deleted | replacement Ready in **31.0s** |
+| ai-gateway (1 replica) | pod deleted | replacement Ready in **33.9s** |
+| agent-runtime (1 replica) | pod deleted | replacement Ready in **34.4s** |
+| redis (`zuno-redis-master-0`) | pod deleted | Ready in **56.8s** |
+| keycloak (`zuno-0`, RHBK operator) | pod deleted | Ready in **64.7s**; realm OIDC endpoint 200 immediately after |
+
+Reading: at demo scale (replicas: 1) a single pod loss costs ≤ ~65s of
+that service's availability - well inside the 43.2 min/30d error budget
+- and the scaled continuity drill demonstrates the PDB + spread
+mechanics deliver near-zero-loss behavior the moment `replicas` ≥ 2
+(the production profile ADR-0101 targets). The rag-service drill's two
+timeouts are endpoint-deregistration lag at pod kill, not a PDB or
+scheduling failure.

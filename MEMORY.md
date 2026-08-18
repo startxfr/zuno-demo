@@ -573,6 +573,16 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
+- **2026-08-18 (ADR-0101+0102 closed, WP-12 Done)**: live failover
+  drill + SLO measurement on the demo cluster. PostgreSQL primary
+  failover 4.8s/5.7s-writable (Patroni, 3 instances); rag-service
+  scaled to 2 for a continuity drill (79/81 requests through a pod
+  kill, PDB held; the temporary selfHeal-off + scale + restore pattern
+  works cleanly); single-replica services recover in 31-65s. SLO
+  measured 100.000% over the trailing 24h (73,894 requests) with both
+  burn-rate alerts health: ok. ADR-0102 closed on an operator-approved
+  short window; 30-day series completes ~2026-09-17 (drill record:
+  `docs/platform/slo.md`).
 - **2026-08-18 (ADR-0117 closed, WP-02 Done)**: the Atlassian
   product-access grant landed and the live e2e chain ran clean against
   `startxfr.atlassian.net`: indexed `knowledge.tech` read (rag-service),

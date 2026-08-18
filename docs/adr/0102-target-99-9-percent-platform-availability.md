@@ -1,6 +1,6 @@
 # ADR-0102: Target 99.9 percent platform availability
 
-- **Status:** Partially implemented (HA chart mechanics, SLO definition and alert rules merged; failover drill and live measurement pending, roadmap WP-12)
+- **Status:** Implemented - see `docs/platform/slo.md`. Measured live 2026-08-18 (roadmap WP-12): 100.000% at the BFF boundary over the trailing 24h window (73,894 requests, zero 5xx) with both burn-rate alerts evaluating `health: ok` on the cluster Prometheus. Closed on a short measured window by explicit operator decision (2026-08-18); the 30-day series continues to accumulate (complete ~2026-09-17) and the window length is recorded honestly in `slo.md`.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

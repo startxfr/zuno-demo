@@ -74,8 +74,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v0.1 | Partially implemented | Provide HA for shared agent platform services |
-| [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v0.1 | Partially implemented | Target 99.9 percent platform availability |
+| [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | v0.1 | Implemented | Provide HA for shared agent platform services |
+| [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v0.1 | Implemented | Target 99.9 percent platform availability |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Implemented | Persist resumable long-running agent workflows |
 | [ADR-0104](0104-introduce-controlled-semantic-caching.md) | v0.1 | Implemented | Introduce controlled semantic caching |
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.1 | Partially implemented | Automate source-specific knowledge ingestion |
