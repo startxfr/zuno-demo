@@ -9,6 +9,11 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Read by ansible/tasks/apply_openshift_build.yml (reached indirectly
+    # by a handful of install.yml roles ensuring their own image exists)
+    # to keep today's re-verify-only behavior - installs must never
+    # silently trigger a rebuild.
+    day1_verb: install
     day1_components:
       - namespaces
       - llm

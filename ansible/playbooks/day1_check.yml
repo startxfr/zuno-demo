@@ -8,6 +8,7 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    day1_verb: check
     day1_components:
       - namespaces
       - llm

@@ -1,7 +1,13 @@
 ---
 # Builds one component image via OpenShift BuildConfig/ImageStream in
-# zuno-ai-build. Idempotent (ConfigChange trigger only rebuilds on a real
-# diff); delete the BuildConfig or run `oc start-build` to force a rebuild.
+# zuno-ai-build. The BuildConfig apply itself is idempotent (its
+# ConfigChange trigger only fires on a real spec diff, and source.git.ref
+# is a fixed branch name rather than a SHA, so it never fires on a
+# content-only git change) - a genuinely fresh Build only happens here
+# when day1_verb is "build" (see the force-a-fresh-Build task below),
+# i.e. an explicit `make d1 build <component>`. Reached via install.yml's
+# own "ensure this image exists" dependency path (day1_verb: install),
+# this stays a re-verify-only check of whichever Build already exists.
 
 - name: "openshift-build | validate required vars are set"
   ansible.builtin.assert:
@@ -116,6 +122,23 @@
             name: "{{ build_image_name }}:latest"
         triggers:
           - type: ConfigChange
+
+- name: "openshift-build | force a fresh Build (day1 verb: build)"
+  # kubernetes.core.k8s has no support for BuildConfig's /instantiate
+  # subresource, so `oc start-build` is a deliberate exception to this
+  # role's kubernetes.core.k8s-only convention. Only runs on an explicit
+  # `make d1 build <component>` (day1_build.yml sets day1_verb: build) -
+  # never on install.yml's own "ensure this image exists" dependency
+  # path, which stays re-verify-only so a routine install never triggers
+  # a surprise rebuild. Without this, the BuildConfig's ConfigChange
+  # trigger never fires on a content-only git change (source.git.ref is
+  # a fixed branch name, not a SHA, so re-applying an unchanged spec is
+  # a no-op diff) and `build` would silently re-verify whichever Build
+  # happened to exist last, same as install does today.
+  ansible.builtin.command:
+    cmd: "oc start-build {{ build_image_name }} -n zuno-ai-build --wait"
+  changed_when: true
+  when: (day1_verb | default('install')) == 'build'
 
 - name: "openshift-build | re-read the BuildConfig to get its current lastVersion"
   kubernetes.core.k8s_info:

@@ -7,6 +7,11 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Read by ansible/tasks/apply_openshift_build.yml to force a genuinely
+    # fresh Build here - an explicit `make d1 build X` always means
+    # "build," unlike the implicit "ensure an image exists" dependency
+    # path day1_install.yml's roles fall back to.
+    day1_verb: build
     day1_build_components:
       - mcp_build
       - rag_build
