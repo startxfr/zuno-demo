@@ -109,13 +109,13 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
-| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `web_search` |
-| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
-| `identify-business-ready-to-invoice` | `sxa.customer.read` | tool | `sxa.customer.read` @ sales-db | C2 | sales, adv, board, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `get_customer` |
-| `identify-business-ready-to-invoice` | `sxa.quote.read` | tool | `sxa.quote.read` @ sales-db | C2 | sales, adv, board, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `get_quote` |
-| `monthly-invoice-report` | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
-| `monthly-invoice-report` | `sxa.record.lookup` | tool | `sxa.record.lookup` @ sales-db | C3 | sales, board, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `lookup_record` |
-| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `list_drive_files` |
-| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `read_gmail` |
+| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `web_search` |
+| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `identify-business-ready-to-invoice` | `sxa.customer.read` | tool | `sxa.customer.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_customer` |
+| `identify-business-ready-to-invoice` | `sxa.quote.read` | tool | `sxa.quote.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_quote` |
+| `monthly-invoice-report` | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
+| `monthly-invoice-report` | `sxa.record.lookup` | tool | `sxa.record.lookup` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `lookup_record` |
+| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
+| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

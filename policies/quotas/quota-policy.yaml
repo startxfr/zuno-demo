@@ -1,0 +1,95 @@
+# Policy: quotas - usage-limit authorization data (ADR-0511, roadmap WP-54).
+#
+# This file is the authoritative, GitOps-managed declaration of HOW MUCH the
+# platform lets an identity consume - the third policy file beside
+# policies/tools/tool-policy.yaml (ADR-0011) and
+# policies/knowledge/knowledge-policy.yaml (ADR-0203). Quota is availability
+# protection layered ON TOP of the five-factor authorization intersection:
+# exceeding a limit produces an explicit, audited quota error and NEVER
+# bypasses or relaxes that intersection (ADR-0511 Security considerations).
+#
+# Enforcement is GENERATED from this file, never hand-authored per agent
+# (ADR-0511 clause 3):
+#   - request-per-window limits -> Kuadrant resources (Limitador counters,
+#     Authorino-extracted identity context) via
+#     platform/okf/generate_quota_enforcement.py;
+#   - token budgets -> AI Gateway configuration (only the inference layer
+#     can meter tokens - ADR-0029 already tracks per-request usage there).
+# Identity dimensions come only from validated tokens (ADR-0033) - user =
+# JWT `sub`, group = business-role `groups` claim (ADR-0040) - or from the
+# ADR-0512 Salesforce-verified project binding; never from client-supplied
+# headers.
+#
+# Precedence (ADR-0511 clause 2): when a conversation carries a verified
+# project binding, usage draws down the PROJECT's quota first; the USER's
+# personal quota applies once the project's is exhausted (or absent); the
+# GROUP quota is the outermost ceiling. Outside project context: user, then
+# group. Exhaustion at every applicable level fails the request with an
+# explicit quota error - never silent degradation.
+#
+# Schema:
+#   classes.<name>:            a named quota class bundling limits. Tasks opt
+#                              in via frontmatter `zuno.quota_class` (absent =
+#                              `standard`).
+#     fail_mode:               open | closed - behavior when the enforcement
+#                              backend (Limitador / budget store) is
+#                              unreachable. ADR-0511 default is CLOSED;
+#                              `open` must be an explicit, per-class,
+#                              reviewed choice.
+#     requests.<dimension>:    {limit: <int>, window: <Nunit>} - request
+#                              count per rolling window. Dimensions: user,
+#                              group, project.
+#     tokens.<dimension>:      {budget: <int>, window: <Nunit>} - total
+#                              LLM tokens (prompt+completion, as metered by
+#                              AI Gateway per ADR-0029) per rolling window.
+#   precedence:                the draw-down orders stated above, encoded so
+#                              consumers never hardcode them.
+#   project_binding.validity_window: how long an ADR-0512 Salesforce project
+#                              verification stays valid before a resumed
+#                              conversation must re-verify.
+#   Windows parse as ^[0-9]+(s|m|h|d)$ (validated by
+#   platform/okf/validate_quota_policy.py, a blocking lint step).
+
+classes:
+  standard:
+    description: >-
+      Default interactive chat usage. Every task without an explicit
+      zuno.quota_class runs here. fail_mode open is a deliberate, reviewed
+      exception to the ADR-0511 fail-closed default: a Limitador outage
+      must not take interactive chat down with it - the trade is recorded
+      in ADR-0511's Security considerations and revisited if abuse is ever
+      observed.
+    fail_mode: open
+    requests:
+      user:    { limit: 60,   window: 5m }
+      group:   { limit: 600,  window: 5m }
+      project: { limit: 300,  window: 5m }
+    tokens:
+      user:    { budget: 200000,   window: 24h }
+      group:   { budget: 2000000,  window: 24h }
+      project: { budget: 1000000,  window: 24h }
+
+  intensive:
+    description: >-
+      Long-running / batch-shaped tasks (report generation, multi-document
+      drafting). Higher token ceilings, lower request rates, and strictly
+      fail-closed: if enforcement cannot be consulted, an intensive task
+      does not run.
+    fail_mode: closed
+    requests:
+      user:    { limit: 10,  window: 5m }
+      group:   { limit: 60,  window: 5m }
+      project: { limit: 30,  window: 5m }
+    tokens:
+      user:    { budget: 500000,   window: 24h }
+      group:   { budget: 5000000,  window: 24h }
+      project: { budget: 2500000,  window: 24h }
+
+precedence:
+  in_project_context: [project, user, group]
+  default: [user, group]
+
+project_binding:
+  # ADR-0512 clause 3: a verified Salesforce project binding is
+  # re-verified on resume once older than this window.
+  validity_window: 24h

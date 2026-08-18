@@ -93,15 +93,15 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
-| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `salesforce.opportunity.read` (live-read) | tool | `salesforce.opportunity.read` @ salesforce | C2 | sales, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `salesforce.opportunity.read` |
-| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `web_search` |
-| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `knowledge.sales` | knowledge | — | C2 | sales, adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.sales` |
-| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
-| `update-opportunity-status` | `salesforce.opportunity.update` | tool | `salesforce.opportunity.update` @ salesforce | C2 | sales, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `salesforce.opportunity.update` |
-| `compare-historical-deals` | `sxa.opportunity.search` | tool | `sxa.opportunity.search` @ sales-db | C2 | sales, adv, board, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `list_open_opportunities` |
-| `compare-historical-deals` | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
-| `compare-historical-deals` | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
-| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `list_drive_files` |
-| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `read_gmail` |
+| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `salesforce.opportunity.read` (live-read) | tool | `salesforce.opportunity.read` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.read` |
+| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `web_search` |
+| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `knowledge.sales` | knowledge | — | C2 | sales, adv, board, cdp, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sales` |
+| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `update-opportunity-status` | `salesforce.opportunity.update` | tool | `salesforce.opportunity.update` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.update` |
+| `compare-historical-deals` | `sxa.opportunity.search` | tool | `sxa.opportunity.search` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_open_opportunities` |
+| `compare-historical-deals` | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
+| `compare-historical-deals` | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
+| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
+| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

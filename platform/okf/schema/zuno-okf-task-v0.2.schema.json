@@ -62,6 +62,11 @@
           "description": "ADR-0342/WP-33: which single entry in allowed_tools above app/graph/nodes.py's tool_call_node conditional live-read branch invokes (Tekos: confluence.page.search; Comage: a Salesforce read) - explicit, git-reviewed configuration, never derived from caller/state data. Optional/omitted for tasks whose shape never attempts a live read (e.g. Arkos's plan_draft_write, which folds its own live Confluence call into retrieve_node instead - see that shape's own module).",
           "type": "string"
         },
+        "quota_class": {
+          "description": "ADR-0511 (WP-54): named quota class from policies/quotas/quota-policy.yaml this task's usage is limited under. Optional - absent means `standard`. Like allowed_tools/allowed_knowledge this selects among centrally-declared limits; it never defines limits locally (quota amounts live only in the policy file).",
+          "type": "string",
+          "enum": ["standard", "intensive"]
+        },
         "allowed_knowledge": {
           "description": "Logical knowledge-domain IDs (knowledge/<domain>/domain.yaml, ADR-0202) this task may retrieve from. Declared independently of allowed_tools (ADR-0203). Effective authorization is the intersection of this list with the agent's declared-knowledge ceiling (the union of every task's allowed_knowledge - see components/agent-runtime/app/registry.py:AgentDefinition.declared_knowledge()), the caller's group rights and policies/knowledge/knowledge-policy.yaml - this field is a ceiling, not a grant on its own. Optional/omitted for tasks that never call RAG retrieval.",
           "type": "array",

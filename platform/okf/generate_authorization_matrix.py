@@ -19,8 +19,9 @@ duplicates platform/supply-chain/validate_okf_bundle.py's
 _split_frontmatter, per this repo's convention of duplicating small
 well-specified parsing code rather than sharing a module.
 
-Until WP-54 lands quota policy (ADR-0511), the quota column renders
-`standard (implicit)` for every row.
+The quota column renders each task's ADR-0511 class (frontmatter
+`zuno.quota_class`, absent = `standard`) with its per-user request
+limit from policies/quotas/quota-policy.yaml (WP-54).
 
 Usage (from the repository root):
 
@@ -42,6 +43,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 AGENTS_DIR = REPO_ROOT / "agents"
 TOOL_POLICY_PATH = REPO_ROOT / "policies" / "tools" / "tool-policy.yaml"
 KNOWLEDGE_POLICY_PATH = REPO_ROOT / "policies" / "knowledge" / "knowledge-policy.yaml"
+QUOTA_POLICY_PATH = REPO_ROOT / "policies" / "quotas" / "quota-policy.yaml"
 
 BEGIN_MARKER = ("<!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; "
                 "regenerate with: python3 platform/okf/generate_authorization_matrix.py -->")
@@ -73,6 +75,20 @@ def _load_knowledge_policy() -> Dict[str, Dict]:
     return dict(doc.get("domains") or {})
 
 
+def _load_quota_classes() -> Dict[str, Dict]:
+    doc = yaml.safe_load(QUOTA_POLICY_PATH.read_text(encoding="utf-8")) or {}
+    return dict(doc.get("classes") or {})
+
+
+def _quota_cell(task_zuno: Dict, quota_classes: Dict[str, Dict]) -> str:
+    cls_name = task_zuno.get("quota_class") or "standard"
+    cls = quota_classes.get(cls_name) or {}
+    user_req = (cls.get("requests") or {}).get("user") or {}
+    if user_req.get("limit"):
+        return f"`{cls_name}` (user {user_req['limit']} req/{user_req.get('window', '?')})"
+    return f"`{cls_name}`"
+
+
 def _groups_cell(allowed_groups: List[str]) -> str:
     if not allowed_groups:
         return "(no groups — unusable)"
@@ -80,7 +96,7 @@ def _groups_cell(allowed_groups: List[str]) -> str:
 
 
 def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
-                    knowledge_policy: Dict[str, Dict]) -> str:
+                    knowledge_policy: Dict[str, Dict], quota_classes: Dict[str, Dict]) -> str:
     frontmatter, _, _ = _split_document(agent_dir / "agent.okf.md")
     zuno = frontmatter.get("zuno") or {}
     name = zuno.get("name", agent_dir.name)
@@ -135,7 +151,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                 f"`{entry.get('capability', tool_name)}` @ {entry.get('mcp_server', '?')} | "
                 f"{entry.get('min_classification', '?')} | "
                 f"{_groups_cell(entry.get('allowed_groups') or [])} | {ext_cell} | "
-                f"standard (implicit) | `tools/tool-policy.yaml` `{entry.get('tool', tool_name)}` |"
+                f"{_quota_cell(task_zuno, quota_classes)} | `tools/tool-policy.yaml` `{entry.get('tool', tool_name)}` |"
             )
 
         for domain in task_zuno.get("allowed_knowledge") or []:
@@ -146,7 +162,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                 f"| {task_label} | `{domain}` | knowledge | — | "
                 f"{entry.get('min_classification', '—')} | "
                 f"{_groups_cell(entry.get('allowed_groups') or [])} | — | "
-                f"standard (implicit) | `knowledge/knowledge-policy.yaml` `{domain}` |"
+                f"{_quota_cell(task_zuno, quota_classes)} | `knowledge/knowledge-policy.yaml` `{domain}` |"
             )
 
     if rows:
@@ -196,13 +212,14 @@ def main() -> int:
 
     tool_policy = _load_tool_policy()
     knowledge_policy = _load_knowledge_policy()
+    quota_classes = _load_quota_classes()
 
     failures: List[str] = []
     written: List[str] = []
     for agent_dir in _agent_dirs(args.agents):
         index_path = agent_dir / "agent.okf.md"
         _, frontmatter_text, body = _split_document(index_path)
-        expected = _render_section(agent_dir, tool_policy, knowledge_policy)
+        expected = _render_section(agent_dir, tool_policy, knowledge_policy, quota_classes)
         current = _current_section(body)
 
         if args.check:

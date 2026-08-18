@@ -101,12 +101,12 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
-| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | standard (implicit) | `tools/tool-policy.yaml` `web_search` |
-| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
-| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
-| `identify-new-business-with-po` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
-| `monthly-sales-report` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | standard (implicit) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
-| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `list_drive_files` |
-| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | standard (implicit) | `tools/tool-policy.yaml` `read_gmail` |
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `web_search` |
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `identify-new-business-with-po` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
+| `monthly-sales-report` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
+| `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
+| `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->
