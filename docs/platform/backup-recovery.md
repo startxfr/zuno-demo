@@ -71,10 +71,30 @@ the live cluster.
 5. Record: wall-clock time from step 2 to step 4 passing (the RTO
    measurement), and delete the scratch cluster/namespace afterward.
 
-**Restore drill executed:** not yet — this is the operator follow-up
-this WP could not perform (no live cluster access from this session).
-Once run, record the date, wall-clock RTO achieved, and any procedure
-corrections needed, right here.
+**Restore drill executed: 2026-08-18 (roadmap WP-13).** A scratch
+cluster `zuno-postgresql-restore-test` was created in `zuno-data`
+itself (PGO watches cluster-wide, so a separate namespace adds nothing
+- procedure correction: same-namespace/different-name is the simpler
+equivalent of step 1) with `dataSource.postgresCluster` on `repo1` and
+no `options` (latest backup). Results:
+
+- pgBackRest restore finished and the instance reported Ready
+  **203 seconds** after `oc apply`; data verified at ~250s wall clock -
+  RTO ≤ 4h met with ~57x margin.
+- Data verification: `rag-tech`'s `rag.document_embeddings` matched the
+  live primary exactly - 38,690 rows with identical
+  `max(created_at) = 2026-08-18T14:26:31Z`, a timestamp *after* the
+  02:00 differential backup: pgBackRest replayed archived WAL to the
+  end, so effective RPO is near-continuous, not the 24h backup cadence.
+- The restored cluster carries one extra database named after itself
+  (`zuno-postgresql-restore-test`, PGO's default bookkeeping DB) -
+  expected, not drift.
+- Also verified this pass: `repo2` (S3, off-cluster) reports `ok` with
+  a real full backup landed 2026-08-16T03:02Z, credentials synced from
+  Vault `postgresql/backup-s3` - the Decision's object-storage clause
+  is live, not just chart wiring.
+
+The scratch cluster was deleted after verification.
 
 ## Vault
 
@@ -123,8 +143,23 @@ diagnostic-only pattern as PostgreSQL's check.
 5. Record: wall-clock time from step 2 to step 4 passing, then delete
    the scratch instance/PVC/namespace.
 
-**Restore drill executed:** not yet — operator follow-up, same as
-PostgreSQL above.
+**Restore drill executed: 2026-08-18 (roadmap WP-13).** Restored from
+the live `vault-data-20260818073439` snapshot (10h old at drill time,
+created by the enabled daily `vault-backup` CronJob) into a scratch PVC
++ single-pod Vault in `zuno-vault` (procedure correction: a bare pod
+with the same image and a minimal file-storage HCL is sufficient - a
+full second chart release, step 2's suggestion, is unnecessary for the
+drill). Results:
+
+- Pod Running at T+16s, unsealed with the **live** unseal key at
+  T+23s (`Initialized: true` straight from the restored filesystem -
+  no re-init, proving the keyring restored intact), known secret
+  (`zuno/confluence/technical`, field `email`) read and matched the
+  live value at **T+39s** wall clock. RTO ≤ 4h met with ~370x margin.
+- RPO: the newest ready snapshot was 10h old (daily 04:00 schedule,
+  `retentionCount: 7`), inside the 24h objective.
+
+The scratch pod/PVC/ConfigMap were deleted after verification.
 
 ## Declarative configuration (GitOps state)
 
@@ -139,13 +174,16 @@ what the PostgreSQL/Vault sections above cover.
 
 ## Operator follow-up (not executable by the model)
 
-1. Provision the PostgreSQL backup object-storage bucket + credentials
-   (Vault/ESO path: `backups.s3.secretName`), enable `backups.s3.enabled`,
-   sync, and confirm repo2 backups run.
-2. Enable `gitops/charts/vault`'s `backup.enabled`, sync, and confirm the
-   `vault-backup` CronJob's first scheduled run creates a `readyToUse`
-   VolumeSnapshot.
-3. Execute both restore drills above, time them against the RTO <= 4h
-   objective, and record results (date, RTO achieved, any procedure
-   corrections) in the two "Restore drill executed" placeholders above.
-   ADR-0112 does not claim `Implemented` until this step is done.
+1. ~~Provision the PostgreSQL backup object-storage bucket + credentials,
+   enable `backups.s3.enabled`, sync, and confirm repo2 backups run~~ -
+   done before 2026-08-18: `zuno-postgresql-backup-s3` ExternalSecret
+   `Ready=True`, live cluster carries `repo1 repo2`, `pgbackrest info`
+   reports repo2 `ok` with a full backup landed 2026-08-16T03:02Z.
+2. ~~Enable `gitops/charts/vault`'s `backup.enabled`, sync, and confirm
+   the `vault-backup` CronJob creates a `readyToUse` VolumeSnapshot~~ -
+   done: CronJob live (`0 4 * * *`), newest snapshot
+   `vault-data-20260818073439` `readyToUse: true`.
+3. ~~Execute both restore drills above~~ - done 2026-08-18, results
+   recorded in the two "Restore drill executed" sections above
+   (PostgreSQL ~250s to verified data, Vault 39s to verified secret,
+   both against RTO ≤ 4h).

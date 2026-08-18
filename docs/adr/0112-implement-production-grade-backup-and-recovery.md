@@ -1,6 +1,6 @@
 # ADR-0112: Implement production-grade backup and recovery
 
-- **Status:** Partially implemented (backup configuration, checks and runbook merged; restore drill pending, roadmap WP-13)
+- **Status:** Implemented - see `docs/platform/backup-recovery.md`. Both restore drills executed live 2026-08-18 (roadmap WP-13): PostgreSQL scratch-cluster restore Ready in 203s with data verified identical to the live primary (38,690 `rag.document_embeddings` rows, WAL replayed to the same-day timestamp), Vault snapshot restore unsealed with the live key and a known secret verified at 39s wall clock. Object-storage clause live: pgBackRest repo2 (S3) reports `ok` with a real full backup landed 2026-08-16. RPO ≤ 24h / RTO ≤ 4h both met with wide margin; drill records and procedure corrections in the runbook.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

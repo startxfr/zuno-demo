@@ -573,6 +573,16 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
+- **2026-08-18 (ADR-0112 closed, WP-13 Done)**: both restore drills
+  executed live. PostgreSQL: scratch cluster via
+  `dataSource.postgresCluster` in zuno-data itself (PGO is
+  cluster-wide - no scratch namespace needed), Ready in 203s, 38,690
+  `rag.document_embeddings` rows verified identical with WAL replayed
+  past the last backup (effective RPO near-continuous). Vault: PVC from
+  the daily CSI snapshot + a bare pod with minimal file-storage HCL,
+  unsealed with the live key, known secret verified at 39s. repo2 (S3)
+  confirmed live with a real full backup. Records in
+  `docs/platform/backup-recovery.md`.
 - **2026-08-18 (ADR-0101+0102 closed, WP-12 Done)**: live failover
   drill + SLO measurement on the demo cluster. PostgreSQL primary
   failover 4.8s/5.7s-writable (Patroni, 3 instances); rag-service
