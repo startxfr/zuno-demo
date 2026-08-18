@@ -9,7 +9,7 @@ EXTRA_VARS ?=
 # platform) sequencing, replacing the former precheck/prepare/configure/
 # install/check interface outright.
 DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets keycloak openshift-oauth redis postgresql mariadb service-mesh tempo mesh-monitoring kiali grafana smtp machines nfd nvidia-gpu observability connectivity-link lws custom-metrics-autoscaler jobset kueue openshift-ai
-DAY0_VERBS := check install uninstall reconcile all
+DAY0_VERBS := check install uninstall reconcile all reinstall
 
 # Day 1 has two different valid component sets depending on the verb:
 # "build" only knows how to build the 5 named image groups (mcp, rag,
@@ -25,7 +25,7 @@ DAY0_VERBS := check install uninstall reconcile all
 # ansible/roles/namespaces/README.md.
 DAY1_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp aiagent-operator agents mlops
 DAY1_BUILD_COMPONENTS := mcp rag rag-ingestion agent ai-gateway mlops aiagent-operator
-DAY1_VERBS := check install build uninstall all
+DAY1_VERBS := check install build uninstall all reinstall
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
@@ -48,12 +48,14 @@ help:
 	  '  make day0|d0 uninstall [component]  Uninstall one/all Day 0 prerequisites (reverse order)' \
 	  '  make day0|d0 reconcile [component]  Diagnose blocked resources and apply known remediations automatically' \
 	  '  make day0|d0 all [component]        check + install, in order' \
+	  '  make day0|d0 reinstall [component]  Uninstall then install one/all Day 0 prerequisites' \
 	  '' \
 	  '  make day1|d1 check [component]      Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
 	  '  make day1|d1 build [component]      Build one/all Day 1 component images' \
 	  '  make day1|d1 install [component]    Install/deploy one/all Day 1 components (no component: builds first)' \
 	  '  make day1|d1 uninstall [component]  Uninstall one/all Day 1 components (reverse order)' \
 	  '  make day1|d1 all [component]        check + build + install, whichever apply to the component' \
+	  '  make day1|d1 reinstall [component]  Uninstall then install one/all Day 1 components' \
 	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
 	  'Day 1 components (check/install): $(DAY1_RUN_COMPONENTS)' \
@@ -82,6 +84,7 @@ if [[ -z "$$verb" ]]; then \
     '  uninstall   Uninstall one/all Day 0 prerequisites (reverse order)' \
     '  reconcile   Diagnose blocked resources and apply known remediations automatically' \
     '  all         check + install, in order' \
+    '  reinstall   Uninstall then install one/all Day 0 prerequisites' \
     '' \
     'Components (optional, default: all):' \
     '  $(DAY0_COMPONENTS)' \
@@ -99,6 +102,7 @@ case "$$verb" in \
   uninstall) run_one uninstall ;; \
   reconcile) run_one reconcile ;; \
   all) run_one check && run_one install ;; \
+  reinstall) run_one uninstall && run_one install ;; \
 esac
 endef
 
@@ -134,6 +138,7 @@ if [[ -z "$$verb" ]]; then \
     '  install     Install/deploy one/all Day 1 components (no component: builds first)' \
     '  uninstall   Uninstall one/all Day 1 components (reverse order)' \
     '  all         check + build + install, whichever apply to the component' \
+    '  reinstall   Uninstall then install one/all Day 1 components' \
     '' \
     'Components (check/install/uninstall/all; optional, default: all):' \
     '  $(DAY1_RUN_COMPONENTS)' \
@@ -174,6 +179,9 @@ case "$$verb" in \
     if [[ $$is_run -eq 1 ]]; then run_check || exit $$?; fi; \
     if [[ $$is_build -eq 1 ]]; then run_build || exit $$?; fi; \
     if [[ $$is_run -eq 1 ]]; then run_install || exit $$?; fi ;; \
+  reinstall) \
+    case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 reinstall component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_uninstall && run_install ;; \
 esac
 endef
 
