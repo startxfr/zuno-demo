@@ -140,7 +140,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | Implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | Superseded by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
-| [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0.1 | Partially implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
+| [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0.1 | Implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
 | [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | v0 | Implemented | Revert OpenShift AI to the default applications namespace |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v0.3 | Implemented | Extend business-role authorization with CDP and scoped capabilities |

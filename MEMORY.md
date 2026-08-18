@@ -573,6 +573,20 @@ under `docs/adr/`.
   `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
   via `ansible/roles/mcp_build`. Protocol-tested against a mocked
   Confluence API; live tenant verification is an operator step.
+- **2026-08-18 (ADR-0330 closed, WP-07 Done)**: real Confluence space
+  keys landed after a live space enumeration - `satellite`/`openshift`
+  point at real space SXS's actual page trees (no archi/build/run
+  subdivision exists in the source, so the three tier entries share one
+  tree, differentiated by requiredGroups only); `openshift-ai`/`keycloak`
+  disabled, no real source tree exists for either. `rag-dspa` reconciled
+  Ready and the live KFP recurring-run activation found two of the three
+  "unverified assumption" bugs were real: the v2beta1 API returns pipeline
+  versions oldest-first (not newest-first - `| first` was silently
+  activating stale versions), and `max_concurrency` is required (0 default
+  gets a 400). Both fixed in `ansible/roles/rag_ingestion/tasks/
+  recurring_run.yml`, then a real live run created the real
+  `rag-corpus-ingestion-schedule` recurring run resolving the correct
+  version.
 - **2026-08-18 (ADR-0114 superseded by ADR-0118, WP-03 Done)**: the
   WP-03 decision-risk clause fired - operator chose supersession. The
   AI Gateway stays the policy router; `maas_adapter.py` stays merged +

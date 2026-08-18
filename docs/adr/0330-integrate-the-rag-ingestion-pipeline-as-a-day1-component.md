@@ -1,8 +1,17 @@
 # ADR-0330: Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access
 
-- **Status:** Partially implemented - catalog now fully HTTP-verified
-  (2026-08-17); real Confluence space keys/directories and the live KFP
-  recurring-run/DSPA verification remain open, see the dated note below
+- **Status:** Implemented - see `gitops/charts/rag-ingestion/values.yaml`
+  (real space keys), `ansible/roles/rag_ingestion/tasks/recurring_run.yml`
+  (live-verified KFP activation). Closed 2026-08-18 (roadmap WP-07): real
+  Confluence space keys/directories supplied (satellite/openshift mapped
+  to real space SXS and its actual page trees; openshift-ai/keycloak
+  disabled - no real source tree exists for either); `rag-dspa` reconciled
+  Ready and the live KFP recurring-run activation ran for real, finding
+  and fixing two of the three previously-unverified assumptions (version
+  ordering was oldest-first not newest-first; `max_concurrency` is
+  required, not optional) before the real `rag-corpus-ingestion-schedule`
+  recurring run was created and confirmed resolving the correct pipeline
+  version.
 - **Target:** v0.1
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team

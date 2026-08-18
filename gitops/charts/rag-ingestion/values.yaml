@@ -408,19 +408,20 @@ confluenceAuthDefault: &confluenceAuthDefault
 # (gitops/charts/keycloak/files/realm-zuno.json's /board and /consultant
 # subGroups) - architects (archi) get one tier across all 4 techs;
 # consultants get build and run tiers separately.
-# operator-supplied: replace demo placeholders - every entry's `spaces`
-# and `directories` below (space key "ARCH", the Satellite/Architecture-
-# style paths) are demo values, not real Confluence space keys/page
-# paths. Cleanly parameterized already (per-entry `spaces:`/`directories:`
-# arrays, not hardcoded into a template) - only the demo *values* need
-# replacing per environment (see examples/values-*.yaml, which show the
-# override shape but reuse the same placeholder space key, not real ones -
-# no real Confluence space key exists anywhere in this repo to copy).
-# Still open as of 2026-08-17 (roadmap WP-07 pass): real space keys/
-# directories for satellite/openshift/openshift-ai/keycloak were not
-# supplied this round - this is a business decision (which real Confluence
-# spaces map to which tech), not a technical unknown, so it stays a
-# placeholder rather than a guess.
+# Real space keys/directories supplied 2026-08-18 (roadmap WP-07, operator
+# decision "map what exists" after a live enumeration of all 42 spaces on
+# startxfr.atlassian.net):
+#   - satellite -> space SXS, page tree "SXS/Technologie : Satellite"
+#   - openshift -> space SXS, page tree "SXS/Technologie : Openshift"
+#   - openshift-ai, keycloak -> disabled: no real source tree exists for
+#     these technologies anywhere on the site. Re-enable with real values
+#     when content exists; never invent keys.
+# The source has NO archi/build/run page-tree subdivision, so a tech's
+# three tier entries deliberately share its one real tree - the tiers
+# still differ in requiredGroups, which is what stamps acl_groups
+# (ADR-0046); tier separation is an access-control property here, not a
+# content-layout one. `directories` matches ordered ancestor-title
+# subsequences (see rag_ingestion.py's _ancestor_path_matches).
 confluence:
   - enabled: true
     name: satellite-archi
@@ -428,8 +429,8 @@ confluence:
     technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["Satellite/Architecture"]
+    spaces: ["SXS"]
+    directories: ["SXS/Technologie : Satellite"]
     requiredGroups: ["confluence-archi-satellite"]
     includeAttachments: true
     preserveAcl: true
@@ -441,8 +442,8 @@ confluence:
     technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["Satellite/Build"]
+    spaces: ["SXS"]
+    directories: ["SXS/Technologie : Satellite"]
     requiredGroups: ["confluence-build-satellite"]
     includeAttachments: true
     preserveAcl: true
@@ -454,8 +455,8 @@ confluence:
     technology: satellite
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["Satellite/Run"]
+    spaces: ["SXS"]
+    directories: ["SXS/Technologie : Satellite"]
     requiredGroups: ["confluence-run-satellite"]
     includeAttachments: true
     preserveAcl: true
@@ -467,8 +468,8 @@ confluence:
     technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["OpenShift/Architecture"]
+    spaces: ["SXS"]
+    directories: ["SXS/Technologie : Openshift"]
     requiredGroups: ["confluence-archi-openshift"]
     includeAttachments: true
     preserveAcl: true
@@ -480,8 +481,8 @@ confluence:
     technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["OpenShift/Build"]
+    spaces: ["SXS"]
+    directories: ["SXS/Technologie : Openshift"]
     requiredGroups: ["confluence-build-openshift"]
     includeAttachments: true
     preserveAcl: true
@@ -493,86 +494,116 @@ confluence:
     technology: openshift
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["OpenShift/Run"]
+    spaces: ["SXS"]
+    directories: ["SXS/Technologie : Openshift"]
     requiredGroups: ["confluence-run-openshift"]
     includeAttachments: true
     preserveAcl: true
     excludeLabels: [obsolete]
     authentication: *confluenceAuthDefault
-  - enabled: true
+  - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
+    # real Confluence source tree exists for this technology anywhere on
+    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
+    # with real spaces/directories when such content exists; do not invent.
+    enabled: false
     name: openshift-ai-archi
     # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
     technology: openshift-ai
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["OpenShiftAI/Architecture"]
+    spaces: []
+    directories: []
     requiredGroups: ["confluence-archi-openshift-ai"]
     includeAttachments: true
     preserveAcl: true
     excludeLabels: [obsolete]
     authentication: *confluenceAuthDefault
-  - enabled: true
+  - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
+    # real Confluence source tree exists for this technology anywhere on
+    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
+    # with real spaces/directories when such content exists; do not invent.
+    enabled: false
     name: openshift-ai-build
     # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
     technology: openshift-ai
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["OpenShiftAI/Build"]
+    spaces: []
+    directories: []
     requiredGroups: ["confluence-build-openshift-ai"]
     includeAttachments: true
     preserveAcl: true
     excludeLabels: [obsolete]
     authentication: *confluenceAuthDefault
-  - enabled: true
+  - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
+    # real Confluence source tree exists for this technology anywhere on
+    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
+    # with real spaces/directories when such content exists; do not invent.
+    enabled: false
     name: openshift-ai-run
     # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
     technology: openshift-ai
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["OpenShiftAI/Run"]
+    spaces: []
+    directories: []
     requiredGroups: ["confluence-run-openshift-ai"]
     includeAttachments: true
     preserveAcl: true
     excludeLabels: [obsolete]
     authentication: *confluenceAuthDefault
-  - enabled: true
+  - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
+    # real Confluence source tree exists for this technology anywhere on
+    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
+    # with real spaces/directories when such content exists; do not invent.
+    enabled: false
     name: keycloak-archi
     # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
     technology: keycloak
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["Keycloak/Architecture"]
+    spaces: []
+    directories: []
     requiredGroups: ["confluence-archi-keycloak"]
     includeAttachments: true
     preserveAcl: true
     excludeLabels: [obsolete]
     authentication: *confluenceAuthDefault
-  - enabled: true
+  - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
+    # real Confluence source tree exists for this technology anywhere on
+    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
+    # with real spaces/directories when such content exists; do not invent.
+    enabled: false
     name: keycloak-build
     # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
     technology: keycloak
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["Keycloak/Build"]
+    spaces: []
+    directories: []
     requiredGroups: ["confluence-build-keycloak"]
     includeAttachments: true
     preserveAcl: true
     excludeLabels: [obsolete]
     authentication: *confluenceAuthDefault
-  - enabled: true
+  - # Disabled 2026-08-18 (WP-07 operator decision, "map what exists"): no
+    # real Confluence source tree exists for this technology anywhere on
+    # startxfr.atlassian.net (SXS carries Technologie : Satellite/Openshift/
+    # Vault/Gitlab/AAP/Terraform - no OpenShift AI, no Keycloak). Re-enable
+    # with real spaces/directories when such content exists; do not invent.
+    enabled: false
     name: keycloak-run
     # ADR-0202 canonical cross-source technology value (knowledge/tech/domain.yaml).
     technology: keycloak
     type: cloud
     baseUrl: "https://startxfr.atlassian.net"
-    spaces: ["ARCH"]
-    directories: ["Keycloak/Run"]
+    spaces: []
+    directories: []
     requiredGroups: ["confluence-run-keycloak"]
     includeAttachments: true
     preserveAcl: true
