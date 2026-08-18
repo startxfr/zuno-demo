@@ -417,7 +417,18 @@ lmEval:
         # confirm `tokenizer` is a distinct, real field).
         - name: tokenizer
           value: Qwen/Qwen2.5-7B-Instruct
-      taskNames: [mmlu]
+      # VERIFIED live 2026-08-18: the full `mmlu` group task (57 subjects)
+      # expands to 56,168 loglikelihood requests - too much sustained
+      # load for this demo cluster's shared single-GPU-plus-MIG capacity
+      # (qwen + gpt-oss-20b + the MaaS backend model all serve
+      # concurrently); the predictor started 503ing under that volume
+      # partway through, a real capacity constraint, not a bug. Scoped to
+      # one real native subject task (mmlu_abstract_algebra, ~100 test
+      # examples x 4 choices ≈ 400 requests) - a genuine, complete,
+      # right-sized GPU-backed run rather than a capacity-planning
+      # exercise. Extend taskNames back to `mmlu` (or add more subjects)
+      # once dedicated eval-time GPU capacity exists.
+      taskNames: [mmlu_abstract_algebra]
       # allowOnline stays false: VERIFIED live 2026-08-18 it has no effect
       # either way (the operator hardcodes the HF offline env vars
       # regardless - see lmevaljob.yaml's dated comment). The real fix is
