@@ -1,6 +1,6 @@
 # ADR-0107: Introduce automated model quality gates
 
-- **Status:** Partially implemented (gate runner, CI wiring and LMEvalJob manifests merged; GPU cluster runs pending, roadmap WP-10)
+- **Status:** Partially implemented (gate runner, CI wiring and LMEvalJob manifests merged; GPU cluster runs pending, roadmap WP-10). Updated 2026-08-18: the blocking half of the acceptance bar is now discharged live - `make d1 check agents` (the real ADR-0053 acceptance gate, `evaluations/tekos/run_acceptance_gate.py` against the live cluster) ran twice, reproducibly, and correctly BLOCKED promotion both times (65-70% scenario pass rate against the 75% threshold, both mandatory-check layers evaluated for real). A companion regression was found and fixed along the way: PgBouncer held a stale cached auth failure for the `agentcheckpoints` role after this session's WP-12 PostgreSQL failover drill; restarting the PgBouncer pods picked up the current credential and flipped the mandatory security-check layer from 6/7 to 7/7. The passing-promotion half remains open - not fabricated - blocked on a separate, genuine platform gap (see ADR-0108's note): still `Partially implemented`.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

@@ -585,6 +585,27 @@ under `docs/adr/`.
   another operator-vs-quota lesson from the same session (rhods-operator
   needed the platform quota resized for its 3 replicas before this got
   even this far).
+- **2026-08-18 (WP-10 progress, ADR-0107/0108 stay Partially implemented)**:
+  gated-promotion blocking half proven live twice via `make d1 check
+  agents` (65-70% vs 75% threshold, real ADR-0053 gate). Found+fixed a
+  real regression as a byproduct: WP-12's PG failover left PgBouncer
+  with a stale cached auth failure for `agentcheckpoints` - restarting
+  the PgBouncer pods fixed it (security checks 6/7 -> 7/7). LM-Eval:
+  found+fixed 3 real 3.5.0-ea.2 TrustyAI operator bugs (pvcManaged.size
+  reconciler panic on empty size; served-model-name isn't a valid HF
+  tokenizer repo id; allowOnline/env-override both silently ignored -
+  worked around with an operator-populated datasetCachePvc, since HF
+  offline mode only blocks network calls, not reads from an
+  already-warm cache); the full mmlu group's 56,168 requests also
+  503'd the shared predictor mid-run (real GPU capacity contention),
+  rescoped to one subject task. Got a real request past every layer,
+  then hit a genuine, separate mesh gap: `/v1/completions` consistently
+  503s at ~10s (Envoy/ztunnel-origin timeout) while `/v1/chat/
+  completions` on the identical pod/port works fine - a real mesh
+  routing gap for the OpenAI legacy completions path, not fixable from
+  chart values, out of WP-10's scope. Scratch PVC `lmeval-hf-cache` was
+  deleted at end of session (needs re-populating per
+  gitops/charts/models/values.yaml's dated comment).
 - **2026-08-18 (ADR-0330 closed, WP-07 Done)**: real Confluence space
   keys landed after a live space enumeration - `satellite`/`openshift`
   point at real space SXS's actual page trees (no archi/build/run
