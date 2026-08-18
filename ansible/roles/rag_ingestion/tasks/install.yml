@@ -47,6 +47,15 @@
       rag-dspa DataSciencePipelinesApplication has reported Ready in
       zuno-ai-build.
 
+# VERIFIED live 2026-08-18 (WP-07 follow-up): compile+apply the tech
+# PipelineVersion (see compile_pipeline_version.yml's header comment for
+# why this step exists) before the recurring-run block below tries to
+# discover one - otherwise a Pipeline CR with zero versions (e.g. right
+# after a `make d1 reinstall`) leaves nothing for the recurring run to
+# reference.
+- name: "rag_ingestion | compile and apply the tech pipeline version"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml"
+
 # --- KFP recurring-run activation (best-effort, UNVERIFIED against a live
 # cluster) -----------------------------------------------------------------
 # RHOAI's DSPA doesn't expose a Kubernetes-native scheduling CRD, only the

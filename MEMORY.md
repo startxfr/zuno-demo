@@ -654,6 +654,34 @@ under `docs/adr/`.
   archi/build/run anyway); (3) ADR-0330's "Evolution" section still called
   the `/board` mapping "transitional" - marked resolved, referencing
   ADR-0340/WP-32.
+- **2026-08-18 (rag-ingestion KFP fixes, same day)**: two real bugs found
+  and fixed while verifying a `make d1 reinstall rag-ingestion` run. (1)
+  Duplicate recurring runs: `recurring_run.yml` always POSTed a fresh
+  create with no list-and-match-by-name step, and KFP doesn't enforce
+  `display_name` uniqueness - repeat installs silently accumulated
+  duplicate `rag-corpus-ingestion-schedule` entries (two found live, both
+  firing the same weekly cron). Fixed by listing existing recurring runs
+  first and reconciling (no-op if already current, delete+replace if
+  stale-version, create only if absent) - verified idempotent across
+  three consecutive installs. (2) No pipeline version at all:
+  `make d1 reinstall` deletes+recreates the ArgoCD Application, which
+  deletes+recreates the `Pipeline` CR and therefore the underlying KFP
+  pipeline object - and nothing in this repo ever uploaded a version into
+  it (the Pipeline CR carries only displayName/description; the compiler
+  image referenced in values.yaml was scaffolded but never wired to a
+  BuildConfig). Result: rag-ingestion had zero runnable pipeline versions,
+  silently. Fixed with a new `compile_pipeline_version.yml` task
+  (idempotent `ansible.builtin.pip` venv from
+  `components/rag-ingestion/tooling/requirements.txt`, compiles
+  `files/pipeline.py.tpl`'s already-correct `kubernetes_manifest_format`
+  output into a real `PipelineVersion` CR - confirmed that CRD exists on
+  this cluster - and `oc apply`s it) run before the recurring-run block in
+  `install.yml`. Verified with a full destroy/self-heal live test: deleted
+  the recurring run and the PipelineVersion CR, re-ran `make d1 install
+  rag-ingestion`, and it recompiled, reapplied, and recreated the
+  recurring run automatically with no manual intervention - then a third
+  consecutive run proved the compile step itself is also idempotent
+  (`already up to date`, no new PipelineVersion object).
 - **2026-08-18 (ADR-0114 superseded by ADR-0118, WP-03 Done)**: the
   WP-03 decision-risk clause fired - operator chose supersession. The
   AI Gateway stays the policy router; `maas_adapter.py` stays merged +
