@@ -417,16 +417,6 @@ lmEval:
         # confirm `tokenizer` is a distinct, real field).
         - name: tokenizer
           value: Qwen/Qwen2.5-7B-Instruct
-        # VERIFIED live 2026-08-18: the 3.5.0-ea.2 TrustyAI operator's
-        # rendered pod hardcodes HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1
-        # regardless of allowOnline or spec.pod.container.env overrides
-        # (a second, independent operator bug from the pvcManaged one
-        # above - the documented override field does not take effect).
-        # tokenizer_backend=none skips the AutoTokenizer/HF network path
-        # entirely; TemplateAPI still scores via the API's own logprobs
-        # (echo=True), which is what local-completions actually needs.
-        - name: tokenizer_backend
-          value: none
       taskNames: [mmlu]
       # allowOnline stays false: VERIFIED live 2026-08-18 it has no effect
       # either way (the operator hardcodes the HF offline env vars
@@ -434,9 +424,14 @@ lmEval:
       # datasetCachePvc below: mmlu's dataset (hails/mmlu_no_train, one
       # HF `load_dataset(path, config)` call per of its 57 subject
       # configs - NOT the "all" aggregate config, which has a real,
-      # separate bug returning 0 examples per split) is pre-cached by the
-      # operator into this PVC's HF_HOME before the job runs. Model access
-      # stays local (local-completions against the in-cluster predictor);
+      # separate bug returning 0 examples per split) AND the
+      # Qwen/Qwen2.5-7B-Instruct tokenizer are both pre-cached by the
+      # operator into this PVC's HF_HOME before the job runs.
+      # tokenizer_backend=none was tried and reverted: mmlu is a
+      # loglikelihood task and TemplateAPI asserts a real tokenizer is
+      # present to compute context lengths even with echo=True - the
+      # tokenizer must be cached and loaded for real, not skipped. Model
+      # access stays local (local-completions against the in-cluster predictor);
       # allowCodeExecution stays false.
       allowOnline: false
       allowCodeExecution: false
