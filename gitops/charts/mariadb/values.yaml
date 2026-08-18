@@ -53,13 +53,24 @@ operator:
       # (spec.config.resources on the Subscription). Default 512Mi limit
       # OOM-kills the manager container (exitCode 137, restarts) on a live
       # cluster - bumped to 700Mi.
+      # cpu was later found to be the actual live bottleneck, not memory:
+      # at the stock 500m limit this operator-sdk Helm-operator gets
+      # CPU-throttled hard enough during its own API-discovery/RESTMapper
+      # startup (this cluster carries 400+ CRDs) that its /healthz and
+      # /readyz handlers miss their 1s probe timeout, so kubelet kills it
+      # every cycle (100+ restarts/day observed) - which flaps the owned
+      # Deployment's Available condition and makes the CSV oscillate
+      # Installing/Succeeded in the console. Memory stayed flat around
+      # 258Mi (well under 700Mi) throughout, confirming it wasn't memory
+      # this time. Bumped cpu request/limit accordingly - see
+      # docs/platform/troubleshooting.md for the full diagnosis.
       config:
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
             memory: 128Mi
           limits:
-            cpu: 500m
+            cpu: "1"
             memory: 700Mi
 
 # mariadb-operator ships as an operator-sdk Helm-operator: its CSV
