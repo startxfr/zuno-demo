@@ -51,6 +51,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/conversations/{run_id}", renameConversationHandler(verifier, runtimeClient, cfg.AgentName))
 	mux.HandleFunc("PUT /api/conversations/{run_id}/star", starConversationHandler(verifier, runtimeClient, cfg.AgentName, true))
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/star", starConversationHandler(verifier, runtimeClient, cfg.AgentName, false))
+	mux.HandleFunc("DELETE /api/conversations/{run_id}", archiveConversationHandler(verifier, runtimeClient, cfg.AgentName))
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -191,6 +192,12 @@ type apiRenameResponse struct {
 // PUT and DELETE /api/conversations/{run_id}/star (ADR-0212).
 type apiStarResponse struct {
 	Starred bool `json:"starred"`
+}
+
+// apiArchiveResponse is the frontend-facing response body for
+// DELETE /api/conversations/{run_id} (ADR-0212 follow-up: soft-delete).
+type apiArchiveResponse struct {
+	Archived bool `json:"archived"`
 }
 
 // chatHandler validates and authorizes the caller, then either proxies a
@@ -522,6 +529,31 @@ func starConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Cli
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(apiStarResponse{Starred: result.Starred})
+	}
+}
+
+// archiveConversationHandler handles DELETE /api/conversations/{run_id}
+// (ADR-0212 follow-up: soft-delete).
+func archiveConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.ArchiveConversation(ctx, token, r.PathValue("run_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime archive-conversation call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiArchiveResponse{Archived: result.Archived})
 	}
 }
 

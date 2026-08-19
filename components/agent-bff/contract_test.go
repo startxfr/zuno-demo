@@ -145,3 +145,7 @@ func TestRenameResponseMatchesOpenAPISpec(t *testing.T) {
 func TestStarResponseMatchesOpenAPISpec(t *testing.T) {
 	assertMatchesSchema(t, loadOpenAPISpec(t), apiStarResponse{}, "StarResponse")
 }
+
+func TestArchiveResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiArchiveResponse{}, "ArchiveResponse")
+}

@@ -137,6 +137,21 @@
           "404": { "description": "No conversation found for this run_id owned by the caller (collapsed with 'not owned by the caller' - never confirms another subject's run_id exists).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
           "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
         }
+      },
+      "delete": {
+        "operationId": "archiveConversation",
+        "summary": "Delete a conversation (ADR-0212 follow-up, soft-delete)",
+        "description": "Hides the conversation from GET /api/conversations by setting archived_at - the underlying Agent Runtime checkpoint (the actual message history) is never deleted.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Archived.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
       }
     },
     "/api/conversations/{run_id}/star": {
@@ -248,6 +263,13 @@
         "required": ["starred"],
         "properties": {
           "starred": { "type": "boolean" }
+        }
+      },
+      "ArchiveResponse": {
+        "type": "object",
+        "required": ["archived"],
+        "properties": {
+          "archived": { "type": "boolean" }
         }
       },
       "ErrorResponse": {

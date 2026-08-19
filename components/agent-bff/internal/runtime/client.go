@@ -105,6 +105,12 @@ type StarResponse struct {
 	Starred bool `json:"starred"`
 }
 
+// ArchiveResponse is the documented response body for
+// DELETE .../runs/{run_id} (ADR-0212 follow-up: soft-delete).
+type ArchiveResponse struct {
+	Archived bool `json:"archived"`
+}
+
 // ChatResponse is the Agent Runtime's documented response body.
 type ChatResponse struct {
 	Reply     string     `json:"reply"`
@@ -308,6 +314,18 @@ func (c *Client) SetStar(ctx context.Context, bearerToken, runID string, starred
 	path := fmt.Sprintf("/v1/agents/%s/runs/%s/star", c.agentName, url.PathEscape(runID))
 	var out StarResponse
 	if err := c.doJSON(ctx, method, bearerToken, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ArchiveConversation calls DELETE /v1/agents/{agent}/runs/{run_id}
+// (ADR-0212 follow-up) - soft-deletes the conversation, never touching
+// its underlying LangGraph checkpoint.
+func (c *Client) ArchiveConversation(ctx context.Context, bearerToken, runID string) (*ArchiveResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s", c.agentName, url.PathEscape(runID))
+	var out ArchiveResponse
+	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, path, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

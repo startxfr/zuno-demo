@@ -52,6 +52,7 @@ forwarding the caller's OIDC access token as a Bearer credential.
 | GET | `/api/conversations` | `Authorization: Bearer <access_token>` | `?starred=true` (optional) | `200 [{"run_id","title","updated_at","starred"}]` (ADR-0212) |
 | GET | `/api/conversations/{run_id}/transcript` | `Authorization: Bearer <access_token>` | - | `200 [{"role","content","ts"}]` / `404` unknown run_id / `403` belongs to a different subject (ADR-0212) |
 | PATCH | `/api/conversations/{run_id}` | `Authorization: Bearer <access_token>` | `{"title": string}` | `200 {"run_id","title"}` / `404` unknown or not owned by the caller (ADR-0212) |
+| DELETE | `/api/conversations/{run_id}` | `Authorization: Bearer <access_token>` | - | `200 {"archived": bool}` / `404` unknown or not owned by the caller (ADR-0212 follow-up, soft-delete: hides the conversation, never touches its checkpoint) |
 | PUT/DELETE | `/api/conversations/{run_id}/star` | `Authorization: Bearer <access_token>` | - | `200 {"starred": bool}` / `404` unknown or not owned by the caller (ADR-0212) |
 | GET | `/healthz` | none | - | `200 ok` |
 
