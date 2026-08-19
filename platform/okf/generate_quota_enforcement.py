@@ -66,8 +66,13 @@ COUNTER_EXPRESSIONS = {
     # `groups` deserializes as a CEL list, not a string (confirmed by the
     # live has()-bracket rejection above being the same class of "CEL
     # environment is stricter than assumed" issue) - no .split() needed,
-    # only .join() to turn the list into one counter key.
-    "group": 'auth.identity.groups.join("|")',
+    # only .join() to turn the list into one counter key. Separator must be
+    # single-quoted: Kuadrant compiles this expression verbatim into a
+    # double-quoted descriptors[0]["<expression>"] CEL string on the
+    # Limitador side, so a double-quoted "|" here breaks that string and
+    # Limitador refuses to load the limits file (confirmed live, 2026-08-19
+    # CrashLoopBackOff - "Couldn't parse: .[1].variables").
+    "group": "auth.identity.groups.join('|')",
     "project": f"request.headers['{PROJECT_HEADER}']",
 }
 

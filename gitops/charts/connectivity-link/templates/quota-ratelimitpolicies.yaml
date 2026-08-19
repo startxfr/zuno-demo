@@ -37,7 +37,7 @@ spec:
         - limit: 60
           window: 5m
       counters:
-        - expression: 'auth.identity.groups.join("|")'
+        - expression: "auth.identity.groups.join('|')"
       when:
         - predicate: "request.headers['x-zuno-quota-class'] == 'intensive'"
     intensive-project:
@@ -62,7 +62,7 @@ spec:
         - limit: 600
           window: 5m
       counters:
-        - expression: 'auth.identity.groups.join("|")'
+        - expression: "auth.identity.groups.join('|')"
       when:
         - predicate: "!('x-zuno-quota-class' in request.headers) || request.headers['x-zuno-quota-class'] == 'standard'"
     standard-project:
