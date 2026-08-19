@@ -11,7 +11,15 @@ OGXServer instance itself has been applied/verified live yet (`oc get
 ogxserver -A` returns no resources today), so this is a schema-correct,
 not yet cluster-verified, manifest. Disabled by default.
 */ -}}
-{{- if .Values.ogxServer.enabled }}
+{{- /*
+Guarded by dataScienceCluster.enabled too: this chart is also installed as
+the operator-only release (zuno-openshift-ai-d0), which shares
+redhat-ods-applications with the dataScienceCluster release
+(zuno-openshift-ai-d1) and would otherwise render this ConfigMap/
+ExternalSecret/OGXServer a second time, triggering ArgoCD
+SharedResourceWarning between the two Applications.
+*/ -}}
+{{- if and .Values.ogxServer.enabled .Values.dataScienceCluster.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
