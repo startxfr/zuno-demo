@@ -51,7 +51,13 @@
             "sxa.record.lookup",
             "salesforce.opportunity.read",
             "salesforce.opportunity.create",
-            "salesforce.opportunity.update"
+            "salesforce.opportunity.update",
+            "git.repository.read",
+            "git.repository.list",
+            "git.repository.private.read",
+            "git.repository.private.list",
+            "git.file.write",
+            "git.repository.create"
           ]
         },
         "used_by_tasks": {

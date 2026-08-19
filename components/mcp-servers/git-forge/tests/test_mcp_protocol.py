@@ -80,11 +80,12 @@ class _FakeGithubCommit:
 
 
 class _FakeGithubRepo:
-    def __init__(self, full_name: str, contents=None, fork_result=None):
+    def __init__(self, full_name: str, contents=None, fork_result=None, private: bool = False):
         self.full_name = full_name
         self.name = full_name.split("/")[-1]
         self._contents = contents or {}
         self._fork_result = fork_result
+        self.private = private
         self.calls = []
 
     def get_contents(self, path, **kwargs):
@@ -190,10 +191,11 @@ class _FakeGitlabForksManager:
 
 
 class _FakeGitlabProject:
-    def __init__(self, default_branch="main", files=None, tree=None, fork_result=None):
+    def __init__(self, default_branch="main", files=None, tree=None, fork_result=None, visibility="public"):
         self.default_branch = default_branch
         self.files = _FakeGitlabFilesManager(files)
         self.forks = _FakeGitlabForksManager(fork_result)
+        self.visibility = visibility
         self._tree = tree or []
 
     def repository_tree(self, path="", ref="", all=True, **kwargs):
@@ -257,7 +259,7 @@ async def test_unauthenticated_call_rejected_before_any_protocol_handling(transp
     assert resp.status_code == 401, f"expected 401 with no gateway token, got {resp.status_code}"
 
 
-async def test_tools_list_reports_exactly_the_six_declared_tools(transport) -> None:
+async def test_tools_list_reports_exactly_the_eight_declared_tools(transport) -> None:
     async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -267,7 +269,9 @@ async def test_tools_list_reports_exactly_the_six_declared_tools(transport) -> N
         "create_repository",
         "delete_repository",
         "fork_repository",
+        "list_private_repositories",
         "list_repositories",
+        "read_private_repository_content",
         "read_repository_content",
         "write_file",
     ], names
@@ -340,6 +344,66 @@ async def test_read_repository_content_gitlab_directory(transport) -> None:
     assert len(payload["entries"]) == 2
 
 
+async def test_read_repository_content_refuses_private_github(transport) -> None:
+    repo = _FakeGithubRepo("acme/secret", contents={"README.md": _FakeGithubContentFile("README.md", b"shh", "sha1")}, private=True)
+    fake = _FakeGithubClient(repo=repo)
+    with _patch_github(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "read_repository_content",
+                    {"provider": "github", "owner": "acme", "repo": "secret", "path": "README.md"},
+                )
+    assert result.is_error, "private GitHub content must never be readable via read_repository_content"
+    assert not repo.calls, "must refuse before even calling get_contents"
+
+
+async def test_read_repository_content_refuses_private_gitlab(transport) -> None:
+    project = _FakeGitlabProject(files={"README.md": _FakeGitlabProjectFile("README.md", b"shh", "blob-1")}, visibility="private")
+    fake = _FakeGitlabClient(project=project)
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "read_repository_content",
+                    {"provider": "gitlab", "owner": "acme", "repo": "secret", "path": "README.md"},
+                )
+    assert result.is_error, "private GitLab content must never be readable via the public-only read_repository_content"
+
+
+async def test_read_private_repository_content_allows_private_gitlab(transport) -> None:
+    project = _FakeGitlabProject(files={"README.md": _FakeGitlabProjectFile("README.md", b"shh", "blob-1")}, visibility="private")
+    fake = _FakeGitlabClient(project=project)
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "read_private_repository_content",
+                    {"provider": "gitlab", "owner": "acme", "repo": "secret", "path": "README.md"},
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    assert payload["content"] == "shh"
+
+
+async def test_read_private_repository_content_refuses_github_provider(transport) -> None:
+    def _boom():
+        raise AssertionError("read_private_repository_content must never construct a GitHub client")
+
+    with mock.patch.object(server, "_github_client", _boom):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "read_private_repository_content",
+                    {"provider": "github", "owner": "acme", "repo": "secret"},
+                )
+    assert result.is_error, "read_private_repository_content must never accept provider='github'"
+
+
 async def test_list_repositories_github_user(transport) -> None:
     repos = [_FakeGithubRepoSummary("widgets", "acme/widgets", False, "widgets repo", "https://github.com/acme/widgets")]
     fake = _FakeGithubClient(user=_FakeGithubAccount(repos=repos))
@@ -372,6 +436,76 @@ async def test_list_repositories_gitlab_organization(transport) -> None:
     payload = _result(result.structured_content)
     assert payload["count"] == 1
     assert payload["repositories"][0]["private"] is False
+
+
+async def test_list_repositories_filters_out_private_github(transport) -> None:
+    repos = [
+        _FakeGithubRepoSummary("widgets", "acme/widgets", False, "public one", "https://github.com/acme/widgets"),
+        _FakeGithubRepoSummary("secret", "acme/secret", True, "private one", "https://github.com/acme/secret"),
+    ]
+    fake = _FakeGithubClient(user=_FakeGithubAccount(repos=repos))
+    with _patch_github(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_repositories", {"provider": "github", "owner": "acme", "owner_type": "user"}
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    assert payload["count"] == 1
+    assert payload["repositories"][0]["full_name"] == "acme/widgets"
+
+
+async def test_list_repositories_filters_out_private_gitlab(transport) -> None:
+    projects = [
+        {"name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public", "description": None, "web_url": "https://gitlab.com/acme/widgets"},
+        {"name": "secret", "path_with_namespace": "acme/secret", "visibility": "private", "description": None, "web_url": "https://gitlab.com/acme/secret"},
+    ]
+    fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_repositories", {"provider": "gitlab", "owner": "acme", "owner_type": "organization"}
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    assert payload["count"] == 1
+    assert payload["repositories"][0]["full_name"] == "acme/widgets"
+
+
+async def test_list_private_repositories_gitlab_includes_private(transport) -> None:
+    projects = [
+        {"name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public", "description": None, "web_url": "https://gitlab.com/acme/widgets"},
+        {"name": "secret", "path_with_namespace": "acme/secret", "visibility": "private", "description": None, "web_url": "https://gitlab.com/acme/secret"},
+    ]
+    fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_private_repositories", {"provider": "gitlab", "owner": "acme", "owner_type": "organization"}
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    assert payload["count"] == 2, "must include both the public and the private project"
+
+
+async def test_list_private_repositories_refuses_github_provider(transport) -> None:
+    def _boom():
+        raise AssertionError("list_private_repositories must never construct a GitHub client")
+
+    with mock.patch.object(server, "_github_client", _boom):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_private_repositories", {"provider": "github", "owner": "acme", "owner_type": "user"}
+                )
+    assert result.is_error, "list_private_repositories must never accept provider='github'"
 
 
 async def test_write_file_github_creates_when_absent(transport) -> None:
@@ -447,6 +581,50 @@ async def test_write_file_gitlab_creates_when_absent(transport) -> None:
     assert len(project.files.created) == 1
 
 
+async def test_write_file_refuses_private_github(transport) -> None:
+    repo = _FakeGithubRepo("acme/secret", contents={}, private=True)
+    fake = _FakeGithubClient(repo=repo)
+    with _patch_github(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "write_file",
+                    {
+                        "provider": "github",
+                        "owner": "acme",
+                        "repo": "secret",
+                        "path": "NEW.md",
+                        "content": "x",
+                        "commit_message": "add NEW.md",
+                    },
+                )
+    assert result.is_error, "must never write to a private GitHub repository"
+    assert not repo.calls, "must refuse before calling create_file/update_file"
+
+
+async def test_write_file_refuses_private_gitlab(transport) -> None:
+    project = _FakeGitlabProject(files={}, visibility="private")
+    fake = _FakeGitlabClient(project=project)
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "write_file",
+                    {
+                        "provider": "gitlab",
+                        "owner": "acme",
+                        "repo": "secret",
+                        "path": "NEW.md",
+                        "content": "x",
+                        "commit_message": "add NEW.md",
+                    },
+                )
+    assert result.is_error, "must never write to a private GitLab project"
+    assert not project.files.created, "must refuse before calling files.create"
+
+
 async def test_create_repository_github(transport) -> None:
     created = _FakeGithubRepoSummary("widgets", "acme/widgets", True, "", "https://github.com/acme/widgets")
     fake = _FakeGithubClient(org=_FakeGithubAccount(created_repo=created))
@@ -515,16 +693,26 @@ async def test_delete_repository_gitlab_always_refuses_and_never_touches_a_clien
 
 TESTS = [
     test_unauthenticated_call_rejected_before_any_protocol_handling,
-    test_tools_list_reports_exactly_the_six_declared_tools,
+    test_tools_list_reports_exactly_the_eight_declared_tools,
     test_read_repository_content_github_file,
     test_read_repository_content_github_missing_path_is_a_tool_error,
     test_read_repository_content_gitlab_file,
     test_read_repository_content_gitlab_directory,
+    test_read_repository_content_refuses_private_github,
+    test_read_repository_content_refuses_private_gitlab,
+    test_read_private_repository_content_allows_private_gitlab,
+    test_read_private_repository_content_refuses_github_provider,
     test_list_repositories_github_user,
     test_list_repositories_gitlab_organization,
+    test_list_repositories_filters_out_private_github,
+    test_list_repositories_filters_out_private_gitlab,
+    test_list_private_repositories_gitlab_includes_private,
+    test_list_private_repositories_refuses_github_provider,
     test_write_file_github_creates_when_absent,
     test_write_file_github_updates_when_present,
     test_write_file_gitlab_creates_when_absent,
+    test_write_file_refuses_private_github,
+    test_write_file_refuses_private_gitlab,
     test_create_repository_github,
     test_fork_repository_github,
     test_delete_repository_github_always_refuses_and_never_touches_a_client,

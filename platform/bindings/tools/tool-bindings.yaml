@@ -317,6 +317,24 @@ bindings:
     provider_tool: list_repositories
     auth_mode: service-identity
 
+  # ADR-0121: GitLab-only, any visibility (public/internal/private) -
+  # this server never grants private GitHub access through any binding.
+  # Which agent can reach these (e.g. Arkos, not Tekos) is governed by
+  # policies/tools/tool-policy.yaml + OKF allowed_tools, same as any
+  # other capability - the provider restriction itself is enforced in
+  # components/mcp-servers/git-forge/server.py, not here.
+  - capability: git.repository.private.read
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: read_private_repository_content
+    auth_mode: service-identity
+
+  - capability: git.repository.private.list
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: list_private_repositories
+    auth_mode: service-identity
+
   - capability: git.file.write
     backend: git-forge
     transport: streamable-http

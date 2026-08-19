@@ -5,16 +5,35 @@ fronting BOTH GitHub (`PyGithub`) and GitLab (`python-gitlab`), selected
 per call via an explicit `provider: "github" | "gitlab"` tool argument
 (ADR-0120), rather than deploying one server per platform.
 
-Six capabilities (`git.*`, ADR-0116 naming), exposed here as:
+Eight capabilities (`git.*`, ADR-0116 naming), exposed here as:
 
 | Tool | Capability | Does |
 |---|---|---|
-| `read_repository_content` | `git.repository.read` | Read a file's content or list a directory - public or private, subject to this server's own credential access |
-| `list_repositories` | `git.repository.list` | List repositories owned by a user/organization (GitHub) or user/group (GitLab) |
-| `write_file` | `git.file.write` | Create or update a file as a single commit |
+| `read_repository_content` | `git.repository.read` | Read a file's content or list a directory in a **public** repo (either provider) |
+| `read_private_repository_content` | `git.repository.private.read` | Same, but allows private/internal too - **GitLab only** |
+| `list_repositories` | `git.repository.list` | List a user's/organization's (GitHub) or user's/group's (GitLab) **public** repositories |
+| `list_private_repositories` | `git.repository.private.list` | Same, but includes private/internal too - **GitLab only** |
+| `write_file` | `git.file.write` | Create or update a file as a single commit - **public repos only**, either provider |
 | `create_repository` | `git.repository.create` | Create a new repository |
 | `fork_repository` | `git.repository.fork` | Fork a repository |
 | `delete_repository` | `git.repository.delete` | **Always refuses** - see below |
+
+## Visibility is a server-enforced rule, not a policy-only one (ADR-0121)
+
+`read_repository_content`/`list_repositories`/`write_file` refuse (or
+filter out) private content on **either** provider, unconditionally -
+this server has no per-caller identity to check (service-identity auth,
+by design), so it can't tell Tekos from Arkos, and doesn't try to. What
+it enforces instead is a hard invariant: those three tools never touch
+private content for anyone. Private access exists only through
+`read_private_repository_content`/`list_private_repositories`, and only
+for GitLab (`provider="github"` is refused outright by both - this server
+never grants private GitHub access to anyone, through any tool).
+
+Which *agent* can reach the private-scoped tools at all is still governed
+the normal way - OKF `allowed_tools` intersected with
+`policies/tools/tool-policy.yaml` (ADR-0011). E.g. Arkos declares
+`git.repository.private.read`/`.list`, Tekos doesn't.
 
 ## `delete_repository` always refuses
 

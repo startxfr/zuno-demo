@@ -8,6 +8,12 @@ zuno:
     - confluence.page.search
     - drive.document.create
     - drive.document.update
+    - git.repository.read
+    - git.repository.list
+    - git.repository.private.read
+    - git.repository.private.list
+    - git.file.write
+    - git.repository.create
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project
@@ -38,3 +44,19 @@ work: the explicit-review checkpoints between stages are a later
 iteration, not built by this task. Live Jira is deferred until its MCP
 server exists (WP-02's template, not yet scheduled for Jira); Confluence
 read/search are live today (`components/mcp-servers/confluence`, ADR-0117).
+
+ADR-0121: the six `git.*` entries add GitHub/GitLab repository access
+(`components/mcp-servers/git-forge`, ADR-0120) so Arkos can cite/reference
+real source repositories in a testimonial and, when asked, publish
+supporting material as a new or updated repository. Arkos's exact
+authorization shape:
+- `git.repository.read`/`git.repository.list` - **public** repositories,
+  both GitHub and GitLab.
+- `git.repository.private.read`/`git.repository.private.list` - private/
+  internal repositories, **GitLab only** (this server never grants
+  private GitHub access to anyone, ADR-0121).
+- `git.file.write` - commits **only ever land in public repositories**,
+  on either provider, server-enforced regardless of what Arkos requests.
+- `git.repository.create` - unrestricted by visibility (Arkos chooses).
+No `git.repository.fork`/`git.repository.delete` - unused by this task;
+`delete_repository` always refuses regardless of declaration anyway.

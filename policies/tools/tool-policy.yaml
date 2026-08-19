@@ -381,6 +381,29 @@ tools:
       - board
       - cdp
 
+  # ADR-0121: GitLab-only, any visibility - same allowed_groups as the
+  # public-only entries above (platform_policy doesn't need to be
+  # narrower; the actual GitHub-refusal and agent-declaration gating
+  # already do the real work - see git-forge/server.py and each agent's
+  # own agents/<name>/tasks/*.md `allowed_tools`).
+  - tool: git.repository.private.read
+    capability: git.repository.private.read
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  - tool: git.repository.private.list
+    capability: git.repository.private.list
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
   - tool: git.file.write
     capability: git.file.write
     mcp_server: git-forge

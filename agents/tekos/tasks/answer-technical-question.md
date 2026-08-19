@@ -6,6 +6,8 @@ zuno:
   allowed_tools:
     - search_confluence
     - web_search
+    - git.repository.read
+    - git.repository.list
   live_read_tool: search_confluence
   allowed_knowledge:
     - knowledge.tech
@@ -25,3 +27,10 @@ This is the task the Agent Runtime's chat endpoint (`POST
 `components/agent-runtime/app/registry.py` (ADR-0039) for how its
 `allowed_tools` above and `prompts/answer-technical-question.md`'s system
 prompt are resolved into the running LangGraph workflow.
+
+ADR-0121: `git.repository.read`/`git.repository.list` add read-only
+GitHub/GitLab repository access (`components/mcp-servers/git-forge`,
+ADR-0120) alongside Confluence/web search - **public repositories only,
+on either provider**. Tekos never declares the private-scoped
+`git.repository.private.*` capabilities (GitLab private access, reserved
+for Arkos) or any write/create capability.

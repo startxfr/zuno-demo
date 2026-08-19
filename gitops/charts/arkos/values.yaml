@@ -80,3 +80,9 @@ toolCapabilities:
   - confluence.page.search
   - drive.document.create
   - drive.document.update
+  - git.repository.read
+  - git.repository.list
+  - git.repository.private.read
+  - git.repository.private.list
+  - git.file.write
+  - git.repository.create
