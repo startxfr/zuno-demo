@@ -69,12 +69,16 @@ platformNamespaces:
     # mysql_real_connect timed out with an empty error against a
     # firewalled 3306 while the DSPO's own probe passed from
     # redhat-ods-applications, which IS allowed above.
+    # zuno-mlops: mlops-dspa's own MLMD/apiserver, same MariaDB, same
+    # reasoning - split into its own namespace 2026-08-19 (see zuno-mlops's
+    # own description above).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-vault
       - zuno-auth
       - redhat-ods-applications
       - zuno-ai-build
+      - zuno-mlops
     # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
     # lives here and is called synchronously by the API server on every
     # MariaDB/Grant/User write - confirmed live 2026-08-14: without this,
@@ -109,6 +113,7 @@ platformNamespaces:
       - zuno-data
       - zuno-auth
       - zuno-ai-build
+      - zuno-mlops
       - openshift-grafana-operator
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
@@ -135,6 +140,27 @@ platformNamespaces:
       - zuno-data
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 4).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
+    extraLabels:
+      istio-injection: enabled
+      zuno.io/managed: "true"
+  - name: zuno-mlops
+    displayName: Zuno MLOps
+    description: >-
+      mlops-dspa (LoRA/PEFT training pipeline, ADR-0301/ADR-0302) - split
+      out of zuno-ai-build on 2026-08-19 because both DSPAs' Argo
+      Workflow-controller Deployments collided on one unscoped
+      "workflow-controller" Lease in that shared namespace (rag-dspa's
+      runs would silently stall or have their Workflow objects deleted
+      within 1-2 seconds of creation, depending on which DSPA's
+      controller happened to hold the lease) - see the
+      dspa-shared-namespace-leader-election-bug memory for the full
+      incident. No resourceQuota/limitRange here, deliberately mirroring
+      zuno-ai-build: mlops's train-lora stage needs unconstrained
+      nvidia.com/gpu requests on the tainted GPU-burst node.
+    allowedFromNamespaces:
+      - zuno-ai-run
+      - zuno-data
+    # Sidecar-injected + mTLS-enforced, same posture as zuno-ai-build.
     extraLabels:
       istio-injection: enabled
       zuno.io/managed: "true"
@@ -199,6 +225,10 @@ platformNamespaces:
       # connect timeout from the grafana pod), same failure class as the two
       # entries above.
       - zuno-monitoring
+      # mlops-dspa's own meshed pods, split out of zuno-ai-build 2026-08-19 -
+      # same istiod/cert-manager-istio-csr bootstrap need as every other
+      # entry here.
+      - zuno-mlops
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
@@ -295,6 +325,11 @@ platformNamespaces:
     allowedFromNamespaces:
       - zuno-ai-build
       - zuno-ai-run
+      # mlops-dspa's push-registry pipeline stage registers a PASSING
+      # adapter here directly (components/mlops/src/mlops.py) - needs the
+      # same access zuno-ai-build got, from its own namespace since
+      # 2026-08-19.
+      - zuno-mlops
     allowApiServerWebhooks: false
     extraLabels:
       istio-injection: enabled
@@ -321,6 +356,7 @@ platformNamespaces:
       - zuno-data
       - zuno-auth
       - zuno-ai-build
+      - zuno-mlops
       - redhat-ods-applications
     allowApiServerWebhooks: false
     extraLabels:

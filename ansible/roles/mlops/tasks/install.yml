@@ -23,14 +23,14 @@
 # UNVERIFIED against a live cluster - same caveat
 # ansible/roles/rag_ingestion/tasks/install.yml documents for its own
 # rag-dspa wait: assumes a standard status.conditions entry of type
-# "Ready". Re-check with `oc get dspa mlops-dspa -n zuno-ai-build -o yaml`
+# "Ready". Re-check with `oc get dspa mlops-dspa -n zuno-mlops -o yaml`
 # against the target cluster and adjust if the operator uses a different
 # field.
 - name: "mlops | wait for the mlops-dspa DataSciencePipelinesApplication to report Ready"
   kubernetes.core.k8s_info:
     api_version: datasciencepipelinesapplications.opendatahub.io/v1
     kind: DataSciencePipelinesApplication
-    namespace: zuno-ai-build
+    namespace: zuno-mlops
     name: mlops-dspa
   register: _mlops_dspa
   until: >-
@@ -45,7 +45,7 @@
   ansible.builtin.debug:
     msg: >-
       mlops-dspa DataSciencePipelinesApplication has reported Ready in
-      zuno-ai-build. The pipeline itself is triggered manually by the
+      zuno-mlops. The pipeline itself is triggered manually by the
       operator (`oc create -f <run-spec>` against the DSPA's KFP API, or
       the OpenShift AI dashboard) once per candidate agent/base-model
       combination - unlike rag-ingestion, MLOps training runs are not
@@ -72,10 +72,10 @@
   kubernetes.core.k8s_info:
     api_version: route.openshift.io/v1
     kind: Route
-    namespace: zuno-ai-build
+    namespace: zuno-mlops
     # ds-pipeline-<dspa-name> is the DSPA operator's own Route-naming
     # convention (unverified against a live cluster - confirm with `oc
-    # get route -n zuno-ai-build`, same assumption
+    # get route -n zuno-mlops`, same assumption
     # ansible/roles/rag_ingestion/tasks/install.yml documents).
     name: "ds-pipeline-mlops-dspa"
   register: _mlops_dspa_route
@@ -122,7 +122,7 @@
           OpenShift AI dashboard instead.
           WP-07-UNVERIFIED-ASSUMPTION(1/1) Route naming: assumed the DSPA
           API server Route is named "ds-pipeline-mlops-dspa". Confirm
-          with `oc get route -n zuno-ai-build | grep ds-pipeline` and
+          with `oc get route -n zuno-mlops | grep ds-pipeline` and
           correct the "look up the mlops-dspa API server Route" task
           above if it differs.
 

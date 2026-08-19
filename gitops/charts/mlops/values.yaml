@@ -2,7 +2,16 @@ nameOverride: ""
 fullnameOverride: ""
 
 platform:
-  namespace: zuno-ai-build
+  # Split from zuno-ai-build 2026-08-19 - rag-dspa and mlops-dspa's Argo
+  # Workflow-controllers collided on one unscoped "workflow-controller"
+  # Lease when sharing a namespace (see the dspa-shared-namespace-
+  # leader-election-bug memory). createNamespace stays false: ownership
+  # is centralized in gitops/charts/namespaces (platformNamespaces'
+  # zuno-mlops entry), same convention rag-ingestion already uses for
+  # zuno-ai-build. images.mlops.repository below deliberately still
+  # points at zuno-ai-build - the image BUILD stays there
+  # (ansible/roles/mlops_build), only the pipeline RUN namespace moved.
+  namespace: zuno-mlops
   createNamespace: false
 
 serviceAccount:

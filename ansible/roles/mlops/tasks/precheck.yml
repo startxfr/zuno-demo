@@ -20,7 +20,7 @@
   kubernetes.core.k8s_info:
     api_version: datasciencepipelinesapplications.opendatahub.io/v1
     kind: DataSciencePipelinesApplication
-    namespace: zuno-ai-build
+    namespace: zuno-mlops
     name: mlops-dspa
   register: _mlops_dspa_lookup
 
