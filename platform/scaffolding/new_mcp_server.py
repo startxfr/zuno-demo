@@ -343,7 +343,13 @@ namespace: zuno-ai-run
 # cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
 image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-{name}
-  tag: v0.1.0
+  # latest, not a version pin: this repo's in-cluster BuildConfig (day1
+  # build) always writes to image:latest, never to a pinned release tag
+  # (that comes from the separate build-publish.yml/RELEASING.md GitHub
+  # Actions release path) - pinning here before that release exists means
+  # manifest-unknown/ImagePullBackOff (VERIFIED live 2026-08-19 across
+  # every mcp-* chart). Re-pin once a real release covers this server.
+  tag: latest
   # Always, not IfNotPresent - with a mutable tag, IfNotPresent serves
   # whatever stale image the node cached, silently ignoring rebuilds.
   pullPolicy: Always

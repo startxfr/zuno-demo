@@ -7,7 +7,14 @@ namespace: zuno-ai-run
 # cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
 image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-confluence
-  tag: v0.1.0
+  # Temporarily back to latest (2026-08-19), undoing WP-04's v0.1.0 pin for
+  # this chart - the in-cluster BuildConfig this repo's day1 build always
+  # writes to image:latest, never to a pinned release tag (that comes from
+  # the separate build-publish.yml/RELEASING.md GitHub Actions release
+  # path), so v0.1.0 was manifest-unknown and every pod ImagePullBackOff'd.
+  # Same fix as commit 09d2cee for agent-runtime/tekos. Revert to a real
+  # pinned tag once a release covering this code exists.
+  tag: latest
   # Always, not IfNotPresent - with a mutable :latest tag, IfNotPresent
   # serves whatever stale image the node cached, silently ignoring
   # rebuilds (VERIFIED live 2026-08-16 across multiple components).
