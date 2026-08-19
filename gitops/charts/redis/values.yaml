@@ -63,8 +63,17 @@ redis:
   replica:
     replicaCount: 0
 
+  # ADR-0413: bitnami's own redis_exporter sidecar (port 9121) + the
+  # ServiceMonitor it can render directly - the redis_* series
+  # dashboard-infra-data.yaml needs. Flipped on from the prior false: no
+  # other consumer of this chart depended on metrics staying off (values.yaml
+  # never referenced it below this point), and templates/networkpolicy.yaml
+  # gets the matching ingress allowance in the same change.
   metrics:
-    enabled: false
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: zuno-auth
 
   # Bitnami's own default NetworkPolicy has an ingress rule with no
   # `from` selector - it allows traffic from anywhere in the cluster,

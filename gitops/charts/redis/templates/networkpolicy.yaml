@@ -50,4 +50,22 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
+{{- if .Values.redis.metrics.enabled }}
+    # ADR-0413: admits prometheus-k8s's scrape of the redis_exporter sidecar
+    # values.yaml's redis.metrics.enabled adds (port 9121, bitnami default) -
+    # zuno-auth's baseline is zuno-default-deny-other-namespaces
+    # (gitops/charts/namespaces), which admits neither openshift-monitoring
+    # nor openshift-user-workload-monitoring by default. Precise allow-list,
+    # same pattern as this policy's own session-store rule above.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+      ports:
+        - protocol: TCP
+          port: 9121
+{{- end }}
 {{- end }}

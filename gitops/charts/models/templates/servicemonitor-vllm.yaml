@@ -1,0 +1,47 @@
+{{- if .Values.metrics.enabled }}
+# vLLM serves its own Prometheus /metrics endpoint on the predictor's normal
+# serving port (the vllm:* series: num_requests_running/waiting,
+# time_to_first_token_seconds, gpu_cache_usage_perc, prompt/generation
+# tokens, request_success_total) - VERIFIED live 2026-08-19: entirely
+# unscraped before this file (only the MaaS LLMInferenceService backend had
+# its own separate scrape, see values.yaml's comment on metrics.enabled).
+#
+# apiVersion is deliberately monitoring.coreos.com/v1, not the
+# monitoring.rhobs/v1 the mesh-monitoring MonitoringStack also installs on
+# this cluster - the same landmine
+# gitops/charts/observability/templates/servicemonitor-otel-collector.yaml
+# already documents: an rhobs/v1 ServiceMonitor here would render
+# successfully and never be scraped by prometheus-k8s, the Prometheus that
+# actually backs the dashboards and Thanos querier Grafana reads from.
+#
+# One ServiceMonitor for all three predictor Services this chart owns
+# (qwen25-7b-instruct-predictor, gpt-oss-20b-predictor,
+# embeddings-predictor) via matchExpressions on the label KServe stamps on
+# every predictor Service, rather than three near-identical CRs - VERIFIED
+# live: all three expose port 80 (name "http") -> targetPort 8080, the same
+# port templates/servingruntime*.yaml's --port=8080 and the NetworkPolicy
+# ingress rules below assume. The embeddings runtime may not populate the
+# vllm:* series the same way the two chat runtimes do (pooling/embed mode,
+# not generation) - harmless either way, it simply contributes no series.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm-predictors
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.namespace }}
+  selector:
+    matchExpressions:
+      - key: serving.kserve.io/inferenceservice
+        operator: Exists
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- end }}

@@ -34,3 +34,17 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+{{- if .Values.metrics.enabled }}
+    # ADR-0413: see templates/networkpolicy.yaml's matching block - same
+    # vLLM /metrics scrape allowance for this predictor.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

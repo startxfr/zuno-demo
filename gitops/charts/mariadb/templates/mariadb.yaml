@@ -70,4 +70,14 @@ spec:
       memory: {{ .Values.cluster.resources.limits.memory | quote }}
   myCnf: |
 {{ .Values.cluster.myCnf | indent 4 }}
+{{- if .Values.cluster.metrics.enabled }}
+  metrics:
+    enabled: true
+    passwordSecretKeyRef:
+      name: {{ .Values.cluster.metrics.passwordSecretKeyRef.name }}
+      key: {{ .Values.cluster.metrics.passwordSecretKeyRef.key }}
+      generate: {{ .Values.cluster.metrics.passwordSecretKeyRef.generate }}
+    serviceMonitor:
+      interval: {{ .Values.cluster.metrics.serviceMonitor.interval }}
+{{- end }}
 {{- end }}

@@ -1,0 +1,34 @@
+{{- if .Values.monitoring.enabled }}
+# Scrapes the crunchy-postgres-exporter sidecar spec.monitoring.pgmonitor.
+# exporter above adds to every instance pod - the ccp_* series (connections,
+# transaction rate, database size, replication lag) dashboard-infra-data.yaml
+# (ADR-0413) needs. A PodMonitor, not a ServiceMonitor: the exporter is a
+# sidecar container on the instance Pod, not fronted by its own Service (the
+# instance/-ha/-primary/-replica Services PGO creates are all postgres
+# protocol on 5432, not the exporter). Port name "exporter" and port 9187
+# are Crunchy's fixed defaults for this sidecar (not exposed as an override
+# field on spec.monitoring.pgmonitor.exporter, `oc explain --recursive`
+# confirmed) - UNVERIFIED against this live cluster's actual generated pod
+# spec; adjust the port name below if it differs once applied.
+#
+# Same monitoring.coreos.com/v1 (not monitoring.rhobs/v1) landmine as
+# templates/servicemonitor-vllm.yaml.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  selector:
+    matchLabels:
+      postgres-operator.crunchydata.com/cluster: {{ .Values.cluster.name }}
+      postgres-operator.crunchydata.com/data: postgres
+  podMetricsEndpoints:
+    - port: exporter
+      path: /metrics
+      interval: 30s
+{{- end }}

@@ -30,3 +30,20 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+{{- if .Values.metrics.enabled }}
+    # ADR-0413: admits prometheus-k8s's scrape of vLLM's own /metrics
+    # endpoint (templates/servicemonitor-vllm.yaml) - same
+    # openshift-monitoring/openshift-user-workload-monitoring namespace-only
+    # allow-list gitops/charts/openshift-ai/templates/maas-gateway.yaml
+    # already uses for the same purpose, scoped to this policy's own port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

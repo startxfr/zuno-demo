@@ -122,6 +122,26 @@ cluster:
     [mariadb]
     bind-address=*
     max_connections=200
+  # ADR-0413: mysqld-exporter sidecar (spec.metrics, `oc explain
+  # mariadb.spec.metrics` confirmed against the live cluster) - the
+  # mysql_* series dashboard-infra-data.yaml needs. Unlike
+  # mariadbOperatorActivation.metrics above (the operator controller's OWN
+  # metrics), this is the operand MariaDB CR's built-in exporter support:
+  # the operator provisions the mysqld-exporter container, a monitoring DB
+  # user/password (generate: true - no separate Vault/ExternalSecret
+  # plumbing needed, same self-service shape as PhysicalBackup's other
+  # generated Secrets) AND its own ServiceMonitor, so no separate
+  # NetworkPolicy is skippable but no separate ServiceMonitor CR is needed
+  # here (contrast templates/podmonitor-postgres.yaml, which PGO does NOT
+  # provide).
+  metrics:
+    enabled: true
+    passwordSecretKeyRef:
+      name: mariadb-metrics-password
+      key: password
+      generate: true
+    serviceMonitor:
+      interval: 30s
 
 credentials:
   # Resolves to Vault path zuno/mariadb/root (single `password` field -

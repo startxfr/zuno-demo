@@ -3,6 +3,23 @@
 
 namespace: zuno-ai-run
 
+# Scrapes each predictor's own vLLM /metrics endpoint (the vllm:* series -
+# queue depth, TTFT, KV-cache usage, token throughput) for
+# dashboard-ai-models.yaml (ADR-0413). Gates both
+# templates/servicemonitor-vllm.yaml and the extra openshift-monitoring/UWM
+# ingress rule the three templates/networkpolicy*.yaml files add - without
+# that rule the ServiceMonitor renders but the scrape is dead on arrival
+# (each policy's existing allow-list is scoped to ai-gateway/rag-service
+# only). Note this only covers the three classic InferenceServices this
+# chart owns directly; the MaaS LLMInferenceService backend
+# (templates/maas.yaml) is already scraped independently by RHOAI's own
+# LLMInferenceService controller (VERIFIED live 2026-08-19: job
+# "zuno-ai-run/kserve-llm-isvc-vllm-engine-default" already reports
+# vllm:num_requests_running for qwen2.5-7b-instruct-maas) - no
+# ServiceMonitor needed here for that one.
+metrics:
+  enabled: true
+
 servingRuntimeName: vllm-runtime
 inferenceServiceName: qwen25-7b-instruct
 

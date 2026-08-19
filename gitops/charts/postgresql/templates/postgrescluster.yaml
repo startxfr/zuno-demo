@@ -31,6 +31,14 @@ spec:
       max_connections: "{{ .Values.config.maxConnections }}"
       log_min_duration_statement: "{{ .Values.config.logMinDurationStatement }}"
 
+{{- if .Values.monitoring.enabled }}
+  # ADR-0413: crunchy-postgres-exporter sidecar on every instance pod,
+  # port "exporter" (9187) - templates/podmonitor-postgres.yaml scrapes it.
+  monitoring:
+    pgmonitor:
+      exporter: {}
+{{- end }}
+
   instances:
     - name: instance1
       replicas: {{ .Values.cluster.instances }}
