@@ -92,6 +92,37 @@ posture, not an oversight, made explicitly to get the first real release
 through while the remediation above is still open. Revisit once the
 deferred bumps above land.
 
+**2026-08-19 (gap 7 closed for real):** with those three bugs and the
+mechanical CVE fixes above in place,
+[run 32273454405](https://github.com/startxfr/zuno-demo/actions/runs/32273454405)
+against tag `v0.1.0` (commit `c83cfcd`) went green end to end: all 11
+`build-publish-sign` matrix jobs and all 8 `sign-okf-bundles` jobs
+succeeded - every first-party image built, pushed to `quay.io/zuno/<name>
+:v0.1.0` with a real digest, SBOM-attested and keyless-signed. That is
+exactly the "at least one real release proves source -> build -> SBOM ->
+scan -> signature -> immutable GitOps reference -> deployment
+traceability" completion criterion below (GitOps reference/deployment
+still pending - see stage 3).
+
+Real numbers, corrected from the estimate above now that the scan actually
+ran clean on some components and worse than expected on others not
+previously sampled: `agent-bff`/`agent-frontend` publish with zero
+findings; `mcp-gateway`/`mcp-confluence`/`mcp-sales-db`/`mcp-salesforce`
+are down to 2 HIGH each (the `wheel`/`jaraco.context`-shaped pip finding
+that survives the base pip/setuptools/wheel upgrade); `mlops` still 94
+HIGH (confirmed, not an estimate) + 2 HIGH (`transformers`);
+`aiagent-operator` still 8 HIGH (`go.mod` staleness, confirmed);
+`rag-service` 6 HIGH (`protobuf`/`starlette`/pip-tooling); and two
+components not sampled before this real run turned out to carry their own
+previously-undocumented debt - `ai-gateway` (14 HIGH, 1 CRITICAL) and
+`agent-runtime` (15 HIGH/1 CRITICAL OS-level + 56 HIGH/2 CRITICAL
+application-level, the largest surface of any component here, driven by
+its own dependency tree rather than anything touched this pass). None of
+this blocks the pipeline (`continue-on-error`), but it means the
+remediation backlog is larger than first estimated - full per-component
+CVE tables are in the `Scan for vulnerabilities` step logs of the run
+above.
+
 ### Implemented foundations
 
 - `.github/workflows/build-publish.yml` builds first-party images, publishes SHA-based tags, generates SPDX SBOMs, scans HIGH/CRITICAL vulnerabilities with Trivy (reported, `continue-on-error: true` - see the 2026-08-19 note above), signs images with keyless Cosign through GitHub OIDC and attests the SBOM.
@@ -109,7 +140,7 @@ deferred bumps above land.
 4. **GitOps still tracks moving Git refs.** Argo CD Applications continue to use `targetRevision: main`; deployment state is therefore not yet tied to a reviewed release revision. Same dependency as gap 2: there is no reviewed release tag to point at until gap 7 produces one.
 5. ~~Two first-party Dockerfiles still inherit moving base images.~~ **Resolved 2026-08-12**: `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` now pin `registry.access.redhat.com/ubi9/ubi-minimal` by digest (`sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221`, version 9.8, confirmed live via `skopeo inspect` against the real Red Hat registry) rather than `:latest`. This gap was independent of the others - it depends on Red Hat's registry, not this repository's own release pipeline.
 6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. `verify_signatures.py` (2026-08-14) is the verification gate itself, CI-wired non-blocking; it still finds nothing to verify because gap 7 means nothing has been signed for real yet - the remaining blocker is gap 7 alone, not building the check.
-7. **The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.** The workflow is authored, but repository evidence does not yet prove a successful publication/promotion cycle with real credentials and registry artifacts. **This is the actual blocker for gaps 2, 3, 4 and 6** - they are one connected release-and-promote step, not four independent fixes, and need real Quay/GitHub Actions credentials to close for real rather than being faked with placeholder tags. **2026-08-19**: three real bugs found and fixed en route (see the dated note above) - still open: `mlops`'s UBI9 base (~94 HIGH OS-package findings), `transformers`/`protobuf`/`starlette` version bumps (`mlops`, `rag-service`), and `aiagent-operator`'s `go.mod` dependency staleness (`otel/sdk`, `x/net`, `x/text`, `grpc`) - all deliberately deferred (real app-compatibility risk, not mechanical), which is why the Trivy scan is `continue-on-error` rather than blocking for now.
+7. ~~The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.~~ **Resolved 2026-08-19**: [run 32273454405](https://github.com/startxfr/zuno-demo/actions/runs/32273454405) (tag `v0.1.0`, commit `c83cfcd`) published, SBOM-attested and keyless-signed all 11 first-party images for real - see the dated note above for the real digests and the three real bugs (trivy-action's yanked pin, cluster-internal base images unreachable from GitHub-hosted runners, wrong Quay org name) it took to get there. **Gaps 2, 3, 4 and 6 are not automatically closed by this** - `pin_release.py` still needs to run against this real manifest (stage 3, WP-04), and one wrinkle stage 3 must account for: `rag-ingestion`'s two `latest` fields (gap 2's list) are built exclusively by the in-cluster OpenShift BuildConfig, not this workflow, so this release has no real Quay artifact for them - `pin_release.py`'s exact-field-set manifest requirement can't be satisfied for `rag-ingestion` from this release alone. Known-open CVE debt from this run (`mlops`, `agent-runtime`, `ai-gateway`, `rag-service`, `aiagent-operator` - see the dated note above) is unrelated to gap 7 itself and stays deliberately deferred.
 
 ### Completion criteria
 

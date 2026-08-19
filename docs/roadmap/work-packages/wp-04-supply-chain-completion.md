@@ -1,6 +1,6 @@
 # WP-04: Supply-chain completion (three stages)
 
-- **State:** Operator pending (2026-08-14 — stage 1 merged: verify_signatures.py, pin_release.py + tests, RELEASING.md and README updated. Awaiting stage 2, the operator's real Quay+GHA release, before stage 3 can run.)
+- **State:** Stage 3 ready (2026-08-14 — stage 1 merged. 2026-08-19 — stage 2 done for real: [run 32273454405](https://github.com/startxfr/zuno-demo/actions/runs/32273454405), tag `v0.1.0`/commit `c83cfcd`, all 11 build-publish-sign + 8 sign-okf-bundles jobs green, real digests captured. Stage 3 (pin_release.py) not yet run — note `rag-ingestion`'s 2 fields have no real artifact from this release, see ADR-0115 gap 7.)
 - **ADRs:** ADR-0115 (Partially implemented -> Implemented)
 - **Depends on:** WP-00 (done)
 - **Blocks:** WP-05; also gates the "immutable tags from day one" rule for every later chart
