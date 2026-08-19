@@ -15,6 +15,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, Optional
 
+import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
@@ -123,6 +124,15 @@ async def lifespan(app: FastAPI):
         min_size=1,
         max_size=int(os.getenv("CHECKPOINT_POOL_MAX_SIZE", "10")),
         kwargs={"autocommit": True, "prepare_threshold": None, "row_factory": dict_row},
+        # VERIFIED live 2026-08-19: after this cluster's Patroni failovers,
+        # the pool's first-ever handout of a connection opened before the
+        # failover surfaced "consuming input failed: SSL SYSCALL error: EOF
+        # detected" straight to the caller (a 500/error SSE event) - the
+        # pool already discards a bad connection on next use, just not
+        # before handing it out once. check_connection runs a trivial probe
+        # before checkout and swaps a dead connection for a fresh one first,
+        # so callers never see a connection that was already broken.
+        check=AsyncConnectionPool.check_connection,
     ) as pool:
         checkpointer = AsyncPostgresSaver(pool)
         await checkpointer.setup()  # idempotent - creates the checkpoint tables on first run
@@ -338,6 +348,25 @@ async def extract_memory_endpoint(
     return result
 
 
+async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict[str, Any], *, session_id: str, request_id: str):
+    """One bounded retry for a checkpoint DB connection that was already
+    dead at the moment of use (psycopg.OperationalError) - lifespan's
+    `check=` callback is the primary defense (catches this before a
+    connection is ever handed out), this covers a connection that dies
+    mid-operation after passing that check. Any other exception (a real
+    application bug) propagates immediately, unretried - retrying
+    something that isn't a connection failure would just double the
+    latency/LLM cost for a call guaranteed to fail again identically."""
+    try:
+        return await graph.ainvoke(initial_state, config=config)
+    except psycopg.OperationalError as exc:
+        logger.warning(
+            "checkpoint DB connection failed, retrying once: session=%s request_id=%s: %s",
+            session_id, request_id, exc,
+        )
+        return await graph.ainvoke(initial_state, config=config)
+
+
 @app.post("/v1/agents/{agent}/chat")
 async def agent_chat(
     agent: str,
@@ -374,7 +403,9 @@ async def agent_chat(
 
     try:
         with graph_run_span(payload.session_id, agent=agent_def.name, graph_shape=agent_def.graph_shape) as recorder:
-            final_state = await graph.ainvoke(initial_state, config=config)
+            final_state = await _ainvoke_with_retry(
+                graph, initial_state, config, session_id=payload.session_id, request_id=request_id,
+            )
             recorder.source_mode = final_state.get("source_mode", "none")
             recorder.live_read_trigger_reason = final_state.get("live_read_trigger_reason")
     except Exception as exc:
@@ -417,28 +448,51 @@ async def _stream_chat(
 
     citations: Any = []
     source_mode = "indexed"
-    try:
-        async for event in graph.astream_events(initial_state, config=config, version="v2"):
-            kind = event.get("event")
-            name = event.get("name")
-            if kind == "on_chat_model_stream":
-                chunk = event["data"].get("chunk")
-                token = getattr(chunk, "content", "") if chunk is not None else ""
-                if token:
-                    yield _sse("token", {"delta": token})
-            elif kind == "on_chain_start" and name in _TOOL_NODES:
-                yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
-            elif kind == "on_chain_end" and name in _TOOL_NODES:
-                yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
-            elif kind == "on_chain_end" and name == "respond":
-                output = event["data"].get("output") or {}
-                citations = output.get("citations", [])
-                # ADR-0205/WP-24: same field the non-streaming response
-                # carries - the streaming path must not silently omit it.
-                source_mode = output.get("source_mode", "indexed")
-    except Exception as exc:
-        logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
-        yield _sse("error", {"message": str(exc)})
-        return
+    # One bounded retry, same rationale as _ainvoke_with_retry, but only
+    # safe to take before any token has reached the client (ADR-0029-style
+    # precedent: components/ai-gateway/app/main.py's _stream_completion
+    # never silently retries a candidate that already streamed partial
+    # content, since the client has content a fresh run wouldn't continue
+    # coherently) - sent_any tracks that boundary.
+    sent_any = False
+    attempts_remaining = 2
+    while attempts_remaining:
+        attempts_remaining -= 1
+        try:
+            async for event in graph.astream_events(initial_state, config=config, version="v2"):
+                kind = event.get("event")
+                name = event.get("name")
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"].get("chunk")
+                    token = getattr(chunk, "content", "") if chunk is not None else ""
+                    if token:
+                        sent_any = True
+                        yield _sse("token", {"delta": token})
+                elif kind == "on_chain_start" and name in _TOOL_NODES:
+                    yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
+                elif kind == "on_chain_end" and name in _TOOL_NODES:
+                    yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
+                elif kind == "on_chain_end" and name == "respond":
+                    output = event["data"].get("output") or {}
+                    citations = output.get("citations", [])
+                    # ADR-0205/WP-24: same field the non-streaming response
+                    # carries - the streaming path must not silently omit it.
+                    source_mode = output.get("source_mode", "indexed")
+        except psycopg.OperationalError as exc:
+            if sent_any or attempts_remaining == 0:
+                logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
+                yield _sse("error", {"message": str(exc)})
+                return
+            logger.warning(
+                "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
+                request_id, exc,
+            )
+            continue
+        except Exception as exc:
+            logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
+            yield _sse("error", {"message": str(exc)})
+            return
+        else:
+            break
 
     yield _sse("done", {"citations": citations, "source_mode": source_mode})
