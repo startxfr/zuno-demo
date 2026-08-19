@@ -8,6 +8,7 @@ import {
   Spinner,
   TextInput,
 } from "@patternfly/react-core";
+import { CommentIcon, OutlinedStarIcon, StarIcon } from "@patternfly/react-icons";
 import { listConversations, renameConversation, setStar, type Conversation } from "./conversations";
 import { openConversationTab } from "./tabTracker";
 
@@ -34,9 +35,12 @@ export interface ConversationListProps {
 // client-side router, so every conversation open/focus goes through
 // shared/tabTracker.ts's window.open, never in-place navigation.
 //
-// Star/rename controls are plain text/double-click here deliberately -
-// ADR-0214 (part 3) swaps these for real PatternFly icons and, later,
-// ADR-0213 adds a proper per-row kebab menu once share/clone exist.
+// ADR-0214 (part 3): every row carries a @patternfly/react-icons icon -
+// filled/outline StarIcon for the star toggle, CommentIcon per row.
+// Rename stays double-click-to-edit (no kebab menu yet) - deliberately
+// scoped down from ADR-0214's original text, which described the kebab's
+// actions (share, clone, rename) as an ADR-0213 dependency this codebase
+// doesn't have yet; it lands once ADR-0213 does.
 export function ConversationList({
   agent,
   conversationsURL,
@@ -159,10 +163,21 @@ export function ConversationList({
                       e.stopPropagation();
                       void toggleStar(c.run_id, !c.starred);
                     }}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1rem", lineHeight: 1 }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      display: "flex",
+                      color: c.starred ? "var(--pf-t--global--icon--color--favorite--default)" : undefined,
+                    }}
                   >
-                    {c.starred ? "★" : "☆"}
+                    {c.starred ? <StarIcon /> : <OutlinedStarIcon />}
                   </button>
+                  <CommentIcon
+                    aria-hidden="true"
+                    style={{ color: "var(--pf-t--global--icon--color--subtle)", flexShrink: 0 }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {renamingRunId === c.run_id ? (
                       <TextInput
