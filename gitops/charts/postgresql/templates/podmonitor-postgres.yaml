@@ -1,4 +1,9 @@
-{{- if .Values.monitoring.enabled }}
+{{- if and .Values.monitoring.enabled .Values.postgresCluster.enabled }}
+# Guarded by postgresCluster.enabled (not just monitoring.enabled): this
+# chart is also installed as the operator-only release (operator.enabled),
+# which shares zuno-data with the postgresCluster release and would
+# otherwise render this same PodMonitor twice, triggering ArgoCD
+# SharedResourceWarning between zuno-postgresql-d0 and -d1.
 # Scrapes the crunchy-postgres-exporter sidecar spec.monitoring.pgmonitor.
 # exporter above adds to every instance pod - the ccp_* series (connections,
 # transaction rate, database size, replication lag) dashboard-infra-data.yaml

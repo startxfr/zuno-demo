@@ -1,4 +1,9 @@
-{{- if .Values.monitoring.enabled }}
+{{- if and .Values.monitoring.enabled .Values.postgresCluster.enabled }}
+# Guarded by postgresCluster.enabled too, same reason as
+# templates/podmonitor-postgres.yaml: without it, the operator-only release
+# (operator.enabled) renders this same NetworkPolicy a second time in the
+# shared zuno-data namespace, triggering ArgoCD SharedResourceWarning
+# between zuno-postgresql-d0 and -d1.
 # ADR-0413: admits prometheus-k8s's scrape of the crunchy-postgres-exporter
 # sidecar (templates/podmonitor-postgres.yaml) - zuno-data's baseline is
 # zuno-default-deny-other-namespaces (gitops/charts/namespaces), which
