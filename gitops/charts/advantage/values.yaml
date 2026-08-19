@@ -12,7 +12,14 @@ image:
   registry: image-registry.openshift-image-registry.svc:5000
   frontendRepository: zuno-ai-build/agent-frontend
   bffRepository: zuno-ai-build/agent-bff
-  tag: v0.1.0
+  # Temporarily back to latest (2026-08-20) - the in-cluster BuildConfig
+  # (day1 build) always writes to `image.repository` above at :latest,
+  # never to a release tag (that only exists at quay.io/zuno/*, a
+  # separate, optional path - RELEASING.md). Pinning `.tag` while
+  # `.repository` still points at the internal ImageStream is a mismatch:
+  # v0.1.0 is manifest-unknown there, ImagePullBackOff. Same fix as
+  # commits 09d2cee/be35efa for agent-runtime/tekos and every mcp-* chart.
+  tag: latest
   # Always, not IfNotPresent - with a mutable :latest tag, IfNotPresent
   # serves whatever stale image the node cached, silently ignoring
   # rebuilds (VERIFIED live 2026-08-16 across multiple components).

@@ -11,13 +11,23 @@ needed - pure static YAML inspection.
 python3 platform/supply-chain/check_no_latest_tags.py
 ```
 
-**This currently fails, honestly.** 7 charts (`agent-runtime`,
-`ai-gateway`, `mcp-gateway`, `mcp-sales-db`, `rag-service`, `tekos`,
-`rag-ingestion` - the last with two image fields) still use `tag: latest`,
-since `.github/workflows/build-publish.yml` has never run in this sandbox
-(no live Quay credentials or GitHub Actions environment). `pin_release.py`
-below bumps these once it has - see `.github/README.md` for what the
-workflow does.
+**This currently fails, honestly, and is expected to for a while.** See
+`RELEASING.md`'s own top note first: every chart whose `image.repository`
+points at the in-cluster `zuno-ai-build` ImageStream (i.e. every
+first-party chart deployed by `make day0|d0`/`day1|d1` today) can only
+ever run its BuildConfig-produced `:latest` image - there is no other tag
+to reference until `.github/workflows/build-publish.yml` has actually run
+against real Quay credentials/a GitHub Actions environment (it hasn't,
+in this sandbox) *and* that chart's `.repository` has separately been
+repointed at `quay.io/zuno/<component>`. `pin_release.py` below only
+rewrites `.tag`, never `.repository` - running it without also
+repointing `.repository` produces exactly the manifest-unknown
+ImagePullBackOff this repo has hit repeatedly (mcp-* charts,
+agent-runtime/tekos, comage/advantage/finage/naveo - all reverted back to
+`latest` each time). Run this check to see the current, honest count of
+charts still on `:latest` (13 as of 2026-08-20 - it grows as new
+components are added, and that's fine: it's supposed to stay red until a
+real release is cut).
 
 Wired into `.github/workflows/lint.yml` alongside other policy-as-code
 checks (`platform/security/check_workload_hardening.py`,
