@@ -285,7 +285,7 @@ def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
         headers=auth_headers(s["persona"]),
-        json={"message": s["message"]},
+        json={"session_id": "eval-7", "message": s["message"]},
         timeout=30,
     )
     if resp.status_code != 200:
