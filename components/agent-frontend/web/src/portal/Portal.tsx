@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Brand,
   Button,
   Content,
   ContentVariants,
@@ -17,7 +18,9 @@ import {
   ToolbarItem,
 } from "@patternfly/react-core";
 import { Gallery } from "@patternfly/react-core";
+import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { PortalConfig } from "../shared/types";
+import { Footer } from "../shared/Footer";
 import { TileCard } from "../shared/TileCard";
 import { UserMenu } from "../shared/UserMenu";
 
@@ -38,6 +41,7 @@ export function Portal({ config }: { config: PortalConfig }): React.ReactElement
         <Masthead>
           <MastheadMain>
             <MastheadBrand>
+              <Brand src={logoPlaceholder} alt="Zuno" heights={{ default: "32px" }} style={{ marginRight: "0.75rem" }} />
               <Content component={ContentVariants.h1}>Zuno Agent Portal</Content>
             </MastheadBrand>
           </MastheadMain>
@@ -103,6 +107,7 @@ export function Portal({ config }: { config: PortalConfig }): React.ReactElement
           </ExpandableSection>
         </PageSection>
       )}
+      <Footer />
     </Page>
   );
 }

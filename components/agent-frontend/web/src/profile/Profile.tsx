@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Brand,
   Card,
   CardBody,
   CardTitle,
@@ -25,7 +26,9 @@ import {
   ToolbarContent,
   ToolbarItem,
 } from "@patternfly/react-core";
+import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ProfileConfig } from "../shared/types";
+import { Footer } from "../shared/Footer";
 import { UserMenu } from "../shared/UserMenu";
 import { TileCard } from "../shared/TileCard";
 
@@ -41,6 +44,7 @@ export function Profile({ config }: { config: ProfileConfig }): React.ReactEleme
         <Masthead>
           <MastheadMain>
             <MastheadBrand>
+              <Brand src={logoPlaceholder} alt="Zuno" heights={{ default: "32px" }} style={{ marginRight: "0.75rem" }} />
               <Content component={ContentVariants.h1}>
                 <a href={config.homeURL} style={{ color: "inherit", textDecoration: "none" }}>
                   Zuno
@@ -118,6 +122,7 @@ export function Profile({ config }: { config: ProfileConfig }): React.ReactEleme
           </Gallery>
         )}
       </PageSection>
+      <Footer />
     </Page>
   );
 }

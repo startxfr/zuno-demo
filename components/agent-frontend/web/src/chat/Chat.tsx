@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Alert,
+  Brand,
   Button,
   Content,
   ContentVariants,
@@ -21,7 +22,9 @@ import {
   ToolbarItem,
 } from "@patternfly/react-core";
 import { Flex, FlexItem } from "@patternfly/react-core";
+import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
+import { Footer } from "../shared/Footer";
 import { SSEParser } from "../shared/sse";
 import { UserMenu } from "../shared/UserMenu";
 import type {
@@ -169,6 +172,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         <Masthead>
           <MastheadMain>
             <MastheadBrand>
+              <Brand src={logoPlaceholder} alt="Zuno" heights={{ default: "32px" }} style={{ marginRight: "0.75rem" }} />
               <Content component={ContentVariants.h1}>
                 <a href={config.homeURL} style={{ color: "inherit", textDecoration: "none" }}>
                   Zuno
@@ -264,6 +268,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           </Flex>
         </Form>
       </PageSection>
+      <Footer />
     </Page>
   );
 }
