@@ -1,6 +1,6 @@
 # ADR-0212: Introduce persistent, navigable chat conversations
 
-- **Status:** Proposed
+- **Status:** Partially implemented (2026-08-19) - schema, agent-runtime endpoints, agent-bff proxy routes and the agent-frontend left-nav/resume UI are all merged, unit/contract-tested, and (the Postgres layer specifically) verified live against the real `agent-conversations` database and `agentconversations` role on the cluster (DDL, insert/conflict, star, rename, cross-owner isolation all confirmed working). **Not yet running in the live deployment**: the currently-deployed `agent-runtime`/`agent-bff`/`agent-frontend` pods still serve the pre-ADR-0212 image - a fresh image build and redeploy is needed (coordinated with concurrent image-pinning work in flight elsewhere in this repo) before this ADR's acceptance criteria can be exercised end to end against real traffic. Do not treat this as `Implemented` until that live run happens.
 - **Target:** v0.2
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

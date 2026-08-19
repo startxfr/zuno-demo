@@ -1,6 +1,6 @@
 # ADR-0214: Refresh agent-frontend chrome: branding, footer and menu icons
 
-- **Status:** Proposed
+- **Status:** Partially implemented (2026-08-19) - parts 1 and 2 exactly as decided below, part 3 with a deliberately narrower scope (see its own note) - all merged and verified (build/lint clean, browser-rendered screenshots confirm the logo, footer and both icon states). **Not yet running in the live deployment**: same image build/redeploy gap as [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md#status), which this ADR depends on - do not treat this as `Implemented` until that live run happens.
 - **Target:** v0.2
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
@@ -11,7 +11,7 @@ Three independent, cosmetic changes to the one shared `agent-frontend` codebase 
 
 1. **Placeholder logo.** A static placeholder SVG asset added to `components/agent-frontend/web/src/assets/` and rendered inside `MastheadBrand`, to the left of the existing text, on `chat/Chat.tsx`, `portal/Portal.tsx`, and `profile/Profile.tsx`. Explicitly a placeholder to be swapped for real branding later - this ADR authorizes the mechanism (an SVG asset in the brand slot), not a final design.
 2. **Shared footer.** A new `web/src/shared/Footer.tsx`, reused verbatim by all three pages exactly the way `shared/UserMenu.tsx` already is, rendered as the last `PageSection` of each page. Three links: startx.fr, the `zuno-demo` GitHub repository, and a GitHub "new issue" link for bug reports. On `chat/Chat.tsx` specifically, the message composer already occupies the page's one `stickyOnBreakpoint: "bottom"` slot, so the footer cannot share it - it renders as a normal, non-sticky `PageSection` reached by scrolling, unlike the always-visible footer on Portal and Profile.
-3. **Left-menu icons.** Every entry in ADR-0212's `ConversationList.tsx` gets a `@patternfly/react-icons` icon (already a dependency in `web/package.json` - no new package), e.g. filled/outline star icons for the star toggle, a per-row icon for each conversation, and a kebab (`EllipsisVIcon`) for the per-row actions ADR-0213 adds (share, clone, rename).
+3. **Left-menu icons.** Every entry in ADR-0212's `ConversationList.tsx` gets a `@patternfly/react-icons` icon (already a dependency in `web/package.json` - no new package): filled/outline `StarIcon`/`OutlinedStarIcon` for the star toggle, `CommentIcon` per row. **Implemented without the kebab menu** this point originally described: the kebab's own actions (share, clone, rename) are an ADR-0213 dependency that ADR-0213 itself was explicitly out of scope for this implementation pass (deferred, along with the rest of that ADR) - shipping a kebab with no actions behind it, or only "rename", would be worse than not shipping one. Rename is reachable via double-click on a row's title instead; the kebab lands whenever ADR-0213 does.
 
 Explicitly out of scope: moving or restyling `shared/UserMenu.tsx`. Confirmed in `chat/Chat.tsx`, `portal/Portal.tsx`, and `profile/Profile.tsx` that it already renders inside PatternFly's right-aligned `MastheadContent`/`Toolbar` slot on every page, consistently, with no custom CSS overriding that layout - there is nothing to move.
 
