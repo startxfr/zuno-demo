@@ -13,12 +13,13 @@ copy would drift unvalidated).
 
 ## Milestones
 
-- **OKF v0.1 — content excellence, in-repo** (ADR-0502 – 0505, 0511, 0512):
-  the two-stage agent maturity model, the generated per-agent authorization
-  matrix ("who can use what, for what, under which policy — and how much"),
-  real `deployment/` content, the `tests/` target structure, per-agent task
-  tabs in the frontend, quota policy enforced via Kuadrant, and
-  project-bound tasks with Salesforce-verified context. `agents/` stays in
+- **OKF v0.1 — content excellence, in-repo** (ADR-0502 – 0505, 0511, 0512,
+  0513): the two-stage agent maturity model, the generated per-agent
+  authorization matrix ("who can use what, for what, under which policy —
+  and how much"), real `deployment/` content, the `tests/` target
+  structure, per-agent task tabs in the frontend, quota policy enforced via
+  Kuadrant, project-bound tasks with Salesforce-verified context, and a
+  real schema for `rag/`/`tools/`/`policies/` content. `agents/` stays in
   this repository throughout.
 - **OKF v0.2 — extraction** (ADR-0506 – 0508): the `zuno-okf` repository is
   bootstrapped (history-preserving), this repository consumes it through a
@@ -85,6 +86,7 @@ component-code package.
 | WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Not started | rebuild/redeploy 3 components; tab demo |
 | WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Operator pending (Parts A+B merged 2026-08-18) | attach agent chat HTTPRoute + AuthPolicy, enable quotaEnforcement, live 429 demo |
 | WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-47A rec.) | Not started | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap) |
+| WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
 
 ### Phase 2 — OKF v0.2: extraction
 
@@ -120,10 +122,13 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
        ├─ WP-45 ─┤              │
        ├─ WP-46 ─┘              │
        │         (WP-44A soft) ─┴─ WP-47
-       └─ WP-44A ── WP-54 ── WP-55
+       ├─ WP-44A ── WP-54 ── WP-55
+       └─ WP-56
 ```
 
 ## Change log
 
 - 2026-08-18 — roadmap created alongside ADR-0501; tracker rows land with
   their WP briefs.
+- 2026-08-19 — WP-56 (ADR-0513: real schema for `rag/`/`tools/`/`policies/`)
+  added and executed against Tekos.

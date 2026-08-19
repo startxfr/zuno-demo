@@ -188,6 +188,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | OKF v0.3 | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 | [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | OKF v0.1 | Partially implemented | Define OKF quota policy enforced via Kuadrant |
 | [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | OKF v0.1 | Proposed | Introduce project-bound tasks with Salesforce-verified context |
+| [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | OKF v0.1 | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
 
 ## Standard clauses
 

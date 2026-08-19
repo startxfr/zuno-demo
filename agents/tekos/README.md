@@ -20,10 +20,10 @@ is the one agent whose deployment interface is not an `AIAgent` CR).
   (ADR-0031).
 - Stage-2 criterion c is structural debt shared by every agent:
   `deployment/` and `tests/` gain their real ADR-0503/ADR-0504 content
-  with WP-45/WP-46.
+  with WP-45/WP-46; `policies/`, `rag/` and `tools/` gain theirs with
+  WP-56/ADR-0513.
 
-**Next step:** none for promotion (already Stage 2). Structural: WP-45
-deployment snapshot, WP-46 tests structure; migrating off plain
+**Next step:** none for promotion (already Stage 2); migrating off plain
 manifests remains a deliberate non-goal while the coexistence proof
 stands.
 
@@ -39,9 +39,9 @@ tekos/
 │   └── check-my-drive-docs.md
 ├── prompts/
 │   └── answer-technical-question.md   System prompt, loaded by app/registry.py
-├── policies/            (stub - platform policies live in policies/ at repo root)
-├── rag/                 (stub)
-├── tools/               (stub)
+├── policies/            1 narrowing-only addendum (ADR-0513, WP-56)
+├── rag/                 2 per-domain retrieval notes (ADR-0513, WP-56)
+├── tools/               3 per-tool usage notes (ADR-0513, WP-56)
 ├── deployment/          Generated ADR-0503 snapshot + README (WP-45)
 └── tests/               ADR-0504 structure (WP-46; suites fill at promotion)
 ```
