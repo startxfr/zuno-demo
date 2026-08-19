@@ -19,6 +19,7 @@ import {
   TextArea,
   Toolbar,
   ToolbarContent,
+  ToolbarGroup,
   ToolbarItem,
 } from "@patternfly/react-core";
 import { Flex, FlexItem } from "@patternfly/react-core";
@@ -72,6 +73,19 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
   // panel (a new conversation appearing, a title changing) - the sidebar
   // has no other way to know, since this app has no shared store/context.
   const [conversationsRefreshToken, setConversationsRefreshToken] = React.useState(0);
+  // ADR-0214 follow-up: the conversation sidebar's width, resizable via
+  // shared/ConversationList.tsx's ResizeHandle - persisted so a reload
+  // keeps the reader's preferred width.
+  const [sidebarWidth, setSidebarWidth] = React.useState(() => {
+    const saved = Number(window.localStorage.getItem("zuno.sidebarWidth"));
+    return saved >= 220 && saved <= 600 ? saved : 320;
+  });
+
+  function handleSidebarWidthChange(width: number) {
+    const clamped = Math.min(600, Math.max(220, width));
+    setSidebarWidth(clamped);
+    window.localStorage.setItem("zuno.sidebarWidth", String(clamped));
+  }
 
   React.useEffect(() => {
     if (logRef.current) {
@@ -230,8 +244,56 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
     abortRef.current?.abort();
   }
 
+  const masthead = (
+    <Masthead>
+      <MastheadMain>
+        <MastheadBrand>
+          <Brand src={logoPlaceholder} alt="Zuno" heights={{ default: "32px" }} style={{ marginRight: "0.75rem" }} />
+          <Content component={ContentVariants.h1}>
+            <a href={config.homeURL} style={{ color: "inherit", textDecoration: "none" }}>
+              Zuno
+            </a>{" "}
+            / {config.displayName}
+          </Content>
+        </MastheadBrand>
+      </MastheadMain>
+      <MastheadContent>
+        <Toolbar>
+          <ToolbarContent>
+            <ToolbarGroup align={{ default: "alignEnd" }}>
+              <ToolbarItem>
+                <UserMenu
+                  userDisplayName={config.userDisplayName}
+                  profileURL={config.profileURL}
+                  logoutURL={config.logoutURL}
+                />
+              </ToolbarItem>
+            </ToolbarGroup>
+          </ToolbarContent>
+        </Toolbar>
+      </MastheadContent>
+    </Masthead>
+  );
+
   return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
     <Page
+      style={
+        {
+          flex: "1 1 auto",
+          minHeight: 0,
+          // ADR-0214 follow-up: PageSidebar's width is fixed by this CSS
+          // custom property (no width prop of its own) - overriding it
+          // here is what shared/ConversationList.tsx's ResizeHandle
+          // actually drives. Tried PatternFly's Drawer/isResizable engine
+          // first; reverted after confirming live it silently narrows the
+          // masthead to the content area only (Page's masthead spans the
+          // full width, over both the sidebar and main content, only
+          // while the sidebar stays in Page's own `sidebar` slot).
+          "--pf-v6-c-page__sidebar--Width": `${sidebarWidth}px`,
+          "--pf-v6-c-page__sidebar--xl--Width": `${sidebarWidth}px`,
+        } as React.CSSProperties
+      }
       sidebar={
         <ConversationList
           agent={config.displayName}
@@ -239,36 +301,11 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           chatURL={window.location.pathname}
           activeRunId={runId}
           refreshSignal={conversationsRefreshToken}
+          width={sidebarWidth}
+          onWidthChange={handleSidebarWidthChange}
         />
       }
-      masthead={
-        <Masthead>
-          <MastheadMain>
-            <MastheadBrand>
-              <Brand src={logoPlaceholder} alt="Zuno" heights={{ default: "32px" }} style={{ marginRight: "0.75rem" }} />
-              <Content component={ContentVariants.h1}>
-                <a href={config.homeURL} style={{ color: "inherit", textDecoration: "none" }}>
-                  Zuno
-                </a>{" "}
-                / {config.displayName}
-              </Content>
-            </MastheadBrand>
-          </MastheadMain>
-          <MastheadContent>
-            <Toolbar>
-              <ToolbarContent>
-                <ToolbarItem>
-                  <UserMenu
-                    userDisplayName={config.userDisplayName}
-                    profileURL={config.profileURL}
-                    logoutURL={config.logoutURL}
-                  />
-                </ToolbarItem>
-              </ToolbarContent>
-            </Toolbar>
-          </MastheadContent>
-        </Masthead>
-      }
+      masthead={masthead}
     >
       <PageSection isFilled aria-label="Chat transcript">
         <div ref={logRef} style={{ height: "100%", overflowY: "auto" }}>
@@ -347,8 +384,9 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           </Flex>
         </Form>
       </PageSection>
-      <Footer />
     </Page>
+    <Footer />
+    </div>
   );
 }
 

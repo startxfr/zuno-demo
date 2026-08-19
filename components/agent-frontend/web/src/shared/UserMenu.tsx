@@ -7,6 +7,7 @@ import {
   MenuToggle,
   type MenuToggleElement,
 } from "@patternfly/react-core";
+import { SignOutAltIcon, UserIcon } from "@patternfly/react-icons";
 
 export interface UserMenuProps {
   userDisplayName: string;
@@ -41,10 +42,10 @@ export function UserMenu({ userDisplayName, profileURL, logoutURL }: UserMenuPro
       )}
     >
       <DropdownList>
-        <DropdownItem key="profile" to={profileURL}>
+        <DropdownItem key="profile" to={profileURL} icon={<UserIcon />}>
           Profile
         </DropdownItem>
-        <DropdownItem key="signout" to={logoutURL}>
+        <DropdownItem key="signout" to={logoutURL} icon={<SignOutAltIcon />}>
           Sign out
         </DropdownItem>
       </DropdownList>

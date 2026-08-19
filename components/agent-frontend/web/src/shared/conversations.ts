@@ -58,3 +58,9 @@ export async function setStar(conversationsURL: string, runId: string, starred: 
     }),
   );
 }
+
+export async function deleteConversation(conversationsURL: string, runId: string): Promise<void> {
+  await parseOrThrow(
+    await fetch(`${conversationsURL}/${encodeURIComponent(runId)}`, { method: "DELETE" }),
+  );
+}

@@ -24,6 +24,7 @@ import {
   PageSection,
   Toolbar,
   ToolbarContent,
+  ToolbarGroup,
   ToolbarItem,
 } from "@patternfly/react-core";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
@@ -39,7 +40,9 @@ import { TileCard } from "../shared/TileCard";
 // grants are managed in Keycloak, not here.
 export function Profile({ config }: { config: ProfileConfig }): React.ReactElement {
   return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
     <Page
+      style={{ flex: "1 1 auto", minHeight: 0 }}
       masthead={
         <Masthead>
           <MastheadMain>
@@ -56,13 +59,15 @@ export function Profile({ config }: { config: ProfileConfig }): React.ReactEleme
           <MastheadContent>
             <Toolbar>
               <ToolbarContent>
-                <ToolbarItem>
-                  <UserMenu
-                    userDisplayName={config.userDisplayName}
-                    profileURL={config.profileURL}
-                    logoutURL={config.logoutURL}
-                  />
-                </ToolbarItem>
+                <ToolbarGroup align={{ default: "alignEnd" }}>
+                  <ToolbarItem>
+                    <UserMenu
+                      userDisplayName={config.userDisplayName}
+                      profileURL={config.profileURL}
+                      logoutURL={config.logoutURL}
+                    />
+                  </ToolbarItem>
+                </ToolbarGroup>
               </ToolbarContent>
             </Toolbar>
           </MastheadContent>
@@ -122,7 +127,8 @@ export function Profile({ config }: { config: ProfileConfig }): React.ReactEleme
           </Gallery>
         )}
       </PageSection>
-      <Footer />
     </Page>
+    <Footer />
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   PageSection,
   Toolbar,
   ToolbarContent,
+  ToolbarGroup,
   ToolbarItem,
 } from "@patternfly/react-core";
 import { Gallery } from "@patternfly/react-core";
@@ -36,7 +37,9 @@ export function Portal({ config }: { config: PortalConfig }): React.ReactElement
   const otherTiles = config.tiles.filter((t) => !t.authorized);
 
   return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
     <Page
+      style={{ flex: "1 1 auto", minHeight: 0 }}
       masthead={
         <Masthead>
           <MastheadMain>
@@ -48,21 +51,23 @@ export function Portal({ config }: { config: PortalConfig }): React.ReactElement
           <MastheadContent>
             <Toolbar>
               <ToolbarContent>
-                {config.signedIn ? (
-                  <ToolbarItem>
-                    <UserMenu
-                      userDisplayName={config.userDisplayName}
-                      profileURL={config.profileURL}
-                      logoutURL={config.logoutURL}
-                    />
-                  </ToolbarItem>
-                ) : (
-                  <ToolbarItem>
-                    <Button variant="primary" component="a" href={config.loginURL}>
-                      Sign in
-                    </Button>
-                  </ToolbarItem>
-                )}
+                <ToolbarGroup align={{ default: "alignEnd" }}>
+                  {config.signedIn ? (
+                    <ToolbarItem>
+                      <UserMenu
+                        userDisplayName={config.userDisplayName}
+                        profileURL={config.profileURL}
+                        logoutURL={config.logoutURL}
+                      />
+                    </ToolbarItem>
+                  ) : (
+                    <ToolbarItem>
+                      <Button variant="primary" component="a" href={config.loginURL}>
+                        Sign in
+                      </Button>
+                    </ToolbarItem>
+                  )}
+                </ToolbarGroup>
               </ToolbarContent>
             </Toolbar>
           </MastheadContent>
@@ -107,7 +112,8 @@ export function Portal({ config }: { config: PortalConfig }): React.ReactElement
           </ExpandableSection>
         </PageSection>
       )}
-      <Footer />
     </Page>
+    <Footer />
+    </div>
   );
 }

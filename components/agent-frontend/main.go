@@ -124,6 +124,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/conversations/{run_id}", conversationsProxy)
 	mux.HandleFunc("PUT /api/conversations/{run_id}/star", conversationsProxy)
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/star", conversationsProxy)
+	mux.HandleFunc("DELETE /api/conversations/{run_id}", conversationsProxy)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
