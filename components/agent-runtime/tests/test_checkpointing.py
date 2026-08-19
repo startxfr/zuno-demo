@@ -45,7 +45,7 @@ import app.main as main_module  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
 from app.graph.nodes import _ANSWER_TASK, _TEKOS  # noqa: E402
 from app.graph.shapes.retrieve_reason_respond import build as _build  # noqa: E402
-from app.main import _checkpoint_conninfo, _resolve_run_id  # noqa: E402
+from app.main import _build_transcript_structured, _checkpoint_conninfo, _resolve_run_id  # noqa: E402
 from app.schemas import ChatRequest  # noqa: E402
 
 
@@ -228,6 +228,49 @@ async def test_checkpoint_conninfo_includes_sslmode_and_dbname() -> None:
         ) = saved
 
 
+async def test_transcript_has_no_duplicate_turns_across_multiple_checkpoints() -> None:
+    """Regression test for a real bug reported live on demo222 2026-08-19:
+    reopening a conversation showed the same question+answer pair
+    duplicated 4-5x. Root cause: LangGraph checkpoints after every graph
+    super-step (retrieve/reason/respond), not once per turn - MemorySaver
+    checkpoints at the same frequency as the Postgres backend (a Pregel
+    loop concern, not backend-specific), so this is reproducible without
+    a live database. Three real graph.ainvoke() turns, each producing
+    multiple checkpoint rows, must still collapse to exactly 3 user +
+    3 assistant entries, correctly paired and ordered."""
+    graph = build_graph(MemorySaver())
+    config = {"configurable": {"thread_id": "run-transcript-dup"}}
+
+    for message in ("first question", "second question", "third question"):
+        await graph.ainvoke(
+            {
+                "session_id": "s1",
+                "user_sub": "alice",
+                "groups": [],
+                "bearer_token": "t",
+                "message": message,
+                "retrieved_docs": [],
+                "tool_results": {},
+                "errors": [],
+            },
+            config=config,
+        )
+
+    checkpoint_count = len([c async for c in graph.checkpointer.alist(config)])
+    assert checkpoint_count > 6, (
+        f"expected more than 2 checkpoints per turn to actually exercise the dedup logic, got {checkpoint_count}"
+    )
+
+    turns = await _build_transcript_structured(graph, "run-transcript-dup")
+    assert len(turns) == 6, f"expected exactly 3 user + 3 assistant entries, got {len(turns)}: {turns}"
+    assert [t["role"] for t in turns] == ["user", "assistant"] * 3
+    assert [t["content"] for t in turns if t["role"] == "user"] == [
+        "first question",
+        "second question",
+        "third question",
+    ]
+
+
 TESTS = [
     test_no_run_id_mints_a_fresh_one_every_time,
     test_resuming_an_unknown_run_id_is_a_404,
@@ -236,6 +279,7 @@ TESTS = [
     test_resumed_state_actually_carries_forward,
     test_checkpoint_conninfo_is_none_when_unconfigured,
     test_checkpoint_conninfo_includes_sslmode_and_dbname,
+    test_transcript_has_no_duplicate_turns_across_multiple_checkpoints,
 ]
 
 

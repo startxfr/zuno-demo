@@ -274,45 +274,80 @@ async def _resolve_run_id(
     return payload.run_id
 
 
-async def _build_transcript(graph, run_id: str) -> str:
-    """ADR-0209: reconstructs the full conversation for this run_id from
-    every checkpoint LangGraph recorded for it (oldest first) -
-    AgentState's message/reply channels hold only the latest turn each,
-    not a running history, so a single checkpoint read (like
-    _resolve_run_id's) would only ever see the last exchange."""
-    config = {"configurable": {"thread_id": run_id}}
-    turns = []
-    async for checkpoint_tuple in graph.checkpointer.alist(config):
-        channel_values = checkpoint_tuple.checkpoint.get("channel_values") or {}
-        message = channel_values.get("message")
-        reply = channel_values.get("reply")
-        if message:
-            turns.append(f"User: {message}")
-        if reply:
-            turns.append(f"Assistant: {reply}")
-    turns.reverse()  # alist() yields newest-first
-    return "\n".join(turns)
-
-
 async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any]]:
-    """ADR-0212: structured sibling of _build_transcript - the frontend's
-    left-nav conversation reopen renders distinct message bubbles
-    directly (GET .../transcript), rather than the single concatenated
-    string extract-memory's LLM prompt needs. Same alist()-then-reverse
-    walk, oldest first."""
+    """ADR-0209/ADR-0212: reconstructs the full conversation for this
+    run_id from every checkpoint LangGraph recorded for it, grouped by
+    turn - AgentState's message/reply channels hold only the latest
+    *value* each (plain LastValue channels), and LangGraph checkpoints
+    after every graph super-step, not once per turn (VERIFIED live
+    2026-08-19 against the installed langgraph==0.2.39: a single Tekos
+    turn walks retrieve -> [tool_call] -> reason -> respond, 3-4
+    super-steps, each producing its own checkpoint row). Naively emitting
+    a line whenever message/reply is truthy - the pre-ADR-0212 approach -
+    therefore repeated the same pair once per super-step: a real user
+    reopening a conversation saw one question+answer duplicated 4-5x,
+    reported live on demo222.
+
+    `checkpoint.metadata["source"] == "input"` is LangGraph's own,
+    persisted (unlike "writes", which is stripped before Postgres
+    storage) marker for the first checkpoint of each turn, before that
+    turn's graph execution has written anything - used here to group
+    checkpoints into turns rather than treating each one as its own
+    exchange.
+    """
     config = {"configurable": {"thread_id": run_id}}
+    checkpoints = [c async for c in graph.checkpointer.alist(config)]
+    checkpoints.reverse()  # alist() yields newest-first
+
     turns: List[Dict[str, Any]] = []
-    async for checkpoint_tuple in graph.checkpointer.alist(config):
+    current: Optional[Dict[str, Any]] = None
+
+    def _flush() -> None:
+        if current is None:
+            return
+        if current["message"]:
+            turns.append({"role": "user", "content": current["message"], "ts": current["ts"]})
+        if current["reply"]:
+            turns.append({"role": "assistant", "content": current["reply"], "ts": current["reply_ts"]})
+
+    for checkpoint_tuple in checkpoints:
         channel_values = checkpoint_tuple.checkpoint.get("channel_values") or {}
-        ts = checkpoint_tuple.checkpoint.get("ts")
-        message = channel_values.get("message")
-        reply = channel_values.get("reply")
-        if message:
-            turns.append({"role": "user", "content": message, "ts": ts})
-        if reply:
-            turns.append({"role": "assistant", "content": reply, "ts": ts})
-    turns.reverse()
+        if checkpoint_tuple.metadata.get("source") == "input":
+            _flush()
+            current = {
+                "message": None,
+                "ts": checkpoint_tuple.checkpoint.get("ts"),
+                "reply": None,
+                "reply_ts": None,
+            }
+            # VERIFIED live (2026-08-19): the "input" checkpoint predates
+            # this turn's own graph execution entirely - neither this
+            # turn's message nor its reply are visible in
+            # channel_values yet (message only becomes visible starting
+            # at the *next* checkpoint, once the graph's first node
+            # actually runs; reply is still whatever the *previous* turn
+            # last wrote, LastValue channels never reset between turns).
+            # Reading either field here would mispair stale/missing data
+            # with this turn. Only ts is taken from this checkpoint.
+            continue
+        if current is not None:
+            if current["message"] is None:
+                current["message"] = channel_values.get("message") or ""
+            reply = channel_values.get("reply")
+            if reply:
+                current["reply"] = reply
+                current["reply_ts"] = checkpoint_tuple.checkpoint.get("ts")
+    _flush()
     return turns
+
+
+async def _build_transcript(graph, run_id: str) -> str:
+    """ADR-0209: the plain-string transcript /extract-memory's LLM prompt
+    needs - a thin wrapper over _build_transcript_structured so both
+    call sites share one, correctly turn-grouped, implementation."""
+    turns = await _build_transcript_structured(graph, run_id)
+    lines = [f"{'User' if t['role'] == 'user' else 'Assistant'}: {t['content']}" for t in turns]
+    return "\n".join(lines)
 
 
 @app.post("/v1/agents/{agent}/runs/{run_id}/extract-memory")
@@ -495,6 +530,23 @@ async def unstar_conversation_endpoint(
     if not ok:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
     return {"starred": False}
+
+
+@app.delete("/v1/agents/{agent}/runs/{run_id}")
+async def archive_conversation_endpoint(
+    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, bool]:
+    """ADR-0212 follow-up: soft-delete. Hides the conversation (404 for
+    both unknown and not-owned, same collapsed-case rationale as rename/
+    star) - the underlying LangGraph checkpoint is never touched, only
+    conversations.archived_at."""
+    _active_agent_or_404(agent)
+    ok = await conversations.archive_conversation(
+        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return {"archived": True}
 
 
 async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict[str, Any], *, session_id: str, request_id: str):

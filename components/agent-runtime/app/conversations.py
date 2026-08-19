@@ -209,6 +209,25 @@ async def list_conversations(
     ]
 
 
+async def archive_conversation(pool: Optional[AsyncConnectionPool], *, run_id: str, owner_sub: str) -> bool:
+    """Soft-delete: hides the conversation from list_conversations (which
+    already filters archived_at IS NULL) without touching the underlying
+    LangGraph checkpoint - the message history itself is never deleted,
+    only this metadata row's visibility. Same "collapsed to one
+    not-found case" rationale as rename_conversation/set_star. Guards
+    `archived_at IS NULL` in the WHERE clause so re-archiving an already
+    archived conversation reports not-found rather than silently
+    bumping nothing."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE conversations SET archived_at = now() WHERE run_id = %s AND owner_sub = %s AND archived_at IS NULL",
+                (run_id, owner_sub),
+            )
+            return cur.rowcount > 0
+
+
 async def rename_conversation(
     pool: Optional[AsyncConnectionPool], *, run_id: str, owner_sub: str, title: str
 ) -> bool:
