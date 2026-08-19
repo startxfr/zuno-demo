@@ -8,10 +8,11 @@ downstream MCP server (`components/mcp-gateway`). A Day 1 component
 of its own.
 
 Also applies `gitops/apps/mcp-confluence` (`gitops/charts/mcp-confluence`,
-ADR-0117) and `gitops/apps/mcp-salesforce` (`gitops/charts/mcp-salesforce`,
-ADR-0326/WP-33): the real Confluence Cloud and Salesforce Opportunity MCP
-servers, under this same run component - same name-mismatch
-self-sufficiency pattern `ansible/roles/sql_schema` uses for
-`gitops/apps/mcp-sales-db`. All three images (`mcp-gateway`,
-`mcp-confluence`, `mcp-salesforce`) build via the `mcp_build` Day 1 build
-component (`make d1 build mcp`).
+ADR-0117), `gitops/apps/mcp-salesforce` (`gitops/charts/mcp-salesforce`,
+ADR-0326/WP-33) and `gitops/apps/mcp-git-forge` (`gitops/charts/mcp-git-forge`,
+ADR-0120/WP-058): the real Confluence Cloud, Salesforce Opportunity and
+GitHub/GitLab MCP servers, under this same run component - same
+name-mismatch self-sufficiency pattern `ansible/roles/sql_schema` uses for
+`gitops/apps/mcp-sales-db`. All four images (`mcp-gateway`,
+`mcp-confluence`, `mcp-salesforce`, `mcp-git-forge`) build via the
+`mcp_build` Day 1 build component (`make d1 build mcp`).
