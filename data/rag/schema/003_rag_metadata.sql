@@ -42,7 +42,30 @@ ALTER TABLE document_embeddings ALTER COLUMN embedding DROP NOT NULL;
 -- yet - ADR-0105 v1 territory) - lets fixture seeding be idempotent via
 -- ON CONFLICT (source) DO NOTHING. A real chunked-ingestion pipeline would
 -- need a compound key (source, chunk_index) instead; revisit then.
-ALTER TABLE document_embeddings ADD CONSTRAINT uq_document_embeddings_source UNIQUE (source);
+--
+-- 004_rag_chunking.sql (ADR-0330) is that revisit: it DROPs this constraint
+-- and replaces it with UNIQUE (source, chunk_index) once real chunked
+-- ingestion exists. This job runs 002/003/004(/005) as one ON_ERROR_STOP=1
+-- psql invocation on every ArgoCD sync (no migration-tracking table - every
+-- file here must stay idempotent, same principle as 004's own guard
+-- comment). Once a domain has real multi-chunk-per-source data, a source
+-- legitimately repeats across rows, so re-running this ADD CONSTRAINT
+-- unguarded fails forever and 004 is never reached to fix it (incident
+-- 2026-08-20: zuno-rag-schema-apply-tech looping on
+-- "uq_document_embeddings_source" duplicate-key errors). Guard it the same
+-- way 004 guards its own constraint: only add it on a table that has
+-- neither constraint yet (a true pre-004 fresh database) - a no-op
+-- everywhere else.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_document_embeddings_source'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_document_embeddings_source_chunk'
+    ) THEN
+        ALTER TABLE document_embeddings ADD CONSTRAINT uq_document_embeddings_source UNIQUE (source);
+    END IF;
+END $$;
 
 -- Deterministic metadata filters before ranking (Decision) need an index,
 -- not a sequential scan through the GIN index's generic containment
