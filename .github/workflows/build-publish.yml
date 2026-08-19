@@ -133,7 +133,7 @@ jobs:
           path: sbom-${{ matrix.name }}.spdx.json
 
       - name: Scan for vulnerabilities (Trivy) - fails the build on HIGH/CRITICAL
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
