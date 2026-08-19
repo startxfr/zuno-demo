@@ -565,12 +565,53 @@ def _ancestor_path_matches(ancestor_titles: list, directory: str) -> bool:
     return False
 
 
+def _resolve_confluence_scope_id(base_url: str, auth, space: str, title: str) -> Optional[str]:
+    """Resolve a directory segment's title to its Confluence page id within
+    one space, so the fetch loop below can scope its search with CQL's
+    `ancestor=<id>` instead of paging through the entire space. Confluence
+    enforces unique page titles within a space, so this is unambiguous.
+    """
+    try:
+        resp = requests.get(
+            f"{base_url}/wiki/rest/api/content/search",
+            params={
+                "cql": f'space="{space}" and type=page and title="{title}"',
+                "limit": 5,
+            },
+            auth=auth,
+            timeout=HTTP_TIMEOUT_SECONDS,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        logger.error(
+            "fetch-confluence: could not resolve directory scope '%s' in space %s: %s",
+            title, space, exc,
+        )
+        return None
+    results = resp.json().get("results", [])
+    return results[0]["id"] if results else None
+
+
 def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
     if not config.confluence_sources:
         logger.info("fetch-confluence: no confluence sources configured")
         return 0
     auth = _confluence_auth(config)
     fetched = 0
+    # VERIFIED live 2026-08-18/19: SXSI alone has 500+ pages (still counting
+    # past a 20-request sample), and every enabled source used to run an
+    # unscoped `space="..." and type=page` search - fetching+expanding
+    # body.storage for EVERY page in the space, filtering by directories
+    # client-side only afterward - once per confluence[] entry (6 today,
+    # each independently re-scanning the same space). A live pipeline run
+    # sat on this stage for 99 minutes with zero log output before being
+    # killed. CQL's `ancestor=<page id>` clause does this filtering
+    # server-side instead: resolving a directory's last title segment to a
+    # page id (cached per space+title, so sources sharing the same
+    # directories only resolve once) turned a full-space scan into a single
+    # ~1s scoped request. `_ancestor_path_matches` is still applied to each
+    # result below - unchanged semantics, just against a pre-narrowed set.
+    scope_id_cache: Dict[tuple, Optional[str]] = {}
     for source in config.confluence_sources:
         if not source.get("enabled", True):
             continue
@@ -580,73 +621,106 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
         required_groups = source.get("requiredGroups") or []
 
         for space in source.get("spaces") or []:
-            start = 0
-            limit = 25
-            while True:
-                params = {
-                    "cql": f'space="{space}" and type=page',
-                    "start": start,
-                    "limit": limit,
+            # One search per resolvable directory scope, or a single
+            # unscoped space-wide search when no directories are set
+            # (operator intent: ingest the whole space) or a scope
+            # couldn't be resolved (falls back rather than silently
+            # fetching nothing).
+            search_cqls = []
+            for directory in directories:
+                last_segment = directory.rsplit("/", 1)[-1]
+                cache_key = (base_url, space, last_segment)
+                if cache_key not in scope_id_cache:
+                    scope_id_cache[cache_key] = _resolve_confluence_scope_id(
+                        base_url, auth, space, last_segment
+                    )
+                scope_id = scope_id_cache[cache_key]
+                if scope_id:
+                    search_cqls.append(f'ancestor={scope_id} and type=page')
+            if not search_cqls:
+                search_cqls = [f'space="{space}" and type=page']
+
+            for search_cql in search_cqls:
+                # VERIFIED live 2026-08-19: `start=`/`limit=` offset paging
+                # silently does NOT advance for `ancestor=`-filtered CQL
+                # searches - every request returns the identical first page
+                # regardless of `start`, even though the response echoes
+                # back the requested `start` value. Confirmed via direct
+                # comparison (start=0/25/50 all returned the same 5
+                # results). That turns the old `while ... start += limit`
+                # loop into a genuine infinite loop whenever a scope has
+                # more than one page of results - worse than the plain
+                # space-wide scan it replaced. `_links.next` cursor-based
+                # pagination advances correctly for both this and the
+                # unscoped fallback query below, so it's used universally.
+                next_url = f"{base_url}/wiki/rest/api/content/search"
+                next_params = {
+                    "cql": search_cql,
+                    "limit": 25,
                     "expand": "body.storage,ancestors,history.lastUpdated,metadata.labels",
                 }
-                try:
-                    resp = requests.get(
-                        f"{base_url}/wiki/rest/api/content/search",
-                        params=params,
-                        auth=auth,
-                        timeout=HTTP_TIMEOUT_SECONDS,
-                    )
-                    resp.raise_for_status()
-                except requests.RequestException as exc:
-                    logger.error("fetch-confluence: search failed for space %s: %s", space, exc)
-                    break
-                payload = resp.json()
-                results = payload.get("results", [])
-                for page in results:
-                    labels = {
-                        label["name"]
-                        for label in page.get("metadata", {}).get("labels", {}).get("results", [])
-                    }
-                    if labels & exclude_labels:
-                        continue
-                    ancestor_titles = [a["title"] for a in page.get("ancestors", [])]
-                    if directories and not any(
-                        _ancestor_path_matches(ancestor_titles, directory) for directory in directories
-                    ):
-                        continue
-                    html = page.get("body", {}).get("storage", {}).get("value", "")
-                    if not html.strip():
-                        continue
-                    web_ui = page.get("_links", {}).get("webui", "")
-                    page_url = f"{base_url}/wiki{web_ui}"
-                    doc_id = doc_id_for(page_url)
-                    record = {
-                        "doc_id": doc_id,
-                        "url": page_url,
-                        "title": page.get("title", page_url),
-                        "raw_html": html,
-                        "domain": "knowledge.tech",
-                        "product": source.get("name", space),
-                        "version": None,
-                        "language": "en",
-                        "source_type": "confluence",
-                        "classification": "C2",
-                        "acl_groups": required_groups,
-                        "fetched_at": _utcnow_iso(),
-                        "sha256": hashlib.sha256(html.encode("utf-8")).hexdigest(),
-                        "provenance": page_url,
-                        "last_modified": page.get("history", {}).get("lastUpdated", {}).get("when"),
-                    }
-                    # Explicit per-source canonical value (values.yaml
-                    # confluence[].technology) - never derived from the
-                    # source name (omit rather than invent, ADR-0202).
-                    if source.get("technology"):
-                        record["technology"] = source["technology"]
-                    store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
-                    fetched += 1
-                if len(results) < limit:
-                    break
-                start += limit
+                while next_url:
+                    try:
+                        resp = requests.get(
+                            next_url,
+                            params=next_params,
+                            auth=auth,
+                            timeout=HTTP_TIMEOUT_SECONDS,
+                        )
+                        resp.raise_for_status()
+                    except requests.RequestException as exc:
+                        logger.error("fetch-confluence: search failed for space %s: %s", space, exc)
+                        break
+                    payload = resp.json()
+                    results = payload.get("results", [])
+                    for page in results:
+                        labels = {
+                            label["name"]
+                            for label in page.get("metadata", {}).get("labels", {}).get("results", [])
+                        }
+                        if labels & exclude_labels:
+                            continue
+                        ancestor_titles = [a["title"] for a in page.get("ancestors", [])]
+                        if directories and not any(
+                            _ancestor_path_matches(ancestor_titles, directory) for directory in directories
+                        ):
+                            continue
+                        html = page.get("body", {}).get("storage", {}).get("value", "")
+                        if not html.strip():
+                            continue
+                        web_ui = page.get("_links", {}).get("webui", "")
+                        page_url = f"{base_url}/wiki{web_ui}"
+                        doc_id = doc_id_for(page_url)
+                        record = {
+                            "doc_id": doc_id,
+                            "url": page_url,
+                            "title": page.get("title", page_url),
+                            "raw_html": html,
+                            "domain": "knowledge.tech",
+                            "product": source.get("name", space),
+                            "version": None,
+                            "language": "en",
+                            "source_type": "confluence",
+                            "classification": "C2",
+                            "acl_groups": required_groups,
+                            "fetched_at": _utcnow_iso(),
+                            "sha256": hashlib.sha256(html.encode("utf-8")).hexdigest(),
+                            "provenance": page_url,
+                            "last_modified": page.get("history", {}).get("lastUpdated", {}).get("when"),
+                        }
+                        # Explicit per-source canonical value (values.yaml
+                        # confluence[].technology) - never derived from the
+                        # source name (omit rather than invent, ADR-0202).
+                        if source.get("technology"):
+                            record["technology"] = source["technology"]
+                        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+                        fetched += 1
+                    next_link = payload.get("_links", {}).get("next")
+                    if next_link:
+                        next_url = f"{base_url}/wiki{next_link}"
+                        next_params = None  # the cursor URL already carries the full query string
+                    else:
+                        next_url = None
     return fetched
 
 

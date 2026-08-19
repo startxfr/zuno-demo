@@ -156,6 +156,98 @@ def test_fetch_confluence_uses_explicit_per_source_technology():
     assert record["acl_groups"] == ["confluence-build-satellite"]
 
 
+def test_fetch_confluence_scopes_via_ancestor_cql_when_directories_set():
+    """VERIFIED live 2026-08-19: an unscoped `space="..." and type=page`
+    search against a 500+-page space (expanding body.storage for every
+    page) sat for 99 minutes before being killed. `directories` should
+    resolve to a page id and search `ancestor=<id>` instead - server-side
+    narrowing, not a client-side filter over the whole space.
+    """
+    page = {
+        "title": "S0 : Satellite",
+        "body": {"storage": {"value": "<p>content</p>"}},
+        "ancestors": [
+            {"title": "SXS Internal"},
+            {"title": "Procédures"},
+            {"title": "Technologie : Satellite"},
+        ],
+        "metadata": {"labels": {"results": []}},
+        "_links": {"webui": "/spaces/SXSI/pages/123"},
+        "history": {"lastUpdated": {"when": "2026-08-01T00:00:00Z"}},
+    }
+    sources = (
+        '[{"name": "satellite-archi", "type": "cloud", "technology": "satellite", '
+        '"baseUrl": "https://conf.test", "spaces": ["SXSI"], '
+        '"directories": ["Proc\\u00e9dures/Technologie : Satellite"], '
+        '"requiredGroups": ["confluence-archi-satellite"]}]'
+    )
+    config = _config(CONFLUENCE_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    store = FakeStore()
+    cqls = []
+
+    def fake_get(url, params=None, **_kwargs):
+        cqls.append(params["cql"])
+        if "title=" in params["cql"]:
+            return _FakeResponse(payload={"results": [{"id": "999"}]})
+        return _FakeResponse(payload={"results": [page]})
+
+    with mock.patch.object(rag_ingestion.requests, "get", side_effect=fake_get):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-confluence"], config, store)
+
+    assert any('title="Technologie : Satellite"' in c for c in cqls), cqls
+    assert any(c.startswith("ancestor=999") for c in cqls), cqls
+    # The old unscoped fallback - no title/ancestor clause at all - must
+    # not fire when a directory scope resolved successfully.
+    assert 'space="SXSI" and type=page' not in cqls, cqls
+    (record,) = store.json.values()
+    assert record["technology"] == "satellite"
+
+
+def test_fetch_confluence_resolves_a_shared_directory_scope_only_once():
+    """The three tier entries for one tech (archi/build/run) share the
+    same space+directories - the scope-id lookup should be cached across
+    them, not repeated per source."""
+    page = {
+        "title": "S0 : Satellite",
+        "body": {"storage": {"value": "<p>content</p>"}},
+        "ancestors": [{"title": "Procédures"}, {"title": "Technologie : Satellite"}],
+        "metadata": {"labels": {"results": []}},
+        "_links": {"webui": "/spaces/SXSI/pages/123"},
+        "history": {"lastUpdated": {"when": "2026-08-01T00:00:00Z"}},
+    }
+    directory = '"Proc\\u00e9dures/Technologie : Satellite"'
+    sources = (
+        "["
+        '{"name": "satellite-archi", "technology": "satellite", "baseUrl": "https://conf.test", '
+        f'"spaces": ["SXSI"], "directories": [{directory}], "requiredGroups": ["confluence-archi-satellite"]}},'
+        '{"name": "satellite-build", "technology": "satellite", "baseUrl": "https://conf.test", '
+        f'"spaces": ["SXSI"], "directories": [{directory}], "requiredGroups": ["confluence-build-satellite"]}}'
+        "]"
+    )
+    config = _config(CONFLUENCE_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    store = FakeStore()
+    title_lookups = []
+    page_searches = []
+
+    def fake_get(url, params=None, **_kwargs):
+        if "title=" in params["cql"]:
+            title_lookups.append(params["cql"])
+            return _FakeResponse(payload={"results": [{"id": "999"}]})
+        page_searches.append(params["cql"])
+        return _FakeResponse(payload={"results": [page]})
+
+    with mock.patch.object(rag_ingestion.requests, "get", side_effect=fake_get):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-confluence"], config, store)
+
+    # The scope id is resolved once and reused - only the resolution is
+    # cached, not the per-source fetch itself (each source still searches
+    # and would write its own record; a pre-existing, separate issue means
+    # same-URL writes from different sources collide on doc_id, so the
+    # FakeStore ends up with one entry here - not this test's concern).
+    assert len(title_lookups) == 1, title_lookups
+    assert len(page_searches) == 2, page_searches
+
+
 # --- fetch-salesforce (knowledge.sales) -------------------------------------
 
 
@@ -563,6 +655,8 @@ TESTS = [
     test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write,
     test_fetch_redhat_stamps_domain_and_canonical_technology,
     test_fetch_confluence_uses_explicit_per_source_technology,
+    test_fetch_confluence_scopes_via_ancestor_cql_when_directories_set,
+    test_fetch_confluence_resolves_a_shared_directory_scope_only_once,
     test_fetch_salesforce_writes_sales_metadata_from_fixture_records,
     test_fetch_salesforce_without_credentials_fails_closed,
     test_fetch_aramis_writes_adv_metadata_from_fixture_export,
