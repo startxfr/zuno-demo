@@ -123,6 +123,30 @@ remediation backlog is larger than first estimated - full per-component
 CVE tables are in the `Scan for vulnerabilities` step logs of the run
 above.
 
+**2026-08-19 (v0.1 objective: registry backend stays internal by
+default):** this ADR's build/publish/sign pipeline exists to prove
+supply-chain provenance (source -> build -> SBOM -> scan -> signature),
+not to become the default deployment source. Every `gitops/charts/*`
+`repository`/`frontendRepository`/`bffRepository` field still points at
+the in-cluster mirror (`image-registry.openshift-image-registry.svc:5000/
+zuno-ai-build/<name>`), populated by the OpenShift `BuildConfig` mechanism
+(`ansible/tasks/apply_openshift_build.yml`) - unchanged by `pin_release.py`
+(stage 3, WP-04) on purpose, and unchanged by this ADR going forward: the
+platform keeps defaulting to internal registry + `BuildConfig` for
+first-party runtime images.
+
+An *optional* mode where charts instead source first-party runtime images
+from Quay (or another external registry) - i.e. actually moving a chart's
+`repository`/`frontendRepository`/`bffRepository` off the in-cluster
+mirror - is a distinct, legitimate future direction, deliberately
+deferred to **ADR-0353** (v0.3, not yet written; see
+[docs/adr/0300-v0.3-roadmap.md](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source)),
+not decided or implemented here. This is a third, distinct sense of
+"external" from ADR-0352's (who deploys the platform's own infrastructure
+services) and ADR-0116/0117's (how agents reach third-party SaaS tool
+backends): ADR-0353 would decide where first-party runtime images
+themselves are sourced from.
+
 ### Implemented foundations
 
 - `.github/workflows/build-publish.yml` builds first-party images, publishes SHA-based tags, generates SPDX SBOMs, scans HIGH/CRITICAL vulnerabilities with Trivy (reported, `continue-on-error: true` - see the 2026-08-19 note above), signs images with keyless Cosign through GitHub OIDC and attests the SBOM.
@@ -164,3 +188,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md)
 - [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md)
 - [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md)
+- ADR-0353 (v0.3, not yet written) - decides whether/how to optionally source first-party runtime images from Quay/an external registry instead of the internal mirror + BuildConfig default this ADR keeps unchanged.
