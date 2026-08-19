@@ -43,6 +43,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthzHandler)
 	mux.HandleFunc("/api/chat", chatHandler(verifier, runtimeClient, cfg.AgentName))
+	// ADR-0212: thin proxy routes for persistent conversations, each
+	// following chatHandler's own verify -> entitlement-check -> forward
+	// shape via the shared authorize() helper. None needs the SSE branch.
+	mux.HandleFunc("GET /api/conversations", listConversationsHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("GET /api/conversations/{run_id}/transcript", transcriptHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("PATCH /api/conversations/{run_id}", renameConversationHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("PUT /api/conversations/{run_id}/star", starConversationHandler(verifier, runtimeClient, cfg.AgentName, true))
+	mux.HandleFunc("DELETE /api/conversations/{run_id}/star", starConversationHandler(verifier, runtimeClient, cfg.AgentName, false))
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -132,6 +140,12 @@ type apiChatRequest struct {
 	// identity-propagation pattern as ADR-0032/0033. This BFF never
 	// validates project membership itself.
 	ProjectID string `json:"project_id,omitempty"`
+	// ADR-0212: optional - omit to start a new conversation, or supply a
+	// prior response's run_id (captured from the SSE "start" event) to
+	// resume it. Forwarded to the Agent Runtime as-is; this BFF does not
+	// itself enforce run_id ownership, same identity-propagation pattern
+	// as ProjectID above.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // apiChatResponse is the frontend-facing response body (see README.md).
@@ -142,6 +156,41 @@ type apiChatResponse struct {
 
 type apiErrorResponse struct {
 	Error string `json:"error"`
+}
+
+// apiConversation is the frontend-facing shape of one conversation-list
+// entry (ADR-0212, see README.md).
+type apiConversation struct {
+	RunID     string `json:"run_id"`
+	Title     string `json:"title"`
+	UpdatedAt string `json:"updated_at"`
+	Starred   bool   `json:"starred"`
+}
+
+// apiTranscriptTurn is the frontend-facing shape of one structured
+// transcript entry (ADR-0212).
+type apiTranscriptTurn struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+	Ts      string `json:"ts"`
+}
+
+// apiRenameRequest is the frontend-facing request body for
+// PATCH /api/conversations/{run_id} (ADR-0212).
+type apiRenameRequest struct {
+	Title string `json:"title"`
+}
+
+// apiRenameResponse is that endpoint's frontend-facing response body.
+type apiRenameResponse struct {
+	RunID string `json:"run_id"`
+	Title string `json:"title"`
+}
+
+// apiStarResponse is the frontend-facing response body for both
+// PUT and DELETE /api/conversations/{run_id}/star (ADR-0212).
+type apiStarResponse struct {
+	Starred bool `json:"starred"`
 }
 
 // chatHandler validates and authorizes the caller, then either proxies a
@@ -212,6 +261,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			UserSub:   claims.Subject, // informational only (ADR-0033); the Runtime derives identity from the forwarded token, not this field
 			Message:   req.Message,
 			ProjectID: req.ProjectID, // ADR-0209: forwarded as-is, this BFF does not validate project membership
+			RunID:     req.RunID,     // ADR-0212: forwarded as-is, the Agent Runtime enforces ownership
 		}
 
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
@@ -301,6 +351,177 @@ func proxySSE(w http.ResponseWriter, resp *http.Response) {
 		if readErr != nil {
 			return
 		}
+	}
+}
+
+// authorize validates the caller's bearer token and agent_<agentName>
+// entitlement (ADR-0040) - the same check chatHandler performs inline,
+// factored out here since every conversation-management handler below
+// (ADR-0212) needs the identical check. Sets the response's Content-Type
+// unconditionally (every response from these handlers, success or
+// failure, is JSON) and writes an error body itself on failure - the
+// caller only needs to check ok and return immediately.
+func authorize(
+	w http.ResponseWriter, r *http.Request, verifier *jwks.Verifier, entitlementGroup string, identity *requestIdentity,
+) (token string, ok bool) {
+	w.Header().Set("Content-Type", "application/json")
+
+	token = bearerToken(r)
+	if token == "" {
+		writeError(w, http.StatusUnauthorized, "missing bearer token")
+		return "", false
+	}
+	claims, err := verifier.Verify(token)
+	if err != nil {
+		log.Printf("agent-bff: token verification failed: %v", err)
+		writeError(w, http.StatusUnauthorized, "invalid or expired token")
+		return "", false
+	}
+	if identity != nil {
+		identity.sub = claims.Subject
+		identity.groups = claims.Groups
+	}
+	if !hasGroup(claims.Groups, entitlementGroup) {
+		log.Printf("agent-bff: subject %q lacks entitlement group %q", claims.Subject, entitlementGroup)
+		writeError(w, http.StatusForbidden, "not entitled to this agent")
+		return "", false
+	}
+	return token, true
+}
+
+// writeUpstreamError maps an Agent Runtime call error the same way
+// chatHandler's synchronous path does: a genuine 4xx from the Runtime
+// means it rejected this specific request (e.g. an unknown/not-owned
+// run_id) and is relayed as that same status; a connectivity failure or
+// 5xx has no such status to relay and falls back to 502.
+func writeUpstreamError(w http.ResponseWriter, err error, fallback string) {
+	var upstream *runtime.UpstreamError
+	if errors.As(err, &upstream) && upstream.StatusCode >= 400 && upstream.StatusCode < 500 {
+		writeError(w, upstream.StatusCode, "agent runtime rejected the request")
+		return
+	}
+	writeError(w, http.StatusBadGateway, fallback)
+}
+
+// listConversationsHandler handles GET /api/conversations (ADR-0212): the
+// caller's own conversations for this agent, `?starred=true` to filter to
+// starred only.
+func listConversationsHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		items, err := runtimeClient.ListConversations(ctx, token, r.URL.Query().Get("starred") == "true")
+		if err != nil {
+			log.Printf("agent-bff: agent runtime list-conversations call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		out := make([]apiConversation, len(items))
+		for i, c := range items {
+			out[i] = apiConversation{RunID: c.RunID, Title: c.Title, UpdatedAt: c.UpdatedAt, Starred: c.Starred}
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// transcriptHandler handles GET /api/conversations/{run_id}/transcript
+// (ADR-0212): the structured message history for reopening a conversation
+// from the left-nav.
+func transcriptHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		turns, err := runtimeClient.GetTranscript(ctx, token, r.PathValue("run_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime transcript call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		out := make([]apiTranscriptTurn, len(turns))
+		for i, t := range turns {
+			out[i] = apiTranscriptTurn{Role: t.Role, Content: t.Content, Ts: t.Ts}
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// renameConversationHandler handles PATCH /api/conversations/{run_id}
+// (ADR-0212).
+func renameConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		var req apiRenameRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if strings.TrimSpace(req.Title) == "" {
+			writeError(w, http.StatusBadRequest, "title is required")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		renamed, err := runtimeClient.RenameConversation(ctx, token, r.PathValue("run_id"), req.Title)
+		if err != nil {
+			log.Printf("agent-bff: agent runtime rename call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiRenameResponse{RunID: renamed.RunID, Title: renamed.Title})
+	}
+}
+
+// starConversationHandler handles both PUT (starred=true) and DELETE
+// (starred=false) /api/conversations/{run_id}/star (ADR-0212) - registered
+// twice in main() under the two methods, each with its own fixed starred
+// value, since a bare toggle would need to read current state first.
+func starConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string, starred bool) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.SetStar(ctx, token, r.PathValue("run_id"), starred)
+		if err != nil {
+			log.Printf("agent-bff: agent runtime set-star call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiStarResponse{Starred: result.Starred})
 	}
 }
 

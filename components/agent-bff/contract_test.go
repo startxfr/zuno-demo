@@ -93,7 +93,15 @@ func assertMatchesSchema(t *testing.T, doc openapiDoc, goValue any, schemaName s
 
 func TestOpenAPISpecIsWellFormed(t *testing.T) {
 	doc := loadOpenAPISpec(t)
-	for _, path := range []string{"/healthz", "/api/chat"} {
+	paths := []string{
+		"/healthz",
+		"/api/chat",
+		"/api/conversations",
+		"/api/conversations/{run_id}/transcript",
+		"/api/conversations/{run_id}",
+		"/api/conversations/{run_id}/star",
+	}
+	for _, path := range paths {
 		if _, ok := doc.Paths[path]; !ok {
 			t.Errorf("openapi.json is missing path %q, which main.go registers", path)
 		}
@@ -114,4 +122,26 @@ func TestErrorResponseMatchesOpenAPISpec(t *testing.T) {
 
 func TestCitationMatchesOpenAPISpec(t *testing.T) {
 	assertMatchesSchema(t, loadOpenAPISpec(t), runtime.Citation{}, "Citation")
+}
+
+// ADR-0212 wire structs.
+
+func TestConversationMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiConversation{}, "Conversation")
+}
+
+func TestTranscriptTurnMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiTranscriptTurn{}, "TranscriptTurn")
+}
+
+func TestRenameRequestMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiRenameRequest{}, "RenameRequest")
+}
+
+func TestRenameResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiRenameResponse{}, "RenameResponse")
+}
+
+func TestStarResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiStarResponse{}, "StarResponse")
 }

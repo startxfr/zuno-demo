@@ -72,6 +72,103 @@
           }
         }
       }
+    },
+    "/api/conversations": {
+      "get": {
+        "operationId": "listConversations",
+        "summary": "List the caller's own conversations for this agent (ADR-0212)",
+        "description": "Validates the caller's bearer JWT and the agent_<AGENT_NAME> entitlement group (ADR-0040), then forwards to the shared Agent Runtime. Starred conversations first, most recently updated first.",
+        "parameters": [
+          {
+            "name": "starred",
+            "in": "query",
+            "required": false,
+            "description": "true to return only starred conversations.",
+            "schema": { "type": "boolean" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's conversations.",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Conversation" } } } }
+          },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}/transcript": {
+      "get": {
+        "operationId": "getTranscript",
+        "summary": "Read a conversation's structured message history (ADR-0212)",
+        "description": "Reused when reopening a conversation from the left-nav conversation list, to repopulate its exact prior message history.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation's turns, oldest first.",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TranscriptTurn" } } } }
+          },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or this run_id belongs to a different subject.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No workflow run found for this run_id.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}": {
+      "patch": {
+        "operationId": "renameConversation",
+        "summary": "Rename a conversation (ADR-0212)",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Renamed.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameResponse" } } } },
+          "400": { "description": "Invalid request body (missing/empty title).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller (collapsed with 'not owned by the caller' - never confirms another subject's run_id exists).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}/star": {
+      "put": {
+        "operationId": "starConversation",
+        "summary": "Star a conversation (ADR-0212)",
+        "description": "The caller's own personal, private star - never shared with other users.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Starred.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StarResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "unstarConversation",
+        "summary": "Unstar a conversation (ADR-0212)",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Unstarred.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StarResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
     }
   },
   "components": {
@@ -90,7 +187,8 @@
         "properties": {
           "session_id": { "type": "string", "description": "Caller-generated correlation ID for this chat session." },
           "message": { "type": "string", "minLength": 1 },
-          "project_id": { "type": "string", "description": "ADR-0209: scopes this turn to a project's durable, cross-session, cross-agent memory (knowledge.project). Optional - omitted or empty means no project memory is read or written for this turn. Propagated to the Agent Runtime exactly as received, following the same identity-propagation pattern as ADR-0032/0033 - this BFF never validates or resolves project membership itself." }
+          "project_id": { "type": "string", "description": "ADR-0209: scopes this turn to a project's durable, cross-session, cross-agent memory (knowledge.project). Optional - omitted or empty means no project memory is read or written for this turn. Propagated to the Agent Runtime exactly as received, following the same identity-propagation pattern as ADR-0032/0033 - this BFF never validates or resolves project membership itself." },
+          "run_id": { "type": "string", "description": "ADR-0212: identifies the conversation to resume. Optional - omit to start a new conversation (the Agent Runtime mints a fresh run_id, returned in the SSE 'start' event); supply a prior run_id to resume it from its last checkpoint. Propagated to the Agent Runtime exactly as received, which enforces ownership - this BFF does not validate it itself." }
         }
       },
       "Citation": {
@@ -107,6 +205,49 @@
         "properties": {
           "reply": { "type": "string" },
           "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } }
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "description": "ADR-0212: one entry of the caller's own conversation list.",
+        "required": ["run_id", "title", "updated_at", "starred"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "title": { "type": "string" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "starred": { "type": "boolean" }
+        }
+      },
+      "TranscriptTurn": {
+        "type": "object",
+        "description": "ADR-0212: one turn of a conversation's structured message history.",
+        "required": ["role", "content", "ts"],
+        "properties": {
+          "role": { "type": "string", "enum": ["user", "assistant"] },
+          "content": { "type": "string" },
+          "ts": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RenameRequest": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 }
+        }
+      },
+      "RenameResponse": {
+        "type": "object",
+        "required": ["run_id", "title"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "title": { "type": "string" }
+        }
+      },
+      "StarResponse": {
+        "type": "object",
+        "required": ["starred"],
+        "properties": {
+          "starred": { "type": "boolean" }
         }
       },
       "ErrorResponse": {
