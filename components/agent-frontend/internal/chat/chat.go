@@ -63,6 +63,13 @@ type chatConfig struct {
 	// future deployment split (e.g. serving the API from a different
 	// path/host) doesn't require a frontend code change.
 	ApiURL string `json:"apiURL"`
+	// ConversationsURL is this same-origin page's own conversation-list
+	// base (ADR-0212), always "/api/conversations" today - same
+	// injected-rather-than-hardcoded rationale as ApiURL above. The
+	// client builds the other three conversation endpoints
+	// (transcript/rename/star) by appending to this base at request time,
+	// since each also needs a run_id it doesn't know until then.
+	ConversationsURL string `json:"conversationsURL"`
 }
 
 type pageView struct {
@@ -88,13 +95,14 @@ func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset)
 		}
 
 		cfg := chatConfig{
-			DisplayName:     agent.Zuno.UI.DisplayName,
-			Subject:         sess.Subject,
-			UserDisplayName: sess.DisplayName(),
-			HomeURL:         "/",
-			LogoutURL:       "/logout",
-			ProfileURL:      "/profile",
-			ApiURL:          "/api/chat",
+			DisplayName:      agent.Zuno.UI.DisplayName,
+			Subject:          sess.Subject,
+			UserDisplayName:  sess.DisplayName(),
+			HomeURL:          "/",
+			LogoutURL:        "/logout",
+			ProfileURL:       "/profile",
+			ApiURL:           "/api/chat",
+			ConversationsURL: "/api/conversations",
 		}
 		configJSON, err := json.Marshal(cfg) // HTML-escaped by default - see portal.go's comment
 		if err != nil {
@@ -117,6 +125,10 @@ func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset)
 type chatRequest struct {
 	SessionID string `json:"session_id"`
 	Message   string `json:"message"`
+	// RunID (ADR-0212) is optional - omit to start a new conversation, or
+	// send a prior response's run_id (captured from the SSE "start"
+	// event) to resume it.
+	RunID string `json:"run_id,omitempty"`
 }
 
 // bffChatRequest is forwarded to the BFF's POST /api/chat (see
@@ -124,6 +136,7 @@ type chatRequest struct {
 type bffChatRequest struct {
 	SessionID string `json:"session_id"`
 	Message   string `json:"message"`
+	RunID     string `json:"run_id,omitempty"`
 }
 
 // APIHandler proxies a validated, authorized chat turn to the BFF.
@@ -174,6 +187,7 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 		body, err := json.Marshal(bffChatRequest{
 			SessionID: req.SessionID,
 			Message:   req.Message,
+			RunID:     req.RunID,
 		})
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -215,6 +229,53 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 			proxySSE(w, resp)
 			return
 		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
+	}
+}
+
+// ConversationsProxyHandler forwards any method/path under
+// /api/conversations... (ADR-0212: list, transcript, rename, star/unstar)
+// to the BFF's identically-shaped route, attaching the caller's session
+// access token as a Bearer credential - the same session-gated
+// reverse-proxy shape as APIHandler's /api/chat above, minus its SSE-relay
+// branch (none of these routes stream). Registered under several
+// method+pattern combinations in main.go, since it needs no per-route
+// parameter - request method and path alone decide where it forwards.
+func ConversationsProxyHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) http.HandlerFunc {
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess, err := sessions.Load(r)
+		if err != nil || sess == nil {
+			http.Error(w, "not authenticated", http.StatusUnauthorized)
+			return
+		}
+		if !agent.AllowsAnyGroup(sess.Groups) {
+			http.Error(w, "not authorized for this agent", http.StatusForbidden)
+			return
+		}
+
+		target := bffBaseURL + r.URL.Path
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		bffReq, err := http.NewRequestWithContext(r.Context(), r.Method, target, io.LimitReader(r.Body, 1<<20))
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		bffReq.Header.Set("Content-Type", "application/json")
+		bffReq.Header.Set("Authorization", "Bearer "+sess.AccessToken)
+
+		resp, err := httpClient.Do(bffReq)
+		if err != nil {
+			http.Error(w, "agent backend unreachable", http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.StatusCode)

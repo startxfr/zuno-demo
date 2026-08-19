@@ -116,6 +116,15 @@ func main() {
 	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, sessions, chatAsset))
 	mux.HandleFunc("/api/chat", chat.APIHandler(activeAgent, cfg.BFFBaseURL, sessions))
 
+	// ADR-0212: persistent conversations, same session-gated reverse-proxy
+	// shape as /api/chat above but via one method/path-agnostic handler.
+	conversationsProxy := chat.ConversationsProxyHandler(activeAgent, cfg.BFFBaseURL, sessions)
+	mux.HandleFunc("GET /api/conversations", conversationsProxy)
+	mux.HandleFunc("GET /api/conversations/{run_id}/transcript", conversationsProxy)
+	mux.HandleFunc("PATCH /api/conversations/{run_id}", conversationsProxy)
+	mux.HandleFunc("PUT /api/conversations/{run_id}/star", conversationsProxy)
+	mux.HandleFunc("DELETE /api/conversations/{run_id}/star", conversationsProxy)
+
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           mux,

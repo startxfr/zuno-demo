@@ -41,6 +41,12 @@ export interface ChatConfig {
   // Same-origin path this page's Go server proxies to the BFF
   // (components/agent-frontend/internal/chat/chat.go's APIHandler).
   apiURL: string;
+  // ADR-0212: same-origin base this page's Go server proxies to the BFF's
+  // conversation-management routes (internal/chat/chat.go's
+  // ConversationsProxyHandler) - always "/api/conversations" today.
+  // shared/ConversationList.tsx builds the transcript/rename/star
+  // endpoints by appending to this base at request time.
+  conversationsURL: string;
 }
 
 // Shape of the JSON config Go injects for the read-only /profile page

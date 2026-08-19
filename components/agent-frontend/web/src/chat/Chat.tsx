@@ -24,6 +24,8 @@ import {
 import { Flex, FlexItem } from "@patternfly/react-core";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
+import { ConversationList } from "../shared/ConversationList";
+import { getTranscript } from "../shared/conversations";
 import { Footer } from "../shared/Footer";
 import { SSEParser } from "../shared/sse";
 import { UserMenu } from "../shared/UserMenu";
@@ -55,13 +57,60 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
   const [error, setError] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
   const logRef = React.useRef<HTMLDivElement | null>(null);
+  // session_id (ADR-0045) is a per-page-load tracing/correlation id,
+  // unrelated to run_id below - the backend still requires it on every
+  // request regardless of whether this turn starts or resumes a
+  // conversation.
   const sessionId = React.useRef(`sess-${Math.random().toString(36).slice(2)}-${Date.now()}`);
+  // ADR-0212: identifies the conversation - null until either seeded from
+  // a `?run_id=` URL param (a reopened conversation, below) or captured
+  // from the SSE "start" event on this tab's first message (a brand new
+  // one).
+  const [runId, setRunId] = React.useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = React.useState(false);
+  // Bumped whenever this tab's own action should be reflected in the left
+  // panel (a new conversation appearing, a title changing) - the sidebar
+  // has no other way to know, since this app has no shared store/context.
+  const [conversationsRefreshToken, setConversationsRefreshToken] = React.useState(0);
 
   React.useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [messages, toolStatus]);
+
+  // ADR-0212: the frontend half of ADR-0103's resume contract, exercised
+  // end to end for the first time - seeded from a `?run_id=` query
+  // parameter (set either by shared/tabTracker.ts's window.open or by
+  // this same effect's own history.replaceState below on a fresh
+  // conversation's first reply), fetching the exact prior message
+  // history rather than starting empty.
+  React.useEffect(() => {
+    const seeded = new URLSearchParams(window.location.search).get("run_id");
+    if (!seeded) {
+      return;
+    }
+    setRunId(seeded);
+    setLoadingHistory(true);
+    getTranscript(config.conversationsURL, seeded)
+      .then((turns) => {
+        setMessages(
+          turns.map((t) => ({
+            id: newId(),
+            role: t.role === "user" ? "user" : "agent",
+            content: t.content,
+          })),
+        );
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setLoadingHistory(false));
+    // Intentionally run once on mount only - run_id is captured into
+    // state above and driven by the SSE "start" event thereafter, not by
+    // watching the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateMessage(id: string, patch: Partial<ChatMessage>) {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
@@ -91,7 +140,11 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           "Content-Type": "application/json",
           Accept: "text/event-stream",
         },
-        body: JSON.stringify({ session_id: sessionId.current, message: text }),
+        body: JSON.stringify({
+          session_id: sessionId.current,
+          message: text,
+          run_id: runId ?? undefined,
+        }),
         signal: controller.signal,
       });
 
@@ -122,6 +175,17 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         for (const evt of events) {
           if (evt.event === "start") {
             const data = JSON.parse(evt.data) as StartEventData;
+            setRunId(data.run_id);
+            setConversationsRefreshToken((n) => n + 1);
+            // A brand new conversation's first reply: the URL had no
+            // run_id yet, so a refresh (or copy-pasting the link) would
+            // otherwise lose it - matches what a reopened conversation's
+            // ?run_id= already provides.
+            const url = new URL(window.location.href);
+            if (url.searchParams.get("run_id") !== data.run_id) {
+              url.searchParams.set("run_id", data.run_id);
+              window.history.replaceState(null, "", url.toString());
+            }
             // eslint-disable-next-line no-console
             console.debug("zuno chat request_id", data.request_id);
           } else if (evt.event === "tool") {
@@ -168,6 +232,15 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
 
   return (
     <Page
+      sidebar={
+        <ConversationList
+          agent={config.displayName}
+          conversationsURL={config.conversationsURL}
+          chatURL={window.location.pathname}
+          activeRunId={runId}
+          refreshSignal={conversationsRefreshToken}
+        />
+      }
       masthead={
         <Masthead>
           <MastheadMain>
@@ -199,7 +272,13 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
     >
       <PageSection isFilled aria-label="Chat transcript">
         <div ref={logRef} style={{ height: "100%", overflowY: "auto" }}>
-          {messages.length === 0 ? (
+          {loadingHistory ? (
+            <EmptyState titleText="Loading conversation…" headingLevel="h2">
+              <EmptyStateBody>
+                <Spinner size="lg" aria-label="Loading conversation history" />
+              </EmptyStateBody>
+            </EmptyState>
+          ) : messages.length === 0 ? (
             <EmptyState titleText="Ask a technical question" headingLevel="h2">
               <EmptyStateBody>
                 {config.displayName} answers from Zuno's technical documentation and, when relevant,

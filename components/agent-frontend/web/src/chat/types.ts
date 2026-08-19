@@ -8,6 +8,10 @@ export interface Citation {
 
 export interface StartEventData {
   request_id: string;
+  // ADR-0212: identifies this conversation - unchanged from ADR-0103's
+  // contract, but captured by Chat.tsx for the first time here (this
+  // component's own half of the resume contract).
+  run_id: string;
 }
 
 export interface TokenEventData {
