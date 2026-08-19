@@ -78,13 +78,22 @@ pipelineServer:
   name: mlops-dspa
   pipelineStore: kubernetes
   cacheEnabled: true
+  # Switched to externalMySQL 2026-08-19: embeddedMariaDB mode (DSPO's own
+  # self-managed pod) has no way to exclude port 3306 from istio's
+  # protocol-sniffing interception (no such field on the DSPA CRD's
+  # database.mariaDB), so its DatabaseAvailable health check stalls
+  # ("context deadline exceeded") - fatal after a cluster restart, this
+  # was never actually reliable. Points at the same shared, already
+  # mesh-excluded gitops/charts/mariadb instance rag-dspa uses
+  # successfully (its own mlpipeline database, this one's mlops sibling -
+  # see that chart's templates/database-mlops.yaml).
   metadataDatabase:
-    mode: embeddedMariaDB
+    mode: externalMySQL
     externalMySQL:
-      host: ""
+      host: "mariadb.zuno-data.svc.cluster.local"
       port: "3306"
-      username: ""
-      database: ""
+      username: mlops
+      database: mlops
       secretName: mlops-dspa-mysql-credentials
       externalSecret:
         remoteKey: mlops/dspa-mysql

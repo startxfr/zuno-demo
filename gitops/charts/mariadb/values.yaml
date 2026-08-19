@@ -166,3 +166,15 @@ pipelineDatabase:
   name: mlpipeline
   owner: mlpipeline
   vaultPath: rag/pipeline-db
+
+# WP-06 follow-up (2026-08-19): second pipeline database on this same
+# shared instance, for mlops-dspa - see templates/database-mlops.yaml's
+# header comment for why (mlops-dspa's own embeddedMariaDB mode is
+# permanently broken post-restart: DSPO's health-check probe can't reach
+# its self-managed, non-mesh-excluded pod). vaultPath matches
+# gitops/charts/mlops/values.yaml's own metadataDatabase.externalMySQL.
+# externalSecret.remoteKey (mlops/dspa-mysql, already scaffolded there).
+mlopsDatabase:
+  name: mlops
+  owner: mlops
+  vaultPath: mlops/dspa-mysql
