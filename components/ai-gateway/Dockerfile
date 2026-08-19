@@ -18,6 +18,12 @@
 ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim
 FROM ${BASE_IMAGE} AS base
 
+# ADR-0115 (WP-04): patch known HIGH CVEs baked into the upstream base image
+# at build time - apt upgrade picks up Debian's patched util-linux/bsdutils
+# (CVE-2026-53615), pip upgrade picks up patched pip/setuptools/wheel.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir --upgrade pip setuptools wheel
+
 WORKDIR /app
 
 COPY components/ai-gateway/requirements.txt ./requirements.txt

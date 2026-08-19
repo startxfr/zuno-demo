@@ -15,7 +15,7 @@
 # the real public registries below, since its GitHub-hosted runners can't
 # reach the cluster-internal mirror at all.
 ARG NODE_BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/node:20-alpine
-ARG GOLANG_BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.24
+ARG GOLANG_BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/golang:1.26
 ARG RUNTIME_BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ubi9-ubi-minimal:9
 
 # ADR-0044: reproducible frontend toolchain (Vite) producing static PatternFly

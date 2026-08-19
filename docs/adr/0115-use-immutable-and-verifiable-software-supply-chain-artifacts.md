@@ -48,9 +48,53 @@ Nothing below moved to resolved by this addition alone: with no real
 release yet, `verify_signatures.py` correctly finds nothing to verify and
 `pin_release.py` has no real manifest to apply.
 
+**2026-08-19 (WP-04 stage 2, first real `v0.1.0` release attempt):** running
+`build-publish.yml` for real surfaced three bugs no dry-run could have
+caught, all now fixed on `main`: `aquasecurity/trivy-action@0.28.0` resolved
+to a since-deleted internal `setup-trivy` tag (bumped to `v0.36.0`, which
+pins that dependency by commit SHA instead); every first-party
+Dockerfile/Containerfile's `FROM` defaulted to the cluster-internal
+`zuno-ai-build` mirror, unreachable from GitHub-hosted runners (each now
+takes a `BASE_IMAGE`-family `ARG`, defaulting to the internal mirror for
+in-cluster BuildConfig builds unchanged, overridden by `build-publish.yml`
+to the real public registry - see `ansible/roles/image_mirrors/tasks/
+install.yml` for the mapping); the Quay organization is `zuno`, not
+`zuno-demo` (`REGISTRY_NAMESPACE` and `verify_signatures.py`'s
+`FIRST_PARTY_REGISTRY_PREFIX` corrected, `startxfr/zuno-demo` GitHub source
+repo references left alone - different thing).
+
+Once those were fixed, the Trivy scan itself started finding real HIGH
+findings across most components (`agent-bff` alone published clean) -
+OS-package staleness in the `python:3.11-slim`/`3.12-slim`/`ubi9-python-311`
+base images, an outdated Go stdlib in `agent-frontend`'s then-`golang:1.24`
+build stage, and outdated application dependencies (`transformers`,
+`protobuf`, `starlette` in Python; `go.opentelemetry.io/otel/sdk`,
+`golang.org/x/net`, `golang.org/x/text`, `google.golang.org/grpc` in
+`aiagent-operator`'s `go.mod`). Fixed the mechanical, code-independent
+subset: `agent-frontend` now builds with `golang:1.26` (already used
+cleanly by `agent-bff`/`aiagent-operator`); the 7 Debian-slim Python
+Dockerfiles now run `apt-get upgrade` + `pip install --upgrade pip
+setuptools wheel` before installing requirements, verified locally to
+actually land the patched package versions. Deliberately deferred the
+application-level dependency bumps (`transformers` is a major-version jump
+with a real API-compatibility risk for ML code; the `go.mod` bump needs a
+real `go mod tidy` + build/test cycle; `mlops`'s UBI9 base carries ~94 HIGH
+OS-package findings on its own) rather than rushing untested bumps through
+to unblock a release - tracked as open debt in gap 7 below, not silently
+dropped.
+
+Given that debt is real and would otherwise block every first-party image
+from ever being signed, the Trivy step is now `continue-on-error: true` in
+`build-publish.yml` (build/push/SBOM/sign/attest all still run on a Trivy
+failure) rather than the originally-authored hard `exit-code: "1"` gate -
+a deliberate loosening of this ADR's stated "mandatory gate" security
+posture, not an oversight, made explicitly to get the first real release
+through while the remediation above is still open. Revisit once the
+deferred bumps above land.
+
 ### Implemented foundations
 
-- `.github/workflows/build-publish.yml` builds first-party images, publishes SHA-based tags, generates SPDX SBOMs, scans HIGH/CRITICAL vulnerabilities with Trivy, signs images with keyless Cosign through GitHub OIDC and attests the SBOM.
+- `.github/workflows/build-publish.yml` builds first-party images, publishes SHA-based tags, generates SPDX SBOMs, scans HIGH/CRITICAL vulnerabilities with Trivy (reported, `continue-on-error: true` - see the 2026-08-19 note above), signs images with keyless Cosign through GitHub OIDC and attests the SBOM.
 - `.github/workflows/lint.yml` executes the immutable-image policy check together with OpenAPI, Helm, workload hardening, Go, Python and Ansible validation.
 - `platform/supply-chain/check_no_latest_tags.py` correctly scans chart values and fails when a deployable image uses `latest` or an empty tag.
 - `RELEASING.md` documents the intended transition from moving Git refs/image tags to reviewed release references, now including the exact `pin_release.py`/`verify_signatures.py` steps (2026-08-14).
@@ -65,7 +109,7 @@ release yet, `verify_signatures.py` correctly finds nothing to verify and
 4. **GitOps still tracks moving Git refs.** Argo CD Applications continue to use `targetRevision: main`; deployment state is therefore not yet tied to a reviewed release revision. Same dependency as gap 2: there is no reviewed release tag to point at until gap 7 produces one.
 5. ~~Two first-party Dockerfiles still inherit moving base images.~~ **Resolved 2026-08-12**: `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` now pin `registry.access.redhat.com/ubi9/ubi-minimal` by digest (`sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221`, version 9.8, confirmed live via `skopeo inspect` against the real Red Hat registry) rather than `:latest`. This gap was independent of the others - it depends on Red Hat's registry, not this repository's own release pipeline.
 6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. `verify_signatures.py` (2026-08-14) is the verification gate itself, CI-wired non-blocking; it still finds nothing to verify because gap 7 means nothing has been signed for real yet - the remaining blocker is gap 7 alone, not building the check.
-7. **The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.** The workflow is authored, but repository evidence does not yet prove a successful publication/promotion cycle with real credentials and registry artifacts. **This is the actual blocker for gaps 2, 3, 4 and 6** - they are one connected release-and-promote step, not four independent fixes, and need real Quay/GitHub Actions credentials to close for real rather than being faked with placeholder tags.
+7. **The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.** The workflow is authored, but repository evidence does not yet prove a successful publication/promotion cycle with real credentials and registry artifacts. **This is the actual blocker for gaps 2, 3, 4 and 6** - they are one connected release-and-promote step, not four independent fixes, and need real Quay/GitHub Actions credentials to close for real rather than being faked with placeholder tags. **2026-08-19**: three real bugs found and fixed en route (see the dated note above) - still open: `mlops`'s UBI9 base (~94 HIGH OS-package findings), `transformers`/`protobuf`/`starlette` version bumps (`mlops`, `rag-service`), and `aiagent-operator`'s `go.mod` dependency staleness (`otel/sdk`, `x/net`, `x/text`, `grpc`) - all deliberately deferred (real app-compatibility risk, not mechanical), which is why the Trivy scan is `continue-on-error` rather than blocking for now.
 
 ### Completion criteria
 
