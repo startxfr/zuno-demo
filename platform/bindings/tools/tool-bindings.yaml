@@ -39,6 +39,19 @@
 # contacting any backend, and startup/readiness validation flags policy
 # capabilities lacking a valid binding (ADR-0116 Operational
 # considerations).
+#
+# ADR-0119: an optional top-level `backends:` map (backend name -> default
+# {env, default, path}) lets a streamable-http entry omit its own
+# `endpoint:` block when every capability of that backend shares one -
+# useful once a backend has many capabilities (a growing integration
+# catalog). A per-entry `endpoint:` still always wins when present;
+# nothing existing below needs to change. Example:
+#
+# backends:
+#   some-backend:
+#     env: SOME_BACKEND_MCP_URL
+#     default: "http://some-backend-mcp.zuno-ai-run.svc:8000"
+#     path: /mcp
 
 bindings:
   # --- sales-db: real MCP server (ADR-0043), streamable-HTTP transport ---

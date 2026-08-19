@@ -38,6 +38,8 @@ jobs:
         continue-on-error: true
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
+      - name: MCP server conformance (ADR-0119)
+        run: python3 platform/supply-chain/check_mcp_server_conformance.py
       # ADR-0106: schema/policy validity (dimensions 2-3 of the ADR's three
       # checks) is verifiable on every PR with no signature needed, so this
       # is a hard gate like check_build_matrix.py above - unlike signature
@@ -183,6 +185,14 @@ jobs:
           python3 tests/test_mcp_protocol.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_mcp_protocol.py
+      # ADR-0119: was missing (a real gap the new
+      # check_mcp_server_conformance.py checker caught) - these tests
+      # existed but never ran in CI.
+      - name: salesforce MCP server tests
+        working-directory: components/mcp-servers/salesforce
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py

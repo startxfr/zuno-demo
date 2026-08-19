@@ -362,7 +362,10 @@ def main() -> int:
     # NetworkPolicy coverage: every zuno-ai-run workload chart (no namespace
     # baseline covers them - ADR-0037) plus the platform-namespace-baseline
     # owner and rag-service's precise cross-namespace policy.
-    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-sales-db", "mcp-confluence", "rag-service", "models"]:
+    # ADR-0119: mcp-salesforce was missing here (a real gap the new
+    # check_mcp_server_conformance.py checker caught) - same class of
+    # omission as ADR-0111's own comment above for mcp-confluence.
+    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-sales-db", "mcp-confluence", "mcp-salesforce", "rag-service", "models"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

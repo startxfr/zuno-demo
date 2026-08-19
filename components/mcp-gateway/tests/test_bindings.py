@@ -186,6 +186,57 @@ bindings:
     assert "auth_mode" in (unknown.load_error or "")
 
 
+def test_backends_default_endpoint_used_when_entry_omits_its_own() -> None:
+    """ADR-0119: an entry may omit `endpoint:` when its `backend` has a
+    default in the top-level `backends:` map; a per-entry `endpoint:`
+    still wins when both are present."""
+    registry = _registry_from(
+        """
+backends:
+  x:
+    env: TEST_X_MCP_URL
+    default: "http://x-mcp.zuno-ai-run.svc:8000"
+    path: /mcp
+
+bindings:
+  - capability: a.b.read
+    backend: x
+    transport: streamable-http
+    provider_tool: t1
+    auth_mode: service-identity
+  - capability: a.c.read
+    backend: x
+    transport: streamable-http
+    provider_tool: t2
+    auth_mode: service-identity
+    endpoint:
+      env: TEST_X_OVERRIDE_MCP_URL
+      default: "http://x-override-mcp.zuno-ai-run.svc:9000"
+      path: /mcp
+"""
+    )
+    assert registry.loaded, registry.load_error
+    inherited = registry.resolve("a.b.read")
+    assert inherited.endpoint_url() == "http://x-mcp.zuno-ai-run.svc:8000/mcp"
+    overridden = registry.resolve("a.c.read")
+    assert overridden.endpoint_url() == "http://x-override-mcp.zuno-ai-run.svc:9000/mcp"
+
+
+def test_streamable_http_without_endpoint_or_backend_default_rejected_at_load() -> None:
+    registry = _registry_from(
+        """
+bindings:
+  - capability: a.b.read
+    backend: unbacked
+    transport: streamable-http
+    provider_tool: t1
+    auth_mode: service-identity
+"""
+    )
+    assert not registry.loaded
+    assert "endpoint" in (registry.load_error or "")
+
+
 def test_invoke_without_binding_is_deterministic_502() -> None:
     async def run() -> None:
         try:
@@ -282,6 +333,8 @@ TESTS = [
     test_duplicate_capability_rejected_at_load,
     test_malformed_entries_rejected_at_load,
     test_binding_without_auth_mode_fails_to_load,
+    test_backends_default_endpoint_used_when_entry_omits_its_own,
+    test_streamable_http_without_endpoint_or_backend_default_rejected_at_load,
     test_invoke_without_binding_is_deterministic_502,
     test_invoke_with_unknown_handler_is_deterministic_502,
     test_evaluate_treats_capability_and_alias_as_one_tool,

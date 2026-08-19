@@ -17,6 +17,15 @@ Two failure modes:
   - a first-party `components/**/Dockerfile` exists but has no matrix
     entry at all (a build artifact silently missing from the inventory).
 
+ADR-0119 (WP-057): `components/mcp-servers/*/Dockerfile` is deliberately
+excluded from the second check above - those are built by the
+`discover-mcp-servers`/`build-publish-sign-mcp-servers` job pair instead
+of a hand-listed matrix entry (every MCP server shares the same
+context/build_args shape). This script instead verifies that discovery
+job still actually targets `components/mcp-servers`, so the exclusion
+can't quietly turn into a real silent gap if that job is ever edited
+away.
+
 Run from the repository root:
 
     python3 platform/supply-chain/check_build_matrix.py
@@ -33,6 +42,9 @@ import yaml
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-publish.yml"
 MATRIX_JOB = "build-publish-sign"
+MCP_DISCOVERY_JOB = "discover-mcp-servers"
+MCP_MATRIX_JOB = "build-publish-sign-mcp-servers"
+MCP_SERVERS_DIR = "components/mcp-servers"
 
 
 @dataclass
@@ -40,8 +52,11 @@ class Finding:
     message: str
 
 
-def _load_matrix_entries() -> List[dict]:
-    doc = yaml.safe_load(WORKFLOW_PATH.read_text())
+def _load_workflow() -> dict:
+    return yaml.safe_load(WORKFLOW_PATH.read_text())
+
+
+def _load_matrix_entries(doc: dict) -> List[dict]:
     job = doc["jobs"][MATRIX_JOB]
     return job["strategy"]["matrix"]["include"]
 
@@ -78,10 +93,14 @@ def _check_orphaned_dockerfiles(entries: List[dict]) -> List[Finding]:
         pathlib.Path(entry["dockerfile"]).resolve() for entry in entries
     }
     actual_dockerfiles = (REPO_ROOT / "components").glob("**/Dockerfile")
+    mcp_servers_dir = (REPO_ROOT / MCP_SERVERS_DIR).resolve()
 
     findings: List[Finding] = []
     for dockerfile in actual_dockerfiles:
-        if dockerfile.resolve() not in matrix_dockerfiles:
+        resolved = dockerfile.resolve()
+        if mcp_servers_dir in resolved.parents:
+            continue  # covered by discover-mcp-servers instead - see _check_mcp_discovery_job
+        if resolved not in matrix_dockerfiles:
             rel = dockerfile.relative_to(REPO_ROOT)
             findings.append(
                 Finding(
@@ -92,9 +111,49 @@ def _check_orphaned_dockerfiles(entries: List[dict]) -> List[Finding]:
     return findings
 
 
+def _check_mcp_discovery_job(doc: dict) -> List[Finding]:
+    findings: List[Finding] = []
+    jobs = doc.get("jobs", {})
+
+    discovery = jobs.get(MCP_DISCOVERY_JOB)
+    if discovery is None:
+        findings.append(Finding(f"workflow has no '{MCP_DISCOVERY_JOB}' job (ADR-0119)"))
+    else:
+        run_steps = " ".join(step.get("run", "") for step in discovery.get("steps", []))
+        if MCP_SERVERS_DIR not in run_steps:
+            findings.append(
+                Finding(
+                    f"'{MCP_DISCOVERY_JOB}' job no longer discovers '{MCP_SERVERS_DIR}' - "
+                    "components/mcp-servers/*/Dockerfile would silently stop being built"
+                )
+            )
+
+    consumer = jobs.get(MCP_MATRIX_JOB)
+    if consumer is None:
+        findings.append(Finding(f"workflow has no '{MCP_MATRIX_JOB}' job (ADR-0119)"))
+    else:
+        matrix_name = (
+            consumer.get("strategy", {}).get("matrix", {}).get("name", "")
+        )
+        if f"needs.{MCP_DISCOVERY_JOB}.outputs.servers" not in str(matrix_name):
+            findings.append(
+                Finding(
+                    f"'{MCP_MATRIX_JOB}' job's matrix no longer consumes "
+                    f"'{MCP_DISCOVERY_JOB}' outputs"
+                )
+            )
+
+    return findings
+
+
 def main() -> int:
-    entries = _load_matrix_entries()
-    findings = _check_matrix_entries(entries) + _check_orphaned_dockerfiles(entries)
+    doc = _load_workflow()
+    entries = _load_matrix_entries(doc)
+    findings = (
+        _check_matrix_entries(entries)
+        + _check_orphaned_dockerfiles(entries)
+        + _check_mcp_discovery_job(doc)
+    )
 
     print(f"Checked {len(entries)} build-matrix entries against {WORKFLOW_PATH.relative_to(REPO_ROOT)}.")
     if not findings:

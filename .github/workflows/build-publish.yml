@@ -31,6 +31,26 @@ env:
   REGISTRY_NAMESPACE: zuno
 
 jobs:
+  # ADR-0119 (WP-057): discovers every components/mcp-servers/<name> with a
+  # Dockerfile, feeding the dynamic matrix below - a new MCP server needs
+  # no entry here at all (unlike every other component in this workflow),
+  # only components/mcp-servers/<name>/Dockerfile + requirements.txt +
+  # server.py to exist. platform/supply-chain/check_build_matrix.py
+  # verifies this job's discovery command still targets
+  # components/mcp-servers, so this can't silently rot into a no-op.
+  discover-mcp-servers:
+    runs-on: ubuntu-latest
+    outputs:
+      servers: ${{ steps.discover.outputs.servers }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Discover components/mcp-servers/*/Dockerfile
+        id: discover
+        run: |
+          servers=$(find components/mcp-servers -mindepth 1 -maxdepth 1 -type d \
+            -exec test -e '{}/Dockerfile' \; -print | xargs -n1 basename | sort | jq -R -s -c 'split("\n")[:-1]')
+          echo "servers=${servers}" >> "$GITHUB_OUTPUT"
+
   build-publish-sign:
     runs-on: ubuntu-latest
     strategy:
@@ -87,21 +107,13 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim
-          - name: mcp-sales-db
-            dockerfile: components/mcp-servers/sales-db/Dockerfile
-            context: components/mcp-servers/sales-db
-            build_args: |
-              BASE_IMAGE=docker.io/library/python:3.12-slim
-          - name: mcp-confluence
-            dockerfile: components/mcp-servers/confluence/Dockerfile
-            context: components/mcp-servers/confluence
-            build_args: |
-              BASE_IMAGE=docker.io/library/python:3.12-slim
-          - name: mcp-salesforce
-            dockerfile: components/mcp-servers/salesforce/Dockerfile
-            context: components/mcp-servers/salesforce
-            build_args: |
-              BASE_IMAGE=docker.io/library/python:3.12-slim
+          # ADR-0119 (WP-057): sales-db/confluence/salesforce used to be
+          # listed here by hand, one entry each. They - and every future
+          # components/mcp-servers/<name>/Dockerfile - are now built by
+          # the discover-mcp-servers/build-publish-sign-mcp-servers job
+          # pair below instead, since every MCP server shares the same
+          # context/build_args shape (unlike the heterogeneous entries in
+          # this matrix). Do not re-add mcp-* server entries here.
           # ADR-0302/WP-34: unlike rag-ingestion (its own image is built
           # exclusively via the in-cluster OpenShift BuildConfig,
           # ansible/roles/rag_ingestion_build), mlops's own WP explicitly
@@ -195,6 +207,88 @@ jobs:
         run: cosign attest --yes --predicate "sbom-${{ matrix.name }}.spdx.json" --type spdxjson "${IMAGE}@${DIGEST}"
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+  # ADR-0119 (WP-057): builds every MCP server discover-mcp-servers found,
+  # mirroring build-publish-sign's own build/SBOM/scan/sign/attest steps -
+  # kept as a separate job (not folded into build-publish-sign's own
+  # matrix) because its entries are homogeneous (all under
+  # components/mcp-servers/<name>, all BASE_IMAGE=python:3.12-slim) and
+  # computed, not hand-listed, unlike every entry above.
+  build-publish-sign-mcp-servers:
+    needs: discover-mcp-servers
+    if: needs.discover-mcp-servers.outputs.servers != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        name: ${{ fromJson(needs.discover-mcp-servers.outputs.servers) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute immutable tags (ADR-0115 - never :latest)
+        id: tags
+        run: |
+          echo "sha_tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "release_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: components/mcp-servers/${{ matrix.name }}
+          file: components/mcp-servers/${{ matrix.name }}/Dockerfile
+          build-args: |
+            BASE_IMAGE=docker.io/library/python:3.12-slim
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}:${{ steps.tags.outputs.sha_tag }}
+            ${{ steps.tags.outputs.release_tag != '' && format('{0}/{1}/mcp-{2}:{3}', env.REGISTRY, env.REGISTRY_NAMESPACE, matrix.name, steps.tags.outputs.release_tag) || '' }}
+
+      - name: Generate SBOM (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-mcp-${{ matrix.name }}.spdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-mcp-${{ matrix.name }}
+          path: sbom-mcp-${{ matrix.name }}.spdx.json
+
+      - name: Scan for vulnerabilities (Trivy) - reports HIGH/CRITICAL, non-blocking
+        uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign the image (keyless)
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - name: Attest the SBOM to the image (keyless)
+        run: cosign attest --yes --predicate "sbom-mcp-${{ matrix.name }}.spdx.json" --type spdxjson "${IMAGE}@${DIGEST}"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}
           DIGEST: ${{ steps.build.outputs.digest }}
 
   # ADR-0106: sign every OKF agent bundle (agents/<agent>/) with the same

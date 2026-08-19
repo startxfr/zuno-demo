@@ -59,3 +59,31 @@ downstream call) lives in `components/mcp-gateway/app/main.py`'s
 `components/mcp-gateway/app/delegation.py`, currently a documented seam
 (no live Google Workspace tenant is reachable from this environment — see
 that module's docstring for what a real integration replaces).
+
+## Backend endpoint defaults (ADR-0119)
+
+An optional top-level `backends:` map lets every streamable-http entry of
+one backend share a default `{env, default, path}` instead of repeating it
+per capability — useful once a backend has several capabilities. A
+per-entry `endpoint:` still always wins when present; nothing written
+before this feature needs to change:
+
+```yaml
+backends:
+  some-backend:
+    env: SOME_BACKEND_MCP_URL
+    default: "http://some-backend-mcp.zuno-ai-run.svc:8000"
+    path: /mcp
+
+bindings:
+  - capability: some-backend.thing.read
+    backend: some-backend
+    transport: streamable-http
+    provider_tool: read_thing
+    auth_mode: service-identity
+    # no endpoint: here - inherits the `some-backend` default above
+```
+
+A streamable-http entry with neither its own `endpoint:` nor a matching
+`backends:` default fails to load, same fail-closed rule as any other
+malformed entry.

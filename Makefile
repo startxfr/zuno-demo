@@ -30,7 +30,7 @@ DAY1_VERBS := check install build uninstall all reinstall
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 new-mcp-server $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -57,9 +57,20 @@ help:
 	  '  make day1|d1 all [component]        check + build + install, whichever apply to the component' \
 	  '  make day1|d1 reinstall [component]  Uninstall then install one/all Day 1 components' \
 	  '' \
+	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
+	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
 	  'Day 1 components (check/install): $(DAY1_RUN_COMPONENTS)' \
 	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)'
+
+# ADR-0119: scaffold a new MCP server from the confluence-shaped template
+# instead of hand-copying an existing server directory-by-directory.
+new-mcp-server:
+	@if [[ -z "$(NAME)" ]]; then \
+	  echo "Usage: make new-mcp-server NAME=<name> [DESCRIPTION=\"...\"]" >&2; \
+	  exit 2; \
+	fi
+	python3 platform/scaffolding/new_mcp_server.py "$(NAME)" $(if $(DESCRIPTION),--description "$(DESCRIPTION)")
 
 credentials-check:
 	@kubeconfig="$${KUBECONFIG:-$$HOME/.kube/config}"; \

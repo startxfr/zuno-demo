@@ -1,8 +1,9 @@
 ---
-# Builds all four MCP images: the gateway, the sales-db tool server, the
-# confluence tool server (ADR-0117), and the salesforce tool server
-# (ADR-0326/WP-33). Drive/Gmail/web-search handlers still live inside
-# mcp-gateway itself, not as separate images.
+# Builds mcp-gateway, plus every real MCP server under
+# components/mcp-servers/<name>/Dockerfile (sales-db, confluence -
+# ADR-0117, salesforce - ADR-0326/WP-33, and any later one - ADR-0119/
+# WP-057). Drive/Gmail/web-search handlers still live inside mcp-gateway
+# itself, not as separate images.
 - name: "mcp_build | build mcp-gateway"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:
@@ -10,23 +11,25 @@
     build_dockerfile_path: components/mcp-gateway/Dockerfile
     build_context_dir: "."
 
-- name: "mcp_build | build mcp-sales-db"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
-  vars:
-    build_image_name: mcp-sales-db
-    build_dockerfile_path: Dockerfile
-    build_context_dir: components/mcp-servers/sales-db
+# ADR-0119 (WP-057): discovered, not hand-listed one block per server -
+# same reasoning as .github/workflows/build-publish.yml's
+# discover-mcp-servers job (every MCP server shares the same Dockerfile/
+# context shape).
+- name: "mcp_build | discover components/mcp-servers/*/Dockerfile"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/components/mcp-servers"
+    patterns: "Dockerfile"
+    recurse: true
+    depth: 2
+  register: _mcp_server_dockerfiles
 
-- name: "mcp_build | build mcp-confluence"
+- name: "mcp_build | build each discovered MCP server"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:
-    build_image_name: mcp-confluence
+    _mcp_server_name: "{{ item.path | dirname | basename }}"
+    build_image_name: "mcp-{{ _mcp_server_name }}"
     build_dockerfile_path: Dockerfile
-    build_context_dir: components/mcp-servers/confluence
-
-- name: "mcp_build | build mcp-salesforce"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
-  vars:
-    build_image_name: mcp-salesforce
-    build_dockerfile_path: Dockerfile
-    build_context_dir: components/mcp-servers/salesforce
+    build_context_dir: "components/mcp-servers/{{ _mcp_server_name }}"
+  loop: "{{ _mcp_server_dockerfiles.files }}"
+  loop_control:
+    label: "{{ item.path | dirname | basename }}"

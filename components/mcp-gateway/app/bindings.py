@@ -23,6 +23,16 @@ never inferred from the tool/capability name. Enforcement (which
 credential flow a mode actually requires) lives in app/main.py's
 ``invoke_tool``, not here - this module only guarantees the mode is
 always present and well-formed by the time a binding resolves.
+
+ADR-0119: an optional top-level ``backends:`` map (backend name ->
+default ``{env, default, path}``) lets a streamable-http entry omit its
+own ``endpoint:`` block when it shares one with every other capability of
+the same backend - at catalog scale (many capabilities per server), most
+of a backend's entries would otherwise repeat an identical block. A
+per-entry ``endpoint:`` still always wins when present (backward
+compatible with every binding written before this - none of them need to
+change). This is purely a YAML-authoring convenience; resolution
+semantics (env-first, then default, ADR-0116) are unchanged.
 """
 
 from __future__ import annotations
@@ -57,23 +67,33 @@ class Binding:
     provider_tool: str
     auth_mode: str
     aliases: List[str] = field(default_factory=list)
-    # streamable-http only: {env, default, path}
+    # streamable-http only: {env, default, path}. May be omitted when
+    # `backends:` (ADR-0119) declares a default for this binding's
+    # `backend` name - see `_effective_endpoint()`.
     endpoint: Optional[Dict[str, str]] = None
     # in-process only: handler module name under app/handlers/
     handler: Optional[str] = None
+    # ADR-0119: this binding's `backend` entry in the top-level
+    # `backends:` map, if any - set by BindingRegistry.reload(), never by
+    # a caller. Used only as a fallback when `endpoint` is absent.
+    backend_default_endpoint: Optional[Dict[str, str]] = None
 
     def all_names(self) -> List[str]:
         """The capability plus its aliases - the equivalence set used for
         policy/agent-declaration matching during migration."""
         return [self.capability, *self.aliases]
 
+    def _effective_endpoint(self) -> Optional[Dict[str, str]]:
+        return self.endpoint or self.backend_default_endpoint
+
     def endpoint_url(self) -> str:
         """Resolve the backend base URL at call time (environment first,
         registry default second) - binding data, never caller-supplied."""
-        if not self.endpoint:
+        endpoint = self._effective_endpoint()
+        if not endpoint:
             raise ValueError(f"binding '{self.capability}' has no endpoint")
-        base = os.getenv(self.endpoint.get("env", ""), "") or self.endpoint.get("default", "")
-        return f"{base}{self.endpoint.get('path', '')}"
+        base = os.getenv(endpoint.get("env", ""), "") or endpoint.get("default", "")
+        return f"{base}{endpoint.get('path', '')}"
 
 
 class BindingRegistry:
@@ -94,6 +114,10 @@ class BindingRegistry:
             try:
                 with open(self._path, "r", encoding="utf-8") as fh:
                     raw_doc = yaml.safe_load(fh) or {}
+                # ADR-0119: optional backend-name -> default {env, default,
+                # path} map, consulted only when an entry has no endpoint
+                # of its own.
+                backends_defaults: Dict[str, Dict[str, str]] = dict(raw_doc.get("backends", {}) or {})
                 for item in raw_doc.get("bindings", []):
                     binding = Binding(
                         capability=item["capability"],
@@ -108,6 +132,7 @@ class BindingRegistry:
                         aliases=list(item.get("aliases", [])),
                         endpoint=item.get("endpoint"),
                         handler=item.get("handler"),
+                        backend_default_endpoint=backends_defaults.get(item["backend"]),
                     )
                     problem = _validate(binding)
                     if problem:
@@ -185,8 +210,11 @@ def _validate(binding: Binding) -> Optional[str]:
             f"binding '{binding.capability}' has unknown transport "
             f"'{binding.transport}' (expected one of {sorted(VALID_TRANSPORTS)})"
         )
-    if binding.transport == "streamable-http" and not binding.endpoint:
-        return f"streamable-http binding '{binding.capability}' is missing its endpoint"
+    if binding.transport == "streamable-http" and not binding._effective_endpoint():
+        return (
+            f"streamable-http binding '{binding.capability}' is missing its endpoint "
+            f"(and backend '{binding.backend}' has no default in `backends:`, ADR-0119)"
+        )
     if binding.transport == "in-process" and not binding.handler:
         return f"in-process binding '{binding.capability}' is missing its handler name"
     return None
