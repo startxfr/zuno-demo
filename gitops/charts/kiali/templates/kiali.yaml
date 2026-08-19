@@ -1,9 +1,11 @@
 {{- if .Values.kiali.enabled }}
-# auth.strategy: anonymous - minimum cert/OAuth plumbing to stand this up
-# for a demo cluster behind the operator's own auto-created, passthrough-TLS
-# Route (deployment.ingress below). Revisit with the "openshift" strategy
-# (OAuth) before treating this as more than a demo/internal tool - anonymous
-# means anyone who can reach the Route has full mesh visibility.
+# auth.strategy: openshift - login goes through the cluster's own OAuth
+# (htpasswd + Keycloak IdPs), and Kiali authorizes each namespace via a
+# SelfSubjectAccessReview against the logged-in user's real RBAC. No
+# Kiali-specific RBAC to maintain: admin/ops (htpasswd, cluster-admin/edit)
+# and the Keycloak ocp-paas-ops/ocp-ai-ops groups already qualify today;
+# accounts with no meaningful namespace read (dev, devops, consultant) can
+# log in but see an empty mesh.
 apiVersion: kiali.io/v1alpha1
 kind: Kiali
 metadata:
@@ -15,7 +17,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
 spec:
   auth:
-    strategy: anonymous
+    strategy: openshift
   deployment:
     accessible_namespaces:
       - '**'
