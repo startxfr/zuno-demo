@@ -12,7 +12,14 @@ image:
   registry: image-registry.openshift-image-registry.svc:5000
   frontendRepository: zuno-ai-build/agent-frontend
   bffRepository: zuno-ai-build/agent-bff
-  tag: v0.1.0
+  # Temporarily back to latest (2026-08-19), undoing WP-04's v0.1.0 pin
+  # for this one chart only - ADR-0212/0214's agent-frontend/agent-bff
+  # code needs to actually run in the live deployment, and the in-cluster
+  # BuildConfig this repo's day1 build always writes to image:latest,
+  # never to a pinned release tag (that comes from the separate
+  # build-publish.yml/RELEASING.md GitHub Actions release path). Revert
+  # to a real pinned tag once a release covering this code exists.
+  tag: latest
   # Always, not IfNotPresent - with a mutable :latest tag, IfNotPresent
   # serves whatever stale image the node cached, silently ignoring
   # rebuilds (VERIFIED live 2026-08-16 across multiple components).
