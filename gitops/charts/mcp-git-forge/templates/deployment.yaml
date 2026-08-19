@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-forge-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: git-forge-mcp
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    image.openshift.io/triggers: |-
+      {{ include "mcp-git-forge.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "git-forge-mcp") }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: git-forge-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: git-forge-mcp
+    spec:
+      serviceAccountName: git-forge-mcp
+      priorityClassName: zuno-workload-default
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: git-forge-mcp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentials.github.secretName }}
+                  key: token
+            - name: GITLAB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentials.gitlab.secretName }}
+                  key: token
+            - name: GITLAB_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentials.gitlab.secretName }}
+                  key: url
+            - name: MCP_GATEWAY_WORKLOAD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-gateway-workload-token
+                  key: token
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

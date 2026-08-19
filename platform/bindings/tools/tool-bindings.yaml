@@ -53,6 +53,15 @@
 #     default: "http://some-backend-mcp.zuno-ai-run.svc:8000"
 #     path: /mcp
 
+backends:
+  # --- git-forge: real MCP server (ADR-0120), first real use of the
+  #     `backends:` shorthand - six capabilities below all share this one
+  #     endpoint instead of repeating it six times.
+  git-forge:
+    env: GIT_FORGE_MCP_URL
+    default: "http://git-forge-mcp.zuno-ai-run.svc:8000"
+    path: /mcp
+
 bindings:
   # --- sales-db: real MCP server (ADR-0043), streamable-HTTP transport ---
   # ADR-0206 (WP-23): these capabilities are `sxa.*`, not `sales.*` - the
@@ -291,3 +300,46 @@ bindings:
       path: /mcp
     provider_tool: get_staff_profile
     auth_mode: provider-delegated
+
+  # --- git-forge: real MCP server (ADR-0120), streamable-HTTP transport.
+  #     One server, two providers (`provider: github|gitlab` is a tool
+  #     argument, not a separate binding) - endpoint inherited from the
+  #     `backends: git-forge` default above, none repeated per entry.
+  - capability: git.repository.read
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: read_repository_content
+    auth_mode: service-identity
+
+  - capability: git.repository.list
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: list_repositories
+    auth_mode: service-identity
+
+  - capability: git.file.write
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: write_file
+    auth_mode: service-identity
+
+  - capability: git.repository.create
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: create_repository
+    auth_mode: service-identity
+
+  - capability: git.repository.fork
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: fork_repository
+    auth_mode: service-identity
+
+  # Always refused by the server itself (never deletes) - still a real,
+  # policy-gated capability so a caller gets a clear tool-level answer
+  # (ADR-0120) rather than "unknown tool".
+  - capability: git.repository.delete
+    backend: git-forge
+    transport: streamable-http
+    provider_tool: delete_repository
+    auth_mode: service-identity

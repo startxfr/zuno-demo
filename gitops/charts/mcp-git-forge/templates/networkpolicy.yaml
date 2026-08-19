@@ -1,0 +1,27 @@
+# git-forge-mcp must accept traffic ONLY from the MCP Gateway, not other
+# same-namespace pods - same reasoning as every other MCP server chart.
+# The app also validates the X-Zuno-Gateway-Token shared secret as
+# defense in depth.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: git-forge-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: git-forge-mcp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mcp-gateway
+      ports:
+        - protocol: TCP
+          port: 8000

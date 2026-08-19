@@ -81,6 +81,26 @@ zuno_salesforce_enabled: false
 zuno_salesforce_url: "xxxxxx"           # e.g. https://your-domain.my.salesforce.com
 zuno_salesforce_access_token: "xxxxxx"
 
+# --- git-forge (technical identities for the git-forge MCP server,
+# ADR-0120/WP-058 - GitHub + GitLab repository read/write/create/fork) ------
+# GitHub: mint a fine-grained Personal Access Token scoped to the repos/
+# orgs this server should reach, with Contents (read/write) and
+# Administration (write, for create_repository) permissions. Security
+# considerations (ADR-0120): do NOT grant the delete_repo scope -
+# delete_repository refuses regardless, but the credential itself should
+# never be able to either.
+zuno_github_enabled: false
+zuno_github_token: "xxxxxx"
+# GitLab: mint a Personal Access Token with the `api` scope for a
+# dedicated account that is a Developer/Maintainer (NOT Owner) on the
+# projects/groups this server should reach - same defense-in-depth
+# reasoning as GitHub's missing delete_repo scope above. `url` is only
+# needed for a self-managed instance; omit/leave "xxxxxx" to use
+# https://gitlab.com.
+zuno_gitlab_enabled: false
+zuno_gitlab_url: "xxxxxx"               # e.g. https://gitlab.your-company.com (optional - defaults to gitlab.com)
+zuno_gitlab_token: "xxxxxx"
+
 # --- RAG corpus S3 bucket (rag-ingestion's raw/normalized/manifest storage -
 # bucket/region/endpoint are chart config, not secret: see
 # gitops/charts/rag-ingestion/values.yaml's s3: block) -----------------------

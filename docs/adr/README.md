@@ -92,6 +92,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v0.1 | Implemented | Implement Confluence as the first real external MCP integration |
 | [ADR-0118](0118-keep-the-ai-gateway-as-policy-router-and-defer-maas-delegation.md) | v0.1 | Implemented | Keep the AI Gateway as policy router and defer MaaS delegation to the governance plane |
 | [ADR-0119](0119-introduce-mcp-server-scaffolding-and-conformance-tooling.md) | v0.1 | Implemented | Introduce MCP server scaffolding and conformance tooling |
+| [ADR-0120](0120-implement-a-multi-provider-git-forge-mcp-server-for-github-and-gitlab.md) | v0.1 | Partially implemented | Implement a multi-provider Git-forge MCP server for GitHub and GitLab |
 
 ## version 0.2
 

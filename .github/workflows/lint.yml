@@ -196,6 +196,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
+      - name: git-forge MCP server tests (ADR-0120)
+        working-directory: components/mcp-servers/git-forge
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_mcp_protocol.py
       - name: rag-service tests
         working-directory: components/rag-service
         run: |

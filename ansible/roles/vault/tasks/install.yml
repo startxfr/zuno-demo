@@ -758,6 +758,44 @@
     and zuno_salesforce_access_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# ADR-0120/WP-058: the git-forge MCP server (components/mcp-servers/
+# git-forge) - a real consumer, same as Salesforce above. Fine-grained PAT
+# only, no url (github.com only, no self-hosted GitHub Enterprise case in
+# this demo). Security considerations (ADR-0120): this token must NOT
+# carry the delete_repo scope - delete_repository refuses regardless, but
+# the credential itself should never be able to either.
+- name: "vault | seed the GitHub technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/github/technical
+      token={{ zuno_github_token | quote }}
+      enabled={{ (zuno_github_enabled | default(false)) | quote }}"
+  when: >-
+    zuno_github_token | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+# Same server, GitLab side. `url` defaults to gitlab.com but is
+# operator-overridable for a self-managed instance. Security
+# considerations (ADR-0120): this account must NOT hold the Owner role on
+# any reachable project - Developer/Maintainer is enough for read/write/
+# create/fork.
+- name: "vault | seed the GitLab technical credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/gitlab/technical
+      url={{ ((zuno_gitlab_url | default('xxxxxx')) == 'xxxxxx') | ternary('https://gitlab.com', zuno_gitlab_url | default('https://gitlab.com')) | quote }}
+      token={{ zuno_gitlab_token | quote }}
+      enabled={{ (zuno_gitlab_enabled | default(false)) | quote }}"
+  when: >-
+    zuno_gitlab_token | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 # ADR-0204/ADR-0105 (WP-22): source credentials for the knowledge.sales
 # and knowledge.adv ingestion adapters (gitops/charts/rag-ingestion's
 # domains.sales.salesforce / domains.adv.aramis ExternalSecrets). Property

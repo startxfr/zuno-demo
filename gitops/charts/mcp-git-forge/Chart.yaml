@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-git-forge
+description: Multi-provider GitHub/GitLab MCP server (ADR-0120) - read, write, create, fork; deletion always refused.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -350,3 +350,74 @@ tools:
     min_classification: C3
     allowed_groups:
       - cdp
+
+  # ADR-0120 (WP-058): git-forge - the same three groups as Confluence's
+  # own entries (technical/knowledge access, not a sales/finance persona).
+  # C2, matching Confluence's "internal, business-sensitive content" tier -
+  # repository content ranges from public OSS to private business logic,
+  # and C2 is the right default until per-repo classification exists. No
+  # `external_model_policy.allow_context: false` here (unlike Confluence's
+  # ADR-0035 entry): that restriction is Confluence's own contractual/
+  # source-level constraint, not a general C2 rule - same reasoning
+  # Salesforce's own entries already document. No agent declares any of
+  # these six capabilities yet (agents/*/tasks/*.md) - every call denies
+  # on the ADR-0011 agent_declaration factor until one does, same initial
+  # state Confluence's write capabilities had at WP-02.
+  - tool: git.repository.read
+    capability: git.repository.read
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  - tool: git.repository.list
+    capability: git.repository.list
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  - tool: git.file.write
+    capability: git.file.write
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  - tool: git.repository.create
+    capability: git.repository.create
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  - tool: git.repository.fork
+    capability: git.repository.fork
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  # Always refused by the server itself (git-forge/server.py's
+  # delete_repository never deletes anything) - kept as a normal,
+  # policy-gated capability so an unauthorized caller still gets denied
+  # by the ordinary intersection, and an authorized one gets the
+  # server's explanatory refusal rather than "unknown tool".
+  - tool: git.repository.delete
+    capability: git.repository.delete
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
