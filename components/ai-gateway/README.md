@@ -158,10 +158,10 @@ metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`
 ## Observability
 
 `app/telemetry.py` wraps every provider attempt (streaming or not) in a
-`model_call` span (provider, model, classification, latency, outcome) and,
-when the model response exposes `usage_metadata`, records prompt/completion
-token counts plus an estimated USD cost (`zuno.model_tokens` /
-`zuno.model_cost_usd` metrics). Streaming calls accumulate their chunks
+`model_call` span (provider, model, classification, latency, outcome),
+unconditionally for every outcome. When the model response exposes
+`usage_metadata`, it additionally records prompt/completion token counts
+(`zuno.model_tokens`). Streaming calls accumulate their chunks
 (`AIMessageChunk.__add__`) and read `usage_metadata` off the merged result,
 same as the non-streaming path - `app/providers.py`'s `ChatOpenAI(...,
 stream_usage=True)` is what makes the terminal chunk of an OpenAI/vLLM
@@ -170,6 +170,15 @@ always streams, `zuno.model_tokens`/`zuno.model_cost_usd` had zero series
 regardless of real traffic). `gemini`/`anthropic`/`mistral` candidates
 still record no usage either way - those LangChain classes have no
 equivalent flag.
+
+Estimated USD cost (`zuno.model_cost_usd`) follows that same usage-gated
+posture for remote/SaaS providers - billed per-1K-token, so no usage means
+no known cost. Local providers (`local`, `local-gpt-oss`) have no
+per-token meter and are billed per-second of call duration instead
+(`_COST_PER_SECOND_LOCAL`, apportioned from this cluster's actual GPU node
+economics per ADR-0351), so their cost is recorded unconditionally -
+whether the call succeeded or errored, since GPU time is consumed either
+way.
 
 ## Local development
 

@@ -9,11 +9,16 @@ README's "Observability" section).
 Sends OTLP traces/metrics to the shared Collector installed by
 ansible/roles/observability (`zuno-otel-collector-collector.zuno-monitoring.svc`).
 
-Cost estimates are approximate, demo-grade USD-per-1K-token rates, not a
-billing-accurate figure - good enough to demonstrate ADR-0029's "cost"
-dimension is wired through, not a finance-grade cost model. Budgets/quotas
-(also named in ADR-0009's decision text) are NOT implemented - this only
-*measures* cost, it doesn't enforce a ceiling. See README.md.
+Cost estimates are approximate and demo-grade, not a billing-accurate
+figure - good enough to demonstrate ADR-0029's "cost" dimension is wired
+through, not a finance-grade cost model. Remote/SaaS providers are priced
+per-1K-token (`_COST_PER_1K_TOKENS`); local providers have no per-token
+meter, so they're priced per-second of call duration
+(`_COST_PER_SECOND_LOCAL`), apportioned from this cluster's actual GPU
+node economics (ADR-0351) - see that table's comment for the derivation.
+Budgets/quotas (also named in ADR-0009's decision text) are NOT
+implemented - this only *measures* cost, it doesn't enforce a ceiling.
+See README.md.
 """
 from __future__ import annotations
 
@@ -39,14 +44,43 @@ OTEL_ENDPOINT = os.getenv(
     "http://zuno-otel-collector-collector.zuno-monitoring.svc:4318",
 )
 
-# USD per 1,000 tokens (input, output). Approximate public pricing at time of
-# writing; update as needed - this is a demo cost signal, not a billing feed.
+# USD per 1,000 tokens (input, output), for remote/SaaS providers billed
+# by token. Approximate public pricing at time of writing; update as
+# needed - this is a demo cost signal, not a billing feed. Local
+# providers ("local", "local-gpt-oss") are NOT priced here - they have no
+# per-token meter, only GPU time. See _COST_PER_SECOND_LOCAL below.
 _COST_PER_1K_TOKENS = {
-    "local": (0.0, 0.0),  # runs on already-provisioned GPU capacity
     "openai": (0.00015, 0.0006),
     "gemini": (0.00125, 0.005),
     "anthropic": (0.003, 0.015),
     "mistral": (0.002, 0.006),
+}
+
+# Indicative us-east-1 on-demand $/hour by node type, from ADR-0351's cost
+# table - kept separate from the per-second rates below so the MIG-share
+# derivation stays legible/updatable without redoing the arithmetic by hand.
+_NODE_USD_PER_HOUR = {
+    "g7e.4xlarge": 4.00,  # shared MIG host: "local" gets a 2g.48gb slice = 50% of the 96GB card
+    "g7e.2xlarge": 3.36,  # dedicated whole-GPU host for "local-gpt-oss" (unmanaged, not MIG-shared)
+}
+
+# USD per SECOND of call duration, for local providers. One float per
+# provider (not an (in, out) tuple like _COST_PER_1K_TOKENS) - there's no
+# per-token meter to split; the GPU is billed by wall clock regardless of
+# tokens produced. Every `kind: local` entry in
+# platform/ai-gateway/provider-routing.yaml MUST have a row here or it
+# silently prices as $0 (see _estimate_cost_usd's fallback) - exactly the
+# bug this table fixes for "local-gpt-oss", which used to fall through
+# _COST_PER_1K_TOKENS's default by accident, not by design.
+#
+# Caveat: policies/model-routing/model-routing-policy.yaml's
+# `cost_ceiling_usd_per_1k` doc comment assumes zuno.model_cost_usd is
+# token-proportional. That's no longer true for local providers priced
+# from this table - not a live bug today (that policy's `objectives:` is
+# empty), but a trap for whoever adds the first local-preferring ceiling.
+_COST_PER_SECOND_LOCAL = {
+    "local": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,  # ~$0.000556/s (qwen2.5-7b-instruct, half the shared card)
+    "local-gpt-oss": _NODE_USD_PER_HOUR["g7e.2xlarge"] / 3600.0,   # ~$0.000933/s (gpt-oss-20b, whole card)
 }
 
 _tracer: Optional[trace.Tracer] = None
@@ -116,7 +150,9 @@ def record_cache_outcome(outcome: str, model: str) -> None:
         _cache_lookup_counter.add(1, {"outcome": outcome, "model": model})
 
 
-def _estimate_cost_usd(provider: str, prompt_tokens: int, completion_tokens: int) -> float:
+def _estimate_cost_usd(provider: str, prompt_tokens: int, completion_tokens: int, latency_ms: float) -> float:
+    if provider in _COST_PER_SECOND_LOCAL:
+        return _COST_PER_SECOND_LOCAL[provider] * (latency_ms / 1000.0)
     in_rate, out_rate = _COST_PER_1K_TOKENS.get(provider, (0.0, 0.0))
     return (prompt_tokens / 1000.0) * in_rate + (completion_tokens / 1000.0) * out_rate
 
@@ -131,13 +167,18 @@ def model_call_span(
     caller_sub: Optional[str] = None,
     groups: Optional[List[str]] = None,
 ) -> Iterator["ModelCallRecorder"]:
-    """Wraps one model invocation: records a span plus the
-    zuno.model_calls / zuno.model_tokens / zuno.model_cost_usd metrics
-    (ADR-0029) once `.record_usage()` is called on the yielded recorder, or
-    just the outcome/latency if the caller never has token counts (e.g. a
-    failed call, or a candidate whose usage_metadata never populates - see
-    app/main.py's `_stream_completion`, which now calls `record_usage` too
-    for `stream_usage=True` candidates, VERIFIED live 2026-08-18).
+    """Wraps one model invocation: records a span plus the zuno.model_calls
+    / zuno.model_call_duration_ms metrics (ADR-0029) unconditionally, for
+    every outcome. zuno.model_tokens additionally requires
+    `.record_usage()` to have been called on the yielded recorder (e.g. not
+    on a failed call, or a candidate whose usage_metadata never populates -
+    see app/main.py's `_stream_completion`, which now calls `record_usage`
+    too for `stream_usage=True` candidates, VERIFIED live 2026-08-18).
+    zuno.model_cost_usd follows that same `.record_usage()` gating for
+    remote/SaaS providers (billed by token, so no usage means no known
+    cost), but is unconditional for local providers (billed by this call's
+    own duration - see _COST_PER_SECOND_LOCAL - so GPU time is charged
+    whether the call succeeded or errored).
 
     ADR-0201 (WP-27): `request_id` is the same X-Zuno-Request-Id
     agent-runtime mints per chat turn (app/main.py's `_request_id`,
@@ -198,15 +239,25 @@ def model_call_span(
                     _model_call_counter.add(1, attrs_per_group)
                 if _model_call_duration_histogram is not None:
                     _model_call_duration_histogram.record(latency_ms, attrs_per_group)
-            if recorder.prompt_tokens or recorder.completion_tokens:
+            has_token_usage = bool(recorder.prompt_tokens or recorder.completion_tokens)
+            if has_token_usage:
                 span.set_attribute("zuno.prompt_tokens", recorder.prompt_tokens)
                 span.set_attribute("zuno.completion_tokens", recorder.completion_tokens)
-                cost = _estimate_cost_usd(provider, recorder.prompt_tokens, recorder.completion_tokens)
-                span.set_attribute("zuno.estimated_cost_usd", cost)
                 for attrs_per_group in ({**attrs, "group": g} for g in group_list):
                     if _token_counter is not None:
                         _token_counter.add(recorder.prompt_tokens, {**attrs_per_group, "kind": "prompt"})
                         _token_counter.add(recorder.completion_tokens, {**attrs_per_group, "kind": "completion"})
+
+            # Local GPU time is billed whether the call succeeded or
+            # errored - the GPU was occupied for `latency_ms` either way
+            # (mirrors zuno.model_call_duration_ms's own always-record
+            # posture above). Remote/SaaS cost stays gated on token usage:
+            # no usage_metadata means no known token count, and SaaS bills
+            # by token, so a token-less remote call genuinely cost $0.
+            if has_token_usage or provider in _COST_PER_SECOND_LOCAL:
+                cost = _estimate_cost_usd(provider, recorder.prompt_tokens, recorder.completion_tokens, latency_ms)
+                span.set_attribute("zuno.estimated_cost_usd", cost)
+                for attrs_per_group in ({**attrs, "group": g} for g in group_list):
                     if _cost_counter is not None:
                         _cost_counter.add(cost, attrs_per_group)
 

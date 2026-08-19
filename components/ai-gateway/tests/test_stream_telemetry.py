@@ -114,12 +114,16 @@ def test_streaming_records_usage_from_terminal_chunk() -> None:
 
 
 def test_streaming_without_usage_metadata_records_zero() -> None:
-    """gemini/anthropic/mistral (no stream_usage field) or any candidate
-    that never emits a usage chunk: recorded but gated off by
-    model_call_span's `if recorder.prompt_tokens or recorder.completion_tokens`,
-    same degrade-safe posture as today - no exception, no metric."""
+    """gemini/anthropic/mistral (no stream_usage field) or any remote
+    candidate that never emits a usage chunk: recorded but gated off by
+    model_call_span's `if has_token_usage`, same degrade-safe posture as
+    today - no exception, no cost metric. Must use an explicit remote
+    candidate here: since the local-cost-estimation change, a local
+    candidate bills by call duration regardless of token usage, so it no
+    longer demonstrates the "no metric" case (see
+    tests/test_local_cost_estimation.py for local's own gating)."""
     fake = _FakeStreamingModel(["partial", "answer"], usage=None)
-    _chunks, recorded = _run_stream(fake)
+    _chunks, recorded = _run_stream(fake, candidates=[ProviderCandidate(name="gemini", kind="saas")])
     assert recorded == [(0, 0)]
 
 
