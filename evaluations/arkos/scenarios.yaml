@@ -148,4 +148,9 @@ scenarios:
   - id: 20
     title: Every service's health endpoint returns 200
     type: health_endpoints_all_ok
-    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service, sales-db-mcp]
+    # sales-db-mcp is deliberately excluded: its NetworkPolicy (ADR-0037)
+    # allows ingress only from mcp-gateway, so a direct probe from this
+    # gate always times out by design, not by fault (ADR-0053 gate
+    # investigation, 2026-08-19) - mcp-gateway's own health, still checked
+    # below, is the honest proxy for "can this agent's traffic reach it".
+    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]

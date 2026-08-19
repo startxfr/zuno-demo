@@ -19,9 +19,11 @@ a handler.
 """
 from __future__ import annotations
 
+import html
 import json
 import os
 import pathlib
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -130,6 +132,63 @@ def auth_headers(persona: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {get_token(persona)}"}
 
 
+# ADR-0042: agent-frontend's `/` is a thin, always-200 HTML shell
+# (internal/portal/portal.go) - it never redirects server-side and never
+# reads an Authorization header. Sign-in state lives entirely in the
+# server-rendered `#zuno-config` JSON blob (`signedIn`, and each tile's
+# `clickable`), which the React SPA reads client-side. Both scenario
+# handlers below that need to know sign-in state parse this blob instead
+# of relying on HTTP status/headers or a Bearer token the frontend would
+# never look at.
+_ZUNO_CONFIG_RE = re.compile(r'<script id="zuno-config"[^>]*>(.*?)</script>', re.DOTALL)
+
+
+def _zuno_config(body: str) -> Dict[str, Any]:
+    match = _ZUNO_CONFIG_RE.search(body)
+    if not match:
+        raise RuntimeError("portal HTML has no #zuno-config script block")
+    return json.loads(match.group(1))
+
+
+_session_clients: Dict[str, httpx.Client] = {}
+
+
+def get_session_client(persona: str) -> httpx.Client:
+    """Completes the real browser OIDC flow - GET {FRONTEND_URL}/login
+    (redirects to Keycloak's authorize endpoint), parse and submit
+    Keycloak's own login form, follow the redirect back through
+    /callback - and returns an httpx.Client whose cookie jar now carries
+    the resulting `zuno_session` cookie, the only credential
+    agent-frontend's `/` ever reads (ADR-0042). Distinct from
+    get_token()/auth_headers() above, which mint a Bearer JWT for calling
+    the BFF/Agent Runtime/MCP Gateway APIs directly - agent-frontend's
+    browser-facing routes are cookie-only and never accept that token.
+    """
+    if persona in _session_clients:
+        return _session_clients[persona]
+    if not DEMO_PASSWORD:
+        raise RuntimeError("DEMO_PERSONA_PASSWORD is required to obtain a session cookie")
+
+    client = httpx.Client(follow_redirects=True, timeout=15)
+    login_page = client.get(f"{FRONTEND_URL}/login")
+    login_page.raise_for_status()
+
+    match = re.search(r'<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"', login_page.text)
+    if not match:
+        client.close()
+        raise RuntimeError("could not find Keycloak's kc-form-login action URL")
+    action_url = html.unescape(match.group(1))
+
+    result = client.post(action_url, data={"username": persona, "password": DEMO_PASSWORD, "credentialId": ""})
+    result.raise_for_status()
+    if "zuno_session" not in client.cookies:
+        client.close()
+        raise RuntimeError(f"OIDC login for {persona!r} did not yield a zuno_session cookie (landed on {result.url})")
+
+    _session_clients[persona] = client
+    return client
+
+
 # --------------------------------------------------------------------------
 # Scenario handlers - one per `type` in scenarios.yaml
 # --------------------------------------------------------------------------
@@ -149,9 +208,16 @@ def portal_lists_all_agents(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def portal_requires_login(s: Dict[str, Any]) -> ScenarioResult:
-    resp = httpx.get(FRONTEND_URL, timeout=10, follow_redirects=False)
-    ok = resp.status_code in (302, 303, 401) or "/login" in resp.headers.get("location", "")
-    return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code}")
+    resp = httpx.get(FRONTEND_URL, timeout=10, follow_redirects=True)
+    if resp.status_code != 200:
+        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
+    try:
+        cfg = _zuno_config(resp.text)
+    except Exception as exc:
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    any_clickable = any(t.get("clickable") for t in cfg.get("tiles", []))
+    ok = cfg.get("signedIn") is False and not any_clickable
+    return ScenarioResult(s["id"], s["title"], ok, f"signedIn={cfg.get('signedIn')} any_clickable={any_clickable}")
 
 
 def _decode_claims_without_verifying(token: str) -> Dict[str, Any]:
@@ -189,15 +255,28 @@ def keycloak_login(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def portal_tile_state(s: Dict[str, Any]) -> ScenarioResult:
-    resp = httpx.get(FRONTEND_URL, headers=auth_headers(s["persona"]), timeout=10, follow_redirects=True)
-    body = resp.text.lower()
+    # Uses a real zuno_session cookie (get_session_client), not a Bearer
+    # header - agent-frontend's `/` only ever reads the cookie (ADR-0042),
+    # and reads the tile's own `clickable` field from #zuno-config rather
+    # than sniffing "disabled"/"coming soon" text near the agent's name in
+    # the HTML (fragile, and no longer even meaningful now the tile grid
+    # is a client-side-rendered React component, not server-templated).
+    try:
+        client = get_session_client(s["persona"])
+    except Exception as exc:
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    resp = client.get(FRONTEND_URL, timeout=10)
+    if resp.status_code != 200:
+        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
+    try:
+        cfg = _zuno_config(resp.text)
+    except Exception as exc:
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
     agent = s["agent"]
-    idx = body.find(agent)
-    if idx == -1:
+    tile = next((t for t in cfg.get("tiles", []) if t.get("name") == agent), None)
+    if tile is None:
         return ScenarioResult(s["id"], s["title"], False, f"tile for {agent} not found")
-    window = body[max(0, idx - 200): idx + 200]
-    is_disabled = "disabled" in window or "coming soon" in window or "coming-soon" in window
-    enabled = not is_disabled
+    enabled = bool(tile.get("clickable"))
     ok = enabled == s["expect_enabled"]
     return ScenarioResult(s["id"], s["title"], ok, f"enabled={enabled} expected={s['expect_enabled']}")
 
@@ -377,24 +456,33 @@ def bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
-    # Requires `oc`/`kubectl` on PATH and a valid kubeconfig - the one
-    # scenario that inspects cluster state directly rather than an HTTP API.
-    # ADR-0329 (supersedes ADR-0023): placeholder agents no longer get their
-    # own namespace, so this checks for zero pods carrying each placeholder
-    # agent's zuno.io/agent label inside the single shared namespace
-    # instead of per-agent namespace emptiness.
-    import subprocess
+    # Requires the Kubernetes Python client and in-cluster config (the gate
+    # Job's own ServiceAccount token) - the one scenario that inspects
+    # cluster state directly rather than an HTTP API. Uses the `kubernetes`
+    # package rather than shelling out to `oc`/`kubectl`: the gate Job's
+    # image (python:3.12-slim) does not ship either binary, which made this
+    # scenario fail with a spurious "No such file or directory" on every
+    # run (ADR-0053 gate investigation, 2026-08-19) regardless of actual
+    # cluster state. ADR-0329 (supersedes ADR-0023): placeholder agents no
+    # longer get their own namespace, so this checks for zero pods carrying
+    # each placeholder agent's zuno.io/agent label inside the single shared
+    # namespace instead of per-agent namespace emptiness.
+    from kubernetes import client as k8s_client
+    from kubernetes import config as k8s_config
 
+    try:
+        k8s_config.load_incluster_config()
+    except Exception as exc:
+        return ScenarioResult(s["id"], s["title"], False, f"cannot load in-cluster kube config: {exc}")
+
+    v1 = k8s_client.CoreV1Api()
     ns = s["namespace"]
     all_empty = True
     details = []
     for agent in s["agents"]:
         try:
-            out = subprocess.run(
-                ["oc", "get", "pods", "-n", ns, "-l", f"zuno.io/agent={agent}", "-o", "name"],
-                capture_output=True, text=True, timeout=15, check=True,
-            )
-            pod_count = len([l for l in out.stdout.splitlines() if l.strip()])
+            pods = v1.list_namespaced_pod(ns, label_selector=f"zuno.io/agent={agent}")
+            pod_count = len(pods.items)
         except Exception as exc:
             details.append(f"{agent}: error ({exc})")
             all_empty = False
