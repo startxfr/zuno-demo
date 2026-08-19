@@ -167,6 +167,70 @@
       auto_fix: "manual only - the fix lives in Vault/postgresql, not in this role"
   when: (_openshift_ai_maas_db_secret.resources | default([]) | length) == 0
 
+# --- payload-processing / payload-pre-processing sidecar injection (ADR-0201
+# MaaS mTLS defect): RHOAI's ModelsAsService controller deploys these two
+# Deployments into openshift-ingress without opting them into the mesh, so
+# traffic to the AuthPolicy fails mTLS before authentication runs (500s on
+# the MaaS gateway). Targeted per-Deployment annotation, NOT a namespace-wide
+# istio-injection label - that would also inject the default HAProxy router
+# pods (see install.yml's istio-ca-root-cert comment for why
+# openshift-ingress is deliberately unlabeled). Both Deployments are owned by
+# the MaaS Config controller (Config/default), so this only patches the one
+# annotation it doesn't manage - safe to re-apply if a future reconcile of
+# theirs drops it. VERIFIED live, 2026-08-19: both Deployments'
+# spec.template.metadata.annotations is null.
+- name: "openshift_ai | reconcile: look up payload-processing/payload-pre-processing Deployments"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item }}"
+    namespace: openshift-ingress
+  register: _openshift_ai_ipp_deployments
+  loop:
+    - payload-processing
+    - payload-pre-processing
+  loop_control:
+    label: "{{ item }}"
+
+- name: "openshift_ai | reconcile: opt payload-processing/payload-pre-processing into the mesh (targeted sidecar inject)"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item.item }}"
+    namespace: openshift-ingress
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: "true"
+  loop: "{{ _openshift_ai_ipp_deployments.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - (item.resources | default([]) | length) > 0
+    - (item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true"
+
+- name: "openshift_ai | reconcile: wait for the payload-processing/payload-pre-processing rollout to pick up the sidecar"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item }}"
+    namespace: openshift-ingress
+  register: _openshift_ai_ipp_rollout
+  until: >-
+    (_openshift_ai_ipp_rollout.resources | default([]) | length) > 0 and
+    (_openshift_ai_ipp_rollout.resources[0].status.observedGeneration | default(-1)) == (_openshift_ai_ipp_rollout.resources[0].metadata.generation | default(-2)) and
+    (_openshift_ai_ipp_rollout.resources[0].status.readyReplicas | default(0)) == (_openshift_ai_ipp_rollout.resources[0].status.replicas | default(-1))
+  retries: 30
+  delay: 10
+  loop:
+    - payload-processing
+    - payload-pre-processing
+  loop_control:
+    label: "{{ item }}"
+
 # --- Optional pod restart (default OFF: side-effect safety - Deployments
 # recreate deleted pods, but reconcile stays state-restoring-only unless the
 # operator explicitly opts in) ------------------------------------------------

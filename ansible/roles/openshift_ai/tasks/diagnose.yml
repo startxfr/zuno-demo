@@ -197,3 +197,34 @@
   loop_control:
     label: "{{ item.item.kind }}/{{ item.item.name }}"
   when: (item.resources | default([]) | length) == 0
+
+# --- MaaS payload-processing mTLS sidecar (ADR-0201) ------------------------
+- name: "openshift_ai | diagnose: look up payload-processing/payload-pre-processing Deployments"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item }}"
+    namespace: openshift-ingress
+  register: _oai_diag_ipp
+  loop:
+    - payload-processing
+    - payload-pre-processing
+  loop_control:
+    label: "{{ item }}"
+
+- name: "openshift_ai | diagnose: record missing Istio sidecar injection on payload-processing/payload-pre-processing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Deployment/{{ item.item }} (openshift-ingress)"
+      state: "sidecar.istio.io/inject annotation missing"
+      cause: "ADR-0201 - RHOAI's ModelsAsService controller deploys this Deployment without opting it into the mesh; mTLS to the MaaS AuthPolicy fails before authentication runs (500s on the MaaS gateway)"
+      solution: "Patch the Deployment's pod template with sidecar.istio.io/inject: \"true\" (targeted, not a namespace-wide istio-injection label - that would also inject the default HAProxy router pods)"
+      auto_fix: "make d0 reconcile openshift-ai"
+  loop: "{{ _oai_diag_ipp.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - (item.resources | default([]) | length) > 0
+    - (item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true"
