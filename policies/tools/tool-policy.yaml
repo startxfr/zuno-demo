@@ -9,9 +9,11 @@
 #   allowed = agent_declaration ∩ task_rights ∩ user_group_rights ∩ classification ∩ platform_policy
 #
 # Where each factor comes from:
-#   1. agent_declaration  - the calling agent's OKF bundle explicitly lists
-#                            this tool under its declared MCP tools (agents/<agent>/tools/).
-#                            An agent can only ever reach tools it declares,
+#   1. agent_declaration  - the union of `allowed_tools` across every one of the
+#                            calling agent's own OKF tasks (agents/<agent>/tasks/*.md),
+#                            computed by AgentDefinition.declared_tools() in
+#                            components/agent-runtime/app/registry.py. An agent can
+#                            only ever reach tools some task of its declares,
 #                            regardless of what its caller is otherwise allowed.
 #   2. task_rights         - the specific OKF task being executed may further
 #                            restrict which of the agent's declared tools apply

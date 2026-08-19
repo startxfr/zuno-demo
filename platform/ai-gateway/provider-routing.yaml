@@ -1,8 +1,10 @@
 # Provider routing configuration (ADR-0020, ADR-0021).
 #
-# Consumed by components/agent-runtime's ModelRouter
-# (app/clients/model_router.py) to decide, per request classification,
-# which provider to call and in what fallback order. Deployed as the
+# Consumed by components/ai-gateway's RoutingTable
+# (app/routing.py) to decide, per request classification, which provider
+# to call and in what fallback order (ADR-0009 moved this out of Agent
+# Runtime's ModelRouter, app/clients/model_router.py, which today only
+# forwards classification/agent/task as headers to this gateway). Deployed as the
 # `zuno-provider-routing` ConfigMap by ansible/roles/llm via
 # gitops/apps/llm/application-d1.yaml (see kustomization.yaml in this
 # directory - the ConfigMap is generated from this exact file, so this is

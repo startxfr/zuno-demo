@@ -60,8 +60,16 @@ task implementation through the ADR-0307 template workflow
 
 ## Authorization matrix
 
-Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_cognos`; model classification ceiling (ADR-0021): `C3`; status: `placeholder`.
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_cognos`; model classification ceiling (ADR-0021): `C3`; status: `placeholder`.
 
 No capabilities declared: every task's `allowed_tools`/`allowed_knowledge` is empty, so this agent can invoke no tool and retrieve from no knowledge domain regardless of caller groups (the honest Stage-1 zero-capability state, ADR-0502).
+
+### Model routing
+
+Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `platform/ai-gateway/provider-routing.yaml`'s classification eligibility reordered by this `(agent, task)`'s `policies/model-routing/model-routing-policy.yaml` preference — the first entry is the reference model, the rest are fallback alternatives, in try order.
+
+| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
+|---|---|---|---|---|---|
+| `coming-soon` | `C3` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

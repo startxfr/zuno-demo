@@ -6,10 +6,14 @@ Renders, into each agents/<name>/agent.okf.md body, a generated
 who x what x for-what x policy intersection for that agent - one row per
 (task x tool) and (task x knowledge domain) pair, derived from the
 bundle frontmatter plus policies/tools/tool-policy.yaml and
-policies/knowledge/knowledge-policy.yaml. The matrix is documentation of
-the intersection, never an input to it (ADR-0503 clause 2): MCP Gateway,
-Agent Runtime and the portal keep reading the YAML sources; nothing at
-runtime reads this section.
+policies/knowledge/knowledge-policy.yaml, plus a `### Model routing`
+subsection - one row per task - resolving each task's effective model
+chain (reference model + fallback) from platform/ai-gateway/
+provider-routing.yaml and policies/model-routing/model-routing-policy.yaml.
+The matrix is documentation of the intersection, never an input to it
+(ADR-0503 clause 2): MCP Gateway, Agent Runtime, AI Gateway and the
+portal keep reading the YAML sources; nothing at runtime reads this
+section.
 
 The section lives between HTML comment markers in the Markdown body
 (after the closing `---` of the frontmatter), so the three independent
@@ -44,6 +48,8 @@ AGENTS_DIR = REPO_ROOT / "agents"
 TOOL_POLICY_PATH = REPO_ROOT / "policies" / "tools" / "tool-policy.yaml"
 KNOWLEDGE_POLICY_PATH = REPO_ROOT / "policies" / "knowledge" / "knowledge-policy.yaml"
 QUOTA_POLICY_PATH = REPO_ROOT / "policies" / "quotas" / "quota-policy.yaml"
+PROVIDER_ROUTING_PATH = REPO_ROOT / "platform" / "ai-gateway" / "provider-routing.yaml"
+MODEL_ROUTING_POLICY_PATH = REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml"
 
 BEGIN_MARKER = ("<!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; "
                 "regenerate with: python3 platform/okf/generate_authorization_matrix.py -->")
@@ -80,6 +86,39 @@ def _load_quota_classes() -> Dict[str, Dict]:
     return dict(doc.get("classes") or {})
 
 
+def _load_providers() -> List[Dict]:
+    doc = yaml.safe_load(PROVIDER_ROUTING_PATH.read_text(encoding="utf-8")) or {}
+    return list(doc.get("providers") or [])
+
+
+def _load_model_routing() -> Tuple[Dict[Tuple[str, str], List[str]], Dict[Tuple[str, str], str]]:
+    doc = yaml.safe_load(MODEL_ROUTING_POLICY_PATH.read_text(encoding="utf-8")) or {}
+    preferences: Dict[Tuple[str, str], List[str]] = {}
+    for entry in doc.get("preferences") or []:
+        preferences[(entry["agent"], entry["task"])] = list(entry.get("prefer") or [])
+    adapters: Dict[Tuple[str, str], str] = {}
+    for entry in doc.get("adapters") or []:
+        adapters[(entry["agent"], entry["task"])] = entry.get("adapter", "?")
+    return preferences, adapters
+
+
+def _effective_model_chain(classification: str, providers: List[Dict], prefer: List[str]) -> List[str]:
+    """Mirrors components/ai-gateway/app/routing.py's
+    RoutingTable.candidates_for() + _apply_preference(): filter providers
+    eligible for `classification`, keep provider-routing.yaml's order,
+    then move any `prefer` names that survived to the front in that order
+    - a pure reorder, never able to resurrect a provider eligibility
+    filtered out. Duplicated here rather than imported (this file already
+    duplicates validate_okf_bundle.py's frontmatter parsing for the same
+    reason: small, well-specified logic, independent lifecycles)."""
+    known = {p["name"] for p in providers}
+    candidates = [p["name"] for p in providers if classification in (p.get("eligible_for") or [])]
+    deduped = [name for name in dict.fromkeys(prefer) if name in known]
+    preferred = [name for name in deduped if name in candidates]
+    rest = [name for name in candidates if name not in deduped]
+    return preferred + rest
+
+
 def _quota_cell(task_zuno: Dict, quota_classes: Dict[str, Dict]) -> str:
     cls_name = task_zuno.get("quota_class") or "standard"
     cls = quota_classes.get(cls_name) or {}
@@ -96,7 +135,9 @@ def _groups_cell(allowed_groups: List[str]) -> str:
 
 
 def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
-                    knowledge_policy: Dict[str, Dict], quota_classes: Dict[str, Dict]) -> str:
+                    knowledge_policy: Dict[str, Dict], quota_classes: Dict[str, Dict],
+                    providers: List[Dict], model_preferences: Dict[Tuple[str, str], List[str]],
+                    model_adapters: Dict[Tuple[str, str], str]) -> str:
     frontmatter, _, _ = _split_document(agent_dir / "agent.okf.md")
     zuno = frontmatter.get("zuno") or {}
     name = zuno.get("name", agent_dir.name)
@@ -112,8 +153,10 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
     lines.append("")
     lines.append(
         f"Generated per ADR-0503 from this bundle's frontmatter, "
-        f"`policies/tools/tool-policy.yaml` and "
-        f"`policies/knowledge/knowledge-policy.yaml` — the enforced "
+        f"`policies/tools/tool-policy.yaml`, "
+        f"`policies/knowledge/knowledge-policy.yaml`, "
+        f"`platform/ai-gateway/provider-routing.yaml` and "
+        f"`policies/model-routing/model-routing-policy.yaml` — the enforced "
         f"intersection (ADR-0011/ADR-0203) restated for review, never read "
         f"at runtime. Entitlement (ADR-0040): `{', '.join(access_groups) or '(none)'}`; "
         f"model classification ceiling (ADR-0021): `{classification}`; "
@@ -122,6 +165,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
     lines.append("")
 
     rows: List[str] = []
+    task_labels: List[Tuple[str, str]] = []
     for task_name in tasks:
         task_path = agent_dir / "tasks" / f"{task_name}.md"
         if not task_path.is_file():
@@ -138,6 +182,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             flags.append(f"prompt: `prompts/{task_name}.md`")
         if flags:
             task_label += f" ({'; '.join(flags)})"
+        task_labels.append((task_name, task_label))
 
         for tool_name in task_zuno.get("allowed_tools") or []:
             entry = tool_policy.get(tool_name)
@@ -176,6 +221,36 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             "and retrieve from no knowledge domain regardless of caller "
             "groups (the honest Stage-1 zero-capability state, ADR-0502)."
         )
+
+    if task_labels:
+        lines.append("")
+        lines.append("### Model routing")
+        lines.append("")
+        lines.append(
+            "Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved "
+            "from `platform/ai-gateway/provider-routing.yaml`'s classification "
+            "eligibility reordered by this `(agent, task)`'s `policies/model-routing/"
+            "model-routing-policy.yaml` preference — the first entry is the "
+            "reference model, the rest are fallback alternatives, in try order."
+        )
+        lines.append("")
+        lines.append("| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |")
+        lines.append("|---|---|---|---|---|---|")
+        for task_name, task_label in task_labels:
+            if classification not in ("C1", "C2", "C3"):
+                lines.append(f"| {task_label} | `{classification}` | — | (classification ceiling unknown — cannot resolve) | — | — |")
+                continue
+            prefer = model_preferences.get((name, task_name), [])
+            chain = _effective_model_chain(classification, providers, prefer)
+            reference = f"`{chain[0]}`" if chain else "(none eligible)"
+            fallback = ", ".join(f"`{p}`" for p in chain[1:]) or "—"
+            adapter = model_adapters.get((name, task_name))
+            adapter_cell = f"`{adapter}`" if adapter else "—"
+            lines.append(
+                f"| {task_label} | `{classification}` | {reference} | {fallback} | {adapter_cell} | "
+                f"`policies/model-routing/model-routing-policy.yaml` |"
+            )
+
     lines.append("")
     lines.append(END_MARKER)
     return "\n".join(lines)
@@ -213,13 +288,16 @@ def main() -> int:
     tool_policy = _load_tool_policy()
     knowledge_policy = _load_knowledge_policy()
     quota_classes = _load_quota_classes()
+    providers = _load_providers()
+    model_preferences, model_adapters = _load_model_routing()
 
     failures: List[str] = []
     written: List[str] = []
     for agent_dir in _agent_dirs(args.agents):
         index_path = agent_dir / "agent.okf.md"
         _, frontmatter_text, body = _split_document(index_path)
-        expected = _render_section(agent_dir, tool_policy, knowledge_policy, quota_classes)
+        expected = _render_section(agent_dir, tool_policy, knowledge_policy, quota_classes,
+                                   providers, model_preferences, model_adapters)
         current = _current_section(body)
 
         if args.check:

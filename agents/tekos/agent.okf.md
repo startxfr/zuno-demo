@@ -35,7 +35,12 @@ zuno:
       (SaaS model use allowed). Answers that incorporate Confluence content
       must respect Confluence's C2 classification (policies/data-classification)
       for the portions of context drawn from it, even though the task's
-      ceiling here is C1.
+      ceiling here is C1. The concrete model catalog lives in
+      platform/ai-gateway/provider-routing.yaml (not a model name here by
+      design); this agent's answer-technical-question preference
+      ([local-gpt-oss, local]) lives in
+      policies/model-routing/model-routing-policy.yaml — the resolved
+      effective chain is generated below in "Model routing".
   access:
     # ADR-0040: agent entitlement group, orthogonal to the `consultant`
     # business role that governs tool/data permissions inside Tekos
@@ -82,7 +87,7 @@ and `tasks/find-relevant-docs.md`.
 
 ## Authorization matrix
 
-Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_tekos`; model classification ceiling (ADR-0021): `C1`; status: `active`.
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_tekos`; model classification ceiling (ADR-0021): `C1`; status: `active`.
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
@@ -93,5 +98,15 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `find-relevant-docs` | `search_confluence` | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `search_confluence` |
 | `find-relevant-docs` | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
 | `check-my-drive-docs` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
+
+### Model routing
+
+Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `platform/ai-gateway/provider-routing.yaml`'s classification eligibility reordered by this `(agent, task)`'s `policies/model-routing/model-routing-policy.yaml` preference — the first entry is the reference model, the rest are fallback alternatives, in try order.
+
+| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
+|---|---|---|---|---|---|
+| `answer-technical-question` (primary; prompt: `prompts/answer-technical-question.md`) | `C1` | `local-gpt-oss` | `local`, `openai`, `gemini`, `anthropic`, `mistral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `find-relevant-docs` | `C1` | `local` | `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-docs` | `C1` | `local` | `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

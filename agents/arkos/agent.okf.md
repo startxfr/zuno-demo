@@ -80,7 +80,7 @@ agent's ADR-0040 dimension split.
 
 ## Authorization matrix
 
-Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_arkos`; model classification ceiling (ADR-0021): `C3`; status: `placeholder`.
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_arkos`; model classification ceiling (ADR-0021): `C3`; status: `placeholder`.
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
@@ -90,5 +90,13 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `drive.document.update` | tool | `drive.document.update` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.update` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+
+### Model routing
+
+Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `platform/ai-gateway/provider-routing.yaml`'s classification eligibility reordered by this `(agent, task)`'s `policies/model-routing/model-routing-policy.yaml` preference — the first entry is the reference model, the rest are fallback alternatives, in try order.
+
+| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
+|---|---|---|---|---|---|
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `C3` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

@@ -97,7 +97,7 @@ Drive/Gmail entries and `policies/knowledge/knowledge-policy.yaml`'s
 
 ## Authorization matrix
 
-Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml` and `policies/knowledge/knowledge-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_advantage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`.
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_advantage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`.
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
@@ -108,5 +108,16 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `monthly-sales-report` | `knowledge.adv` | knowledge | — | C2 | adv, board, cdp, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.adv` |
 | `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
 | `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
+
+### Model routing
+
+Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `platform/ai-gateway/provider-routing.yaml`'s classification eligibility reordered by this `(agent, task)`'s `policies/model-routing/model-routing-policy.yaml` preference — the first entry is the reference model, the rest are fallback alternatives, in try order.
+
+| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
+|---|---|---|---|---|---|
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `identify-new-business-with-po` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `monthly-sales-report` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-and-mail` | `C2` | `local` | `local-gpt-oss`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->
