@@ -46,11 +46,11 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 BUILD_PUBLISH_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-publish.yml"
 
 # Matches build-publish.yml's own `env:` block (REGISTRY, REGISTRY_NAMESPACE)
-# and RELEASING.md's documented `quay.io/zuno-demo/<component>` naming -
+# and RELEASING.md's documented `quay.io/zuno/<component>` naming -
 # only images published under this prefix were built/signed by our own
 # workflow, so only these get verified here. Third-party images
 # (postgresql, keycloak, redis, ...) are out of scope for this check.
-FIRST_PARTY_REGISTRY_PREFIX = "quay.io/zuno-demo/"
+FIRST_PARTY_REGISTRY_PREFIX = "quay.io/zuno/"
 
 # The exact keyless-signing identity build-publish.yml signs with: GitHub's
 # OIDC token for a run of that workflow file, on this repository
@@ -67,7 +67,7 @@ IGNORED_TAG_VALUES = {"latest", ""}
 class ImageRef:
     file: str
     path: str
-    image: str  # "quay.io/zuno-demo/<name>:<tag>"
+    image: str  # "quay.io/zuno/<name>:<tag>"
 
 
 @dataclass

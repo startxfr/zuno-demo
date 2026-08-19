@@ -28,7 +28,7 @@ permissions:
 
 env:
   REGISTRY: quay.io
-  REGISTRY_NAMESPACE: zuno-demo
+  REGISTRY_NAMESPACE: zuno
 
 jobs:
   build-publish-sign:

@@ -19,8 +19,8 @@ tag for from here.
 2. `git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`.
 3. `.github/workflows/build-publish.yml` triggers on the tag push: builds,
    scans, SBOMs and signs every component image, publishing each as both
-   `quay.io/zuno-demo/<component>:sha-<commit>` (always) and
-   `quay.io/zuno-demo/<component>:v0.1.0` (only for a tag push).
+   `quay.io/zuno/<component>:sha-<commit>` (always) and
+   `quay.io/zuno/<component>:v0.1.0` (only for a tag push).
 4. Bump each `gitops/charts/*/values.yaml`'s `image.tag` (or
    `.repository`, if also moving off the in-cluster registry placeholder
    coordinates - see each chart's own comment) to `v0.1.0` in a follow-up

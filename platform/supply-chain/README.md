@@ -47,7 +47,7 @@ gate (not `continue-on-error`, unlike `check_no_latest_tags.py` above).
 ## verify_signatures.py (WP-04)
 
 `verify_signatures.py` runs `cosign verify` against every first-party
-image reference (`quay.io/zuno-demo/...`) that already carries an
+image reference (`quay.io/zuno/...`) that already carries an
 immutable tag, checking it was signed by `build-publish.yml`'s exact
 keyless GitHub OIDC identity.
 
