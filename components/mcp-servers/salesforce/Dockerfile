@@ -1,6 +1,10 @@
-# Pulls through the zuno-ai-build ImageStream mirror
+# Defaults to the zuno-ai-build ImageStream mirror
 # (ansible/roles/image_mirrors), not docker.io directly.
-FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.12-slim
+# .github/workflows/build-publish.yml (ADR-0115) overrides this ARG to the
+# real docker.io image, since its GitHub-hosted runners can't reach the
+# cluster-internal mirror at all.
+ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.12-slim
+FROM ${BASE_IMAGE}
 
 WORKDIR /app
 COPY requirements.txt .

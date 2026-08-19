@@ -41,15 +41,33 @@ jobs:
           # own component directory (e.g. agents/) and needs the
           # repository root as build context - see each Dockerfile's own
           # header comment for exactly why.
+          #
+          # build_args: every Dockerfile's FROM defaults to the
+          # cluster-internal zuno-ai-build ImageStream mirror
+          # (ansible/roles/image_mirrors) for in-cluster BuildConfig builds
+          # (ansible/tasks/apply_openshift_build.yml). This workflow's
+          # GitHub-hosted runners can't reach that internal registry, so
+          # every entry overrides its ARG(s) to the same real public image
+          # the mirror itself points at (see
+          # ansible/roles/image_mirrors/tasks/install.yml for the mapping).
           - name: agent-bff
             dockerfile: components/agent-bff/Dockerfile
             context: components/agent-bff
+            build_args: |
+              GOLANG_BASE_IMAGE=docker.io/library/golang:1.26
+              RUNTIME_BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
           - name: agent-frontend
             dockerfile: components/agent-frontend/Dockerfile
             context: .
+            build_args: |
+              NODE_BASE_IMAGE=docker.io/library/node:20-alpine
+              GOLANG_BASE_IMAGE=docker.io/library/golang:1.24
+              RUNTIME_BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
           - name: agent-runtime
             dockerfile: components/agent-runtime/Dockerfile
             context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
           # ADR-0303/WP-39: context changed from "components/ai-gateway" to
           # "." - the image now bakes in policies/model-routing/, outside
           # its own component directory (same reason agent-bff's sibling
@@ -57,21 +75,33 @@ jobs:
           - name: ai-gateway
             dockerfile: components/ai-gateway/Dockerfile
             context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
           - name: mcp-gateway
             dockerfile: components/mcp-gateway/Dockerfile
             context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
           - name: rag-service
             dockerfile: components/rag-service/Dockerfile
             context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
           - name: mcp-sales-db
             dockerfile: components/mcp-servers/sales-db/Dockerfile
             context: components/mcp-servers/sales-db
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.12-slim
           - name: mcp-confluence
             dockerfile: components/mcp-servers/confluence/Dockerfile
             context: components/mcp-servers/confluence
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.12-slim
           - name: mcp-salesforce
             dockerfile: components/mcp-servers/salesforce/Dockerfile
             context: components/mcp-servers/salesforce
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.12-slim
           # ADR-0302/WP-34: unlike rag-ingestion (its own image is built
           # exclusively via the in-cluster OpenShift BuildConfig,
           # ansible/roles/rag_ingestion_build), mlops's own WP explicitly
@@ -80,6 +110,8 @@ jobs:
           - name: mlops
             dockerfile: components/mlops/Containerfile
             context: .
+            build_args: |
+              BASE_IMAGE=registry.access.redhat.com/ubi9/python-311:latest
           # ADR-0327/ADR-0308/WP-38: first-party Go module, own go.mod
           # (not part of the repo-root Python/Node build surface any other
           # entry here belongs to) - context is its own directory since
@@ -89,6 +121,9 @@ jobs:
           - name: aiagent-operator
             dockerfile: operator/aiagent-operator/Dockerfile
             context: operator/aiagent-operator
+            build_args: |
+              GOLANG_BASE_IMAGE=docker.io/library/golang:1.26
+              RUNTIME_BASE_IMAGE=gcr.io/distroless/static:nonroot
     steps:
       - uses: actions/checkout@v4
 
@@ -115,6 +150,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build_args }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ steps.tags.outputs.sha_tag }}

@@ -8,11 +8,14 @@
 #
 #   docker build -f components/rag-service/Dockerfile -t zuno/rag-service:local .
 #
-# FROM image below pulls through the zuno-ai-build ImageStream mirror
+# FROM image below defaults to the zuno-ai-build ImageStream mirror
 # (ansible/roles/image_mirrors), not docker.io directly - a local
 # `docker build` therefore needs network access to the cluster's internal
-# registry route.
-FROM image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim AS base
+# registry route. .github/workflows/build-publish.yml (ADR-0115) overrides
+# this ARG to the real docker.io image, since its GitHub-hosted runners
+# can't reach the cluster-internal mirror at all.
+ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim
+FROM ${BASE_IMAGE} AS base
 
 WORKDIR /app
 
