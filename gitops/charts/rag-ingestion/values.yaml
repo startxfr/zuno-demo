@@ -104,6 +104,688 @@ redhat:
     fetchMode: html
     include: []
     exclude: []
+  # 2026-08-19: release_notes alone left this product at 2 real pages per
+  # version (out of 874 total corpus documents) - html-single "landing"
+  # pages like release_notes typically link to little/nothing else
+  # (components/rag-ingestion/src/rag_ingestion.py's _discover_doc_links
+  # docstring), so OpenShift's real documentation - dozens of independent
+  # html-single books - was structurally undiscoverable from that one seed.
+  # Every URL below is HTTP-verified (200, this session) against the live
+  # docs.redhat.com for both 4.22 and 4.21 - each is itself an html-single
+  # page (the whole book in one fetch, matching this chart's existing
+  # convention), so this is still one HTTP call per entry, not a
+  # multi-page crawl. A few guessed slugs 404'd and were dropped rather
+  # than kept speculatively: installing_on_oracle_cloud_infrastructure (no
+  # OCP-native book found), a standalone "networking"/"observability"
+  # overview book (superseded below by their real constituent books -
+  # networking_operators/network_security and
+  # logging/monitoring/distributed_tracing respectively).
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/architecture/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/authentication_and_authorization/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/registry/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/web_console/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/cli_tools/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/building_applications/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/images/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/operators/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/machine_management/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/scalability_and_performance/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/backup_and_restore/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/hosted_control_planes/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/specialized_hardware_and_driver_enablement/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/extensions/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installation_overview/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_aws/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_azure/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_google_cloud/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_cloud/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_a_single_node/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_power/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_openstack/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_nutanix/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_vmware_vsphere/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_z_and_ibm_linuxone/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/networking_operators/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/distributed_tracing/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/logging/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/monitoring/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/architecture/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/security_and_compliance/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/authentication_and_authorization/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/storage/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/registry/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/web_console/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/cli_tools/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/images/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/operators/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/nodes/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/machine_management/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/scalability_and_performance/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/backup_and_restore/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/updating_clusters/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/disconnected_environments/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/hosted_control_planes/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/specialized_hardware_and_driver_enablement/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/extensions/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installation_overview/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_bare_metal/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_aws/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_azure/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_google_cloud/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_ibm_cloud/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_a_single_node/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_ibm_power/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_openstack/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_nutanix/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_vmware_vsphere/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_ibm_z_and_ibm_linuxone/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/networking_operators/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/network_security/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/distributed_tracing/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/logging/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift Container Platform"
+    productSlug: "openshift-container-platform"
+    version: "4.21"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/monitoring/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
   - enabled: true
     product: "Red Hat OpenShift AI"
     productSlug: "red-hat-openshift-ai-self-managed"
