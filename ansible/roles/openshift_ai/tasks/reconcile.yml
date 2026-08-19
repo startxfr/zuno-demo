@@ -171,14 +171,23 @@
 # MaaS mTLS defect): RHOAI's ModelsAsService controller deploys these two
 # Deployments into openshift-ingress without opting them into the mesh, so
 # traffic to the AuthPolicy fails mTLS before authentication runs (500s on
-# the MaaS gateway). Targeted per-Deployment annotation, NOT a namespace-wide
+# the MaaS gateway). Targeted per-Deployment opt-in, NOT a namespace-wide
 # istio-injection label - that would also inject the default HAProxy router
 # pods (see install.yml's istio-ca-root-cert comment for why
-# openshift-ingress is deliberately unlabeled). Both Deployments are owned by
-# the MaaS Config controller (Config/default), so this only patches the one
-# annotation it doesn't manage - safe to re-apply if a future reconcile of
-# theirs drops it. VERIFIED live, 2026-08-19: both Deployments'
-# spec.template.metadata.annotations is null.
+# openshift-ingress is deliberately unlabeled).
+#
+# Needs BOTH the annotation and a matching LABEL: the istio-sidecar-injector-
+# zuno-mesh webhook's per-object opt-in rule (object.sidecar-injector.istio.io)
+# filters via objectSelector, and the Kubernetes API only ever evaluates
+# objectSelector against .metadata.labels, never .metadata.annotations - an
+# annotation-only patch never gets the webhook invoked at all. VERIFIED live,
+# 2026-08-20: an annotation-only patch (2026-08-19 revision of this task)
+# rolled out fine and the annotation reached the running pod, but istiod's
+# logs showed zero injection calls for these pods and they came back 1/1
+# (no istio-proxy) - the label was missing. Both Deployments are owned by the
+# MaaS Config controller (Config/default), so this only patches the one
+# annotation+label pair it doesn't manage - safe to re-apply if a future
+# reconcile of theirs drops it.
 - name: "openshift_ai | reconcile: look up payload-processing/payload-pre-processing Deployments"
   kubernetes.core.k8s_info:
     api_version: apps/v1
@@ -205,12 +214,16 @@
           metadata:
             annotations:
               sidecar.istio.io/inject: "true"
+            labels:
+              sidecar.istio.io/inject: "true"
   loop: "{{ _openshift_ai_ipp_deployments.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
   when:
     - (item.resources | default([]) | length) > 0
-    - (item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true"
+    - >-
+      ((item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true") or
+      ((item.resources[0].spec.template.metadata.labels | default({}))["sidecar.istio.io/inject"] | default('') != "true")
 
 - name: "openshift_ai | reconcile: wait for the payload-processing/payload-pre-processing rollout to pick up the sidecar"
   kubernetes.core.k8s_info:

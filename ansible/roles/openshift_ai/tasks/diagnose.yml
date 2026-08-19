@@ -218,13 +218,15 @@
     blocked_finding:
       component: openshift-ai
       resource: "Deployment/{{ item.item }} (openshift-ingress)"
-      state: "sidecar.istio.io/inject annotation missing"
-      cause: "ADR-0201 - RHOAI's ModelsAsService controller deploys this Deployment without opting it into the mesh; mTLS to the MaaS AuthPolicy fails before authentication runs (500s on the MaaS gateway)"
-      solution: "Patch the Deployment's pod template with sidecar.istio.io/inject: \"true\" (targeted, not a namespace-wide istio-injection label - that would also inject the default HAProxy router pods)"
+      state: "sidecar.istio.io/inject label missing"
+      cause: "ADR-0201 - RHOAI's ModelsAsService controller deploys this Deployment without opting it into the mesh; mTLS to the MaaS AuthPolicy fails before authentication runs (500s on the MaaS gateway). The LABEL specifically (not just the annotation) is required - the zuno-mesh sidecar injector's per-object opt-in rule filters via objectSelector, which Kubernetes only ever evaluates against labels (VERIFIED live, 2026-08-20: annotation-only was not enough, istiod never got called)"
+      solution: "Patch the Deployment's pod template with sidecar.istio.io/inject: \"true\" as both a label and an annotation (targeted, not a namespace-wide istio-injection label - that would also inject the default HAProxy router pods)"
       auto_fix: "make d0 reconcile openshift-ai"
   loop: "{{ _oai_diag_ipp.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
   when:
     - (item.resources | default([]) | length) > 0
-    - (item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true"
+    - >-
+      ((item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true") or
+      ((item.resources[0].spec.template.metadata.labels | default({}))["sidecar.istio.io/inject"] | default('') != "true")
