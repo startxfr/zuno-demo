@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import string
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
@@ -110,6 +111,39 @@ def _summarize(content: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# A full natural-language question passed verbatim into CQL's
+# text~"<phrase>" operator rarely matches real page content: Confluence's
+# fuzzy text search still needs the words to actually co-occur, and
+# interrogative/meta words ("what", "does", "the latest internal Confluence
+# doc") dilute a query that would otherwise match on its few significant
+# words ("RHOAI 3.5 EA2 rollout"). Only applied above _QUERY_WORD_THRESHOLD
+# words - a caller already passing a short, targeted query (the common case
+# for direct tool use, e.g. "model serving") is left untouched.
+_QUERY_STOPWORDS = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "do", "does", "did",
+    "what", "when", "where", "who", "how", "why", "which", "say", "says",
+    "said", "about", "please", "can", "could", "would", "tell", "me",
+    "of", "for", "to", "in", "on", "at", "and", "or", "that", "this",
+    "it", "its", "i", "you", "we", "doc", "docs", "document", "documents",
+    "confluence", "internal", "latest",
+})
+_QUERY_WORD_THRESHOLD = 5
+
+
+def _cql_query_text(query: str) -> str:
+    """Reduces a long, question-shaped query to its significant words for
+    CQL's text~ operator; returns short queries unchanged."""
+    words = query.split()
+    if len(words) <= _QUERY_WORD_THRESHOLD:
+        return query
+    significant = [
+        stripped
+        for w in words
+        if (stripped := w.strip(string.punctuation)) and stripped.lower() not in _QUERY_STOPWORDS
+    ]
+    return " ".join(significant) or query
+
+
 mcp_server = MCPServer(
     name="confluence",
     version="0.1.0",
@@ -142,7 +176,7 @@ async def healthz() -> Dict[str, str]:
 @mcp_server.tool()
 async def search_pages(query: str, space: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
     """Search Confluence pages by text (CQL), optionally scoped to a space key."""
-    cql = f'type=page and text~"{query}"'
+    cql = f'type=page and text~"{_cql_query_text(query)}"'
     if space:
         cql = f'space="{space}" and {cql}'
     async with _client() as client:

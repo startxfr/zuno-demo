@@ -150,6 +150,37 @@ async def test_search_pages_round_trip(transport) -> None:
     assert 'text~"model serving"' in kwargs["params"]["cql"]
 
 
+async def test_search_pages_strips_stopwords_from_a_long_question(transport) -> None:
+    """A question-shaped query (ADR-0513 gate investigation: the acceptance
+    gate's own "What does the latest internal Confluence doc say about the
+    RHOAI 3.5 EA2 rollout?" scenario) must not reach CQL verbatim - the
+    interrogative/meta words dilute text~'s fuzzy match below the point
+    it ever matches a real page. A short query (test above) is untouched."""
+    fake_client = _FakeConfluenceClient([_FakeResponse(200, {"results": []})])
+
+    with _patch_client(fake_client):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "search_pages",
+                    {"query": "What does the latest internal Confluence doc say about the RHOAI 3.5 EA2 rollout?"},
+                )
+
+    assert not result.is_error, result.content
+    _, _, kwargs = fake_client.requests[0]
+    cql = kwargs["params"]["cql"]
+    for stopword in ("What", "does", "the", "latest", "internal", "Confluence", "doc", "say", "about"):
+        assert stopword not in cql.split('"')[1].split(), f"{stopword!r} should have been stripped from {cql!r}"
+    for keyword in ("RHOAI", "3.5", "EA2", "rollout"):
+        assert keyword in cql, f"{keyword!r} missing from {cql!r}"
+    # The original caller-supplied query is still reported back verbatim -
+    # only the CQL search text itself is reduced.
+    assert result.structured_content["result"]["query"] == (
+        "What does the latest internal Confluence doc say about the RHOAI 3.5 EA2 rollout?"
+    )
+
+
 async def test_read_page_not_found_reports_as_a_tool_error_not_a_crash(transport) -> None:
     fake_client = _FakeConfluenceClient([_FakeResponse(404)])
 
@@ -233,6 +264,7 @@ TESTS = [
     test_unauthenticated_call_rejected_before_any_protocol_handling,
     test_tools_list_reports_exactly_the_four_declared_tools,
     test_search_pages_round_trip,
+    test_search_pages_strips_stopwords_from_a_long_question,
     test_read_page_not_found_reports_as_a_tool_error_not_a_crash,
     test_create_page_round_trip,
     test_update_page_reads_current_version_then_increments_it,
