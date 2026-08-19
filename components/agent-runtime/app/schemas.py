@@ -45,3 +45,8 @@ class ChatResponse(BaseModel):
     # answer's context came from indexed retrieval, a live capability
     # call, both, or neither. See app/graph/nodes.py:_compute_source_mode.
     source_mode: str = "indexed"
+
+
+class RenameConversationRequest(BaseModel):
+    # ADR-0212: PATCH /v1/agents/{agent}/runs/{run_id} body.
+    title: str = Field(min_length=1, max_length=200)

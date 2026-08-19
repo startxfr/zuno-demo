@@ -13,20 +13,21 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 
+from app import conversations
 from app.auth import CallerIdentity, validate_token
 from app.clients import project_memory_client
 from app.graph.build import GraphFactory, validate_shapes
 from app.graph.nodes import _model_router
 from app.memory import MemoryExtractionError, extract_memory
 from app.registry import AgentDefinition, AgentRegistry
-from app.schemas import ChatRequest, ChatResponse
+from app.schemas import ChatRequest, ChatResponse, RenameConversationRequest
 from app.telemetry import graph_run_span, init_telemetry
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -97,48 +98,56 @@ async def lifespan(app: FastAPI):
     graph shape before the app finishes starting (ADR-0342 Operational
     considerations) - this runs regardless of which checkpointer backend
     is selected.
+
+    ADR-0212 wraps this in `conversations.pool_context()`, a second and
+    entirely independent Postgres pool for conversation metadata - never
+    sharing a connection or credential with the checkpoint pool below.
     """
     validate_shapes(_registry.all())
-    conninfo = _checkpoint_conninfo()
-    if conninfo is None:
-        logger.info("CHECKPOINT_PG* not fully configured - using in-memory checkpointing (not resumable across restarts)")
-        app.state.graph_factory = GraphFactory(MemorySaver())
-        yield
-        return
 
-    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from psycopg.rows import dict_row
-    from psycopg_pool import AsyncConnectionPool
+    async with conversations.pool_context() as conversations_pool:
+        app.state.conversations_pool = conversations_pool
 
-    # A connection POOL, not from_conn_string - VERIFIED live (2026-08-16):
-    # from_conn_string opens ONE psycopg async connection shared by every
-    # concurrent graph run, which fails with "another command is already in
-    # progress" under any request concurrency and leaves the connection
-    # permanently wedged (every subsequent chat 500s until pod restart).
-    # kwargs mirror what from_conn_string sets internally (the saver
-    # requires autocommit + dict_row; prepare_threshold=None avoids
-    # server-side prepared statements, PgBouncer-safe if the host ever
-    # changes back).
-    async with AsyncConnectionPool(
-        conninfo,
-        min_size=1,
-        max_size=int(os.getenv("CHECKPOINT_POOL_MAX_SIZE", "10")),
-        kwargs={"autocommit": True, "prepare_threshold": None, "row_factory": dict_row},
-        # VERIFIED live 2026-08-19: after this cluster's Patroni failovers,
-        # the pool's first-ever handout of a connection opened before the
-        # failover surfaced "consuming input failed: SSL SYSCALL error: EOF
-        # detected" straight to the caller (a 500/error SSE event) - the
-        # pool already discards a bad connection on next use, just not
-        # before handing it out once. check_connection runs a trivial probe
-        # before checkout and swaps a dead connection for a fresh one first,
-        # so callers never see a connection that was already broken.
-        check=AsyncConnectionPool.check_connection,
-    ) as pool:
-        checkpointer = AsyncPostgresSaver(pool)
-        await checkpointer.setup()  # idempotent - creates the checkpoint tables on first run
-        app.state.graph_factory = GraphFactory(checkpointer)
-        logger.info("Postgres-backed checkpointing enabled at %s:%s/%s", CHECKPOINT_PGHOST, CHECKPOINT_PGPORT, CHECKPOINT_PGDATABASE)
-        yield
+        conninfo = _checkpoint_conninfo()
+        if conninfo is None:
+            logger.info("CHECKPOINT_PG* not fully configured - using in-memory checkpointing (not resumable across restarts)")
+            app.state.graph_factory = GraphFactory(MemorySaver())
+            yield
+            return
+
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from psycopg.rows import dict_row
+        from psycopg_pool import AsyncConnectionPool
+
+        # A connection POOL, not from_conn_string - VERIFIED live (2026-08-16):
+        # from_conn_string opens ONE psycopg async connection shared by every
+        # concurrent graph run, which fails with "another command is already in
+        # progress" under any request concurrency and leaves the connection
+        # permanently wedged (every subsequent chat 500s until pod restart).
+        # kwargs mirror what from_conn_string sets internally (the saver
+        # requires autocommit + dict_row; prepare_threshold=None avoids
+        # server-side prepared statements, PgBouncer-safe if the host ever
+        # changes back).
+        async with AsyncConnectionPool(
+            conninfo,
+            min_size=1,
+            max_size=int(os.getenv("CHECKPOINT_POOL_MAX_SIZE", "10")),
+            kwargs={"autocommit": True, "prepare_threshold": None, "row_factory": dict_row},
+            # VERIFIED live 2026-08-19: after this cluster's Patroni failovers,
+            # the pool's first-ever handout of a connection opened before the
+            # failover surfaced "consuming input failed: SSL SYSCALL error: EOF
+            # detected" straight to the caller (a 500/error SSE event) - the
+            # pool already discards a bad connection on next use, just not
+            # before handing it out once. check_connection runs a trivial probe
+            # before checkout and swaps a dead connection for a fresh one first,
+            # so callers never see a connection that was already broken.
+            check=AsyncConnectionPool.check_connection,
+        ) as pool:
+            checkpointer = AsyncPostgresSaver(pool)
+            await checkpointer.setup()  # idempotent - creates the checkpoint tables on first run
+            app.state.graph_factory = GraphFactory(checkpointer)
+            logger.info("Postgres-backed checkpointing enabled at %s:%s/%s", CHECKPOINT_PGHOST, CHECKPOINT_PGPORT, CHECKPOINT_PGDATABASE)
+            yield
 
 
 app = FastAPI(
@@ -213,7 +222,12 @@ def _initial_state(payload: ChatRequest, identity: CallerIdentity, request_id: s
     }
 
 
-async def _resolve_run_id(graph, payload: ChatRequest, identity: CallerIdentity) -> str:
+async def _resolve_run_id(
+    graph,
+    payload: ChatRequest,
+    identity: CallerIdentity,
+    conversations_pool: Optional[Any] = None,
+) -> str:
     """ADR-0103: mints a new run_id when the caller isn't resuming anything,
     or validates a resume attempt against the checkpoint the run_id
     actually points at.
@@ -226,6 +240,15 @@ async def _resolve_run_id(graph, payload: ChatRequest, identity: CallerIdentity)
     of what run_id.user_sub the checkpoint's *content* claims, this is
     exactly the re-enforced-authorization property ADR-0103's Decision
     text requires.
+
+    ADR-0212 widens the ownership check from "must be the checkpoint's own
+    stored subject" to "must be the conversations table's owner_sub",
+    once conversation tracking is configured (conversations_pool is not
+    None) and a row already exists for this run_id - a pre-ADR-0212
+    run_id with no conversations row yet falls back to the original
+    checkpoint-only check (additive, no backfill, per that ADR's
+    Operational considerations). conversations_pool defaults to None so
+    every existing call site/test keeps today's exact behavior unchanged.
     """
     if payload.run_id is None:
         return str(uuid.uuid4())
@@ -236,6 +259,11 @@ async def _resolve_run_id(graph, payload: ChatRequest, identity: CallerIdentity)
         raise HTTPException(status_code=404, detail=f"no workflow run found for run_id '{payload.run_id}'")
 
     stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
+    if conversations_pool is not None:
+        owner_sub = await conversations.resolve_owner(conversations_pool, payload.run_id)
+        if owner_sub is not None:
+            stored_sub = owner_sub
+
     if stored_sub != identity.sub:
         logger.warning(
             "refused to resume run_id=%s: checkpoint belongs to a different subject",
@@ -264,6 +292,27 @@ async def _build_transcript(graph, run_id: str) -> str:
             turns.append(f"Assistant: {reply}")
     turns.reverse()  # alist() yields newest-first
     return "\n".join(turns)
+
+
+async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any]]:
+    """ADR-0212: structured sibling of _build_transcript - the frontend's
+    left-nav conversation reopen renders distinct message bubbles
+    directly (GET .../transcript), rather than the single concatenated
+    string extract-memory's LLM prompt needs. Same alist()-then-reverse
+    walk, oldest first."""
+    config = {"configurable": {"thread_id": run_id}}
+    turns: List[Dict[str, Any]] = []
+    async for checkpoint_tuple in graph.checkpointer.alist(config):
+        channel_values = checkpoint_tuple.checkpoint.get("channel_values") or {}
+        ts = checkpoint_tuple.checkpoint.get("ts")
+        message = channel_values.get("message")
+        reply = channel_values.get("reply")
+        if message:
+            turns.append({"role": "user", "content": message, "ts": ts})
+        if reply:
+            turns.append({"role": "assistant", "content": reply, "ts": ts})
+    turns.reverse()
+    return turns
 
 
 @app.post("/v1/agents/{agent}/runs/{run_id}/extract-memory")
@@ -348,6 +397,106 @@ async def extract_memory_endpoint(
     return result
 
 
+@app.get("/v1/agents/{agent}/conversations")
+async def list_conversations_endpoint(
+    agent: str,
+    request: Request,
+    starred: bool = False,
+    identity: CallerIdentity = Depends(validate_token),
+) -> List[Dict[str, Any]]:
+    """ADR-0212: the caller's own conversations for this agent, starred
+    first, most recently updated first. owner_sub = identity.sub only
+    under this ADR alone - ADR-0213 widens listing to shared
+    conversations too."""
+    agent_def = _active_agent_or_404(agent)
+    return await conversations.list_conversations(
+        request.app.state.conversations_pool,
+        agent_name=agent_def.name,
+        owner_sub=identity.sub,
+        starred_only=starred,
+    )
+
+
+@app.get("/v1/agents/{agent}/runs/{run_id}/transcript")
+async def transcript_endpoint(
+    agent: str,
+    run_id: str,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> List[Dict[str, Any]]:
+    """ADR-0212: reopening a conversation from the left-nav repopulates
+    its exact prior message history from here. Reuses the same 404
+    (unknown run)/403 (wrong subject) split as extract_memory_endpoint,
+    widened by conversations.resolve_owner the same way _resolve_run_id
+    is (see that function's docstring)."""
+    agent_def = _active_agent_or_404(agent)
+    graph = request.app.state.graph_factory.graph_for(agent_def)
+    config = {"configurable": {"thread_id": run_id}}
+    tuple_ = await graph.checkpointer.aget_tuple(config)
+    if tuple_ is None:
+        raise HTTPException(status_code=404, detail=f"no workflow run found for run_id '{run_id}'")
+
+    stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
+    owner_sub = await conversations.resolve_owner(request.app.state.conversations_pool, run_id)
+    if owner_sub is not None:
+        stored_sub = owner_sub
+    if stored_sub != identity.sub:
+        logger.warning("refused to read transcript for run_id=%s: belongs to a different subject", run_id)
+        raise HTTPException(status_code=403, detail="this workflow run belongs to a different user")
+
+    return await _build_transcript_structured(graph, run_id)
+
+
+@app.patch("/v1/agents/{agent}/runs/{run_id}")
+async def rename_conversation_endpoint(
+    agent: str,
+    run_id: str,
+    payload: RenameConversationRequest,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> Dict[str, str]:
+    """ADR-0212. 404 for both an unknown run_id and one owned by a
+    different subject (conversations.rename_conversation collapses both
+    - see its own docstring), so this endpoint never confirms another
+    subject's run_id exists."""
+    _active_agent_or_404(agent)
+    ok = await conversations.rename_conversation(
+        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub, title=payload.title
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return {"run_id": run_id, "title": payload.title}
+
+
+@app.put("/v1/agents/{agent}/runs/{run_id}/star")
+async def star_conversation_endpoint(
+    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, bool]:
+    """ADR-0212: toggles the caller's own personal star (a private
+    organizing flag, never shared - see conversations.py's own schema
+    comment)."""
+    _active_agent_or_404(agent)
+    ok = await conversations.set_star(
+        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub, starred=True
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return {"starred": True}
+
+
+@app.delete("/v1/agents/{agent}/runs/{run_id}/star")
+async def unstar_conversation_endpoint(
+    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, bool]:
+    _active_agent_or_404(agent)
+    ok = await conversations.set_star(
+        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub, starred=False
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return {"starred": False}
+
+
 async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict[str, Any], *, session_id: str, request_id: str):
     """One bounded retry for a checkpoint DB connection that was already
     dead at the moment of use (psycopg.OperationalError) - lifespan's
@@ -387,7 +536,18 @@ async def agent_chat(
     accept = request.headers.get("accept", "")
     request_id = _request_id(request)
     initial_state = _initial_state(payload, identity, request_id)
-    run_id = await _resolve_run_id(graph, payload, identity)
+    run_id = await _resolve_run_id(graph, payload, identity, request.app.state.conversations_pool)
+    # ADR-0212: creates the conversations row on first use of run_id
+    # (title derived from this opening message) or just bumps updated_at
+    # on resume - no-ops if conversation persistence isn't configured, so
+    # chat itself never depends on this pool being up.
+    await conversations.record_turn(
+        request.app.state.conversations_pool,
+        run_id=run_id,
+        agent_name=agent_def.name,
+        owner_sub=identity.sub,
+        opening_message=payload.message,
+    )
     config = {"configurable": {"thread_id": run_id}}
 
     if "text/event-stream" in accept:
