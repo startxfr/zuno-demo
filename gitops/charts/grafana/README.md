@@ -4,9 +4,32 @@ Referenced by `gitops/apps/grafana/application-d0.yaml` (operator.enabled:
 `Namespace` + `OperatorGroup` + `Subscription` for the Grafana Labs
 Community operator) and `application-d1.yaml` (grafana.enabled: the
 `Grafana` CR, its oauth-proxy Route/ServiceAccount, the Prometheus/Tempo
-`GrafanaDatasource`s and the "Model consumption" `GrafanaDashboard`, all in
+`GrafanaDatasource`s and six `GrafanaDashboard`s, all in
 `zuno-monitoring`) - same operator/operand `-d0`/`-d1` split as
 `observability`/`tempo`/`mesh-monitoring`/`kiali` (ADR-0312).
+
+## Dashboards (ADR-0413, folder "Zuno Platform")
+
+Six dashboards, each with template-variable filters wired into its
+queries and a `dashlist`/dashboard-links panel back to the other five.
+Consolidated 2026-08-19 from an earlier set of five (model-consumption,
+user-consumption, infra, network-mesh, api-gateway - all retired, their
+panels redistributed below) that had no template variables and never used
+the Tempo datasource:
+
+| File | uid | Filters | Covers |
+|---|---|---|---|
+| `dashboard-overview.yaml` | `zuno-overview` | none (landing page) | ADR-0102 SLO/error budget, component health, headline KPIs, links to the other five |
+| `dashboard-ai-models.yaml` | `zuno-ai-models` | provider, model, outcome, served_model | ADR-0029 gateway model traffic, semantic cache, vLLM serving internals, GPU/DCGM |
+| `dashboard-usage-cost.yaml` | `zuno-usage-cost` | user, group, agent, model, provider | ADR-0029 usage/cost by user and Keycloak group |
+| `dashboard-agents-tools-rag.yaml` | `zuno-agents-tools-rag` | agent, tool, mcp_server, domain | Per-agent SLO, MCP tool authorization outcomes, RAG search/freshness |
+| `dashboard-infra-data.yaml` | `zuno-infra-data` | namespace, node, pod | Node/pod/deployment health, resource consumption, database exporters, ArgoCD sync |
+| `dashboard-mesh-gateway.yaml` | `zuno-mesh-gateway` | dest_service, source_workload, mesh_namespace | Istio/Envoy mesh traffic, Kuadrant Authorino/Limitador |
+
+Several panels (AI models, Agents/tools/RAG, Mesh & gateway) query the
+`tempo` datasource directly via TraceQL, or carry a `fieldConfig` data link
+into Tempo Explore from a related metric panel - the first use of that
+datasource on this dashboard set.
 
 No redhat-operators/certified-operators Grafana package exists on this
 cluster - `grafana-operator` (Grafana Labs, channel `v5`) is Community

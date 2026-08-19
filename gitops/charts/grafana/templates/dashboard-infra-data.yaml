@@ -1,0 +1,431 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0413: merges dashboard-infra.yaml's node/pod/deployment health with
+# node- and pod-level CPU/RAM/GPU/disk-IO/network-IO/error panels, the
+# database exporters WP-A (gitops/charts/postgresql|mariadb|redis) adds,
+# and ArgoCD sync health (argocd_app_info - VERIFIED live 2026-08-19,
+# already queryable, no scrape change needed).
+#
+# Node-level panels (CPU/memory/disk/network) use node-exporter's own
+# "instance" label, NOT "node" - node_cpu_seconds_total etc. have no
+# "node" label to join against the $node variable (which comes from
+# kube_node_info), so those panels are deliberately left unfiltered by
+# $node; only the node-readiness table (kube_node_status_condition, which
+# DOES carry a "node" label) honors it.
+#
+# The Postgres ccp_* metric names (Crunchy's postgres_exporter custom
+# queries) are UNVERIFIED against this cluster's actual exporter output -
+# gitops/charts/postgresql/templates/postgrescluster.yaml's exporter block
+# is new in this same change and hasn't been synced/scraped yet. MariaDB
+# (mysqld_exporter) and Redis (oliver006/redis_exporter, bitnami's default)
+# metric names are the stable upstream defaults and are not expected to
+# need adjustment. Adjust the ccp_* expressions once the exporter is live
+# if the actual series differ.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: infra-data
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-infra-data
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-infra-data",
+      "title": "Infrastructure & data",
+      "description": "ADR-0413: node/pod/deployment health, node and pod resource consumption (CPU/RAM/GPU/disk/network/errors), database exporters and ArgoCD sync health.",
+      "tags": ["zuno", "infra", "kubernetes", "data", "adr-0413"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "templating": {"list": [
+        {
+          "current": {"text": "zuno-.*", "value": "zuno-.*"},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
+          "hide": 0, "includeAll": true, "allValue": "zuno-.*", "multi": true,
+          "name": "namespace", "options": [],
+          "query": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        },
+        {
+          "current": {"text": "All", "value": "$__all"},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(kube_node_info, node)",
+          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
+          "name": "node", "options": [],
+          "query": "label_values(kube_node_info, node)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        },
+        {
+          "current": {"text": "All", "value": "$__all"},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
+          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
+          "name": "pod", "options": [],
+          "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        }
+      ]},
+      "panels": [
+        {
+          "id": 1,
+          "title": "Pod status by namespace",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, phase) (kube_pod_status_phase{namespace=~\"$namespace\"})", "legendFormat": "{{`{{namespace}}`}} ({{`{{phase}}`}})"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Pod restarts (last hour)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[1h])) > 0", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Deployment availability",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_deployment_status_replicas_available{namespace=~\"$namespace\"} / kube_deployment_spec_replicas{namespace=~\"$namespace\"}", "legendFormat": "{{`{{namespace}}`}}/{{`{{deployment}}`}}"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Component status (pod-health + BFF error-rate approximation)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent) (rate(zuno_bff_requests_total{code=~\"5..\"}[5m]))", "legendFormat": "bff errors: {{`{{agent}}`}}"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Failed\"})", "legendFormat": "failed pods: {{`{{namespace}}`}}"}
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Node readiness / schedulability",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_node_status_condition{condition=\"Ready\", node=~\"$node\"} == 1", "format": "table", "instant": true},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_node_spec_unschedulable{node=~\"$node\"}", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Node CPU utilization",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "{{`{{instance}}`}}"}
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Node memory utilization",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{`{{instance}}`}}"}
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Node disk IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_disk_read_bytes_total[5m]))", "legendFormat": "{{`{{instance}}`}} (read)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_disk_written_bytes_total[5m]))", "legendFormat": "{{`{{instance}}`}} (write)"}
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Node network IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*\"}[5m]))", "legendFormat": "{{`{{instance}}`}} (rx)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*\"}[5m]))", "legendFormat": "{{`{{instance}}`}} (tx)"}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "GPU utilization by node",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Summary view - see dashboard-ai-models.yaml for full GPU/DCGM detail.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+          "fieldConfig": {"defaults": {"unit": "percent"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "{{`{{Hostname}}`}}"}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "CPU usage by namespace",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}"}
+          ]
+        },
+        {
+          "id": 12,
+          "title": "Memory working set by namespace",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\"})", "legendFormat": "{{`{{namespace}}`}}"}
+          ]
+        },
+        {
+          "id": 13,
+          "title": "CPU usage by pod",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 14,
+          "title": "Memory working set by pod",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"})", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 15,
+          "title": "Pod network IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Raw pod/NIC counters (cAdvisor) - moved from the retired dashboard-network-mesh.yaml, which kept this separate from mesh-attributed Istio bandwidth (different Prometheus stack, dashboard-mesh-gateway.yaml).",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (rx)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (tx)"}
+          ]
+        },
+        {
+          "id": 16,
+          "title": "Pod network errors / drops",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_errors_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_errors_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (errors)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_packets_dropped_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_packets_dropped_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (drops)"}
+          ]
+        },
+        {
+          "id": 17,
+          "title": "Container disk IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 64},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_fs_reads_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]) + rate(container_fs_writes_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 18,
+          "title": "PVC usage",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 64},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kubelet_volume_stats_used_bytes{namespace=~\"$namespace\"} / kubelet_volume_stats_capacity_bytes{namespace=~\"$namespace\"}", "legendFormat": "{{`{{namespace}}`}}/{{`{{persistentvolumeclaim}}`}}"}
+          ]
+        },
+        {
+          "id": 19,
+          "title": "PostgreSQL: active connections",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "UNVERIFIED ccp_* metric name - see this dashboard's header comment.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 72},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (pod) (ccp_connection_stats_active)", "legendFormat": "{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 20,
+          "title": "PostgreSQL: transactions/s",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "UNVERIFIED ccp_* metric name - see this dashboard's header comment.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 72},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(ccp_stat_database_xact_commit[5m])) + sum(rate(ccp_stat_database_xact_rollback[5m]))"}
+          ]
+        },
+        {
+          "id": 21,
+          "title": "PostgreSQL: database size",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "UNVERIFIED ccp_* metric name - see this dashboard's header comment.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 80},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "ccp_database_size_bytes", "legendFormat": "{{`{{dbname}}`}}"}
+          ]
+        },
+        {
+          "id": 22,
+          "title": "PostgreSQL: replication lag",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "3-instance Patroni cluster (docs/platform/slo.md's failover drill: new primary Ready in 4.8s). UNVERIFIED ccp_* metric name.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 80},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "ccp_replication_lag_size_bytes", "legendFormat": "{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 23,
+          "title": "MariaDB: connections",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 88},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "mysql_global_status_threads_connected", "legendFormat": "connected"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "mysql_global_variables_max_connections", "legendFormat": "max"}
+          ]
+        },
+        {
+          "id": 24,
+          "title": "MariaDB: queries/s and slow queries/s",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 88},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_questions[5m])", "legendFormat": "queries/s"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "slow queries/s"}
+          ]
+        },
+        {
+          "id": 25,
+          "title": "Redis: memory used vs max",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 96},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_bytes", "legendFormat": "used"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_max_bytes", "legendFormat": "max"}
+          ]
+        },
+        {
+          "id": 26,
+          "title": "Redis: hit ratio",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 96},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))"}
+          ]
+        },
+        {
+          "id": 27,
+          "title": "Redis: connected clients",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 96},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_connected_clients"}
+          ]
+        },
+        {
+          "id": 28,
+          "title": "Redis: commands/s",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 100},
+          "fieldConfig": {"defaults": {"unit": "ops"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_commands_processed_total[5m])"}
+          ]
+        },
+        {
+          "id": 29,
+          "title": "Database exporters: up",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 24, "x": 0, "y": 104},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min(mysql_up)", "legendFormat": "mariadb"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min(redis_up)", "legendFormat": "redis"}
+          ]
+        },
+        {
+          "id": 30,
+          "title": "ArgoCD application sync/health status",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 16, "x": 0, "y": 108},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (name, sync_status, health_status) (argocd_app_info{namespace=\"openshift-gitops\"})", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 31,
+          "title": "ArgoCD apps out of sync",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 108},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "orange", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(argocd_app_info{namespace=\"openshift-gitops\", sync_status!=\"Synced\"}) or vector(0)"}
+          ]
+        }
+      ]
+    }
+{{- end }}

@@ -1,0 +1,231 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0413: landing page for the "Zuno Platform" folder - the platform's
+# ADR-0102 SLO/error-budget posture, a component-health summary and the
+# headline usage KPIs in one screen, with a dashboard-list panel linking to
+# the five dashboards below it (dashboard-ai-models.yaml,
+# dashboard-usage-cost.yaml, dashboard-agents-tools-rag.yaml,
+# dashboard-infra-data.yaml, dashboard-mesh-gateway.yaml - the same "Zuno
+# Platform" folder/"zuno" tag every one of them carries). Deliberately has
+# no template variables of its own: this is meant to be read at a glance,
+# not filtered - drill-down happens on the linked dashboards.
+#
+# SLO panels reuse docs/platform/slo.md's measurement query verbatim
+# (successful-ratio at the BFF boundary, code!~"5..") and the burn-rate
+# shape gitops/charts/observability/templates/prometheusrule-slo.yaml's
+# AgentPathErrorBudgetBurnFast/Slow alerts already evaluate (14.4x/6x
+# thresholds) - this dashboard visualizes the same numbers those alerts
+# fire on, it doesn't invent a new definition.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: overview
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-overview
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-overview",
+      "title": "Zuno overview",
+      "description": "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs, links to the other five Zuno dashboards.",
+      "tags": ["zuno", "overview", "slo", "adr-0102", "adr-0413"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Agent-path availability (5m)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "docs/platform/slo.md measurement query - successful (non-5xx) ratio at the BFF boundary.",
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 0.999}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_bff_requests_total{code!~\"5..\"}[5m])) / sum(rate(zuno_bff_requests_total[5m]))"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Agent-path availability (30d)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "ADR-0102 objective: 99.9% over a rolling 30-day window.",
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 0.999}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(zuno_bff_requests_total{code!~\"5..\"}[30d])) / sum(increase(zuno_bff_requests_total[30d]))"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Error budget remaining (30d)",
+          "type": "gauge",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "1 - (budget consumed / 0.1% budget). Negative means the 30-day error budget is exhausted.",
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": -1, "max": 1, "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 0}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - ((1 - (sum(increase(zuno_bff_requests_total{code!~\"5..\"}[30d])) / sum(increase(zuno_bff_requests_total[30d])))) / 0.001)"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Firing zuno alerts",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "red", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(ALERTS{alertname=~\"AgentPathErrorBudgetBurn.*|RagFreshnessLagExceeded.*\", alertstate=\"firing\"}) or vector(0)"}
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Error budget burn rate (1h vs 6h windows)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Same multi-window shape as AgentPathErrorBudgetBurnFast (1h, pages at 14.4x) / AgentPathErrorBudgetBurnSlow (6h, tickets at 6x) - prometheusrule-slo.yaml.",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+          "fieldConfig": {"defaults": {"unit": "short", "custom": {"thresholdsStyle": {"mode": "line"}}, "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "orange", "value": 6}, {"color": "red", "value": 14.4}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(1 - (sum(rate(zuno_bff_requests_total{code!~\"5..\"}[1h])) / sum(rate(zuno_bff_requests_total[1h])))) / 0.001", "legendFormat": "burn rate (1h, fast)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(1 - (sum(rate(zuno_bff_requests_total{code!~\"5..\"}[6h])) / sum(rate(zuno_bff_requests_total[6h])))) / 0.001", "legendFormat": "burn rate (6h, slow)"}
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Deployment availability (zuno-*)",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min by (namespace, deployment) (kube_deployment_status_replicas_available{namespace=~\"zuno-.*\"} / kube_deployment_spec_replicas{namespace=~\"zuno-.*\"})", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Failed / pending pods (zuno-*)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 12},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "red", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(kube_pod_status_phase{namespace=~\"zuno-.*\", phase=~\"Failed|Pending\"})"}
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Telemetry pipeline up (OTel collector)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "up{job=\"zuno-otel-collector-collector\"} - the series docs/platform/slo.md confirmed live as the collector's own scrape health.",
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 16},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "up{job=\"zuno-otel-collector-collector\"}"}
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Model calls/s",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_model_calls_total[5m]))"}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Model error ratio",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "orange", "value": 0.02}, {"color": "red", "value": 0.1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_model_calls_total{outcome=\"error\"}[5m])) / sum(rate(zuno_model_calls_total[5m]))"}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Model cost (24h)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(zuno_model_cost_usd_total[24h]))"}
+          ]
+        },
+        {
+          "id": 12,
+          "title": "Tool denials/s",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_tool_invocations_total{outcome=\"denied\"}[5m])) or vector(0)"}
+          ]
+        },
+        {
+          "id": 13,
+          "title": "BFF requests by agent (rate)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 16, "x": 0, "y": 24},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent) (rate(zuno_bff_requests_total[5m]))", "legendFormat": "{{`{{agent}}`}}"}
+          ]
+        },
+        {
+          "id": 14,
+          "title": "RAG search errors/s",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 8, "x": 16, "y": 24},
+          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) or vector(0)"}
+          ]
+        },
+        {
+          "id": 15,
+          "title": "Zuno dashboards",
+          "type": "dashlist",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+          "options": {"tags": ["zuno"], "includeVars": false, "keepTime": true, "starred": false, "headings": false}
+        }
+      ]
+    }
+{{- end }}
