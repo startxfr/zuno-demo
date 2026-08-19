@@ -1,0 +1,84 @@
+# ADR-0115 release-pinning audit ledger - append-only, written by pin_release.py.
+# Each entry records one pin_release.py run: which chart values.yaml/path fields were
+# repointed to which immutable tag (and digest, when the release manifest supplied
+# one - see pin_release.py's own docstring for why the digest isn't also
+# embedded in values.yaml). This is evidence for ADR-0115's completion criterion
+# "at least one real release proves source -> build -> SBOM -> scan -> signature
+# -> immutable GitOps reference -> deployment traceability", not a mechanism consumed
+# by any deployment - never hand-edit.
+
+releases:
+- release_tag: v0.1.0
+  pinned_at: '2026-08-19T16:24:50Z'
+  pins:
+  - chart_values: gitops/charts/advantage/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: null
+  - chart_values: gitops/charts/agent-runtime/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:25792fb9dc72b475fad7da439c2bb3432dcf6379eccf126522528b12a2310c44
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:68a290abc2b3b6734bae620eb5658558cdcce6f2225a689ba2068741e79ffbb7
+  - chart_values: gitops/charts/aiagent-operator/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:fd4ed53e8eb47e7ab1c9f99440a6828a61454e8305f603e6a2a8412d65f8e863
+  - chart_values: gitops/charts/arkos/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: null
+  - chart_values: gitops/charts/comage/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: null
+  - chart_values: gitops/charts/finage/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: null
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:d7080da5424eac50e15142952feb5a7cb77b88fbb6e375be8361c8aeb8dbcb47
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:57f35f8512c1ab322632fb810a1d10ea9f0d73a7e4bb5e6382e5920f6886d78f
+  - chart_values: gitops/charts/mcp-sales-db/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:64b0dc2cb7a36071e7a6b91cc8a5e08be61c7faa2586733aa74866e0e769ffd3
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:4606a92b00983f876779e7adaa4843be9e98de5f5782297336544882bc813341
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    tag: v0.1.0
+    digest: sha256:aeff195f7c27f9a056c2cb39cdeeb9f80a7bc008c9588c9634411850ddfe78f6
+  - chart_values: gitops/charts/naveo/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: null
+  - chart_values: gitops/charts/rag-service/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:d602275cb04de578b5692246a2a6d18d1cea7e846ccfcaf756d6feb8addae738
+  - chart_values: gitops/charts/tekos/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: null
+  skipped:
+  - chart_values: gitops/charts/rag-ingestion/values.yaml
+    path: images.ingestion.tag
+    reason: built exclusively by the in-cluster OpenShift BuildConfig (ansible/roles/rag_ingestion_build),
+      never by build-publish.yml - no real Quay artifact from this release to pin
+      to
+  - chart_values: gitops/charts/rag-ingestion/values.yaml
+    path: images.compiler.tag
+    reason: built exclusively by the in-cluster OpenShift BuildConfig (ansible/roles/rag_ingestion_build),
+      never by build-publish.yml - no real Quay artifact from this release to pin
+      to

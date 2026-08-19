@@ -22,9 +22,17 @@ Deliberately narrow in scope, on purpose:
   'agent' build component...") survives untouched. `yaml.safe_load` is
   used only to VALIDATE the resulting file is still well-formed YAML after
   the edit, never to regenerate it.
-- refuses to run unless the manifest covers EXACTLY the set of fields
-  `check_no_latest_tags.py` currently reports (no more, no less) - a
-  stale/incomplete manifest is a loud error, not a partial, silent fix.
+- refuses to run unless the manifest's `pins` plus its `skipped` cover
+  EXACTLY the set of fields `check_no_latest_tags.py` currently reports (no
+  more, no less) - a stale/incomplete manifest is a loud error, not a
+  partial, silent fix. `skipped` exists for fields a given release
+  genuinely cannot pin (e.g. `rag-ingestion` is built exclusively by the
+  in-cluster OpenShift BuildConfig, never by `build-publish.yml` - no real
+  Quay artifact for it exists from a GitHub Actions release) - each entry
+  requires a `reason`, is written to the audit ledger alongside the real
+  pins, and does NOT silence `check_no_latest_tags.py` itself: a skipped
+  field still fails that check, honestly, until its own release path pins
+  it for real.
 - records each pin's optional digest in a small audit ledger
   (`platform/supply-chain/pinned-releases.yaml`) rather than embedding it
   in `values.yaml`: every chart's Deployment template renders
@@ -41,10 +49,13 @@ build-publish.yml run output):
         path: image.tag
         tag: v0.1.0
         digest: sha256:...          # optional, audit-only (see above)
+    skipped:                        # optional - see above
       - chart_values: gitops/charts/rag-ingestion/values.yaml
         path: images.ingestion.tag
-        tag: v0.1.0
-        digest: sha256:...
+        reason: >-
+          built exclusively by the in-cluster OpenShift BuildConfig
+          (ansible/roles/rag_ingestion_build), never by build-publish.yml -
+          no real Quay artifact from this release to pin to
 
 Run from the repository root:
 
@@ -113,6 +124,13 @@ def _load_manifest(manifest_path: pathlib.Path) -> Dict[str, Any]:
         for required in ("chart_values", "path", "tag"):
             if required not in pin:
                 raise ValueError(f"manifest pin {pin!r} is missing required field '{required}'")
+    skipped = doc.get("skipped", [])
+    if not isinstance(skipped, list):
+        raise ValueError(f"manifest {manifest_path}'s 'skipped' must be a list")
+    for skip in skipped:
+        for required in ("chart_values", "path", "reason"):
+            if required not in skip:
+                raise ValueError(f"manifest skip {skip!r} is missing required field '{required}'")
     return doc
 
 
@@ -169,25 +187,44 @@ def main() -> int:
     current = _current_findings()
     current_keys = {(f.chart_values, f.path) for f in current}
     manifest_keys = {(p["chart_values"], p["path"]) for p in manifest["pins"]}
+    skipped = manifest.get("skipped", [])
+    skipped_keys = {(s["chart_values"], s["path"]) for s in skipped}
 
-    missing = current_keys - manifest_keys
+    overlap = manifest_keys & skipped_keys
+    stale_skips = skipped_keys - current_keys
+    missing = current_keys - manifest_keys - skipped_keys
     extra = manifest_keys - current_keys
-    if missing or extra:
+    if missing or extra or overlap or stale_skips:
         if missing:
-            print(f"{len(missing)} non-immutable tag field(s) have no pin in the manifest:")
+            print(f"{len(missing)} non-immutable tag field(s) have no pin or skip in the manifest:")
             for chart_values, path in sorted(missing):
                 print(f"  ✗ {chart_values}: {path}")
         if extra:
             print(f"{len(extra)} manifest pin(s) do not match any current non-immutable field:")
             for chart_values, path in sorted(extra):
                 print(f"  ✗ {chart_values}: {path} (already pinned, wrong path, or typo)")
+        if overlap:
+            print(f"{len(overlap)} field(s) are both pinned and skipped - pick one:")
+            for chart_values, path in sorted(overlap):
+                print(f"  ✗ {chart_values}: {path}")
+        if stale_skips:
+            print(f"{len(stale_skips)} skipped field(s) are not actually non-immutable anymore:")
+            for chart_values, path in sorted(stale_skips):
+                print(f"  ✗ {chart_values}: {path} (already pinned, wrong path, or stale skip)")
         print(
-            "\nRESULT: FAIL - the manifest must cover exactly the fields "
-            "check_no_latest_tags.py currently reports, no more and no less."
+            "\nRESULT: FAIL - the manifest's pins plus skipped fields must cover exactly "
+            "the fields check_no_latest_tags.py currently reports, no more and no less."
         )
         return 1
 
-    print(f"Manifest covers all {len(current)} non-immutable tag field(s). Applying pins"
+    if skipped:
+        print(f"{len(skipped)} field(s) deliberately skipped (still non-immutable, not pinned by this release):")
+        for skip in sorted(skipped, key=lambda s: (s["chart_values"], s["path"])):
+            print(f"  ○ {skip['chart_values']}: {skip['path']} - {skip['reason']}")
+        print()
+
+    print(f"Manifest covers all {len(current)} non-immutable tag field(s) "
+          f"({len(manifest_keys)} pinned, {len(skipped_keys)} skipped). Applying pins"
           + (" (dry run - no files will be written):" if args.dry_run else ":"))
 
     pins_by_file: Dict[str, List[Dict[str, Any]]] = {}
@@ -213,25 +250,28 @@ def main() -> int:
             )
 
     if not args.dry_run:
-        _update_ledger(manifest.get("release_tag"), ledger_entries)
-        print(f"\nRESULT: PASS - pinned {len(current)} field(s). Ledger updated at "
-              f"{LEDGER_PATH.relative_to(REPO_ROOT)}. Run check_no_latest_tags.py to confirm.")
+        _update_ledger(manifest.get("release_tag"), ledger_entries, skipped)
+        print(f"\nRESULT: PASS - pinned {len(ledger_entries)} field(s), skipped {len(skipped)}. "
+              f"Ledger updated at {LEDGER_PATH.relative_to(REPO_ROOT)}. Run check_no_latest_tags.py "
+              "to confirm (skipped fields will still show as non-immutable, as expected).")
     else:
-        print(f"\nRESULT: PASS (dry run) - {len(current)} field(s) would be pinned; no files written.")
+        print(f"\nRESULT: PASS (dry run) - {len(manifest_keys)} field(s) would be pinned, "
+              f"{len(skipped)} skipped; no files written.")
     return 0
 
 
-def _update_ledger(release_tag: Any, entries: List[Dict[str, Any]]) -> None:
+def _update_ledger(release_tag: Any, entries: List[Dict[str, Any]], skipped: List[Dict[str, Any]]) -> None:
     ledger: Dict[str, Any] = {"releases": []}
     if LEDGER_PATH.exists():
         ledger = yaml.safe_load(LEDGER_PATH.read_text()) or {"releases": []}
-    ledger.setdefault("releases", []).append(
-        {
-            "release_tag": release_tag,
-            "pinned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "pins": entries,
-        }
-    )
+    entry: Dict[str, Any] = {
+        "release_tag": release_tag,
+        "pinned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "pins": entries,
+    }
+    if skipped:
+        entry["skipped"] = skipped
+    ledger.setdefault("releases", []).append(entry)
     LEDGER_PATH.write_text(
         "# ADR-0115 release-pinning audit ledger - append-only, written by "
         "pin_release.py.\n# Each entry records one pin_release.py run: which "

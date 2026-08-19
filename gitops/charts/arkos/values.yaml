@@ -27,7 +27,7 @@ image:
   registry: image-registry.openshift-image-registry.svc:5000
   frontendRepository: zuno-ai-build/agent-frontend
   bffRepository: zuno-ai-build/agent-bff
-  tag: latest
+  tag: v0.1.0
 
 frontend:
   replicas: 1

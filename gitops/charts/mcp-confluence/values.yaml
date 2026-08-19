@@ -7,7 +7,7 @@ namespace: zuno-ai-run
 # cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
 image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-confluence
-  tag: latest
+  tag: v0.1.0
   # Always, not IfNotPresent - with a mutable :latest tag, IfNotPresent
   # serves whatever stale image the node cached, silently ignoring
   # rebuilds (VERIFIED live 2026-08-16 across multiple components).
