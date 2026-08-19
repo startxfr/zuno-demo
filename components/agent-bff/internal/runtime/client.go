@@ -31,6 +31,19 @@ import (
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/reqid"
 )
 
+// UpstreamError reports a non-200 response from Agent Runtime, preserving
+// the status code so callers (main.go's chatHandler) can decide how to map
+// it - e.g. relay a 4xx as-is - instead of treating every non-200 as an
+// opaque connectivity failure.
+type UpstreamError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *UpstreamError) Error() string {
+	return fmt.Sprintf("agent runtime returned %d: %s", e.StatusCode, e.Body)
+}
+
 // Citation mirrors one entry of the Agent Runtime's citations array.
 type Citation struct {
 	Source string `json:"source"`
@@ -112,7 +125,7 @@ func (c *Client) Chat(ctx context.Context, bearerToken string, req ChatRequest) 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("agent runtime returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, &UpstreamError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 
 	var out ChatResponse

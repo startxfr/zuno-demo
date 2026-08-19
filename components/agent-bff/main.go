@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -199,6 +200,11 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			writeError(w, http.StatusBadRequest, "message is required")
 			return
 		}
+		if strings.TrimSpace(req.SessionID) == "" {
+			w.Header().Set("Content-Type", "application/json")
+			writeError(w, http.StatusBadRequest, "session_id is required")
+			return
+		}
 
 		requestID := reqid.FromHeaderOrNew(r.Header)
 		runtimeReq := runtime.ChatRequest{
@@ -244,7 +250,18 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		if err != nil {
 			log.Printf("agent-bff: agent runtime call failed: %v", err)
 			w.Header().Set("Content-Type", "application/json")
-			writeError(w, http.StatusBadGateway, "agent runtime unreachable")
+			// A 4xx from Agent Runtime means it rejected this specific
+			// request (bad body, auth) - relay that as our own 4xx instead
+			// of collapsing it into a generic 502, which would otherwise
+			// hide a real client-side problem behind a false "upstream is
+			// down" signal. A connection failure or a 5xx has no such
+			// status to relay and stays 502.
+			var upstream *runtime.UpstreamError
+			if errors.As(err, &upstream) && upstream.StatusCode >= 400 && upstream.StatusCode < 500 {
+				writeError(w, upstream.StatusCode, "agent runtime rejected the request")
+			} else {
+				writeError(w, http.StatusBadGateway, "agent runtime unreachable")
+			}
 			return
 		}
 
