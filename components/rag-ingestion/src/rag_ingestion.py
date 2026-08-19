@@ -597,7 +597,6 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
         logger.info("fetch-confluence: no confluence sources configured")
         return 0
     auth = _confluence_auth(config)
-    fetched = 0
     # VERIFIED live 2026-08-18/19: SXSI alone has 500+ pages (still counting
     # past a 20-request sample), and every enabled source used to run an
     # unscoped `space="..." and type=page` search - fetching+expanding
@@ -612,6 +611,19 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
     # ~1s scoped request. `_ancestor_path_matches` is still applied to each
     # result below - unchanged semantics, just against a pre-narrowed set.
     scope_id_cache: Dict[tuple, Optional[str]] = {}
+    # VERIFIED live 2026-08-19: the three tier entries per tech
+    # (archi/build/run) intentionally target the same directory tree,
+    # differentiated only by requiredGroups (ADR-0330) - doc_id is purely
+    # URL-derived, so writing immediately per source let whichever source
+    # processed a shared page LAST silently overwrite the earlier
+    # sources' acl_groups (confirmed live: 1497 fetch matches, only 499
+    # unique records ever landed). A real access-control bug: architects
+    # could lose visibility a page should have granted them, or a lower
+    # tier could inherit access it shouldn't have. Records are now
+    # accumulated in memory across every source, merging acl_groups
+    # (union, order-preserving) into one entry per doc_id instead of
+    # overwriting, with a single deduplicated write per page at the end.
+    records_by_doc_id: Dict[str, dict] = {}
     for source in config.confluence_sources:
         if not source.get("enabled", True):
             continue
@@ -691,6 +703,15 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
                         web_ui = page.get("_links", {}).get("webui", "")
                         page_url = f"{base_url}/wiki{web_ui}"
                         doc_id = doc_id_for(page_url)
+                        existing = records_by_doc_id.get(doc_id)
+                        if existing:
+                            # Same page already matched by an earlier
+                            # source (typically a sibling tier sharing the
+                            # same directory tree) - merge, don't overwrite.
+                            existing["acl_groups"] = list(
+                                dict.fromkeys(existing["acl_groups"] + required_groups)
+                            )
+                            continue
                         record = {
                             "doc_id": doc_id,
                             "url": page_url,
@@ -702,7 +723,7 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
                             "language": "en",
                             "source_type": "confluence",
                             "classification": "C2",
-                            "acl_groups": required_groups,
+                            "acl_groups": list(required_groups),
                             "fetched_at": _utcnow_iso(),
                             "sha256": hashlib.sha256(html.encode("utf-8")).hexdigest(),
                             "provenance": page_url,
@@ -713,15 +734,16 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
                         # source name (omit rather than invent, ADR-0202).
                         if source.get("technology"):
                             record["technology"] = source["technology"]
-                        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
-                        fetched += 1
+                        records_by_doc_id[doc_id] = record
                     next_link = payload.get("_links", {}).get("next")
                     if next_link:
                         next_url = f"{base_url}/wiki{next_link}"
                         next_params = None  # the cursor URL already carries the full query string
                     else:
                         next_url = None
-    return fetched
+    for doc_id, record in records_by_doc_id.items():
+        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+    return len(records_by_doc_id)
 
 
 # --------------------------------------------------------------------------

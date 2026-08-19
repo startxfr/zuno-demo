@@ -206,7 +206,11 @@ def test_fetch_confluence_scopes_via_ancestor_cql_when_directories_set():
 def test_fetch_confluence_resolves_a_shared_directory_scope_only_once():
     """The three tier entries for one tech (archi/build/run) share the
     same space+directories - the scope-id lookup should be cached across
-    them, not repeated per source."""
+    them, not repeated per source. They also share the matched pages
+    themselves: the resulting record should merge every matching source's
+    acl_groups, not have the last source silently overwrite the rest
+    (VERIFIED live 2026-08-19 as a real bug: only 1/3 tiers' acl_groups
+    ever survived)."""
     page = {
         "title": "S0 : Satellite",
         "body": {"storage": {"value": "<p>content</p>"}},
@@ -240,12 +244,16 @@ def test_fetch_confluence_resolves_a_shared_directory_scope_only_once():
         _run_source_adapter(SOURCE_ADAPTERS["fetch-confluence"], config, store)
 
     # The scope id is resolved once and reused - only the resolution is
-    # cached, not the per-source fetch itself (each source still searches
-    # and would write its own record; a pre-existing, separate issue means
-    # same-URL writes from different sources collide on doc_id, so the
-    # FakeStore ends up with one entry here - not this test's concern).
+    # cached, not the per-source fetch itself (each source still searches).
     assert len(title_lookups) == 1, title_lookups
     assert len(page_searches) == 2, page_searches
+    # Both sources match the same page - one merged record, not two
+    # colliding writes with only the last source's acl_groups surviving.
+    (record,) = store.json.values()
+    assert record["acl_groups"] == [
+        "confluence-archi-satellite",
+        "confluence-build-satellite",
+    ], record["acl_groups"]
 
 
 # --- fetch-salesforce (knowledge.sales) -------------------------------------
