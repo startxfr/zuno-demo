@@ -1,6 +1,6 @@
 # ADR-0214: Refresh agent-frontend chrome: branding, footer and menu icons
 
-- **Status:** Partially implemented (2026-08-19) - parts 1 and 2 exactly as decided below, part 3 with a deliberately narrower scope (see its own note) - all merged and verified (build/lint clean, browser-rendered screenshots confirm the logo, footer and both icon states). **Not yet running in the live deployment**: same image build/redeploy gap as [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md#status), which this ADR depends on - do not treat this as `Implemented` until that live run happens.
+- **Status:** Implemented (2026-08-19) - parts 1 and 2 exactly as decided below, part 3 with a deliberately narrower scope (see its own note) - all merged, verified (build/lint clean, browser-rendered screenshots), and live: `tekos-frontend` rebuilt and redeployed on the real cluster (same temporary `gitops/charts/tekos` unpin as [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md#status)).
 - **Target:** v0.2
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
