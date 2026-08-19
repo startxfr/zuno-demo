@@ -352,6 +352,16 @@
         username: agentcheckpoints
         password: "{{ zuno_admin_agent_runtime_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      agent-runtime/conversations-postgresql-app:
+        # Dedicated database/role for the Agent Runtime's persistent
+        # conversation metadata (ADR-0212) - deliberately a separate
+        # credential from agent-runtime/postgresql-app (agentcheckpoints)
+        # above, per that ADR's explicit "never share credentials with
+        # agentcheckpoints or any rag-* role" requirement. Same naming
+        # constraint as postgresql/app above.
+        username: agentconversations
+        password: "{{ zuno_admin_agent_runtime_conversations_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       ogx/postgresql-app:
         # Dedicated database/role for the OGX-backed RAG provider
         # prototype's remote::pgvector vector I/O provider (ADR-0322 v0.1

@@ -75,4 +75,9 @@ data:
     \connect {{ .Values.ragProjectDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragProjectDatabase.owner }};
+
+    -- Plain relational conversation metadata (ADR-0212) - no pgvector
+    -- needed, unlike the embeddings-bearing databases above.
+    \connect {{ .Values.conversationsDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.conversationsDatabase.owner }};
 {{- end }}

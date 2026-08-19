@@ -100,3 +100,21 @@ checkpointDb:
     secretName: agent-runtime-checkpoint-credentials
     secretStoreName: vault-backend
     refreshInterval: 1h
+
+# ADR-0212: persistent-conversation metadata (conversations/
+# conversation_stars tables), a second, separate Postgres pool from
+# checkpointDb above - deliberately never sharing credentials with it
+# (ADR-0212's own Security considerations). Unlike checkpointDb's
+# optional-degrade-to-MemorySaver fallback, this pool is fail-closed by
+# design: list/transcript/resume must refuse (503/deny) rather than
+# silently drop the ownership restriction if it's unreachable.
+conversationsDb:
+  host: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
+  port: "5432"
+  database: agent-conversations
+  sslmode: require
+  credentials:
+    vaultPath: agent-runtime/conversations-postgresql-app
+    secretName: agent-runtime-conversations-credentials
+    secretStoreName: vault-backend
+    refreshInterval: 1h

@@ -214,3 +214,17 @@ ragProjectDatabase:
   name: rag-project
   owner: ragproject
   vaultPath: rag-project/postgresql-app
+
+# Dedicated database/role for ADR-0212's persistent-conversation metadata
+# (conversations/conversation_stars tables). One shared database, not one
+# per agent unlike the ragXxxDatabase pattern above - conversation
+# metadata is operationally a single, cross-agent concern, not a
+# knowledge domain. Isolated from checkpointDatabase's agentcheckpoints
+# role and every rag-* role (ADR-0212's own Security considerations:
+# never share credentials between them). Same "bring your own password"
+# mechanism as checkpointDatabase above, via
+# templates/externalsecret-conversations.yaml.
+conversationsDatabase:
+  name: agent-conversations
+  owner: agentconversations
+  vaultPath: agent-runtime/conversations-postgresql-app

@@ -83,6 +83,31 @@ spec:
                   name: {{ .Values.checkpointDb.credentials.secretName }}
                   key: password
                   optional: true
+            # ADR-0212: persistent-conversation metadata, a second Postgres
+            # pool - optional: true for the same "Deployment comes up before
+            # the ExternalSecret has synced" reason as CHECKPOINT_PG* above,
+            # even though the app itself treats this pool as fail-closed
+            # once configured (unlike checkpointDb's MemorySaver fallback).
+            - name: CONVERSATIONS_PGHOST
+              value: {{ .Values.conversationsDb.host | quote }}
+            - name: CONVERSATIONS_PGPORT
+              value: {{ .Values.conversationsDb.port | quote }}
+            - name: CONVERSATIONS_PGDATABASE
+              value: {{ .Values.conversationsDb.database | quote }}
+            - name: CONVERSATIONS_PGSSLMODE
+              value: {{ .Values.conversationsDb.sslmode | quote }}
+            - name: CONVERSATIONS_PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.conversationsDb.credentials.secretName }}
+                  key: username
+                  optional: true
+            - name: CONVERSATIONS_PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.conversationsDb.credentials.secretName }}
+                  key: password
+                  optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:
