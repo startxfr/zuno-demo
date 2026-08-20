@@ -988,6 +988,10 @@
       gemini: "{{ zuno_llm_provider_gemini_api_key | default('xxxxxx') }}"
       anthropic: "{{ zuno_llm_provider_anthropic_api_key | default('xxxxxx') }}"
       mistral: "{{ zuno_llm_provider_mistral_api_key | default('xxxxxx') }}"
+      # ADR-0417: Codestral - a dedicated key/project from the mistral
+      # entry above, so Codestral running low on credits is distinguishable
+      # from mistral-large-latest doing so.
+      mistral-codestral: "{{ zuno_llm_provider_mistral_codestral_api_key | default('xxxxxx') }}"
       # ADR-0415: image-generation provider (stable-diffusion-xl via
       # OVHcloud AI Endpoints).
       ovhcloud: "{{ zuno_llm_provider_ovhcloud_api_key | default('xxxxxx') }}"
@@ -1004,6 +1008,7 @@
     - gemini
     - anthropic
     - mistral
+    - mistral-codestral
     - ovhcloud
   loop_control:
     loop_var: provider
@@ -1030,8 +1035,8 @@
 - name: "vault | LLM provider operator action required"
   ansible.builtin.debug:
     msg: >-
-      zuno/providers/{openai,gemini,anthropic,mistral,ovhcloud} are still
-      placeholders - the corresponding zuno_llm_provider_<name>_api_key
+      zuno/providers/{openai,gemini,anthropic,mistral,mistral-codestral,ovhcloud}
+      are still placeholders - the corresponding zuno_llm_provider_<name>_api_key
       value(s) in ansible/confidential.yml are still the "xxxxxx" sentinel
       from confidential.example.yml. Fill them in and re-run
       `make d0 install vault` (this role re-seeds from confidential.yml on

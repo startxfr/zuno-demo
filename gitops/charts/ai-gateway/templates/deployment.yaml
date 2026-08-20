@@ -87,6 +87,14 @@ spec:
                   name: {{ .Values.providerSecrets.mistral }}
                   key: api_key
                   optional: true
+            # ADR-0417: Codestral, a dedicated key/project from
+            # MISTRAL_API_KEY above.
+            - name: MISTRAL_CODESTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.providerSecrets.mistral_codestral }}
+                  key: api_key
+                  optional: true
             # ADR-0415: image-generation provider (stable-diffusion-xl via
             # OVHcloud AI Endpoints) - see app/image_providers.py.
             - name: OVHCLOUD_API_KEY

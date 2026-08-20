@@ -30,4 +30,5 @@ resources:
   - externalsecret-gemini.yaml
   - externalsecret-anthropic.yaml
   - externalsecret-mistral.yaml
+  - externalsecret-mistral-codestral.yaml
   - externalsecret-ovhcloud.yaml

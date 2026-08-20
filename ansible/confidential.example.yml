@@ -155,6 +155,13 @@ zuno_llm_provider_gemini_api_key: "xxxxxx"
 zuno_llm_provider_anthropic_api_key: "xxxxxx"
 zuno_llm_provider_mistral_api_key: "xxxxxx"
 
+# ADR-0417: Codestral, Mistral's code-specialized model - a DEDICATED
+# key/project, separate from zuno_llm_provider_mistral_api_key above, so
+# Codestral running low on credits is a distinguishable event from
+# mistral-large-latest doing so.
+#   Mistral (Codestral): https://console.mistral.ai/api-keys
+zuno_llm_provider_mistral_codestral_api_key: "xxxxxx"
+
 # ADR-0415: image-generation provider (stable-diffusion-xl via OVHcloud AI
 # Endpoints) - used by arkos/advantage/cognos/comage's generate_image tool.
 # Create a Public Cloud project with a payment method attached, then

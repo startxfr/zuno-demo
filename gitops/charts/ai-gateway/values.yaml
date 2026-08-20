@@ -82,6 +82,8 @@ providerSecrets:
   gemini: llm-provider-gemini
   anthropic: llm-provider-anthropic
   mistral: llm-provider-mistral
+  # ADR-0417: Codestral, a dedicated key/project from `mistral` above.
+  mistral_codestral: llm-provider-mistral-codestral
   # ADR-0415: image-generation provider (stable-diffusion-xl via OVHcloud
   # AI Endpoints).
   ovhcloud: llm-provider-ovhcloud
