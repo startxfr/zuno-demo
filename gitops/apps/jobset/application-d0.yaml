@@ -3,8 +3,8 @@
 # separate Application (application-d1.yaml) applied after this one is healthy.
 # Dedicated OwnNamespace-scoped namespace (openshift-jobset-operator), not the
 # originally shared openshift-operators - job-set's CSV only supports
-# OwnNamespace/SingleNamespace, not AllNamespaces (confirmed live; see
-# gitops/charts/jobset/values.yaml for the full incident detail).
+# OwnNamespace/SingleNamespace, not AllNamespaces; see
+# gitops/charts/jobset/values.yaml for detail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

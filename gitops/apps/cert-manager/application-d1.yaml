@@ -22,9 +22,9 @@ spec:
         issuer:
           enabled: true
         # Required by the vault-issuer template (issuer.enabled AND
-        # vaultServiceName) - dropped by mistake in the ADR-0211 edit,
-        # which let a pruning sync delete the vault-issuer ClusterIssuer
-        # live (2026-08-16); every internal certificate (Keycloak TLS,
+        # vaultServiceName) - dropped by mistake once already in an
+        # ADR-0211 edit, which let a pruning sync delete the vault-issuer
+        # ClusterIssuer; every internal certificate (Keycloak TLS,
         # istio-csr chain) renews through it.
         vaultServiceName: zuno-vault
         # ADR-0211: ships disabled - the operator flips `enabled: true`
@@ -37,13 +37,13 @@ spec:
           # Substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
-          # Production cutover (2026-08-16): staging rehearsal proved all
-          # three Certificates issue and validate (Ready:True) with the
-          # IAM identity and DNS-01 self-check both working end to end.
+          # Production cutover: staging rehearsal proved all three
+          # Certificates issue and validate (Ready:True) with the IAM
+          # identity and DNS-01 self-check both working end to end.
           certificatesIssuer: letsencrypt-route53
-          # Consumer flip (2026-08-16): all 3 production Certificates
-          # confirmed Ready with real Let's Encrypt chains - safe to point
-          # the router and API server at them.
+          # Consumer flip: all 3 production Certificates are Ready with
+          # real Let's Encrypt chains - safe to point the router and API
+          # server at them.
           consumers:
             routerDefaultCert: true
             apiServerNamedCert: true

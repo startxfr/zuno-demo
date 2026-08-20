@@ -3,9 +3,8 @@
 # (openshift-kueue-operator) with its own AllNamespaces-mode OperatorGroup,
 # unlike gitops/charts/jobset/lws which share openshift-operators: sharing it
 # here put Kueue's webhook Service selector in collision with other operators'
-# pods carrying the same generic label, causing intermittent admission failures
-# (confirmed live; see gitops/charts/kueue/values.yaml for the full incident
-# detail).
+# pods carrying the same generic label, causing intermittent admission
+# failures - see gitops/charts/kueue/values.yaml for detail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

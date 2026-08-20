@@ -2,10 +2,9 @@
 # LeaderWorkerSet operator install (ADR-0317). No singleton operand CR - see
 # application-d1.yaml. Dedicated OwnNamespace-scoped namespace
 # (openshift-lws-operator), not the originally shared openshift-operators -
-# leader-worker-set's CSV only supports OwnNamespace, not AllNamespaces
-# (confirmed live). This is the *opposite* install-mode problem from
-# connectivity-link (AllNamespaces-only); see gitops/charts/lws/values.yaml
-# for the full incident detail.
+# leader-worker-set's CSV only supports OwnNamespace, not AllNamespaces.
+# This is the *opposite* install-mode problem from connectivity-link
+# (AllNamespaces-only); see gitops/charts/lws/values.yaml for detail.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
