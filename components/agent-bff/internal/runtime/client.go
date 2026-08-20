@@ -51,6 +51,16 @@ type Citation struct {
 	Title  string `json:"title"`
 }
 
+// Image mirrors one entry of the Agent Runtime's images array (ADR-0415,
+// components/agent-runtime/app/schemas.py's ImageArtifact) - a
+// generate_image tool result for this turn, passed through unchanged, the
+// same sidecar-field shape as Citation above.
+type Image struct {
+	DataBase64 string `json:"data_base64"`
+	MimeType   string `json:"mime_type"`
+	Alt        string `json:"alt"`
+}
+
 // ChatRequest is the Agent Runtime's documented request body.
 type ChatRequest struct {
 	SessionID string `json:"session_id"`
@@ -85,6 +95,10 @@ type TranscriptTurn struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 	Ts      string `json:"ts"`
+	// ADR-0415: present only on an assistant turn that generated at least
+	// one image (components/agent-runtime/app/main.py's
+	// _build_transcript_structured).
+	Images []Image `json:"images,omitempty"`
 }
 
 // RenameConversationRequest is the Agent Runtime's documented request body
@@ -124,6 +138,7 @@ type ArchiveResponse struct {
 type ChatResponse struct {
 	Reply      string     `json:"reply"`
 	Citations  []Citation `json:"citations"`
+	Images     []Image    `json:"images"`
 	RunID      string     `json:"run_id"`
 	SourceMode string     `json:"source_mode"`
 }

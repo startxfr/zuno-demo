@@ -161,6 +161,7 @@ type apiChatRequest struct {
 type apiChatResponse struct {
 	Reply      string             `json:"reply"`
 	Citations  []runtime.Citation `json:"citations"`
+	Images     []runtime.Image    `json:"images"`
 	RunID      string             `json:"run_id"`
 	SourceMode string             `json:"source_mode"`
 }
@@ -181,9 +182,10 @@ type apiConversation struct {
 // apiTranscriptTurn is the frontend-facing shape of one structured
 // transcript entry (ADR-0212).
 type apiTranscriptTurn struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-	Ts      string `json:"ts"`
+	Role    string          `json:"role"`
+	Content string          `json:"content"`
+	Ts      string          `json:"ts"`
+	Images  []runtime.Image `json:"images,omitempty"`
 }
 
 // apiRenameRequest is the frontend-facing request body for
@@ -337,6 +339,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		_ = json.NewEncoder(w).Encode(apiChatResponse{
 			Reply:      resp.Reply,
 			Citations:  resp.Citations,
+			Images:     resp.Images,
 			RunID:      resp.RunID,
 			SourceMode: resp.SourceMode,
 		})
@@ -475,7 +478,7 @@ func transcriptHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, a
 
 		out := make([]apiTranscriptTurn, len(turns))
 		for i, t := range turns {
-			out[i] = apiTranscriptTurn{Role: t.Role, Content: t.Content, Ts: t.Ts}
+			out[i] = apiTranscriptTurn{Role: t.Role, Content: t.Content, Ts: t.Ts, Images: t.Images}
 		}
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(out)

@@ -28,7 +28,10 @@ from typing import Any, Dict, Optional
 
 
 async def handle(
-    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+    arguments: Dict[str, Any],
+    caller_sub: str,
+    delegated_token: Optional[str] = None,
+    bearer_token: str = "",
 ) -> Dict[str, Any]:
     folder = str(arguments.get("folder", "")).strip() or "My Drive"
     return {
@@ -55,7 +58,10 @@ async def handle(
 
 
 async def handle_create(
-    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+    arguments: Dict[str, Any],
+    caller_sub: str,
+    delegated_token: Optional[str] = None,
+    bearer_token: str = "",
 ) -> Dict[str, Any]:
     title = str(arguments.get("title", "")).strip() or "Untitled document"
     content = str(arguments.get("content", ""))
@@ -72,7 +78,10 @@ async def handle_create(
 
 
 async def handle_update(
-    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+    arguments: Dict[str, Any],
+    caller_sub: str,
+    delegated_token: Optional[str] = None,
+    bearer_token: str = "",
 ) -> Dict[str, Any]:
     document_id = str(arguments.get("document_id", "")).strip()
     if not document_id:

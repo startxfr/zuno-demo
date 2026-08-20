@@ -155,6 +155,13 @@ zuno_llm_provider_gemini_api_key: "xxxxxx"
 zuno_llm_provider_anthropic_api_key: "xxxxxx"
 zuno_llm_provider_mistral_api_key: "xxxxxx"
 
+# ADR-0415: image-generation provider (stable-diffusion-xl via OVHcloud AI
+# Endpoints) - used by arkos/advantage/cognos/comage's generate_image tool.
+# Create a Public Cloud project with a payment method attached, then
+# AI & Machine Learning -> AI Endpoints -> Generate my first access Key.
+#   OVHcloud: https://www.ovhcloud.com/en/public-cloud/ai-endpoints/
+zuno_llm_provider_ovhcloud_api_key: "xxxxxx"
+
 zuno_admin_mainpwd: "AbcdeF_Ghi123"
 
 # --- Aramis (adv-domain source API for rag-ingestion's fetch-aramis

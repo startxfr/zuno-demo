@@ -17,6 +17,9 @@ configMapGenerator:
   - name: zuno-provider-routing
     files:
       - provider-routing.yaml
+      # ADR-0415: same ConfigMap/volume mount as provider-routing.yaml -
+      # both files land in /app/config, so no new volume is needed.
+      - image-provider-routing.yaml
     options:
       disableNameSuffixHash: true
       labels:
@@ -27,3 +30,4 @@ resources:
   - externalsecret-gemini.yaml
   - externalsecret-anthropic.yaml
   - externalsecret-mistral.yaml
+  - externalsecret-ovhcloud.yaml

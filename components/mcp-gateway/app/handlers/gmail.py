@@ -19,7 +19,10 @@ from typing import Any, Dict, Optional
 
 
 async def handle(
-    arguments: Dict[str, Any], caller_sub: str, delegated_token: Optional[str] = None
+    arguments: Dict[str, Any],
+    caller_sub: str,
+    delegated_token: Optional[str] = None,
+    bearer_token: str = "",
 ) -> Dict[str, Any]:
     query = str(arguments.get("query", "")).strip() or "in:inbox"
     return {

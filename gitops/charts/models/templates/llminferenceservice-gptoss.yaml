@@ -44,6 +44,17 @@ spec:
       - name: main
         args:
           - --max-model-len={{ .Values.gptOssModel.maxModelLen }}
+          # ADR-0415: same generate_image tool-calling requirement as
+          # servingruntime.yaml's qwen args (see that file's comment) -
+          # gpt-oss-20b is arkos/cognos's own first fallback within their
+          # C3/local-only chain, and the reflexional-task preference
+          # (policies/model-routing/model-routing-policy.yaml) puts it
+          # FIRST for several agents. `openai` is vLLM's documented
+          # tool-call parser for gpt-oss's own Harmony response format.
+          # UNVERIFIED against a live cluster - confirm with `--help` on
+          # the resolved vLLM image before relying on it.
+          - --enable-auto-tool-choice
+          - --tool-call-parser=openai
         resources:
           {{- toYaml .Values.gptOssModel.resources | nindent 10 }}
   router:

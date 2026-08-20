@@ -15,6 +15,9 @@ export interface TranscriptTurn {
   role: "user" | "assistant";
   content: string;
   ts: string;
+  // ADR-0415: present only on an assistant turn that generated at least
+  // one image.
+  images?: { data_base64: string; mime_type: string; alt: string }[];
 }
 
 async function parseOrThrow<T>(resp: Response): Promise<T> {

@@ -59,6 +59,10 @@ spec:
               value: {{ .Values.localModelName | quote }}
             - name: PROVIDER_ROUTING_PATH
               value: /app/config/provider-routing.yaml
+            # ADR-0415: same ConfigMap/volume as PROVIDER_ROUTING_PATH
+            # above (see platform/ai-gateway/kustomization.yaml).
+            - name: IMAGE_PROVIDER_ROUTING_PATH
+              value: /app/config/image-provider-routing.yaml
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -81,6 +85,14 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.providerSecrets.mistral }}
+                  key: api_key
+                  optional: true
+            # ADR-0415: image-generation provider (stable-diffusion-xl via
+            # OVHcloud AI Endpoints) - see app/image_providers.py.
+            - name: OVHCLOUD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.providerSecrets.ovhcloud }}
                   key: api_key
                   optional: true
             # ADR-0114: MaaS adapter prototype, default off - see

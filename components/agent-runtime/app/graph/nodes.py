@@ -17,11 +17,12 @@ app/graph/shapes/retrieve_reason_respond.py's `build()` calls the
 
 from __future__ import annotations
 
+import json
 import logging
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
@@ -107,6 +108,54 @@ RAG_TOP_K = _TEKOS.rag_top_k  # from agent.okf.md's zuno.rag.top_k
 
 _model_router = ModelRouter()
 _knowledge_store = KnowledgePolicyStore()
+
+# ADR-0415: bound onto the reasoning model via bind_tools() only for a
+# task that declares "generate_image" in its own allowed_tools (same
+# declarative gate as live_read_tool below - ADR-0011 factor 1), so a task
+# never entitled to image generation never even offers the LLM the
+# choice. Deliberately narrow parameters (a prompt string, nothing
+# structured) - the model composes the visual description itself rather
+# than being handed retrieved context to forward, keeping the tool's
+# actual input surface small for the ADR's C2 scoped-override reasoning.
+_GENERATE_IMAGE_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": (
+            "Generate an image with stable-diffusion-xl when the user's request or "
+            "the surrounding conversation calls for a picture, diagram, illustration "
+            "or mockup. Only pass the visual description itself as the prompt - never "
+            "paste retrieved document content, citations or conversation history into it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "A concise description of the image to generate.",
+                },
+                "negative_prompt": {
+                    "type": "string",
+                    "description": "Optional: elements or qualities to avoid in the image.",
+                },
+            },
+            "required": ["prompt"],
+        },
+    },
+}
+# ADR-0415 decision 3: fixed ceiling for this one call type, regardless of
+# the calling agent's own ambient classification (arkos/cognos are C3 for
+# everything else) - see the ADR's Accepted risks.
+_IMAGE_GENERATION_CLASSIFICATION = "C2"
+
+
+def _image_generation_declared(task: TaskDefinition) -> bool:
+    """ADR-0116 migration-alias tolerance (task frontmatter should use the
+    canonical `image.generation.create` capability ID; accepting the
+    legacy `generate_image` name too costs nothing and matches how
+    policies/tools/tool-policy.yaml and platform/bindings/tools/
+    tool-bindings.yaml both already answer to either name)."""
+    return "image.generation.create" in task.allowed_tools or "generate_image" in task.allowed_tools
 
 # ADR-0046: "Similarity alone can return an incorrect OpenShift version
 # even when the user names a version" - these deterministic pre-ranking
@@ -395,6 +444,10 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     byte-identical messages to before.
     """
     base_classification = agent.preferred_classification
+    # ADR-0415: declarative gate, same ADR-0011-factor-1 mechanism
+    # live_read_tool already uses - only offered to the LLM when this
+    # task's own OKF bundle lists it.
+    image_generation_enabled = _image_generation_declared(task)
 
     async def reason_node(state: AgentState) -> Dict[str, Any]:
         context = _build_context_block(state)
@@ -411,15 +464,17 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
 
         classification = state.get("effective_classification", base_classification)
         local_only = state.get("local_only_required", False)
+        turn_messages: List[Any] = [system, *history_messages, human]
         try:
             result, provider = await _model_router.invoke_with_fallback(
                 classification=classification,
-                messages=[system, *history_messages, human],
+                messages=turn_messages,
                 bearer_token=state["bearer_token"],
                 local_only=local_only,
                 request_id=state.get("request_id"),
                 agent_name=agent.name,
                 task_name=task.name,
+                tools=[_GENERATE_IMAGE_TOOL_SCHEMA] if image_generation_enabled else None,
             )
         except ModelRouterError as exc:
             logger.error("all model providers failed: %s", exc)
@@ -432,10 +487,96 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 "errors": state.get("errors", []) + [f"reason: {exc}"],
             }
 
-        reply_text = result.content if hasattr(result, "content") else str(result)
-        return {"reply": reply_text, "provider_used": provider.name}
+        tool_calls = getattr(result, "tool_calls", None) or []
+        image_call = next((tc for tc in tool_calls if tc.get("name") == "generate_image"), None)
+        if not image_call:
+            reply_text = result.content if hasattr(result, "content") else str(result)
+            return {"reply": reply_text, "provider_used": provider.name}
+
+        return await _resolve_image_generation_call(
+            state, agent, task, turn_messages, result, image_call, provider,
+        )
 
     return reason_node
+
+
+async def _resolve_image_generation_call(
+    state: AgentState,
+    agent: AgentDefinition,
+    task: TaskDefinition,
+    turn_messages: List[Any],
+    assistant_result: Any,
+    image_call: Dict[str, Any],
+    provider: Any,
+) -> Dict[str, Any]:
+    """ADR-0415: executes the LLM's own choice to call generate_image, then
+    makes a SECOND (tool-less) model call so the agent can present the
+    result in natural language, the standard two-round tool-calling shape.
+    The tool result fed back to that second call is a short status
+    summary, never the base64 payload itself - the image only ever rides
+    in `generated_images`, kept out of every text-based prompt/history
+    path (see app/graph/history.py's placeholder substitution)."""
+    args = image_call.get("args", {})
+    try:
+        tool_result = await invoke_tool(
+            tool_name="generate_image",
+            arguments={"prompt": args.get("prompt", ""), "negative_prompt": args.get("negative_prompt")},
+            bearer_token=state["bearer_token"],
+            agent_name=agent.name,
+            task_name=task.name,
+            data_classification=_IMAGE_GENERATION_CLASSIFICATION,
+        )
+    except McpClientError as exc:
+        logger.warning("generate_image tool call failed: %s", exc)
+        tool_result = {"error": str(exc)}
+
+    if "error" in tool_result:
+        tool_summary = {"status": "error", "detail": tool_result["error"]}
+        generated_images_update: Dict[str, Any] = {}
+    else:
+        tool_summary = {"status": "ok", "prompt": args.get("prompt", "")}
+        generated_images_update = {
+            "generated_images": state.get("generated_images", [])
+            + [
+                {
+                    "data_base64": tool_result["data_base64"],
+                    "mime_type": tool_result.get("mime_type", "image/png"),
+                    "alt": tool_result.get("alt", args.get("prompt", "")),
+                }
+            ]
+        }
+
+    follow_up_messages = [
+        *turn_messages,
+        AIMessage(content=assistant_result.content or "", tool_calls=[image_call]),
+        ToolMessage(content=json.dumps(tool_summary), tool_call_id=image_call.get("id", "")),
+    ]
+    try:
+        final_result, final_provider = await _model_router.invoke_with_fallback(
+            classification=state.get("effective_classification", agent.preferred_classification),
+            messages=follow_up_messages,
+            bearer_token=state["bearer_token"],
+            local_only=state.get("local_only_required", False),
+            request_id=state.get("request_id"),
+            agent_name=agent.name,
+            task_name=task.name,
+        )
+    except ModelRouterError as exc:
+        logger.error("follow-up model call after generate_image failed: %s", exc)
+        fallback_reply = (
+            "I generated the image, but couldn't compose a follow-up reply right now."
+            if "error" not in tool_result
+            else f"I couldn't generate that image: {tool_result['error']}"
+        )
+        return {
+            "reply": fallback_reply,
+            "provider_used": provider.name,
+            "errors": state.get("errors", []) + [f"reason: {exc}"],
+            **generated_images_update,
+        }
+
+    reply_text = final_result.content if hasattr(final_result, "content") else str(final_result)
+    return {"reply": reply_text, "provider_used": final_provider.name, **generated_images_update}
 
 
 def _compute_source_mode(state: AgentState) -> str:

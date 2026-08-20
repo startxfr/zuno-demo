@@ -18,10 +18,12 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app import quota, semantic_cache
 from app.auth import CallerIdentity, validate_token
+from app.image_providers import ImageProviderFactoryError, generate_image
+from app.image_routing import ImageRoutingError, ImageRoutingTable
 from app.model_routing_policy import AdapterDeclaration, ModelRoutingPolicy
 from app.optimizer import OptimizationRefused, TuningController
 from app.providers import chat_model_for
@@ -32,6 +34,9 @@ from app.schemas import (
     ChatCompletionResponse,
     ChatCompletionUsage,
     ChatMessage,
+    ImageGenerationData,
+    ImageGenerationRequest,
+    ImageGenerationResponse,
 )
 from app.telemetry import init_telemetry, model_call_span, record_cache_outcome
 
@@ -50,6 +55,7 @@ app = FastAPI(
 )
 
 routing_table = RoutingTable()
+image_routing_table = ImageRoutingTable()  # ADR-0415
 model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
 tuning_controller = TuningController()  # ADR-0309 (WP-42) - inert unless the policy enables it
 
@@ -80,6 +86,7 @@ async def reload_routing() -> Dict[str, Any]:
     kill immediately (TuningController.reload_policy's own behavior).
     """
     routing_table.reload()
+    image_routing_table.reload()
     model_routing_policy.reload()
     tuning_controller.reload_policy()
     return {"loaded": routing_table.loaded}
@@ -148,7 +155,36 @@ async def optimizer_apply(payload: Dict[str, Any]) -> JSONResponse:
 
 
 def _to_langchain_messages(messages: List[ChatMessage]) -> List[Any]:
-    return [_ROLE_TO_MESSAGE[m.role](content=m.content) for m in messages]
+    """ADR-0415: role="tool" (a tool's result being fed back for a
+    follow-up turn) becomes a LangChain ToolMessage; an assistant message
+    that itself carries tool_calls (the model's own prior turn choosing to
+    call one) is rebuilt with LangChain's normalized tool_calls shape,
+    converting each OpenAI-wire `function.arguments` JSON string back into
+    a dict - the reverse of what _invoke_with_fallback/_stream_completion
+    do when they serialize a model's response tool_calls onto the wire."""
+    result: List[Any] = []
+    for m in messages:
+        if m.role == "tool":
+            result.append(ToolMessage(content=m.content or "", tool_call_id=m.tool_call_id or ""))
+            continue
+        if m.role == "assistant" and m.tool_calls:
+            result.append(
+                AIMessage(
+                    content=m.content or "",
+                    tool_calls=[
+                        {
+                            "name": tc["function"]["name"],
+                            "args": json.loads(tc["function"]["arguments"] or "{}"),
+                            "id": tc.get("id", ""),
+                            "type": "tool_call",
+                        }
+                        for tc in m.tool_calls
+                    ],
+                )
+            )
+            continue
+        result.append(_ROLE_TO_MESSAGE[m.role](content=m.content or ""))
+    return result
 
 
 @app.post("/v1/chat/completions")
@@ -229,7 +265,10 @@ async def chat_completions(
 
     if payload.stream:
         return StreamingResponse(
-            _stream_completion(candidates, classification, messages, request_id, adapter_decl, identity=identity),
+            _stream_completion(
+                candidates, classification, messages, request_id, adapter_decl,
+                identity=identity, tools=payload.tools,
+            ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -248,6 +287,57 @@ async def chat_completions(
         adapter_decl=adapter_decl,
         quota_class=quota_class,
         project_id=project_id,
+        tools=payload.tools,
+    )
+
+
+@app.post("/v1/images/generations")
+async def images_generations(
+    payload: ImageGenerationRequest,
+    identity: CallerIdentity = Depends(validate_token),
+    # ADR-0415: callers of this endpoint (the MCP Gateway's in-process
+    # image_gen handler) always send C2 here, regardless of the calling
+    # agent's own ambient classification - the scoped override that lets
+    # arkos/cognos (C3 for everything else) use this one capability. This
+    # endpoint does not special-case that; it enforces eligibility exactly
+    # like /v1/chat/completions does, against whatever classification the
+    # caller actually declares, and fails closed the same way.
+    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
+):
+    classification = x_zuno_data_classification.upper()
+    request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
+
+    try:
+        candidates = image_routing_table.candidates_for(classification)
+    except ImageRoutingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    errors: List[str] = []
+    for candidate in candidates:
+        cfg = image_routing_table.provider_config(candidate.name)
+        try:
+            logger.info(
+                "image_call: provider=%s model=%s classification=%s request_id=%s caller=%s",
+                candidate.name, cfg.get("model"), classification, request_id, identity.sub,
+            )
+            image = generate_image(candidate, cfg, prompt=payload.prompt, negative_prompt=payload.negative_prompt)
+        except ImageProviderFactoryError as exc:
+            errors.append(f"{candidate.name}: {exc}")
+            continue
+        except Exception as exc:  # pragma: no cover - defensive, mirrors _invoke_with_fallback
+            logger.warning("image provider '%s' failed: %s", candidate.name, exc)
+            errors.append(f"{candidate.name}: {exc}")
+            continue
+
+        return ImageGenerationResponse(
+            data=[ImageGenerationData(b64_json=image.data_base64)],
+            zuno_provider=candidate.name,
+        )
+
+    raise HTTPException(
+        status_code=502,
+        detail=f"all eligible image providers failed for classification {classification}: {'; '.join(errors)}",
     )
 
 
@@ -291,6 +381,7 @@ async def _invoke_with_fallback(
     groups: Optional[List[str]] = None,
     quota_class: str = "standard",
     project_id: Optional[str] = None,
+    tools: Optional[List[Dict[str, Any]]] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -299,9 +390,13 @@ async def _invoke_with_fallback(
     # enablement); the cache key itself binds to `requested_model`, not the
     # specific candidate, so this stays correct regardless of which
     # candidate ends up serving an uncached request.
+    # ADR-0415: a tools= request is never served from (or written to) the
+    # cache - whether the model chooses to call a tool can depend on
+    # context this cache's key doesn't capture, and a stale cached
+    # tool_calls decision replayed onto a different turn would be wrong.
     cache_key: Optional[str] = None
-    if candidates and semantic_cache.should_use_cache(routing_table.provider_config(candidates[0].name)):
-        prompt_text = "\n".join(f"{m.role}: {m.content}" for m in raw_messages)
+    if tools is None and candidates and semantic_cache.should_use_cache(routing_table.provider_config(candidates[0].name)):
+        prompt_text = "\n".join(f"{m.role}: {m.content or ''}" for m in raw_messages)
         context = semantic_cache.CacheContext(
             model_name=requested_model,
             user_sub=caller_sub,
@@ -343,6 +438,8 @@ async def _invoke_with_fallback(
                 adapter=adapter_name, caller_sub=caller_sub, groups=groups,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
+                if tools:
+                    model = model.bind_tools(tools)
                 result = await model.ainvoke(messages)
                 prompt_tokens, completion_tokens = _usage_tokens(result)
                 call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
@@ -366,9 +463,28 @@ async def _invoke_with_fallback(
             continue
 
         content = result.content if hasattr(result, "content") else str(result)
+        # ADR-0415: serialize LangChain's normalized tool_calls
+        # ([{"name", "args": dict, "id"}]) back into OpenAI wire format -
+        # the reverse of _to_langchain_messages' conversion, so a caller
+        # that sends a prior assistant tool_calls message back in on the
+        # next turn round-trips correctly.
+        result_tool_calls = getattr(result, "tool_calls", None) or []
+        wire_tool_calls = [
+            {
+                "id": tc.get("id") or f"call_{uuid.uuid4().hex[:24]}",
+                "type": "function",
+                "function": {"name": tc["name"], "arguments": json.dumps(tc["args"])},
+            }
+            for tc in result_tool_calls
+        ] or None
         response = ChatCompletionResponse(
             model=effective_model_name,
-            choices=[ChatCompletionChoice(message=ChatMessage(role="assistant", content=content))],
+            choices=[
+                ChatCompletionChoice(
+                    message=ChatMessage(role="assistant", content=content, tool_calls=wire_tool_calls),
+                    finish_reason="tool_calls" if wire_tool_calls else "stop",
+                )
+            ],
             usage=ChatCompletionUsage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
@@ -387,7 +503,7 @@ async def _invoke_with_fallback(
     )
 
 
-def _sse_chunk(completion_id: str, created: int, model_name: str, delta: Dict[str, str], finish_reason: Optional[str] = None) -> str:
+def _sse_chunk(completion_id: str, created: int, model_name: str, delta: Dict[str, Any], finish_reason: Optional[str] = None) -> str:
     return "data: " + json.dumps(
         {
             "id": completion_id,
@@ -406,6 +522,7 @@ async def _stream_completion(
     request_id: str,
     adapter_decl: Optional[AdapterDeclaration] = None,
     identity: Optional[CallerIdentity] = None,
+    tools: Optional[List[Dict[str, Any]]] = None,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -435,6 +552,8 @@ async def _stream_completion(
                 groups=identity.groups if identity else None,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
+                if tools:
+                    model = model.bind_tools(tools)
                 # ADR-0029: accumulate chunks via AIMessageChunk.__add__ so the
                 # terminal usage-only chunk (vLLM/OpenAI's stream_options.
                 # include_usage extension, enabled in app/providers.py) merges
@@ -445,6 +564,15 @@ async def _stream_completion(
                 # path never read anything past `.content` before. That
                 # terminal chunk's content is always "", so it never reaches
                 # the `if token:` forward below - no wire-format change.
+                # ADR-0415: the same accumulation also reconstructs a fully
+                # merged tool_calls list from a provider's streamed
+                # tool-call-argument deltas (AIMessageChunk.__add__ already
+                # merges tool_call_chunks) - forwarded as ONE consolidated
+                # delta once the loop ends, rather than incremental
+                # argument-fragment deltas like OpenAI's own API does; the
+                # only real client (langchain_openai.ChatOpenAI) parses a
+                # single complete tool_calls delta the same as it would
+                # multiple partial ones.
                 final_chunk = None
                 async for event in model.astream(messages):
                     final_chunk = event if final_chunk is None else final_chunk + event
@@ -463,7 +591,20 @@ async def _stream_completion(
                 return
             continue
 
-        yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="stop")
+        final_tool_calls = getattr(final_chunk, "tool_calls", None) or []
+        if final_tool_calls:
+            wire_tool_calls = [
+                {
+                    "id": tc.get("id") or f"call_{uuid.uuid4().hex[:24]}",
+                    "type": "function",
+                    "function": {"name": tc["name"], "arguments": json.dumps(tc["args"])},
+                }
+                for tc in final_tool_calls
+            ]
+            yield _sse_chunk(completion_id, created, effective_model_name, {"tool_calls": wire_tool_calls})
+            yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="tool_calls")
+        else:
+            yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="stop")
         yield "data: [DONE]\n\n"
         return
 

@@ -39,6 +39,12 @@ class Citation(TypedDict):
     title: str
 
 
+class GeneratedImage(TypedDict):
+    data_base64: str
+    mime_type: str
+    alt: str
+
+
 class AgentState(TypedDict, total=False):
     # Request-scoped inputs
     session_id: str
@@ -61,6 +67,13 @@ class AgentState(TypedDict, total=False):
     tool_results: Dict[str, Any]
     reply: str
     citations: List[Citation]
+    # ADR-0415: images generate_image produced this turn, accumulated
+    # across the whole thread the same way ADR-0103's checkpointer already
+    # persists every other state channel - no separate database/table.
+    # Kept out of `history`/`summary` (app/graph/history.py substitutes a
+    # short text placeholder for a past turn's images instead) so the
+    # base64 payload is never re-injected into a later LLM call.
+    generated_images: List[GeneratedImage]
     # Always "ai-gateway" now (ADR-0009 split) - this runtime no longer
     # knows which downstream provider actually served the request; that
     # detail lives in components/ai-gateway's own OTel traces.

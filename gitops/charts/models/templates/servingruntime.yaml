@@ -53,6 +53,21 @@ spec:
         # 8080 - verified on-cluster: without this, vLLM serves on 8000
         # while everything else probes 8080, so the pod never goes Ready.
         - --port=8080
+        # ADR-0415: required for components/ai-gateway's generate_image
+        # tool-calling (arkos/cognos's C3/local-only routing means their
+        # reasoning call - which decides WHETHER to call generate_image,
+        # never the OVHcloud call itself - reaches this model first, per
+        # provider-routing.yaml's local-first fallback order; without
+        # this flag vLLM's OpenAI-compatible server does not parse
+        # tool_calls out of the model's own output at all). `hermes` is
+        # vLLM's documented parser for Qwen2.5-Instruct's tool-call
+        # format. UNVERIFIED against a live cluster (same caveat as
+        # --lora-modules below - no GPU/vLLM instance in this repo's
+        # sandbox to confirm against the pinned image.vllm build) -
+        # confirm with `--help` and correct the parser name if needed
+        # before relying on it.
+        - --enable-auto-tool-choice
+        - --tool-call-parser=hermes
 {{- if .Values.loraAdapters }}
         # ADR-0301 point 1: vLLM's own native multi-LoRA support, additive
         # to this same ServingRuntime/InferenceService - never a second

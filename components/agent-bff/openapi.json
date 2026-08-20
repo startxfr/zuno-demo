@@ -214,13 +214,24 @@
           "title": { "type": "string" }
         }
       },
+      "Image": {
+        "type": "object",
+        "description": "ADR-0415: a generate_image tool result for this turn (stable-diffusion-xl via OVHcloud AI Endpoints).",
+        "required": ["data_base64", "mime_type", "alt"],
+        "properties": {
+          "data_base64": { "type": "string" },
+          "mime_type": { "type": "string" },
+          "alt": { "type": "string" }
+        }
+      },
       "ChatResponse": {
         "type": "object",
         "description": "ADR-0215: run_id/source_mode added to the synchronous JSON reply - previously only the SSE 'start' event exposed run_id, so a synchronous caller had no way to resume the conversation for a follow-up turn.",
-        "required": ["reply", "citations", "run_id", "source_mode"],
+        "required": ["reply", "citations", "images", "run_id", "source_mode"],
         "properties": {
           "reply": { "type": "string" },
           "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } },
+          "images": { "type": "array", "items": { "$ref": "#/components/schemas/Image" }, "description": "ADR-0415: empty unless this turn's agent/task is entitled to generate_image and the model chose to call it." },
           "run_id": { "type": "string", "description": "ADR-0212/ADR-0215: identifies this conversation - pass it as the request's run_id to resume with history on a later turn." },
           "source_mode": { "type": "string", "enum": ["indexed", "live", "both", "none"], "description": "ADR-0205: whether this reply used indexed knowledge, a live tool call, or both." }
         }
@@ -243,7 +254,8 @@
         "properties": {
           "role": { "type": "string", "enum": ["user", "assistant"] },
           "content": { "type": "string" },
-          "ts": { "type": "string", "format": "date-time" }
+          "ts": { "type": "string", "format": "date-time" },
+          "images": { "type": "array", "items": { "$ref": "#/components/schemas/Image" }, "description": "ADR-0415: present only on an assistant turn that generated at least one image." }
         }
       },
       "RenameRequest": {

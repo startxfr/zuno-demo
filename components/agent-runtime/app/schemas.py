@@ -34,9 +34,21 @@ class Citation(BaseModel):
     title: str
 
 
+class ImageArtifact(BaseModel):
+    """ADR-0415: a generate_image tool result for this turn. Sidecar
+    field, mirroring Citation above - never folded into `reply` itself."""
+
+    data_base64: str
+    mime_type: str
+    alt: str
+
+
 class ChatResponse(BaseModel):
     reply: str
     citations: List[Citation]
+    # ADR-0415: empty unless this turn's agent/task is entitled to
+    # generate_image and the model chose to call it.
+    images: List[ImageArtifact] = Field(default_factory=list)
     # ADR-0103: pass this back as `run_id` on a later request (browser
     # disconnect, explicit "continue" action) to resume this exact
     # workflow from its last checkpoint instead of starting a new one.

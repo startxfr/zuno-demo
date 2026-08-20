@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -24,7 +24,13 @@ from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
 from app.graph.history import build_history_messages
-from app.graph.nodes import _LIVE_READ_CLASSIFICATION, _escalate
+from app.graph.nodes import (
+    _GENERATE_IMAGE_TOOL_SCHEMA,
+    _LIVE_READ_CLASSIFICATION,
+    _escalate,
+    _image_generation_declared,
+    _resolve_image_generation_call,
+)
 from app.graph.state import AgentState
 from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
 from app.registry import AgentRegistry
@@ -215,15 +221,19 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
 
     classification = state.get("effective_classification", ARKOS_BASE_CLASSIFICATION)
     local_only = state.get("local_only_required", False)
+    # ADR-0415: same declarative gate as app/graph/nodes.py:reason_node.
+    image_generation_enabled = _image_generation_declared(_DRAFT_TASK)
+    turn_messages: List[Any] = [system, *history_messages, human]
     try:
         result, provider = await _model_router.invoke_with_fallback(
             classification=classification,
-            messages=[system, *history_messages, human],
+            messages=turn_messages,
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
             agent_name=_ARKOS.name,
             task_name=_DRAFT_TASK.name,
+            tools=[_GENERATE_IMAGE_TOOL_SCHEMA] if image_generation_enabled else None,
         )
     except ModelRouterError as exc:
         logger.error("all model providers failed: %s", exc)
@@ -235,6 +245,23 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             ),
             "provider_used": None,
             "errors": state.get("errors", []) + [f"draft: {exc}"],
+        }
+
+    tool_calls = getattr(result, "tool_calls", None) or []
+    image_call = next((tc for tc in tool_calls if tc.get("name") == "generate_image"), None)
+    if image_call:
+        # ADR-0415: arkos's draft is the document body itself
+        # (document_draft, not reply) - the shared helper's own reply/
+        # provider_used/generated_images result is remapped onto that
+        # field here rather than reused verbatim.
+        resolved = await _resolve_image_generation_call(
+            state, _ARKOS, _DRAFT_TASK, turn_messages, result, image_call, provider,
+        )
+        return {
+            "document_draft": resolved.get("reply"),
+            "provider_used": resolved.get("provider_used"),
+            **({"errors": resolved["errors"]} if "errors" in resolved else {}),
+            **({"generated_images": resolved["generated_images"]} if "generated_images" in resolved else {}),
         }
 
     draft_text = result.content if hasattr(result, "content") else str(result)

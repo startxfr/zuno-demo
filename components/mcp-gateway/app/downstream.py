@@ -23,7 +23,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
 from app.bindings import Binding
-from app.handlers import drive, email_report, gmail, web_search
+from app.handlers import drive, email_report, gmail, image_gen, web_search
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
@@ -58,6 +58,9 @@ IN_PROCESS_HANDLERS = {
     "gmail": gmail.handle,
     "web_search": web_search.handle,
     "email_report": email_report.handle,
+    # ADR-0415: not a demo-mode stub like the rest of this dict - calls
+    # the real, already-deployed components/ai-gateway in-cluster.
+    "image_gen": image_gen.handle,
 }
 
 
@@ -94,7 +97,11 @@ async def invoke(
         # ADR-0208: delegated_token is None for every non-delegated-user
         # binding (app/main.py only resolves one when auth_mode requires
         # it) - handlers that don't need it simply ignore the kwarg.
-        return await handler(arguments, caller_sub, delegated_token=delegated_token)
+        # ADR-0415: bearer_token is forwarded the same way, for the one
+        # handler (image_gen) that makes a real in-cluster call and needs
+        # the caller's own identity to reach it - every other handler
+        # ignores it, same as delegated_token above.
+        return await handler(arguments, caller_sub, delegated_token=delegated_token, bearer_token=bearer_token)
 
     raise DownstreamError(
         502, f"binding '{binding.capability}' has unsupported transport '{binding.transport}'"

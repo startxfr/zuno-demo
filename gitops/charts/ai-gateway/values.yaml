@@ -82,6 +82,9 @@ providerSecrets:
   gemini: llm-provider-gemini
   anthropic: llm-provider-anthropic
   mistral: llm-provider-mistral
+  # ADR-0415: image-generation provider (stable-diffusion-xl via OVHcloud
+  # AI Endpoints).
+  ovhcloud: llm-provider-ovhcloud
 
 # ADR-0114: MaaS adapter prototype (components/ai-gateway/app/
 # maas_adapter.py). Disabled by default - flipping `enabled` alone changes

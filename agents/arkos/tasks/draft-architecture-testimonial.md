@@ -14,6 +14,10 @@ zuno:
     - git.repository.private.list
     - git.file.write
     - git.repository.create
+    # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints, offered to
+    # the drafting model as a callable tool - it decides whether a given
+    # DAT/workshop request needs an illustration.
+    - image.generation.create
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project

@@ -6,6 +6,10 @@ zuno:
   allowed_tools:
     - salesforce.opportunity.read
     - web_search
+    # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints, offered to
+    # the reasoning model as a callable tool for deal-status questions
+    # that call for a visual (chart, mockup).
+    - image.generation.create
   live_read_tool: salesforce.opportunity.read
   allowed_knowledge:
     - knowledge.sales

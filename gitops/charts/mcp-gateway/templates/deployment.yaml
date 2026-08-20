@@ -55,6 +55,8 @@ spec:
               value: {{ .Values.keycloakJwksUrl | quote }}
             - name: SALES_DB_MCP_URL
               value: {{ .Values.salesDbMcpUrl | quote }}
+            - name: AI_GATEWAY_URL
+              value: {{ .Values.aiGatewayUrl | quote }}
             - name: INTERNAL_EMAIL_DOMAINS
               value: {{ .Values.internalEmailDomains | quote }}
             - name: MCP_GATEWAY_WORKLOAD_TOKEN

@@ -5,6 +5,10 @@ title: Answer a project or bid question
 zuno:
   allowed_tools:
     - web_search
+    # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints, offered to
+    # the reasoning model as a callable tool for project/bid questions
+    # that call for a visual (mockup, diagram).
+    - image.generation.create
   allowed_knowledge:
     - knowledge.adv
     - knowledge.project

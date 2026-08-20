@@ -73,6 +73,9 @@ keycloakIssuer: ""
 keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
 
 salesDbMcpUrl: http://sales-db-mcp.zuno-ai-run.svc:8000
+# ADR-0415: components/mcp-gateway/app/handlers/image_gen.py's real
+# in-cluster call target.
+aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 
 # Domains treated as "internal" by the send_technical_report_email demo
 # handler (comma-separated). Override for the real environment.

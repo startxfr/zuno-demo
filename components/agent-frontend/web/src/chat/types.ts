@@ -6,6 +6,14 @@ export interface Citation {
   title: string;
 }
 
+// ADR-0415: a generate_image tool result for this turn - sidecar field,
+// same shape/placement convention as Citation above.
+export interface ImageArtifact {
+  data_base64: string;
+  mime_type: string;
+  alt: string;
+}
+
 export interface StartEventData {
   request_id: string;
   // ADR-0212: identifies this conversation - unchanged from ADR-0103's
@@ -25,6 +33,7 @@ export interface ToolEventData {
 
 export interface DoneEventData {
   citations: Citation[];
+  images?: ImageArtifact[];
 }
 
 export interface ErrorEventData {
@@ -38,5 +47,6 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   citations?: Citation[];
+  images?: ImageArtifact[];
   pending?: boolean;
 }

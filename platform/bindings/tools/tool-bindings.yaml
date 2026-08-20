@@ -361,3 +361,18 @@ bindings:
     transport: streamable-http
     provider_tool: delete_repository
     auth_mode: service-identity
+
+  # ADR-0415: not a demo-mode stub like the other in-process handlers
+  # above - calls the real, already-deployed components/ai-gateway
+  # in-cluster (app/handlers/image_gen.py). service-identity because
+  # OVHcloud is reached via ai-gateway's own shared OVHCLOUD_API_KEY
+  # credential, not a per-user delegated token - the caller's bearer
+  # token is still forwarded to ai-gateway for identity/audit, same as
+  # every other service-identity backend here.
+  - capability: image.generation.create
+    aliases: [generate_image]
+    backend: image-gen
+    transport: in-process
+    handler: image_gen
+    provider_tool: generate_image
+    auth_mode: service-identity

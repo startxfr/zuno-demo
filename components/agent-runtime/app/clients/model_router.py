@@ -116,6 +116,7 @@ class ModelRouter:
         agent_name: Optional[str] = None,
         task_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        tools: Optional[List[Any]] = None,
     ):
         """Kept as async + same name/signature as before this split (plus
         `bearer_token`/`local_only`, added for ADR-0032/ADR-0035) so
@@ -132,8 +133,20 @@ class ModelRouter:
         (tagged "zuno-internal") out of the user-visible SSE token
         stream - every other caller passes nothing and keeps today's
         exact behavior.
+
+        `tools` (ADR-0415): LangChain tool schemas (or raw OpenAI-format
+        dicts - bind_tools accepts either), applied via the model's own
+        `.bind_tools()` before invoking - components/ai-gateway's
+        ChatCompletionRequest.tools field and _to_langchain_messages/
+        _invoke_with_fallback/_stream_completion are what actually forward
+        them to the selected provider and parse back any tool_calls the
+        model chose to make. The returned `result` is the raw AIMessage;
+        callers inspect `result.tool_calls` themselves (reason_node), same
+        as they already read `result.content`.
         """
         model = self.chat_model_for(classification, bearer_token, local_only, request_id, agent_name, task_name)
+        if tools:
+            model = model.bind_tools(tools)
         try:
             if tags:
                 result = await model.ainvoke(messages, config={"tags": tags})

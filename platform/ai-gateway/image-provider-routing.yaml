@@ -1,0 +1,46 @@
+# Image-generation provider routing (ADR-0415). Sibling to
+# provider-routing.yaml, kept separate because that file's loader
+# (components/ai-gateway/app/routing.py's RoutingTable) and provider
+# factory (app/providers.py's chat_model_for) are documented and typed
+# around text-chat completion (BaseChatModel) end to end - mixing
+# modalities into one config/class would blur that contract for zero
+# benefit, since there is exactly one image provider today and no
+# LoRA/MaaS/semantic-cache concept applies to it.
+#
+# Consumed by components/ai-gateway's ImageRoutingTable
+# (app/image_routing.py) to decide, per request classification, which
+# image provider to call. Deployed alongside provider-routing.yaml in the
+# same `zuno-provider-routing` ConfigMap by ansible/roles/llm via
+# gitops/apps/llm/application-d1.yaml (see kustomization.yaml in this
+# directory) - this file is the single source of truth, do not hand-copy
+# its contents elsewhere.
+#
+# `eligible_for` follows the same C1/C2/C3 semantics as
+# provider-routing.yaml (ADR-0021), but the caller for this endpoint
+# always declares a fixed C2 ceiling for image-generation calls
+# regardless of the calling agent's own ambient classification (ADR-0415
+# decision 3 - the scoped override that lets arkos/cognos, both C3 for
+# everything else, use this one capability). This file's own
+# `eligible_for` is still enforced as defense in depth: if a caller ever
+# declared C3 here by mistake, the request would fail closed exactly like
+# provider-routing.yaml's C3 SaaS requests do today, since no image
+# provider below lists C3.
+#
+# `api_key_env` names the environment variable this provider's API key is
+# read from at runtime (populated by an ExternalSecret -- see
+# ansible/roles/vault/tasks/install.yml -- never a literal value here).
+
+image_providers:
+  - name: ovhcloud-sdxl
+    kind: saas-image
+    model: stable-diffusion-xl
+    # OVHcloud AI Endpoints' OpenAI-compatible images endpoint (verified
+    # live against the catalog/getting-started docs, 2026-08-20) - lets
+    # app/image_providers.py reuse the `openai` SDK exactly like every
+    # text provider does, instead of a bespoke HTTP client for the raw
+    # .../api/text2image endpoint.
+    endpoint: https://oai.endpoints.kepler.ai.cloud.ovh.net/v1
+    api_key_env: OVHCLOUD_API_KEY
+    size: "1024x1024"
+    timeout_seconds: 60
+    eligible_for: [C1, C2]

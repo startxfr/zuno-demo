@@ -35,6 +35,7 @@ import type {
   Citation,
   DoneEventData,
   ErrorEventData,
+  ImageArtifact,
   StartEventData,
   ToolEventData,
 } from "./types";
@@ -113,6 +114,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
             id: newId(),
             role: t.role === "user" ? "user" : "agent",
             content: t.content,
+            images: t.images,
           })),
         );
       })
@@ -178,6 +180,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       const parser = new SSEParser();
       let accumulated = "";
       let citations: Citation[] | undefined;
+      let images: ImageArtifact[] | undefined;
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -212,6 +215,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           } else if (evt.event === "done") {
             const data = JSON.parse(evt.data) as DoneEventData;
             citations = data.citations;
+            images = data.images;
             setToolStatus(null);
           } else if (evt.event === "error") {
             const data = JSON.parse(evt.data) as ErrorEventData;
@@ -223,6 +227,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       updateMessage(agentMessageId, {
         content: accumulated || "(empty reply)",
         citations,
+        images,
         pending: false,
       });
     } catch (err) {
@@ -409,6 +414,23 @@ function MessageBubble({ message }: { message: ChatMessage }): React.ReactElemen
     >
       {message.content}
       {message.pending && !message.content && <Spinner size="sm" isInline aria-label="Waiting for a reply" />}
+      {message.images && message.images.length > 0 && (
+        // ADR-0415: generated images render inline in this same bubble,
+        // between the reply text above and the citations below - the
+        // sidecar-field placement convention citations already
+        // established, extended to a second sidecar field.
+        <Flex direction={{ default: "column" }} gap={{ default: "gapSm" }} style={{ marginTop: "0.5rem" }}>
+          {message.images.map((img, i) => (
+            <FlexItem key={i}>
+              <img
+                src={`data:${img.mime_type};base64,${img.data_base64}`}
+                alt={img.alt}
+                style={{ maxWidth: "100%", borderRadius: "var(--pf-t--global--border-radius--medium, 4px)" }}
+              />
+            </FlexItem>
+          ))}
+        </Flex>
+      )}
       {message.citations && message.citations.length > 0 && (
         <Flex gap={{ default: "gapXs" }} style={{ marginTop: "0.5rem" }}>
           {message.citations.map((c, i) => (

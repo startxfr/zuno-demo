@@ -444,3 +444,21 @@ tools:
       - consultant
       - board
       - cdp
+
+  # ADR-0415: stable-diffusion-xl image generation via OVHcloud AI
+  # Endpoints, for arkos/advantage/cognos/comage's preferred image model.
+  # min_classification C2, not each agent's own ambient ceiling - arkos
+  # and cognos are C3 for everything else; this tool is the one deliberate,
+  # narrow exception (see the ADR's Accepted risks), enforced at the call
+  # site (components/mcp-gateway/app/handlers/image_gen.py always declares
+  # C2 to ai-gateway, never the caller's real classification).
+  - tool: generate_image
+    capability: image.generation.create
+    mcp_server: image-gen
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - adv
+      - sales
+      - board
+      - cdp

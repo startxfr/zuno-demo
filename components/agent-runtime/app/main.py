@@ -310,7 +310,17 @@ async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any
         if current["message"]:
             turns.append({"role": "user", "content": current["message"], "ts": current["ts"]})
         if current["reply"]:
-            turns.append({"role": "assistant", "content": current["reply"], "ts": current["reply_ts"]})
+            # ADR-0415: generated_images is a cumulative LastValue channel
+            # (never reset between turns, like reply/history) - the slice
+            # against images_before (captured at this turn's "input"
+            # checkpoint, below) isolates just the images THIS turn added,
+            # the same way this whole function isolates this turn's reply
+            # from the growing checkpoint stream.
+            new_images = current["images"][current["images_before"]:]
+            entry = {"role": "assistant", "content": current["reply"], "ts": current["reply_ts"]}
+            if new_images:
+                entry["images"] = new_images
+            turns.append(entry)
 
     for checkpoint_tuple in checkpoints:
         channel_values = checkpoint_tuple.checkpoint.get("channel_values") or {}
@@ -321,6 +331,8 @@ async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any
                 "ts": checkpoint_tuple.checkpoint.get("ts"),
                 "reply": None,
                 "reply_ts": None,
+                "images": channel_values.get("generated_images") or [],
+                "images_before": len(channel_values.get("generated_images") or []),
             }
             # VERIFIED live (2026-08-19): the "input" checkpoint predates
             # this turn's own graph execution entirely - neither this
@@ -339,6 +351,8 @@ async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any
             if reply:
                 current["reply"] = reply
                 current["reply_ts"] = checkpoint_tuple.checkpoint.get("ts")
+            if "generated_images" in channel_values:
+                current["images"] = channel_values["generated_images"]
     _flush()
     return turns
 
@@ -664,6 +678,7 @@ async def agent_chat(
     return ChatResponse(
         reply=final_state.get("reply", ""),
         citations=final_state.get("citations", []),
+        images=final_state.get("generated_images", []),
         run_id=run_id,
         source_mode=final_state.get("source_mode", "indexed"),
     )
@@ -696,6 +711,7 @@ async def _stream_chat(
     yield _sse("start", {"request_id": request_id, "run_id": run_id})
 
     citations: Any = []
+    images: Any = []
     source_mode = "indexed"
     # One bounded retry, same rationale as _ainvoke_with_retry, but only
     # safe to take before any token has reached the client (ADR-0029-style
@@ -735,6 +751,16 @@ async def _stream_chat(
                     # ADR-0205/WP-24: same field the non-streaming response
                     # carries - the streaming path must not silently omit it.
                     source_mode = output.get("source_mode", "indexed")
+                elif kind == "on_chain_end" and name in ("reason", "draft"):
+                    # ADR-0415: generate_image results are returned by
+                    # whichever node actually calls the model
+                    # (retrieve_reason_respond's "reason", plan_draft_write's
+                    # "draft") - unlike citations/source_mode above, there is
+                    # no later node in either shape that re-assembles this,
+                    # so it's captured here directly.
+                    output = event["data"].get("output") or {}
+                    if output.get("generated_images"):
+                        images = output["generated_images"]
         except psycopg.OperationalError as exc:
             if sent_any or attempts_remaining == 0:
                 logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
@@ -752,4 +778,4 @@ async def _stream_chat(
         else:
             break
 
-    yield _sse("done", {"citations": citations, "source_mode": source_mode})
+    yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})

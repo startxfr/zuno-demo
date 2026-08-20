@@ -18,3 +18,11 @@ explicitly excludes technical tools and the technical RAG corpora
 `agent.okf.md`) - a placeholder agent has zero tool-call capability by
 construction (ADR-0036), matching it having no running Agent Runtime
 workflow at all.
+
+ADR-0415: `image.generation.create` (stable-diffusion-xl via OVHcloud AI
+Endpoints) is forward-declared at the POLICY layer only -
+`policies/tools/tool-policy.yaml`'s `generate_image` entry already lists
+`board` (Cognos's intended business role) in `allowed_groups` - so no
+policy change is needed when Cognos is actually built; add
+`image.generation.create` to this task's own `allowed_tools` at that
+point, the same way every other real Cognos tool will be.
