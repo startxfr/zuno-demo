@@ -35,6 +35,22 @@ AGENTS_DIR = os.getenv("AGENTS_DIR", "/app/agents")
 REQUIRE_SIGNED_BUNDLES = os.getenv("ZUNO_REQUIRE_SIGNED_BUNDLES", "false").strip().lower() == "true"
 OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 
+# ADR-0215: fleet-wide defaults for a bundle that declares no zuno.memory.
+# history block at all (every field there is optional - see
+# platform/okf/schema/zuno-okf-v0.2.schema.json). HISTORY_TOKEN_BUDGET's
+# default (1800) is sized against qwen2.5-7b-instruct's
+# --max-model-len=8192 (gitops/charts/models/templates/servingruntime.
+# yaml), leaving headroom for the system prompt (~500) and RAG context
+# (~2500) - an agent routed to a larger-context model (e.g. Arkos's C3
+# local-only path to gpt-oss-20b's 32768) declares a larger budget
+# explicitly in its own bundle instead of raising this shared default.
+HISTORY_TOKEN_BUDGET_DEFAULT = int(os.getenv("HISTORY_TOKEN_BUDGET", "1800"))
+HISTORY_MAX_TURNS_DEFAULT = 6
+# Operational kill switch (ADR-0215): forces every agent's history off
+# regardless of bundle content, for a rollback that needs no image
+# rebuild.
+HISTORY_DISABLED = os.getenv("ZUNO_HISTORY_DISABLED", "false").strip().lower() == "true"
+
 
 class OkfError(Exception):
     pass
@@ -102,6 +118,18 @@ class AgentDefinition:
     # own find-relevant-docs/check-my-drive-docs) - this field names only
     # the one the shape is built against. None for `placeholder` agents.
     primary_task: Optional[str] = None
+    # ADR-0215: whether this agent carries conversation history into its
+    # prompts at all - `zuno.memory.history.enabled`, defaulting true and
+    # additionally forced off fleet-wide by ZUNO_HISTORY_DISABLED
+    # regardless of what the bundle itself declares (see _load_agent).
+    history_enabled: bool = True
+    # `zuno.memory.history.max_turns` - most recent turn pairs kept
+    # verbatim after compaction folds everything older into `summary`.
+    history_max_turns: int = HISTORY_MAX_TURNS_DEFAULT
+    # `zuno.memory.history.token_budget` - approximate (char/4 heuristic,
+    # app/graph/history.py) token budget for summary + verbatim history
+    # combined.
+    history_token_budget: int = HISTORY_TOKEN_BUDGET_DEFAULT
 
     def declared_tools(self) -> List[str]:
         """Union of every task's allowed_tools - ADR-0011 factor 1 (agent
@@ -210,6 +238,12 @@ class AgentRegistry:
 
         model = zuno.get("model") or {}
         rag = zuno.get("rag") or {}
+        # ADR-0215: zuno.memory.history is entirely optional - a bundle
+        # that omits it (or omits individual fields within it) rides the
+        # module-level defaults above, following zuno.rag.top_k's own
+        # parse-with-default pattern immediately above this block.
+        memory = zuno.get("memory") or {}
+        history = memory.get("history") or {}
         return AgentDefinition(
             name=name,
             status=zuno.get("status", "placeholder"),
@@ -218,6 +252,9 @@ class AgentRegistry:
             tasks=tasks,
             graph_shape=zuno.get("graph_shape"),
             primary_task=zuno.get("primary_task"),
+            history_enabled=bool(history.get("enabled", True)) and not HISTORY_DISABLED,
+            history_max_turns=int(history.get("max_turns", HISTORY_MAX_TURNS_DEFAULT)),
+            history_token_budget=int(history.get("token_budget", HISTORY_TOKEN_BUDGET_DEFAULT)),
         )
 
     def _load_task(self, task_name: str, agent_dir: Path) -> TaskDefinition:

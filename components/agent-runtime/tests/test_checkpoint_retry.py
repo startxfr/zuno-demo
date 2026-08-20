@@ -95,8 +95,11 @@ async def test_ainvoke_second_failure_still_raises() -> None:
     assert graph.calls == 2
 
 
-def _token_event(text: str) -> dict:
-    return {"event": "on_chat_model_stream", "name": "reason", "data": {"chunk": SimpleNamespace(content=text)}}
+def _token_event(text: str, tags: list = None) -> dict:
+    event = {"event": "on_chat_model_stream", "name": "reason", "data": {"chunk": SimpleNamespace(content=text)}}
+    if tags is not None:
+        event["tags"] = tags
+    return event
 
 
 class _FakeAstreamGraph:
@@ -144,12 +147,30 @@ async def test_stream_does_not_retry_after_a_token_was_sent() -> None:
     assert any(c.startswith("event: error") for c in chunks), "the failure must still surface as an error event"
 
 
+async def _yield_a_user_token_and_an_internal_token():
+    yield _token_event("visible reply")
+    yield _token_event("internal compaction summary text", tags=["zuno-internal"])
+
+
+async def test_stream_filters_out_zuno_internal_tagged_tokens() -> None:
+    """ADR-0215: app/graph/history.py's compaction call is a nested model
+    invocation inside the same graph run astream_events observes - tagged
+    "zuno-internal" (app/clients/model_router.py's `tags` param) so its
+    own output never reaches the browser as a chat token, unlike the
+    user-visible reason/draft call's own tokens."""
+    graph = _FakeAstreamGraph([_yield_a_user_token_and_an_internal_token])
+    chunks = [c async for c in main_module._stream_chat(graph, {}, {}, "req-1", "run-1")]
+    assert any('"delta": "visible reply"' in c for c in chunks)
+    assert not any("internal compaction summary text" in c for c in chunks)
+
+
 TESTS = [
     test_ainvoke_retries_once_on_operational_error,
     test_ainvoke_does_not_retry_non_connection_errors,
     test_ainvoke_second_failure_still_raises,
     test_stream_retries_before_any_token_sent,
     test_stream_does_not_retry_after_a_token_was_sent,
+    test_stream_filters_out_zuno_internal_tagged_tokens,
 ]
 
 

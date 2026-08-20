@@ -110,3 +110,40 @@ class AgentState(TypedDict, total=False):
     # The Drive document URL write_node persisted the draft to, when the
     # write succeeded - None if the write failed or wasn't attempted.
     drive_doc_url: Optional[str]
+
+    # ADR-0215: conversation history carried into the next model call,
+    # reconstructed from state that ADR-0103's checkpoints already persist
+    # rather than from a wire field - callers still send only the newest
+    # message (app/schemas.py's ChatRequest is unchanged). All three keys
+    # below are explicitly managed, plain LastValue channels (no reducer):
+    # app/graph/history.py's record_history node always returns a full
+    # replacement list/string, the same explicit-rebuild style `errors`
+    # above already uses, because compaction must be able to rewrite
+    # `history` wholesale, not merely append to it. `_initial_state`
+    # (app/main.py) never touches any of these three keys, so - exactly
+    # like `local_only_required` above - they carry forward unchanged
+    # across turns on the same thread_id; a checkpoint that predates this
+    # ADR simply lacks them, and every reader below defaults via `.get`.
+
+    # Recent turns, verbatim, newest last - `[{"role": "user"|"assistant",
+    # "content": str}]`. Injected as proper HumanMessage/AIMessage pairs
+    # (app/graph/nodes.py's reason_node, app/graph/arkos_nodes.py's
+    # draft_node), never as this turn's own `Context:` RAG wrapper - a
+    # prior turn's retrieved snippets would blow the token budget and
+    # could contradict this turn's fresh retrieval.
+    history: List[Dict[str, str]]
+    # The running compacted summary of every turn folded out of `history`
+    # once the token budget is exceeded (app/graph/history.py:compact) -
+    # injected into the single system message as delimited background
+    # information, never as instructions.
+    summary: str
+    # The monotonic maximum classification across EVERY turn seen so far
+    # on this thread, escalated the same way `effective_classification`
+    # above is (nodes.py's `_escalate`) but deliberately never reset -
+    # `effective_classification` is recomputed from the agent's baseline
+    # every turn by retrieve_node and can therefore downgrade turn to
+    # turn; once history spans turns, the classification of the
+    # accumulated conversation must not. Governs the compaction model
+    # call's own routing (local-only for C2/C3, ADR-0034/ADR-0035),
+    # mirroring app/memory.py's extract_memory.
+    history_classification: str

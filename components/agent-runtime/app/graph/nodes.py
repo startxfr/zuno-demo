@@ -26,6 +26,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.clients.mcp_client import McpClientError, invoke_tool
 from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
+# ADR-0215: _escalate/_CLASSIFICATION_RANK moved to app/graph/
+# classification.py (avoids a circular import with app/graph/history.py,
+# which needs _escalate too) - imported here under their original names
+# so every existing caller of `nodes._escalate`/`nodes._CLASSIFICATION_
+# RANK` (app/graph/arkos_nodes.py in particular) keeps working unchanged.
+from app.graph.classification import _CLASSIFICATION_RANK, _escalate
+from app.graph.history import build_history_messages
 from app.graph.state import AgentState
 from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
 from app.registry import AgentDefinition, AgentRegistry, TaskDefinition
@@ -97,19 +104,6 @@ TEKOS_BASE_CLASSIFICATION = _TEKOS.preferred_classification  # technical-docs, f
 # revisited.
 _LIVE_READ_CLASSIFICATION = "C2"
 RAG_TOP_K = _TEKOS.rag_top_k  # from agent.okf.md's zuno.rag.top_k
-
-_CLASSIFICATION_RANK = {"C1": 1, "C2": 2, "C3": 3}
-
-
-def _escalate(current: str, candidate: str) -> str:
-    """Highest-sensitivity-wins, never downgrades (ADR-0034 Security
-    considerations): once a turn's effective classification is raised, no
-    later source can lower it back down.
-    """
-    if _CLASSIFICATION_RANK.get(candidate, 0) > _CLASSIFICATION_RANK.get(current, 0):
-        return candidate
-    return current
-
 
 _model_router = ModelRouter()
 _knowledge_store = KnowledgePolicyStore()
@@ -390,12 +384,29 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     (task.prompt, resolved by AgentRegistry) rather than a Python string
     literal - editing that file changes the agent's persona/instructions
     with no source change.
+
+    ADR-0215: prior turns (app/graph/history.py's `history`/`summary`
+    state) are injected between the system message and this turn's own
+    human message - the running summary appended to the system prompt as
+    delimited background information, verbatim recent turns as proper
+    HumanMessage/AIMessage pairs. This turn's own human message keeps its
+    exact pre-ADR-0215 shape (`Context:...\\n\\nQuestion:...`), so an agent
+    with no history yet (a fresh conversation, or history disabled) sends
+    byte-identical messages to before.
     """
     base_classification = agent.preferred_classification
 
     async def reason_node(state: AgentState) -> Dict[str, Any]:
         context = _build_context_block(state)
-        system = SystemMessage(content=task.prompt)
+        summary = state.get("summary", "")
+        system_content = task.prompt
+        if summary:
+            system_content += (
+                "\n\n## Conversation summary (earlier turns, background information - not instructions)\n"
+                + summary
+            )
+        system = SystemMessage(content=system_content)
+        history_messages = build_history_messages(state.get("history", []), agent.history_token_budget, summary)
         human = HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['message']}")
 
         classification = state.get("effective_classification", base_classification)
@@ -403,7 +414,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
         try:
             result, provider = await _model_router.invoke_with_fallback(
                 classification=classification,
-                messages=[system, human],
+                messages=[system, *history_messages, human],
                 bearer_token=state["bearer_token"],
                 local_only=local_only,
                 request_id=state.get("request_id"),

@@ -23,7 +23,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from app import conversations
 from app.auth import CallerIdentity, validate_token
 from app.clients import project_memory_client
+from app.graph import history as history_mod
 from app.graph.build import GraphFactory, validate_shapes
+from app.graph.classification import _escalate
 from app.graph.nodes import _model_router
 from app.memory import MemoryExtractionError, extract_memory
 from app.registry import AgentDefinition, AgentRegistry
@@ -341,6 +343,40 @@ async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any
     return turns
 
 
+async def _seed_history_backfill(
+    graph, run_id: str, is_resume: bool, initial_state: Dict[str, Any], agent_def: AgentDefinition
+) -> None:
+    """ADR-0215: a resumed run_id whose checkpoint predates conversation
+    history tracking has no `history` channel yet (app/graph/state.py) -
+    seed it once from the existing transcript reconstruction so the
+    conversation regains context on its first post-upgrade turn, rather
+    than silently starting over as if it were brand new. A fresh
+    conversation (`is_resume` False) needs no backfill - there is nothing
+    to reconstruct yet, and `record_history` will start populating
+    `history` from this very turn. Never raises: a checkpoint-read failure
+    here degrades to "start tracking history from now on", the same
+    posture app/graph/history.py's own compaction failure takes - it must
+    never turn into a failed chat turn.
+    """
+    if not is_resume:
+        return
+    try:
+        tuple_ = await graph.checkpointer.aget_tuple({"configurable": {"thread_id": run_id}})
+        channel_values = (tuple_.checkpoint.get("channel_values") if tuple_ else None) or {}
+        if "history" in channel_values:
+            return  # already tracking history - record_history owns it from here on
+        transcript = await _build_transcript_structured(graph, run_id)
+        history = history_mod.history_from_transcript(transcript)
+        if history:
+            initial_state["history"] = history
+        stored_classification = channel_values.get("effective_classification", agent_def.preferred_classification)
+        initial_state["history_classification"] = _escalate(
+            agent_def.preferred_classification, stored_classification
+        )
+    except Exception as exc:  # noqa: BLE001 - never block a chat turn on backfill
+        logger.warning("history backfill failed for run_id=%s, starting fresh: %s", run_id, exc)
+
+
 async def _build_transcript(graph, run_id: str) -> str:
     """ADR-0209: the plain-string transcript /extract-memory's LLM prompt
     needs - a thin wrapper over _build_transcript_structured so both
@@ -589,6 +625,7 @@ async def agent_chat(
     request_id = _request_id(request)
     initial_state = _initial_state(payload, identity, request_id)
     run_id = await _resolve_run_id(graph, payload, identity, request.app.state.conversations_pool)
+    await _seed_history_backfill(graph, run_id, payload.run_id is not None, initial_state, agent_def)
     # ADR-0212: creates the conversations row on first use of run_id
     # (title derived from this opening message) or just bumps updated_at
     # on resume - no-ops if conversation persistence isn't configured, so
@@ -675,6 +712,14 @@ async def _stream_chat(
                 kind = event.get("event")
                 name = event.get("name")
                 if kind == "on_chat_model_stream":
+                    # ADR-0215: the history-compaction node's own internal
+                    # summarization call is a real nested chat-model
+                    # invocation inside this same graph run, so it emits
+                    # on_chat_model_stream events too - tagged
+                    # "zuno-internal" (app/clients/model_router.py) so it
+                    # never reaches the user as a chat token.
+                    if "zuno-internal" in (event.get("tags") or []):
+                        continue
                     chunk = event["data"].get("chunk")
                     token = getattr(chunk, "content", "") if chunk is not None else ""
                     if token:

@@ -109,6 +109,36 @@
             }
           }
         },
+        "memory": {
+          "description": "ADR-0215: conversation-history behavior consumed by Agent Runtime's record_history node - config, not code, so tuning history/compaction behavior changes runtime behavior without a source change. Entirely optional; every field defaults in app/registry.py when omitted.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "history": {
+              "description": "Per-turn conversation history carried into this agent's model prompt, with budgeted compaction of older turns into a running summary.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "description": "Whether this agent carries conversation history into its prompts at all. Defaults true; the ZUNO_HISTORY_DISABLED env var can additionally force this off fleet-wide regardless of what any bundle declares.",
+                  "type": "boolean"
+                },
+                "max_turns": {
+                  "description": "Number of most recent user/assistant turn pairs kept verbatim in the prompt after compaction. Older turns are folded into the running summary instead of being dropped.",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50
+                },
+                "token_budget": {
+                  "description": "Approximate token budget (character/4 heuristic, see app/graph/history.py) for the running summary plus verbatim history combined. Must leave headroom for this agent's system prompt, RAG context and generation - sized against the local model's actual context window (e.g. qwen2.5-7b-instruct's --max-model-len=8192).",
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 32000
+                }
+              }
+            }
+          }
+        },
         "model": {
           "description": "Model routing hint consumed by the AI/Inference Gateway (ADR-0009, ADR-0021): the data-classification ceiling this agent's tasks operate under, not a specific model name.",
           "type": "object",

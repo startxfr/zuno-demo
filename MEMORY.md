@@ -1299,12 +1299,57 @@ under `docs/adr/`.
   routed local-only for C2/C3 conversations (mirrors
   `app/memory.py:61`'s existing rule). Internal compaction calls are
   tagged `zuno-internal` and filtered out of `_stream_chat`'s SSE token
-  forwarding so they never leak into the user-visible chat. Docs-only so
-  far: ADR-0215 body, `docs/adr/README.md` index row, WP-060 brief, the
-  v0.1-v0.3 roadmap tracker's new Phase 6 + scope note + change log.
-  `python3 platform/docs/check_docs.py` re-run clean (only the
-  pre-existing ADR-0212/ADR-0214 status drift remains, nothing new).
-  Implementation itself (the actual `app/graph/history.py` module, state/
-  node/shape changes, tests, eval scenario) is WP-060's next execution
-  step, not yet started - check WP-060's own `State:` line before
-  assuming otherwise.
+  forwarding so they never leak into the user-visible chat.
+
+  Repo work now merged (same session, same day): new
+  `components/agent-runtime/app/graph/history.py` (estimate_tokens,
+  append_turn, build_history_messages, compact, make_history_node) plus a
+  small `app/graph/classification.py` split out of nodes.py's own
+  `_escalate`/`_CLASSIFICATION_RANK` purely to avoid a circular import
+  (history.py needs _escalate; nodes.py needs history.py's
+  build_history_messages for prompt injection) - nodes.py/arkos_nodes.py
+  still re-export the original names so no other caller changed.
+  `AgentState` gained the three channels; `reason_node`/`draft_node` now
+  inject summary-in-system + history-as-role-messages; both shapes wire a
+  `record_history` terminal node (`respond`/`write` -> `record_history` ->
+  `END`); `ModelRouter.invoke_with_fallback` gained an optional `tags`
+  param; `app/registry.py` parses `zuno.memory.history.*` with env
+  defaults (`HISTORY_TOKEN_BUDGET`, `ZUNO_HISTORY_DISABLED` kill switch);
+  `platform/okf/schema/zuno-okf-v0.2.schema.json` gained the `memory`
+  property; `agents/arkos/agent.okf.md` declares an explicit larger
+  budget (6000 vs the 1800 default, since its C3/local-only path routes
+  to gpt-oss-20b's 32768 context, not qwen2.5-7b's 8192). New
+  `tests/test_history.py` (15 tests: two-turn prompt content for both
+  Tekos and Arkos, compaction trigger/failure-degradation, the C3
+  local-only-routing security-negative, cross-turn classification
+  monotonicity, the prompt-build hard cap, pre-ADR-0215 checkpoint
+  backfill) plus a tagged-stream-filter test added to
+  `tests/test_checkpoint_retry.py` - all pass, and the full pre-existing
+  suite still passes except the SAME two `test_registry.py` failures
+  confirmed pre-existing (stale tool-list assertions predating WP-059's
+  git-forge additions, reproduced identically on `git stash`, unrelated
+  to this WP). `validate_okf_bundle.py`, `generate_authorization_matrix.py
+  --check --all` and `check_docs.py` (only the pre-existing ADR-0212/
+  ADR-0214 drift) all pass; `generate_deployment_snapshot.py --check`
+  flagged arkos's snapshot only because of the ALREADY-known,
+  already-documented v0.1.0->latest tag drift (confirmed independent of
+  this change via `git stash`) - reverted rather than fixed, per WP-059's
+  own "do not fix unrelated drift" convention.
+
+  Evaluation: ADR-0027 fixes Tekos's suite at exactly twenty scenarios, so
+  the originally-planned new `chat_multi_turn_context` scenario was not
+  actually addable - discovered mid-implementation and corrected by
+  extending existing scenario 7 (`chat_basic_qa`) with an optional
+  `follow_up` field instead: sends a second turn on the same `run_id` and
+  asserts it still completes with a non-empty reply (deeper
+  semantic-recall assertions live in the unit tests, which a live smoke
+  check with no LLM judge can't make). WP-060's own brief was corrected to
+  match.
+
+  ADR-0215 -> `Partially implemented`, `docs/adr/README.md` row updated to
+  match, WP-060 -> `Operator pending (repo work merged)`, roadmap tracker
+  row updated. Residual gap before `Implemented`: live two-turn
+  verification on the real cluster (agent-runtime rebuild/redeploy +
+  manual check), one conversation per agent - not yet attempted this
+  session, ask before attempting (commit-per-WP / ask-before-validation
+  convention this repo's sessions follow).

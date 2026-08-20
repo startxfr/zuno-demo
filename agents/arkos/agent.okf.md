@@ -22,6 +22,17 @@ zuno:
   primary_task: draft-architecture-testimonial
   tasks:
     - draft-architecture-testimonial
+  memory:
+    # ADR-0215: Arkos is C3/local-only (see model.preferred_classification
+    # below), so its history-carrying model calls route to gpt-oss-20b
+    # rather than qwen2.5-7b-instruct - a much larger context window
+    # (32768 vs 8192, see gitops/charts/models/values.yaml), so its
+    # history budget can be generous rather than riding the tighter
+    # qwen-sized default (app/registry.py's HISTORY_TOKEN_BUDGET, 1800).
+    history:
+      enabled: true
+      max_turns: 6
+      token_budget: 6000
   model:
     preferred_classification: C3
     notes: >-

@@ -1,7 +1,7 @@
 # WP-060: Carry conversation history into agent prompts with budgeted compaction
 
-- **State:** Not started
-- **ADRs:** ADR-0215 (Proposed -> Implemented)
+- **State:** Operator pending (repo work merged)
+- **ADRs:** ADR-0215 (Proposed -> Partially implemented -> Implemented)
 - **Depends on:** WP-08 (checkpointing, merged), WP-30 (multi-shape runtime, merged), WP-31/WP-33 (Arkos/Comage slices, merged)
 - **Blocks:** none
 - **Estimated files touched:** ~18
@@ -137,11 +137,18 @@ output is unchanged.
     `test_project_memory_e2e.py`'s `fake_invoke` (dispatches on
     `messages[0].content`) still matches - its sessions use distinct
     `run_id`s so `summary` stays empty and the system text is unchanged.
-12. **Evaluation**: add a `chat_multi_turn_context` scenario to
-    `evaluations/tekos/scenarios.yaml` (turn 1 states a fact, turn 2
-    resumes via the `run_id` the first turn returned and asks about it,
-    expects the fact reflected in the reply) and its handler in
-    `evaluations/tekos/run_scenarios.py`.
+12. **Evaluation**: ADR-0027 fixes Tekos's suite at exactly twenty
+    scenarios, so a new 21st scenario is not available - instead extend
+    existing scenario 7 (`chat_basic_qa`,
+    `evaluations/tekos/scenarios.yaml`) with an optional `follow_up`
+    field; its handler in `evaluations/tekos/run_scenarios.py` sends the
+    follow-up on the SAME `run_id` the first turn returned and asserts
+    the resumed turn still completes with a non-empty reply - the live
+    proof that resume + history-carrying works end to end. Deeper
+    semantic-recall assertions belong in
+    `components/agent-runtime/tests/test_history.py`'s prompt-content
+    tests (step 11), which a scripted smoke check with no LLM judge
+    cannot itself make.
 13. **Do NOT fix unrelated drift found along the way** (WP-057/058/059
     convention) - in particular, leave the pre-existing ADR-0212/ADR-0214
     index-status drift untouched; it is out of scope here.
@@ -178,14 +185,19 @@ and the gpt-oss-20b routing share are observed in production traffic.
 ## Status updates (then re-run check_docs.py)
 
 - `docs/adr/0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md`:
-  `Status:` line -> `Implemented (<date>)` once merged and redeployed, with
+  `Status:` line -> `Partially implemented (2026-08-20)` done, enumerating
+  the residual live-cluster verification gap (ADR-0115 gap-list pattern);
+  flips to `Implemented (<date>)` once that verification actually happens,
   the same evidence-prose convention ADR-0212's status line uses.
-- `docs/adr/README.md`: ADR-0215 row -> `Implemented`.
+- `docs/adr/README.md`: ADR-0215 row -> `Partially implemented` done;
+  -> `Implemented` once the operator step above closes.
 - `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: WP-060 tracker row ->
-  `Done`; add a one-line scope note next to the existing "later additions"
-  note (ADR-0119/0120/0121) recording ADR-0215 as a fourth later addition.
+  `Operator pending (repo work merged)` done; add a one-line scope note
+  next to the existing "later additions" note (ADR-0119/0120/0121)
+  recording ADR-0215 as a fourth later addition - done.
 - `MEMORY.md`: one dated bullet describing multi-turn history + compaction
-  as implemented state, across which agents.
+  as implemented state, across which agents, and the residual operator
+  gap - done.
 
 ## Out of scope / deferred
 

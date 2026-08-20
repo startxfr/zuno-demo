@@ -15,10 +15,12 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.graph.history import make_history_node
 from app.graph.nodes import (
     _make_reason_node,
     _make_retrieve_node,
     _make_tool_call_node,
+    _model_router,
     respond_node,
     should_call_tools,
 )
@@ -33,6 +35,11 @@ def build(checkpointer: BaseCheckpointSaver, agent: AgentDefinition, task: TaskD
     graph.add_node("tool_call", _make_tool_call_node(agent, task))
     graph.add_node("reason", _make_reason_node(agent, task))
     graph.add_node("respond", respond_node)
+    # ADR-0215: appends this finished turn to `history` (and compacts
+    # older turns into `summary` once the token budget is exceeded) -
+    # runs AFTER respond, so the compaction LLM call it may trigger never
+    # delays the reply that already streamed to the user.
+    graph.add_node("record_history", make_history_node(agent, task, _model_router))
 
     graph.add_edge(START, "retrieve")
     graph.add_conditional_edges(
@@ -42,7 +49,8 @@ def build(checkpointer: BaseCheckpointSaver, agent: AgentDefinition, task: TaskD
     )
     graph.add_edge("tool_call", "reason")
     graph.add_edge("reason", "respond")
-    graph.add_edge("respond", END)
+    graph.add_edge("respond", "record_history")
+    graph.add_edge("record_history", END)
 
     # Compiled once per checkpointer (at app startup, or once per test); the
     # compiled graph is safe to reuse concurrently across requests -

@@ -115,6 +115,7 @@ class ModelRouter:
         request_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         task_name: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ):
         """Kept as async + same name/signature as before this split (plus
         `bearer_token`/`local_only`, added for ADR-0032/ADR-0035) so
@@ -122,10 +123,22 @@ class ModelRouter:
         fallback loop this name used to describe runs server-side in the
         gateway now (app/main.py:_invoke_with_fallback there) - this is a
         single HTTP call.
+
+        `tags` (ADR-0215): passed through to LangChain's own `config`,
+        surfacing on every event `astream_events` emits for this call
+        (`event["tags"]`) without changing what's sent over the wire to
+        ai-gateway. app/main.py:_stream_chat uses this to filter the
+        conversation-history compaction node's internal model call
+        (tagged "zuno-internal") out of the user-visible SSE token
+        stream - every other caller passes nothing and keeps today's
+        exact behavior.
         """
         model = self.chat_model_for(classification, bearer_token, local_only, request_id, agent_name, task_name)
         try:
-            result = await model.ainvoke(messages)
+            if tags:
+                result = await model.ainvoke(messages, config={"tags": tags})
+            else:
+                result = await model.ainvoke(messages)
         except Exception as exc:
             logger.error(
                 "AI Inference Gateway call failed for classification %s: %s", classification, exc

@@ -292,7 +292,28 @@ def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
     body = resp.json()
     ok = bool(body.get("reply")) and isinstance(body.get("citations", []), list)
-    return ScenarioResult(s["id"], s["title"], ok, f"reply_len={len(body.get('reply', ''))} citations={len(body.get('citations', []))}")
+    detail = f"reply_len={len(body.get('reply', ''))} citations={len(body.get('citations', []))}"
+
+    # ADR-0215: a second turn on the SAME run_id must still succeed - the
+    # live-path proof that resume + history-carrying actually works end to
+    # end (components/agent-runtime/tests/test_history.py already covers
+    # the exact prompt content this produces; a scripted smoke check with
+    # no LLM judge can only assert the resumed turn completes with a
+    # non-empty reply, not that it semantically recalled turn 1).
+    follow_up = s.get("follow_up")
+    run_id = body.get("run_id")
+    if ok and follow_up and run_id:
+        resp2 = httpx.post(
+            f"{BFF_URL}/api/chat",
+            headers=auth_headers(s["persona"]),
+            json={"session_id": "eval-7", "message": follow_up, "run_id": run_id},
+            timeout=30,
+        )
+        follow_up_ok = resp2.status_code == 200 and bool(resp2.json().get("reply"))
+        ok = ok and follow_up_ok
+        detail += f" follow_up_status={resp2.status_code} follow_up_ok={follow_up_ok}"
+
+    return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
 def chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
