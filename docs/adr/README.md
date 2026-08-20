@@ -180,6 +180,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | v0.4 | Proposed | Consolidate zuno-ai-run into three tiered MIG predictors |
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
 | [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume gpt-oss-120b via OVHcloud AI Endpoints |
+| [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Proposed | Consume Codestral via the Mistral API |
 
 ## OKF stream
 
