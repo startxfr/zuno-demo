@@ -25,13 +25,20 @@ spec:
     server: https://kubernetes.default.svc
     namespace: zuno-mesh
   ignoreDifferences:
-    # The Kiali operator defaults nearly every leaf under spec (deployment,
-    # external_services, ...) at runtime; without this, ArgoCD sees
-    # permanent drift and fights it.
+    # The Kiali operator defaults nearly every leaf under these three
+    # subtrees at runtime (deployment.*, external_services.*, version);
+    # without this, ArgoCD sees permanent drift and fights it. Deliberately
+    # scoped to just those subtrees (not the whole /spec) so git-authored
+    # top-level fields like auth.strategy and server.* actually sync -
+    # a blanket /spec ignore previously meant spec edits silently never
+    # reached the live object after initial creation (only a delete+
+    # recreate picked them up).
     - group: kiali.io
       kind: Kiali
       jsonPointers:
-        - /spec
+        - /spec/deployment
+        - /spec/external_services
+        - /spec/version
   syncPolicy:
     automated:
       prune: true
