@@ -288,6 +288,27 @@ maasDb:
 userWorkloadMonitoring:
   enabled: false
 
+# VERIFIED live 2026-08-20: prometheus-k8s-1 had no memory request/limit
+# beyond the cluster-monitoring-operator's own tiny default (1Gi request,
+# no limit) while actually using ~5.5Gi - the scheduler placed it on a
+# t3a.large (8GB) general worker based on the understated request, and the
+# real usage then starved every other mandatory pod on that node (DNS,
+# insights, Kueue's leader replica, network-diagnostics all CrashLoopBackOff/
+# ProbeError from resource starvation, node showed MemoryPressure: True).
+# Giving prometheusK8s a request that matches real usage is what actually
+# fixes this - the scheduler stops being lied to and simply won't place it
+# on a node that can't sustain it; the limit caps future unbounded growth.
+# Merged into the same cluster-monitoring-config ConfigMap as
+# userWorkloadMonitoring above per that key's own header comment ("if
+# broader cluster-monitoring config is ever needed, it must be merged into
+# this same object").
+prometheusK8s:
+  resources:
+    requests:
+      memory: 6Gi
+    limits:
+      memory: 8Gi
+
 # ADR-0322 v0.1 integration scope: stands up an OGXServer instance (the OGX
 # Operator's data-plane CR - spec.components.ogx: Managed above only
 # installs the operator/controller, VERIFIED live 2026-08-14: `oc get svc

@@ -2,21 +2,26 @@
 Enables OpenShift User Workload Monitoring, the third MaaS prerequisite
 (DataScienceCluster's ModelsAsServiceReady: "User Workload Monitoring not
 configured: ConfigMap 'cluster-monitoring-config' not found in
-'openshift-monitoring'. Showback/FinOps usage views will not work").
+'openshift-monitoring'. Showback/FinOps usage views will not work"), and
+(2026-08-20) prometheusK8s.resources - see values.yaml's prometheusK8s
+comment for why: the operator's own tiny default request let the scheduler
+place it on an undersized node, where its real usage then starved every
+other mandatory pod there.
 
-This ConfigMap configures the ENTIRE cluster monitoring stack, not just UWM
-- deliberately kept to the single enableUserWorkload key so ArgoCD ownership
-of it can't fight any future manual Prometheus/Alertmanager tuning beyond
-that. If broader cluster-monitoring config is ever needed, it must be merged
-into this same object (the name is fixed by the cluster-monitoring-operator).
+This ConfigMap configures the ENTIRE cluster monitoring stack - kept to
+exactly these two concerns so ArgoCD ownership of it can't fight any future
+manual Alertmanager/other tuning beyond them. If broader cluster-monitoring
+config is ever needed, it must be merged into this same object (the name is
+fixed by the cluster-monitoring-operator).
 
 Rendered from the d0 Application (cluster-level prerequisite, like the
 operator install itself) - gitops/apps/openshift-ai/application-d0.yaml opts
 in via userWorkloadMonitoring.enabled. No sync-wave needed: nothing else in
 this chart orders against it, and the cluster-monitoring-operator picks it
-up whenever it lands.
+up whenever it lands. prometheusK8s.resources always renders regardless of
+that toggle - it's a standing capacity fix, not part of the MaaS opt-in.
 */ -}}
-{{- if .Values.userWorkloadMonitoring.enabled }}
+{{- if or .Values.userWorkloadMonitoring.enabled .Values.prometheusK8s }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -26,5 +31,12 @@ metadata:
     zuno.io/managed-by: argocd
 data:
   config.yaml: |
+    {{- if .Values.userWorkloadMonitoring.enabled }}
     enableUserWorkload: true
+    {{- end }}
+    {{- if .Values.prometheusK8s }}
+    prometheusK8s:
+      resources:
+        {{- toYaml .Values.prometheusK8s.resources | nindent 8 }}
+    {{- end }}
 {{- end }}
