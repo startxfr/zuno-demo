@@ -76,4 +76,6 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 |---|---|---|---|---|---|
 | `coming-soon` | `C2` | `local` | `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
 
+**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local`, `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
+
 <!-- END GENERATED AUTHORIZATION MATRIX -->

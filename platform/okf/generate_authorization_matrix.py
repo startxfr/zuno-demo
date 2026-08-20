@@ -296,6 +296,11 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
         lines.append("")
         lines.append("| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |")
         lines.append("|---|---|---|---|---|---|")
+        # ADR-0419: union of every model appearing in any row below - the
+        # "Available models" line after the table. Accumulated from the
+        # exact same computed chains the table already renders, not a
+        # separate computation, so it can never drift out of sync with it.
+        available_models: set = set()
         for task_name, task_label, task_prompts in task_labels:
             if classification not in ("C1", "C2", "C3"):
                 lines.append(f"| {task_label} | `{classification}` | — | (classification ceiling unknown — cannot resolve) | — | — |")
@@ -320,6 +325,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                 slot_chain = _effective_model_chain(
                     slot_classification, providers, prefer, local_only=local_only, strict=strict
                 )
+                available_models.update(slot_chain)
                 slot_reference = f"`{slot_chain[0]}`" if slot_chain else "(none eligible)"
                 slot_fallback = ", ".join(f"`{p}`" for p in slot_chain[1:]) or "—"
                 slot_label = f"{task_label} → `{slot_name}`"
@@ -331,11 +337,21 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             chain = _effective_model_chain(
                 classification, providers, prefer, local_only=local_only, strict=strict
             )
+            available_models.update(chain)
             reference = f"`{chain[0]}`" if chain else "(none eligible)"
             fallback = ", ".join(f"`{p}`" for p in chain[1:]) or "—"
             lines.append(
                 f"| {task_label} | `{classification}` | {reference} | {fallback} | {adapter_cell} | "
                 f"`policies/model-routing/model-routing-policy.yaml` |"
+            )
+
+        if available_models:
+            lines.append("")
+            ordered = [p["name"] for p in providers if p["name"] in available_models]
+            lines.append(
+                "**Available models** (ADR-0419, generated): the union of every "
+                "model reachable by any task or prompt slot above, at any "
+                "classification - " + ", ".join(f"`{p}`" for p in ordered) + "."
             )
 
     lines.append("")
