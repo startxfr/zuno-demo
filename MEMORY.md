@@ -309,51 +309,15 @@ Roadmap is represented in two complementary forms:
 
 The roadmap must include platform/OpenShift AI, backend, frontend, OKF/agents, data/RAG, security, observability, testing, documentation and operations, with effort expressed in person-days and parallelism for two contributors.
 
-2026-08-14: execution of the open v0.1/v0.2/v0.3 ADRs is decomposed into
-work packages in `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`, one
-self-contained brief per WP under `docs/roadmap/work-packages/` (written for
-standalone execution by a lower-capability model). Conventions: WP state
-machine `Not started -> Repo work in review -> Repo work merged -> Operator
-pending -> Done`; ADR status strings live only in `docs/adr/README.md` and
-ADR bodies (checked by `platform/docs/check_docs.py`) — the roadmap tracks
-WP state only; stub ADRs are promoted to full files (Step 0 of their brief)
-before implementation; every brief separates model-executable repo changes
-from operator/cluster steps.
+Execution conventions (established 2026-08-14, extended by the OKF stream 2026-08-18):
 
-2026-08-18: the OKF stream opened as its own version line (ADR-0501,
-05xx band reserved; OKF v0.1 content excellence → OKF v0.2 extraction
-into a standalone `zuno-okf` repository → OKF v0.3 operator live
-reconciliation), tracked in `docs/roadmap/okf-roadmap.md` with WP-43 –
-WP-55 continuing the global WP series. Twelve ADRs (0501–0512) and all
-thirteen briefs authored as full files (no stub promotion — Step 0 in
-these briefs is only the Status flip). New conventions the stream adds:
-the cross-repo single-writer clause (from WP-48's merge to WP-50's,
-zuno-demo stays authoritative and zuno-okf is a mirror); ADR Target
-header values `OKF v0.1|v0.2|v0.3`; quota precedence project → user →
-group (ADR-0511); `project_required` tasks verify a Salesforce project
-binding fail-closed before any action (ADR-0512).
-
-2026-08-18 (later): WP-43 Done, ADR-0502 Implemented — all eight agent
-READMEs now state stage/evolution/next-step, `platform/templates/agent/
-PROMOTION.md` is the named promotion checklist (generated NEXT_STEPS
-step 7 points at it), and Cognos/Soursage carry Stage-1 identity
-artifacts (generator run into a temp root via `write_all(repo_root=…)`;
-charts/evaluations deliberately deferred to build time).
-
-2026-08-18 (later still): WP-44/WP-45/WP-46 Done — ADR-0503 and
-ADR-0504 Implemented. Three new generators/checkers in `platform/okf/`,
-each a blocking lint step: `generate_authorization_matrix.py`
-(`--check --all`; matrix section between HTML markers in the
-agent.okf.md body — frontmatter untouched, so the three service parsers
-are unaffected), `generate_deployment_snapshot.py` (helm-template-
-derived; auto-detects CR-managed vs raw chart — only Arkos renders an
-AIAgent CR; Tekos's Application pair is the legacy-named `zuno-api-*`),
-`run_agent_contract_tests.py` (structure gate; suites fill at
-promotion). Notable: zero `(no groups — unusable)` matrix rows across
-all 8 agents — no policy gaps. Next unblocked: WP-47A (task-tab
-contract), WP-54 (quota policy — its Part B has cluster-side Kuadrant
-work), then WP-48 (zuno-okf bootstrap, needs the operator-created
-repo).
+- Work is decomposed into self-contained work-package briefs under `docs/roadmap/work-packages/` (v0.1-v0.3, tracked in `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`) and `docs/roadmap/okf-roadmap.md` (OKF stream, WP-43+, 05xx ADR band), each written for standalone execution by a lower-capability model.
+- WP state machine: `Not started -> Repo work in review -> Repo work merged -> Operator pending -> Done`.
+- ADR status strings live only in `docs/adr/README.md` and ADR bodies (checked by `platform/docs/check_docs.py`); the roadmap tracks WP state only. Stub ADRs are promoted to full files before implementation (Step 0 of their brief).
+- Every brief separates model-executable repo changes from operator/cluster steps.
+- Sessions commit one WP at a time and ask the user before attempting any live/cluster validation step.
+- OKF-stream-specific: cross-repo single-writer clause (`zuno-demo` stays authoritative, `zuno-okf` is a mirror, from WP-48/WP-50); ADR `Target` header values `OKF v0.1|v0.2|v0.3`; quota precedence project -> user -> group (ADR-0511); `project_required` tasks verify a Salesforce project binding fail-closed before any action (ADR-0512).
+- `platform/templates/agent/PROMOTION.md` is the canonical per-agent promotion checklist; `platform/okf/generate_authorization_matrix.py`, `generate_deployment_snapshot.py` and `run_agent_contract_tests.py` are blocking lint steps validating an agent's OKF bundle, rendered deployment shape and test-suite structure respectively.
 
 ## 14. Explicitly deferred capabilities
 
@@ -376,12 +340,11 @@ Main v3 candidates:
 ## 15. v0 implementation status
 
 The sections above remain the working memory for the full target vision.
-This section is a dated changelog kept for future work-package execution
-(each roadmap WP appends one dated entry on merge, see
-`docs/roadmap/v0.1-v0.3-implementation-roadmap.md`); entries are terse
-status facts, not narrative. Current state only — a later entry overrides
-an earlier one on the same topic. Full rationale lives in the cited ADRs
-under `docs/adr/`.
+This section tracks current implementation status only: one status bullet
+per ADR/WP, grouped by roadmap version band (v0.1/v0.2/v0.3). A later
+fact supersedes an earlier one on the same topic — full rationale and
+narrative live in the cited ADRs under `docs/adr/` and in git history,
+not here.
 
 ### Baseline v0 build
 
@@ -487,8 +450,7 @@ under `docs/adr/`.
   exist (`.github/workflows/{build-publish,lint}.yml}`: build/SBOM/
   scan/keyless-cosign-sign, and a lint gate) but have never run (no live
   Quay/Actions credentials); `check_no_latest_tags.py` correctly still
-  fails (6 charts on `tag: latest`) until a real release is cut — see
-  `RELEASING.md`.
+  fails until a real release is cut — see `RELEASING.md`.
 - **Evaluation gate** (ADR-0027/0028/0053): `make day1|d1 check agents`
   runs `ansible/roles/agents/tasks/check.yml`'s OKF-structural + `/healthz`
   smoke checks, then `run_acceptance_gate.yml` runs
@@ -497,8 +459,7 @@ under `docs/adr/`.
   `security_checks.py` and `gate_checks.py` (both 100% mandatory) into one
   exit code. `components/{agent-runtime,mcp-gateway}/tests/test_auth.py`
   prove expired/untrusted-key JWTs are rejected, fully offline.
-- **ADR-0350** (AIAgent CRD/operator) is retargeted from v0 to v1 — Tekos
-  deploys as a plain `Deployment`.
+- **ADR-0350** (AIAgent CRD/operator) is Implemented — see WP-38 below.
 - **Deployment sequencing** (ADR-0056): `make day0|d0
   <check|install|configure|all> [component]` (cluster prerequisites) +
   `make day1|d1 <check|build|configure|run|all> [component]` (build +
@@ -525,8 +486,7 @@ under `docs/adr/`.
   CR sets `spec.hostname.strict: true` and `KC_PROXY_HEADERS=xforwarded`
   explicitly (edge-terminated Route), and gets its own dedicated
   `keycloak`/`keycloak` Postgres database/role on `zuno-postgresql`
-  (not the shared `zunoapp` app-data database). Unverified against a live
-  cluster — see `ansible/roles/keycloak/README.md`.
+  (not the shared `zunoapp` app-data database).
 - **Namespace consolidation** (ADR-0328/0329, 2026-08-12): `zuno-ai-platform`
   exists in `gitops/charts/namespaces` as the future OpenShift AI
   applications namespace (ADR-0328; DSC wiring to it is out of scope for
@@ -537,819 +497,223 @@ under `docs/adr/`.
   placeholder agents carry no namespace footprint until their FE/BFF
   charts exist.
 
-### Dated entries (roadmap work packages, v0.1)
+### Dated entries (roadmap work packages, v0.1) — current status per ADR
 
-- **2026-08-14 (ADR-0116, WP-01)**: MCP Gateway routes through a platform
+- **ADR-0116 (WP-01)**: MCP Gateway routes tool calls through a
   backend-binding registry (`platform/bindings/tools/tool-bindings.yaml`,
-  `components/mcp-gateway/app/bindings.py`) instead of hard-coded
-  tool-name sets. Canonical `<domain>.<resource>.<verb>` capability IDs
-  are the stable contract; legacy names (`search_confluence`,
-  `get_customer`, …) remain aliases. Unknown/unbound capabilities fail
-  closed before any backend contact; startup + `/readyz` validate every
-  policy-listed capability resolves to exactly one binding.
-- **2026-08-14 (ADR-0114, WP-03)**: `components/ai-gateway/app/
-  maas_adapter.py` is a MaaS adapter prototype behind the existing
-  OpenAI-compatible client. Two-gated (`via_maas: true` per provider in
-  `platform/ai-gateway/provider-routing.yaml` AND chart
-  `maasAdapter.enabled`, default false — no provider opts in yet).
-  Classification eligibility always evaluates first regardless of
-  transport. Coverage comparison:
-  `docs/roadmap/evidence/adr-0114-maas-coverage.md`. Live MaaS
-  verification/cutover is an operator step (WP-27).
-- **2026-08-14 (ADR-0115 stage 1, WP-04)**: added
-  `platform/supply-chain/verify_signatures.py` (`cosign verify` against
-  immutable-tagged first-party images — nothing to verify yet, every
-  chart is `tag: latest`) and `pin_release.py` (rewrites chart `tag`
-  fields from an operator-authored release manifest). Both wired into
-  `lint.yml` as `continue-on-error: true`. `RELEASING.md` documents the
-  release sequence. Neither closes an ADR-0115 gap alone — all remaining
-  gaps block on the real credentialed release run.
-- **2026-08-14 (ADR-0117, WP-02)**: `components/mcp-servers/confluence/`
-  is a real MCP server (official `mcp` SDK, streamable-HTTP) implementing
-  `confluence.page.search/read/create/update` against the real Confluence
-  Cloud REST API (Basic Auth, `zuno/confluence/technical`,
-  service-identity mode/ADR-0208). `tool-bindings.yaml` routes all four
-  capabilities to it; the old demo-mode handler is deleted. New charts
-  `gitops/charts/mcp-confluence/` + `gitops/apps/mcp-confluence/`, built
-  via `ansible/roles/mcp_build`. Protocol-tested against a mocked
-  Confluence API; live tenant verification is an operator step.
-- **2026-08-19 (WP-06: `zuno-ogx` fixed for real, ADR-0322 stays Partially
-  implemented pending corpus proof)**: three independent, real bugs in the
-  RHOAI 3.5 EA2 OGX operator, each confirmed by reading its actual
-  upstream Go/Python source (`github.com/ogx-ai/ogx-k8s-operator`,
-  `github.com/ogx-ai/ogx`), not guessed: (1) `distribution.name` webhook
-  enum is `rh|rh-dev` only, not `remote-vllm` (schema drift); (2) its
-  OCI-manifest-fetch client is anonymous-only by design - never sends
-  auth to ANY registry (registry.redhat.io 401, our own internal mirror
-  400, even a real public docker.io image 401 - Docker Hub enforces the
-  OAuth challenge this client never follows) - fixed with
-  `spec.overrideConfig`, bypassing OCI-label resolution entirely; (3)
-  `expandPgvectorProvider()` never sets a `persistence` field for
-  `remote::pgvector` - the CRD's typed field has no way to supply one
-  either, crashing the server at startup regardless of CR content. Also
-  found+removed a 4th crash: `vector_stores.default_embedding_model`/
-  `default_reranker_model` need a matching `registered_resources.models`
-  entry or they crash startup too. `zuno-ogx` is now genuinely healthy:
-  `2/2 Running`, `DeploymentReady`/`ServiceReady`/`HealthCheck` all
-  `True`, real pgvector connection confirmed live. Lesson: when a
-  Kubernetes operator's error message looks like a credentials/RBAC
-  problem, read its actual source before assuming - "imagePullSecrets
-  don't apply" turned out to be right for a completely different reason
-  (the client never sends auth to begin with) than the mirror-based fix
-  first assumed. [[demo222-argocd-oom-limitrange]]-adjacent: an earlier
-  operator-vs-quota lesson from the same session (rhods-operator needed
-  the platform quota resized for its 3 replicas before this got even this
-  far).
-- **2026-08-18 (WP-10 progress, ADR-0107/0108 stay Partially implemented)**:
-  gated-promotion blocking half proven live twice via `make d1 check
-  agents` (65-70% vs 75% threshold, real ADR-0053 gate). Found+fixed a
-  real regression as a byproduct: WP-12's PG failover left PgBouncer
-  with a stale cached auth failure for `agentcheckpoints` - restarting
-  the PgBouncer pods fixed it (security checks 6/7 -> 7/7). LM-Eval:
-  found+fixed 3 real 3.5.0-ea.2 TrustyAI operator bugs (pvcManaged.size
-  reconciler panic on empty size; served-model-name isn't a valid HF
-  tokenizer repo id; allowOnline/env-override both silently ignored -
-  worked around with an operator-populated datasetCachePvc, since HF
-  offline mode only blocks network calls, not reads from an
-  already-warm cache); the full mmlu group's 56,168 requests also
-  503'd the shared predictor mid-run (real GPU capacity contention),
-  rescoped to one subject task. Got a real request past every layer,
-  then hit a genuine, separate mesh gap: `/v1/completions` consistently
-  503s at ~10s (Envoy/ztunnel-origin timeout) while `/v1/chat/
-  completions` on the identical pod/port works fine - a real mesh
-  routing gap for the OpenAI legacy completions path, not fixable from
-  chart values, out of WP-10's scope. Scratch PVC `lmeval-hf-cache` was
-  deleted at end of session (needs re-populating per
-  gitops/charts/models/values.yaml's dated comment).
-- **2026-08-18 (ADR-0330 closed, WP-07 Done)**: real Confluence space
-  keys landed after a live space enumeration - `satellite`/`openshift`
-  point at real space SXS's actual page trees (no archi/build/run
-  subdivision exists in the source, so the three tier entries share one
-  tree, differentiated by requiredGroups only); `openshift-ai`/`keycloak`
-  disabled, no real source tree exists for either. `rag-dspa` reconciled
-  Ready and the live KFP recurring-run activation found two of the three
-  "unverified assumption" bugs were real: the v2beta1 API returns pipeline
-  versions oldest-first (not newest-first - `| first` was silently
-  activating stale versions), and `max_concurrency` is required (0 default
-  gets a 400). Both fixed in `ansible/roles/rag_ingestion/tasks/
-  recurring_run.yml`, then a real live run created the real
-  `rag-corpus-ingestion-schedule` recurring run resolving the correct
-  version.
-- **2026-08-18 (ADR-0330 correction, same day)**: the WP-07 space mapping
-  above named `SXS`, but a follow-up live check (`GET /wiki/api/v2/spaces`)
-  found the real content is in a *different* space, `SXSI` ("SXS
-  Internal") - `satellite`/`openshift` now use `spaces: ["SXSI"]` with
-  `directories: ["Procédures/Technologie : Satellite"]` /
-  `["Procédures/Technologie : Openshift"]`. Also surfaced a latent bug:
-  `_ancestor_path_matches` (`components/rag-ingestion/src/
-  rag_ingestion.py:551-565`) matches `directories` segments against real
-  Confluence page-tree ancestor *titles* only - it never sees the space
-  key/name, so the old `"SXS/..."` value only worked because SXS's
-  space-home page happens to be titled exactly `"SXS"`; SXSI's is titled
-  `"SXS Internal"`, so a naive `"SXSI/..."` rename would have silently
-  matched zero pages. Fix: drop the space-identifying segment entirely
-  and let `spaces:` alone do space scoping. See ADR-0330's "Confluence
-  space correction" section.
-- **2026-08-18 (downstream Confluence audit, same day)**: checked whether
-  the Tekos OKF bundle and the Keycloak-sourced ACL groups were aware of
-  the SXS->SXSI correction above. Both came back clean - `agents/tekos/`
-  never hardcodes a space/directory/technology assumption (`search_confluence`
-  is a dynamically-bound MCP capability, space/CQL decided server-side);
-  the 12 `confluence-{archi,build,run}-<tech>` Keycloak groups
-  (`gitops/charts/keycloak/files/realm-zuno.json`) carry no stale space
-  references. The audit did surface two stale `values.yaml` comments and
-  one stale ADR-0330 note, now corrected: (1) the group-hierarchy comment
-  still described the old `/board`+`/consultant` split - all 12 groups
-  actually live under `/consultant` since ADR-0340/WP-32; (2) the "source
-  has NO archi/build/run page-tree subdivision" comment was contradicted by
-  a real live sub-tree found under Satellite (`S0B`/`S0R` phase pages) -
-  reworded to acknowledge it exists but is deliberately unused, per operator
-  decision to keep tier separation purely access-control (not narrowing
-  `directories` per tier - the real split doesn't map cleanly to
-  archi/build/run anyway); (3) ADR-0330's "Evolution" section still called
-  the `/board` mapping "transitional" - marked resolved, referencing
-  ADR-0340/WP-32.
-- **2026-08-18 (rag-ingestion KFP fixes, same day)**: two real bugs found
-  and fixed while verifying a `make d1 reinstall rag-ingestion` run. (1)
-  Duplicate recurring runs: `recurring_run.yml` always POSTed a fresh
-  create with no list-and-match-by-name step, and KFP doesn't enforce
-  `display_name` uniqueness - repeat installs silently accumulated
-  duplicate `rag-corpus-ingestion-schedule` entries (two found live, both
-  firing the same weekly cron). Fixed by listing existing recurring runs
-  first and reconciling (no-op if already current, delete+replace if
-  stale-version, create only if absent) - verified idempotent across
-  three consecutive installs. (2) No pipeline version at all:
-  `make d1 reinstall` deletes+recreates the ArgoCD Application, which
-  deletes+recreates the `Pipeline` CR and therefore the underlying KFP
-  pipeline object - and nothing in this repo ever uploaded a version into
-  it (the Pipeline CR carries only displayName/description; the compiler
-  image referenced in values.yaml was scaffolded but never wired to a
-  BuildConfig). Result: rag-ingestion had zero runnable pipeline versions,
-  silently. Fixed with a new `compile_pipeline_version.yml` task
-  (idempotent `ansible.builtin.pip` venv from
-  `components/rag-ingestion/tooling/requirements.txt`, compiles
-  `files/pipeline.py.tpl`'s already-correct `kubernetes_manifest_format`
-  output into a real `PipelineVersion` CR - confirmed that CRD exists on
-  this cluster - and `oc apply`s it) run before the recurring-run block in
-  `install.yml`. Verified with a full destroy/self-heal live test: deleted
-  the recurring run and the PipelineVersion CR, re-ran `make d1 install
-  rag-ingestion`, and it recompiled, reapplied, and recreated the
-  recurring run automatically with no manual intervention - then a third
-  consecutive run proved the compile step itself is also idempotent
-  (`already up to date`, no new PipelineVersion object).
-- **2026-08-18 (ADR-0114 superseded by ADR-0118, WP-03 Done)**: the
-  WP-03 decision-risk clause fired - operator chose supersession. The
-  AI Gateway stays the policy router; `maas_adapter.py` stays merged +
-  default-off as the delegation seam; keep-vs-delegate and any cutover
-  move to ADR-0201/WP-27 once RHOAI's upstream MaaS payload-processing
-  mTLS defect is fixed (GPU capacity itself is resolved - 3rd node).
-  Never gate a v0.1 record on upstream product maturity again - that
-  was the actual lesson.
-- **2026-08-18 (ADR-0112 closed, WP-13 Done)**: both restore drills
-  executed live. PostgreSQL: scratch cluster via
-  `dataSource.postgresCluster` in zuno-data itself (PGO is
-  cluster-wide - no scratch namespace needed), Ready in 203s, 38,690
-  `rag.document_embeddings` rows verified identical with WAL replayed
-  past the last backup (effective RPO near-continuous). Vault: PVC from
-  the daily CSI snapshot + a bare pod with minimal file-storage HCL,
-  unsealed with the live key, known secret verified at 39s. repo2 (S3)
-  confirmed live with a real full backup. Records in
-  `docs/platform/backup-recovery.md`.
-- **2026-08-18 (ADR-0101+0102 closed, WP-12 Done)**: live failover
-  drill + SLO measurement on the demo cluster. PostgreSQL primary
-  failover 4.8s/5.7s-writable (Patroni, 3 instances); rag-service
-  scaled to 2 for a continuity drill (79/81 requests through a pod
-  kill, PDB held; the temporary selfHeal-off + scale + restore pattern
-  works cleanly); single-replica services recover in 31-65s. SLO
-  measured 100.000% over the trailing 24h (73,894 requests) with both
-  burn-rate alerts health: ok. ADR-0102 closed on an operator-approved
-  short window; 30-day series completes ~2026-09-17 (drill record:
-  `docs/platform/slo.md`).
-- **2026-08-18 (ADR-0117 closed, WP-02 Done)**: the Atlassian
-  product-access grant landed and the live e2e chain ran clean against
-  `startxfr.atlassian.net`: indexed `knowledge.tech` read (rag-service),
-  gateway `search`/`read` as real personas (tekos/arkos declarations),
-  gateway `create` correctly 403-denied (ADR-0011 — no agent declares
-  write), and all four provider tools verified against the real REST API
-  via service identity (create/update confined to the technical
-  identity's personal space, cleaned up after). ADR-0117 `Implemented`;
-  ADR-0043's status line records confluence as migrated.
-- **2026-08-14 (ADR-0106, WP-05)**: OKF bundles get a signing/validation
-  pipeline. `platform/supply-chain/sign_okf_bundle.py` computes a
-  deterministic sha256 digest and signs/verifies with keyless `cosign
-  sign-blob`/`verify-blob` (same GitHub OIDC identity as image signing),
-  wired as `build-publish.yml`'s `sign-okf-bundles` job.
-  `validate_okf_bundle.py` checks OKF schema + tool-policy validity, wired
-  into `lint.yml` as a hard gate. Agent Runtime's
-  `ZUNO_REQUIRE_SIGNED_BUNDLES` (default false) enforces verified
-  signatures when enabled. No bundle is signed yet (needs WP-04 stage 2's
-  credentialed CI run) — ADR-0106 stays Partially implemented, flag off.
-- **2026-08-14 (ADR-0103, WP-08)**: Agent Runtime workflows are resumable.
-  `build_graph()` takes an explicit LangGraph checkpointer;
-  `AsyncPostgresSaver` is used when `CHECKPOINT_PGHOST/PORT/DATABASE/
-  USER/PASSWORD` are all set, else `MemorySaver` (default, not resumable
-  across restarts). `POST /v1/agents/tekos/chat` gains optional
-  request/mandatory response `run_id`; resuming re-checks the checkpoint's
-  stored `user_sub` against the caller's token (403 on mismatch, 404 on
-  unknown/expired run). Dedicated `agent-checkpoints` DB on
-  `zuno-postgresql`. Fully Implemented, no operator step required.
-- **2026-08-14 (ADR-0104, WP-09)**: AI Gateway gets an opt-in semantic
-  cache for non-streaming `/v1/chat/completions`
-  (`components/ai-gateway/app/semantic_cache.py`), stored in the shared
-  platform Redis. Two-gated (chart `semanticCache.enabled` AND a model's
-  `cache_enabled: true`). Prompts are embedded via the shared embedding
-  service and bucketed with fixed-seed SimHash. Cache key binds model
-  identity, caller subject, effective classification, local-only
-  requirement and task — any difference is a guaranteed miss.
-  Infrastructure failures fail open (cache is perf-only, never a security
-  control; eligibility always checked first). Streaming is not cached.
-  Fully Implemented, no operator step required.
-- **2026-08-14 (ADR-0111, WP-11)**: first SecNumCloud hardening
-  increment. `docs/security/secnumcloud-controls.md` is the control
-  matrix (deployment/supply-chain/identity/network/data families, each
-  row `enforced-in-ci`/`enforced-on-cluster`/`gap` with its enforcing
-  file); `check_workload_hardening.py` remains authoritative and now adds
-  `check_no_hardcoded_secret_values` (no chart embeds a literal secret
-  value). Closed a real gap: `zuno-ai-run` was silently getting an
-  all-ports same-namespace NetworkPolicy from the generic
-  `platformNamespaces` loop, contradicting ADR-0037/0052 — fixed via a
-  `skipNetworkPolicy: true` flag on that entry (never deployed live yet,
-  `policy.enabled` is false there). `check_workload_hardening.py` passes
-  95/95. ADR-0111 stays Partially implemented — remaining `gap` rows are
-  owned by WP-12 (HA/PDB), WP-13 (backup) and WP-26 (binding auth-mode).
-- **2026-08-15 (ADR-0111 control-matrix sync)**: WP-12/13/26 had each
-  merged their repo half without flipping their owned `gap` rows in
-  `docs/security/secnumcloud-controls.md`, contradicting the matrix's own
-  "how to update" rule. Flipped auth-mode enforcement, backup
-  configuration/recency-check and PDB/topology-spread rows to
-  `enforced-in-ci` with concrete citations; split the backup row into
-  "configured" (closed) vs. "restore drill executed" (still `gap`, live);
-  reworded the SLO row to name its two real missing prerequisites
-  (`agent-bff`'s `zuno_bff_requests_total` metric, unconfirmed
-  `ServiceMonitor` scrape). No code changed — every remaining `gap` row in
-  the matrix is now genuinely live-cluster-only. ADR-0111 status line
-  updated with a dated Implementation note; no ADR-0111 index-row change
-  (label stays Partially implemented).
-- **2026-08-14 (ADR-0322, WP-06)**: OGX migration + RAG provider parity.
-  DataScienceCluster already has `ogx.managementState: Managed` and the
-  deprecated Llama Stack component `Removed`; live cluster confirms
-  `OGXReady: "True"`. `ansible/roles/openshift_ai`'s Day 1 OGX check is a
-  real readiness gate on that condition now. `components/rag-service/app/
-  ogx_provider.py` is an OGX-backed retrieval provider behind the same
-  `hybrid_search` contract, opt-in via `RAG_PROVIDER=ogx` (default
-  `pgvector`) and chart `ogxProvider.enabled`. `spec.components.ogx:
-  Managed` installs only the OGX Operator — the data-plane `OGXServer` CR
-  (`ogxservers.ogx.io/v1beta1`) is defined at `gitops/charts/openshift-ai/
-  templates/ogxserver.yaml` (disabled by default, wired to this repo's
-  own PostgreSQL/pgvector and KServe/vLLM) but nothing has created one
-  yet, so the adapter has never run against a live OGX endpoint — it
-  over-fetches and re-applies the same fail-closed filter semantics
-  `app/search.py` enforces in SQL, as defense in depth.
-  `tests/test_provider_parity.py` proves both providers agree on
-  row-mapping and schema. ADR-0322 stays Partially implemented — live DSC
-  reconciliation and an OGX-backed corpus proof are operator follow-ups.
-- **2026-08-14 (ADR-0330, WP-07)**: rag-ingestion catalog completion.
-  `components/rag-ingestion/tooling/verify_catalog.py` HTTP-verifies every
-  `redhat[]` entry's `documentationUrl` (meant to run from a network that
-  can reach `docs.redhat.com`; blocked here). Its test file
-  (`tooling/tests/test_verify_catalog.py`) is rag-ingestion's first
-  committed test. All 32 non-Satellite `redhat[]` entries carry a
-  `# CONFIRM` marker pending that verification; Confluence
-  `spaces:`/`directories:` values carry an `# operator-supplied` marker —
-  no real space key exists in this repo. ADR-0330 stays Partially
-  implemented — live HTTP verification, real Confluence credentials, and
-  KFP/DSPA checks need operator/cluster access.
-- **2026-08-14 (ADR-0107 + ADR-0108, WP-10)**: model/agent promotion
-  quality gate. `evaluations/quality_gate.py` runs an agent's
-  `run_acceptance_gate.py`, then re-derives PASS/FAIL from a
-  per-agent-configurable threshold in `evaluations/<agent>/
-  gate_config.yaml` (tekos seeded at 0.75) rather than a hardcoded
-  constant. `security_checks`/`gate_checks` stay 100% mandatory
-  regardless of threshold; an agent with no `gate_config.yaml` fails
-  closed. `lint.yml`'s `quality-gate` job smoke-checks only agents whose
-  eval directory changed, and never claims a live PASS/FAIL verdict (no
-  cluster in CI). For ADR-0108: `LMEvalJob`
-  (`trustyai.opendatahub.io/v1alpha1`) is real and the DSC's `trustyai`
-  component is already `Managed`; `gitops/charts/models/templates/
-  lmevaljob.yaml` adds one CR per `lmEval.jobs[]` entry, disabled by
-  default, opt-in per candidate model. Both ADRs stay Partially
-  implemented — a real GPU LM-Eval run and one exercised promotion need
-  cluster access.
-- **2026-08-14 (ADR-0101 + ADR-0102, WP-12)**: HA-capable shape for every
-  shared service. PostgreSQL (PGO) and Redis (Bitnami) were already
-  replica/PDB-complete by their own defaults; the only real gap was
-  `topologySpreadConstraints` (added to PostgreSQL; skipped for Redis, a
-  genuinely single-pod standalone design). agent-runtime/ai-gateway/
-  mcp-gateway/rag-service each gained a PodDisruptionBudget +
-  `whenUnsatisfiable: ScheduleAnyway` topology spread (soft — no-op on a
-  single-node cluster). Keycloak gets a hand-authored PDB and
-  `spec.scheduling.topologySpreadConstraints` on its CR. Replica/instance
-  counts are unchanged (demo-scale 1) — this WP ships the mechanism, not
-  a topology change. `check_workload_hardening.py` gains availability
-  checks (116/116 passing). For ADR-0102: `docs/platform/slo.md` defines
-  the 99.9% monthly SLO (BFF-boundary success ratio) with a multi-window
-  burn-rate alert policy (`gitops/charts/observability/templates/
-  prometheusrule-slo.yaml`, disabled by default). Found the OTel
-  Collector's metrics pipeline exported only to `debug` (stdout) — no
-  metric from any service was Prometheus-queryable; added a `prometheus`
-  exporter. Still missing: a ServiceMonitor for that exporter, and
-  `agent-bff`'s `zuno_bff_requests_total` metric the SLO query needs (see
-  `docs/platform/slo.md`'s "Current gap"). Both ADRs stay Partially
-  implemented — a failover drill and a real 30-day SLO measurement need
-  cluster access.
-- **2026-08-14 (ADR-0112, WP-13)**: PostgreSQL backups were already fully
-  configured and running (pgBackRest, weekly full + daily differential,
-  inside the 24h RPO); added a Day 1 recency check
-  (`ansible/roles/postgresql/tasks/precheck.yml`, diagnostic only). Vault
-  uses `file` storage (no Raft snapshot API) — backup instead via a daily
-  CSI VolumeSnapshot CronJob (`gitops/charts/vault/templates/
-  cronjob-backup.yaml`, disabled by default, prunes to newest N).
-  `docs/platform/backup-recovery.md` documents per-service RPO/RTO
-  (≤24h/≤4h) and the tested runbook: PostgreSQL restore-to-scratch-cluster
-  via `spec.dataSource.postgresCluster` (never destructive in place),
-  Vault restore via a new PVC from the snapshot, GitOps config needing no
-  separate backup (git is the backup). ADR-0112 stays Partially
-  implemented — both restore drills are unexecuted operator follow-up.
+  `components/mcp-gateway/app/bindings.py`) keyed by canonical
+  `<domain>.<resource>.<verb>` capability IDs; legacy tool names remain
+  aliases. Unbound/unknown capabilities fail closed before any backend
+  contact. Implemented.
+- **ADR-0114 / ADR-0118 (WP-03)**: ADR-0114 superseded by ADR-0118 — AI
+  Gateway stays the policy router, `maas_adapter.py` (MaaS transport)
+  stays merged and default-off as a delegation seam. Keep-vs-delegate and
+  any cutover deferred to ADR-0201/WP-27, pending RHOAI's upstream MaaS
+  mTLS defect fix and available GPU capacity.
+- **ADR-0115 stage 1 (WP-04)**: supply-chain tooling merged
+  (`platform/supply-chain/verify_signatures.py`, `pin_release.py`), wired
+  into `lint.yml` non-blocking. No credentialed release has run yet — see
+  `RELEASING.md` for the release process and current blocker.
+- **ADR-0117 (WP-02)**: Confluence MCP server. Real MCP server
+  (`components/mcp-servers/confluence/`, official SDK, streamable-HTTP)
+  against the live Confluence Cloud REST API; `tool-bindings.yaml` routes
+  all four capabilities to it. Live e2e chain (search/read/create-denied/
+  update) verified against `startxfr.atlassian.net` once Atlassian
+  product access was granted. Implemented. Note: two mcp-gateway test
+  files (`test_downstream_sales_db.py`, confluence's
+  `test_mcp_protocol.py`) are standalone async scripts — run as `python
+  test_x.py`, not via pytest (pytest misreads their `transport` param as
+  a missing fixture).
+- **ADR-0330 (WP-07)**: rag-ingestion Confluence catalog. `spaces:
+  ["SXSI"]` (not `SXS` — corrected after a live space enumeration),
+  `directories:` scoped per the real page tree; space-identifying path
+  segments were dropped from `_ancestor_path_matches` since it only ever
+  sees Confluence page-tree ancestor titles, never the space key.
+  Recurring-run installer now lists-and-reconciles existing KFP recurring
+  runs instead of blind-creating (the v2beta1 API returns pipeline
+  versions oldest-first, and `max_concurrency` has no usable 0 default —
+  both were real bugs, fixed in `ansible/roles/rag_ingestion/tasks/
+  recurring_run.yml`). `compile_pipeline_version.yml` compiles and
+  uploads a `PipelineVersion` before the recurring-run step, so a fresh
+  install has something to run against. Done.
+- **ADR-0106 (WP-05)**: OKF bundle signing pipeline merged
+  (`sign_okf_bundle.py`/`validate_okf_bundle.py`, keyless cosign, wired
+  into `build-publish.yml`/`lint.yml`). `ZUNO_REQUIRE_SIGNED_BUNDLES`
+  (default false) enforces verification once enabled. Partially
+  implemented — no bundle is signed yet (needs a credentialed CI run).
+- **ADR-0103 (WP-08)**: Agent Runtime workflows are resumable via an
+  explicit LangGraph checkpointer (`AsyncPostgresSaver` when
+  `CHECKPOINT_PG*` env is set, else in-memory). `run_id` resumes
+  re-validate the checkpoint's stored `user_sub` against the caller's
+  token. Implemented.
+- **ADR-0104 (WP-09)**: AI Gateway opt-in semantic cache for
+  non-streaming completions (`semantic_cache.py`, shared Redis, SimHash
+  bucketing). Two-gated (chart flag AND per-model `cache_enabled`); cache
+  key binds model/subject/classification/local-only/task; infra failures
+  fail open (perf-only, never a security control). Implemented.
+- **ADR-0111 (WP-11)**: SecNumCloud hardening control matrix
+  (`docs/security/secnumcloud-controls.md`) plus
+  `check_workload_hardening.py`'s `check_no_hardcoded_secret_values`.
+  Partially implemented — remaining gap rows owned by WP-12 (HA/PDB),
+  WP-13 (backup) and WP-26 (binding auth-mode), each closed below.
+- **ADR-0101 + ADR-0102 (WP-12)**: HA-capable shape for shared services.
+  PostgreSQL/Redis were already replica+PDB-complete by default; added
+  `topologySpreadConstraints` to PostgreSQL (skipped for Redis, single-pod
+  by design); agent-runtime/ai-gateway/mcp-gateway/rag-service gained a
+  PodDisruptionBudget + soft topology spread. `docs/platform/slo.md`
+  defines the 99.9% monthly SLO with burn-rate alerting (disabled by
+  default); fixed the OTel Collector only exporting to stdout (added a
+  `prometheus` exporter). Both ADRs closed after a live failover drill and
+  a 24h SLO measurement — see `docs/platform/slo.md` for the drill record
+  (30-day series completes ~2026-09-17). Implemented.
+- **ADR-0112 (WP-13)**: backup/restore. PostgreSQL backups (pgBackRest
+  weekly full + daily differential) were already configured; added a Day
+  1 recency check. Vault backs up via a daily CSI VolumeSnapshot CronJob
+  (disabled by default). Both restore drills executed live (PostgreSQL:
+  scratch-cluster restore via `dataSource.postgresCluster`, WAL-replayed
+  to near-continuous RPO; Vault: PVC-from-snapshot, unsealed, secret
+  verified) — see `docs/platform/backup-recovery.md` for the drill
+  record. Implemented.
+- **ADR-0322 (WP-06)**: OGX migration + RAG provider parity.
+  `rag-service`'s `ogx_provider.py` is an opt-in OGX-backed retrieval
+  provider (`RAG_PROVIDER=ogx`) behind the same `hybrid_search` contract;
+  the data-plane `OGXServer` CR is defined but disabled by default — kept
+  deliberately deferred rather than flipped live. Three real upstream OGX
+  operator bugs (schema-enum drift, an anonymous-only OCI-fetch client,
+  missing `persistence` field for `remote::pgvector`) were found by
+  reading the operator's own Go/Python source and fixed via
+  `spec.overrideConfig`; `zuno-ogx` is now genuinely healthy live (2/2
+  Running, real pgvector connection confirmed). Partially implemented,
+  pending a live OGX-backed corpus proof.
 
-### Dated entries (roadmap work packages, v0.2)
+### Dated entries (roadmap work packages, v0.2) — current status per ADR
 
-- **2026-08-15 (ADR-0202/ADR-0203, WP-20)**: introduced the four logical
-  knowledge-domain identifiers (`knowledge.tech`, `knowledge.sales`,
-  `knowledge.sxa-legacy`, `knowledge.adv`) as a declarative repo contract:
-  `knowledge/<domain>/domain.yaml` (taxonomy, freshness objective,
-  classification defaults — no physical DB/endpoint/secret) +
-  `knowledge/metadata-schema.yaml` + `platform/docs/check_knowledge_refs.py`
-  (wired blocking in CI, validates descriptors and rejects any
-  `knowledge.*` reference under `agents/`/`policies/` not declared there).
+- **ADR-0202 / ADR-0203 (WP-20)**: four logical knowledge-domain
+  identifiers (`knowledge.tech/sales/sxa-legacy/adv`) declared in
+  `knowledge/<domain>/domain.yaml`, validated by
+  `platform/docs/check_knowledge_refs.py` (blocking in CI).
   `policies/knowledge/knowledge-policy.yaml` maps each domain to allowed
-  Keycloak groups, analogous to `policies/tools/tool-policy.yaml`. New
-  `zuno.allowed_knowledge` OKF task field, declared on Tekos's
-  `answer-technical-question`/`find-relevant-docs` tasks
-  (`knowledge.tech`); the agent-level ceiling is a derived union
-  (`AgentDefinition.declared_knowledge()`), mirroring `declared_tools()` —
-  no separate agent-level field. `components/agent-runtime/app/
-  knowledge.py` (`KnowledgePolicyStore` + `evaluate_knowledge()`) enforces
-  the fail-closed ADR-0203 intersection (agent ceiling ∩ task
-  `allowed_knowledge` ∩ caller groups ∩ policy) in `retrieve_node` before
-  every rag-service call, skipping retrieval entirely when nothing is
-  authorized. rag-service gained an additive `domains`/`technology` filter
-  (`app/search.py`, `app/ogx_provider.py` in lockstep for parity) as
-  defense in depth; untagged legacy rows default to `knowledge.tech`. Both
-  ADRs fully repo-provable — no operator follow-up. Physical bindings/
-  per-domain databases are WP-21; `stale_after` enforcement is WP-24.
+  Keycloak groups; enforcement is a fail-closed intersection (agent
+  ceiling ∩ task `allowed_knowledge` ∩ caller groups ∩ policy) in
+  `agent-runtime`'s `retrieve_node`. Fully repo-provable, no operator
+  follow-up. Physical per-domain databases are WP-21 (below);
+  `stale_after` enforcement is WP-24 (below).
+- **ADR-0205 + ADR-0109 (WP-24)**: freshness/trust scoring. Metadata
+  split into `source_modified_at` (the source's own signal) and
+  `indexed_at` (pipeline clock); `stale_after` computed per-domain from
+  `domain.yaml`. `rag-service`'s scoring adds provenance weight,
+  continuous freshness decay and a `freshness_untrusted` rank-last
+  penalty for chunks missing freshness metadata (mirrored in
+  `ogx_provider.py` for provider parity). `source_mode`
+  (`indexed`/`live`/`both`/`none`) is derived in `respond_node` from what
+  actually contributed to the answer, returned in `ChatResponse`/SSE and
+  traced via `agent_graph_run`. Fully repo-provable, no operator
+  follow-up.
+- **ADR-0110 (WP-25)**: ACL reconciliation. New `reconcile-acls` stage in
+  `rag-ingestion` re-checks EVERY indexed Confluence chunk's `acl_groups`
+  against the source's current `requiredGroups` (not just the run's
+  changeset), removing chunks whose source is no longer visible; aborts
+  with zero deletions if a source-listing call fails (never mistakes an
+  outage for mass deletion). Authoritative ACL source is the platform's
+  own declared `requiredGroups` config, not a live Confluence
+  restrictions API (none exists here). Partially implemented — needs a
+  live Confluence restriction-change + verified run.
+- **ADR-0208 (WP-26)**: every tool binding declares an explicit
+  `auth_mode` (`delegated-user`/`service-identity`/`provider-delegated`),
+  never inferred from the tool name. `delegated-user` requires a
+  resolvable delegated token and never falls back to a shared credential
+  — a missing token is a deterministic 403. Audit trail carries
+  `auth_mode`, never token material. Implemented (concrete live
+  Google-token resolution is an optional operator follow-up).
+- **ADR-0201 (WP-27)**: MaaS governance plane. `MaaSModelRef` wraps the
+  existing vLLM predictor via `ExternalModel` rather than provisioning a
+  full separate `LLMInferenceService` stack (both GPUs already
+  committed). Two `MaaSSubscription`s (`agent_tekos`/`sales`) demonstrate
+  differentiated rate limits; `MAAS_EXTERNAL_EGRESS_ENABLED` (default
+  off) gates external-provider egress independent of the adapter flag.
+  `X-Zuno-Request-Id` threads end-to-end for usage correlation. Partially
+  implemented — blocked on GPU capacity and live MaaS verification.
+- **ADR-0215 (WP-060, 2026-08-20)**: Tekos/Comage/Arkos previously lost
+  all conversation history between turns (each prompt sent only the
+  static system prompt + the newest question). Fixed: three new
+  `AgentState` channels (`history`, `summary`, `history_classification`)
+  carried across turns via the existing checkpoint mechanism; a shared
+  `record_history` terminal node compacts older turns into a running
+  summary once a token budget is exceeded (default 1800 tokens, sized for
+  qwen2.5-7b's 8192 context; Arkos overrides to 6000 since its
+  C3/local-only path uses gpt-oss-20b's 32768 context). Compaction stays
+  local-only for C2/C3 conversations (mirrors the existing
+  `app/memory.py` rule) and is tagged `zuno-internal`, filtered out of
+  the user-visible SSE stream. New `app/graph/history.py` +
+  `app/graph/classification.py` (split out to avoid a circular import).
+  Partially implemented, WP-060 Operator pending (repo work merged) —
+  residual gap is live two-turn verification on the real cluster, not yet
+  attempted.
 
-- **2026-08-15 (ADR-0205 + ADR-0109, WP-24)**: freshness routing and trust
-  scoring, both ADRs fully repo-provable (mocked live tools) — no operator
-  follow-up. Split the old conflated `last_modified` metadata field into
-  `source_modified_at` (the source's own signal — Confluence's
-  `lastUpdated`, Salesforce's `LastModifiedDate`, Aramis' `updated_at`, a
-  best-effort HTTP `Last-Modified` header for product docs, or `fetched_at`
-  as a last resort) and `indexed_at` (the pipeline's own clock at normalize
-  time); `stale_after` is now computed from each domain's `STALE_AFTER`
-  chart value in `gitops/charts/rag-ingestion/values.yaml`, mirroring the
-  new `freshness.operation_classes.{semantic-read,current-state-read}.
-  max_staleness` blocks in every `knowledge/<domain>/domain.yaml`
-  (validated by `check_knowledge_refs.py`). `rag-ingestion`'s validate
-  stage fails closed on any operational-domain chunk missing the trio
-  (`knowledge.sxa-legacy` exempt). `rag-service`'s `_is_stale` now parses
-  full ISO datetimes (was date-only) for sales' hours-scale window;
-  `_apply_soft_adjustments` gained provenance weight (real URL vs.
-  fixture-marker provenance), continuous freshness decay (replacing the
-  old flat `_STALE_PENALTY_FACTOR` — same constant, now a floor) and a
-  `freshness_untrusted` flag + heavy rank-last penalty for chunks missing
-  `indexed_at`/`stale_after` — mirrored in `ogx_provider.py` for provider
-  parity. Agent Runtime's `_live_read_trigger_reason` (feeding
-  `should_call_tools`) fires on an explicit current-state question, a
-  policy-marked freshness-sensitive domain (`knowledge.sales`), or a
-  retrieved doc past its `stale_after`; `source_mode`
-  (`indexed`/`live`/`both`/`none`) is computed in `respond_node` from what
-  actually contributed to the answer (never from what was merely
-  attempted), returned in `ChatResponse` and the SSE `done` event, and
-  traced via a new `agent_graph_run` OTel span
-  (`app/telemetry.py:graph_run_span`). Write-path invariant tests (no
-  write-shaped SQL/HTTP verb in any retrieval code path) added to
-  rag-service, rag-ingestion and agent-runtime. New per-domain
-  `zuno.rag_freshness_lag_seconds` histogram plus a gated
-  `PrometheusRule` (`gitops/charts/observability`) alerting each domain
-  against its own freshness objective.
+### Dated entries (roadmap work packages, v0.3) — current status per ADR
 
-- **2026-08-15 (ADR-0110, WP-25)**: promoted ADR-0110, honestly scoped
-  during implementation — the brief's "re-reads current source
-  authorization" assumed a live Confluence restrictions API that doesn't
-  exist in this repo; the actual authoritative source of `acl_groups` is
-  the platform's own declared `requiredGroups` config
-  (`gitops/charts/rag-ingestion/values.yaml`), same as `fetch-confluence`
-  already used. New `reconcile-acls` stage
-  (`components/rag-ingestion/src/rag_ingestion.py`) runs after `validate`
-  over EVERY indexed Confluence chunk (not just the run's changeset — an
-  unchanged document's authorization can still drift): updates
-  `acl_groups` when a source's `requiredGroups` changed, removes chunks
-  whose source is no longer visible or has fallen outside every
-  configured source's scope (fail closed — retrieval-side filtering alone
-  isn't sufficient), and aborts the whole stage with zero deletions if a
-  source listing call fails (never mistakes a transient outage for mass
-  deletion). Gave the previously-dead `preserveAcl` per-source field real
-  meaning: `false` confirms a page's continued existence without ever
-  letting reconciliation overwrite manually-curated `acl_groups`. Wired
-  into the KFP DAG after `validate` for every domain (a no-op wherever no
-  Confluence source is configured). ADR-0110 stays Partially implemented
-  — operator follow-up (live Confluence restriction change + verified
-  run) unchanged from the brief.
+- **ADR-0327 (WP-37)**: `AIAgent` CRD contract
+  (`operator/aiagent-operator/api/v1alpha1/aiagent_types.go`) —
+  deployment bindings/references only, no secrets/prompts/tokens.
+  `validate_contract.py` enforces schema shape and reject rules a
+  structural CRD schema alone can't (secret/cross-namespace fields),
+  wired blocking into `lint.yml`. Implemented, no operator-pending items.
+- **ADR-0308 / ADR-0350 (WP-38)**: AIAgent operator reconciler,
+  generating each agent's resource set with owner references (plain-GC
+  delete, no finalizer) and five status conditions. Arkos is CR-managed
+  (its chart renders one `AIAgent` CR); Tekos deliberately stays
+  plain-manifest to prove coexistence. Live-verified: `aiagent-operator`
+  deployed and Ready, both `AIAgent` CRs (Arkos, Naveo) show all five
+  conditions `True`. Both ADRs Implemented.
+- **ADR-0303 (WP-39)**: per-request dynamic LoRA adapter selection
+  scaffolding (`policies/model-routing/model-routing-policy.yaml`, empty
+  `adapters: []` until a real GPU-trained adapter exists); the
+  C2/C3-adapter-never-external guard is enforced inside
+  `chat_model_for()` (local-vLLM-direct only, never via MaaS).
+  Repo-complete, no adapters trained yet.
+- **ADR-0305 / ADR-0304 (WP-40)**: `evaluations/benchmark.py` (LM-Eval
+  snapshot -> versioned artifact, `--check-policy` enforces
+  no-artifact-no-promotion) and `evaluations/routing_report.py` (routing
+  recommendations as a report only, never a policy write). Repo-complete.
+- **ADR-0307 / ADR-0306 (WP-41)**: `platform/templates/agent/
+  scaffold_agent.py` generates a new agent from template. **Naveo** is
+  the first agent generated this way (consultant role, zero policy edits
+  needed — proves the composition works), CR-managed from day one.
+  Repo-complete.
+- **ADR-0309 (WP-42)**: `policies/optimization/optimization-policy.yaml`
+  + `components/ai-gateway/app/optimizer.py` — runtime-config-only
+  optimization with a classification/authorization denylist, full audit
+  trail, auto-rollback and a one-step kill switch. Ships `enabled:
+  false`. Repo-complete.
+- **ADR-0340 (WP-32)**: `confluence-archi-*` groups live under
+  `/consultant`; new `cdp` group exists with no members yet (per-agent
+  consumption is WP-33+). Implemented.
+- **ADR-0349**: Keycloak realm baseline — 27 anonymized personas,
+  `ocp-*` RBAC groups, live IdP federation. Live-verified: realm applied,
+  ClusterRoleBindings wired, ArgoCD RBAC policy matches, no stale legacy
+  Group objects. Implemented.
+- **ADR-0204 (WP-21)**: all four domain databases/roles exist on the PGO
+  cluster, each ACL'd to only its own database; `tech`/`sales`
+  schema-apply Jobs Complete. Fixed a real regression: `make d1 check
+  rag`'s precheck looked up a retired hardcoded Job name instead of
+  matching on the `app.kubernetes.io/name=rag-service` label — now
+  fixed. Partially implemented — WP-22 (source adapters' live runs)
+  remains.
 
-- **2026-08-15 (ADR-0208, WP-26)**: every binding in
-  `platform/bindings/tools/tool-bindings.yaml` (13 entries) now declares a
-  required, explicit `auth_mode` (`delegated-user` | `service-identity` |
-  `provider-delegated`), never inferred from the tool/capability name -
-  `drive.*`/`gmail.*` are `delegated-user`, everything else (`sxa.*`,
-  `confluence.page.*`, `web.page.search`, `email.report.send`) is
-  `service-identity`. `components/mcp-gateway/app/bindings.py`'s loader
-  fails closed on a missing/unrecognized mode. Enforcement lives in
-  `main.py`'s `invoke_tool`, between the policy decision and the
-  downstream call: `delegated-user` requires a resolvable delegated token
-  (new `app/delegation.py` - a documented seam, since no component
-  resolves a real Keycloak Google-broker token yet; the CONTRACT is fully
-  enforced today, only the concrete resolution is pending a live
-  integration) and NEVER falls back to a shared credential - a missing
-  token (including a "revoked" one at the mock level) is a deterministic
-  403, identical in shape to a policy denial. `provider-delegated` is
-  schema-only (501, no binding uses it yet). `downstream.py` and all four
-  in-process handlers (`drive`, `gmail`, `web_search`, `email_report`)
-  thread an optional `delegated_token` kwarg. Audit trail (log line + OTel
-  span) carries `auth_mode` alongside subject/capability/binding - never
-  token material, verified by a dedicated test. Fully repo-provable - ADR-0208
-  flips straight to Implemented; optional live Google-revocation
-  confirmation left for the operator.
-
-- **2026-08-15 (ADR-0201, WP-27)**: MaaS governance-plane manifests, key
-  lifecycle, correlation and guards - live MaaS verification pending.
-  `gitops/charts/models/templates/maas.yaml` publishes the local chat
-  model through `MaaSModelRef`, wrapping the existing vLLM predictor's
-  OpenAI-compatible endpoint via an `ExternalModel`
-  (`maas.opendatahub.io/v1alpha1`) rather than `LLMInferenceService` -
-  the latter is a FULL SEPARATE serving stack per its live-cluster schema
-  (`model.uri`, no reference to an existing InferenceService), and this
-  cluster's two GPUs are already both committed, so duplicating one would
-  need real capacity/migration planning out of this WP's scope; the
-  ExternalModel choice is flagged `# CONFIRM` since its own schema
-  description reads as designed for genuinely external providers, not
-  confirmed for an internal Service. Two `MaaSSubscription`s
-  (`agent_tekos`/`sales`) demonstrate different access via differentiated
-  token-rate limits (MaaSSubscription has no separate "which models"
-  axis beyond rate); one `MaaSAuthPolicy` scoped to just those two groups
-  proves denial-by-omission for any other group. Every CRD field checked
-  live (`oc explain`, 2026-08-15) except explicitly marked
-  `# CONFIRM`/`# verify-on-cluster` fields. New
-  `externalsecret-maas.yaml` + a `maas/gateway-api-key` Vault seed close
-  the API-key lifecycle gap the adapter already expected but nothing
-  populated. `X-Zuno-Request-Id` now threads end to end (agent-runtime's
-  `AgentState.request_id` → `ModelRouter` → ai-gateway's `model_call_span`
-  → `maas_adapter.chat_model_via_maas`'s own header) for usage/trace
-  correlation. New `MAAS_EXTERNAL_EGRESS_ENABLED` gate (default off,
-  independent of `MAAS_ADAPTER_ENABLED`) blocks external-provider egress
-  through MaaS until explicitly opted in - 2 new security-negative tests,
-  alongside the existing WP-03 C3/local-only eligibility test. Day 1 check
-  extended, diagnostic only. Everything new ships disabled by default.
-  ADR-0201 stays Partially implemented; every ADR-0201 acceptance bullet
-  and the external-egress lifecycle decision remain live-cluster operator
-  steps.
-
-### Dated entries (roadmap work packages, v0.3)
-
-- **2026-08-16 (live-cluster verification session on demo222)**: first
-  real end-to-end exercise of the v0.1-v0.3 stack. Verified live: full
-  ADR-0349 realm (27 users, ocp-* RBAC matrix via real Keycloak-IdP
-  logins, ArgoCD role mapping), aiagent-operator reconciling Arkos+Naveo
-  CRs (all 5 conditions True, owner-ref GC + selfHeal recreate),
-  WP-21 two live domains with distinct credentials + hybrid search incl.
-  the vector arm, first full grounded chat (5 citations, local qwen),
-  Tekos gate: security 7/7 + gate-checks 1/1 PASS, scenarios 14/20 (70%).
-  ~30 commits of live-found fixes - the big ones: Keycloak 25/26
-  behavioral changes (varchar(255) import abort, vault-file `__`
-  escaping, import-time vs runtime secret resolution, `basic` scope for
-  sub, self-audience mappers, required firstName/lastName), stale
-  hardcoded issuers + JWKS-over-Route TLS in all 4 services (new
-  KEYCLOAK_JWKS_URL seam), served-model-name vs canonical model id split,
-  PgBouncer vs search_path/prepared statements (direct-to-primary),
-  pgvector text-format serialization, AsyncPostgresSaver single-connection
-  wedge (pooled), fleet-wide pullPolicy Always (stale :latest cache),
-  redhat-ods-applications mesh/quota recovery, acceptance-gate Job
-  environment (HOME, per-agent ConfigMap projections, internal CA).
-  Remaining gate failures are scenario-design/harness/credential items
-  (portal Bearer-session contract, `oc` binary in harness, sales-db
-  reachability-by-design, Atlassian Confluence product access for the
-  token identity, BFF 55s timeout vs non-streaming completion latency),
-  not platform defects. Credential-blocked: Route53 (ADR-0211 flips),
-  Salesforce, Aramis, rag-S3, MaaS key. OGX corpus proof (WP-06) not yet
-  attempted live.
-
-
-- **2026-08-15 (ADR-0327, WP-37)**: `zuno.zuno.ai/v1alpha1 AIAgent` CRD
-  reconciliation contract — first commit against a brand-new Kubebuilder
-  v4 (Go + controller-runtime) scaffold in `operator/aiagent-operator/`,
-  a deliberate first-of-its-kind framework dependency (contrast
-  `components/agent-bff`'s stdlib-only Go, kept that way on purpose).
-  Contract only, no reconciler (WP-38). `api/v1alpha1/aiagent_types.go`
-  hand-authors `AIAgentSpec` as deployment bindings/references only
-  (agentName, targetNamespace, okfBundleRef, frontend/bff profiles,
-  entitlement+business-role group bindings, knowledgeDomains,
-  toolCapabilities, modelPolicyRef, evaluationProfileRef — no secrets,
-  prompts or tokens anywhere in the type) and `AIAgentStatus.conditions`
-  with five required condition types
-  (ConfigValid/OKFReady/FrontendReady/BFFReady/RuntimeBindingReady).
-  Three `config/samples/` CRs (tekos/arkos/comage) hand-derived
-  field-by-field from real chart values + OKF bundles.
-  `validate_contract.py` (plain Python, no new dependency) enforces
-  schema shape, secret/cross-namespace reject rules (a vanilla CRD
-  structural schema only prunes unknown fields silently — it does not
-  reject the create — so this is harness-enforced, not schema-inferred),
-  a self-test proving the reject rules actually fire, and drift against
-  real chart/OKF state; wired blocking into the repo root
-  `.github/workflows/lint.yml`. `CONTRACT.md` restates the ownership
-  model and migration path (Arkos is WP-38's designated first
-  plain-manifest→CR migration proof; Tekos deliberately stays
-  plain-manifest to prove coexistence, no flag day). ADR-0327 → fully
-  Implemented, zero operator-pending items — the only WP-30–42 WP in
-  this phase that closes with no live-cluster step remaining.
-
-- **2026-08-15 (WP-38–WP-42: v0.3 repo work complete)**: the entire
-  v0.1–v0.3 roadmap's repo-side work is merged. WP-38 (ADR-0308): the
-  AIAgent operator controller — reconciler generating CONTRACT.md's
-  per-agent resource set with owner references (delete = plain GC, no
-  finalizer), in-code namespace-allowlist defense in depth, five
-  status conditions, envtest suite (plain `testing`+Gomega `NewWithT`,
-  NOT Ginkgo, per plan D8; envtest has no GC controller so
-  cascade-delete's structural half is proven, documented honestly);
-  Arkos migrated to CR-managed (its chart now renders ONE AIAgent CR;
-  Tekos deliberately stays plain-manifest for coexistence); new
-  `gitops/charts/aiagent-operator` (the one deliberate
-  `automountServiceAccountToken: true` workload, allow-listed in
-  check_workload_hardening.py) + ansible roles + Makefile/build-matrix
-  entries. WP-39 (ADR-0303): per-request dynamic LoRA adapter selection —
-  `policies/model-routing/model-routing-policy.yaml` (adapters: [] until
-  a real GPU-trained adapter exists), `X-Zuno-Agent`+`X-Zuno-Task`
-  headers threaded from both graph shapes, the C2/C3-adapter-never-
-  external guard enforced INSIDE `chat_model_for()` (local-vLLM-direct
-  only, not even via MaaS), `zuno.adapter` trace attribute; ai-gateway's
-  build context moved to repo root to bake `policies/` in. WP-40
-  (ADR-0305/0304): `evaluations/benchmark.py` (LM-Eval snapshot/oc read +
-  quality-gate reuse → versioned artifact; `--check-policy` enforces
-  no-artifact-no-promotion as a real CI gate) and
-  `evaluations/routing_report.py` (objectives blocks in the same policy
-  file; downgrade/upgrade recommendations as a report, never a policy
-  write; `--metrics-file` primary per D13). WP-41 (ADR-0307/0306):
-  `platform/templates/agent/scaffold_agent.py` + scaffold-validate-
-  discard CI test, and **Naveo** — the sixth agent, generated by the
-  real template (synthetic onboarding-assistant persona, consultant
-  role, zero policy edits needed since consultant already had every
-  declared capability — the cleanest composition proof; CR-managed from
-  day one). Three real generator bugs found by consuming its output
-  (REPO_ROOT off-by-one, hyphenated-slug identifier crash, missing
-  `type: prompt` frontmatter). WP-42 (ADR-0309):
-  `policies/optimization/optimization-policy.yaml` (ships
-  `enabled: false`; cache_ttl range scope + routing
-  pre-approved-equivalents scope, empty today) +
-  `components/ai-gateway/app/optimizer.py` (D12 in-process) — runtime
-  config only, code-level classification/authorization denylist,
-  complete audit entries, auto-rollback triggers, one-step kill switch;
-  14 tests cover every brief-named case. Remaining for the operator/user
-  (cluster was down during this run; stacked for a joint session): all
-  agent scenario reviews + 75% gates + active flips (ADR-0326/0306),
-  operator deploy + Arkos CR verification (ADR-0308/0113), realm
-  re-apply (ADR-0340), GPU pipeline run (ADR-0301/0302/0303), live
-  benchmark+report loop (ADR-0304/0305), observed autonomy cycle +
-  sign-off (ADR-0309 — closes the roadmap).
-
-- **2026-08-17 (ADR-0340, WP-32)**: closed the one operator step this WP
-  had left. `KeycloakRealmImport/zuno-realm` (namespace `zuno-auth`) was
-  already `Done` on the live cluster — ArgoCD (`zuno-keycloak-d0`/`d1`)
-  syncs directly from `origin/main`, and the realm content landed as part
-  of the 2026-08-16 live-cluster verification session's broader ADR-0349
-  realm apply, not a dedicated re-apply for this WP. Verified specifically
-  for WP-32 via the Keycloak admin REST API (no interactive login needed):
-  `/cdp` group exists; all four `confluence-archi-*` groups live under
-  `/consultant`, held by `consultant-01`/`consultant-02`; `board-01`/
-  `board-02` hold none of them. `cdp` has no member yet — expected, this
-  WP only introduces the role, per-agent consumption is WP-33+. Repo
-  acceptance re-run clean: `test_workday_ownership.py` 9/9,
-  `check_docs.py` PASS. ADR-0340 → Implemented.
-
-- **2026-08-17 (ADR-0322, WP-06)**: re-verified, made no repo or live
-  changes. Repo acceptance checks re-run clean (`llamastackoperator`
-  grep empty, `helm template`/`helm lint` on `openshift-ai` with
-  `dataScienceCluster.enabled=true`, `pytest components/rag-service/tests/`
-  54/54, `day1_check.yml --syntax-check`, `check_docs.py`). Live
-  `DataScienceCluster` still shows `OGXReady: True` (2026-08-17T10:40:39Z).
-  `OGXServer` remains `enabled: false` — asked the user whether to flip it
-  and run the live corpus proof + provider-parity run now that cluster
-  access is available; they chose to keep the prior deliberate deferral.
-  ADR-0322 stays Partially implemented by choice, not by blocker.
-
-- **2026-08-17 (ADR-0117, WP-02)**: re-verified, made no repo changes.
-  Repo acceptance checks re-run clean (`py_compile`, confluence server's
-  6/6 protocol tests, `check_build_matrix.py`, `check_workload_hardening.py`
-  189/189, `helm lint gitops/charts/mcp-confluence`, handler-removed check,
-  `check_docs.py`, atlassian-name grep in `agents/`). `confluence-mcp` is
-  deployed live and Healthy in `zuno-ai-run` (ArgoCD
-  `zuno-mcp-confluence-d0`/`d1`). Probed Confluence Cloud directly with the
-  live `zuno/confluence/technical` credential (`cl@startx.fr`, same
-  identity as env `CONFLUENCE_EMAIL`/`CONFLUENCE_API_TOKEN` in this
-  session): `403 "Request rejected because caller cannot access
-  Confluence"` from `startxfr.atlassian.net` - the credential resolves and
-  authenticates fine, but the identity has no Confluence product-access
-  grant on the Atlassian side. Same blocker the 2026-08-16 session
-  recorded; confirmed still open. Needs an Atlassian admin action (grant
-  Confluence product access to `cl@startx.fr`) outside this repo/session -
-  nothing further to attempt here until that lands.
-
-  Note in passing: two mcp-gateway test files
-  (`test_downstream_sales_db.py`, and confluence's own
-  `test_mcp_protocol.py`) are written as standalone async scripts (a
-  `TESTS = [...]` list + `_run_all()`/`main()`, invoked as
-  `python test_x.py`, not via pytest fixture injection) - intentional,
-  mirrored from the sales-db precedent, but pytest misreads their
-  `transport` parameter as a missing fixture and errors if you point
-  `pytest` at them directly. Run them as scripts instead. Separately,
-  `mcp-gateway/tests/test_auth_mode_enforcement.py::test_no_token_material_appears_in_the_audit_log_line`
-  fails even in isolation (logging-capture issue, WP-26 territory) -
-  pre-existing, unrelated to WP-32/WP-06/WP-02.
-
-- **2026-08-17 (ADR-0204, WP-21)**: closed WP-21's own scope, made one
-  real repo fix. Live-verified all four domain databases/roles exist on
-  the PGO cluster (`ragtech`/`ragsales`/`ragsxalegacy`/`ragadv`, each
-  ACL'd to only its own database - `\l` shows a single-role grant per
-  db); `rag-service` deployed and Healthy; `tech`+`sales` schema-apply
-  Jobs Complete (`sales.enabled: true` was already flipped live by a
-  prior 2026-08-15 session per `gitops/charts/rag-service/values.yaml`'s
-  own dated comment) - satisfies "two live domains, distinct credentials"
-  today. Found `make d1 check rag` reporting "rag is NOT installed"
-  despite all that: `ansible/roles/rag/tasks/precheck.yml` still looked
-  up a single hardcoded `zuno-rag-schema-apply` Job, a name WP-21 itself
-  retired when it switched to per-domain `zuno-rag-schema-apply-<domain>`
-  Jobs (`gitops/charts/rag-service/templates/job-schema-apply.yaml`,
-  the chart's only Job template) - the check had been silently broken
-  since the WP that introduced the rename. Fixed: match on the
-  `app.kubernetes.io/name=rag-service` label instead of a fixed name,
-  require every returned Job to have succeeded. Re-ran live: now reports
-  "rag is installed". ADR-0204 stays Partially implemented - WP-22
-  (source adapters' live runs) is the remaining piece, out of this
-  session's WP list.
-
-- **2026-08-17 (ADR-0114, WP-03)**: re-verified, made no repo or live
-  changes. Repo acceptance checks re-run clean (`py_compile`,
-  `pytest components/ai-gateway/` 58/58, `helm lint`, coverage doc
-  present, `check_docs.py`); `maasAdapter.enabled` correctly stays
-  `false`. Live MaaS comparison remains blocked - confirmed this is
-  ADR-0201's own capacity gap, not a WP-03 problem: `oc get nodes` shows
-  exactly one GPU-capable node, and its one `nvidia.com/gpu` is already
-  committed to the existing `qwen25-7b-instruct`/`embeddings` models
-  (ADR-0201's 2026-08-16 note). The MaaS-published
-  `qwen25-7b-instruct-maas-backend` LLMInferenceService (created live
-  since then, part of that same in-flight rollout - `MaaSModelRef` Pending,
-  two `MaaSSubscription`s exist) sits `FailedScheduling: Insufficient
-  nvidia.com/gpu`. Adding GPU capacity is a real infrastructure/cost
-  decision for the user, not something to do unilaterally while auditing
-  a WP - left untouched. Nothing left to attempt for WP-03 itself until
-  ADR-0201/WP-27 resolves that gap.
-
-- **2026-08-17 (ADR-0308/ADR-0350, WP-38)**: closed the cluster-
-  reconciliation step this WP had left, made no repo changes. Repo
-  acceptance re-run clean (`go build ./...`, 13/13 envtest 86.2%
-  coverage, `validate_contract.py`, `check_build_matrix.py`,
-  `check_workload_hardening.py` 189/189, `helm lint`,
-  `day1_check.yml --syntax-check`). Live: `aiagent-operator` deployed and
-  Ready in `zuno-ai-run`; both `AIAgent` CRs (Arkos, Naveo) show all five
-  status conditions `True` - confirms the reconciler, boundary
-  enforcement and migration proof all work against a real cluster,
-  matching the 2026-08-16 session's finding and now re-verified.
-  `make d1 check agents` was also run: it's the full ADR-0053 fleet gate
-  (every agent, not just this WP), and it fails overall
-  (13/20 scenarios, 6/7 security checks) on the same pre-existing
-  scenario-design/harness/credential gaps the 2026-08-16 note already
-  recorded - not an operator or CR-reconciliation defect. ADR-0308 →
-  Implemented. ADR-0350 → Implemented too, per its own "Evolution" note's
-  stated trigger (moves to Implemented once ADR-0308 does) - the
-  immutable Decision text itself is untouched, only the Status line and a
-  new dated Evolution entry were added.
-
-- **2026-08-17 (ADR-0349)**: closed, made no repo changes. Live-verified:
-  realm re-applied (`KeycloakRealmImport/zuno-realm` `Done`, 27 users,
-  fresh environment so the create-only constraint never bit);
-  `ClusterRoleBinding`s correctly wired (`ocp-paas-ops`→`cluster-admin`,
-  `ocp-paas-dev`→`cluster-reader`); live ArgoCD `argocd-rbac-cm` policy
-  matches §5 exactly; Vault's `demo-personas-password` already holds the
-  new `secretdemerde` value; no stale `admin`/`zuno-admin`/`aidev`/
-  `aiops` Group objects (never logged into here); the OAuth group-sync
-  mechanism itself is directly proven via `ai-ops-01`'s live
-  `ocp-ai-ops` Group object. Tried to go one step further and log in
-  interactively as an `ocp-paas-ops`/`ocp-paas-dev` persona to watch the
-  sync happen for those specific groups too - the permission classifier
-  blocked even reading current `oc` context as a first step toward a
-  reversible test login, and did not attempt to route around it. Asked
-  the user how to proceed; they chose to close on the indirect evidence
-  above rather than push for the interactive test. Same call for the
-  plus-address mail-delivery check - accepted, not independently run.
-  `make check`'s fleet-wide gate still fails on the same pre-existing,
-  unrelated gaps noted throughout this session (WP-38 bullet above).
-  ADR-0349 → Implemented.
-
-- **2026-08-17 (session-level note)**: this session worked WP-32 → WP-06
-  → WP-02 → WP-21 → WP-03 → ADR-0350(WP-38) → ADR-0349 in that
-  user-specified order, one git commit per item, plan-then-approve each
-  time. Recurring shape worth remembering: every item's repo work was
-  already merged going in: what remained was uniformly a live/operator
-  verification step, and this session had real cluster-admin `oc` access
-  plus Confluence API creds to actually attempt them (unlike most prior
-  sessions, which left them "pending" for lack of access). Two real repo
-  bugs were found and fixed purely as a byproduct of live-checking rather
-  than being the point of the task (WP-21's stale `make d1 check rag`
-  Job-name lookup; none other found). Two live blockers turned out to be
-  genuine, already-documented, non-code gaps outside this session's
-  power to resolve: WP-06's `OGXServer` deferral (a live-deployment
-  decision the user chose to keep deferred rather than flip) and WP-03's
-  MaaS GPU-capacity gap (ADR-0201, one GPU node already fully committed -
-  a real infrastructure/cost decision, left alone on purpose). The
-  permission classifier blocking `oc config current-context` (ADR-0349)
-  is worth remembering too: login/context-switching commands get treated
-  as sensitive even when read-only and reversible in intent - ask the
-  user rather than probing for a workaround.
-
-- **2026-08-20 (ADR-0215, WP-060 briefed)**: user reported Tekos chat
-  forgets prior turns entirely - each prompt is answered as if the
-  conversation just started, with no history or synthesized/compressed
-  context (compared explicitly to Claude Code's own context-compression
-  UX). Confirmed: `reason_node`
-  (`components/agent-runtime/app/graph/nodes.py:396-412`) and Arkos's
-  `draft_node` (`app/graph/arkos_nodes.py:187-228`) each send the model
-  only a static system prompt + one human message (RAG context + the
-  newest question) - never prior turns, for any agent. The history is
-  already durably checkpointed (ADR-0103) and reconstructable via
-  `_build_transcript_structured`, but that function's only callers are
-  the transcript-replay UI and ADR-0209 memory extraction - nothing fed
-  it back into the prompt, and no token-budget/truncation/summarization
-  logic existed anywhere. Authored ADR-0215 (Proposed, v0.2 band) and WP-
-  060 to fix this for all three active agents (Tekos, Comage, Arkos):
-  three new `AgentState` channels (`history`, `summary`,
-  `history_classification`) carried across turns via the existing
-  checkpoint mechanism (no schema/wire-contract change), a shared
-  `record_history` terminal node that appends each finished turn and
-  compacts older turns into a running summary once a token budget (qwen
-  2.5-7b's 8192 `--max-model-len` is the binding constraint - default
-  1800 estimated tokens for history) is exceeded, Claude-Code-style:
-  recent turns verbatim, older ones folded into an LLM-generated summary
-  routed local-only for C2/C3 conversations (mirrors
-  `app/memory.py:61`'s existing rule). Internal compaction calls are
-  tagged `zuno-internal` and filtered out of `_stream_chat`'s SSE token
-  forwarding so they never leak into the user-visible chat.
-
-  Repo work now merged (same session, same day): new
-  `components/agent-runtime/app/graph/history.py` (estimate_tokens,
-  append_turn, build_history_messages, compact, make_history_node) plus a
-  small `app/graph/classification.py` split out of nodes.py's own
-  `_escalate`/`_CLASSIFICATION_RANK` purely to avoid a circular import
-  (history.py needs _escalate; nodes.py needs history.py's
-  build_history_messages for prompt injection) - nodes.py/arkos_nodes.py
-  still re-export the original names so no other caller changed.
-  `AgentState` gained the three channels; `reason_node`/`draft_node` now
-  inject summary-in-system + history-as-role-messages; both shapes wire a
-  `record_history` terminal node (`respond`/`write` -> `record_history` ->
-  `END`); `ModelRouter.invoke_with_fallback` gained an optional `tags`
-  param; `app/registry.py` parses `zuno.memory.history.*` with env
-  defaults (`HISTORY_TOKEN_BUDGET`, `ZUNO_HISTORY_DISABLED` kill switch);
-  `platform/okf/schema/zuno-okf-v0.2.schema.json` gained the `memory`
-  property; `agents/arkos/agent.okf.md` declares an explicit larger
-  budget (6000 vs the 1800 default, since its C3/local-only path routes
-  to gpt-oss-20b's 32768 context, not qwen2.5-7b's 8192). New
-  `tests/test_history.py` (15 tests: two-turn prompt content for both
-  Tekos and Arkos, compaction trigger/failure-degradation, the C3
-  local-only-routing security-negative, cross-turn classification
-  monotonicity, the prompt-build hard cap, pre-ADR-0215 checkpoint
-  backfill) plus a tagged-stream-filter test added to
-  `tests/test_checkpoint_retry.py` - all pass, and the full pre-existing
-  suite still passes except the SAME two `test_registry.py` failures
-  confirmed pre-existing (stale tool-list assertions predating WP-059's
-  git-forge additions, reproduced identically on `git stash`, unrelated
-  to this WP). `validate_okf_bundle.py`, `generate_authorization_matrix.py
-  --check --all` and `check_docs.py` (only the pre-existing ADR-0212/
-  ADR-0214 drift) all pass; `generate_deployment_snapshot.py --check`
-  flagged arkos's snapshot only because of the ALREADY-known,
-  already-documented v0.1.0->latest tag drift (confirmed independent of
-  this change via `git stash`) - reverted rather than fixed, per WP-059's
-  own "do not fix unrelated drift" convention.
-
-  Evaluation: ADR-0027 fixes Tekos's suite at exactly twenty scenarios, so
-  the originally-planned new `chat_multi_turn_context` scenario was not
-  actually addable - discovered mid-implementation and corrected by
-  extending existing scenario 7 (`chat_basic_qa`) with an optional
-  `follow_up` field instead: sends a second turn on the same `run_id` and
-  asserts it still completes with a non-empty reply (deeper
-  semantic-recall assertions live in the unit tests, which a live smoke
-  check with no LLM judge can't make). WP-060's own brief was corrected to
-  match.
-
-  ADR-0215 -> `Partially implemented`, `docs/adr/README.md` row updated to
-  match, WP-060 -> `Operator pending (repo work merged)`, roadmap tracker
-  row updated. Residual gap before `Implemented`: live two-turn
-  verification on the real cluster (agent-runtime rebuild/redeploy +
-  manual check), one conversation per agent - not yet attempted this
-  session, ask before attempting (commit-per-WP / ask-before-validation
-  convention this repo's sessions follow).
+**2026-08-16 live-cluster verification session** (demo222) found and
+fixed roughly 15 real bugs during the platform's first full end-to-end
+exercise — worth remembering since these are the kind of thing that
+silently recurs: Keycloak 25→26 behavior changes (varchar(255) import
+abort, vault-file `__` escaping, import-time vs runtime secret
+resolution, `basic` scope required for `sub`, self-audience mappers,
+required firstName/lastName); stale hardcoded issuers + JWKS-over-Route
+TLS across all 4 services (new `KEYCLOAK_JWKS_URL` seam); served-model-
+name vs canonical model id split; PgBouncer needs direct-to-primary
+routing for `search_path`/prepared statements; pgvector text-format
+serialization; `AsyncPostgresSaver` needs a pooled (not single)
+connection; fleet-wide `imagePullPolicy: Always` is required (stale
+`:latest` image cache otherwise); acceptance-gate Job needs `HOME` +
+per-agent ConfigMap projections + an internal CA. Remaining gate failures
+are scenario-design/harness/credential issues, not platform defects.
+Credential-blocked pending operator action: Route53 (ADR-0211),
+Salesforce, Aramis, rag-S3, MaaS key.
