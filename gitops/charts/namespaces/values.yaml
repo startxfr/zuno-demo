@@ -404,25 +404,23 @@ platformNamespaces:
 
 # ADR-0351: MIG-aware GPU quota mirroring the permanent node's all-balanced
 # partition (2x 1g.24gb + 1x 2g.48gb on the RTX PRO 6000 Blackwell 96GB) -
-# one slice per inference workload: embeddings + the MaaS backend on the
+# one slice per inference workload: embeddings + gpt-oss-20b on the
 # 24GB slices, the qwen chat predictor on the 48GB one (gitops/charts/
 # models). Replaces the earlier whole-GPU count quota (1->2->3 as L4 nodes
 # were added through 2026-08-16; that history and its admission-refusal
 # evidence lives in git).
-# nvidia.com/gpu was pinned to 0 from ADR-0351 until ADR-0412: whole GPUs
-# only existed on the tainted gpu-burst node and belong to training in
-# zuno-ai-build (the DSPA namespace, which has no quota), so an inference
-# workload in zuno-ai-run asking for a full GPU was a config error this
-# refused at admission. ADR-0412 carves the ONE sanctioned exception: the
-# gpt-oss-20b predictor (gitops/charts/models gptOssModel) serves on the
-# unmanaged workergpu node's otherwise-idle full GPU because every MIG
-# slice above is taken. Exactly "1" - a second full-GPU request is still a
-# config error - and it returns to "0" the day that node goes away or the
-# model moves onto a MIG slice (see the ADR's remediation section).
+# nvidia.com/gpu is pinned to 0: whole GPUs only exist on the tainted
+# gpu-burst node and belong to training in zuno-ai-build (the DSPA
+# namespace, which has no quota) - an inference workload in zuno-ai-run
+# asking for a full GPU is a config error this refuses at admission.
+# ADR-0412 carved the one prior exception (gpt-oss-20b on the unmanaged
+# workergpu node's idle full GPU); ADR-0414 retires it now that
+# gpt-oss-20b runs on a mig-1g.24gb slice instead - back to zero
+# exceptions, matching ADR-0351's original rule.
 openshiftAi:
   namespace: zuno-ai-run
   gpuQuota:
     resources:
       nvidia.com/mig-1g.24gb: "2"
       nvidia.com/mig-2g.48gb: "1"
-      nvidia.com/gpu: "1"
+      nvidia.com/gpu: "0"

@@ -80,10 +80,17 @@ providers:
   # ADR-0412: second local model, reasoning-preferred via the
   # model-routing policy's `preferences:` (it leads the chain only for
   # tasks declared reflexional there; everything else keeps qwen first).
+  # ADR-0414: gpt-oss-20b is now an LLMInferenceService (also the
+  # MaaS-published backend), not a classic InferenceService - it has no
+  # <name>-predictor Service anymore. Points directly at its
+  # -kserve-workload-svc Service instead (port 8000, a real
+  # OpenAI-compatible vLLM API - VERIFIED live against the equivalent
+  # qwen-maas-backend Service), bypassing the MaaS Gateway/router entirely
+  # for this in-cluster call.
   - name: local-gpt-oss
     kind: local
     model: gpt-oss-20b
-    endpoint: http://gpt-oss-20b-predictor.zuno-ai-run.svc:8080/v1
+    endpoint: http://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
     eligible_for: [C1, C2, C3]

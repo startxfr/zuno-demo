@@ -22,7 +22,9 @@ from app import providers  # noqa: E402
 from app.routing import ProviderCandidate  # noqa: E402
 
 _QWEN_URL = "http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1"
-_GPTOSS_URL = "http://gpt-oss-20b-predictor.zuno-ai-run.svc:8080/v1"
+# ADR-0414: gpt-oss-20b is now an LLMInferenceService, reached via its own
+# -kserve-workload-svc Service (port 8000), not a classic predictor.
+_GPTOSS_URL = "http://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1"
 
 
 def test_second_local_uses_its_own_endpoint_and_model_over_env() -> None:

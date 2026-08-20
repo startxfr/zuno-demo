@@ -1,8 +1,17 @@
-# ADR-0412: same precise ingress allow-list as networkpolicy.yaml, for the
-# gpt-oss-20b predictor. ai-gateway is this model's only intended caller
-# today (the local-gpt-oss provider entry); rag-service is kept in the
-# allow-list for symmetry with the qwen policy - this chart can't know
-# which role a given instance plays.
+# ADR-0414: gpt-oss-20b is now an LLMInferenceService, not a classic
+# InferenceService predictor - its workload pod carries
+# app.kubernetes.io/name/kserve.io/component labels (VERIFIED live against
+# the equivalent qwen-maas-backend pods), not serving.kserve.io/inferenceservice,
+# and its OpenAI-compatible API listens on port 8000, not 8080 (VERIFIED
+# live: curled the kserve-workload-svc equivalent directly). ai-gateway is
+# this model's only intended local caller today (the local-gpt-oss
+# provider entry, now pointed at this LLMInferenceService's own
+# -kserve-workload-svc Service); rag-service is kept in the allow-list for
+# symmetry with the qwen policy - this chart can't know which role a given
+# instance plays. Metrics scraping is NOT covered here: RHOAI's own
+# LLMInferenceService controller scrapes this independently (see
+# templates/servicemonitor-vllm.yaml's comment), no NetworkPolicy allowance
+# needed from this chart for that path.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -15,7 +24,8 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      serving.kserve.io/inferenceservice: {{ .Values.gptOssModel.inferenceServiceName }}
+      app.kubernetes.io/name: {{ .Values.gptOssModel.inferenceServiceName }}
+      kserve.io/component: workload
   policyTypes:
     - Ingress
   ingress:
@@ -31,18 +41,4 @@ spec:
               app.kubernetes.io/name: rag-service
       ports:
         - protocol: TCP
-          port: 8080
-{{- if .Values.metrics.enabled }}
-    # ADR-0413: see templates/networkpolicy.yaml's matching block - same
-    # vLLM /metrics scrape allowance for this predictor.
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: openshift-monitoring
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: openshift-user-workload-monitoring
-      ports:
-        - protocol: TCP
-          port: 8080
-{{- end }}
+          port: 8000

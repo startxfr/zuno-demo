@@ -1,13 +1,16 @@
 {{- /*
-ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane for
-a dedicated MaaS-published copy of the chat model. Schema-checked against
-the maas.opendatahub.io/v1alpha1 and serving.kserve.io/v1alpha2 CRDs
-confirmed installed on the live cluster (`oc explain
-maasmodelref/maassubscription/maasauthpolicy/llminferenceservice
---recursive`, 2026-08-15/16) - see values.yaml's maas.modelRef.kind
-comment for the resolved ExternalModel-vs-LLMInferenceService decision.
-Disabled by default (.Values.maas.enabled: false) until a GPU node with
-spare capacity exists.
+ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane.
+Schema-checked against the maas.opendatahub.io/v1alpha1 and
+serving.kserve.io/v1alpha2 CRDs confirmed installed on the live cluster
+(`oc explain maasmodelref/maassubscription/maasauthpolicy/llminferenceservice
+--recursive`, 2026-08-15/16). MaaSModelRef.spec.modelRef.kind's hard enum
+(LLMInferenceService | ExternalModel only) ruled out ExternalModel on its
+own schema (built for authenticated third-party SaaS, not an internal
+vLLM Service) back when this first stood up a dedicated backend.
+ADR-0414: that dedicated backend is retired - this now publishes
+gpt-oss-20b's own LLMInferenceService (templates/llminferenceservice-gptoss.yaml)
+instead, folding what were two separate GPU-consuming deployments into
+one.
 */ -}}
 {{- if .Values.maas.enabled }}
 # VERIFIED live (2026-08-16): MaaSAuthPolicy's admission webhook rejected
@@ -32,134 +35,22 @@ spec:
     name: maas-default-gateway
     namespace: openshift-ingress
 ---
-# RESOLVED 2026-08-18: the LLMInferenceService's own hf:// storage-
-# initializer hung mid-download on every attempt (3 separate stalls at
-# different byte offsets, single uninterrupted process each time - not a
-# network issue, an isolated 100MB ranged HTTPS test hit 65MB/s; disabling
-# the HF concurrent-transfer path didn't fix it either). Switched to
-# model.uri: s3:// instead (values below), reusing rag-ingestion's own S3
-# credential (same Vault path "rag/s3", same bucket, new prefix) rather
-# than provisioning new IAM. KServe's storage-initializer auto-detects S3
-# credentials via a Secret carrying the serving.kserve.io/s3-* annotations,
-# referenced through a ServiceAccount the LLMInferenceService points at
-# (spec.template.serviceAccountName below) - same mechanism classic
-# InferenceServices use, just wired by hand here since this is this
-# chart's first S3-backed model.
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: {{ .Values.maas.llmInferenceService.s3.secretName }}
-  namespace: {{ .Values.namespace }}
-  labels:
-    zuno.io/managed-by: argocd
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    kind: ClusterSecretStore
-    name: vault-backend
-  target:
-    name: {{ .Values.maas.llmInferenceService.s3.secretName }}
-    creationPolicy: Owner
-    template:
-      metadata:
-        annotations:
-          serving.kserve.io/s3-endpoint: {{ .Values.modelsS3.endpoint | quote }}
-          serving.kserve.io/s3-region: {{ .Values.modelsS3.region | quote }}
-          serving.kserve.io/s3-usehttps: "1"
-          serving.kserve.io/s3-verifyssl: "1"
-  data:
-    - secretKey: AWS_ACCESS_KEY_ID
-      remoteRef:
-        key: {{ .Values.modelsS3.externalSecret.remoteKey | quote }}
-        property: {{ .Values.modelsS3.externalSecret.accessKeyProperty | quote }}
-    - secretKey: AWS_SECRET_ACCESS_KEY
-      remoteRef:
-        key: {{ .Values.modelsS3.externalSecret.remoteKey | quote }}
-        property: {{ .Values.modelsS3.externalSecret.secretKeyProperty | quote }}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ .Values.maas.llmInferenceService.serviceAccountName }}
-  namespace: {{ .Values.namespace }}
-  labels:
-    zuno.io/managed-by: argocd
-secrets:
-  - name: {{ .Values.maas.llmInferenceService.s3.secretName }}
----
-# Its own GPU-bound serving stack (RESOLVED 2026-08-16 - see values.yaml's
-# maas.modelRef.kind comment for why ExternalModel/PVC-reuse were both
-# ruled out). baseRefs supplies the vLLM/CUDA image; model.uri triggers
-# LLMInferenceService's own storage-initializer to download the model
-# directly (hf://) rather than reusing the classic InferenceService's
-# ReadWriteOnce/zone-locked PVC. router.{gateway,route,scheduler}: {}
-# auto-generates the HTTPRoute/Service this MaaSModelRef discovers by
-# name - the pre-existing maas-default-gateway
-# (gitops/charts/openshift-ai/templates/maas-gateway.yaml, confirmed live
-# and PROGRAMMED) is the front door MaaS clients hit; the MaaS controller
-# wires this LLMInferenceService's endpoint in once it resolves modelRef
-# by name, not by this chart hand-authoring that link.
-apiVersion: serving.kserve.io/v1alpha2
-kind: LLMInferenceService
-metadata:
-  name: {{ .Values.maas.modelRef.name }}-backend
-  namespace: {{ .Values.namespace }}
-  labels:
-    zuno.io/managed-by: argocd
-spec:
-  baseRefs:
-    - name: {{ .Values.maas.llmInferenceService.baseRef }}
-  model:
-    # <prefix>/<servedModelName>/ (the CLASSIC servedModelName - the S3
-    # directory holds the one shared copy both serving paths read; this
-    # LLMInferenceService's own -maas id below is only an API name). Same
-    # derivation as inferenceservice.yaml's S3 branch.
-    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.servedModelName }}/"
-    name: {{ .Values.maas.llmInferenceService.servedModelName | quote }}
-  replicas: 1
-  template:
-    # No PVC here (model.uri: s3:// downloads straight onto the node), so
-    # unlike the classic predictor this only ever needed "any GPU node",
-    # never a specific zone - see values.yaml's llmInferenceService
-    # comment.
-    nodeSelector:
-      nvidia.com/gpu.present: "true"
-    serviceAccountName: {{ .Values.maas.llmInferenceService.serviceAccountName }}
-    containers:
-      - name: main
-        resources:
-          {{- toYaml .Values.maas.llmInferenceService.resources | nindent 10 }}
-  router:
-    # VERIFIED live (2026-08-16): an empty gateway: {} does NOT auto-create
-    # or reuse an existing Gateway on this RHOAI build - it defaults to a
-    # hardcoded expected name (openshift-ingress/openshift-ai-inference)
-    # that ODH would provision itself but hasn't on this cluster
-    # ("RefsInvalid: Managed HTTPRoute references non-existent Gateway").
-    # Points explicitly at the real, live, PROGRAMMED maas-default-gateway
-    # (gitops/charts/openshift-ai/templates/maas-gateway.yaml) instead.
-    gateway:
-      refs:
-        - name: maas-default-gateway
-          namespace: openshift-ingress
-    route: {}
-    # scheduler: {} is not optional here - VERIFIED live (2026-08-16): the
-    # controller's own defaulting always adds it to a gateway-enabled
-    # LLMInferenceService regardless of what this manifest sends, so it
-    # needs ENABLE_GATEWAY_API_INFERENCE_EXTENSION set on istiod
-    # (gitops/charts/service-mesh) rather than trying to opt out.
-    scheduler: {}
----
+# ADR-0414: the published backend is gpt-oss-20b's own LLMInferenceService
+# (templates/llminferenceservice-gptoss.yaml) - no dedicated MaaS-only
+# copy anymore. That template owns its own S3 credentials
+# (templates/s3-serving-credentials-gptoss.yaml) and GPU resources; this
+# CR only points MaaS's governance plane at it by name.
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSModelRef
 metadata:
-  name: {{ .Values.maas.modelRef.name }}
+  name: {{ .Values.maas.publishedName }}
   namespace: {{ .Values.namespace }}
   labels:
     zuno.io/managed-by: argocd
 spec:
   modelRef:
-    kind: {{ .Values.maas.modelRef.kind }}
-    name: {{ .Values.maas.modelRef.name }}-backend
+    kind: LLMInferenceService
+    name: {{ .Values.gptOssModel.inferenceServiceName }}
 ---
 {{- range .Values.maas.subscriptions }}
 apiVersion: maas.opendatahub.io/v1alpha1
@@ -190,7 +81,7 @@ spec:
       - name: {{ .group }}
   priority: {{ .priority }}
   modelRefs:
-    - name: {{ $.Values.maas.modelRef.name }}
+    - name: {{ $.Values.maas.publishedName }}
       namespace: {{ $.Values.namespace }}
       tokenRateLimits:
         {{- toYaml .tokenRateLimits | nindent 8 }}
@@ -206,7 +97,7 @@ metadata:
     zuno.io/managed-by: argocd
 spec:
   modelRefs:
-    - name: {{ .Values.maas.modelRef.name }}
+    - name: {{ .Values.maas.publishedName }}
       namespace: {{ .Values.namespace }}
   subjects:
     groups:

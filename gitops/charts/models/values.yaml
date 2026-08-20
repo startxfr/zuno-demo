@@ -230,27 +230,28 @@ embeddingModel:
   minReplicas: 1
   maxReplicas: 1
 
-# ADR-0412: third model - gpt-oss-20b as a second local CHAT model (the
-# reasoning-preferred local for the ai-gateway's per-(agent,task)
-# preferences, see policies/model-routing/model-routing-policy.yaml).
-# Same additive servingRuntime/inferenceService-pair pattern as
-# embeddingModel above (and the same flat-values rationale). S3-only:
-# unlike the qwen chat model there is no PVC/download-Job mode at all -
-# templates/inferenceservice-gptoss.yaml always reads
-# s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/ through its
-# own unconditional credentials pair
-# (templates/s3-serving-credentials-gptoss.yaml - deliberately NOT the
-# qwen SA, which only renders while modelStorage.downloadJob.enabled is
-# false).
-# GPU: a FULL nvidia.com/gpu, not a MIG slice - all three ADR-0351 slices
-# are taken (qwen chat, embeddings, MaaS backend), so ADR-0412 serves
-# this model on the unmanaged workergpu node's idle 96GB GPU. The full-GPU
-# request is also what steers scheduling there: it's the only node
-# advertising nvidia.com/gpu (the MIG node exposes only mig-* resources).
-# Requires the zuno-ai-run gpuQuota exception in
-# gitops/charts/namespaces/values.yaml (nvidia.com/gpu: "1", ADR-0412).
+# ADR-0414 (supersedes ADR-0412): gpt-oss-20b as an LLMInferenceService,
+# not a classic InferenceService+ServingRuntime pair anymore.
+# templates/llminferenceservice-gptoss.yaml replaces the old
+# inferenceservice-gptoss.yaml/servingruntime-gptoss.yaml (removed).
+# Forced by MaaSModelRef.spec.modelRef.kind's hard enum
+# (LLMInferenceService | ExternalModel only - confirmed via `oc explain
+# maasmodelref.spec.modelRef.kind`): to fold the old dedicated
+# qwen25-7b-instruct-maas-backend copy into this model (one deployment,
+# two access paths, freeing a whole slice), gpt-oss-20b itself must be an
+# LLMInferenceService. ai-gateway's own local routing (platform/ai-gateway/
+# provider-routing.yaml) now points directly at this LLMInferenceService's
+# plain -kserve-workload-svc Service (port 8000, confirmed live against
+# the qwen-maas-backend equivalent - a real OpenAI-compatible vLLM API,
+# not an internal-only port) rather than a classic predictor Service;
+# MaaS clients keep reaching it through maas.yaml's Gateway/router config,
+# same as before.
+# GPU: mig-1g.24gb, not a full nvidia.com/gpu - gpt-oss-20b's real
+# footprint (13.8GB MXFP4 weights, ~16-24GB VRAM at runtime per public
+# specs) fits the slice with headroom; ADR-0412's full-GPU-node exception
+# and its gpuQuota override are both retired by this change (see
+# gitops/charts/namespaces/values.yaml).
 gptOssModel:
-  servingRuntimeName: vllm-gpt-oss-runtime
   inferenceServiceName: gpt-oss-20b
   # Same modelId-vs-API-id split as the chat model; also the S3 directory
   # name under modelsS3 (<prefix>/<servedModelName>/).
@@ -258,19 +259,30 @@ gptOssModel:
   # 131k native; capped well below to bound KV growth while still giving
   # reasoning tasks far more room than the qwen chat model's 8192.
   maxModelLen: 32768
-  # cpu/memory sized to the workergpu node's actual headroom (~4 vCPU,
-  # ~50Gi free after daemonsets - verified live 2026-08-18); the 13.8GB
-  # MXFP4 weights live in GPU VRAM, system RAM only carries the vLLM
-  # engine/tokenizer/request buffers.
+  llmInferenceService:
+    # Same RHOAI 3.5 EA2 vLLM/CUDA preset the qwen MaaS backend used
+    # (`oc get llminferenceserviceconfig -n redhat-ods-applications`) -
+    # generic serving image, not qwen-specific.
+    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    # templates/s3-serving-credentials-gptoss.yaml's existing SA/Secret
+    # pair (unchanged by this ADR - already the right serving.kserve.io/
+    # s3-* annotated shape LLMInferenceService's storage-initializer
+    # expects, same convention maas.yaml used for its own now-removed
+    # qwen-specific credentials).
+    serviceAccountName: gpt-oss-20b-s3
+  # cpu/memory sized like the old qwen-maas-backend's own mig-1g.24gb
+  # workload (proven to fit alongside the other Card A co-resident
+  # predictors on the g7e.4xlarge managed node), not the old workergpu
+  # node's headroom - that node and its sizing rationale no longer apply.
   resources:
     requests:
-      cpu: "2"
-      memory: 12Gi
-      nvidia.com/gpu: "1"
-    limits:
-      cpu: "3"
+      cpu: "4"
       memory: 16Gi
-      nvidia.com/gpu: "1"
+      nvidia.com/mig-1g.24gb: "1"
+    limits:
+      cpu: "8"
+      memory: 20Gi
+      nvidia.com/mig-1g.24gb: "1"
   minReplicas: 1
   maxReplicas: 1
 
@@ -292,93 +304,23 @@ gptOssModel:
 # this chart deploys and belongs to the same install/uninstall lifecycle.
 maas:
   # ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane -
-  # publishes the local chat model, group-based subscriptions and an
-  # authorization policy proving denial for an unentitled group. Disabled
-  # by default: the maas.opendatahub.io/v1alpha1 CRDs (MaaSModelRef,
-  # MaaSSubscription, MaaSAuthPolicy, ExternalModel) are confirmed
-  # installed on the test cluster (`oc get crd`, 2026-08-15), but no
-  # MaaSModelRef/Subscription/AuthPolicy exists there yet - every
-  # acceptance bullet (publish, two-group access difference, AuthPolicy
-  # deny, end-to-end request, metric/trace correlation) is a live-cluster
-  # operator step (see the WP-27 brief's follow-up section), same
-  # "manifests exist, live verification pending" posture as
-  # maasAdapter.enabled in gitops/charts/ai-gateway.
-  # Enabled 2026-08-16: 3rd GPU node ready, LLMInferenceService path built.
+  # publishes a local chat model, group-based subscriptions and an
+  # authorization policy proving denial for an unentitled group.
+  # ADR-0414: publishes gpt-oss-20b (gptOssModel above) instead of a
+  # dedicated qwen25-7b-instruct-maas-backend copy - one LLMInferenceService
+  # deployment now serves both ai-gateway's local routing AND this
+  # governance-plane publication, retiring the old standalone backend
+  # entirely (templates/maas.yaml no longer owns its own
+  # ExternalSecret/ServiceAccount/LLMInferenceService trio - those live
+  # with gptOssModel/templates/llminferenceservice-gptoss.yaml now).
   enabled: true
 
-  modelRef:
-    name: qwen25-7b-instruct-maas
-    # RESOLVED live 2026-08-16 (a 3rd GPU node - g6.2xlarge/L4, zone
-    # eu-west-2c - was added, freeing this decision): LLMInferenceService.
-    # ExternalModel was ruled out on its own schema, not just suspected -
-    # ExternalProvider.spec.endpoint is documented "FQDN of the external
-    # provider... e.g. api.openai.com" and spec.auth is required
-    # (simple/sigv4/oauth2), genuinely built for authenticated third-party
-    # SaaS, not our internal unauthenticated vLLM Service. Reusing the
-    # existing classic InferenceService's model PVC was considered and
-    # rejected: it's ReadWriteOnce, bound to zone eu-west-2b where that
-    # GPU is already fully committed - a second GPU-requesting pod can't
-    # land on the same node, and RWO EBS volumes can't attach cross-node.
-    # llmInferenceService below downloads its own copy via hf:// onto the
-    # new node instead (standard KServe LLMInferenceService pattern, see
-    # https://kserve.github.io/website/docs/model-serving/generative-inference/llmisvc/llmisvc-configuration).
-    kind: LLMInferenceService
-  llmInferenceService:
-    # RHOAI 3.5 EA2's own vLLM/CUDA preset (`oc get llminferenceserviceconfig
-    # -n redhat-ods-applications`, 2026-08-16) - supplies the serving image;
-    # everything below overrides/adds to it.
-    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
-    # RESOLVED 2026-08-18: switched from hf://Qwen/Qwen2.5-7B-Instruct
-    # after the storage-initializer's HF download hung mid-transfer on
-    # every attempt (see templates/maas.yaml's ExternalSecret comment for
-    # the full history). The model.uri is no longer set here: maas.yaml
-    # derives s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/
-    # from the top-level modelsS3 block (the classic servedModelName,
-    # qwen2.5-7b-instruct - the S3 directory holds the one shared copy
-    # both serving paths read; the -maas suffix below is only an API id).
-    # Served-model id MaaS callers use in the "model" field - independent
-    # canonical id from the classic InferenceService's own
-    # servedModelName (models.servedModelName), by design: this is a
-    # deliberately separate governed-access copy, not an alias for it.
-    servedModelName: qwen2.5-7b-instruct-maas
-    # RESOLVED 2026-08-17: no zone pin here either, same reasoning as
-    # modelStorage's comment above - this workload has no PVC to worry
-    # about (downloads its own copy straight onto the node), so it only
-    # ever needed "any node with a GPU", never a specific zone.
-    # templates/maas.yaml nodeSelects on `nvidia.com/gpu.present: "true"`.
-    serviceAccountName: qwen25-7b-instruct-maas-s3
-    # Reuses rag-ingestion's existing S3 credential/bucket rather than a
-    # new IAM user - see templates/maas.yaml's ExternalSecret for how
-    # this gets translated into KServe's serving.kserve.io/s3-* Secret
-    # annotation convention. Endpoint/region and the Vault credential
-    # location come from the top-level modelsS3 block; only the
-    # maas-scoped Secret name stays here.
-    s3:
-      secretName: qwen25-7b-instruct-maas-s3-credentials
-    # Smaller than the classic qwen predictor's 24Gi/32Gi (g6.4xlarge,
-    # 16vCPU/64GiB) - VERIFIED live (2026-08-16): the new node is a
-    # g6.2xlarge (8vCPU/32GiB, ~28.7Gi allocatable), half the instance
-    # size. 24Gi request alone exceeded total allocatable once the
-    # router-scheduler pod + daemonsets' own ~6.8Gi baseline is counted
-    # ("FailedScheduling: Insufficient memory"). 16Gi/20Gi leaves
-    # headroom; system RAM mainly needs to cover the vLLM engine/
-    # tokenizer/request buffers, not the model weights (those live in
-    # GPU VRAM).
-    # ADR-0351: a 1g.24gb MIG slice. Qwen2.5-7B bf16 is ~15GB of weights -
-    # inside 24GB that leaves ~6-7GB of KV cache at vLLM's default
-    # --gpu-memory-utilization, the same envelope this model targeted on an
-    # L4; verify the startup logs for CUDA OOM at rollout and lower the
-    # utilization/context flags (or swap slices with the chat model) if it
-    # ever gets tight.
-    resources:
-      requests:
-        cpu: "4"
-        memory: 16Gi
-        nvidia.com/mig-1g.24gb: "1"
-      limits:
-        cpu: "8"
-        memory: 20Gi
-        nvidia.com/mig-1g.24gb: "1"
+  # The MaaSModelRef CR's own name (the "published entry"), distinct from
+  # the backend it points at (gptOssModel.inferenceServiceName). Kept
+  # separate so the published/governed identity doesn't have to match the
+  # underlying deployment's name.
+  publishedName: gpt-oss-20b-maas
+
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
   # model via different token rate limits (MaaSSubscription has no
@@ -388,13 +330,13 @@ maas:
   # consumers) gets the higher limit, sales a materially lower one to
   # make the difference obvious in a live comparison.
   subscriptions:
-    - name: qwen25-7b-instruct-tekos
+    - name: gpt-oss-20b-tekos
       group: agent_tekos
       tokenRateLimits:
         - limit: 100000
           window: 1h
       priority: 10
-    - name: qwen25-7b-instruct-sales
+    - name: gpt-oss-20b-sales
       group: sales
       tokenRateLimits:
         - limit: 5000
@@ -407,7 +349,7 @@ maas:
   # test) is denied by omission. The live proof itself is the WP-27
   # follow-up's job; this manifest is what makes that proof possible.
   authPolicy:
-    name: qwen25-7b-instruct-entitlement
+    name: gpt-oss-20b-entitlement
 
 lmEval:
   enabled: true

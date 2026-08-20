@@ -1,0 +1,62 @@
+{{- /*
+ADR-0414 (supersedes ADR-0412): gpt-oss-20b as an LLMInferenceService,
+replacing the old classic InferenceService + dedicated ServingRuntime
+(templates/inferenceservice-gptoss.yaml, templates/servingruntime-gptoss.yaml
+- both removed). Forced by MaaSModelRef.spec.modelRef.kind's hard enum
+(LLMInferenceService | ExternalModel only, confirmed via `oc explain
+maasmodelref.spec.modelRef.kind`) - the only way to fold the old dedicated
+qwen25-7b-instruct-maas-backend copy into this model is for gpt-oss-20b
+itself to be an LLMInferenceService. One deployment now serves two access
+paths:
+  - ai-gateway's own local routing (platform/ai-gateway/provider-routing.yaml)
+    calls this LLMInferenceService's plain -kserve-workload-svc Service
+    directly (port 8000 - confirmed live against the qwen-maas-backend
+    equivalent: a real OpenAI-compatible vLLM /v1 API, not an internal-only
+    port), bypassing router/gateway entirely.
+  - MaaS clients reach it through the router/gateway config below, same
+    mechanism templates/maas.yaml used for the old dedicated backend.
+S3-only, same as before: no PVC/download-Job mode exists for this model.
+*/ -}}
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.gptOssModel.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  baseRefs:
+    - name: {{ .Values.gptOssModel.llmInferenceService.baseRef }}
+  model:
+    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.gptOssModel.servedModelName }}/"
+    name: {{ .Values.gptOssModel.servedModelName | quote }}
+  replicas: {{ .Values.gptOssModel.minReplicas }}
+  template:
+    # Same generic GPU-family guard the other GPU workloads use; the
+    # resources request's mig-1g.24gb type is the real scheduling steer
+    # (only Card A's managed MIG node advertises it).
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    serviceAccountName: {{ .Values.gptOssModel.llmInferenceService.serviceAccountName }}
+    containers:
+      - name: main
+        args:
+          - --max-model-len={{ .Values.gptOssModel.maxModelLen }}
+        resources:
+          {{- toYaml .Values.gptOssModel.resources | nindent 10 }}
+  router:
+    # Same explicit Gateway ref maas.yaml's old LLMInferenceService used -
+    # an empty gateway: {} does not auto-create/reuse an existing Gateway
+    # on this RHOAI build (VERIFIED live 2026-08-16, see maas.yaml's own
+    # comment history).
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+    route: {}
+    # scheduler: {} is not optional - the controller's own defaulting
+    # always adds it to a gateway-enabled LLMInferenceService regardless
+    # of what this manifest sends (VERIFIED live 2026-08-16).
+    scheduler: {}
