@@ -291,6 +291,14 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     classification ESCALATION only (state's `effective_classification`,
     which for Arkos starts at its C3 seed and only ever climbs, ADR-0034);
     it never overrides this separate source-level restriction.
+
+    Tagged "zuno-internal" (ADR-0215) for the same reason
+    app/graph/history.py:compact is: this is a second nested chat-model
+    call inside the same graph run draft_node's own call already made -
+    app/main.py's `_stream_chat` forwards every `on_chat_model_stream`
+    event unless tagged, so without this the user would see the original
+    draft stream in full, then this call's refined version stream in
+    full again right after it, concatenated into one message.
     """
     draft = state.get("document_draft")
     if not draft:
@@ -320,6 +328,7 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
             request_id=state.get("request_id"),
             agent_name=_ARKOS.name,
             task_name=_DRAFT_TASK.name,
+            tags=["zuno-internal"],
         )
     except ModelRouterError as exc:
         logger.warning("reflection pass failed, keeping the original draft: %s", exc)

@@ -147,6 +147,11 @@ async def test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_clas
     assert captured, "reflect_node never called the model router"
     assert captured["classification"] == "C2", "must not inherit the turn's escalated C3"
     assert captured["local_only"] is False
+    # ADR-0215: must never stream visibly - draft_node's own call already
+    # streamed the pre-refinement draft to the user in the same graph run;
+    # without this tag app/main.py's _stream_chat would forward this
+    # call's tokens too, showing the user the draft twice concatenated.
+    assert captured["tags"] == ["zuno-internal"]
     assert result["document_draft"] == "a refined draft"
 
 
