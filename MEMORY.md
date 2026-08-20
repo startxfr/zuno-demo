@@ -1272,3 +1272,39 @@ under `docs/adr/`.
   is worth remembering too: login/context-switching commands get treated
   as sensitive even when read-only and reversible in intent - ask the
   user rather than probing for a workaround.
+
+- **2026-08-20 (ADR-0215, WP-060 briefed)**: user reported Tekos chat
+  forgets prior turns entirely - each prompt is answered as if the
+  conversation just started, with no history or synthesized/compressed
+  context (compared explicitly to Claude Code's own context-compression
+  UX). Confirmed: `reason_node`
+  (`components/agent-runtime/app/graph/nodes.py:396-412`) and Arkos's
+  `draft_node` (`app/graph/arkos_nodes.py:187-228`) each send the model
+  only a static system prompt + one human message (RAG context + the
+  newest question) - never prior turns, for any agent. The history is
+  already durably checkpointed (ADR-0103) and reconstructable via
+  `_build_transcript_structured`, but that function's only callers are
+  the transcript-replay UI and ADR-0209 memory extraction - nothing fed
+  it back into the prompt, and no token-budget/truncation/summarization
+  logic existed anywhere. Authored ADR-0215 (Proposed, v0.2 band) and WP-
+  060 to fix this for all three active agents (Tekos, Comage, Arkos):
+  three new `AgentState` channels (`history`, `summary`,
+  `history_classification`) carried across turns via the existing
+  checkpoint mechanism (no schema/wire-contract change), a shared
+  `record_history` terminal node that appends each finished turn and
+  compacts older turns into a running summary once a token budget (qwen
+  2.5-7b's 8192 `--max-model-len` is the binding constraint - default
+  1800 estimated tokens for history) is exceeded, Claude-Code-style:
+  recent turns verbatim, older ones folded into an LLM-generated summary
+  routed local-only for C2/C3 conversations (mirrors
+  `app/memory.py:61`'s existing rule). Internal compaction calls are
+  tagged `zuno-internal` and filtered out of `_stream_chat`'s SSE token
+  forwarding so they never leak into the user-visible chat. Docs-only so
+  far: ADR-0215 body, `docs/adr/README.md` index row, WP-060 brief, the
+  v0.1-v0.3 roadmap tracker's new Phase 6 + scope note + change log.
+  `python3 platform/docs/check_docs.py` re-run clean (only the
+  pre-existing ADR-0212/ADR-0214 status drift remains, nothing new).
+  Implementation itself (the actual `app/graph/history.py` module, state/
+  node/shape changes, tests, eval scenario) is WP-060's next execution
+  step, not yet started - check WP-060's own `State:` line before
+  assuming otherwise.
