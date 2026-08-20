@@ -27,7 +27,7 @@ os.environ.setdefault(
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
-from app.clients.model_router import ProviderCandidate  # noqa: E402
+from app.clients.model_router import ModelRouterError, ProviderCandidate  # noqa: E402
 from app.graph import arkos_nodes  # noqa: E402
 
 
@@ -198,6 +198,77 @@ def test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task() ->
     assert "knowledge.project" in arkos_nodes._DRAFT_TASK.allowed_knowledge
 
 
+# --------------------------------------------------------------------------
+# ADR-0417: coding-request early exit (route_after_plan / code_node)
+# --------------------------------------------------------------------------
+
+
+def test_arkos_declares_the_write_code_task() -> None:
+    """Sanity check against the real checked-in bundle - confirms the
+    module-level singleton resolved the actual write-code task."""
+    assert arkos_nodes._WRITE_CODE_TASK.name == "write-code"
+
+
+def test_route_after_plan_detects_a_coding_request() -> None:
+    assert arkos_nodes.route_after_plan({"message": "write me a Terraform snippet for this workshop"}) == "code"
+
+
+def test_route_after_plan_falls_through_to_retrieve_for_a_dat_request() -> None:
+    assert (
+        arkos_nodes.route_after_plan({"message": "draft a DAT for the OpenShift AI GPU sizing project"})
+        == "retrieve"
+    )
+
+
+async def test_code_node_uses_a_fixed_c2_ceiling_and_the_write_code_task_name() -> None:
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("```hcl\nresource \"x\" {}\n```"), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_invoke
+        state = {
+            "message": "write me a Terraform snippet",
+            "bearer_token": "t",
+            "request_id": "req-1",
+            "local_only_required": False,
+        }
+        result = await arkos_nodes.code_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert captured["classification"] == "C2", "must not inherit Arkos's ambient C3 seed"
+    assert captured["task_name"] == "write-code"
+    assert captured["agent_name"] == "arkos"
+    assert result["citations"] == []
+    assert result["source_mode"] == "none"
+    assert result["provider_used"] == "ai-gateway"
+
+
+async def test_code_node_provider_failure_is_a_visible_error_not_a_silent_fallback() -> None:
+    """The (arkos, write-code) preference is strict: true - Codestral only,
+    no local/SaaS substitute. A ModelRouterError here must surface as a
+    visible failure reply, never a silently different provider's answer."""
+
+    async def failing_invoke(**kwargs):
+        raise ModelRouterError("all eligible providers failed")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = failing_invoke
+        result = await arkos_nodes.code_node({"message": "write a bash script", "bearer_token": "t", "request_id": "r"})
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert "try again" in result["reply"].lower()
+    assert result["provider_used"] is None
+    assert result["citations"] == []
+    assert result["source_mode"] == "none"
+
+
 TESTS = [
     test_extract_topic_from_a_dat_request,
     test_extract_topic_accepts_the_full_phrase_too,
@@ -215,6 +286,11 @@ TESTS = [
     test_reflect_node_still_honors_local_only_required,
     test_reflect_node_is_a_noop_without_a_draft,
     test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task,
+    test_arkos_declares_the_write_code_task,
+    test_route_after_plan_detects_a_coding_request,
+    test_route_after_plan_falls_through_to_retrieve_for_a_dat_request,
+    test_code_node_uses_a_fixed_c2_ceiling_and_the_write_code_task_name,
+    test_code_node_provider_failure_is_a_visible_error_not_a_silent_fallback,
 ]
 
 

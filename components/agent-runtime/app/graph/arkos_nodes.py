@@ -27,6 +27,7 @@ from app.graph.history import build_history_messages
 from app.graph.nodes import (
     _GENERATE_IMAGE_TOOL_SCHEMA,
     _LIVE_READ_CLASSIFICATION,
+    _code_request_trigger_reason,
     _escalate,
     _image_generation_declared,
     _resolve_image_generation_call,
@@ -53,9 +54,21 @@ if _DRAFT_TASK is None or not _DRAFT_TASK.prompt:
     raise RuntimeError(
         "agent-runtime: arkos's 'draft-architecture-testimonial' task or its prompt file is missing"
     )
+# ADR-0417: catalog-only task, referenced solely as a task_name routing
+# label by code_node below (see that task's own file for why) - never a
+# task GraphFactory builds a graph for directly, same "declared but not
+# independently live-routed" status Finage's non-primary tasks have.
+_WRITE_CODE_TASK = _ARKOS.tasks.get("write-code")
+if _WRITE_CODE_TASK is None:
+    raise RuntimeError("agent-runtime: arkos's 'write-code' task bundle is missing")
 
 ARKOS_BASE_CLASSIFICATION = _ARKOS.preferred_classification  # from agent.okf.md's zuno.model
 RAG_TOP_K = _ARKOS.rag_top_k or 5  # Arkos declares no zuno.rag block; AgentDefinition defaults to 5
+
+# ADR-0417: fixed ceiling for code_node's call only - mirrors reflect_node's
+# ADR-0416 C2 override; mistral-codestral is eligible_for: [C1, C2] only,
+# never reachable at Arkos's ambient C3 seed without this.
+_CODE_GENERATION_CLASSIFICATION = "C2"
 
 _model_router = ModelRouter()
 _knowledge_store = KnowledgePolicyStore()
@@ -89,6 +102,64 @@ async def plan_node(state: AgentState) -> Dict[str, Any]:
     """
     topic = _extract_topic(state["message"])
     return {"doc_plan": {"topic": topic, "doc_title": f"DAT - {topic}"}}
+
+
+def route_after_plan(state: AgentState) -> str:
+    """ADR-0417: a coding request has nothing to do with drafting/saving a
+    DAT to Drive - short-circuit straight from plan_node, before
+    retrieve/draft/reflect/write ever run."""
+    if _code_request_trigger_reason(state.get("message", "")) is not None:
+        return "code"
+    return "retrieve"
+
+
+async def code_node(state: AgentState) -> Dict[str, Any]:
+    """ADR-0417: early-exit branch, reachable only via route_after_plan.
+    Never runs retrieve_node, so this call's payload is only the user's
+    own message - never retrieved_docs/Confluence content - which is what
+    makes evaluating it at a fixed C2 ceiling (below Arkos's ambient C3
+    seed) safe, the same scoped-exception shape as reflect_node/
+    generate_image. Routes via the (arkos, write-code) strict: true
+    preference - mistral-codestral only, no fallback; a ModelRouterError
+    here is the turn's genuine, final failure (the concrete form of "ask
+    the user to retry/choose a different model" - nothing auto-
+    substitutes a model the user didn't ask for).
+    """
+    system = SystemMessage(content=(
+        "You are Arkos, an architecture assistant. The user is asking for "
+        "code, a configuration file, or a script - not a document draft. "
+        "Respond with the requested code in a fenced code block, plus a "
+        "brief explanation only if it adds real value."
+    ))
+    human = HumanMessage(content=state["message"])
+    local_only = state.get("local_only_required", False) or _ARKOS.local_only
+    try:
+        result, provider = await _model_router.invoke_with_fallback(
+            classification=_CODE_GENERATION_CLASSIFICATION,
+            messages=[system, human],
+            bearer_token=state["bearer_token"],
+            local_only=local_only,
+            request_id=state.get("request_id"),
+            agent_name=_ARKOS.name,
+            task_name=_WRITE_CODE_TASK.name,
+        )
+    except ModelRouterError as exc:
+        logger.error("code generation model call failed: %s", exc)
+        return {
+            "reply": (
+                "I could not reach the approved model provider for code "
+                "generation right now. Please try again shortly."
+            ),
+            "provider_used": None,
+            "citations": [],
+            "source_mode": "none",
+            "errors": state.get("errors", []) + [f"code: {exc}"],
+        }
+
+    reply_text = result.content if hasattr(result, "content") else str(result)
+    # citations/source_mode set explicitly - this is the first Arkos path
+    # that skips write_node, the only other place that normally sets them.
+    return {"reply": reply_text, "provider_used": provider.name, "citations": [], "source_mode": "none"}
 
 
 async def retrieve_node(state: AgentState) -> Dict[str, Any]:

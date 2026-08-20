@@ -38,7 +38,16 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.graph.arkos_nodes import _model_router, draft_node, plan_node, reflect_node, retrieve_node, write_node
+from app.graph.arkos_nodes import (
+    _model_router,
+    code_node,
+    draft_node,
+    plan_node,
+    reflect_node,
+    retrieve_node,
+    route_after_plan,
+    write_node,
+)
 from app.graph.history import make_history_node
 from app.graph.state import AgentState
 from app.registry import AgentDefinition, TaskDefinition
@@ -52,6 +61,9 @@ def build(
     graph = StateGraph(AgentState)
 
     graph.add_node("plan", plan_node)
+    # ADR-0417: early-exit branch for a coding request - never touches
+    # retrieve/draft/reflect/write, see route_after_plan below.
+    graph.add_node("code", code_node)
     graph.add_node("retrieve", retrieve_node)
     graph.add_node("draft", draft_node)
     # ADR-0416: self-review pass over draft_node's own output, before write.
@@ -64,11 +76,13 @@ def build(
     graph.add_node("record_history", make_history_node(agent, task, _model_router))
 
     graph.add_edge(START, "plan")
-    graph.add_edge("plan", "retrieve")
+    # ADR-0417: replaces the previously-unconditional plan -> retrieve edge.
+    graph.add_conditional_edges("plan", route_after_plan, {"code": "code", "retrieve": "retrieve"})
     graph.add_edge("retrieve", "draft")
     graph.add_edge("draft", "reflect")
     graph.add_edge("reflect", "write")
     graph.add_edge("write", "record_history")
+    graph.add_edge("code", "record_history")
     graph.add_edge("record_history", END)
 
     return graph.compile(checkpointer=checkpointer)

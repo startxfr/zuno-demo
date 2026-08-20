@@ -68,6 +68,33 @@ _TOOL_TRIGGER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# ADR-0417: same deterministic keyword/regex style as _TOOL_TRIGGER_PATTERN
+# above - a "this turn wants generated code/config, not prose" signal, not
+# an LLM classifier call. Shared between Arkos (app/graph/arkos_nodes.py's
+# route_after_plan) and Tekos (_make_route_after_retrieval below) rather
+# than duplicated, since both agents' coding-request detection is the same
+# question asked at a different point in two structurally different
+# graphs.
+_CODE_TRIGGER_PATTERN = re.compile(
+    r"\b(?:write|generate|create)\s+(?:me\s+)?(?:a|an|some)\s+"
+    r"(?:python|go|golang|bash|shell|ansible|terraform|helm|yaml|dockerfile|"
+    r"kubernetes|k8s|script|snippet|function|program|playbook|manifest|"
+    r"module|class|regex|code)\b"
+    r"|\b(?:code|script)\s+(?:snippet|example|sample)\b"
+    r"|```",
+    re.IGNORECASE,
+)
+
+
+def _code_request_trigger_reason(message: str) -> Optional[str]:
+    """ADR-0417: returns why this message looks like a coding request, or
+    None. A provisional heuristic (like _live_read_trigger_reason's own
+    _TOOL_TRIGGER_PATTERN) - expect false negatives/positives, tune from
+    real usage rather than trying to enumerate every phrasing up front."""
+    if _CODE_TRIGGER_PATTERN.search(message or ""):
+        return "message phrasing matched the code-generation trigger pattern"
+    return None
+
 # ADR-0205/WP-24: domains whose current-state-read freshness window is
 # tight enough (knowledge/<domain>/domain.yaml's freshness.
 # operation_classes.current-state-read.max_staleness) that ANY retrieval
