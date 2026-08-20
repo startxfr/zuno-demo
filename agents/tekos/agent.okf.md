@@ -26,6 +26,7 @@ zuno:
     - answer-technical-question
     - find-relevant-docs
     - check-my-drive-docs
+    - write-code
   rag:
     top_k: 5
   model:

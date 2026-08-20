@@ -12,15 +12,18 @@ Run directly:
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import pathlib
 import sys
+import types
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 os.environ.setdefault("AGENTS_DIR", str(_REPO_ROOT / "agents"))
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
+from app.clients.model_router import ModelRouterError, ProviderCandidate  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.graph.nodes import (  # noqa: E402
     _ANSWER_TASK,
@@ -28,6 +31,11 @@ from app.graph.nodes import (  # noqa: E402
     _live_read_trigger_reason,
     should_call_tools,
 )
+
+
+class _FakeModelResult:
+    def __init__(self, content: str) -> None:
+        self.content = content
 
 
 # --- _live_read_trigger_reason / should_call_tools --------------------------
@@ -161,6 +169,85 @@ def test_tool_call_node_source_binds_tool_name_from_task_config_not_caller_input
     assert 'state.get("live_read_tool"' not in node_source
 
 
+# --- ADR-0417: _make_route_after_retrieval / _make_code_node ---------------
+
+
+def test_route_after_retrieval_is_a_noop_for_an_agent_without_write_code() -> None:
+    fake_agent = types.SimpleNamespace(tasks={})
+    route = nodes._make_route_after_retrieval(fake_agent)
+    assert route({"message": "write me a python script", "retrieved_docs": []}) == "reason"
+
+
+def test_tekos_declares_the_write_code_task() -> None:
+    """Sanity check against the real checked-in bundle."""
+    assert "write-code" in nodes._TEKOS.tasks
+
+
+def test_route_after_retrieval_routes_tekos_to_code() -> None:
+    route = nodes._make_route_after_retrieval(nodes._TEKOS)
+    assert route({"message": "write me a bash script to list pods", "retrieved_docs": []}) == "code"
+
+
+def test_route_after_retrieval_still_prioritizes_a_live_read_trigger() -> None:
+    route = nodes._make_route_after_retrieval(nodes._TEKOS)
+    assert (
+        route({"message": "what's the current OpenShift version - write me the yaml", "retrieved_docs": []})
+        == "tool_call"
+    )
+
+
+def test_route_after_retrieval_falls_through_to_reason_for_a_normal_question() -> None:
+    route = nodes._make_route_after_retrieval(nodes._TEKOS)
+    assert route({"message": "how does OpenShift's scheduler work", "retrieved_docs": []}) == "reason"
+
+
+async def test_tekos_code_node_passes_write_code_task_name() -> None:
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("```bash\nkubectl get pods\n```"), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        nodes._model_router.invoke_with_fallback = fake_invoke
+        code_node = nodes._make_code_node(nodes._TEKOS, nodes._ANSWER_TASK)
+        result = await code_node({
+            "message": "write a bash script", "bearer_token": "t", "request_id": "r", "retrieved_docs": [],
+        })
+    finally:
+        nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert captured["task_name"] == "write-code"
+    assert captured["agent_name"] == "tekos"
+    assert result["provider_used"] == "ai-gateway"
+
+
+async def test_code_node_degrades_gracefully_when_no_write_code_task_is_declared() -> None:
+    fake_agent = types.SimpleNamespace(name="fake-agent", tasks={}, preferred_classification="C1", local_only=False)
+    code_node = nodes._make_code_node(fake_agent, _ANSWER_TASK)
+    result = await code_node({"message": "write a script", "bearer_token": "t"})
+    assert result["provider_used"] is None
+
+
+async def test_tekos_code_node_provider_failure_is_a_visible_error() -> None:
+    async def failing_invoke(**kwargs):
+        raise ModelRouterError("all eligible providers failed")
+
+    saved_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        nodes._model_router.invoke_with_fallback = failing_invoke
+        code_node = nodes._make_code_node(nodes._TEKOS, nodes._ANSWER_TASK)
+        result = await code_node({
+            "message": "write a script", "bearer_token": "t", "request_id": "r", "retrieved_docs": [],
+        })
+    finally:
+        nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert "try again" in result["reply"].lower()
+    assert result["provider_used"] is None
+
+
 TESTS = [
     test_explicit_current_state_question_triggers_a_live_read,
     test_a_freshness_sensitive_domain_triggers_a_live_read_even_without_trigger_words,
@@ -174,18 +261,33 @@ TESTS = [
     test_source_mode_ignores_an_empty_confluence_result_as_not_live,
     test_the_answer_task_never_declares_a_write_capable_tool,
     test_tool_call_node_source_binds_tool_name_from_task_config_not_caller_input,
+    test_route_after_retrieval_is_a_noop_for_an_agent_without_write_code,
+    test_tekos_declares_the_write_code_task,
+    test_route_after_retrieval_routes_tekos_to_code,
+    test_route_after_retrieval_still_prioritizes_a_live_read_trigger,
+    test_route_after_retrieval_falls_through_to_reason_for_a_normal_question,
+    test_tekos_code_node_passes_write_code_task_name,
+    test_code_node_degrades_gracefully_when_no_write_code_task_is_declared,
+    test_tekos_code_node_provider_failure_is_a_visible_error,
 ]
 
 
-def main() -> int:
+async def _run_all() -> int:
     failed = 0
     for test in TESTS:
         try:
-            test()
+            result = test()
+            if asyncio.iscoroutine(result):
+                await result
             print(f"PASS {test.__name__}")
         except AssertionError as exc:
             failed += 1
             print(f"FAIL {test.__name__}: {exc}")
+    return failed
+
+
+def main() -> int:
+    failed = asyncio.run(_run_all())
     return 1 if failed else 0
 
 

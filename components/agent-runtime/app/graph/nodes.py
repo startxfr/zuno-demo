@@ -334,6 +334,29 @@ def should_call_tools(state: AgentState) -> str:
     return "reason"
 
 
+def _make_route_after_retrieval(agent: AgentDefinition):
+    """ADR-0417: 3-way selector extending should_call_tools with a `code`
+    branch. Data-driven, not agent-name-hardcoded: only ever returns
+    "code" for an agent whose OKF bundle declares a sibling `write-code`
+    task (today: only Tekos) - for every agent that doesn't (comage,
+    advantage, finage, naveo), this is behaviorally identical to
+    should_call_tools, which stays unchanged/untouched for backward
+    compatibility (test_freshness_routing.py still exercises it directly).
+    Live-read priority is unchanged: an explicit "current/latest" question
+    still routes to tool_call even if it also looks like a code request.
+    """
+    code_declared = "write-code" in agent.tasks
+
+    def route_after_retrieval(state: AgentState) -> str:
+        if _live_read_trigger_reason(state) is not None:
+            return "tool_call"
+        if code_declared and _code_request_trigger_reason(state.get("message", "")) is not None:
+            return "code"
+        return "reason"
+
+    return route_after_retrieval
+
+
 def _make_tool_call_node(agent: AgentDefinition, task: TaskDefinition):
     """Builds a tool_call_node closure bound to one agent/task pair. Calls
     the MCP Gateway for `task.live_read_tool` (ADR-0342/WP-33: e.g.
@@ -442,6 +465,65 @@ def _build_context_block(state: AgentState) -> str:
             parts.append(f"[Live: {item['title']}] ({item.get('url', '')})\n{item.get('excerpt', '')}")
 
     return "\n\n---\n\n".join(parts) if parts else "(no supporting context retrieved)"
+
+
+def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
+    """ADR-0417: builds a code_node closure for an agent declaring a
+    sibling `write-code` task (today: only Tekos, via
+    _make_route_after_retrieval's gate above) - resolved once at
+    graph-build time. `task` (this shape's primary task) is accepted only
+    for call-site symmetry with the other _make_* factories in this
+    module; the resolved write-code task is always used for task_name
+    instead. If reached for an agent that doesn't declare it (shouldn't
+    happen - the selector above gates this), degrades gracefully rather
+    than crashing, the same posture _make_tool_call_node already has for
+    a missing live_read_tool.
+    """
+    code_task = agent.tasks.get("write-code")
+    base_classification = agent.preferred_classification
+
+    async def code_node(state: AgentState) -> Dict[str, Any]:
+        if code_task is None:
+            logger.error("%s: code_node reached with no 'write-code' task declared", agent.name)
+            return {"reply": "Code generation is not available for this assistant.", "provider_used": None}
+
+        context = _build_context_block(state)
+        system = SystemMessage(content=(
+            "You are a coding assistant. The user is asking for code, a "
+            "configuration file, or a script - not a narrative answer. "
+            "Respond with the requested code in a fenced code block, plus "
+            "a brief explanation only if it adds real value. Use the "
+            "supporting context below only if directly relevant.\n\n"
+            f"Context:\n{context}"
+        ))
+        human = HumanMessage(content=state["message"])
+        classification = state.get("effective_classification", base_classification)
+        local_only = state.get("local_only_required", False) or agent.local_only
+        try:
+            result, provider = await _model_router.invoke_with_fallback(
+                classification=classification,
+                messages=[system, human],
+                bearer_token=state["bearer_token"],
+                local_only=local_only,
+                request_id=state.get("request_id"),
+                agent_name=agent.name,
+                task_name=code_task.name,
+            )
+        except ModelRouterError as exc:
+            logger.error("code generation model call failed: %s", exc)
+            return {
+                "reply": (
+                    "I could not reach any approved model provider to generate code "
+                    "right now. Please try again shortly."
+                ),
+                "provider_used": None,
+                "errors": state.get("errors", []) + [f"code: {exc}"],
+            }
+
+        reply_text = result.content if hasattr(result, "content") else str(result)
+        return {"reply": reply_text, "provider_used": provider.name}
+
+    return code_node
 
 
 def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
