@@ -54,11 +54,16 @@ preferences:
   - agent: tekos
     task: answer-technical-question
     prefer: [local-gpt-oss, local]
-  # Plan->draft->write document workflow; C3 by agent seed - the flagship
-  # local-only reflexional case.
+  # Plan->draft->reflect->write document workflow; C3 by agent seed - the
+  # flagship local-only reflexional case. draft_node's own call is always
+  # C3 (effective_classification starts from the agent's C3 seed and only
+  # ever escalates, ADR-0034) so ovhcloud-gpt-oss-120b never applies
+  # there; this entry's practical effect (ADR-0416) is scoped to
+  # reflect_node's explicit fixed-C2-ceiling call, which shares this same
+  # (agent, task) preference key.
   - agent: arkos
     task: draft-architecture-testimonial
-    prefer: [local-gpt-oss, local]
+    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss, local]
   # Multi-year comparison/analysis over C3 sxa-legacy data.
   - agent: comage
     task: compare-historical-deals

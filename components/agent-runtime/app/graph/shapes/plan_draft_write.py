@@ -1,10 +1,17 @@
 """Arkos's LangGraph workflow shape (ADR-0342, WP-31): plan -> retrieve ->
-draft -> write. Structurally distinct from retrieve_reason_respond.py's
-retrieve -> tool_call (conditional) -> reason -> respond: this shape plans
-what to draft BEFORE retrieving context (topic-driven retrieval, not the
-raw user message), has no conditional live-tool-call branch, and ends in
-a write side effect (Drive) rather than a respond node that only
-assembles citations from what earlier nodes already fetched.
+draft -> reflect -> write. Structurally distinct from
+retrieve_reason_respond.py's retrieve -> tool_call (conditional) -> reason
+-> respond: this shape plans what to draft BEFORE retrieving context
+(topic-driven retrieval, not the raw user message), has no conditional
+live-tool-call branch, and ends in a write side effect (Drive) rather than
+a respond node that only assembles citations from what earlier nodes
+already fetched.
+
+ADR-0416 added `reflect` between draft and write: a self-review pass over
+draft_node's own output only (never the raw retrieved context), which is
+what lets it be evaluated at a fixed C2 ceiling even on an ambient-C3
+Arkos turn - see arkos_nodes.py:reflect_node's own docstring for the full
+safety argument.
 
 Only Arkos uses this shape today, so unlike retrieve_reason_respond.py
 its nodes (app/graph/arkos_nodes.py) stay bound to Arkos's own
@@ -31,7 +38,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.graph.arkos_nodes import _model_router, draft_node, plan_node, retrieve_node, write_node
+from app.graph.arkos_nodes import _model_router, draft_node, plan_node, reflect_node, retrieve_node, write_node
 from app.graph.history import make_history_node
 from app.graph.state import AgentState
 from app.registry import AgentDefinition, TaskDefinition
@@ -47,6 +54,8 @@ def build(
     graph.add_node("plan", plan_node)
     graph.add_node("retrieve", retrieve_node)
     graph.add_node("draft", draft_node)
+    # ADR-0416: self-review pass over draft_node's own output, before write.
+    graph.add_node("reflect", reflect_node)
     graph.add_node("write", write_node)
     # ADR-0215: mirrors retrieve_reason_respond.py's own terminal node -
     # this shape's `agent`/`task` params, previously unused (see this
@@ -57,7 +66,8 @@ def build(
     graph.add_edge(START, "plan")
     graph.add_edge("plan", "retrieve")
     graph.add_edge("retrieve", "draft")
-    graph.add_edge("draft", "write")
+    graph.add_edge("draft", "reflect")
+    graph.add_edge("reflect", "write")
     graph.add_edge("write", "record_history")
     graph.add_edge("record_history", END)
 

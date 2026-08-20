@@ -34,10 +34,19 @@ This is the task Agent Runtime's `plan_draft_write` graph shape
 (`components/agent-runtime/app/graph/shapes/plan_draft_write.py`, ADR-0342)
 executes: plan (derive the document's topic/title from the request) ->
 retrieve (`knowledge.tech` + `knowledge.project`, topic-driven) -> draft
-(long-form generation) -> write (`drive.document.create`/`.update`) -
-materially different from Tekos's retrieve/tool_call/reason/respond shape,
-proving a second agent can run a genuinely different workflow on the same
-shared runtime (ADR-0326).
+(long-form generation) -> reflect (self-review pass, ADR-0416) -> write
+(`drive.document.create`/`.update`) - materially different from Tekos's
+retrieve/tool_call/reason/respond shape, proving a second agent can run a
+genuinely different workflow on the same shared runtime (ADR-0326).
+
+ADR-0416: the reflect step prefers `ovhcloud-gpt-oss-120b` (same OVHcloud
+AI Endpoints account as the `image.generation.create` tool above) for its
+self-review pass over the draft - evaluated at a fixed C2 ceiling since
+that call's payload is only the draft's own prose, never the raw
+retrieved/Confluence context draft_node was grounded in. Still honors any
+source-level `local_only_required` restriction that turn's retrieval may
+have set (ADR-0035) - the C2 ceiling overrides classification escalation
+only, never that separate restriction.
 
 v0 scope, honestly: this proves the plan -> retrieve -> draft -> write
 mechanism end to end in one turn. The full v1 DAT workflow described in

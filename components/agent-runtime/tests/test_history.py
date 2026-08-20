@@ -224,15 +224,20 @@ async def test_arkos_second_turn_prompt_carries_the_first_turns_history() -> Non
         arkos_nodes._model_router.invoke_with_fallback = saved_invoke
         arkos_nodes.search = saved_search
 
-    assert len(captured_calls) == 2
-    turn2_messages = captured_calls[1]["messages"]
+    # ADR-0416: each turn now makes two model_router calls - draft_node,
+    # then reflect_node's self-review pass over that draft (which is what
+    # actually becomes document_draft/reply, since reflect runs last) -
+    # so 2 turns produce 4 captured calls, and turn 2's draft prompt is
+    # captured_calls[2], not [1].
+    assert len(captured_calls) == 4
+    turn2_messages = captured_calls[2]["messages"]
     history_messages = turn2_messages[1:-1]
     assert any(
         isinstance(m, HumanMessage) and "GPU sizing project" in m.content for m in history_messages
     ), f"turn 1's request missing from turn 2's draft prompt: {[m.content for m in history_messages]}"
     assert any(
-        isinstance(m, AIMessage) and m.content == "draft #1" for m in history_messages
-    ), f"turn 1's draft missing from turn 2's prompt: {[m.content for m in history_messages]}"
+        isinstance(m, AIMessage) and m.content == "draft #2" for m in history_messages
+    ), f"turn 1's reflected draft missing from turn 2's prompt: {[m.content for m in history_messages]}"
 
 
 # --------------------------------------------------------------------------

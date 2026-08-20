@@ -268,6 +268,63 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
     return {"document_draft": draft_text, "provider_used": provider.name}
 
 
+async def reflect_node(state: AgentState) -> Dict[str, Any]:
+    """ADR-0416: a self-review/refinement pass over draft_node's output -
+    reads and writes only `document_draft` (Arkos's own already-generated
+    prose), never `retrieved_docs`/the Confluence tool result draft_node
+    was grounded in. That narrow scope is what makes it safe to evaluate
+    at a fixed C2 classification ceiling below, the same scoped-exception
+    pattern ADR-0415 established for generate_image: that call's payload
+    is also a short agent-authored string rather than raw source
+    material, so it can be evaluated below the turn's own
+    effective_classification without the genuinely C3-classified source
+    content this turn may have touched ever entering the call.
+
+    Still honors `local_only_required` (ADR-0035) unconditionally - that
+    flag means a source explicitly forbids ITS OWN influence from
+    reaching any external model, and the draft may already have been
+    shaped by that source's content. The C2 ceiling below overrides
+    classification ESCALATION only (state's `effective_classification`,
+    which for Arkos starts at its C3 seed and only ever climbs, ADR-0034);
+    it never overrides this separate source-level restriction.
+    """
+    draft = state.get("document_draft")
+    if not draft:
+        return {}
+
+    system = SystemMessage(
+        content=(
+            "You are reviewing your own draft of a Design & Architecture "
+            "Testimonial before it is saved. Read it critically and return "
+            "an improved version: tighten unclear passages, check internal "
+            "consistency, and strengthen weak sections. Return only the "
+            "revised document body, with no commentary about the review "
+            "itself."
+        )
+    )
+    human = HumanMessage(content=draft)
+
+    local_only = state.get("local_only_required", False)
+    try:
+        result, provider = await _model_router.invoke_with_fallback(
+            # ADR-0416: fixed C2 ceiling for this call only - see the
+            # docstring above for why that's safe here.
+            classification="C2",
+            messages=[system, human],
+            bearer_token=state["bearer_token"],
+            local_only=local_only,
+            request_id=state.get("request_id"),
+            agent_name=_ARKOS.name,
+            task_name=_DRAFT_TASK.name,
+        )
+    except ModelRouterError as exc:
+        logger.warning("reflection pass failed, keeping the original draft: %s", exc)
+        return {"errors": state.get("errors", []) + [f"reflect: {exc}"]}
+
+    refined = result.content if hasattr(result, "content") else str(result)
+    return {"document_draft": refined, "provider_used": provider.name}
+
+
 def _citations(state: AgentState):
     citations = [{"source": doc["source"], "title": doc["title"]} for doc in state.get("retrieved_docs", [])]
     confluence = state.get("tool_results", {}).get("confluence.page.search")
