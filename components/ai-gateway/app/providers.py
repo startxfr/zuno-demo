@@ -136,5 +136,19 @@ def chat_model_for(
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
         )
+    if candidate.name == "ovhcloud-gpt-oss-120b":
+        from langchain_openai import ChatOpenAI
+
+        # ADR-0416: same OVHcloud AI Endpoints account as ADR-0415's
+        # stable-diffusion-xl, OpenAI-compatible chat completions -
+        # reuses ChatOpenAI with a custom base_url exactly like the
+        # `local` candidate above.
+        return ChatOpenAI(
+            base_url=cfg.get("endpoint", "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1"),
+            api_key=os.getenv(cfg.get("api_key_env", "OVHCLOUD_API_KEY")),
+            model=cfg.get("model", "gpt-oss-120b"),
+            temperature=cfg.get("temperature", 0.2),
+            stream_usage=True,
+        )
 
     raise ProviderFactoryError(f"no chat model factory registered for provider '{candidate.name}'")

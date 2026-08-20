@@ -104,6 +104,39 @@ def test_no_config_degraded_mode_is_unaffected() -> None:
     assert [c.name for c in candidates] == ["local"]
 
 
+# ADR-0416: gpt-oss-120b via OVHcloud - same saas eligibility shape as
+# openai/anthropic above (eligible_for: [C1, C2], never C3), exercised
+# with its own provider set so the assertions above stay untouched.
+_PROVIDERS_WITH_OVHCLOUD_GPT_OSS = {
+    "providers": [
+        {"name": "local", "kind": "local", "eligible_for": ["C1", "C2", "C3"], "serves_adapters": True},
+        {"name": "local-gpt-oss", "kind": "local", "eligible_for": ["C1", "C2", "C3"]},
+        {"name": "ovhcloud-gpt-oss-120b", "kind": "saas", "eligible_for": ["C1", "C2"]},
+    ]
+}
+
+
+def test_ovhcloud_gpt_oss_120b_is_excluded_at_c3() -> None:
+    """Security-negative, mirrors test_maas_adapter_never_widens_c3_local_only_eligibility:
+    a C3 request must never see the new OVH provider, preference or not."""
+    table = _StubTable(_PROVIDERS_WITH_OVHCLOUD_GPT_OSS)
+    candidates = table.candidates_for("C3", prefer=["ovhcloud-gpt-oss-120b", "local-gpt-oss"])
+    assert [c.name for c in candidates] == ["local-gpt-oss", "local"]
+    assert all(c.kind == "local" for c in candidates)
+
+
+def test_ovhcloud_gpt_oss_120b_eligible_and_preferred_at_c2() -> None:
+    table = _StubTable(_PROVIDERS_WITH_OVHCLOUD_GPT_OSS)
+    names = [c.name for c in table.candidates_for("C2", prefer=["ovhcloud-gpt-oss-120b", "local-gpt-oss", "local"])]
+    assert names == ["ovhcloud-gpt-oss-120b", "local-gpt-oss", "local"]
+
+
+def test_ovhcloud_gpt_oss_120b_eligible_without_preference_at_c1() -> None:
+    table = _StubTable(_PROVIDERS_WITH_OVHCLOUD_GPT_OSS)
+    names = [c.name for c in table.candidates_for("C1")]
+    assert "ovhcloud-gpt-oss-120b" in names
+
+
 TESTS = [
     test_preferred_survivors_move_to_front_in_given_order,
     test_unlisted_survivors_keep_relative_order_after_preferred,
@@ -114,6 +147,9 @@ TESTS = [
     test_duplicate_preference_names_are_deduped,
     test_fail_closed_still_raises_with_a_preference,
     test_no_config_degraded_mode_is_unaffected,
+    test_ovhcloud_gpt_oss_120b_is_excluded_at_c3,
+    test_ovhcloud_gpt_oss_120b_eligible_and_preferred_at_c2,
+    test_ovhcloud_gpt_oss_120b_eligible_without_preference_at_c1,
 ]
 
 

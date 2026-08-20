@@ -122,3 +122,19 @@ providers:
     api_key_env: MISTRAL_API_KEY
     temperature: 0.2
     eligible_for: [C1]
+
+  # ADR-0416: gpt-oss-120b via the same OVHcloud AI Endpoints account/
+  # credential ADR-0415 already set up for stable-diffusion-xl (same
+  # OVHCLOUD_API_KEY secret, same OpenAI-compatible base URL) - not
+  # servable on this cluster's GPUs (gitops/charts/models/values.yaml,
+  # ADR-0414), so this is the only way to offer it. eligible_for is [C1,
+  # C2] only, never C3 - policies/data-classification/classification.yaml
+  # forbids external SaaS at C3 unconditionally, same as every other saas
+  # entry above.
+  - name: ovhcloud-gpt-oss-120b
+    kind: saas
+    model: gpt-oss-120b
+    endpoint: https://oai.endpoints.kepler.ai.cloud.ovh.net/v1
+    api_key_env: OVHCLOUD_API_KEY
+    temperature: 0.2
+    eligible_for: [C1, C2]
