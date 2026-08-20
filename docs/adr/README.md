@@ -159,6 +159,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | To be implemented (manifests merged 2026-08-17; live rollout pending) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
+| [ADR-0354](0354-add-ansible-automation-platform-as-a-day-0-component.md) | v0.3 | Proposed | Add Ansible Automation Platform as a new Day 0 component |
 
 ## version 0.4
 
@@ -181,6 +182,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
 | [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume gpt-oss-120b via OVHcloud AI Endpoints |
 | [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Proposed | Consume Codestral via the Mistral API |
+| [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Proposed | Execute Day 0 and Day 1 operations as AAP Job Templates |
 
 ## OKF stream
 
