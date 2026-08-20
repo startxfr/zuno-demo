@@ -127,12 +127,20 @@ repo; this decision does not add one).
   same as every prior model in this bucket. Remediation: none planned —
   matches existing accepted practice; a future ADR can add a real upload
   job if this keeps recurring.
-- **Card B's first-time MIG partition requires a node replacement while
-  `gpt-oss-20b` is its only current tenant.** Expect a brief availability
-  gap for whichever tier lands there during cutover. Remediation: land
-  tier 3 (gpt-oss-20b, already-proven weights) on Card B first and verify
-  it before migrating tier 1 traffic onto the same card's new `2g.48gb`
-  slot — sequence the cutover tier-by-tier, not as one atomic change.
+- **Card B's first-time MIG partition requires a node replacement, and
+  `gpt-oss-20b` (moving to Card A, not staying on Card B) is its only
+  current tenant.** Card B must be fully drained before it can be safely
+  repartitioned — a live node is never repartitioned in place (ADR-0351).
+  Remediation, in order: (1) retire the standalone MaaS backend
+  (`templates/maas.yaml`) to free Card A's `1g.24gb` slot that gpt-oss-20b
+  is moving into; (2) resize and move `gpt-oss-20b` onto that freed Card A
+  slot, now also serving the MaaS role, and verify it; this leaves Card B
+  fully idle; (3) only then bring Card B under `machines` management and
+  apply `all-balanced` — a node replacement with nothing running on it
+  yet, not a live repartition; (4) land tier 2 on Card B's new `2g.48gb`
+  slot; (5) land tier 1 on Card A's `2g.48gb` slot, independently of the
+  above, whenever `Qwen3-32B` is staged. Sequence tier-by-tier, not as one
+  atomic change.
 - **Retiring ADR-0412's `nvidia.com/gpu: "1"` quota exception** in
   `gitops/charts/namespaces/values.yaml` must happen in the same change
   that removes the last whole-GPU request, or an already-scheduled pod
