@@ -22,6 +22,7 @@ zuno:
   primary_task: draft-architecture-testimonial
   tasks:
     - draft-architecture-testimonial
+    - workshop-presentation
     - structure-demo
     - write-code
   memory:

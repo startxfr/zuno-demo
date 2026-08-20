@@ -81,6 +81,13 @@ preferences:
   - agent: arkos
     task: draft-architecture-testimonial
     prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss, local]
+  # ADR-0514: workshop-presentation shares draft-architecture-
+  # testimonial's exact reasoning - same plan/retrieve/draft/reflect/write
+  # shape, same C3 agent seed, same reflect-slot C2 ceiling that's what
+  # actually makes ovhcloud-gpt-oss-120b reachable at this preference.
+  - agent: arkos
+    task: workshop-presentation
+    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss, local]
   # Multi-year comparison/analysis over C3 sxa-legacy data.
   - agent: comage
     task: compare-historical-deals

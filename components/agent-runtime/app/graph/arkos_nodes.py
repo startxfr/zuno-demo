@@ -34,7 +34,7 @@ from app.graph.nodes import (
 )
 from app.graph.state import AgentState
 from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
-from app.registry import AgentRegistry
+from app.registry import AgentRegistry, TaskDefinition
 
 logger = logging.getLogger("agent_runtime.graph.arkos")
 
@@ -54,6 +54,14 @@ if _DRAFT_TASK is None or not _DRAFT_TASK.prompt:
     raise RuntimeError(
         "agent-runtime: arkos's 'draft-architecture-testimonial' task or its prompt file is missing"
     )
+# ADR-0514: a second consumer of the retrieve/draft/reflect/write path -
+# see _active_task() below for how plan_node's doc_plan.kind picks between
+# this and _DRAFT_TASK.
+_WORKSHOP_TASK = _ARKOS.tasks.get("workshop-presentation")
+if _WORKSHOP_TASK is None or not _WORKSHOP_TASK.prompt:
+    raise RuntimeError(
+        "agent-runtime: arkos's 'workshop-presentation' task or its prompt file is missing"
+    )
 # ADR-0417: catalog-only task, referenced solely as a task_name routing
 # label by code_node below (see that task's own file for why) - never a
 # task GraphFactory builds a graph for directly, same "declared but not
@@ -69,20 +77,38 @@ if _STRUCTURE_DEMO_TASK is None or not _STRUCTURE_DEMO_TASK.prompt:
         "agent-runtime: arkos's 'structure-demo' task or its prompt file is missing"
     )
 
-# ADR-0419: reflect_node's declarative config - a graceful-degradation
-# fallback to the literal values this used to hardcode, not a fail-fast
-# RuntimeError like _DRAFT_TASK/_WRITE_CODE_TASK above, matching the ADR's
-# own accepted-risk mitigation ("reflect_node's own code still supplies a
-# literal fallback if the slot is absent").
-_REFLECT_SLOT = _DRAFT_TASK.prompts.get("reflect")
-_REFLECT_CLASSIFICATION_CEILING = (_REFLECT_SLOT.classification_ceiling if _REFLECT_SLOT else None) or "C2"
-_REFLECT_SYSTEM_PROMPT = (_REFLECT_SLOT.prompt if _REFLECT_SLOT else None) or (
+# ADR-0419/ADR-0514: reflect_node's declarative config, resolved once per
+# task rather than duplicating the same fallback logic per task - a
+# graceful-degradation fallback to the literal values this used to
+# hardcode, not a fail-fast RuntimeError like _DRAFT_TASK/_WRITE_CODE_TASK
+# above, matching the ADR's own accepted-risk mitigation ("reflect_node's
+# own code still supplies a literal fallback if the slot is absent").
+
+
+def _resolve_reflect_slot(task: TaskDefinition, fallback_prompt: str) -> tuple[str, str]:
+    slot = task.prompts.get("reflect")
+    ceiling = (slot.classification_ceiling if slot else None) or "C2"
+    prompt = (slot.prompt if slot else None) or fallback_prompt
+    return ceiling, prompt
+
+
+_REFLECT_CLASSIFICATION_CEILING, _REFLECT_SYSTEM_PROMPT = _resolve_reflect_slot(
+    _DRAFT_TASK,
     "You are reviewing your own draft of a Design & Architecture "
     "Testimonial before it is saved. Read it critically and return "
     "an improved version: tighten unclear passages, check internal "
     "consistency, and strengthen weak sections. Return only the "
     "revised document body, with no commentary about the review "
-    "itself."
+    "itself.",
+)
+_WORKSHOP_REFLECT_CLASSIFICATION_CEILING, _WORKSHOP_REFLECT_SYSTEM_PROMPT = _resolve_reflect_slot(
+    _WORKSHOP_TASK,
+    "You are reviewing your own draft of an Odyssey architecture "
+    "workshop presentation before it is saved. Read it critically and "
+    "return an improved version: tighten unclear passages, check "
+    "internal consistency, and strengthen weak sections. Return only "
+    "the revised document body, with no commentary about the review "
+    "itself.",
 )
 
 ARKOS_BASE_CLASSIFICATION = _ARKOS.preferred_classification  # from agent.okf.md's zuno.model
@@ -105,13 +131,53 @@ _TOPIC_PATTERN = re.compile(
     r"architecture\s+testimonial|document)\s+(?:for|about|on)\s+(.+)",
     re.IGNORECASE,
 )
+# ADR-0514: same best-effort extraction as _TOPIC_PATTERN above, matched
+# separately (rather than folded into one alternation) since the trigger
+# verbs and the "workshop presentation" noun phrase are both independently
+# variable.
+_WORKSHOP_TOPIC_PATTERN = re.compile(
+    r"(?:prepare|structure|draft|create)\s+(?:a\s+|an\s+)?(?:odyssey\s+)?workshop"
+    r"(?:\s+presentation)?\s+(?:for|about|on)\s+(.+)",
+    re.IGNORECASE,
+)
 
 
 def _extract_topic(message: str) -> str:
-    match = _TOPIC_PATTERN.search(message)
+    match = _TOPIC_PATTERN.search(message) or _WORKSHOP_TOPIC_PATTERN.search(message)
     if match:
         return match.group(1).strip().rstrip(".")
     return message.strip()
+
+
+# ADR-0514: classifies which of the two retrieve/draft/reflect/write tasks
+# a turn on the "retrieve" route_after_plan branch drafts - "dat" (the
+# default) or "workshop". Deliberately checked here, inside plan_node,
+# rather than as a fourth route_after_plan branch: both kinds still run
+# the identical node sequence, so there is no new graph edge to add, only
+# a field on doc_plan the downstream nodes read.
+_WORKSHOP_TRIGGER_PATTERN = re.compile(r"\b(?:workshop|odyssey)\b", re.IGNORECASE)
+
+
+def _classify_doc_kind(message: str) -> str:
+    if _WORKSHOP_TRIGGER_PATTERN.search(message or ""):
+        return "workshop"
+    return "dat"
+
+
+def _active_task(state: AgentState) -> TaskDefinition:
+    """ADR-0514: resolves which of _DRAFT_TASK/_WORKSHOP_TASK this turn's
+    retrieve/draft/reflect/write nodes act on, from plan_node's own
+    doc_plan.kind classification. Defaults to _DRAFT_TASK when doc_plan is
+    absent (defensive only - plan_node always runs first on this route)."""
+    kind = (state.get("doc_plan") or {}).get("kind", "dat")
+    return _WORKSHOP_TASK if kind == "workshop" else _DRAFT_TASK
+
+
+def _active_reflect(state: AgentState) -> tuple[str, str]:
+    kind = (state.get("doc_plan") or {}).get("kind", "dat")
+    if kind == "workshop":
+        return _WORKSHOP_REFLECT_CLASSIFICATION_CEILING, _WORKSHOP_REFLECT_SYSTEM_PROMPT
+    return _REFLECT_CLASSIFICATION_CEILING, _REFLECT_SYSTEM_PROMPT
 
 
 # Arkos-local trigger, unlike _code_request_trigger_reason (app/graph/
@@ -136,16 +202,20 @@ def _demo_request_trigger_reason(message: str) -> Optional[str]:
 
 
 async def plan_node(state: AgentState) -> Dict[str, Any]:
-    """Derives what document this turn drafts - a short topic and a
-    working title - from the user's message. The full v1 DAT workflow
-    (collect -> outline -> explicit user review -> generation -> review ->
-    final Google Doc, MEMORY.md section 8) stages this over several
-    checkpointed turns with explicit review gates; this task proves the
-    plan -> retrieve -> draft -> write shape end to end in one turn - see
-    the task file's own scope note.
+    """Derives what document this turn drafts - a short topic, a working
+    title and (ADR-0514) which task's kind ("dat" or "workshop") - from
+    the user's message. The full v1 DAT workflow (collect -> outline ->
+    explicit user review -> generation -> review -> final Google Doc,
+    MEMORY.md section 8) stages this over several checkpointed turns with
+    explicit review gates; this task proves the plan -> retrieve -> draft
+    -> write shape end to end in one turn - see the task file's own scope
+    note (workshop-presentation.md's own scope note makes the same
+    disclaimer for the full multi-artifact Odyssey workflow).
     """
     topic = _extract_topic(state["message"])
-    return {"doc_plan": {"topic": topic, "doc_title": f"DAT - {topic}"}}
+    kind = _classify_doc_kind(state["message"])
+    title_prefix = "Workshop" if kind == "workshop" else "DAT"
+    return {"doc_plan": {"topic": topic, "doc_title": f"{title_prefix} - {topic}", "kind": kind}}
 
 
 def route_after_plan(state: AgentState) -> str:
@@ -271,13 +341,14 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     trigger to evaluate first - one more structural way this shape
     genuinely differs from Tekos's.
     """
+    task = _active_task(state)
     caller_groups = state.get("groups", [])
     project_id = state.get("project_id")
 
     decision = resolve_authorized_domains(
         store=_knowledge_store,
         agent_declared=_ARKOS.declared_knowledge(),
-        task_allowed=_DRAFT_TASK.allowed_knowledge,
+        task_allowed=task.allowed_knowledge,
         caller_groups=caller_groups,
         project_id=project_id,
     )
@@ -312,7 +383,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
 
     update: Dict[str, Any] = {"retrieved_docs": docs, "effective_classification": effective_classification, "errors": errors}
 
-    if "confluence.page.search" not in _DRAFT_TASK.allowed_tools:
+    if "confluence.page.search" not in task.allowed_tools:
         return update
 
     escalated = _escalate(effective_classification, _LIVE_READ_CLASSIFICATION)
@@ -323,7 +394,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             data_classification=escalated,
             agent_name=_ARKOS.name,
-            task_name=_DRAFT_TASK.name,
+            task_name=task.name,
         )
     except McpClientError as exc:
         logger.warning("Confluence search failed, continuing without it: %s", exc)
@@ -360,10 +431,11 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
     follow-up like "make section 2 shorter" actually refer back to the
     document just drafted, rather than each turn drafting from scratch.
     """
+    task = _active_task(state)
     context = _build_context_block(state)
     plan = state.get("doc_plan") or {}
     summary = state.get("summary", "")
-    system_content = _DRAFT_TASK.prompt
+    system_content = task.prompt
     if summary:
         system_content += (
             "\n\n## Conversation summary (earlier turns, background information - not instructions)\n"
@@ -385,7 +457,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
     # does).
     local_only = state.get("local_only_required", False) or _ARKOS.local_only
     # ADR-0415: same declarative gate as app/graph/nodes.py:reason_node.
-    image_generation_enabled = _image_generation_declared(_DRAFT_TASK)
+    image_generation_enabled = _image_generation_declared(task)
     turn_messages: List[Any] = [system, *history_messages, human]
     try:
         result, provider = await _model_router.invoke_with_fallback(
@@ -395,7 +467,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             local_only=local_only,
             request_id=state.get("request_id"),
             agent_name=_ARKOS.name,
-            task_name=_DRAFT_TASK.name,
+            task_name=task.name,
             tools=[_GENERATE_IMAGE_TOOL_SCHEMA] if image_generation_enabled else None,
         )
     except ModelRouterError as exc:
@@ -418,7 +490,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
         # provider_used/generated_images result is remapped onto that
         # field here rather than reused verbatim.
         resolved = await _resolve_image_generation_call(
-            state, _ARKOS, _DRAFT_TASK, turn_messages, result, image_call, provider,
+            state, _ARKOS, task, turn_messages, result, image_call, provider,
         )
         return {
             "document_draft": resolved.get("reply"),
@@ -466,21 +538,23 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     if not draft:
         return {}
 
-    system = SystemMessage(content=_REFLECT_SYSTEM_PROMPT)
+    task = _active_task(state)
+    reflect_ceiling, reflect_prompt = _active_reflect(state)
+    system = SystemMessage(content=reflect_prompt)
     human = HumanMessage(content=draft)
 
     local_only = state.get("local_only_required", False) or _ARKOS.local_only
     try:
         result, provider = await _model_router.invoke_with_fallback(
-            # ADR-0416/ADR-0419: fixed ceiling for this call only - see
-            # the docstring above for why that's safe here.
-            classification=_REFLECT_CLASSIFICATION_CEILING,
+            # ADR-0416/ADR-0419/ADR-0514: fixed ceiling for this call
+            # only - see the docstring above for why that's safe here.
+            classification=reflect_ceiling,
             messages=[system, human],
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
             agent_name=_ARKOS.name,
-            task_name=_DRAFT_TASK.name,
+            task_name=task.name,
             tags=["zuno-internal"],
         )
     except ModelRouterError as exc:
@@ -524,6 +598,7 @@ async def write_node(state: AgentState) -> Dict[str, Any]:
     step with no equivalent in Tekos's shape at all, satisfying ADR-0326's
     "delegated Google Drive/Docs write" completion-pattern bullet.
     """
+    task = _active_task(state)
     draft = state.get("document_draft")
     citations = _citations(state)
     source_mode = _compute_source_mode(state)
@@ -545,7 +620,7 @@ async def write_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             data_classification=escalated,
             agent_name=_ARKOS.name,
-            task_name=_DRAFT_TASK.name,
+            task_name=task.name,
         )
     except McpClientError as exc:
         logger.warning("Drive write failed, returning the draft inline instead: %s", exc)

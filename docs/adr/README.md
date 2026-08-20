@@ -202,6 +202,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | OKF v0.1 | Partially implemented | Define OKF quota policy enforced via Kuadrant |
 | [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | OKF v0.1 | Proposed | Introduce project-bound tasks with Salesforce-verified context |
 | [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | OKF v0.1 | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
+| [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | OKF v0.1 | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
 
 ## Standard clauses
 

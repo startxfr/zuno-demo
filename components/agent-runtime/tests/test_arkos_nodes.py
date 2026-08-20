@@ -212,6 +212,88 @@ def test_reflect_slot_resolves_from_the_real_bundle() -> None:
 
 
 # --------------------------------------------------------------------------
+# ADR-0514: workshop-presentation as a second kind through the same shape
+# --------------------------------------------------------------------------
+
+
+def test_arkos_declares_the_workshop_presentation_task() -> None:
+    """Sanity check against the real checked-in bundle - confirms the
+    module-level singleton resolved the actual workshop-presentation task
+    and its prompt file."""
+    assert arkos_nodes._WORKSHOP_TASK.name == "workshop-presentation"
+    assert "confluence.page.search" in arkos_nodes._WORKSHOP_TASK.allowed_tools
+    assert "drive.document.create" in arkos_nodes._WORKSHOP_TASK.allowed_tools
+    assert "knowledge.tech" in arkos_nodes._WORKSHOP_TASK.allowed_knowledge
+
+
+def test_workshop_reflect_slot_resolves_from_the_real_bundle() -> None:
+    """Same ADR-0419 sanity check as test_reflect_slot_resolves_from_the_
+    real_bundle, for the second slot _resolve_reflect_slot now serves."""
+    slot = arkos_nodes._WORKSHOP_TASK.prompts.get("reflect")
+    assert slot is not None
+    assert slot.classification_ceiling == "C2"
+    assert slot.prompt and "reviewing your own draft" in slot.prompt
+    assert arkos_nodes._WORKSHOP_REFLECT_CLASSIFICATION_CEILING == "C2"
+    assert arkos_nodes._WORKSHOP_REFLECT_SYSTEM_PROMPT == slot.prompt
+
+
+def test_classify_doc_kind_detects_workshop_and_odyssey_keywords() -> None:
+    assert arkos_nodes._classify_doc_kind("Prepare a workshop for the Keycloak SSO migration") == "workshop"
+    assert arkos_nodes._classify_doc_kind("Structure an Odyssey workshop about GPU sizing") == "workshop"
+    assert arkos_nodes._classify_doc_kind("Draft a DAT for the OpenShift AI GPU sizing project") == "dat"
+
+
+async def test_plan_node_classifies_a_workshop_request() -> None:
+    result = await arkos_nodes.plan_node(
+        {"message": "Prepare an Odyssey workshop for the Keycloak SSO migration"}
+    )
+    assert result["doc_plan"]["kind"] == "workshop"
+    assert result["doc_plan"]["doc_title"].startswith("Workshop - ")
+
+
+async def test_plan_node_defaults_to_dat_kind() -> None:
+    result = await arkos_nodes.plan_node({"message": "Draft a DAT for the OpenShift AI GPU sizing project"})
+    assert result["doc_plan"]["kind"] == "dat"
+    assert result["doc_plan"]["doc_title"].startswith("DAT - ")
+
+
+def test_active_task_resolves_workshop_vs_dat_from_doc_plan_kind() -> None:
+    assert arkos_nodes._active_task({"doc_plan": {"kind": "workshop"}}) is arkos_nodes._WORKSHOP_TASK
+    assert arkos_nodes._active_task({"doc_plan": {"kind": "dat"}}) is arkos_nodes._DRAFT_TASK
+    assert arkos_nodes._active_task({}) is arkos_nodes._DRAFT_TASK
+
+
+async def test_reflect_node_uses_the_workshop_slot_when_doc_plan_kind_is_workshop() -> None:
+    """Same shape as test_reflect_node_uses_a_fixed_c2_ceiling_..., proving
+    reflect_node picks the workshop task/slot instead of the DAT one when
+    plan_node classified this turn as a workshop request."""
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("a refined workshop draft"), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_invoke
+        state = {
+            "document_draft": "the original workshop draft",
+            "doc_plan": {"kind": "workshop"},
+            "effective_classification": "C3",
+            "local_only_required": False,
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.reflect_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert captured["classification"] == "C2"
+    assert captured["task_name"] == "workshop-presentation"
+    assert result["document_draft"] == "a refined workshop draft"
+
+
+# --------------------------------------------------------------------------
 # ADR-0417: coding-request early exit (route_after_plan / code_node)
 # --------------------------------------------------------------------------
 
@@ -377,6 +459,13 @@ TESTS = [
     test_reflect_node_is_a_noop_without_a_draft,
     test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task,
     test_reflect_slot_resolves_from_the_real_bundle,
+    test_arkos_declares_the_workshop_presentation_task,
+    test_workshop_reflect_slot_resolves_from_the_real_bundle,
+    test_classify_doc_kind_detects_workshop_and_odyssey_keywords,
+    test_plan_node_classifies_a_workshop_request,
+    test_plan_node_defaults_to_dat_kind,
+    test_active_task_resolves_workshop_vs_dat_from_doc_plan_kind,
+    test_reflect_node_uses_the_workshop_slot_when_doc_plan_kind_is_workshop,
     test_arkos_declares_the_write_code_task,
     test_route_after_plan_detects_a_coding_request,
     test_route_after_plan_falls_through_to_retrieve_for_a_dat_request,
