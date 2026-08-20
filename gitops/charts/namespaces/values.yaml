@@ -334,9 +334,20 @@ platformNamespaces:
     extraLabels:
       istio-injection: enabled
       zuno.io/managed: "true"
+    # RESIZED live (2026-08-20): limits.cpu was sized for the app alone
+    # (limitRange.default.cpu: 1) before istio-injection was turned on
+    # above. The sidecar has no explicit cpu limit either, so it also
+    # takes the 1-core LimitRange default - app (1) + proxy (1) = 2.5
+    # measured (proxy's actual default settles under 1 core), exceeding
+    # the old 2-core cap on every single pod creation. model-catalog had
+    # zero running replicas for ~2 days as a result (FailedCreate:
+    # "requested: limits.cpu=2500m ... limited: limits.cpu=2"). 3/5Gi
+    # gives the sidecar's measured ~1 core/~1Gi room alongside the
+    # existing 2-core/4Gi app budget; requests already had headroom
+    # (250m/576Mi used of 500m/1Gi) so left as-is.
     resourceQuota:
       requests: { cpu: "500m", memory: "1Gi" }
-      limits: { cpu: "2", memory: "4Gi" }
+      limits: { cpu: "3", memory: "5Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "1Gi" }
