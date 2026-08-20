@@ -96,7 +96,7 @@ explicitly *not* new work here:
    `write-code` is untouched.
 3. **Prompt slots.** A task's frontmatter gains an optional `prompts:` map,
    naming any call within that task that needs its own prompt text and/or its
-   own model preference:
+   own classification ceiling:
    ```yaml
    # agents/arkos/tasks/draft-architecture-testimonial.md
    zuno:
@@ -104,16 +104,38 @@ explicitly *not* new work here:
      prompts:
        reflect:
          classification_ceiling: C2
-         preferred: [ovhcloud-gpt-oss-120b]
-         fallback: [local-gpt-oss, local]
    ```
    Prompt text for a named slot loads from
    `agents/<agent>/prompts/<task-name>--<slot>.md`, alongside the existing
    `<task-name>.md` convention for the task's primary/implicit prompt.
    `registry.py::TaskDefinition` gains a `prompts: Dict[str, PromptSlot]` field.
-   `reflect_node` is refactored to read this slot's `classification_ceiling`/
-   `preferred`/`fallback` instead of the hardcoded `"C2"` and the inline system
-   prompt string it has today - identical runtime behavior, now declarative.
+   `reflect_node` is refactored to read this slot's `classification_ceiling`
+   instead of the hardcoded `"C2"`, and its prompt text instead of the inline
+   system prompt string it has today - identical runtime behavior, now
+   declarative.
+
+   **Scoped down from this ADR's original draft during implementation**: a
+   slot does *not* get its own `preferred:`/`fallback:` model-preference
+   override. Model preference is resolved server-side by `ai-gateway` purely
+   from the `(X-Zuno-Agent, X-Zuno-Task)` headers `ModelRouter.
+   invoke_with_fallback` sends (`components/agent-runtime/app/clients/
+   model_router.py`) - there is no existing mechanism for the caller to pass
+   an explicit preference list that bypasses that server-side lookup, and
+   `reflect_node` sharing its task's `task_name` (by design - see point 3's
+   "Alternatives considered" entry on why it isn't a distinct task) means it
+   is subject to the *same* `(arkos, draft-architecture-testimonial)` entry
+   `draft_node` is. This turns out not to matter for `reflect_node` itself:
+   preference is applied *after* classification-eligibility filtering, so
+   the same ordered list (`[ovhcloud-gpt-oss-120b, local-gpt-oss, local]`)
+   naturally produces a different effective chain at `reflect_node`'s `C2`
+   ceiling (OVH eligible, leads) than at `draft_node`'s ambient `C3` (OVH
+   excluded) - classification divergence alone is sufficient here. A real
+   per-slot preference override, if a future case needs one, requires either
+   a client-supplied override reaching `ai-gateway` (a request-contract
+   change, not scoped here) or a distinct `task_name` per slot (this ADR's
+   own rejected alternative, revisited only if the shared-classification
+   trick above turns out insufficient for that future case). See Future
+   work.
 4. **Generator fixes**, both in `generate_authorization_matrix.py`:
    - Read and honor `strict:` in `_effective_model_chain` (mirrors
      `routing.py`'s real algorithm) - fixes Arkos's `write-code` row.
@@ -207,6 +229,12 @@ explicitly *not* new work here:
 - A stricter OKF validator that fails loudly on a `prompts:` entry naming a
   slot with no corresponding `<task-name>--<slot>.md` file, rather than
   silently resolving to `None` (see Accepted risks above).
+- A genuine per-slot model-preference override, if a future slot's need
+  cannot be satisfied by the classification-divergence trick `reflect_node`
+  relies on today (point 3 above). Requires deciding how a caller-supplied
+  preference reaches `ai-gateway` without a server-side `(agent, task)`
+  lookup - a request-contract change to `ModelRouter.invoke_with_fallback`
+  and the `/v1/chat/completions` schema, not attempted in this decision.
 
 ## Related ADRs
 
