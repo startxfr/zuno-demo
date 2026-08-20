@@ -221,7 +221,11 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
     lines.append("")
 
     rows: List[str] = []
-    task_labels: List[Tuple[str, str]] = []
+    # ADR-0419: third element is the task's raw zuno.prompts dict (slot
+    # name -> {classification_ceiling, ...}), read once here alongside
+    # task_zuno rather than re-reading the task file in the Model routing
+    # loop below.
+    task_labels: List[Tuple[str, str, Dict]] = []
     for task_name in tasks:
         task_path = agent_dir / "tasks" / f"{task_name}.md"
         if not task_path.is_file():
@@ -238,7 +242,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             flags.append(f"prompt: `prompts/{task_name}.md`")
         if flags:
             task_label += f" ({'; '.join(flags)})"
-        task_labels.append((task_name, task_label))
+        task_labels.append((task_name, task_label, task_zuno.get("prompts") or {}))
 
         for tool_name in task_zuno.get("allowed_tools") or []:
             entry = tool_policy.get(tool_name)
@@ -292,19 +296,43 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
         lines.append("")
         lines.append("| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |")
         lines.append("|---|---|---|---|---|---|")
-        for task_name, task_label in task_labels:
+        for task_name, task_label, task_prompts in task_labels:
             if classification not in ("C1", "C2", "C3"):
                 lines.append(f"| {task_label} | `{classification}` | — | (classification ceiling unknown — cannot resolve) | — | — |")
                 continue
             prefer = model_preferences.get((name, task_name), [])
             strict = model_strict.get((name, task_name), False)
+            adapter = model_adapters.get((name, task_name))
+            adapter_cell = f"`{adapter}`" if adapter else "—"
+
+            # ADR-0419: a slot's own row uses its own classification_ceiling
+            # (falling back to the task's own ceiling if a slot doesn't
+            # declare one) but the SAME (agent, task) prefer/strict as the
+            # task's primary row - slots don't have their own preference
+            # list (see PromptSlot's docstring for why), only their own
+            # ceiling. Rendered before the primary row so the primary
+            # task's own chain (below) reads as "everything else".
+            for slot_name, slot_zuno in task_prompts.items():
+                slot_zuno = slot_zuno or {}
+                slot_classification = slot_zuno.get("classification_ceiling", classification)
+                if slot_classification not in ("C1", "C2", "C3"):
+                    continue
+                slot_chain = _effective_model_chain(
+                    slot_classification, providers, prefer, local_only=local_only, strict=strict
+                )
+                slot_reference = f"`{slot_chain[0]}`" if slot_chain else "(none eligible)"
+                slot_fallback = ", ".join(f"`{p}`" for p in slot_chain[1:]) or "—"
+                slot_label = f"{task_label} → `{slot_name}`"
+                lines.append(
+                    f"| {slot_label} | `{slot_classification}` | {slot_reference} | {slot_fallback} | {adapter_cell} | "
+                    f"`policies/model-routing/model-routing-policy.yaml` |"
+                )
+
             chain = _effective_model_chain(
                 classification, providers, prefer, local_only=local_only, strict=strict
             )
             reference = f"`{chain[0]}`" if chain else "(none eligible)"
             fallback = ", ".join(f"`{p}`" for p in chain[1:]) or "—"
-            adapter = model_adapters.get((name, task_name))
-            adapter_cell = f"`{adapter}`" if adapter else "—"
             lines.append(
                 f"| {task_label} | `{classification}` | {reference} | {fallback} | {adapter_cell} | "
                 f"`policies/model-routing/model-routing-policy.yaml` |"

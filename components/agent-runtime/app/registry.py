@@ -77,6 +77,32 @@ def _split_frontmatter(path: Path) -> tuple[Dict, str]:
 
 
 @dataclass
+class PromptSlot:
+    """ADR-0419: a named call within a task that needs its own prompt text
+    and/or its own classification ceiling, distinct from the task's
+    primary/implicit call - formalizes what app/graph/arkos_nodes.py's
+    reflect_node hardcoded in Python (ADR-0416's fixed "C2" literal and an
+    inline system-prompt string) as declarative OKF config instead.
+
+    Deliberately has no preference-list fields of its own (an earlier draft
+    of ADR-0419 had `preferred`/`fallback` here, corrected before any code
+    was built against it): ai-gateway resolves model preference server-side
+    purely from the `(agent, task)` routing key, and a slot shares its
+    task's `task_name` by design (see the ADR's "Alternatives considered" -
+    a slot is one step of a task, not a second task), so there is no
+    existing mechanism for a slot to supply its own preference list. This
+    doesn't cost reflect_node anything: preference applies after
+    classification-eligibility filtering, so the same shared preference
+    list already produces a different effective chain at a slot's own
+    (lower) ceiling than at the task's ambient one.
+    """
+
+    name: str
+    prompt: Optional[str] = None
+    classification_ceiling: Optional[str] = None
+
+
+@dataclass
 class TaskDefinition:
     name: str
     title: str
@@ -94,6 +120,10 @@ class TaskDefinition:
     # derived from caller/state data. None means this task's shape never
     # attempts a live read (tool_call_node degrades to a no-op).
     live_read_tool: Optional[str] = None
+    # ADR-0419: `zuno.prompts` - named prompt slots keyed by slot name (see
+    # PromptSlot above). Empty for every task that doesn't declare any -
+    # today, only arkos's draft-architecture-testimonial does.
+    prompts: Dict[str, PromptSlot] = field(default_factory=dict)
 
 
 @dataclass
@@ -283,6 +313,23 @@ class AgentRegistry:
         if prompt_path.is_file():
             _, prompt = _split_frontmatter(prompt_path)
 
+        prompts: Dict[str, PromptSlot] = {}
+        for slot_name, slot_zuno in (zuno.get("prompts") or {}).items():
+            slot_zuno = slot_zuno or {}
+            # ADR-0419: `<task-name>--<slot>.md` alongside the primary
+            # `<task-name>.md` convention above. Silently None if missing -
+            # same graceful-degradation posture the primary prompt already
+            # has (a stricter validator is noted as future work in the ADR).
+            slot_prompt_path = agent_dir / "prompts" / f"{task_name}--{slot_name}.md"
+            slot_prompt = None
+            if slot_prompt_path.is_file():
+                _, slot_prompt = _split_frontmatter(slot_prompt_path)
+            prompts[slot_name] = PromptSlot(
+                name=slot_name,
+                prompt=slot_prompt,
+                classification_ceiling=slot_zuno.get("classification_ceiling"),
+            )
+
         return TaskDefinition(
             name=task_name,
             title=frontmatter.get("title", task_name),
@@ -291,6 +338,7 @@ class AgentRegistry:
             allowed_knowledge=list(zuno.get("allowed_knowledge", [])),
             prompt=prompt,
             live_read_tool=zuno.get("live_read_tool"),
+            prompts=prompts,
         )
 
     def get(self, name: str) -> Optional[AgentDefinition]:

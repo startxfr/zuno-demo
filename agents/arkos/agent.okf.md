@@ -116,6 +116,7 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` | `local-gpt-oss`, `local`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `C3` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `write-code` | `C3` | (none eligible) | — | — | `policies/model-routing/model-routing-policy.yaml` |
 

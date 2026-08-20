@@ -152,6 +152,31 @@ zuno:
 Do a thing, now also searching the web.
 """
 
+_FIXTURE_TASK_WITH_PROMPT_SLOT = """---
+okf_version: v0.2
+type: task
+title: Do a thing
+zuno:
+  allowed_tools:
+    - search_confluence
+  prompts:
+    reflect:
+      classification_ceiling: C2
+    orphan: {}
+---
+
+Do a thing.
+"""
+
+_FIXTURE_REFLECT_PROMPT_MD = """---
+okf_version: v0.2
+type: prompt
+title: Fixture reflect prompt
+---
+
+Review your own output.
+"""
+
 _FIXTURE_AGENT_MD = """---
 okf_version: v0.2
 type: agent
@@ -212,6 +237,61 @@ def test_changing_the_bundle_changes_resolved_behavior_with_no_code_change() -> 
         shutil.rmtree(agent_dir, ignore_errors=True)
 
 
+def test_prompt_slots_load_declared_ceiling_and_prompt_text() -> None:
+    """ADR-0419: a task's zuno.prompts entries resolve to PromptSlot
+    objects, each with its own classification_ceiling and prompt text
+    loaded from <task-name>--<slot>.md - independent of the task's own
+    primary prompt file."""
+    with tempfile.TemporaryDirectory() as tmp:
+        agents_dir = pathlib.Path(tmp)
+        agent_dir = agents_dir / "fixture-agent"
+        (agent_dir / "tasks").mkdir(parents=True)
+        (agent_dir / "prompts").mkdir(parents=True)
+        (agent_dir / "agent.okf.md").write_text(_FIXTURE_AGENT_MD, encoding="utf-8")
+        (agent_dir / "tasks" / "do-a-thing.md").write_text(_FIXTURE_TASK_WITH_PROMPT_SLOT, encoding="utf-8")
+        (agent_dir / "prompts" / "do-a-thing--reflect.md").write_text(_FIXTURE_REFLECT_PROMPT_MD, encoding="utf-8")
+
+        try:
+            registry = AgentRegistry(agents_dir=str(agents_dir))
+            assert not registry.load_errors, registry.load_errors
+            task = registry.get("fixture-agent").tasks["do-a-thing"]
+
+            reflect = task.prompts.get("reflect")
+            assert reflect is not None
+            assert reflect.classification_ceiling == "C2"
+            assert reflect.prompt == "Review your own output."
+
+            # Declared in frontmatter but no do-a-thing--orphan.md file on
+            # disk - resolves to a present slot with prompt=None, the same
+            # silent-degradation behavior the primary prompt already has
+            # for a missing file (never a load error).
+            orphan = task.prompts.get("orphan")
+            assert orphan is not None
+            assert orphan.classification_ceiling is None
+            assert orphan.prompt is None
+        finally:
+            shutil.rmtree(agent_dir, ignore_errors=True)
+
+
+def test_task_with_no_prompts_key_has_an_empty_prompts_dict() -> None:
+    """Backward compatibility: every task that doesn't declare zuno.prompts
+    (i.e. every task in the repo except arkos's draft-architecture-
+    testimonial) resolves to an empty dict, not None or an error."""
+    with tempfile.TemporaryDirectory() as tmp:
+        agents_dir = pathlib.Path(tmp)
+        agent_dir = agents_dir / "fixture-agent"
+        (agent_dir / "tasks").mkdir(parents=True)
+        (agent_dir / "agent.okf.md").write_text(_FIXTURE_AGENT_MD, encoding="utf-8")
+        (agent_dir / "tasks" / "do-a-thing.md").write_text(_FIXTURE_TASK_V1, encoding="utf-8")
+
+        try:
+            registry = AgentRegistry(agents_dir=str(agents_dir))
+            task = registry.get("fixture-agent").tasks["do-a-thing"]
+            assert task.prompts == {}
+        finally:
+            shutil.rmtree(agent_dir, ignore_errors=True)
+
+
 def test_finage_declares_local_only_from_its_real_bundle() -> None:
     """ADR-0416 sanity check against the actual checked-in bundle: Finage
     must never be routable to an external model, at any classification -
@@ -231,6 +311,8 @@ TESTS = [
     test_placeholder_agents_declare_their_real_tool_ceiling,
     test_genuine_placeholder_agents_declare_no_tools,
     test_changing_the_bundle_changes_resolved_behavior_with_no_code_change,
+    test_prompt_slots_load_declared_ceiling_and_prompt_text,
+    test_task_with_no_prompts_key_has_an_empty_prompts_dict,
     test_finage_declares_local_only_from_its_real_bundle,
 ]
 

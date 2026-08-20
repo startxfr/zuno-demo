@@ -62,6 +62,22 @@ _WRITE_CODE_TASK = _ARKOS.tasks.get("write-code")
 if _WRITE_CODE_TASK is None:
     raise RuntimeError("agent-runtime: arkos's 'write-code' task bundle is missing")
 
+# ADR-0419: reflect_node's declarative config - a graceful-degradation
+# fallback to the literal values this used to hardcode, not a fail-fast
+# RuntimeError like _DRAFT_TASK/_WRITE_CODE_TASK above, matching the ADR's
+# own accepted-risk mitigation ("reflect_node's own code still supplies a
+# literal fallback if the slot is absent").
+_REFLECT_SLOT = _DRAFT_TASK.prompts.get("reflect")
+_REFLECT_CLASSIFICATION_CEILING = (_REFLECT_SLOT.classification_ceiling if _REFLECT_SLOT else None) or "C2"
+_REFLECT_SYSTEM_PROMPT = (_REFLECT_SLOT.prompt if _REFLECT_SLOT else None) or (
+    "You are reviewing your own draft of a Design & Architecture "
+    "Testimonial before it is saved. Read it critically and return "
+    "an improved version: tighten unclear passages, check internal "
+    "consistency, and strengthen weak sections. Return only the "
+    "revised document body, with no commentary about the review "
+    "itself."
+)
+
 ARKOS_BASE_CLASSIFICATION = _ARKOS.preferred_classification  # from agent.okf.md's zuno.model
 RAG_TOP_K = _ARKOS.rag_top_k or 5  # Arkos declares no zuno.rag block; AgentDefinition defaults to 5
 
@@ -348,17 +364,20 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     reads and writes only `document_draft` (Arkos's own already-generated
     prose), never `retrieved_docs`/the Confluence tool result draft_node
     was grounded in. That narrow scope is what makes it safe to evaluate
-    at a fixed C2 classification ceiling below, the same scoped-exception
-    pattern ADR-0415 established for generate_image: that call's payload
-    is also a short agent-authored string rather than raw source
-    material, so it can be evaluated below the turn's own
-    effective_classification without the genuinely C3-classified source
-    content this turn may have touched ever entering the call.
+    at a fixed classification ceiling below (ADR-0419: declared as this
+    task's `reflect` prompt slot, `_REFLECT_CLASSIFICATION_CEILING` -
+    "C2" today, see agents/arkos/tasks/draft-architecture-testimonial.md),
+    the same scoped-exception pattern ADR-0415 established for
+    generate_image: that call's payload is also a short agent-authored
+    string rather than raw source material, so it can be evaluated below
+    the turn's own effective_classification without the genuinely
+    C3-classified source content this turn may have touched ever entering
+    the call.
 
     Still honors `local_only_required` (ADR-0035) unconditionally - that
     flag means a source explicitly forbids ITS OWN influence from
     reaching any external model, and the draft may already have been
-    shaped by that source's content. The C2 ceiling below overrides
+    shaped by that source's content. The ceiling below overrides
     classification ESCALATION only (state's `effective_classification`,
     which for Arkos starts at its C3 seed and only ever climbs, ADR-0034);
     it never overrides this separate source-level restriction.
@@ -375,24 +394,15 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     if not draft:
         return {}
 
-    system = SystemMessage(
-        content=(
-            "You are reviewing your own draft of a Design & Architecture "
-            "Testimonial before it is saved. Read it critically and return "
-            "an improved version: tighten unclear passages, check internal "
-            "consistency, and strengthen weak sections. Return only the "
-            "revised document body, with no commentary about the review "
-            "itself."
-        )
-    )
+    system = SystemMessage(content=_REFLECT_SYSTEM_PROMPT)
     human = HumanMessage(content=draft)
 
     local_only = state.get("local_only_required", False) or _ARKOS.local_only
     try:
         result, provider = await _model_router.invoke_with_fallback(
-            # ADR-0416: fixed C2 ceiling for this call only - see the
-            # docstring above for why that's safe here.
-            classification="C2",
+            # ADR-0416/ADR-0419: fixed ceiling for this call only - see
+            # the docstring above for why that's safe here.
+            classification=_REFLECT_CLASSIFICATION_CEILING,
             messages=[system, human],
             bearer_token=state["bearer_token"],
             local_only=local_only,

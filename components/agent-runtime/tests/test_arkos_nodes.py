@@ -198,6 +198,19 @@ def test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task() ->
     assert "knowledge.project" in arkos_nodes._DRAFT_TASK.allowed_knowledge
 
 
+def test_reflect_slot_resolves_from_the_real_bundle() -> None:
+    """ADR-0419 sanity check: the declarative reflect_node config actually
+    came from agents/arkos/tasks/draft-architecture-testimonial.md's
+    zuno.prompts.reflect and prompts/draft-architecture-testimonial--
+    reflect.md, not the module's own hardcoded-literal safety net."""
+    slot = arkos_nodes._DRAFT_TASK.prompts.get("reflect")
+    assert slot is not None
+    assert slot.classification_ceiling == "C2"
+    assert slot.prompt and "reviewing your own draft" in slot.prompt
+    assert arkos_nodes._REFLECT_CLASSIFICATION_CEILING == "C2"
+    assert arkos_nodes._REFLECT_SYSTEM_PROMPT == slot.prompt
+
+
 # --------------------------------------------------------------------------
 # ADR-0417: coding-request early exit (route_after_plan / code_node)
 # --------------------------------------------------------------------------
@@ -286,6 +299,7 @@ TESTS = [
     test_reflect_node_still_honors_local_only_required,
     test_reflect_node_is_a_noop_without_a_draft,
     test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task,
+    test_reflect_slot_resolves_from_the_real_bundle,
     test_arkos_declares_the_write_code_task,
     test_route_after_plan_detects_a_coding_request,
     test_route_after_plan_falls_through_to_retrieve_for_a_dat_request,

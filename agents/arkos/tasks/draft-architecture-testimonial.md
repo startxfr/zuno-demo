@@ -21,6 +21,15 @@ zuno:
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project
+  # ADR-0419: the reflect step (app/graph/arkos_nodes.py::reflect_node,
+  # ADR-0416) is a distinct call within this same task - a self-review
+  # pass over draft_node's own output, evaluated at a fixed C2 ceiling
+  # rather than this task's ambient classification. Declared here instead
+  # of hardcoded in Python; prompts/draft-architecture-testimonial--reflect.md
+  # is its prompt text.
+  prompts:
+    reflect:
+      classification_ceiling: C2
 ---
 
 # Draft an architecture testimonial
