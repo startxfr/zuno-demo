@@ -49,6 +49,7 @@ async def extract_memory(
     transcript: str,
     classification: str,
     bearer_token: str,
+    agent_local_only: bool = False,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Returns (facts, memories) - both possibly empty. Raises
     MemoryExtractionError on a model-call failure or unparseable output;
@@ -57,8 +58,13 @@ async def extract_memory(
     silently drop a session's context... logged and retried/flagged") -
     this function only guarantees it never returns a half-parsed or
     guessed result.
+
+    `agent_local_only` (ADR-0416, e.g. Finage's `agent.local_only`) forces
+    local regardless of classification - the same agent-level restriction
+    app/graph/nodes.py:reason_node and app/graph/history.py:compact honor.
+    Defaults False so every other caller/test is unaffected.
     """
-    local_only = classification.upper() in ("C2", "C3")
+    local_only = agent_local_only or classification.upper() in ("C2", "C3")
     system = SystemMessage(content=_EXTRACTION_SYSTEM_PROMPT)
     human = HumanMessage(content=transcript)
 

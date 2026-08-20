@@ -99,6 +99,16 @@ def test_c1_conversation_does_not_force_local_only() -> None:
     assert call_kwargs["local_only"] is False
 
 
+def test_agent_local_only_forces_local_even_at_c1() -> None:
+    """ADR-0416: an agent-level restriction (e.g. Finage) must force local
+    regardless of classification - distinct from the C2/C3 rule above,
+    which a C1 conversation would otherwise skip."""
+    router = _fake_router({"facts": [], "memories": []})
+    asyncio.run(extract_memory(router, "public transcript", "C1", "token", agent_local_only=True))
+    call_kwargs = router.invoke_with_fallback.call_args.kwargs
+    assert call_kwargs["local_only"] is True
+
+
 def test_malformed_json_output_raises_rather_than_guessing() -> None:
     router = ModelRouter()
 
@@ -134,6 +144,7 @@ TESTS = [
     test_c2_conversation_forces_local_only_extraction,
     test_c3_conversation_also_forces_local_only_extraction,
     test_c1_conversation_does_not_force_local_only,
+    test_agent_local_only_forces_local_even_at_c1,
     test_malformed_json_output_raises_rather_than_guessing,
     test_model_call_failure_raises_rather_than_silently_dropping_context,
 ]

@@ -130,6 +130,17 @@ class AgentDefinition:
     # app/graph/history.py) token budget for summary + verbatim history
     # combined.
     history_token_budget: int = HISTORY_TOKEN_BUDGET_DEFAULT
+    # ADR-0416: `zuno.model.local_only` - an agent-declared, unconditional
+    # local-only restriction, independent of the turn's own computed
+    # classification (ADR-0034). Distinct from the existing per-tool-call
+    # `local_only_required` graph-state flag (ADR-0035, set from a tool
+    # result's `external_model_policy.allow_context: false`): that
+    # mechanism only fires when a specific restricted source was actually
+    # touched this turn, so an agent with no such tool wired yet (or one
+    # whose C1/C2 turns simply never touch one) could still reach an
+    # external provider. This field is the coarser, agent-level guarantee
+    # for an agent that must never do that, full stop - Finage's case.
+    local_only: bool = False
 
     def declared_tools(self) -> List[str]:
         """Union of every task's allowed_tools - ADR-0011 factor 1 (agent
@@ -255,6 +266,7 @@ class AgentRegistry:
             history_enabled=bool(history.get("enabled", True)) and not HISTORY_DISABLED,
             history_max_turns=int(history.get("max_turns", HISTORY_MAX_TURNS_DEFAULT)),
             history_token_budget=int(history.get("token_budget", HISTORY_TOKEN_BUDGET_DEFAULT)),
+            local_only=bool(model.get("local_only", False)),
         )
 
     def _load_task(self, task_name: str, agent_dir: Path) -> TaskDefinition:

@@ -451,6 +451,7 @@ async def extract_memory_endpoint(
             transcript=transcript,
             classification=classification,
             bearer_token=identity.token,
+            agent_local_only=agent_def.local_only,
         )
     except MemoryExtractionError as exc:
         # ADR-0209 Operational considerations: logged, not silently

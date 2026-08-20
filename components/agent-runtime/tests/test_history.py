@@ -36,7 +36,7 @@ from app.clients.model_router import ModelRouterError, ProviderCandidate  # noqa
 from app.graph import history as history_mod  # noqa: E402
 from app.graph.arkos_nodes import _ARKOS, _DRAFT_TASK  # noqa: E402
 from app.graph.arkos_nodes import _model_router as _arkos_model_router  # noqa: E402
-from app.graph.nodes import _ANSWER_TASK, _TEKOS, _model_router  # noqa: E402
+from app.graph.nodes import _ANSWER_TASK, _TEKOS, _model_router, reason_node  # noqa: E402
 from app.graph.shapes.plan_draft_write import build as _build_arkos  # noqa: E402
 from app.graph.shapes.retrieve_reason_respond import build as _build  # noqa: E402
 from app.main import _seed_history_backfill  # noqa: E402
@@ -368,6 +368,44 @@ async def test_compaction_call_is_local_only_for_a_c3_conversation() -> None:
     assert captured["tags"] == ["zuno-internal"]
 
 
+async def test_reason_node_forces_local_only_when_agent_declares_it() -> None:
+    """ADR-0416: an agent-level local_only (e.g. Finage) must force local
+    even at C1, where neither the C2/C3 classification rule nor any
+    per-tool local_only_required would otherwise fire - proven here
+    against Tekos's real reason_node with local_only monkeypatched on,
+    the same way test_compaction_call_is_local_only_for_a_c3_conversation
+    monkeypatches _TEKOS's history fields above."""
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("a reply"), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = _model_router.invoke_with_fallback
+    saved_local_only = _TEKOS.local_only
+    _TEKOS.local_only = True
+    try:
+        state = {
+            "message": "a public question",
+            "bearer_token": "t",
+            "request_id": "req-1",
+            "effective_classification": "C1",
+            "local_only_required": False,
+            "retrieved_docs": [],
+            "tool_results": {},
+            "errors": [],
+        }
+        _model_router.invoke_with_fallback = fake_invoke
+        await reason_node(state)
+    finally:
+        _model_router.invoke_with_fallback = saved_invoke
+        _TEKOS.local_only = saved_local_only
+
+    assert captured, "reason_node never called the model router"
+    assert captured["classification"] == "C1"
+    assert captured["local_only"] is True
+
+
 async def test_history_classification_never_downgrades_across_turns() -> None:
     node = history_mod.make_history_node(_TEKOS, _ANSWER_TASK, _model_router)
     state_c2 = {
@@ -477,6 +515,7 @@ TESTS = [
     test_compaction_triggers_under_a_small_budget_and_folds_old_turns,
     test_compaction_failure_degrades_to_sliding_window_without_failing_the_turn,
     test_compaction_call_is_local_only_for_a_c3_conversation,
+    test_reason_node_forces_local_only_when_agent_declares_it,
     test_history_classification_never_downgrades_across_turns,
     test_resume_without_a_history_channel_does_not_crash_and_backfills,
     test_resume_with_an_existing_history_channel_is_left_alone,

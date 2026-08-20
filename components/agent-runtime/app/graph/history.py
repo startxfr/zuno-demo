@@ -235,7 +235,10 @@ def make_history_node(agent: AgentDefinition, task: TaskDefinition, model_router
                     summary=summary,
                     folded_turns=folded,
                     classification=history_classification,
-                    local_only_required=state.get("local_only_required", False),
+                    # ADR-0416: agent.local_only (e.g. Finage) applies here
+                    # too - an agent-level restriction, not just a per-turn
+                    # source restriction.
+                    local_only_required=state.get("local_only_required", False) or agent.local_only,
                     bearer_token=state["bearer_token"],
                     request_id=state.get("request_id"),
                     agent_name=agent.name,

@@ -197,6 +197,8 @@ def test_changing_the_bundle_changes_resolved_behavior_with_no_code_change() -> 
         agent_v1 = registry_v1.get("fixture-agent")
         assert agent_v1.declared_tools() == ["search_confluence"]
         assert agent_v1.rag_top_k == 3
+        # ADR-0416: absent zuno.model.local_only defaults False.
+        assert agent_v1.local_only is False
 
         # Edit only the bundle - no Python code changes - then reload via a
         # fresh AgentRegistry (matching how a redeploy picks up a bundle
@@ -210,11 +212,26 @@ def test_changing_the_bundle_changes_resolved_behavior_with_no_code_change() -> 
         shutil.rmtree(agent_dir, ignore_errors=True)
 
 
+def test_finage_declares_local_only_from_its_real_bundle() -> None:
+    """ADR-0416 sanity check against the actual checked-in bundle: Finage
+    must never be routable to an external model, at any classification -
+    every other agent defaults to local_only False."""
+    registry = AgentRegistry(agents_dir=str(REAL_AGENTS_DIR))
+    finage = registry.get("finage")
+    assert finage is not None
+    assert finage.local_only is True
+
+    tekos = registry.get("tekos")
+    assert tekos is not None
+    assert tekos.local_only is False
+
+
 TESTS = [
     test_tekos_loads_from_the_real_bundle,
     test_placeholder_agents_declare_their_real_tool_ceiling,
     test_genuine_placeholder_agents_declare_no_tools,
     test_changing_the_bundle_changes_resolved_behavior_with_no_code_change,
+    test_finage_declares_local_only_from_its_real_bundle,
 ]
 
 

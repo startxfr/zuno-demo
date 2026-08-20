@@ -30,11 +30,17 @@ zuno:
     - check-my-drive-and-mail
   model:
     preferred_classification: C2
+    local_only: true
     notes: >-
       Placeholder pending the live acceptance gate; C2 default, escalating
       to C3 whenever a turn touches the deterministic legacy SXA
       aggregation/lookup capabilities (`financial-data`/`hr-data` tier,
       policies/data-classification/classification.yaml, ADR-0034).
+      ADR-0416: `local_only: true` makes Finage local-model-only
+      unconditionally, at every classification including C1 - finance
+      material never leaves the cluster, full stop, rather than riding
+      the standard C2 restricted-SaaS-allowlist default every other C2
+      agent gets.
   access:
     # ADR-0040: agent entitlement group, orthogonal to the `finance`
     # business role that governs tool/data permissions inside Finage.
@@ -105,7 +111,7 @@ permissions inside Finage once active - see
 
 ## Authorization matrix
 
-Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_finage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`.
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_finage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`; local-only (ADR-0416): `true`.
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
@@ -124,9 +130,9 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `C2` | `local` | `local-gpt-oss`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `identify-business-ready-to-invoice` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `monthly-invoice-report` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `check-my-drive-and-mail` | `C2` | `local` | `local-gpt-oss`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `C2` | `local` | `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `identify-business-ready-to-invoice` | `C2` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `monthly-invoice-report` | `C2` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-and-mail` | `C2` | `local` | `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

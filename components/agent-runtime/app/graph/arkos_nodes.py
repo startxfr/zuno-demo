@@ -220,7 +220,11 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
     )
 
     classification = state.get("effective_classification", ARKOS_BASE_CLASSIFICATION)
-    local_only = state.get("local_only_required", False)
+    # ADR-0416: agent.local_only mirrors app/graph/nodes.py:reason_node's
+    # same unconditional, agent-declared restriction (defaults False -
+    # Arkos doesn't set it, only relevant if a future agent on this shape
+    # does).
+    local_only = state.get("local_only_required", False) or _ARKOS.local_only
     # ADR-0415: same declarative gate as app/graph/nodes.py:reason_node.
     image_generation_enabled = _image_generation_declared(_DRAFT_TASK)
     turn_messages: List[Any] = [system, *history_messages, human]
@@ -304,7 +308,7 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     )
     human = HumanMessage(content=draft)
 
-    local_only = state.get("local_only_required", False)
+    local_only = state.get("local_only_required", False) or _ARKOS.local_only
     try:
         result, provider = await _model_router.invoke_with_fallback(
             # ADR-0416: fixed C2 ceiling for this call only - see the

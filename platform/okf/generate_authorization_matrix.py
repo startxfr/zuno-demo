@@ -102,7 +102,9 @@ def _load_model_routing() -> Tuple[Dict[Tuple[str, str], List[str]], Dict[Tuple[
     return preferences, adapters
 
 
-def _effective_model_chain(classification: str, providers: List[Dict], prefer: List[str]) -> List[str]:
+def _effective_model_chain(
+    classification: str, providers: List[Dict], prefer: List[str], local_only: bool = False
+) -> List[str]:
     """Mirrors components/ai-gateway/app/routing.py's
     RoutingTable.candidates_for() + _apply_preference(): filter providers
     eligible for `classification`, keep provider-routing.yaml's order,
@@ -110,9 +112,21 @@ def _effective_model_chain(classification: str, providers: List[Dict], prefer: L
     - a pure reorder, never able to resurrect a provider eligibility
     filtered out. Duplicated here rather than imported (this file already
     duplicates validate_okf_bundle.py's frontmatter parsing for the same
-    reason: small, well-specified logic, independent lifecycles)."""
+    reason: small, well-specified logic, independent lifecycles).
+
+    `local_only` (ADR-0416, `zuno.model.local_only`) mirrors routing.py's
+    own source-level restriction: when set, non-local candidates are
+    dropped regardless of classification eligibility - without this, an
+    agent like Finage would show openai/anthropic as "reference"/fallback
+    candidates in this generated table even though local_only makes them
+    unreachable at runtime, which would make the doc actively wrong."""
     known = {p["name"] for p in providers}
-    candidates = [p["name"] for p in providers if classification in (p.get("eligible_for") or [])]
+    candidates = [
+        p["name"]
+        for p in providers
+        if classification in (p.get("eligible_for") or [])
+        and (not local_only or p.get("kind") == "local")
+    ]
     deduped = [name for name in dict.fromkeys(prefer) if name in known]
     preferred = [name for name in deduped if name in candidates]
     rest = [name for name in candidates if name not in deduped]
@@ -142,7 +156,9 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
     zuno = frontmatter.get("zuno") or {}
     name = zuno.get("name", agent_dir.name)
     access_groups = (zuno.get("access") or {}).get("groups") or []
-    classification = (zuno.get("model") or {}).get("preferred_classification", "?")
+    model_zuno = zuno.get("model") or {}
+    classification = model_zuno.get("preferred_classification", "?")
+    local_only = bool(model_zuno.get("local_only", False))
     primary_task = zuno.get("primary_task")
     tasks: List[str] = zuno.get("tasks") or []
 
@@ -160,7 +176,9 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
         f"intersection (ADR-0011/ADR-0203) restated for review, never read "
         f"at runtime. Entitlement (ADR-0040): `{', '.join(access_groups) or '(none)'}`; "
         f"model classification ceiling (ADR-0021): `{classification}`; "
-        f"status: `{zuno.get('status', '?')}`."
+        f"status: `{zuno.get('status', '?')}`"
+        + (f"; local-only (ADR-0416): `{str(local_only).lower()}`" if local_only else "")
+        + "."
     )
     lines.append("")
 
@@ -241,7 +259,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                 lines.append(f"| {task_label} | `{classification}` | — | (classification ceiling unknown — cannot resolve) | — | — |")
                 continue
             prefer = model_preferences.get((name, task_name), [])
-            chain = _effective_model_chain(classification, providers, prefer)
+            chain = _effective_model_chain(classification, providers, prefer, local_only=local_only)
             reference = f"`{chain[0]}`" if chain else "(none eligible)"
             fallback = ", ".join(f"`{p}`" for p in chain[1:]) or "—"
             adapter = model_adapters.get((name, task_name))

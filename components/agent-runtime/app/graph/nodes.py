@@ -427,7 +427,9 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     Uses the turn's aggregated effective_classification (ADR-0034) rather
     than a static constant, and forces local-only inference (ADR-0035) when
     a source-restricted result (e.g. Confluence) was folded into context
-    this turn - see tool_call_node.
+    this turn - see tool_call_node. Also forces it unconditionally when
+    `agent.local_only` is set (ADR-0416, e.g. Finage) - an agent-level
+    restriction independent of any single turn's classification or tools.
 
     ADR-0039: the system prompt comes from this task's own prompt file
     (task.prompt, resolved by AgentRegistry) rather than a Python string
@@ -463,7 +465,10 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
         human = HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['message']}")
 
         classification = state.get("effective_classification", base_classification)
-        local_only = state.get("local_only_required", False)
+        # ADR-0416: agent.local_only (e.g. Finage) is an unconditional,
+        # agent-declared restriction independent of this turn's own
+        # local_only_required (ADR-0035, per-tool-call) - either forces it.
+        local_only = state.get("local_only_required", False) or agent.local_only
         turn_messages: List[Any] = [system, *history_messages, human]
         try:
             result, provider = await _model_router.invoke_with_fallback(
