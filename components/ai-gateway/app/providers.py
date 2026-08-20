@@ -136,6 +136,16 @@ def chat_model_for(
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
         )
+    if candidate.name == "mistral-codestral":
+        from langchain_mistralai import ChatMistralAI
+
+        # ADR-0417: same native Mistral API as the `mistral` branch above -
+        # a dedicated credential (MISTRAL_CODESTRAL_API_KEY) only.
+        return ChatMistralAI(
+            model=cfg.get("model", "codestral-latest"),
+            api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_CODESTRAL_API_KEY")),
+            temperature=cfg.get("temperature", 0.2),
+        )
     if candidate.name == "ovhcloud-gpt-oss-120b":
         from langchain_openai import ChatOpenAI
 

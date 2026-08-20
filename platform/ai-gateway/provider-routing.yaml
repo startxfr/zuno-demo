@@ -123,6 +123,21 @@ providers:
     temperature: 0.2
     eligible_for: [C1]
 
+  # ADR-0417: Codestral, Mistral's code-specialized model, via the native
+  # Mistral API - same transport as the `mistral` entry above (no
+  # endpoint: override, langchain_mistralai talks to api.mistral.ai
+  # directly), but a DEDICATED api_key/account (MISTRAL_CODESTRAL_API_KEY,
+  # zuno/providers/mistral-codestral) so Codestral running low on credits
+  # is a distinguishable event from mistral-large-latest doing so.
+  # eligible_for is [C1, C2] only, never C3 - same unconditional SaaS rule
+  # as every other entry in this file (ADR-0021/0035).
+  - name: mistral-codestral
+    kind: saas
+    model: codestral-latest
+    api_key_env: MISTRAL_CODESTRAL_API_KEY
+    temperature: 0.2
+    eligible_for: [C1, C2]
+
   # ADR-0416: gpt-oss-120b via the same OVHcloud AI Endpoints account/
   # credential ADR-0415 already set up for stable-diffusion-xl (same
   # OVHCLOUD_API_KEY secret, same OpenAI-compatible base URL) - not

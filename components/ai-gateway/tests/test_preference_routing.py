@@ -137,6 +137,36 @@ def test_ovhcloud_gpt_oss_120b_eligible_without_preference_at_c1() -> None:
     assert "ovhcloud-gpt-oss-120b" in names
 
 
+# ADR-0417: mistral-codestral - same saas eligibility shape as
+# ovhcloud-gpt-oss-120b above (eligible_for: [C1, C2], never C3).
+_PROVIDERS_WITH_MISTRAL_CODESTRAL = {
+    "providers": [
+        {"name": "local", "kind": "local", "eligible_for": ["C1", "C2", "C3"], "serves_adapters": True},
+        {"name": "local-gpt-oss", "kind": "local", "eligible_for": ["C1", "C2", "C3"]},
+        {"name": "mistral-codestral", "kind": "saas", "eligible_for": ["C1", "C2"]},
+    ]
+}
+
+
+def test_mistral_codestral_is_excluded_at_c3() -> None:
+    table = _StubTable(_PROVIDERS_WITH_MISTRAL_CODESTRAL)
+    candidates = table.candidates_for("C3", prefer=["mistral-codestral", "local-gpt-oss"])
+    assert [c.name for c in candidates] == ["local-gpt-oss", "local"]
+    assert all(c.kind == "local" for c in candidates)
+
+
+def test_mistral_codestral_eligible_and_preferred_at_c2() -> None:
+    table = _StubTable(_PROVIDERS_WITH_MISTRAL_CODESTRAL)
+    names = [c.name for c in table.candidates_for("C2", prefer=["mistral-codestral", "local-gpt-oss", "local"])]
+    assert names == ["mistral-codestral", "local-gpt-oss", "local"]
+
+
+def test_mistral_codestral_eligible_without_preference_at_c1() -> None:
+    table = _StubTable(_PROVIDERS_WITH_MISTRAL_CODESTRAL)
+    names = [c.name for c in table.candidates_for("C1")]
+    assert "mistral-codestral" in names
+
+
 TESTS = [
     test_preferred_survivors_move_to_front_in_given_order,
     test_unlisted_survivors_keep_relative_order_after_preferred,
@@ -150,6 +180,9 @@ TESTS = [
     test_ovhcloud_gpt_oss_120b_is_excluded_at_c3,
     test_ovhcloud_gpt_oss_120b_eligible_and_preferred_at_c2,
     test_ovhcloud_gpt_oss_120b_eligible_without_preference_at_c1,
+    test_mistral_codestral_is_excluded_at_c3,
+    test_mistral_codestral_eligible_and_preferred_at_c2,
+    test_mistral_codestral_eligible_without_preference_at_c1,
 ]
 
 
