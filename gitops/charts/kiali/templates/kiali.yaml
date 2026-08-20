@@ -69,4 +69,26 @@ spec:
       provider: tempo
       use_grpc: false
       in_cluster_url: "http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200"
+  kiali_feature_flags:
+    validations:
+      # KIA1301 ships pre-ignored by the Kiali operator's own CRD defaults;
+      # pinned explicitly here alongside KIA1401 so both are visible in one
+      # place instead of relying on an implicit operator default.
+      #
+      # KIA1401 ("Route is pointing to a non-existent or inaccessible K8s
+      # gateway"): openshift-ingress runs its own independent istiod
+      # (openshift-gateway-istiod, OpenShift's built-in Gateway API support,
+      # provisioned outside zuno-mesh) that Kiali has no visibility into -
+      # external_services.istio above pins Kiali to zuno-mesh's control
+      # plane only. Every HTTPRoute that correctly targets the shared
+      # ingress Gateways living in openshift-ingress (maas-default-gateway,
+      # data-science-gateway, zuno-agent-gateway) will always trip this
+      # false positive even though their real Gateway API status is
+      # Accepted=True/ResolvedRefs=True/Programmed=True - verified against
+      # the live cluster. Suppress rather than chase a real fix: joining
+      # openshift-ingress to zuno-mesh would sidecar-inject the OpenShift
+      # router, and Kiali only supports one control plane per cluster.
+      ignore:
+        - KIA1301
+        - KIA1401
 {{- end }}

@@ -29,3 +29,17 @@ never injects the `X-Forwarded-*` headers Kiali would otherwise use to guess
 its own external URL - without the pin, Kiali fell back to its internal
 listen port (20001) when building the browser-side OAuth redirect, sending
 the login button to an unroutable `host:20001`.
+
+The cluster runs two fully independent Istio control planes: `zuno-mesh`'s
+own (`external_services.istio.root_namespace`/`istiod_url` above), and a
+second, separate one OpenShift provisions automatically for its built-in
+Gateway API support (`openshift-gateway-istiod` in `openshift-ingress`,
+backing the shared `maas-default-gateway`/`data-science-gateway`/
+`zuno-agent-gateway`). Kiali only supports one control plane per cluster, so
+it can read HTTPRoute/Gateway objects in `openshift-ingress` (RBAC and
+`accessible_namespaces` are cluster-wide) but can't validate them against a
+control plane it doesn't know about, and flags every route pointing there
+with a false-positive `KIA1401` ("Route is pointing to a non-existent or
+inaccessible K8s gateway") even though their real Gateway API status is
+healthy. `kiali_feature_flags.validations.ignore` suppresses `KIA1401`
+mesh-wide for this reason - it is not silencing a real bug.
