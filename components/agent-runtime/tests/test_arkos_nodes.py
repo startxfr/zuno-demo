@@ -282,6 +282,83 @@ async def test_code_node_provider_failure_is_a_visible_error_not_a_silent_fallba
     assert result["source_mode"] == "none"
 
 
+# --------------------------------------------------------------------------
+# structure-demo: demo-narrative early exit (route_after_plan / demo_node)
+# --------------------------------------------------------------------------
+
+
+def test_arkos_declares_the_structure_demo_task() -> None:
+    """Sanity check against the real checked-in bundle - confirms the
+    module-level singleton resolved the actual structure-demo task and
+    its prompt file (unlike write-code, this task's prompt lives in
+    Markdown, not a Python literal - see the module's own comment)."""
+    assert arkos_nodes._STRUCTURE_DEMO_TASK.name == "structure-demo"
+    assert arkos_nodes._STRUCTURE_DEMO_TASK.prompt
+    assert "demo narrative" in arkos_nodes._STRUCTURE_DEMO_TASK.prompt.lower()
+
+
+def test_route_after_plan_detects_a_demo_request() -> None:
+    assert (
+        arkos_nodes.route_after_plan({"message": "Structure a demo for the OpenShift AI GPU sizing project"})
+        == "demo"
+    )
+
+
+def test_route_after_plan_prefers_code_over_demo_when_both_could_match() -> None:
+    """A coding request checked first, same order code_node/demo_node are
+    declared in plan_draft_write.py's conditional edges."""
+    assert (
+        arkos_nodes.route_after_plan({"message": "write me a Terraform snippet for this workshop"}) == "code"
+    )
+
+
+async def test_demo_node_uses_arkos_ambient_classification_and_the_structure_demo_task_name() -> None:
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("1. Opening...\n2. Show the RAG pipeline..."), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_invoke
+        state = {
+            "message": "Structure a demo for the OpenShift AI GPU sizing project",
+            "bearer_token": "t",
+            "request_id": "req-1",
+            "local_only_required": False,
+        }
+        result = await arkos_nodes.demo_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert captured["classification"] == arkos_nodes.ARKOS_BASE_CLASSIFICATION
+    assert captured["task_name"] == "structure-demo"
+    assert captured["agent_name"] == "arkos"
+    assert result["citations"] == []
+    assert result["source_mode"] == "none"
+    assert result["provider_used"] == "ai-gateway"
+
+
+async def test_demo_node_provider_failure_is_a_visible_error() -> None:
+    async def failing_invoke(**kwargs):
+        raise ModelRouterError("all eligible providers failed")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = failing_invoke
+        result = await arkos_nodes.demo_node(
+            {"message": "structure a demo", "bearer_token": "t", "request_id": "r"}
+        )
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert "try again" in result["reply"].lower()
+    assert result["provider_used"] is None
+    assert result["citations"] == []
+    assert result["source_mode"] == "none"
+
+
 TESTS = [
     test_extract_topic_from_a_dat_request,
     test_extract_topic_accepts_the_full_phrase_too,
@@ -305,6 +382,11 @@ TESTS = [
     test_route_after_plan_falls_through_to_retrieve_for_a_dat_request,
     test_code_node_uses_a_fixed_c2_ceiling_and_the_write_code_task_name,
     test_code_node_provider_failure_is_a_visible_error_not_a_silent_fallback,
+    test_arkos_declares_the_structure_demo_task,
+    test_route_after_plan_detects_a_demo_request,
+    test_route_after_plan_prefers_code_over_demo_when_both_could_match,
+    test_demo_node_uses_arkos_ambient_classification_and_the_structure_demo_task_name,
+    test_demo_node_provider_failure_is_a_visible_error,
 ]
 
 

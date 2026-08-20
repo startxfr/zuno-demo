@@ -41,6 +41,7 @@ from langgraph.graph.state import CompiledStateGraph
 from app.graph.arkos_nodes import (
     _model_router,
     code_node,
+    demo_node,
     draft_node,
     plan_node,
     reflect_node,
@@ -64,6 +65,8 @@ def build(
     # ADR-0417: early-exit branch for a coding request - never touches
     # retrieve/draft/reflect/write, see route_after_plan below.
     graph.add_node("code", code_node)
+    # Same early-exit shape as "code" above, for a demo-narrative request.
+    graph.add_node("demo", demo_node)
     graph.add_node("retrieve", retrieve_node)
     graph.add_node("draft", draft_node)
     # ADR-0416: self-review pass over draft_node's own output, before write.
@@ -77,12 +80,15 @@ def build(
 
     graph.add_edge(START, "plan")
     # ADR-0417: replaces the previously-unconditional plan -> retrieve edge.
-    graph.add_conditional_edges("plan", route_after_plan, {"code": "code", "retrieve": "retrieve"})
+    graph.add_conditional_edges(
+        "plan", route_after_plan, {"code": "code", "demo": "demo", "retrieve": "retrieve"}
+    )
     graph.add_edge("retrieve", "draft")
     graph.add_edge("draft", "reflect")
     graph.add_edge("reflect", "write")
     graph.add_edge("write", "record_history")
     graph.add_edge("code", "record_history")
+    graph.add_edge("demo", "record_history")
     graph.add_edge("record_history", END)
 
     return graph.compile(checkpointer=checkpointer)

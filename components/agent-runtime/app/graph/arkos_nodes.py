@@ -61,6 +61,13 @@ if _DRAFT_TASK is None or not _DRAFT_TASK.prompt:
 _WRITE_CODE_TASK = _ARKOS.tasks.get("write-code")
 if _WRITE_CODE_TASK is None:
     raise RuntimeError("agent-runtime: arkos's 'write-code' task bundle is missing")
+# Same early-exit, catalog-only shape as _WRITE_CODE_TASK above, this time
+# for a demo-narrative request - see demo_node below.
+_STRUCTURE_DEMO_TASK = _ARKOS.tasks.get("structure-demo")
+if _STRUCTURE_DEMO_TASK is None or not _STRUCTURE_DEMO_TASK.prompt:
+    raise RuntimeError(
+        "agent-runtime: arkos's 'structure-demo' task or its prompt file is missing"
+    )
 
 # ADR-0419: reflect_node's declarative config - a graceful-degradation
 # fallback to the literal values this used to hardcode, not a fail-fast
@@ -107,6 +114,27 @@ def _extract_topic(message: str) -> str:
     return message.strip()
 
 
+# Arkos-local trigger, unlike _code_request_trigger_reason (app/graph/
+# nodes.py): "demo"/"structure a demo" is Arkos-only vocabulary today, no
+# second agent needs to share the regex, so it stays in this module rather
+# than the cross-agent one - same reasoning _TOPIC_PATTERN above already
+# follows.
+_DEMO_TRIGGER_PATTERN = re.compile(
+    r"\b(?:structure|prepare|build|put together|walk\s*through|script)\s+(?:me\s+)?(?:a|an)\s+demo\b"
+    r"|\bdemo\s+(?:narrative|script|walkthrough|talk\s*track)\b",
+    re.IGNORECASE,
+)
+
+
+def _demo_request_trigger_reason(message: str) -> Optional[str]:
+    """Same provisional-heuristic posture as _code_request_trigger_reason:
+    expect false negatives/positives, tune from real usage rather than
+    trying to enumerate every phrasing up front."""
+    if _DEMO_TRIGGER_PATTERN.search(message or ""):
+        return "message phrasing matched the demo-structuring trigger pattern"
+    return None
+
+
 async def plan_node(state: AgentState) -> Dict[str, Any]:
     """Derives what document this turn drafts - a short topic and a
     working title - from the user's message. The full v1 DAT workflow
@@ -122,10 +150,16 @@ async def plan_node(state: AgentState) -> Dict[str, Any]:
 
 def route_after_plan(state: AgentState) -> str:
     """ADR-0417: a coding request has nothing to do with drafting/saving a
-    DAT to Drive - short-circuit straight from plan_node, before
-    retrieve/draft/reflect/write ever run."""
-    if _code_request_trigger_reason(state.get("message", "")) is not None:
+    document to Drive - short-circuit straight from plan_node, before
+    retrieve/draft/reflect/write ever run. Demo-narrative requests get the
+    same early-exit treatment, checked second: both are conversational
+    replies with no retrieval/write step, distinct from the dat/workshop
+    kinds plan_node's own doc_plan.kind classifies for the retrieve path."""
+    message = state.get("message", "")
+    if _code_request_trigger_reason(message) is not None:
         return "code"
+    if _demo_request_trigger_reason(message) is not None:
+        return "demo"
     return "retrieve"
 
 
@@ -175,6 +209,44 @@ async def code_node(state: AgentState) -> Dict[str, Any]:
     reply_text = result.content if hasattr(result, "content") else str(result)
     # citations/source_mode set explicitly - this is the first Arkos path
     # that skips write_node, the only other place that normally sets them.
+    return {"reply": reply_text, "provider_used": provider.name, "citations": [], "source_mode": "none"}
+
+
+async def demo_node(state: AgentState) -> Dict[str, Any]:
+    """Early-exit branch, reachable only via route_after_plan, same shape
+    as code_node above: never runs retrieve_node, so this call's payload
+    is only the user's own message. Unlike code_node's fixed C2 ceiling
+    (which exists to reach mistral-codestral, eligible_for [C1, C2] only),
+    this call has no such routing constraint - it rides Arkos's own
+    ambient classification like draft_node does, just without a
+    retrieve/write step around it."""
+    system = SystemMessage(content=_STRUCTURE_DEMO_TASK.prompt)
+    human = HumanMessage(content=state["message"])
+    local_only = state.get("local_only_required", False) or _ARKOS.local_only
+    try:
+        result, provider = await _model_router.invoke_with_fallback(
+            classification=ARKOS_BASE_CLASSIFICATION,
+            messages=[system, human],
+            bearer_token=state["bearer_token"],
+            local_only=local_only,
+            request_id=state.get("request_id"),
+            agent_name=_ARKOS.name,
+            task_name=_STRUCTURE_DEMO_TASK.name,
+        )
+    except ModelRouterError as exc:
+        logger.error("demo-structuring model call failed: %s", exc)
+        return {
+            "reply": (
+                "I could not reach the approved model provider to structure "
+                "this demo right now. Please try again shortly."
+            ),
+            "provider_used": None,
+            "citations": [],
+            "source_mode": "none",
+            "errors": state.get("errors", []) + [f"demo: {exc}"],
+        }
+
+    reply_text = result.content if hasattr(result, "content") else str(result)
     return {"reply": reply_text, "provider_used": provider.name, "citations": [], "source_mode": "none"}
 
 

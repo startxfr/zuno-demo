@@ -22,6 +22,7 @@ zuno:
   primary_task: draft-architecture-testimonial
   tasks:
     - draft-architecture-testimonial
+    - structure-demo
     - write-code
   memory:
     # ADR-0215: Arkos is C3/local-only (see model.preferred_classification
