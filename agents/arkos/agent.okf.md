@@ -111,6 +111,19 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `image.generation.create` | tool | `image.generation.create` @ image-gen | C2 | consultant, adv, sales, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `generate_image` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `confluence.page.read` | tool | `confluence.page.read` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `confluence.page.read` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `confluence.page.search` | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `search_confluence` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `drive.document.create` | tool | `drive.document.create` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.create` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `drive.document.update` | tool | `drive.document.update` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.update` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.read` | tool | `git.repository.read` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.read` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.list` | tool | `git.repository.list` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.list` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.private.read` | tool | `git.repository.private.read` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.private.read` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.private.list` | tool | `git.repository.private.list` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.private.list` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.file.write` | tool | `git.file.write` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.file.write` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.create` | tool | `git.repository.create` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.create` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `image.generation.create` | tool | `image.generation.create` @ image-gen | C2 | consultant, adv, sales, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `generate_image` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
 
 ### Model routing
 
@@ -120,6 +133,9 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 |---|---|---|---|---|---|
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` | `local-gpt-oss`, `local`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `C3` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` | `local-gpt-oss`, `local`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `C3` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `structure-demo` (prompt: `prompts/structure-demo.md`) | `C3` | `local` | `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `write-code` | `C3` | (none eligible) | — | — | `policies/model-routing/model-routing-policy.yaml` |
 
 **Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local`, `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
