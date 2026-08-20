@@ -99,6 +99,27 @@ preferences:
     task: coming-soon
     prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss, local]
 
+  # ADR-0417: coding requests. Arkos's write-code call is a scoped,
+  # early-exit branch of an otherwise C3-seeded agent (evaluated at a
+  # fixed C2 ceiling in code, mirroring reflect_node's ADR-0416 override).
+  # strict: true means mistral-codestral is the ONLY candidate; if it
+  # fails for any reason (including running out of credits), the turn
+  # fails explicitly (RoutingError/502) rather than silently falling back
+  # to a different model the user didn't ask for.
+  - agent: arkos
+    task: write-code
+    prefer: [mistral-codestral]
+    strict: true
+  # Tekos is C1-seeded, so mistral-codestral (eligible_for: [C1, C2]) is
+  # already reachable at its natural classification with no override - no
+  # strict flag: the existing generic fallback-on-any-exception in
+  # app/main.py's _invoke_with_fallback (unchanged) naturally drops to
+  # local if Codestral errors, giving "use local also for coding" for
+  # free from already-live machinery.
+  - agent: tekos
+    task: write-code
+    prefer: [mistral-codestral, local-gpt-oss, local]
+
 # ADR-0304 (WP-40 Part B): per (agent, task) "task class" quality/cost/
 # latency objectives, consumed by evaluations/routing_report.py alongside
 # live ai-gateway metrics (ADR-0029) and evaluations/benchmarks/*.json
