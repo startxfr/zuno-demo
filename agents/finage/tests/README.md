@@ -20,6 +20,10 @@ cluster, no credentials, no model calls; **behavioral** checks stay in
 - `prompts/` - prompt lint (required OKF frontmatter, referenced by a
   task, golden-format checks where a task defines one)
 
-No suites exist yet - filling them is a Stage-2 promotion criterion
-(`platform/templates/agent/PROMOTION.md` step 4), owned by whichever
-work promotes Finage, never left as empty stubs.
+**Blocking rule (ADR-0504):** Finage is not exempt from this structure
+requirement. `contract/`, `tasks/` and `prompts/` must contain real, green
+tests before Finage can be promoted to Stage 2 -
+`platform/templates/agent/PROMOTION.md` step 4 is explicit: empty stub
+directories are not Stage 2. Filling these suites is owned by whichever
+work promotes Finage, but the requirement itself blocks promotion, not
+just documents an aspiration.

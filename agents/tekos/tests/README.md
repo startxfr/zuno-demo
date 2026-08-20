@@ -20,6 +20,13 @@ cluster, no credentials, no model calls; **behavioral** checks stay in
 - `prompts/` - prompt lint (required OKF frontmatter, referenced by a
   task, golden-format checks where a task defines one)
 
-No suites exist yet - filling them is a Stage-2 promotion criterion
-(`platform/templates/agent/PROMOTION.md` step 4), owned by whichever
-work promotes Tekos, never left as empty stubs.
+**Blocking rule (ADR-0504):** Tekos is not exempt from this structure
+requirement. `contract/`, `tasks/` and `prompts/` must contain real, green
+tests before Tekos can be promoted to Stage 2 -
+`platform/templates/agent/PROMOTION.md` step 4 is explicit: empty stub
+directories are not Stage 2. Filling these suites is owned by whichever
+work promotes Tekos, but the requirement itself blocks promotion, not
+just documents an aspiration. Tekos's only historical exception from the
+promotion checklist is the deployment mechanism (plain manifests instead
+of the `AIAgent` CR, per PROMOTION.md step 2 / ADR-0350's coexistence
+proof) - never this tests-content requirement.
