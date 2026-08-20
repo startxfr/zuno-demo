@@ -6,9 +6,8 @@
 # password each time, but will not write it to /dev/null") - without this
 # check-first guard, every re-run of the vault role would silently
 # regenerate and overwrite every credential seeded this way, desyncing it
-# from whatever any already-running consumer cached (VERIFIED live,
-# 2026-08-13: this desync broke maas-api and briefly broke MariaDB's root
-# password after an unrelated `make d0 install vault` re-run).
+# from whatever any already-running consumer cached (has broken maas-api
+# and MariaDB's root password this way before).
 - name: "vault | check whether zuno/{{ vault_seed_path }} already exists"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

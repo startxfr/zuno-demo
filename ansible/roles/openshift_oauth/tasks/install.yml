@@ -55,15 +55,15 @@
 
 # ADR-0347/ADR-0211: the actual trust anchor for the live Keycloak route -
 # whichever Secret the keycloak chart's own Ingress currently references
-# (zuno-auth), not a hardcoded name. VERIFIED live (2026-08-16): flipping
-# ingress.acmeWildcardTLS switches the Ingress's tls[].secretName from
-# keycloak-tls (Vault pki/ mount, root CN=zuno-demo.internal) to
-# keycloak-wildcard-tls (cert-manager ACME, Let's Encrypt) without this
-# role knowing - the authentication clusteroperator went Degraded
+# (zuno-auth), not a hardcoded name. Flipping ingress.acmeWildcardTLS
+# switches the Ingress's tls[].secretName from keycloak-tls (Vault pki/
+# mount, root CN=zuno-demo.internal) to keycloak-wildcard-tls
+# (cert-manager ACME, Let's Encrypt) without this role knowing - a
+# hardcoded name would leave keycloak-serving-ca bundling a stale CA and
+# the authentication clusteroperator Degraded
 # (OAuthServerConfigObservationDegraded, "certificate signed by unknown
-# authority") because keycloak-serving-ca kept bundling the now-stale
-# Vault root while Keycloak served a Let's Encrypt chain. Reading the
-# Ingress's own secretName keeps this self-correcting across either mode.
+# authority"). Reading the Ingress's own secretName keeps this
+# self-correcting across either mode.
 - name: "openshift_oauth | look up the Keycloak Ingress to find its live TLS secret name"
   kubernetes.core.k8s_info:
     api_version: networking.k8s.io/v1
@@ -134,20 +134,19 @@
 # ADR-0347: cluster-wide complement to openID.ca above (defense in depth) -
 # proxy/cluster.spec.trustedCA is consumed by every operator whose
 # trusted-ca-bundle ConfigMap carries the CNO injection label
-# config.openshift.io/inject-trusted-cabundle: "true" (confirmed live:
-# openshift-authentication-operator's already does), so this makes the
-# Vault PKI root trusted cluster-wide, not just by this one IDP. Only the
-# Vault root is needed here (system trust already covers everything else);
-# key MUST be ca-bundle.crt - the key OpenShift's proxy/trustedCA
-# convention requires, different from openID.ca's ca.crt above. The
-# Proxy/cluster PATCH itself (spec.trustedCA.name) is Helm-templated and
-# GitOps-applied (gitops/charts/openshift-oauth/templates/
-# cluster-trusted-ca.yaml) since the ConfigMap *name* isn't
-# cluster-specific - only this ConfigMap's data-write belongs in Ansible.
-# Skipped entirely when Keycloak's live cert has no ca.crt (ACME/Let's
-# Encrypt - already in every system trust store, nothing private to
-# distribute cluster-wide) - VERIFIED live 2026-08-16, same finding as
-# openID.ca above.
+# config.openshift.io/inject-trusted-cabundle: "true" (including
+# openshift-authentication-operator's), so this makes the Vault PKI root
+# trusted cluster-wide, not just by this one IDP. Only the Vault root is
+# needed here (system trust already covers everything else); key MUST be
+# ca-bundle.crt - the key OpenShift's proxy/trustedCA convention requires,
+# different from openID.ca's ca.crt above. The Proxy/cluster PATCH itself
+# (spec.trustedCA.name) is Helm-templated and GitOps-applied
+# (gitops/charts/openshift-oauth/templates/cluster-trusted-ca.yaml) since
+# the ConfigMap *name* isn't cluster-specific - only this ConfigMap's
+# data-write belongs in Ansible. Skipped entirely when Keycloak's live
+# cert has no ca.crt (ACME/Let's Encrypt - already in every system trust
+# store, nothing private to distribute cluster-wide), same as openID.ca
+# above.
 - name: "openshift_oauth | copy the Vault PKI root into openshift-config as user-ca-bundle (key ca-bundle.crt) for cluster-wide trust"
   kubernetes.core.k8s:
     state: present

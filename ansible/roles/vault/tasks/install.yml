@@ -624,8 +624,8 @@
 # Same pattern as rag-ingestion's pipeline DB password above - mlops-dspa's
 # own MariaDB user (gitops/charts/mariadb's mlopsDatabase, gitops/charts/
 # mlops's pipelineServer.metadataDatabase.externalMySQL), self-generated,
-# not from confidential.yml. Added 2026-08-19 moving mlops-dspa off DSPO's
-# broken embeddedMariaDB mode (see gitops/charts/mariadb/templates/
+# not from confidential.yml. Exists to move mlops-dspa off DSPO's broken
+# embeddedMariaDB mode (see gitops/charts/mariadb/templates/
 # database-mlops.yaml's header comment).
 - name: "vault | generate and seed the mlops pipeline metadata DB password (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"

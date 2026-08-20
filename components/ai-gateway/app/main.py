@@ -562,13 +562,13 @@ async def _stream_completion(
                 # ADR-0029: accumulate chunks via AIMessageChunk.__add__ so the
                 # terminal usage-only chunk (vLLM/OpenAI's stream_options.
                 # include_usage extension, enabled in app/providers.py) merges
-                # into a message with populated usage_metadata - VERIFIED
-                # live 2026-08-18 this was the reason zuno.model_tokens/
-                # zuno.model_cost_usd had zero series in Grafana: every real
-                # chat turn streams (agent-runtime always does), and this
-                # path never read anything past `.content` before. That
-                # terminal chunk's content is always "", so it never reaches
-                # the `if token:` forward below - no wire-format change.
+                # into a message with populated usage_metadata - without this,
+                # zuno.model_tokens/zuno.model_cost_usd have zero series in
+                # Grafana, since every real chat turn streams (agent-runtime
+                # always does) and this path never read anything past
+                # `.content` before. That terminal chunk's content is always
+                # "", so it never reaches the `if token:` forward below - no
+                # wire-format change.
                 # ADR-0415: the same accumulation also reconstructs a fully
                 # merged tool_calls list from a provider's streamed
                 # tool-call-argument deltas (AIMessageChunk.__add__ already

@@ -147,8 +147,7 @@ scenarios:
     type: health_endpoints_all_ok
     # sales-db-mcp/salesforce-mcp are deliberately excluded: their
     # NetworkPolicies (ADR-0037) allow ingress only from mcp-gateway, so a
-    # direct probe from this gate always times out by design, not by fault
-    # (ADR-0053 gate investigation, 2026-08-19) - mcp-gateway's own health,
-    # still checked below, is the honest proxy for "can this agent's
-    # traffic reach it".
+    # direct probe from this gate always times out by design, not by
+    # fault - mcp-gateway's own health, still checked below, is the honest
+    # proxy for "can this agent's traffic reach it".
     services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]

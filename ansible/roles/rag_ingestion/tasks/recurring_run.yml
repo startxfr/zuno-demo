@@ -38,24 +38,19 @@
 
 - name: "rag_ingestion | resolve the latest pipeline_version_id"
   ansible.builtin.set_fact:
-    # VERIFIED live 2026-08-18 (roadmap WP-07 KFP-verify pass): the
-    # v2beta1 API returns versions OLDEST-first, not newest-first - two
-    # real versions on rag-corpus-ingestion came back as
-    # [2026-08-18T11:29:50Z, 2026-08-18T17:46:34Z], so the previous
-    # `| first` picked the STALE version. Sort by created_at descending
-    # and take index 0 instead.
+    # The v2beta1 API returns versions OLDEST-first, not newest-first, so
+    # a plain `| first` picks the STALE version. Sort by created_at
+    # descending and take index 0 instead.
     _rag_ingestion_pipeline_version_id: >-
       {{ (_rag_ingestion_pipeline_versions.json.pipeline_versions | default([])
           | sort(attribute='created_at', reverse=true) | first).pipeline_version_id | default('') }}
 
-# VERIFIED live 2026-08-18 (WP-07 duplicate-schedule bug): this task used
-# to always POST a fresh create with no prior list-and-match step. KFP's
-# v2beta1 API does not enforce `display_name` uniqueness on recurring
-# runs, so re-running `make d1 install rag-ingestion` after the resolved
-# pipeline_version_id changed (e.g. a new pipeline version uploaded
-# between runs) silently created ANOTHER enabled recurring run on the same
-# cron instead of replacing the old one - two live duplicates were found
-# and cleaned up manually the day this was fixed. List existing recurring
+# This task used to always POST a fresh create with no prior list-and-match
+# step. KFP's v2beta1 API does not enforce `display_name` uniqueness on
+# recurring runs, so re-running `make d1 install rag-ingestion` after the
+# resolved pipeline_version_id changed (e.g. a new pipeline version
+# uploaded between runs) silently created ANOTHER enabled recurring run on
+# the same cron instead of replacing the old one. List existing recurring
 # runs first and reconcile by display_name instead of blindly creating.
 - name: "rag_ingestion | list existing recurring runs for {{ _rag_schedule_cm.data.DOMAIN }}"
   ansible.builtin.uri:
@@ -117,8 +112,7 @@
       trigger:
         cron_schedule:
           cron: "{{ _rag_schedule_cm.data.CRON }}"
-      # VERIFIED live 2026-08-18 (WP-07 KFP-verify pass): omitting
-      # max_concurrency defaults it to 0, which this API rejects
+      # Omitting max_concurrency defaults it to 0, which this API rejects
       # ("Max concurrency of a recurring run must be at least 1 and at
       # most 10. Received 0", HTTP 400) - it is required, not optional.
       # 1 matches ADR-0204's per-domain single-run intent (no overlapping

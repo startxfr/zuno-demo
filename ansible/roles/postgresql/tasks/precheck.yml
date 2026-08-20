@@ -30,10 +30,7 @@
 # time), so treating a missing/stale backup as "not installed" would be
 # a false negative on day one, same reasoning as the OGX/LMEvalJob
 # diagnostics elsewhere in this role family. RPO objective is <=24h
-# (ADR-0112) - `status.pgbackrest.scheduledBackups[]` shape confirmed
-# live, 2026-08-14 (`oc get postgrescluster zuno-postgresql -n zuno-data
-# -o jsonpath='{.status.pgbackrest}'` shows a real completed `full`
-# backup for repo1).
+# (ADR-0112); shape is `status.pgbackrest.scheduledBackups[]`.
 - name: "postgresql | list successful scheduled backups"
   ansible.builtin.set_fact:
     _postgresql_successful_backups: >-

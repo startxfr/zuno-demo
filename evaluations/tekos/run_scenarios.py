@@ -488,9 +488,9 @@ def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     # package rather than shelling out to `oc`/`kubectl`: the gate Job's
     # image (python:3.12-slim) does not ship either binary, which made this
     # scenario fail with a spurious "No such file or directory" on every
-    # run (ADR-0053 gate investigation, 2026-08-19) regardless of actual
-    # cluster state. ADR-0329 (supersedes ADR-0023): placeholder agents no
-    # longer get their own namespace, so this checks for zero pods carrying
+    # run regardless of actual cluster state. ADR-0329 (supersedes
+    # ADR-0023): placeholder agents no longer get their own namespace, so
+    # this checks for zero pods carrying
     # each placeholder agent's zuno.io/agent label inside the single shared
     # namespace instead of per-agent namespace emptiness.
     from kubernetes import client as k8s_client

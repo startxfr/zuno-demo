@@ -26,8 +26,8 @@
 # authoritative in-cluster copy is the same one the cluster OAuth trusts
 # for its Keycloak IdP (openshift-config/keycloak-serving-ca, created by
 # ansible/roles/openshift_oauth) - copied here into a zuno-ai-run
-# ConfigMap the Job can mount (VERIFIED live 2026-08-16: every HTTPS
-# scenario failed CERTIFICATE_VERIFY_FAILED before this).
+# ConfigMap the Job can mount; without it every HTTPS scenario fails
+# CERTIFICATE_VERIFY_FAILED.
 - name: "acceptance-gate | read the platform's internal root CA from openshift-config"
   kubernetes.core.k8s_info:
     kind: ConfigMap
@@ -197,9 +197,9 @@
                   # certifi) and SSL_CERT_FILE points urllib at the same
                   # combined bundle - every Route this gate dials
                   # (Keycloak, the agent frontends) chains to Vault's
-                  # internal root, absent from any stock trust store
-                  # (VERIFIED live 2026-08-16: every HTTPS scenario failed
-                  # CERTIFICATE_VERIFY_FAILED without this).
+                  # internal root, absent from any stock trust store;
+                  # without this every HTTPS scenario fails
+                  # CERTIFICATE_VERIFY_FAILED.
                   - >-
                     pip install --quiet --no-cache-dir -r /gate/requirements.txt &&
                     CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
@@ -225,10 +225,10 @@
                 env:
                   - name: PYTHONUNBUFFERED
                     value: "1"
-                  # VERIFIED live (2026-08-16): under the restricted SCC the
-                  # pod runs as a random UID with no HOME, so pip's implicit
-                  # --user fallback tries /.local and dies with EACCES -
-                  # point both at the pod's writable /tmp instead.
+                  # Under the restricted SCC the pod runs as a random UID
+                  # with no HOME, so pip's implicit --user fallback tries
+                  # /.local and dies with EACCES - point both at the pod's
+                  # writable /tmp instead.
                   - name: HOME
                     value: /tmp
                   - name: PYTHONUSERBASE
@@ -255,8 +255,8 @@
                   # keys can't contain '/', so the same ConfigMap is
                   # mounted a second time, projecting only that one file
                   # into the per-agent subdirectory the script resolves
-                  # (VERIFIED live 2026-08-16: FileNotFoundError
-                  # /gate/tekos/security_checks.py otherwise).
+                  # (otherwise FileNotFoundError on
+                  # /gate/tekos/security_checks.py).
                   - name: gate-agent
                     mountPath: /gate/tekos
                   # security_checks.py resolves repo_root as parents[2] of

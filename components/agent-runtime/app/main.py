@@ -70,11 +70,11 @@ CHECKPOINT_PGPORT = os.getenv("CHECKPOINT_PGPORT", "5432")
 CHECKPOINT_PGDATABASE = os.getenv("CHECKPOINT_PGDATABASE", "")
 CHECKPOINT_PGUSER = os.getenv("CHECKPOINT_PGUSER", "")
 CHECKPOINT_PGPASSWORD = os.getenv("CHECKPOINT_PGPASSWORD", "")
-# Incident 2026-08-14: omitting sslmode left psycopg on its libpq default
-# (`prefer`), which retries a second, plaintext connection attempt after any
-# TLS failure - PGO's PgBouncer rejects that plaintext attempt with
-# "FATAL: SSL required", masking the real error (a missing database) behind
-# a misleading one. Same convention as rag_ingestion.py's PGSSLMODE.
+# Omitting sslmode leaves psycopg on its libpq default (`prefer`), which
+# retries a second, plaintext connection attempt after any TLS failure -
+# PGO's PgBouncer rejects that plaintext attempt with "FATAL: SSL required",
+# masking the real error (a missing database) behind a misleading one.
+# Same convention as rag_ingestion.py's PGSSLMODE.
 CHECKPOINT_PGSSLMODE = os.getenv("CHECKPOINT_PGSSLMODE", "require")
 
 
@@ -121,12 +121,12 @@ async def lifespan(app: FastAPI):
         from psycopg.rows import dict_row
         from psycopg_pool import AsyncConnectionPool
 
-        # A connection POOL, not from_conn_string - VERIFIED live (2026-08-16):
-        # from_conn_string opens ONE psycopg async connection shared by every
-        # concurrent graph run, which fails with "another command is already in
-        # progress" under any request concurrency and leaves the connection
-        # permanently wedged (every subsequent chat 500s until pod restart).
-        # kwargs mirror what from_conn_string sets internally (the saver
+        # A connection POOL, not from_conn_string: from_conn_string opens ONE
+        # psycopg async connection shared by every concurrent graph run, which
+        # fails with "another command is already in progress" under any
+        # request concurrency and leaves the connection permanently wedged
+        # (every subsequent chat 500s until pod restart). kwargs mirror what
+        # from_conn_string sets internally (the saver
         # requires autocommit + dict_row; prepare_threshold=None avoids
         # server-side prepared statements, PgBouncer-safe if the host ever
         # changes back).
@@ -135,12 +135,12 @@ async def lifespan(app: FastAPI):
             min_size=1,
             max_size=int(os.getenv("CHECKPOINT_POOL_MAX_SIZE", "10")),
             kwargs={"autocommit": True, "prepare_threshold": None, "row_factory": dict_row},
-            # VERIFIED live 2026-08-19: after this cluster's Patroni failovers,
-            # the pool's first-ever handout of a connection opened before the
-            # failover surfaced "consuming input failed: SSL SYSCALL error: EOF
-            # detected" straight to the caller (a 500/error SSE event) - the
-            # pool already discards a bad connection on next use, just not
-            # before handing it out once. check_connection runs a trivial probe
+            # After a Patroni failover, the pool's first-ever handout of a
+            # connection opened before the failover can surface "consuming
+            # input failed: SSL SYSCALL error: EOF detected" straight to the
+            # caller (a 500/error SSE event) - the pool already discards a bad
+            # connection on next use, just not before handing it out once.
+            # check_connection runs a trivial probe
             # before checkout and swaps a dead connection for a fresh one first,
             # so callers never see a connection that was already broken.
             check=AsyncConnectionPool.check_connection,
@@ -281,14 +281,12 @@ async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any
     run_id from every checkpoint LangGraph recorded for it, grouped by
     turn - AgentState's message/reply channels hold only the latest
     *value* each (plain LastValue channels), and LangGraph checkpoints
-    after every graph super-step, not once per turn (VERIFIED live
-    2026-08-19 against the installed langgraph==0.2.39: a single Tekos
-    turn walks retrieve -> [tool_call] -> reason -> respond, 3-4
-    super-steps, each producing its own checkpoint row). Naively emitting
-    a line whenever message/reply is truthy - the pre-ADR-0212 approach -
+    after every graph super-step, not once per turn (a single Tekos turn
+    walks retrieve -> [tool_call] -> reason -> respond, 3-4 super-steps,
+    each producing its own checkpoint row). Naively emitting a line
+    whenever message/reply is truthy - the pre-ADR-0212 approach -
     therefore repeated the same pair once per super-step: a real user
-    reopening a conversation saw one question+answer duplicated 4-5x,
-    reported live on demo222.
+    reopening a conversation saw one question+answer duplicated 4-5x.
 
     `checkpoint.metadata["source"] == "input"` is LangGraph's own,
     persisted (unlike "writes", which is stripped before Postgres
@@ -334,9 +332,9 @@ async def _build_transcript_structured(graph, run_id: str) -> List[Dict[str, Any
                 "images": channel_values.get("generated_images") or [],
                 "images_before": len(channel_values.get("generated_images") or []),
             }
-            # VERIFIED live (2026-08-19): the "input" checkpoint predates
-            # this turn's own graph execution entirely - neither this
-            # turn's message nor its reply are visible in
+            # The "input" checkpoint predates this turn's own graph
+            # execution entirely - neither this turn's message nor its
+            # reply are visible in
             # channel_values yet (message only becomes visible starting
             # at the *next* checkpoint, once the graph's first node
             # actually runs; reply is still whatever the *previous* turn

@@ -90,7 +90,7 @@
       tags:
         # Same bitnamilegacy/* rationale as bitnami-kubectl above. 8.2.1 is
         # the newest Redis version Bitnami ever published as a pinned tag
-        # (the legacy org was frozen 2025-08-22); the chart's own appVersion
+        # (the legacy org is now frozen); the chart's own appVersion
         # (8.10.0) is aspirational metadata, not a tag Bitnami ever shipped.
         - name: "8.2.1"
           from: {kind: DockerImage, name: "registry-1.docker.io/bitnamilegacy/redis:8.2.1"}
@@ -112,9 +112,9 @@
           referencePolicy: {type: Local}
     # WP-06/ADR-0322: the OGX operator's own in-process OCI-manifest-fetch
     # client 401s against registry.redhat.io directly even with a valid
-    # cluster pull secret (verified live 2026-08-18 - imagePullSecrets on
-    # the operator's own ServiceAccount had no effect, since that governs
-    # kubelet pulls, not the operator's own registry HTTP client). Mirroring
+    # cluster pull secret - imagePullSecrets on the operator's own
+    # ServiceAccount has no effect, since that governs kubelet pulls, not
+    # the operator's own registry HTTP client. Mirroring
     # here and pointing OGXServer.spec.distribution.image at the internal
     # copy instead (gitops/charts/openshift-ai) works around it if the
     # operator's client honors ambient in-cluster ServiceAccount-token

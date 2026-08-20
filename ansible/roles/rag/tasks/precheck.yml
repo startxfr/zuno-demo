@@ -3,16 +3,14 @@
 # domain's one-shot schema-apply Job to have last succeeded and the RAG
 # service Application to be Synced+Healthy.
 #
-# WP-21 (2026-08-17): the schema-apply Job used to be a single fixed
+# WP-21: the schema-apply Job used to be a single fixed
 # `zuno-rag-schema-apply`; the multi-domain core (gitops/charts/rag-service/
 # templates/job-schema-apply.yaml) renders one `zuno-rag-schema-apply-
 # <domain>` Job per enabled `knowledgeDomains` entry instead (it is the
 # only Job template in that chart, always labeled
-# app.kubernetes.io/name=rag-service), and this lookup was never updated
-# for that rename - it looked up a Job name that can no longer exist, so
-# `make d1 check rag` reported "NOT installed" unconditionally regardless
-# of real state. Fixed by matching on the label instead of a fixed name,
-# and requiring every returned Job to have succeeded (not just the first).
+# app.kubernetes.io/name=rag-service). Match on the label, not a fixed
+# name, or a rename here breaks `make d1 check rag` again; require every
+# returned Job to have succeeded (not just the first).
 - name: "rag | look up the RAG schema-apply Jobs (one per enabled domain)"
   kubernetes.core.k8s_info:
     api_version: batch/v1

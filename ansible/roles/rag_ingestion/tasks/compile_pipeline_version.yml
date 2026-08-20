@@ -1,16 +1,16 @@
 ---
-# VERIFIED live 2026-08-18 (WP-07 follow-up): the chart's Pipeline CR
-# (templates/pipeline.yaml) carries only displayName/description - nothing
-# ever uploaded an actual KFP pipeline VERSION into it. Discovered when
-# `make d1 reinstall rag-ingestion` deleted+recreated the Application (and
-# therefore the Pipeline CR, and therefore its underlying KFP pipeline
-# object), leaving zero pipeline versions and no schedulable run at all.
-# The compiled pipeline source (files/pipeline.py.tpl) already targets
+# The chart's Pipeline CR (templates/pipeline.yaml) carries only
+# displayName/description - nothing ever uploads an actual KFP pipeline
+# VERSION into it. A `make d1 reinstall rag-ingestion` deletes+recreates
+# the Application (and therefore the Pipeline CR, and therefore its
+# underlying KFP pipeline object), leaving zero pipeline versions and no
+# schedulable run at all unless this task re-runs. The compiled pipeline
+# source (files/pipeline.py.tpl) already targets
 # `kubernetes_manifest_format=True` (its __main__ block), which emits a
 # real `PipelineVersion` CR (pipelines.kubeflow.org/v2beta1, CRD
-# `pipelineversions.pipelines.kubeflow.org`, confirmed present on this
-# cluster) rather than a raw KFP-server REST upload - `oc apply`-ing that
-# manifest is the actual missing step, not a kfp.Client() call. This task
+# `pipelineversions.pipelines.kubeflow.org`) rather than a raw KFP-server
+# REST upload - `oc apply`-ing that manifest is the actual missing step,
+# not a kfp.Client() call. This task
 # compiles it locally (operator-machine imperative op, same pattern as the
 # KFP recurring-run activation below and the day1-build BuildConfig
 # trigger) and applies it, so a future reinstall regenerates the version

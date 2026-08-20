@@ -11,10 +11,10 @@ the local pgvector+full-text hybrid search in search.py.
 OGX's own documented positioning is "OpenAI-compatible APIs and
 vector-store integrations" (ADR-0322 Context), so this adapter targets the
 OpenAI Vector Stores search convention
-(`POST /v1/vector_stores/{vector_store_id}/search`). VERIFIED live,
-2026-08-14: `spec.components.ogx.managementState: Managed` on this
-cluster's zuno-dsc only installs the OGX Operator/controller (`oc get svc
--n redhat-ods-applications` shows only
+(`POST /v1/vector_stores/{vector_store_id}/search`).
+`spec.components.ogx.managementState: Managed` on this cluster's
+zuno-dsc only installs the OGX Operator/controller (`oc get svc -n
+redhat-ods-applications` shows only
 ogx-k8s-operator-controller-manager-metrics-service/-webhook-service, no
 API-serving Service) - a separate namespaced `OGXServer` CR
 (`ogxservers.ogx.io/v1beta1`, confirmed via `oc explain ogxserver.spec`)

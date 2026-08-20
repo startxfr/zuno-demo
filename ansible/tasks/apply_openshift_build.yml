@@ -80,8 +80,8 @@
     - zuno-vault
     - zuno-auth
     # mlops-dspa's pods pull their own runtime image from here cross-
-    # namespace since the 2026-08-19 namespace split (build stays in
-    # zuno-ai-build, only the DSPA/pipeline run moved to zuno-mlops).
+    # namespace, since the build stays in zuno-ai-build while the
+    # DSPA/pipeline run lives in zuno-mlops.
     - zuno-mlops
   loop_control:
     loop_var: "rbname"

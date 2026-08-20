@@ -52,12 +52,12 @@
 #    burst node keeps its whole GPU - only the mixed strategy can advertise
 #    nvidia.com/mig-* slices and plain nvidia.com/gpu side by side.
 #  - daemonsets.tolerations: every GPU-operator operand only tolerates
-#    nvidia.com/gpu:NoSchedule by default (verified live 2026-08-17) -
-#    without a zuno.io/gpu-burst toleration the driver/device-plugin never
-#    start on the tainted burst node, which then never advertises its GPU
-#    and can never serve a training pod. nvidia.com/gpu is restated
-#    defensively in case the operator replaces rather than appends its
-#    implicit default when this list is set.
+#    nvidia.com/gpu:NoSchedule by default - without a zuno.io/gpu-burst
+#    toleration the driver/device-plugin never start on the tainted burst
+#    node, which then never advertises its GPU and can never serve a
+#    training pod. nvidia.com/gpu is restated defensively in case the
+#    operator replaces rather than appends its implicit default when this
+#    list is set.
 # A live `oc patch clusterpolicy` is NOT an alternative: zuno-nvidia-gpu-d1
 # has selfHeal and owns the spec through its helm values - the day-2 path
 # for any strategy change is re-running this role.

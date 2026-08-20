@@ -183,12 +183,11 @@
   retries: 60
   delay: 10
 
-# VERIFIED live 2026-08-18: MySQL is a server-first protocol, and istio
-# protocol-sniffs any Service port with no declared protocol on BOTH the
-# inbound and the OUTBOUND (client-sidecar) side - in-mesh clients
-# (mariadb-operator itself, sales-db-mcp) deadlocked waiting for a
-# greeting their own sidecar was withholding (measured: zero bytes in
-# 15s; 0.02s once appProtocol was set). The chart-side halves of this fix
+# MySQL is a server-first protocol, and istio protocol-sniffs any Service
+# port with no declared protocol on BOTH the inbound and the OUTBOUND
+# (client-sidecar) side - in-mesh clients (mariadb-operator itself,
+# sales-db-mcp) deadlock waiting for a greeting their own sidecar is
+# withholding until appProtocol is set. The chart-side halves of this fix
 # (gitops/charts/mariadb: podMetadata excludeInboundPorts + the
 # DestinationRule) cover the inbound/istio-TLS sides, but the Service
 # object is OWNED BY the mariadb-operator, whose CR has no port template

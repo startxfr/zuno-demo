@@ -218,14 +218,11 @@ spec:
         memory: 128Mi
   controller:
     processors: {}
-    # 2026-08-16: VERIFIED live - application-controller was OOMKilled
-    # (exitCode 137) repeatedly at the old 5Gi limit, crashlooping for
-    # 46+ minutes with zero Applications reconciling in the meantime.
-    # This is the likely root cause of this session's recurring "sync
-    # stuck / health-gating stalled" symptoms worked around by manual
-    # operation-termination + hard refresh. Host node has ~28Gi free
-    # allocatable headroom (72% requested/56.8Gi allocatable), so this
-    # is a safe bump, not a resize.
+    # application-controller was repeatedly OOMKilled at the old 5Gi
+    # limit, crashlooping with zero Applications reconciling in the
+    # meantime (root cause of "sync stuck / health-gating stalled"
+    # symptoms). Host node has ample allocatable headroom, so this is a
+    # safe bump, not a resize.
     resources:
       limits:
         cpu: 1800m

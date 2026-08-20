@@ -82,9 +82,9 @@ async def search(payload: SearchRequest) -> SearchResponse:
     # domain just is not).
     use_ogx = ogx_provider.should_use_ogx()
     if not use_ogx and not db.any_ready():
-        # Interval-bounded reconnect chance before failing (2026-08-18
-        # restart incident: PostgreSQL came up after this pod and every
-        # domain stayed dead until a manual delete - see db._retry_failed).
+        # Interval-bounded reconnect chance before failing: PostgreSQL can
+        # come up after this pod and leave every domain dead until a
+        # manual delete otherwise - see db._retry_failed.
         await db.retry_failed_domains()
     if not use_ogx and not db.any_ready():
         raise HTTPException(status_code=503, detail="no domain database connected")

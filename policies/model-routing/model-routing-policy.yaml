@@ -42,7 +42,7 @@ adapters: []
 #   - never auto-tunable (ADR-0309: `prefer` is on the optimizer's
 #     code-level denylist).
 #
-# The entries below implement the 2026-08-18 decision: reasoning-heavy
+# The entries below implement the decision that reasoning-heavy
 # ("reflexional") tasks prefer the local gpt-oss-20b over qwen - it leads
 # the WHOLE chain (also ahead of SaaS on C1/C2 turns, consistent with the
 # platform's local-first doctrine), and on C3/local-only turns it makes

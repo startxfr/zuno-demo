@@ -38,14 +38,13 @@
     gitops_app_wait: false
 
 # rhods-operator's Subscription is deliberately installPlanApproval: Manual.
-# VERIFIED live, 2026-08-13: without an explicit approval step the
-# Subscription (and therefore zuno-openshift-ai-d0's health) sits at
-# InstallPlanPending/RequiresApproval forever - `oc get installplan -n
-# redhat-ods-operator` showed APPROVED: false with no other task in this
-# repo ever flipping it. Approve only the InstallPlan that targets the
-# exact CSV the Subscription itself was configured to pin to (checked
-# below), never anything else - that preserves the "don't drift past the
-# pinned build" property Manual exists for.
+# Without an explicit approval step the Subscription (and therefore
+# zuno-openshift-ai-d0's health) sits at InstallPlanPending/RequiresApproval
+# forever - no other task in this repo ever flips it. Approve only the
+# InstallPlan that targets the exact CSV the Subscription itself was
+# configured to pin to (checked below), never anything else - that
+# preserves the "don't drift past the pinned build" property Manual
+# exists for.
 - name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan, diagnosing blocked resources on timeout"
   block:
     - name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan"
@@ -139,9 +138,9 @@
 # Istio's gateway-controller auto-deploys a proxy pod for maas-default-gateway
 # into openshift-ingress; that pod needs the istio-ca-root-cert ConfigMap for
 # its CA trust bundle. cert-manager-istio-csr only distributes that ConfigMap
-# into namespaces labeled istio-injection=enabled (VERIFIED live, 2026-08-13),
-# and openshift-ingress is deliberately NOT labeled that way: that same label
-# is what the sidecar-injection webhook selects on, so labeling it would start
+# into namespaces labeled istio-injection=enabled, and openshift-ingress is
+# deliberately NOT labeled that way: that same label is what the
+# sidecar-injection webhook selects on, so labeling it would start
 # auto-injecting Istio sidecars into every pod there, including the default
 # HAProxy router pods. Copying the ConfigMap in directly is safe to do
 # unconditionally on every run: the CA root (Vault-generated, idempotent) is
@@ -208,10 +207,10 @@
   block:
     - name: "openshift_ai | wait for the DataScienceCluster to report Ready"
       kubernetes.core.k8s_info:
-        # v2, not v1: v2 is the CRD's storage version (VERIFIED live,
-        # 2026-08-12/13 - same reasoning as precheck.yml's DataScienceCluster
-        # lookup and this chart's own templates/datasciencecluster.yaml, which
-        # already renders the CR at v2).
+        # v2, not v1: v2 is the CRD's storage version - same reasoning as
+        # precheck.yml's DataScienceCluster lookup and this chart's own
+        # templates/datasciencecluster.yaml, which already renders the CR
+        # at v2.
         api_version: datasciencecluster.opendatahub.io/v2
         kind: DataScienceCluster
         name: zuno-dsc

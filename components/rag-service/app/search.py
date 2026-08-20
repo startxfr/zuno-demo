@@ -434,10 +434,9 @@ async def hybrid_search(
     embedding = await embed_query(query)
     # asyncpg has no codec for the vector type: with the $1::vector cast in
     # _vector_query, the parameter must arrive in pgvector's text format
-    # ("[0.1,0.2,...]"), not as a Python list (VERIFIED live 2026-08-16:
-    # "invalid input for query argument $1 ... expected str, got list" on
-    # every similarity query, silently degrading hybrid search to
-    # text-only).
+    # ("[0.1,0.2,...]"), not as a Python list - otherwise every similarity
+    # query fails with "invalid input for query argument $1 ... expected
+    # str, got list", silently degrading hybrid search to text-only.
     if isinstance(embedding, (list, tuple)):
         embedding = "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 

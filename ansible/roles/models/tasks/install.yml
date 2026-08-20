@@ -38,8 +38,8 @@
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Day 1 default is the S3 serving path (the chat model's weights are
-      # staged in the modelsS3 bucket since 2026-08-18): the HF->PVC
-      # predownload Job is opt-in via zuno_models_download_enabled: true.
+      # staged in the modelsS3 bucket): the HF->PVC predownload Job is
+      # opt-in via zuno_models_download_enabled: true.
       # The chart's own default stays true so this deactivation only
       # reaches the cluster through an ansible run, never through a bare
       # ArgoCD sync of a chart commit (see the chart's modelStorage

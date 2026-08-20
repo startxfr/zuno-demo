@@ -132,9 +132,9 @@ d0: $(if $(DAY_VERB),credentials-check)
 # of assuming one shared list. `install` with no component (component
 # defaults to "all") also runs build first, same as `all` does - a named
 # single-component install (`make d1 install rag`) does not, build/install
-# stay separate verbs there (incident 2026-08-14: `make d1 install rag`
-# deployed a Deployment whose image had never been built, permanent
-# ImagePullBackOff - "install everything" must never do that).
+# stay separate verbs there (`make d1 install rag` alone can deploy a
+# Deployment whose image was never built, a permanent ImagePullBackOff -
+# "install everything" must never do that).
 define DAY1_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \

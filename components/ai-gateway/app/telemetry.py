@@ -173,7 +173,7 @@ def model_call_span(
     `.record_usage()` to have been called on the yielded recorder (e.g. not
     on a failed call, or a candidate whose usage_metadata never populates -
     see app/main.py's `_stream_completion`, which now calls `record_usage`
-    too for `stream_usage=True` candidates, VERIFIED live 2026-08-18).
+    too for `stream_usage=True` candidates).
     zuno.model_cost_usd follows that same `.record_usage()` gating for
     remote/SaaS providers (billed by token, so no usage means no known
     cost), but is unconditional for local providers (billed by this call's

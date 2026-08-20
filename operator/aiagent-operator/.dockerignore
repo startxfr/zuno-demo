@@ -1,9 +1,8 @@
-# VERIFIED live (2026-08-15, first in-cluster build): kubebuilder's default
-# "exclude ** then re-include !**/*.go" pattern is not honored by OpenShift's
-# buildah-based Docker builds - COPY . . copied an empty tree and the build
-# failed with "package cmd/main.go is not in std". Plain exclude list instead;
-# including test sources in the context is harmless (go build compiles only
-# cmd/main.go's dependency graph).
+# kubebuilder's default "exclude ** then re-include !**/*.go" pattern is
+# not honored by OpenShift's buildah-based Docker builds - COPY . . copies
+# an empty tree and the build fails with "package cmd/main.go is not in
+# std". Plain exclude list instead; including test sources in the context
+# is harmless (go build compiles only cmd/main.go's dependency graph).
 bin/
 test/
 config/

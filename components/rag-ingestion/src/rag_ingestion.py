@@ -293,8 +293,8 @@ class CorpusStore:
             "aws_access_key_id": config.aws_access_key_id,
             "aws_secret_access_key": config.aws_secret_access_key,
             # Bounded timeouts + retries: in-cluster S3 transfers on this
-            # platform hang intermittently (seen live 2026-08-18 - an index
-            # run sat idle-in-transaction for minutes inside a get_json).
+            # platform hang intermittently (an index run can sit
+            # idle-in-transaction for minutes inside a get_json).
             # botocore's legacy defaults can stall a stage for a long time;
             # fail the call fast and let the retry mode handle transients.
             "config": BotoClientConfig(
@@ -597,32 +597,30 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
         logger.info("fetch-confluence: no confluence sources configured")
         return 0
     auth = _confluence_auth(config)
-    # VERIFIED live 2026-08-18/19: SXSI alone has 500+ pages (still counting
-    # past a 20-request sample), and every enabled source used to run an
-    # unscoped `space="..." and type=page` search - fetching+expanding
-    # body.storage for EVERY page in the space, filtering by directories
-    # client-side only afterward - once per confluence[] entry (6 today,
-    # each independently re-scanning the same space). A live pipeline run
-    # sat on this stage for 99 minutes with zero log output before being
-    # killed. CQL's `ancestor=<page id>` clause does this filtering
+    # A space like SXSI can hold 500+ pages, and every enabled source used
+    # to run an unscoped `space="..." and type=page` search - fetching+
+    # expanding body.storage for EVERY page in the space, filtering by
+    # directories client-side only afterward - once per confluence[] entry,
+    # each independently re-scanning the same space. That can leave a
+    # pipeline run sitting on this stage for an hour or more with zero log
+    # output. CQL's `ancestor=<page id>` clause does this filtering
     # server-side instead: resolving a directory's last title segment to a
     # page id (cached per space+title, so sources sharing the same
-    # directories only resolve once) turned a full-space scan into a single
+    # directories only resolve once) turns a full-space scan into a single
     # ~1s scoped request. `_ancestor_path_matches` is still applied to each
     # result below - unchanged semantics, just against a pre-narrowed set.
     scope_id_cache: Dict[tuple, Optional[str]] = {}
-    # VERIFIED live 2026-08-19: the three tier entries per tech
-    # (archi/build/run) intentionally target the same directory tree,
-    # differentiated only by requiredGroups (ADR-0330) - doc_id is purely
-    # URL-derived, so writing immediately per source let whichever source
-    # processed a shared page LAST silently overwrite the earlier
-    # sources' acl_groups (confirmed live: 1497 fetch matches, only 499
-    # unique records ever landed). A real access-control bug: architects
-    # could lose visibility a page should have granted them, or a lower
-    # tier could inherit access it shouldn't have. Records are now
-    # accumulated in memory across every source, merging acl_groups
-    # (union, order-preserving) into one entry per doc_id instead of
-    # overwriting, with a single deduplicated write per page at the end.
+    # The three tier entries per tech (archi/build/run) intentionally
+    # target the same directory tree, differentiated only by
+    # requiredGroups (ADR-0330) - doc_id is purely URL-derived, so writing
+    # immediately per source let whichever source processed a shared page
+    # LAST silently overwrite the earlier sources' acl_groups, dropping
+    # most records. A real access-control bug: architects could lose
+    # visibility a page should have granted them, or a lower tier could
+    # inherit access it shouldn't have. Records are now accumulated in
+    # memory across every source, merging acl_groups (union,
+    # order-preserving) into one entry per doc_id instead of overwriting,
+    # with a single deduplicated write per page at the end.
     records_by_doc_id: Dict[str, dict] = {}
     for source in config.confluence_sources:
         if not source.get("enabled", True):
@@ -653,15 +651,13 @@ def _fetch_confluence(config: IngestionConfig, store: CorpusStore) -> int:
                 search_cqls = [f'space="{space}" and type=page']
 
             for search_cql in search_cqls:
-                # VERIFIED live 2026-08-19: `start=`/`limit=` offset paging
-                # silently does NOT advance for `ancestor=`-filtered CQL
-                # searches - every request returns the identical first page
-                # regardless of `start`, even though the response echoes
-                # back the requested `start` value. Confirmed via direct
-                # comparison (start=0/25/50 all returned the same 5
-                # results). That turns the old `while ... start += limit`
-                # loop into a genuine infinite loop whenever a scope has
-                # more than one page of results - worse than the plain
+                # `start=`/`limit=` offset paging silently does NOT advance
+                # for `ancestor=`-filtered CQL searches - every request
+                # returns the identical first page regardless of `start`,
+                # even though the response echoes back the requested
+                # `start` value. That turns the old `while ... start +=
+                # limit` loop into a genuine infinite loop whenever a scope
+                # has more than one page of results - worse than the plain
                 # space-wide scan it replaced. `_links.next` cursor-based
                 # pagination advances correctly for both this and the
                 # unscoped fallback query below, so it's used universally.
@@ -1342,8 +1338,8 @@ def _embed_batch(texts: list, config: IngestionConfig) -> list:
     # model's max sequence length 400-fails its ENTIRE batch. Chunk budgets
     # can't fully prevent that - the chunker counts cl100k tokens (~1.4-1.7x
     # fewer than bge WordPiece) and preserved code blocks bypass the budget
-    # altogether. Verified live 2026-08-18: 13307/13324 chunks lost to
-    # shared-batch 400s (knowledge.tech run 3).
+    # altogether - in practice this has cost a run nearly all of its chunks
+    # to shared-batch 400s.
     payload = {
         "model": config.embedding_model,
         "input": texts,
@@ -1456,10 +1452,10 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                     )
                     indexed += 1
                 # Commit per document, not per run: the S3 get_json above can
-                # stall and a Patroni failover can kill the connection (both
-                # seen live 2026-08-18) - a single run-wide transaction lost
-                # every upserted row each time. The upsert makes partial
-                # progress safe to re-run.
+                # stall and a Patroni failover can kill the connection - a
+                # single run-wide transaction loses every upserted row each
+                # time either happens. The upsert makes partial progress
+                # safe to re-run.
                 conn.commit()
                 if position % 100 == 0:
                     logger.info(

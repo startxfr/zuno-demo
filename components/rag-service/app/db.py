@@ -27,11 +27,11 @@ logger = logging.getLogger("rag_service.db")
 _pools: Dict[str, asyncpg.Pool] = {}
 _pool_errors: Dict[str, str] = {}
 # Every binding connect_all ever resolved, kept so _retry_failed() can
-# re-attempt a domain that failed its startup connect (VERIFIED live
-# 2026-08-18: a cluster stop/start brought this pod up while PostgreSQL
-# was still in crash recovery - "the database system is starting up" -
-# and with connect-once-at-lifespan semantics every domain stayed dead
-# until a manual pod delete, taking all retrieval down with it).
+# re-attempt a domain that failed its startup connect: a cluster
+# stop/start can bring this pod up while PostgreSQL is still in crash
+# recovery - "the database system is starting up" - and with
+# connect-once-at-lifespan semantics every domain would stay dead until a
+# manual pod delete, taking all retrieval down with it.
 _bindings: Dict[str, KnowledgeBinding] = {}
 _retry_lock = asyncio.Lock()
 _last_retry_at = 0.0
@@ -80,15 +80,15 @@ async def _connect_one(binding: KnowledgeBinding) -> None:
             # <schema>,public not just <schema> - the vector extension's
             # objects live in public (databaseInitSQL creates it with the
             # default search_path), so a bare per-domain search_path can't
-            # resolve the vector type/operators at query time (VERIFIED
-            # live 2026-08-15 via the schema-apply Job's identical failure).
+            # resolve the vector type/operators at query time (the
+            # schema-apply Job hits the identical failure otherwise).
             server_settings={"search_path": f"{binding.schema},public"},
-            # VERIFIED live (2026-08-15, WP-21): connecting direct to the
-            # PGO primary (required because PgBouncer's transaction pooling
-            # rejects the search_path startup option above) needs TLS -
-            # PGO's pg_hba only has hostssl entries for external clients
-            # ("no pg_hba.conf entry ... no encryption" otherwise). asyncpg
-            # ignores PGSSLMODE, so this must be explicit.
+            # Connecting direct to the PGO primary (required because
+            # PgBouncer's transaction pooling rejects the search_path
+            # startup option above) needs TLS - PGO's pg_hba only has
+            # hostssl entries for external clients ("no pg_hba.conf entry
+            # ... no encryption" otherwise). asyncpg ignores PGSSLMODE, so
+            # this must be explicit.
             ssl="require",
         )
         _pools[binding.domain] = pool

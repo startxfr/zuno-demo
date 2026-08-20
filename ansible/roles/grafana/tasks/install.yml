@@ -37,11 +37,10 @@
 # The Authorization header value ("Bearer <token>") is passed straight
 # through to a second d1 apply (ADR-0048's gitops_app_extra_helm_values,
 # already used by models/nvidia_gpu for other runtime-discovered values)
-# rather than via GrafanaDatasource spec.valuesFrom/secretKeyRef - VERIFIED
-# live, 2026-08-18: valuesFrom's resolved value never reached Grafana for
-# this nested secureJsonData path on grafana-operator v5.24.0 (confirmed
-# via a full delete+recreate of the GrafanaDatasource, ruling out a stale
-# cache), while an inline value in the same spot worked immediately - see
+# rather than via GrafanaDatasource spec.valuesFrom/secretKeyRef - that
+# path's resolved value never reaches Grafana for this nested
+# secureJsonData field on grafana-operator v5.24.0, while an inline value
+# in the same spot works immediately - see
 # gitops/charts/grafana/values.yaml's prometheusReaderBearer comment. This
 # is a platform-issued ServiceAccount session token (minted by the cluster
 # itself once serviceaccount-prometheus-reader.yaml lands), the same class

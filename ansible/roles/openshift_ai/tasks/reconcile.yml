@@ -180,13 +180,11 @@
 # zuno-mesh webhook's per-object opt-in rule (object.sidecar-injector.istio.io)
 # filters via objectSelector, and the Kubernetes API only ever evaluates
 # objectSelector against .metadata.labels, never .metadata.annotations - an
-# annotation-only patch never gets the webhook invoked at all. VERIFIED live,
-# 2026-08-20: an annotation-only patch (2026-08-19 revision of this task)
-# rolled out fine and the annotation reached the running pod, but istiod's
-# logs showed zero injection calls for these pods and they came back 1/1
-# (no istio-proxy) - the label was missing. Both Deployments are owned by the
-# MaaS Config controller (Config/default), so this only patches the one
-# annotation+label pair it doesn't manage - safe to re-apply if a future
+# annotation-only patch never gets the webhook invoked at all (the pod
+# comes back 1/1 with no istio-proxy despite the annotation landing). Both
+# Deployments are owned by the MaaS Config controller (Config/default), so
+# this only patches the one annotation+label pair it doesn't manage - safe
+# to re-apply if a future
 # reconcile of theirs drops it.
 - name: "openshift_ai | reconcile: look up payload-processing/payload-pre-processing Deployments"
   kubernetes.core.k8s_info:
