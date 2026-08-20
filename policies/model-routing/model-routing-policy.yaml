@@ -85,9 +85,14 @@ preferences:
     prefer: [local-gpt-oss, local]
   # Board-level strategic/financial work, C3 agent seed - forward-declared
   # (cognos is a placeholder with no runtime route yet; inert until then).
+  # ADR-0416: ovhcloud-gpt-oss-120b leads the chain for turns that compute
+  # at C1/C2 (reflection-heavy board Q&A that doesn't touch C3 material) -
+  # eligible_for: [C1, C2] on that provider means a turn that escalates to
+  # C3 excludes it automatically (ADR-0021/0035, no extra logic needed
+  # here) and falls through to local-gpt-oss/local exactly as before.
   - agent: cognos
     task: coming-soon
-    prefer: [local-gpt-oss, local]
+    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss, local]
 
 # ADR-0304 (WP-40 Part B): per (agent, task) "task class" quality/cost/
 # latency objectives, consumed by evaluations/routing_report.py alongside

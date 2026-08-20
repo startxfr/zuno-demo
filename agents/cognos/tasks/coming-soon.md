@@ -26,3 +26,12 @@ Endpoints) is forward-declared at the POLICY layer only -
 policy change is needed when Cognos is actually built; add
 `image.generation.create` to this task's own `allowed_tools` at that
 point, the same way every other real Cognos tool will be.
+
+ADR-0416: reflection-heavy board Q&A prefers `ovhcloud-gpt-oss-120b`
+(same OVHcloud AI Endpoints account as the image model above) on turns
+that compute at C1/C2 - `policies/model-routing/model-routing-policy.yaml`
+already forward-declares this preference for `coming-soon`, inert like
+everything else here until Cognos is actually built. A turn that
+escalates to C3 (genuine Direction-level financial/strategic material)
+excludes it automatically and falls back to `local-gpt-oss`/`local` -
+no special-casing needed, the classification-eligibility rule handles it.
