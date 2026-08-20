@@ -20,6 +20,17 @@ substituting a different model on failure would be the wrong behavior.
 Defaults false for every existing entry, unchanged from today's reorder-
 only semantics.
 
+ADR-0419 adds an alternative to the single `prefer:` key: `preferred:`
+and `fallback:`, two separate ordered lists expressing intent ("these
+are genuinely wanted" vs "these are acceptable, only once the real
+choices are gone") rather than one flat list where position alone
+carries that meaning. Purely a schema change - `preferred + fallback`
+is concatenated into the exact same ordered name list `prefer:` would
+have produced, handed to the same `_apply_preference`/`strict:`
+mechanism unchanged. An entry may use either key shape; `prefer:`
+keeps working exactly as it does today for every entry that doesn't
+opt into the new one.
+
 Fails closed per malformed entry, not per file: a single bad entry (a
 typo'd/missing field) is skipped and logged, never crashes the whole
 gateway - the affected agent/task pair just falls back to the base model,
@@ -40,6 +51,20 @@ logger = logging.getLogger("ai_gateway.model_routing_policy")
 MODEL_ROUTING_POLICY_PATH = os.getenv(
     "MODEL_ROUTING_POLICY_PATH", "/app/policies/model-routing/model-routing-policy.yaml"
 )
+
+
+def _name_list(value: object) -> List[str]:
+    return [n for n in value if isinstance(n, str) and n] if isinstance(value, list) else []
+
+
+def _preference_names(raw: Dict) -> List[str]:
+    """ADR-0419: `preferred:`/`fallback:` take precedence when either is
+    present on an entry - concatenated in that order, the same shape
+    `prefer:` alone would have produced. Falls back to the single
+    `prefer:` key otherwise, unchanged from pre-ADR-0419 behavior."""
+    if "preferred" in raw or "fallback" in raw:
+        return _name_list(raw.get("preferred")) + _name_list(raw.get("fallback"))
+    return _name_list(raw.get("prefer"))
 
 
 @dataclass
@@ -92,11 +117,11 @@ class ModelRoutingPolicy:
         for raw in config.get("preferences", []) or []:
             agent = raw.get("agent")
             task = raw.get("task")
-            prefer = raw.get("prefer")
-            names = [n for n in prefer if isinstance(n, str) and n] if isinstance(prefer, list) else []
+            names = _preference_names(raw)
             if not agent or not task or not names:
                 logger.warning(
-                    "skipping malformed model-routing preference entry (needs agent/task and a non-empty prefer list): %r",
+                    "skipping malformed model-routing preference entry (needs agent/task and a "
+                    "non-empty prefer list, or a non-empty preferred/fallback pair): %r",
                     raw,
                 )
                 continue

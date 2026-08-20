@@ -219,6 +219,96 @@ def test_strict_absent_agent_task_returns_false() -> None:
     assert policy.strict_for("arkos", "write-code") is False
 
 
+# --- ADR-0419: preferred/fallback split ------------------------------------
+
+
+def test_preferred_and_fallback_concatenate_in_order() -> None:
+    path = _write_policy_doc({"preferences": [
+        {
+            "agent": "tekos", "task": "answer-technical-question",
+            "preferred": ["local-gpt-oss", "local", "ovhcloud-gpt-oss-120b"],
+            "fallback": ["openai", "gemini", "anthropic", "mistral"],
+        },
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("tekos", "answer-technical-question") == [
+            "local-gpt-oss", "local", "ovhcloud-gpt-oss-120b", "openai", "gemini", "anthropic", "mistral",
+        ]
+    finally:
+        os.unlink(path)
+
+
+def test_preferred_and_fallback_is_byte_identical_to_an_equivalent_flat_prefer() -> None:
+    """The whole point of the schema split (ADR-0419): preferred+fallback
+    must produce the exact same resolved list a single prefer: with the
+    same names in the same order would - a pure expressiveness change,
+    not a new computation."""
+    flat_path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["a", "b", "c"]},
+    ]})
+    split_path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "preferred": ["a", "b"], "fallback": ["c"]},
+    ]})
+    try:
+        flat = ModelRoutingPolicy(flat_path).preference_for("arkos", "draft-architecture-testimonial")
+        split = ModelRoutingPolicy(split_path).preference_for("arkos", "draft-architecture-testimonial")
+        assert flat == split == ["a", "b", "c"]
+    finally:
+        os.unlink(flat_path)
+        os.unlink(split_path)
+
+
+def test_preferred_only_with_no_fallback_key() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "write-code", "preferred": ["mistral-codestral"], "strict": True},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("arkos", "write-code") == ["mistral-codestral"]
+        assert policy.strict_for("arkos", "write-code") is True
+    finally:
+        os.unlink(path)
+
+
+def test_fallback_only_with_no_preferred_key() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "tekos", "task": "find-relevant-docs", "fallback": ["openai", "anthropic"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("tekos", "find-relevant-docs") == ["openai", "anthropic"]
+    finally:
+        os.unlink(path)
+
+
+def test_preferred_fallback_present_but_both_empty_is_malformed() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "tekos", "task": "check-my-drive-docs", "preferred": [], "fallback": []},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("tekos", "check-my-drive-docs") is None
+    finally:
+        os.unlink(path)
+
+
+def test_prefer_key_still_works_unchanged_alongside_new_schema_entries() -> None:
+    """Backward compatibility: an untouched prefer: entry and a new
+    preferred/fallback entry coexist in the same file, each resolved
+    correctly."""
+    path = _write_policy_doc({"preferences": [
+        {"agent": "comage", "task": "compare-historical-deals", "prefer": ["local-gpt-oss", "local"]},
+        {"agent": "tekos", "task": "answer-technical-question", "preferred": ["local-gpt-oss"], "fallback": ["local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.preference_for("comage", "compare-historical-deals") == ["local-gpt-oss", "local"]
+        assert policy.preference_for("tekos", "answer-technical-question") == ["local-gpt-oss", "local"]
+    finally:
+        os.unlink(path)
+
+
 TESTS = [
     test_declared_adapter_is_resolved,
     test_undeclared_agent_task_returns_none,
@@ -236,6 +326,12 @@ TESTS = [
     test_strict_defaults_false,
     test_strict_true_is_resolved,
     test_strict_absent_agent_task_returns_false,
+    test_preferred_and_fallback_concatenate_in_order,
+    test_preferred_and_fallback_is_byte_identical_to_an_equivalent_flat_prefer,
+    test_preferred_only_with_no_fallback_key,
+    test_fallback_only_with_no_preferred_key,
+    test_preferred_fallback_present_but_both_empty_is_malformed,
+    test_prefer_key_still_works_unchanged_alongside_new_schema_entries,
 ]
 
 

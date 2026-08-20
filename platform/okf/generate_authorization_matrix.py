@@ -91,11 +91,24 @@ def _load_providers() -> List[Dict]:
     return list(doc.get("providers") or [])
 
 
+def _preference_names(entry: Dict) -> List[str]:
+    """ADR-0419: mirrors components/ai-gateway/app/model_routing_policy.py's
+    own `_preference_names` exactly (duplicated, not imported - this file
+    already duplicates validate_okf_bundle.py's frontmatter parsing for the
+    same reason: small, well-specified logic, independent lifecycles).
+    `preferred:`/`fallback:` take precedence when either is present,
+    concatenated in that order; falls back to the single `prefer:` key
+    otherwise, unchanged from pre-ADR-0419 behavior."""
+    if "preferred" in entry or "fallback" in entry:
+        return list(entry.get("preferred") or []) + list(entry.get("fallback") or [])
+    return list(entry.get("prefer") or [])
+
+
 def _load_model_routing() -> Tuple[Dict[Tuple[str, str], List[str]], Dict[Tuple[str, str], str]]:
     doc = yaml.safe_load(MODEL_ROUTING_POLICY_PATH.read_text(encoding="utf-8")) or {}
     preferences: Dict[Tuple[str, str], List[str]] = {}
     for entry in doc.get("preferences") or []:
-        preferences[(entry["agent"], entry["task"])] = list(entry.get("prefer") or [])
+        preferences[(entry["agent"], entry["task"])] = _preference_names(entry)
     adapters: Dict[Tuple[str, str], str] = {}
     for entry in doc.get("adapters") or []:
         adapters[(entry["agent"], entry["task"])] = entry.get("adapter", "?")
