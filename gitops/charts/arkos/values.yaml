@@ -27,14 +27,7 @@ image:
   registry: image-registry.openshift-image-registry.svc:5000
   frontendRepository: zuno-ai-build/agent-frontend
   bffRepository: zuno-ai-build/agent-bff
-  # Temporarily back to latest (2026-08-20), same as ai-gateway/
-  # aiagent-operator/rag-service (commit 90ce5c3) and comage/advantage/
-  # finage/naveo (019a654): the in-cluster BuildConfig only ever writes
-  # agent-bff/agent-frontend:latest, never :v0.1.0, so the ImageStreamTag
-  # trigger below could never resolve - it just silently never fired,
-  # leaving this Deployment frozen on whatever digest it last resolved
-  # before the v0.1.0 pin. Revert to a real pinned tag once a release
-  # covering this code exists.
+  # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
   tag: latest
 
 frontend:

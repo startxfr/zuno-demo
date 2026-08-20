@@ -1551,16 +1551,7 @@ images:
   ingestion:
     repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/rag-ingestion
     tag: latest
-    # Always, not IfNotPresent - with a mutable :latest tag, IfNotPresent
-    # serves whatever stale image the node cached, silently ignoring
-    # rebuilds (VERIFIED live 2026-08-16 across multiple components).
-    # Revisit when WP-04 pins immutable tags.
-    # NOTE indentation is load-bearing here - VERIFIED live 2026-08-18:
-    # this key sat dedented at the images. level (a comment insertion had
-    # pulled it out of ingestion.), so files/pipeline.py.tpl's
-    # {{ .Values.images.ingestion.pullPolicy }} rendered "" and the
-    # compiled pipeline failed kfp's set_image_pull_policy validation -
-    # one reason no PipelineVersion ever existed on the cluster.
+    # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
     pullPolicy: Always
   # Unused by any template today - components/rag-ingestion/tooling holds
   # a separate KFP pipeline-compiler image source, not yet wired to a

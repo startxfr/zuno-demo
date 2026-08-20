@@ -21,17 +21,9 @@ serviceAccount:
 images:
   mlops:
     repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mlops
-    # Temporarily back to latest (2026-08-20), same as the other charts hit
-    # by WP-04's premature v0.1.0 pin (ai-gateway/aiagent-operator/
-    # rag-service in 90ce5c3, comage/advantage/finage/naveo in 019a654):
-    # the in-cluster BuildConfig only ever writes image:latest, never a
-    # pinned release tag. Not yet wired to a live workload, so this hadn't
-    # broken anything visibly, but would ImagePullBackOff the moment it is.
+    # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
     tag: latest
-    # Always, not IfNotPresent - with a mutable :latest tag, IfNotPresent
-  # serves whatever stale image the node cached, silently ignoring
-  # rebuilds (VERIFIED live 2026-08-16 across multiple components).
-  # Revisit when WP-04 pins immutable tags.
+    # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
   pullPolicy: Always
 
 externalSecrets:
