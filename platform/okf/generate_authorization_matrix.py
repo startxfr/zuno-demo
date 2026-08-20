@@ -104,19 +104,32 @@ def _preference_names(entry: Dict) -> List[str]:
     return list(entry.get("prefer") or [])
 
 
-def _load_model_routing() -> Tuple[Dict[Tuple[str, str], List[str]], Dict[Tuple[str, str], str]]:
+def _load_model_routing() -> Tuple[
+    Dict[Tuple[str, str], List[str]], Dict[Tuple[str, str], str], Dict[Tuple[str, str], bool]
+]:
     doc = yaml.safe_load(MODEL_ROUTING_POLICY_PATH.read_text(encoding="utf-8")) or {}
     preferences: Dict[Tuple[str, str], List[str]] = {}
+    strict: Dict[Tuple[str, str], bool] = {}
     for entry in doc.get("preferences") or []:
-        preferences[(entry["agent"], entry["task"])] = _preference_names(entry)
+        key = (entry["agent"], entry["task"])
+        preferences[key] = _preference_names(entry)
+        # ADR-0419 fix: previously silently dropped, making a strict
+        # entry's row (e.g. arkos/write-code) show unlisted survivors as
+        # reachable fallbacks when at runtime none are - see
+        # _effective_model_chain's own docstring for the consequence.
+        strict[key] = bool(entry.get("strict", False))
     adapters: Dict[Tuple[str, str], str] = {}
     for entry in doc.get("adapters") or []:
         adapters[(entry["agent"], entry["task"])] = entry.get("adapter", "?")
-    return preferences, adapters
+    return preferences, adapters, strict
 
 
 def _effective_model_chain(
-    classification: str, providers: List[Dict], prefer: List[str], local_only: bool = False
+    classification: str,
+    providers: List[Dict],
+    prefer: List[str],
+    local_only: bool = False,
+    strict: bool = False,
 ) -> List[str]:
     """Mirrors components/ai-gateway/app/routing.py's
     RoutingTable.candidates_for() + _apply_preference(): filter providers
@@ -132,7 +145,16 @@ def _effective_model_chain(
     dropped regardless of classification eligibility - without this, an
     agent like Finage would show openai/anthropic as "reference"/fallback
     candidates in this generated table even though local_only makes them
-    unreachable at runtime, which would make the doc actively wrong."""
+    unreachable at runtime, which would make the doc actively wrong.
+
+    `strict` (ADR-0417, fixed here per ADR-0419 - this parameter didn't
+    exist before) mirrors routing.py's own strict `_apply_preference`:
+    when set, no unlisted survivor is appended - the chain is exactly the
+    `prefer` names that survived eligibility filtering, possibly empty.
+    Before this fix, arkos's `write-code` row rendered `local`/
+    `local-gpt-oss` as reachable fallbacks; at runtime `strict: true`
+    means only `mistral-codestral` is ever tried, no fallback at all -
+    the committed doc was actively wrong about what the agent can do."""
     known = {p["name"] for p in providers}
     candidates = [
         p["name"]
@@ -142,6 +164,8 @@ def _effective_model_chain(
     ]
     deduped = [name for name in dict.fromkeys(prefer) if name in known]
     preferred = [name for name in deduped if name in candidates]
+    if strict:
+        return preferred
     rest = [name for name in candidates if name not in deduped]
     return preferred + rest
 
@@ -164,7 +188,8 @@ def _groups_cell(allowed_groups: List[str]) -> str:
 def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                     knowledge_policy: Dict[str, Dict], quota_classes: Dict[str, Dict],
                     providers: List[Dict], model_preferences: Dict[Tuple[str, str], List[str]],
-                    model_adapters: Dict[Tuple[str, str], str]) -> str:
+                    model_adapters: Dict[Tuple[str, str], str],
+                    model_strict: Dict[Tuple[str, str], bool]) -> str:
     frontmatter, _, _ = _split_document(agent_dir / "agent.okf.md")
     zuno = frontmatter.get("zuno") or {}
     name = zuno.get("name", agent_dir.name)
@@ -272,7 +297,10 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                 lines.append(f"| {task_label} | `{classification}` | — | (classification ceiling unknown — cannot resolve) | — | — |")
                 continue
             prefer = model_preferences.get((name, task_name), [])
-            chain = _effective_model_chain(classification, providers, prefer, local_only=local_only)
+            strict = model_strict.get((name, task_name), False)
+            chain = _effective_model_chain(
+                classification, providers, prefer, local_only=local_only, strict=strict
+            )
             reference = f"`{chain[0]}`" if chain else "(none eligible)"
             fallback = ", ".join(f"`{p}`" for p in chain[1:]) or "—"
             adapter = model_adapters.get((name, task_name))
@@ -320,7 +348,7 @@ def main() -> int:
     knowledge_policy = _load_knowledge_policy()
     quota_classes = _load_quota_classes()
     providers = _load_providers()
-    model_preferences, model_adapters = _load_model_routing()
+    model_preferences, model_adapters, model_strict = _load_model_routing()
 
     failures: List[str] = []
     written: List[str] = []
@@ -328,7 +356,7 @@ def main() -> int:
         index_path = agent_dir / "agent.okf.md"
         _, frontmatter_text, body = _split_document(index_path)
         expected = _render_section(agent_dir, tool_policy, knowledge_policy, quota_classes,
-                                   providers, model_preferences, model_adapters)
+                                   providers, model_preferences, model_adapters, model_strict)
         current = _current_section(body)
 
         if args.check:
