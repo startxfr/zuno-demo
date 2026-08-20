@@ -108,9 +108,9 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `answer-technical-question` (primary; prompt: `prompts/answer-technical-question.md`) | `C1` | `local-gpt-oss` | `local`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `find-relevant-docs` | `C1` | `local` | `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `check-my-drive-docs` | `C1` | `local` | `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `answer-technical-question` (primary; prompt: `prompts/answer-technical-question.md`) | `C1` | `local-gpt-oss` | `local`, `ovhcloud-gpt-oss-120b`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `find-relevant-docs` | `C1` | `local` | `local-gpt-oss`, `ovhcloud-gpt-oss-120b`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-docs` | `C1` | `local` | `local-gpt-oss`, `ovhcloud-gpt-oss-120b`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `write-code` | `C1` | `mistral-codestral` | `local-gpt-oss`, `local`, `openai`, `gemini`, `anthropic`, `mistral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

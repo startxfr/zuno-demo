@@ -51,9 +51,26 @@ adapters: []
 # deliberately absent (qwen stays their first candidate).
 preferences:
   # Multi-doc synthesis with citations (tekos's primary task).
+  # ADR-0419: local models still lead (unchanged doctrine - reasoning-heavy
+  # answer-technical-question keeps gpt-oss first per this file's own
+  # header comment, the two simple lookup tasks below keep qwen first,
+  # same as their pre-existing implicit default), then OVHcloud ahead of
+  # openai/gemini/anthropic (their own relative order unchanged), then
+  # mistral. mistral-codestral is deliberately left unlisted - a
+  # code-specialized model has no place being preferred for general Q&A/
+  # lookup, but stays reachable at the very end rather than excluded.
   - agent: tekos
     task: answer-technical-question
-    prefer: [local-gpt-oss, local]
+    preferred: [local-gpt-oss, local, ovhcloud-gpt-oss-120b]
+    fallback: [openai, gemini, anthropic, mistral]
+  - agent: tekos
+    task: find-relevant-docs
+    preferred: [local, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    fallback: [openai, gemini, anthropic, mistral]
+  - agent: tekos
+    task: check-my-drive-docs
+    preferred: [local, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    fallback: [openai, gemini, anthropic, mistral]
   # Plan->draft->reflect->write document workflow; C3 by agent seed - the
   # flagship local-only reflexional case. draft_node's own call is always
   # C3 (effective_classification starts from the agent's C3 seed and only
