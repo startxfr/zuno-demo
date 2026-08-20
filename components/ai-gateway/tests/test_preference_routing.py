@@ -167,6 +167,49 @@ def test_mistral_codestral_eligible_without_preference_at_c1() -> None:
     assert "mistral-codestral" in names
 
 
+# --- ADR-0417: strict preferences -----------------------------------------
+
+
+def test_strict_preference_returns_only_the_listed_survivors() -> None:
+    table = _StubTable(_PROVIDERS_WITH_MISTRAL_CODESTRAL)
+    names = [c.name for c in table.candidates_for("C2", prefer=["mistral-codestral"], strict=True)]
+    assert names == ["mistral-codestral"]
+
+
+def test_strict_preference_still_excludes_at_c3() -> None:
+    table = _StubTable(_PROVIDERS_WITH_MISTRAL_CODESTRAL)
+    try:
+        table.candidates_for("C3", prefer=["mistral-codestral"], strict=True)
+    except RoutingError:
+        pass
+    else:
+        raise AssertionError("expected RoutingError: mistral-codestral is not C3-eligible")
+
+
+def test_strict_preference_raises_when_the_only_listed_name_is_ineligible() -> None:
+    """A C1-only provider strictly preferred at C2: eligibility already
+    dropped it before _apply_preference even runs, but another provider
+    (local) survives base eligibility - so it's strict's own empty-
+    preferred check that must fire, not candidates_for's base check."""
+    providers = {"providers": [
+        {"name": "local", "kind": "local", "eligible_for": ["C1", "C2", "C3"]},
+        {"name": "gemini", "kind": "saas", "eligible_for": ["C1"]},
+    ]}
+    table = _StubTable(providers)
+    try:
+        table.candidates_for("C2", prefer=["gemini"], strict=True)
+    except RoutingError:
+        pass
+    else:
+        raise AssertionError("expected RoutingError: strict preference has no eligible survivor")
+
+
+def test_non_strict_preference_unaffected_by_the_new_parameter() -> None:
+    table = _StubTable(_PROVIDERS)
+    names = [c.name for c in table.candidates_for("C1", prefer=["anthropic"])]
+    assert names == ["anthropic", "local", "local-gpt-oss", "openai", "gemini"]
+
+
 TESTS = [
     test_preferred_survivors_move_to_front_in_given_order,
     test_unlisted_survivors_keep_relative_order_after_preferred,
@@ -183,6 +226,10 @@ TESTS = [
     test_mistral_codestral_is_excluded_at_c3,
     test_mistral_codestral_eligible_and_preferred_at_c2,
     test_mistral_codestral_eligible_without_preference_at_c1,
+    test_strict_preference_returns_only_the_listed_survivors,
+    test_strict_preference_still_excludes_at_c3,
+    test_strict_preference_raises_when_the_only_listed_name_is_ineligible,
+    test_non_strict_preference_unaffected_by_the_new_parameter,
 ]
 
 

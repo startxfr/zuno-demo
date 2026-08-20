@@ -236,10 +236,15 @@ async def chat_completions(
     # only (never the ADR-0309 autonomy surface - "prefer" is on the
     # optimizer's code-level denylist). Only permutes the candidates that
     # survive the eligibility/local-only filtering inside candidates_for -
-    # it can never widen what ADR-0021/0035 allow.
+    # it can never widen what ADR-0021/0035 allow. ADR-0417: `strict`
+    # narrows that permutation into an exclusion (no unlisted survivor) for
+    # entries that opt in - see model_routing_policy.py/routing.py.
     preference = model_routing_policy.preference_for(x_zuno_agent, x_zuno_task)
+    strict_preference = model_routing_policy.strict_for(x_zuno_agent, x_zuno_task)
     try:
-        candidates = routing_table.candidates_for(classification, local_only=local_only, prefer=preference)
+        candidates = routing_table.candidates_for(
+            classification, local_only=local_only, prefer=preference, strict=strict_preference
+        )
     except RoutingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -81,6 +81,7 @@ class RoutingTable:
         classification: str,
         local_only: bool = False,
         prefer: Optional[List[str]] = None,
+        strict: bool = False,
     ) -> List[ProviderCandidate]:
         """`local_only` (ADR-0035) is a source-level restriction independent
         of `classification`: when true, candidates are further filtered to
@@ -96,6 +97,14 @@ class RoutingTable:
         cannot resurrect a provider the hard constraints removed - same
         shape of guarantee as ADR-0114's "via_maas changes transport,
         never eligibility".
+
+        `strict` (ADR-0417) narrows that permutation into an exclusion:
+        when true, ONLY the still-eligible `prefer` names are returned - no
+        unlisted survivor is appended after them. Meaningless without
+        `prefer` (ignored if it's empty). Used where a silent substitution
+        to a different model would be the wrong behavior on failure (e.g. a
+        SaaS-only coding path that should fail visibly, not quietly swap
+        providers the caller never asked for) - see `_apply_preference`.
         """
         classification = classification.upper()
         if classification not in CLASSIFICATION_RANK:
@@ -123,11 +132,11 @@ class RoutingTable:
             )
             raise RoutingError(f"{reason}; failing closed per ADR-0021 rather than risk violating data-handling policy")
         if prefer:
-            candidates = self._apply_preference(candidates, prefer)
+            candidates = self._apply_preference(candidates, prefer, strict=strict)
         return candidates
 
     def _apply_preference(
-        self, candidates: List[ProviderCandidate], prefer: List[str]
+        self, candidates: List[ProviderCandidate], prefer: List[str], strict: bool = False
     ) -> List[ProviderCandidate]:
         """Moves the preferred names that SURVIVED filtering to the front,
         in preference order; unlisted survivors keep their relative
@@ -137,6 +146,16 @@ class RoutingTable:
         into the image while provider-routing.yaml is a ConfigMap, so the
         two legitimately drift; preference is a hint, not a security
         control, and eligibility already failed closed above.
+
+        `strict` (ADR-0417): return ONLY `preferred`, dropping every
+        unlisted survivor instead of appending them. This is a SECOND,
+        LATER fail-closed check than `candidates_for`'s own base
+        eligibility check above (which already ran, on the full candidate
+        set, before this method was even called) - it narrows further,
+        never replaces that check: a strict preference whose every listed
+        name got filtered out by eligibility still needs its own explicit
+        raise here, since `candidates` being non-empty at this point says
+        nothing about `preferred` being non-empty.
         """
         known = {p["name"] for p in self._config.get("providers", [])}
         deduped: List[str] = []
@@ -152,6 +171,14 @@ class RoutingTable:
             deduped.append(name)
         by_name = {c.name: c for c in candidates}
         preferred = [by_name[n] for n in deduped if n in by_name]
+        if strict:
+            if not preferred:
+                raise RoutingError(
+                    f"strict preference {deduped} has no eligible survivor among "
+                    f"{[c.name for c in candidates]}; failing closed per ADR-0021 rather than "
+                    "silently substituting an unlisted provider"
+                )
+            return preferred
         listed = set(deduped)
         rest = [c for c in candidates if c.name not in listed]
         return preferred + rest

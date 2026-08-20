@@ -12,6 +12,14 @@ that survived classification/local-only filtering. Reorder only: it never
 widens eligibility (ADR-0021/0035 stay the hard constraints), and it is
 on the ADR-0309 optimizer's code-level denylist.
 
+ADR-0417 adds an optional `strict: true` field to a `preferences:` entry:
+narrows that reorder into an exclusion (app/routing.py's
+`_apply_preference` returns only the listed, still-eligible names, no
+unlisted survivor appended) - for a request path where silently
+substituting a different model on failure would be the wrong behavior.
+Defaults false for every existing entry, unchanged from today's reorder-
+only semantics.
+
 Fails closed per malformed entry, not per file: a single bad entry (a
 typo'd/missing field) is skipped and logged, never crashes the whole
 gateway - the affected agent/task pair just falls back to the base model,
@@ -43,9 +51,15 @@ class AdapterDeclaration:
 class ModelRoutingPolicy:
     def __init__(self, policy_path: str = MODEL_ROUTING_POLICY_PATH):
         self._policy_path = policy_path
-        self._entries, self._preferences = self._load()
+        self._entries, self._preferences, self._strict = self._load()
 
-    def _load(self) -> Tuple[Dict[Tuple[str, str], AdapterDeclaration], Dict[Tuple[str, str], List[str]]]:
+    def _load(
+        self,
+    ) -> Tuple[
+        Dict[Tuple[str, str], AdapterDeclaration],
+        Dict[Tuple[str, str], List[str]],
+        Dict[Tuple[str, str], bool],
+    ]:
         try:
             with open(self._policy_path, "r", encoding="utf-8") as fh:
                 config = yaml.safe_load(fh) or {}
@@ -54,10 +68,10 @@ class ModelRoutingPolicy:
                 "no model-routing policy found at %s; every request uses the base model (ADR-0303 default)",
                 self._policy_path,
             )
-            return {}, {}
+            return {}, {}, {}
         except Exception as exc:
             logger.error("failed to parse model-routing policy %s: %s", self._policy_path, exc)
-            return {}, {}
+            return {}, {}, {}
 
         entries: Dict[Tuple[str, str], AdapterDeclaration] = {}
         for raw in config.get("adapters", []) or []:
@@ -74,6 +88,7 @@ class ModelRoutingPolicy:
             )
 
         preferences: Dict[Tuple[str, str], List[str]] = {}
+        strict: Dict[Tuple[str, str], bool] = {}
         for raw in config.get("preferences", []) or []:
             agent = raw.get("agent")
             task = raw.get("task")
@@ -86,15 +101,16 @@ class ModelRoutingPolicy:
                 )
                 continue
             preferences[(agent, task)] = names
+            strict[(agent, task)] = bool(raw.get("strict", False))
 
         logger.info(
             "loaded model-routing policy from %s (%d adapter declaration(s), %d preference(s))",
             self._policy_path, len(entries), len(preferences),
         )
-        return entries, preferences
+        return entries, preferences, strict
 
     def reload(self) -> None:
-        self._entries, self._preferences = self._load()
+        self._entries, self._preferences, self._strict = self._load()
 
     def adapter_for(self, agent_name: str, task_name: str) -> Optional[AdapterDeclaration]:
         if not agent_name or not task_name:
@@ -109,3 +125,14 @@ class ModelRoutingPolicy:
             return None
         names = self._preferences.get((agent_name, task_name))
         return list(names) if names else None
+
+    def strict_for(self, agent_name: str, task_name: str) -> bool:
+        """ADR-0417: whether this (agent, task)'s preference is exclusive -
+        only the listed, still-eligible providers are candidates, no
+        unlisted survivor is appended. Defaults False (today's reorder-only
+        behavior, unchanged) for every entry that doesn't set
+        `strict: true`, and for any (agent, task) with no preference entry
+        at all."""
+        if not agent_name or not task_name:
+            return False
+        return self._strict.get((agent_name, task_name), False)

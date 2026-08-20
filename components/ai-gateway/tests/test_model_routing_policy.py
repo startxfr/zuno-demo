@@ -188,6 +188,37 @@ def test_reload_picks_up_preference_changes() -> None:
         os.unlink(path)
 
 
+# --- ADR-0417: strict preferences -----------------------------------------
+
+
+def test_strict_defaults_false() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local-gpt-oss"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.strict_for("arkos", "draft-architecture-testimonial") is False
+    finally:
+        os.unlink(path)
+
+
+def test_strict_true_is_resolved() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "write-code", "prefer": ["mistral-codestral"], "strict": True},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.strict_for("arkos", "write-code") is True
+        assert policy.preference_for("arkos", "write-code") == ["mistral-codestral"]
+    finally:
+        os.unlink(path)
+
+
+def test_strict_absent_agent_task_returns_false() -> None:
+    policy = ModelRoutingPolicy("/nonexistent/model-routing-policy.yaml")
+    assert policy.strict_for("arkos", "write-code") is False
+
+
 TESTS = [
     test_declared_adapter_is_resolved,
     test_undeclared_agent_task_returns_none,
@@ -202,6 +233,9 @@ TESTS = [
     test_preference_returns_a_copy_not_the_loaded_list,
     test_missing_file_degrades_to_no_preferences_either,
     test_reload_picks_up_preference_changes,
+    test_strict_defaults_false,
+    test_strict_true_is_resolved,
+    test_strict_absent_agent_task_returns_false,
 ]
 
 
