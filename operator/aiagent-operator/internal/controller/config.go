@@ -34,8 +34,8 @@ type OperatorConfig struct {
 	// KeycloakJWKSURL is where the BFFs actually fetch the JWKS, while
 	// keycloakIssuerURL() stays the iss-claim comparison string - the
 	// external Route's certificate chains to Vault's internal root CA,
-	// absent from container trust stores (VERIFIED live 2026-08-16), so
-	// the in-cluster Keycloak Service is the reliable fetch path.
+	// absent from container trust stores, so the in-cluster Keycloak
+	// Service is the reliable fetch path.
 	KeycloakJWKSURL string
 
 	// KeycloakCAConfigMapName, if non-empty, names a ConfigMap (key

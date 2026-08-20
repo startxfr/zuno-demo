@@ -364,13 +364,13 @@ func desiredService(agent *zunov1alpha1.AIAgent, component string) *corev1.Servi
 }
 
 // desiredBFFNetworkPolicy grants the agent's own frontend (the real chat
-// path) and the acceptance-gate Job ingress to the BFF. VERIFIED live
-// 2026-08-16 (Tekos incident): this previously only listed acceptance-gate,
-// so the frontend's own calls to the BFF were silently dropped by the
-// implicit default-deny (Kubernetes denies everything not explicitly
-// allowed once any NetworkPolicy selects a pod) - every real chat turn
-// timed out at the TCP level. The acceptance-gate suite never caught this
-// because it calls the BFF directly, bypassing the frontend.
+// path) and the acceptance-gate Job ingress to the BFF. Listing only
+// acceptance-gate here silently drops the frontend's own calls to the BFF
+// via the implicit default-deny (Kubernetes denies everything not
+// explicitly allowed once any NetworkPolicy selects a pod) - every real
+// chat turn would time out at the TCP level, a failure mode the
+// acceptance-gate suite can't catch since it calls the BFF directly,
+// bypassing the frontend.
 func desiredBFFNetworkPolicy(agent *zunov1alpha1.AIAgent) *networkingv1.NetworkPolicy {
 	name := agent.Spec.AgentName + "-bff"
 	podSelector := map[string]string{labelComponent: "bff", labelAgent: agent.Spec.AgentName}

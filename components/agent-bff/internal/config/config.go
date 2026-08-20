@@ -27,12 +27,12 @@ type Config struct {
 
 	// KeycloakJWKSURL optionally overrides where the JWKS is actually
 	// fetched from, while KeycloakIssuerURL stays the iss-claim comparison
-	// string. VERIFIED live (2026-08-16): the external Route's certificate
-	// chains to Vault's internal root CA, absent from the container's
-	// trust store, so fetching JWKS via the issuer URL fails TLS
-	// verification and every token is rejected as invalid - the in-cluster
-	// Keycloak Service (plain HTTP by Keycloak's own edge-termination
-	// design, inside the mesh/NetworkPolicy boundary) is the reliable
+	// string. The external Route's certificate chains to Vault's internal
+	// root CA, absent from the container's trust store, so fetching JWKS
+	// via the issuer URL fails TLS verification and every token is
+	// rejected as invalid - the in-cluster Keycloak Service (plain HTTP by
+	// Keycloak's own edge-termination design, inside the mesh/NetworkPolicy
+	// boundary) is the reliable
 	// path. Same two-variable seam as the Python services' auth.py.
 	KeycloakJWKSURL string
 
