@@ -242,6 +242,16 @@ platformNamespaces:
       # same istiod/cert-manager-istio-csr bootstrap need as every other
       # entry here.
       - zuno-mlops
+      # VERIFIED live (2026-08-20): same class of bug as
+      # redhat-ods-applications above - rhoai-model-registries is
+      # istio-injection: enabled but was missing from this allowlist, so
+      # model-catalog's istio-proxy could never reach cert-manager-istio-csr
+      # ("dial tcp <ClusterIP>:443: i/o timeout" on every CSR attempt,
+      # invisible to NetworkPolicy checks scoped to that namespace alone
+      # since the block is on this side) and crash-looped on its startup
+      # probe indefinitely once the ResourceQuota fix let it finally
+      # schedule.
+      - rhoai-model-registries
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
