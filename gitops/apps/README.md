@@ -51,13 +51,18 @@ standing component. `mlops` is out of scope for v0.
 
 `sql_schema`'s and `rag`'s one-shot SQL `Job`s (schema/fixtures applies
 against PostgreSQL) are covered here too, unlike `vault`'s unseal: each is
-an ArgoCD `PreSync` hook Job templated into the consuming chart
+an ArgoCD `Sync` hook Job templated into the consuming chart
 (`gitops/charts/sql-schema`'s `-d0` "prerequisites" Application for
 `mcp-sales-db`; `gitops/charts/rag-service`'s own `-d1` Application for
 `rag`), with `hook-delete-policy: BeforeHookCreation` (Jobs are immutable).
-Only the static SQL/fixtures `ConfigMap` generation
-(`ansible/roles/{sql_schema,rag}/kustomize/schema/`, plain
-`configMapGenerator`s reading `data/{sxa,rag}/`) stays Ansible-applied.
+The static SQL/fixtures `ConfigMap` each Job mounts used to be Ansible-applied
+for both (`ansible/roles/{sql_schema,rag}/kustomize/schema/`, plain
+`configMapGenerator`s reading `data/{sxa,rag}/`), entirely outside GitOps -
+`rag`'s is now rendered by the chart itself instead
+(`gitops/charts/rag-service/templates/configmap-schema.yaml`, `.Files.Get`
+on a copy of the same SQL under that chart's own `files/sql/`), so it's part
+of the same ArgoCD-tracked flow as the Job that consumes it. `sql_schema`'s
+ConfigMap (`zuno-sxa-schema`) is still the older Ansible-applied pattern.
 
 `nfd`, `nvidia_gpu`, `openshift_ai`, `external_secrets`, `smtp` and
 `observability` each have their own `-d0`/`-d1` Application pair backed by
