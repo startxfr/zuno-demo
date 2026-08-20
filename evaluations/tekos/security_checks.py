@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """Security-negative checks for ADR-0032/0033 (identity propagation),
 ADR-0034/0035 (classification aggregation and source-level external-model
-restrictions), ADR-0040 (agent entitlement vs. business-role separation)
-and ADR-0037 (MCP server network/workload-identity boundary).
+restrictions), ADR-0040 (agent entitlement vs. business-role separation),
+ADR-0037 (MCP server network/workload-identity boundary), and ADR-0415/
+ADR-0036 (image-generation entitlement vs. Tekos's own agent_declaration -
+see the two checks appended at the bottom for the live/behavioral half of
+the DAT/image-generation capability-boundary probe stress_test.py's
+module docstring describes; gate_checks.py's
+tekos_declares_no_dat_or_image_generation_capability is its static
+config-only counterpart).
 
 Kept separate from scenarios.yaml/run_scenarios.py rather than added as
 scenarios 21+: ADR-0027 fixes Tekos's acceptance suite at exactly 20
 scenarios, and these are security-negative checks for specific ADRs, not
 part of that fixed acceptance count. Reuses run_scenarios.py's token-fetch
 helpers rather than duplicating them. gate_checks.py holds ADR-0053's
-remaining non-negative, non-scenario capability checks (currently just
-"permitted SaaS fallback"). run_acceptance_gate.py (ADR-0053) is the single
+remaining non-negative, non-scenario capability checks (currently
+"permitted SaaS fallback" plus the two write-code/DAT-boundary checks
+added alongside these). run_acceptance_gate.py (ADR-0053) is the single
 entrypoint `make check` actually invokes, combining this module (100%
 mandatory), gate_checks.py (100% mandatory) and run_scenarios.py (75%
 threshold) into one gate with one exit code.
@@ -241,6 +248,61 @@ def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
     )
 
 
+def mcp_gateway_denies_generate_image_for_tekos_agent_declaration() -> CheckResult:
+    """ADR-0036's agent_declaration factor, isolated from the group/role
+    factor: `generate_image`'s allowed_groups
+    (policies/tools/tool-policy.yaml) includes `consultant` -
+    consultant-01's own business-role group - so a 403 here can only be
+    explained by Tekos's `answer-technical-question` task never declaring
+    `image.generation.create`/`generate_image` in its allowed_tools
+    (agents/tekos/tasks/answer-technical-question.md; that capability
+    belongs to Arkos/Advantage/Comage alone, ADR-0415). This is the
+    isolated-boundary counterpart to entitlement_without_business_role_
+    denied_confluence above (which isolates the opposite factor).
+    """
+    resp = _invoke_tool(
+        "consultant-01",
+        "generate_image",
+        {"prompt": "a simple test diagram"},
+        classification="C2",
+    )
+    ok = resp.status_code == 403
+    return CheckResult(
+        "mcp_gateway_denies_generate_image_for_tekos_agent_declaration",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
+def tekos_chat_never_returns_image_artifacts() -> CheckResult:
+    """ADR-0415: `ChatResponse.images` must stay empty for every Tekos
+    turn, including one that explicitly asks for a generated image - since
+    Tekos's task never lists `image.generation.create`,
+    app/graph/nodes.py's reason_node never even offers the generate_image
+    tool schema to the model, so this is a structural guarantee, not a
+    probabilistic one. Deliberately checks only the `images` field, not
+    reply prose content - a mandatory check must never fail on benign LLM
+    phrasing variance; the fuzzier false-capability-claim heuristic lives
+    in stress_test.py instead.
+    """
+    resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/tekos/chat",
+        headers=auth_headers("consultant-01"),
+        json={
+            "session_id": "sec-check-8",
+            "user_sub": "consultant-01",
+            "message": "Generate a diagram illustrating a Kubernetes Deployment rolling update.",
+        },
+        timeout=30,
+    )
+    ok = resp.status_code == 200 and resp.json().get("images", None) == []
+    return CheckResult(
+        "tekos_chat_never_returns_image_artifacts",
+        ok,
+        f"status={resp.status_code} images={resp.json().get('images') if resp.status_code == 200 else None}",
+    )
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -249,6 +311,8 @@ CHECKS = [
     entitlement_without_business_role_denied_confluence,
     business_role_without_entitlement_denied_by_bff,
     direct_call_to_sales_db_mcp_denied_without_gateway_token,
+    mcp_gateway_denies_generate_image_for_tekos_agent_declaration,
+    tekos_chat_never_returns_image_artifacts,
 ]
 
 

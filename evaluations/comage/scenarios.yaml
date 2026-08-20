@@ -77,10 +77,6 @@ scenarios:
     persona: sale-01
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
     expect_tool: salesforce.opportunity.read
-    # ADR-0326/WP-33: Comage's live_read_tool is Salesforce, not
-    # Confluence - see evaluations/tekos/run_scenarios.py's
-    # chat_triggers_tool handler for why this field exists.
-    expect_source_contains: salesforce
 
   - id: 11
     title: RAG retrieval contributes at least one citation for a sales topic

@@ -45,9 +45,9 @@ type-specific parameters); `run_scenarios.py` maps each `type` to one
 handler function and prints a pass/fail table plus the overall rate against
 the 75% threshold, exiting non-zero on failure so it's CI-friendly once a
 live cluster is reachable from a GitHub Actions runner (not yet true for
-this project - see `.github/README.md`). `gate_checks.py`'s one check
-needs no live cluster and is wired into `.github/workflows/lint.yml`'s
-`policy-as-code` job accordingly.
+this project - see `.github/README.md`). `gate_checks.py`'s checks need no
+live cluster and are wired into `.github/workflows/lint.yml`'s
+`policy-as-code` job accordingly (see below for what they check).
 
 Coverage: portal/tile access gating (scenarios 1, 2, 4-6), authentication
 (3), the chat contract synchronous and streaming (7-9), tool-triggered
@@ -55,6 +55,13 @@ retrieval (10-11), MCP Gateway policy enforcement (12-13, 18), model
 routing/classification fail-closed behavior (14-15, config-consistency
 checks that don't need a live cluster), BFF JWT validation (16-17),
 namespace isolation (19), and service health (20).
+
+`gate_checks.py` holds three config-only checks (no live cluster needed):
+permitted SaaS fallback at C2, `write-code`'s model-routing preference
+genuinely resolving to `mistral-codestral` first (ADR-0417), and Tekos's
+OKF bundle staying free of the DAT-drafting/image-generation capabilities
+that belong to Arkos alone (ADR-0415) - all three are wired into
+`.github/workflows/lint.yml`'s `policy-as-code` job.
 
 This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what "make
@@ -84,4 +91,34 @@ boundary (`gitops/charts/mcp-sales-db`'s `NetworkPolicy`, which an
 HTTP-level check like this can't directly exercise;
 `platform/security/check_workload_hardening.py` statically verifies that
 policy and the rest of the hardening baseline exist in every chart's
-rendered manifests instead).
+rendered manifests instead); and, closing a gap a stress-testing pass over
+Tekos surfaced (ADR-0415/ADR-0036), a direct `generate_image` call "as
+Tekos" is denied (403) by the MCP Gateway's agent_declaration factor alone
+- `generate_image`'s `allowed_groups` includes `consultant`, so this
+isolates the boundary from group/role noise - and a live chat turn that
+explicitly asks Tekos for a generated image still returns an empty
+`images` list, since Tekos's task never declares that capability in the
+first place (Arkos/Advantage/Comage's alone).
+
+## Exploratory stress test
+
+`stress_test.py` (same setup as above, run from this directory) is a
+broad, deliberately-uncapped battery of prompts run live as `consultant-01`
+against Tekos's real chat surface, covering: technical Q&A across every
+declared RAG domain (OpenShift/Kubernetes/Keycloak/Ansible/ArgoCD/Helm/Go),
+Confluence-live-read-triggering prompts, code-generation prompts across
+several `write-code` trigger-pattern branches, a DAT-drafting boundary
+probe and an image-generation boundary probe (Tekos has neither capability
+- see `gate_checks.py`'s/`security_checks.py`'s deterministic counterparts
+of this same boundary above), a handful of adversarial/edge prompts (a
+dual live-read+code trigger, a very short and a very long message, a
+mid-conversation pivot to an out-of-scope request reusing `run_id`), and
+two ai-gateway-direct model-routing correlation checks
+(`answer-technical-question` should prefer `local-gpt-oss`, `write-code`
+should prefer `mistral-codestral`, per `agents/tekos/agent.okf.md`'s
+generated "Model routing" table). **Not part of `run_acceptance_gate.py`/
+ADR-0053's mandatory gate** - unlike `security_checks.py`/`gate_checks.py`,
+several of its assertions (false-capability-claim phrase heuristics, "did
+the preferred model actually answer vs. legitimately fall back") are
+exploratory/informational by design, not hard release gates. Run with
+`python3 stress_test.py`.

@@ -6,16 +6,25 @@ specific identity/classification ADR (security_checks.py). ADR-0053's own
 Decision text names "local model inference" and "permitted SaaS fallback"
 as checks `make check` must run; local model inference is already proven
 live by scenarios 8/9 (a real token stream from the always-preferred local
-provider), so the one genuine gap this file closes is "permitted SaaS
+provider), so one genuine gap this file closes is "permitted SaaS
 fallback" - config-consistency only, no live cluster needed, same style
 and for the same reason as run_scenarios.py's model_router_fails_closed/
 model_router_prefers_local: proving a live SaaS *fallback* would require
 deliberately breaking the local model's availability, which a `make check`
 gate has no safe way to do and shouldn't attempt.
 
+Two further checks close gaps a stress-testing pass over Tekos surfaced
+(see stress_test.py's module docstring for the live/behavioral counterparts
+of these same two guarantees): `write-code` (ADR-0417, Tekos's newest
+declared task) never had a task-specific model-routing check - scenarios
+14/15 only assert the generic C1/C3 provider-kind invariant - and nothing
+anywhere asserted Tekos's OKF bundle stays free of the DAT-drafting/
+image-generation capabilities that belong to Arkos alone
+(agents/arkos/tasks/draft-architecture-testimonial.md, ADR-0415).
+
 Like security_checks.py, every check here is mandatory (100%) - these are
-capability guarantees ADR-0053 requires, not part of the 75% quality
-threshold reserved for the fixed 20 scenarios.
+capability guarantees ADR-0053 requires (plus the two closed gaps above),
+not part of the 75% quality threshold reserved for the fixed 20 scenarios.
 """
 from __future__ import annotations
 
@@ -56,8 +65,83 @@ def c2_permits_saas_fallback_when_not_local_only() -> CheckResult:
     )
 
 
+def tekos_write_code_prefers_mistral_codestral() -> CheckResult:
+    """ADR-0417: Tekos's `write-code` task must genuinely prefer
+    `mistral-codestral` first, and must remain non-strict (unlike Arkos's
+    `strict: true` for the same task - Arkos seeds C3 and wants a Codestral
+    failure to surface as a visible error, Tekos seeds C1 and deliberately
+    wants a silent drop to a local model instead). Checks
+    policies/model-routing/model-routing-policy.yaml directly (same style
+    as c2_permits_saas_fallback_when_not_local_only above), cross-checked
+    against platform/ai-gateway/provider-routing.yaml so the preference
+    doesn't name a provider Tekos could never actually reach at its C1
+    ceiling. Closes a real gap: scenarios 14/15 only assert the generic
+    C1/C3 provider-kind invariant, nothing write-code- or
+    Codestral-specific, despite write-code being one of only 4 declared
+    Tekos tasks and the newest one.
+    """
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    policy = yaml.safe_load((repo_root / "policies/model-routing/model-routing-policy.yaml").read_text())
+    routing = yaml.safe_load((repo_root / "platform/ai-gateway/provider-routing.yaml").read_text())
+
+    entry = next(
+        (p for p in policy.get("preferences", []) if p.get("agent") == "tekos" and p.get("task") == "write-code"),
+        None,
+    )
+    prefer = (entry or {}).get("prefer", [])
+    strict = (entry or {}).get("strict", False)
+
+    codestral = next((p for p in routing.get("providers", []) if p["name"] == "mistral-codestral"), None)
+    codestral_c1_eligible = bool(codestral) and "C1" in codestral.get("eligible_for", [])
+
+    ok = bool(prefer) and prefer[0] == "mistral-codestral" and codestral_c1_eligible and not strict
+    return CheckResult(
+        "tekos_write_code_prefers_mistral_codestral",
+        ok,
+        f"prefer={prefer} strict={strict} codestral_c1_eligible={codestral_c1_eligible}",
+    )
+
+
+def tekos_declares_no_dat_or_image_generation_capability() -> CheckResult:
+    """The boundary this whole exercise probes, statically: Tekos's OKF
+    bundle must never declare Arkos's `draft-architecture-testimonial` task,
+    and none of Tekos's own declared tasks may list `image.generation.create`
+    (or its legacy alias `generate_image`) in `allowed_tools` - mirroring
+    components/agent-runtime/app/graph/nodes.py's own alias-tolerant check
+    for whether a task is entitled to the generate_image tool. A pure
+    config-consistency check, no live cluster needed - the live/behavioral
+    counterpart (`images` always empty on a real chat turn) lives in
+    security_checks.py's tekos_chat_never_returns_image_artifacts.
+    """
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    bundle = yaml.safe_load(
+        (repo_root / "agents/tekos/agent.okf.md").read_text().split("---", 2)[1]
+    )
+    tasks = bundle.get("zuno", {}).get("tasks", [])
+    dat_declared = "draft-architecture-testimonial" in tasks
+
+    image_gen_tasks = []
+    for task_name in tasks:
+        task_path = repo_root / "agents/tekos/tasks" / f"{task_name}.md"
+        if not task_path.exists():
+            continue
+        task_frontmatter = yaml.safe_load(task_path.read_text().split("---", 2)[1])
+        allowed_tools = task_frontmatter.get("zuno", {}).get("allowed_tools", [])
+        if "image.generation.create" in allowed_tools or "generate_image" in allowed_tools:
+            image_gen_tasks.append(task_name)
+
+    ok = not dat_declared and not image_gen_tasks
+    return CheckResult(
+        "tekos_declares_no_dat_or_image_generation_capability",
+        ok,
+        f"dat_declared={dat_declared} tasks_with_image_gen={image_gen_tasks}",
+    )
+
+
 CHECKS = [
     c2_permits_saas_fallback_when_not_local_only,
+    tekos_write_code_prefers_mistral_codestral,
+    tekos_declares_no_dat_or_image_generation_capability,
 ]
 
 

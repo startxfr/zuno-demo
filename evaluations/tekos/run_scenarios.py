@@ -372,16 +372,21 @@ def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     )
     if resp.status_code != 200:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    citations = resp.json().get("citations", [])
-    # ADR-0326/WP-33: which live-read source's citations to look for -
-    # defaults to "confluence" so Tekos/Arkos's existing scenarios (which
-    # never set this field) keep matching their own live tool unchanged;
-    # Comage's own scenario sets this to "salesforce" instead (its
-    # live_read_tool is Salesforce, not Confluence - app/graph/nodes.py's
-    # tool_call_node/respond_node are agent-agnostic, see that module).
-    expect_source_contains = s.get("expect_source_contains", "confluence")
-    ok = any(expect_source_contains in c.get("source", "").lower() for c in citations)
-    return ScenarioResult(s["id"], s["title"], ok, f"citations={citations}")
+    body = resp.json()
+    # Citation.source is the raw result URL
+    # (app/graph/nodes.py's respond_node: `item.get("url") or "live-read"`),
+    # not a fixed marker string for the tool that produced it - Tekos's real
+    # Confluence instance, for instance, is hosted at startxfr.atlassian.net,
+    # which never contains the word "confluence". source_mode ("live"/"both"
+    # only when a live tool call's results actually contributed - ADR-0205's
+    # _compute_source_mode, agent-agnostic) is the correct, hosting-domain-
+    # independent signal that THIS task's one declared live_read_tool
+    # (Confluence for Tekos, Salesforce for Comage, ADR-0326/WP-33 - each
+    # task has exactly one, so no ambiguity) fired and contributed, so check
+    # that instead of pattern-matching the citation URL against a per-agent
+    # marker string.
+    ok = body.get("source_mode") in ("live", "both")
+    return ScenarioResult(s["id"], s["title"], ok, f"source_mode={body.get('source_mode')} citations={body.get('citations', [])}")
 
 
 def rag_retrieval_has_citation(s: Dict[str, Any]) -> ScenarioResult:
