@@ -175,8 +175,9 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0409](0400-v0.4-roadmap.md#adr-0409-introduce-advanced-human-approval-workflows) | v0.4 | Proposed | Introduce advanced human approval workflows |
 | [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.4 | Partially implemented | Expand the agent catalog beyond the initial five agents |
 | [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Implemented | Trust the Vault PKI root in every agent frontend's OIDC client |
-| [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Implemented | Serve gpt-oss-20b on the unmanaged full-GPU node |
+| [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | v0.4 | Implemented | Consolidate Grafana dashboards into six platform views |
+| [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | v0.4 | Proposed | Consolidate zuno-ai-run into three tiered MIG predictors |
 
 ## OKF stream
 

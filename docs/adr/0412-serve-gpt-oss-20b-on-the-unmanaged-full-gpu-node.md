@@ -1,9 +1,10 @@
 # ADR-0412: Serve gpt-oss-20b on the unmanaged full-GPU node
 
-- **Status:** Implemented
+- **Status:** Superseded by ADR-0414
 - **Target:** v0.4
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
+- **Superseded:** 2026-08-20 by [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md)
 
 ## Context
 
