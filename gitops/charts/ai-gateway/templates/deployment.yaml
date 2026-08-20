@@ -19,6 +19,30 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: ai-gateway
+      annotations:
+        # Live-verified 2026-08-20: the LLMInferenceService controller
+        # (RHOAI 3.5.0-ea.2 llm-d) auto-generates a DestinationRule for
+        # gpt-oss-20b's -kserve-workload-svc with trafficPolicy.tls.mode:
+        # SIMPLE and caCertificates pointing at
+        # /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt -
+        # a path that only exists when a pod's default ServiceAccount
+        # token is automounted. This pod sets automountServiceAccountToken:
+        # false below (hardening), so istio-proxy's SDS secret fetch for
+        # that file fails outright ("no such file or directory"), and
+        # every call to gpt-oss-20b gets an immediate "Connection reset by
+        # peer" - Envoy can never build the TLS context the
+        # (controller-owned, not ours to edit) DestinationRule demands.
+        # gpt-oss-20b's vLLM container already terminates real TLS itself
+        # (--ssl-certfile/--ssl-keyfile), so Istio managing a second TLS
+        # layer on top is redundant anyway - excluding this port removes
+        # Envoy from the outbound path entirely and lets the app's own TLS
+        # reach it directly, the same class of fix as mariadb's
+        # excludeInboundPorts sidestepping a mesh/app TLS mismatch (see
+        # gitops/charts/mariadb/templates/mariadb.yaml). Port-scoped, not
+        # IP-scoped: every LLMInferenceService this cluster deploys lands
+        # on this same container port 8000 today, so this covers the
+        # whole controller-bug class, not just this one model.
+        traffic.sidecar.istio.io/excludeOutboundPorts: "8000"
     spec:
       serviceAccountName: ai-gateway
       priorityClassName: zuno-workload-default
