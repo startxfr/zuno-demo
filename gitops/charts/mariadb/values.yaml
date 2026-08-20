@@ -64,23 +64,16 @@ operator:
       # 258Mi (well under 700Mi) throughout, confirming it wasn't memory
       # this time. Bumped cpu request/limit accordingly - see
       # docs/platform/troubleshooting.md for the full diagnosis.
-      # 2026-08-18 addendum: still crash-looping (73 restarts/10h) after
-      # the above bump, but with a second, distinct proximate cause visible
-      # in the container's own logs, not just kubelet events: this
-      # operator-sdk Helm-operator watches ALL namespaces across 9
-      # dependent kinds with 16 reconcile workers, and this cluster's
-      # client-side request throttling (many operators log the same
-      # "Waited ... due to client-side throttling" lines - it's a shared
-      # cluster trait, not unique to mariadb-operator) occasionally delays
-      # the shared client's leader-election lease-renewal call past its
-      # ~10s deadline, which controller-runtime treats as "leader election
-      # lost" and exits(1) by design - fatal here since there's only one
-      # replica to fail over to. Only one MariadbOperator CR exists
-      # cluster-wide (zuno-data/mariadb-operator), so WATCH_NAMESPACE below
-      # scopes the watch down to it, cutting most of the reconcile-time API
-      # call volume that feeds the throttling; cpu is bumped further as a
-      # supporting measure against the still-possible startup-discovery
-      # throttling this doesn't address (discovery isn't namespace-scoped).
+      # Root cause: this operator watches all namespaces with many reconcile
+      # workers, and cluster-wide client-side throttling can delay its
+      # leader-election lease renewal past its deadline - see
+      # docs/platform/troubleshooting.md for the full diagnosis. Only one
+      # MariadbOperator CR exists cluster-wide (zuno-data/mariadb-operator),
+      # so WATCH_NAMESPACE below scopes the watch down to it, cutting most
+      # of the reconcile-time API call volume that feeds the throttling;
+      # cpu is bumped further as a supporting measure against the
+      # still-possible startup-discovery throttling this doesn't address
+      # (discovery isn't namespace-scoped).
       config:
         env:
           - name: WATCH_NAMESPACE
@@ -187,8 +180,8 @@ pipelineDatabase:
   owner: mlpipeline
   vaultPath: rag/pipeline-db
 
-# WP-06 follow-up (2026-08-19): second pipeline database on this same
-# shared instance, for mlops-dspa - see templates/database-mlops.yaml's
+# WP-06 follow-up: second pipeline database on this same shared instance,
+# for mlops-dspa - see templates/database-mlops.yaml's
 # header comment for why (mlops-dspa's own embeddedMariaDB mode is
 # permanently broken post-restart: DSPO's health-check probe can't reach
 # its self-managed, non-mesh-excluded pod). vaultPath matches

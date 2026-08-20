@@ -1,8 +1,8 @@
 {{- if .Values.grafana.enabled }}
 # ADR-0413: merges dashboard-model-consumption.yaml's gateway-traffic panels
 # (ADR-0029) with vLLM's own serving metrics and GPU (DCGM) panels - all
-# NEW, VERIFIED live 2026-08-19 that vllm:* and DCGM_FI_DEV_* are both
-# already queryable (the latter via gpu-operator's own DCGM exporter
+# NEW; vllm:* and DCGM_FI_DEV_* are both already queryable (the latter via
+# gpu-operator's own DCGM exporter
 # ServiceMonitor; the former via the vLLM ServiceMonitor
 # gitops/charts/models/templates/servicemonitor-vllm.yaml adds - see that
 # file for the "why wasn't this scraped before" history). This is the
@@ -257,7 +257,7 @@ spec:
           "title": "GPU utilization",
           "type": "timeseries",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "gpu-operator's own nvidia-dcgm-exporter ServiceMonitor - VERIFIED live 2026-08-19, single full GPU (no MIG slicing active on this cluster today).",
+          "description": "gpu-operator's own nvidia-dcgm-exporter ServiceMonitor - single full GPU (no MIG slicing active on this cluster today).",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
           "fieldConfig": {"defaults": {"unit": "percent"}},
           "targets": [

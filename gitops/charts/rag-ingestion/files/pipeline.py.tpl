@@ -52,10 +52,10 @@ CONFIG_KEYS = {
     "CORPUS_INCREMENTAL": "CORPUS_INCREMENTAL",
     "CORPUS_HASH_ALGORITHM": "CORPUS_HASH_ALGORITHM",
     "CORPUS_DELETE_ORPHANS": "CORPUS_DELETE_ORPHANS",
-    # WP-24 freshness objective. VERIFIED live 2026-08-18: this key existed
-    # in the config ConfigMap since 0619a1f but was never forwarded here, so
-    # normalize silently omitted stale_after from every chunk and validate
-    # fail-closed on the whole corpus once rows actually indexed.
+    # WP-24 freshness objective. This key existed in the config ConfigMap
+    # since 0619a1f but was never forwarded here, so normalize silently
+    # omitted stale_after from every chunk and validate fail-closed on the
+    # whole corpus once rows actually indexed.
     "STALE_AFTER": "STALE_AFTER",
 }
 

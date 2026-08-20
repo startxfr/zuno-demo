@@ -172,8 +172,8 @@ dataScienceCluster:
       workbenches:
         workbenchNamespace: zuno-ai-build
         managementState: Managed
-      # VERIFIED live, 2026-08-13 - mlflow-operator-controller-manager was
-      # the pod whose CrashLoopBackOff surfaced this whole bug class
+      # mlflow-operator-controller-manager was the pod whose
+      # CrashLoopBackOff surfaced this whole bug class
       # (manager Deployment hardcodes --namespace=redhat-ods-applications;
       # its generated ClusterRole grants no list/watch on Secret/
       # ServiceAccount/ConfigMap/Deployment/Job/CronJob/Service/PVC/
@@ -207,9 +207,9 @@ dataScienceCluster:
       # (superseded by `ogx` above) is removed entirely - not merely set
       # to an inactive management state - per the ADR's own acceptance
       # criterion that it be "absent from the rendered DataScienceCluster":
-      # the literal key, not just an inactive value. Confirmed live on
-      # this cluster, 2026-08-14: `oc get datasciencecluster zuno-dsc`
-      # shows `status.conditions` carrying `type: OGXReady, status:
+      # the literal key, not just an inactive value. `oc get
+      # datasciencecluster zuno-dsc` shows `status.conditions` carrying
+      # `type: OGXReady, status:
       # "True"` and `status.components.ogx.managementState: Managed`,
       # while the deprecated component's own status entry is already an
       # empty object (no managementState/releases) even before this key's
@@ -240,10 +240,9 @@ dataScienceCluster:
 # maas-controller (deployed automatically by the rhods-operator once
 # modelsAsService is Managed) otherwise reconciles everything else itself.
 # False by default, same pattern as cluster-ods's own sub-blocks above -
-# gitops/apps/openshift-ai/application-d0.yaml opts this in explicitly
-# (VERIFIED live, 2026-08-13: Wave 3 MaaS-prerequisite work pulled forward;
+# gitops/apps/openshift-ai/application-d0.yaml opts this in explicitly -
 # lives in d0 specifically since DataScienceCluster/d1 needs the Gateway to
-# already exist before it reconciles kserve.modelsAsService).
+# already exist before it reconciles kserve.modelsAsService.
 # templates/maas-gateway.yaml's gatewayClassName was switched from
 # data-science-gateway-class (a GatewayClass RHOAI would provision itself
 # once kserve.modelsAsService is healthy - it wasn't, on this cluster) to
@@ -288,9 +287,9 @@ maasDb:
 userWorkloadMonitoring:
   enabled: false
 
-# VERIFIED live 2026-08-20: prometheus-k8s-1 had no memory request/limit
-# beyond the cluster-monitoring-operator's own tiny default (1Gi request,
-# no limit) while actually using ~5.5Gi - the scheduler placed it on a
+# prometheus-k8s-1 had no memory request/limit beyond the
+# cluster-monitoring-operator's own tiny default (1Gi request, no limit)
+# while actually using ~5.5Gi - the scheduler placed it on a
 # t3a.large (8GB) general worker based on the understated request, and the
 # real usage then starved every other mandatory pod on that node (DNS,
 # insights, Kueue's leader replica, network-diagnostics all CrashLoopBackOff/
@@ -311,10 +310,10 @@ prometheusK8s:
 
 # ADR-0322 v0.1 integration scope: stands up an OGXServer instance (the OGX
 # Operator's data-plane CR - spec.components.ogx: Managed above only
-# installs the operator/controller, VERIFIED live 2026-08-14: `oc get svc
-# -n redhat-ods-applications` shows only ogx-k8s-operator-controller-
-# manager-metrics-service/-webhook-service, no API-serving Service, and
-# `oc get ogxserver -A` returns no resources) so
+# installs the operator/controller: `oc get svc -n redhat-ods-applications`
+# shows only ogx-k8s-operator-controller-manager-metrics-service/-webhook-
+# service, no API-serving Service, and `oc get ogxserver -A` returns no
+# resources) so
 # components/rag-service/app/ogx_provider.py has something real to call
 # once an operator opts in. False by default (same two-gate shape as
 # maasGateway/maasDb above): rag-service's own RAG_PROVIDER stays
@@ -350,33 +349,28 @@ prometheusK8s:
 # document_embeddings table rag-service's own provider reads (see that
 # values file's ogxDatabase comment for why).
 ogxServer:
-  # Enabled 2026-08-18 (WP-06 operator follow-up): stands up the OGX
-  # data-plane API for the corpus proof + provider-parity run. All spec
-  # fields below were schema-verified 2026-08-14; this flip is the first
-  # live apply.
+  # Enabled (WP-06 operator follow-up): stands up the OGX data-plane API
+  # for the corpus proof + provider-parity run.
   enabled: true
   name: zuno-ogx
   namespace: redhat-ods-applications
-  # First live apply (2026-08-18) surfaced schema drift: the 3.5.0-ea.2
-  # admission webhook accepts only `rh` | `rh-dev` for distribution.name -
-  # the 2026-08-14 oc-explain pass predated that validation; the
-  # remote-vllm/pgvector shapes below stay providers, not the distribution
-  # name.
+  # Schema drift: the 3.5.0-ea.2 admission webhook accepts only `rh` |
+  # `rh-dev` for distribution.name - an earlier oc-explain pass predated
+  # that validation; the remote-vllm/pgvector shapes below stay providers,
+  # not the distribution name.
   #
-  # ROOT CAUSE (confirmed 2026-08-18/19 by reading the OGX operator's
-  # actual source, github.com/ogx-ai/ogx-k8s-operator pkg/config/
-  # oci_fetcher.go): its OCI-label-fetch client is anonymous-only by design
-  # ("Authentication: currently supports anonymous/public registry access")
-  # and never performs the WWW-Authenticate challenge/token exchange real
-  # registries require. Tried and ruled out live, in order: registry.
-  # redhat.io direct (401), an internal zuno-ai-build mirror (ansible/roles/
-  # image_mirrors' odh-ogx-core-rhel9 entry, kept - harmless - but 400, no
-  # Authorization header sent at all), and docker.io/ogxai/distribution-
-  # starter@sha256:f9d8... (a real, anonymously-pullable public image,
-  # confirmed via a properly token-authenticated fetch outside the
-  # operator) - still 401, because Docker Hub enforces the OAuth challenge
-  # even for public images and this client never follows it. No registry
-  # this client talks to directly can ever work.
+  # ROOT CAUSE (from the OGX operator's actual source, github.com/ogx-ai/
+  # ogx-k8s-operator pkg/config/oci_fetcher.go): its OCI-label-fetch client
+  # is anonymous-only by design ("Authentication: currently supports
+  # anonymous/public registry access") and never performs the
+  # WWW-Authenticate challenge/token exchange real registries require.
+  # Ruled out: registry.redhat.io direct (401), an internal zuno-ai-build
+  # mirror (ansible/roles/image_mirrors' odh-ogx-core-rhel9 entry, kept -
+  # harmless - but 400, no Authorization header sent at all), and a real,
+  # anonymously-pullable public docker.io/ogxai/distribution-starter image
+  # - still 401, because Docker Hub enforces the OAuth challenge even for
+  # public images and this client never follows it. No registry this
+  # client talks to directly can ever work.
   #
   # REAL FIX: templates/ogxserver.yaml's spec.baseConfig bypasses OCI-label
   # resolution entirely (`oc explain ogxserver.spec.baseConfig`: "When set,

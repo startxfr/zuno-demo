@@ -43,19 +43,14 @@ spec:
     - name: instance1
       replicas: {{ .Values.cluster.instances }}
       priorityClassName: zuno-platform-critical
-      # ADR-0101 (roadmap WP-12) originally added an explicit
-      # topologySpreadConstraints block here. REVERTED 2026-08-14, confirmed
-      # live: PGO 5.8 already injects its own default
-      # topologySpreadConstraints (hostname + zone, both ScheduleAnyway) into
-      # every instance/pgBouncer/repo-host pod template it manages. K8s SSA
-      # treats this field as listType=map keyed on
-      # (topologyKey, whenUnsatisfiable), so re-declaring the same zone key
-      # here made every generated StatefulSet patch invalid
-      # ("duplicate entries for key ...") and broke reconciliation entirely -
-      # including spec.users, which is why checkpointDatabase/ogxDatabase
-      # were never created. PGO's own defaults already provide the intended
-      # zone spread; see docs/adr/0101-provide-ha-for-shared-agent-platform-services.md
-      # for the incident note.
+      # Do not add an explicit topologySpreadConstraints block here
+      # (ADR-0101 tried this) - PGO 5.8 already injects its own default
+      # (hostname + zone, both ScheduleAnyway) into every instance/
+      # pgBouncer/repo-host pod template it manages, and re-declaring the
+      # same zone key breaks reconciliation entirely via a K8s SSA
+      # listType=map conflict ("duplicate entries for key ..."), including
+      # spec.users - see
+      # docs/adr/0101-provide-ha-for-shared-agent-platform-services.md.
       resources:
         requests:
           cpu: {{ .Values.cluster.resources.requests.cpu | quote }}
@@ -87,7 +82,7 @@ spec:
       priorityClassName: zuno-platform-critical
       # See the matching comment on spec.instances above: an explicit
       # topologySpreadConstraints block here collided with PGO's own
-      # injected default and was reverted 2026-08-14.
+      # injected default and was reverted.
       resources:
         requests:
           cpu: {{ .Values.pgBouncer.resources.requests.cpu | quote }}

@@ -15,9 +15,9 @@ externalSecrets:
   enabled: true
   # No refreshPolicy: that is an ESO >= v0.16 external-secrets.io/v1
   # field; this cluster's ESO v0.11 serves only v1alpha1/v1beta1, whose
-  # schema has no such field (incident 2026-08-14 - the whole
-  # zuno-rag-ingestion-d1 sync failed on "could not find version v1").
-  # Periodic refresh is what refreshInterval alone already does.
+  # schema has no such field (the whole zuno-rag-ingestion-d1 sync fails
+  # on "could not find version v1" if set). Periodic refresh is what
+  # refreshInterval alone already does.
   refreshInterval: 1h
   storeRef:
     kind: ClusterSecretStore
@@ -59,13 +59,12 @@ pipelineServer:
 #     parent product's own two latest versions, not invented version
 #     numbers.
 # Satellite 6.17/6.16 are confirmed (given directly). Every other entry was
-# HTTP-verified for real 2026-08-17 (roadmap WP-07 operator follow-up) via
-# `components/rag-ingestion/tooling/verify_catalog.py`: 32/34 OK on first
-# run, the 2 MTC entries came back HTTP 404 and were corrected to the real
-# book path (`migrating_from_version_3_to_4`, confirmed by re-running the
-# tool - see ADR-0330's dated implementation note). All 34 `redhat[]`
-# entries are now HTTP-confirmed; no `# CONFIRM` markers remain.
-# platform.openshiftVersion (4.22, ADR-0319) now matches the "latest"
+# HTTP-verified via `components/rag-ingestion/tooling/verify_catalog.py`:
+# the 2 MTC entries came back HTTP 404 and were corrected to the real book
+# path (`migrating_from_version_3_to_4`) - see ADR-0330's implementation
+# note. All 34 `redhat[]` entries are HTTP-confirmed; no `# CONFIRM`
+# markers remain.
+# platform.openshiftVersion (4.22, ADR-0319) matches the "latest"
 # redhat[] OCP entry below - both track the real current GA release.
 redhat:
   - enabled: true
@@ -104,22 +103,22 @@ redhat:
     fetchMode: html
     include: []
     exclude: []
-  # 2026-08-19: release_notes alone left this product at 2 real pages per
-  # version (out of 874 total corpus documents) - html-single "landing"
-  # pages like release_notes typically link to little/nothing else
+  # release_notes alone leaves this product at 2 real pages per version
+  # (out of 874 total corpus documents) - html-single "landing" pages like
+  # release_notes typically link to little/nothing else
   # (components/rag-ingestion/src/rag_ingestion.py's _discover_doc_links
   # docstring), so OpenShift's real documentation - dozens of independent
-  # html-single books - was structurally undiscoverable from that one seed.
-  # Every URL below is HTTP-verified (200, this session) against the live
-  # docs.redhat.com for both 4.22 and 4.21 - each is itself an html-single
-  # page (the whole book in one fetch, matching this chart's existing
-  # convention), so this is still one HTTP call per entry, not a
-  # multi-page crawl. A few guessed slugs 404'd and were dropped rather
-  # than kept speculatively: installing_on_oracle_cloud_infrastructure (no
-  # OCP-native book found), a standalone "networking"/"observability"
-  # overview book (superseded below by their real constituent books -
-  # networking_operators/network_security and
-  # logging/monitoring/distributed_tracing respectively).
+  # html-single books - is structurally undiscoverable from that one seed.
+  # Every URL below is HTTP-verified against docs.redhat.com for both 4.22
+  # and 4.21 - each is itself an html-single page (the whole book in one
+  # fetch, matching this chart's existing convention), so this is still
+  # one HTTP call per entry, not a multi-page crawl. A few guessed slugs
+  # 404'd and were dropped rather than kept speculatively:
+  # installing_on_oracle_cloud_infrastructure (no OCP-native book found), a
+  # standalone "networking"/"observability" overview book (superseded
+  # below by their real constituent books - networking_operators/
+  # network_security and logging/monitoring/distributed_tracing
+  # respectively).
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
@@ -1089,15 +1088,12 @@ confluenceAuthDefault: &confluenceAuthDefault
 # confluence-{archi,build,run}-<tech> Keycloak groups 1:1
 # (gitops/charts/keycloak/files/realm-zuno.json) - all 12 now live under
 # /consultant (ADR-0340/WP-32 relocated the four confluence-archi-* groups
-# out of /board, verified live 2026-08-17: board-01/-02 no longer members,
-# consultant-01/-02 hold all four archi groups plus their own build/run
-# groups); /board no longer carries any confluence-* subgroup.
-# Real space keys/directories supplied 2026-08-18 (roadmap WP-07, operator
-# decision "map what exists" after a live enumeration of all 42 spaces on
-# startxfr.atlassian.net), corrected same day after a live re-check found
-# the content actually lives in space SXSI ("SXS Internal"), not SXS - see
-# ADR-0330's dated correction note for the full story, including why the
-# `directories` value below has no space-identifying segment:
+# out of /board; /board no longer carries any confluence-* subgroup).
+# Real space keys/directories reflect a live enumeration of all 42 spaces
+# on startxfr.atlassian.net (roadmap WP-07) - the content actually lives
+# in space SXSI ("SXS Internal"), not SXS - see ADR-0330's correction note
+# for the full story, including why the `directories` value below has no
+# space-identifying segment:
 #   - satellite -> space SXSI, page tree "Procédures/Technologie : Satellite"
 #   - openshift -> space SXSI, page tree "Procédures/Technologie : Openshift"
 #   - openshift-ai, keycloak -> disabled: no real source tree exists for
@@ -1106,7 +1102,7 @@ confluenceAuthDefault: &confluenceAuthDefault
 # A real Build/Run phase sub-tree does exist further down (e.g. under
 # Satellite: "S0B : Phase de Build Satellite" with Architecture/Build/Check
 # children, "S0R : Phase de Run Satellite" with six Install/Maintain/
-# Improve/Repare/Relocate/Destroy children - live-checked 2026-08-18), but
+# Improve/Repare/Relocate/Destroy children), but
 # it doesn't map cleanly 1:1 onto archi/build/run (S0B alone bundles
 # Architecture+Build+Check together) and is deliberately NOT used to narrow
 # `directories` per tier: a tech's three tier entries still share the one
@@ -1358,13 +1354,12 @@ postgres:
 embedding:
   endpoint: "http://embeddings-predictor.zuno-ai-run.svc:8080/v1"
   # The SERVED model id (gitops/charts/models embeddingModel.servedModelName),
-  # NOT the HF repo id "BAAI/bge-small-en-v1.5" - VERIFIED live 2026-08-18:
-  # vLLM answers 404 NotFoundError ("The model `BAAI/bge-small-en-v1.5`
-  # does not exist") for the HF id, which zeroed out every embedding in
-  # both ingestion runs (embed: embedded 0 chunks) and failed validate
-  # with "no rows indexed". Same modelId-vs-servedModelName split the
-  # models chart documents for the chat model (its own 404 incident,
-  # values.yaml servedModelName comment).
+  # NOT the HF repo id "BAAI/bge-small-en-v1.5" - vLLM answers 404
+  # NotFoundError ("The model `BAAI/bge-small-en-v1.5` does not exist")
+  # for the HF id, which zeroes out every embedding (embed: embedded 0
+  # chunks) and fails validate with "no rows indexed". Same
+  # modelId-vs-servedModelName split the models chart documents for the
+  # chat model (its own 404, values.yaml servedModelName comment).
   model: "bge-small-en-v1.5"
   dimensions: 384
   batchSize: 64
@@ -1378,9 +1373,9 @@ embedding:
 chunking:
   strategy: structural
   # Budget must fit embedding.model's max sequence length (bge-small-en-v1.5:
-  # 512), and the chunker counts cl100k tokens which run ~1.4-1.7x FEWER than
-  # bge's WordPiece on technical prose - 700 here meant 1000+ real tokens and
-  # vLLM 400-failed nearly every batch (run 3, 2026-08-18: 17/13324 chunks
+  # 512), and the chunker counts cl100k tokens which run ~1.4-1.7x FEWER
+  # than bge's WordPiece on technical prose - 700 here meant 1000+ real
+  # tokens and vLLM 400-failed nearly every batch (17/13324 chunks
   # embedded). 320 cl100k =~ 450-540 WordPiece; the embed stage's
   # truncate_prompt_tokens handles the tail that still crosses 512.
   maxTokens: 320

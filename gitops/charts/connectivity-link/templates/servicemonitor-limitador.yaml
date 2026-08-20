@@ -1,10 +1,10 @@
 {{- if .Values.kuadrant.enabled }}
 # Limitador's own /metrics (limitador_up/datastore_partitioned always
 # present; authorized_calls/limited_calls only once a RateLimitPolicy is
-# actually attached and hit - VERIFIED live, 2026-08-18: none exists yet,
-# only the AuthPolicy half of MaaS governance is live). Same
-# cluster-monitoring-labeled-namespace scrape path as
-# servicemonitor-authorino.yaml - no extra RBAC/labeling needed.
+# actually attached and hit - none exists yet, only the AuthPolicy half of
+# MaaS governance is live). Same cluster-monitoring-labeled-namespace
+# scrape path as servicemonitor-authorino.yaml - no extra RBAC/labeling
+# needed.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

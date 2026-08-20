@@ -2,10 +2,9 @@
 # ADR-0413: NEW dashboard - the agent-path SLO at per-agent granularity
 # (ADR-0102), MCP tool authorization outcomes (ADR-0011/ADR-0036 - denied
 # calls included, not just successes) and RAG search/freshness health
-# (ADR-0050/ADR-0109). VERIFIED live 2026-08-19: zuno_tool_invocations_total,
-# zuno_rag_searches_total, zuno_rag_result_count_bucket and
-# zuno_rag_freshness_lag_seconds_{sum,count} are all already flowing with
-# real series (8/2/32/2 respectively) - unlike the model-call duration
+# (ADR-0050/ADR-0109). zuno_tool_invocations_total, zuno_rag_searches_total,
+# zuno_rag_result_count_bucket and zuno_rag_freshness_lag_seconds_{sum,count}
+# are all already flowing with real series - unlike the model-call duration
 # histogram, these were simply never put on a dashboard before, not blocked
 # on a redeploy.
 apiVersion: grafana.integreatly.org/v1beta1

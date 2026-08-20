@@ -26,8 +26,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "-10"
 spec:
   keycloakCRName: {{ .Values.keycloakCRName }}
-  # VERIFIED live (2026-08-15, first real import of this realm): user
-  # credentials[].value is hashed at import time and never consults the
+  # user credentials[].value is hashed at import time and never consults the
   # runtime vault SPI - a ${vault.*} credential value imports as the
   # LITERAL password string. spec.placeholders is the operator's own
   # mechanism for import-time values: it injects the Secret as an env var

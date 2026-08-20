@@ -69,11 +69,10 @@ monitoringNamespace: zuno-monitoring
 
 # Backs spec.persistentVolumeClaim in templates/grafana.yaml - without this,
 # Grafana's SQLite state (datasources, dashboards, admin user) lives in the
-# operator's default emptyDir and is wiped on every pod restart (VERIFIED
-# live, 2026-08-18: several restarts during this chart's own development
-# each required grafana-operator to re-provision every GrafanaDatasource/
-# GrafanaDashboard from scratch). gp3-csi is this cluster's default
-# StorageClass, named explicitly per this repo's convention
+# operator's default emptyDir and is wiped on every pod restart, forcing
+# grafana-operator to re-provision every GrafanaDatasource/GrafanaDashboard
+# from scratch. gp3-csi is this cluster's default StorageClass, named
+# explicitly per this repo's convention
 # (gitops/charts/mariadb/values.yaml's own storageClassName).
 storage:
   size: 2Gi
@@ -84,11 +83,11 @@ storage:
 # "Authorization: Bearer <token>" value, resolved by
 # ansible/roles/grafana/tasks/install.yml once
 # serviceaccount-prometheus-reader.yaml's token Secret is minted. Templated
-# in directly (not via GrafanaDatasource spec.valuesFrom/secretKeyRef) -
-# VERIFIED live, 2026-08-18: grafana-operator v5.24.0's valuesFrom
-# resolves into spec.datasource.secureJsonData's map correctly per its own
-# status (ApplySuccessful, fresh hash), but the resolved value never
-# reaches Grafana's API (secureJsonFields stayed empty even after a full
+# in directly (not via GrafanaDatasource spec.valuesFrom/secretKeyRef):
+# grafana-operator v5.24.0's valuesFrom resolves into
+# spec.datasource.secureJsonData's map correctly per its own status
+# (ApplySuccessful, fresh hash), but the resolved value never reaches
+# Grafana's API (secureJsonFields stayed empty even after a full
 # delete+recreate); a statically-inlined secureJsonData value in the same
 # spot works immediately. datasource-prometheus.yaml only renders once
 # this is non-empty (same two-phase pattern nvidia_gpu's ClusterPolicy

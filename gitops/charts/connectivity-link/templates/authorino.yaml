@@ -2,10 +2,9 @@
 # Enables TLS on the Authorino operand's own listener - required by MaaS
 # (DataScienceCluster's MaaSPrerequisitesAvailable condition checks
 # spec.listener.tls.enabled on this exact object). The Kuadrant operator
-# creates this CR when it reconciles the Kuadrant CR (kuadrant.yaml) -
-# VERIFIED live, 2026-08-13: the two objects' creationTimestamps are one
-# second apart, i.e. part of the same reconcile, not a separately-triggered
-# async process. Its Kuadrant CRD version has no spec field to override this
+# creates this CR when it reconciles the Kuadrant CR (kuadrant.yaml), as
+# part of the same reconcile rather than a separately-triggered async
+# process. Its Kuadrant CRD version has no spec field to override this
 # from (see kuadrant.yaml's comment), so this patches the Authorino CR
 # directly. Only spec.listener.tls is set here (not a full spec
 # re-declaration) so this only ever asserts that one sub-field, leaving the

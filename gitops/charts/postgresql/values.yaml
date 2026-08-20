@@ -52,9 +52,9 @@ monitoring:
 
 # ADR-0101 (roadmap WP-12) originally added a topologySpreadConstraints
 # block here, applied to both spec.instances and spec.proxy.pgBouncer in
-# templates/postgrescluster.yaml. REVERTED 2026-08-14: it duplicated PGO's
-# own injected default topology spread constraints and broke reconciliation
-# - see that template's comments and the ADR-0101 incident note for details.
+# templates/postgrescluster.yaml. Reverted: it duplicated PGO's own
+# injected default topology spread constraints and broke reconciliation -
+# see that template's comments for details.
 
 cluster:
   name: zuno-postgresql
@@ -160,10 +160,7 @@ maasDatabase:
 # (ADR-0103) - resumable workflow state, isolated from every other
 # database on this cluster for the same reason ragTechDatabase/
 # maasDatabase are. The hyphenated database name mirrors ragTechDatabase's
-# "rag-tech" - confirmed working against the real zuno-postgresql
-# PostgresCluster on 2026-08-14 (`oc get postgrescluster zuno-postgresql
-# -n zuno-data -o jsonpath='{.spec.users}'` shows "rag-tech" already
-# reconciled), so this is no longer an unverified assumption.
+# "rag-tech".
 checkpointDatabase:
   name: agent-checkpoints
   owner: agentcheckpoints

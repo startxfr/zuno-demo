@@ -3,13 +3,12 @@
 # default-deny baseline. No namespaceSelector needed: an ingress `from`
 # peer with only a podSelector matches same-namespace pods.
 #
-# VERIFIED live 2026-08-16 (Tekos incident): this policy previously only
-# listed acceptance-gate, so the frontend's own calls to the BFF were
-# silently dropped by the implicit default-deny (Kubernetes denies
-# everything not explicitly allowed once any NetworkPolicy selects a
-# pod) - every real chat turn timed out at the TCP level. The
-# acceptance-gate suite never caught this because it calls the BFF
-# directly, bypassing the frontend.
+# Must list both frontend and acceptance-gate: listing only acceptance-gate
+# silently drops the frontend's own calls to the BFF under the implicit
+# default-deny (Kubernetes denies everything not explicitly allowed once any
+# NetworkPolicy selects a pod), timing out every real chat turn at the TCP
+# level. The acceptance-gate suite alone won't catch this since it calls the
+# BFF directly, bypassing the frontend.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

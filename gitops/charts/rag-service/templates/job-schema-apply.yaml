@@ -38,7 +38,7 @@ spec:
   backoffLimit: 2
   # psql over 3 small files takes seconds; without a deadline a pod stuck in
   # CreateContainerConfigError (not a pod *failure*, so backoffLimit never
-  # triggers) hangs the whole sync operation forever - incident 2026-08-14.
+  # triggers) hangs the whole sync operation forever.
   activeDeadlineSeconds: 300
   template:
     spec:
@@ -58,11 +58,11 @@ spec:
               value: {{ $.Values.pg.port | quote }}
             - name: PGDATABASE
               value: {{ .database | quote }}
-            # {{ .schema }},public not just {{ .schema }} - VERIFIED live
-            # (2026-08-15): the vector extension's objects live in public
-            # (databaseInitSQL creates it with the default search_path), so
-            # a bare per-domain search_path can't resolve the vector type
-            # ("type \"vector\" does not exist" at 002_pgvector.sql).
+            # {{ .schema }},public not just {{ .schema }}: the vector
+            # extension's objects live in public (databaseInitSQL creates
+            # it with the default search_path), so a bare per-domain
+            # search_path can't resolve the vector type ("type \"vector\"
+            # does not exist" at 002_pgvector.sql).
             - name: PGOPTIONS
               value: "-c search_path={{ .schema }},public"
             # Direct-to-primary requires TLS (PGO pg_hba hostssl) - same

@@ -3,30 +3,30 @@
 # spec.listener.tls.enabled on Authorino - see templates/authorino.yaml,
 # which references this Secret via spec.listener.tls.certSecretRef).
 #
-# Issued via vault-issuer-istio, NOT the generic vault-issuer - confirmed
-# live, 2026-08-18 (WP-54 quota-demo debugging): every Kuadrant AuthPolicy's
-# gRPC ext_authz call from Envoy's kuadrant-wasm-shim to this listener
-# failed ("gRPC status code is not OK"; TLS handshake itself succeeded but
-# "Verify return code: 21 (unable to verify the first certificate)") - the
+# Issued via vault-issuer-istio, NOT the generic vault-issuer: the
 # original vault-issuer (pki/sign/cert-manager, a general-purpose TLS role)
 # is deliberately NOT part of the mesh's trust bundle, by
 # gitops/charts/service-mesh/templates/clusterissuer-istio.yaml's own
 # design comment: "isolates the mesh's SPIFFE trust root from
-# general-purpose TLS certs." Every gRPC-ext_authz caller (Envoy sidecars,
-# mesh members by construction) already trusts vault-issuer-istio
-# (pki/sign/istio) natively - the same root cert-manager-istio-csr issues
-# mesh workload identity certs from - so this listener's cert now chains
-# to it too, with no separate application-level CA-trust configuration
-# needed anywhere. Confirmed pre-existing and affecting every
-# Kuadrant-protected route on this cluster (including the already-deployed
-# MaaS gateway), not something introduced by the WP-54 demo gateway.
+# general-purpose TLS certs." Using the generic issuer here breaks every
+# Kuadrant AuthPolicy's gRPC ext_authz call from Envoy's kuadrant-wasm-shim
+# to this listener ("gRPC status code is not OK"; TLS handshake succeeds
+# but "Verify return code: 21 (unable to verify the first certificate)"),
+# because every gRPC-ext_authz caller (Envoy sidecars, mesh members by
+# construction) only trusts vault-issuer-istio (pki/sign/istio) natively -
+# the same root cert-manager-istio-csr issues mesh workload identity certs
+# from - so issuing from it here makes this listener's cert chain to that
+# trust root too, with no separate application-level CA-trust configuration
+# needed anywhere. This affects every Kuadrant-protected route on this
+# cluster (including the already-deployed MaaS gateway), not just the
+# WP-54 demo gateway that surfaced it.
 #
 # dnsNames default below (the "authorino" instance name and its
 # <name>-authorino-authorization Service - the one spec.listener.tls
 # actually fronts, distinct from the separate -oidc Service/oidcServer.tls
-# field) is VERIFIED live, 2026-08-13 (`oc get authorino,svc -n
-# kuadrant-system`), not a guess. If a future reinstall ever provisions the
-# operand under a different name, correct
+# field) matches the actual live objects (verify with `oc get authorino,svc
+# -n kuadrant-system`), not a guess. If a future reinstall ever provisions
+# the operand under a different name, correct
 # .Values.kuadrant.authorinoTls.dnsNames to match.
 apiVersion: cert-manager.io/v1
 kind: Certificate

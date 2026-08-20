@@ -31,9 +31,9 @@ rules:
   - apiGroups: ["route.openshift.io"]
     resources: ["routes"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-  # VERIFIED live (2026-08-15): setting spec.host on a Route requires the
-  # create verb on routes/custom-host - without it every reconcile fails
-  # with "spec.host: Forbidden" (never caught by envtest, which has no
+  # Setting spec.host on a Route requires the create verb on
+  # routes/custom-host - without it every reconcile fails with
+  # "spec.host: Forbidden" (never caught by envtest, which has no
   # OpenShift route admission plugin).
   - apiGroups: ["route.openshift.io"]
     resources: ["routes/custom-host"]

@@ -1,12 +1,11 @@
 {{- /*
 ADR-0108 (roadmap WP-10). See values.yaml's lmEval comment for the full
 rationale. Every field below is confirmed real via `oc explain
-lmevaljob.spec...` against the live test cluster, 2026-08-14. Disabled by
-default; renders nothing with an empty job list even if enabled. Moved
-here (2026-08-14) from gitops/charts/openshift-ai (Day 0) to this chart
-(Day 1 "models" component): it benchmarks a model this chart deploys, so
-it belongs to the same install/uninstall lifecycle rather than the
-operator/DSC chart.
+lmevaljob.spec...` against the live cluster. Disabled by default; renders
+nothing with an empty job list even if enabled. Moved here from
+gitops/charts/openshift-ai (Day 0) to this chart (Day 1 "models"
+component): it benchmarks a model this chart deploys, so it belongs to
+the same install/uninstall lifecycle rather than the operator/DSC chart.
 */ -}}
 {{- if .Values.lmEval.enabled }}
 {{- range .Values.lmEval.jobs }}
@@ -30,37 +29,33 @@ spec:
   allowCodeExecution: {{ .allowCodeExecution | default false }}
   # Operator-managed PVC. The size is REQUIRED in practice: the 3.5.0-ea.2
   # TrustyAI operator (v1.37.0) panics reconciling an empty size
-  # (resource.MustParse("") in controllers/lmes/storage.go:35, verified
-  # live 2026-08-18 - the "CRD default applies" assumption this comment
-  # previously made does not hold). Switch to outputs.oci if results need
-  # to leave the cluster (e.g. for evaluations/quality_gate.py to read via
-  # CI rather than a Day 1 check - see ansible/roles/models/tasks/ for the
+  # (resource.MustParse("") in controllers/lmes/storage.go:35) - there is
+  # no usable CRD default. Switch to outputs.oci if results need to leave
+  # the cluster (e.g. for evaluations/quality_gate.py to read via CI
+  # rather than a Day 1 check - see ansible/roles/models/tasks/ for the
   # read path this WP added).
   outputs:
     pvcManaged:
       size: {{ .pvcSize | default "5Gi" }}
 {{- if .datasetCachePvc }}
-  # VERIFIED live 2026-08-18 (3.5.0-ea.2, v1.37.0 TrustyAI operator): TWO
-  # real, independent operator bugs make `allowOnline: true` non-functional
-  # - (1) the rendered pod hardcodes HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1/
-  # HF_DATASETS_OFFLINE=1/HF_EVALUATE_OFFLINE=1 regardless of the spec
-  # field, and (2) setting spec.pod.container.env to override those same
-  # names back to "0" does NOT take effect either - the operator's own
-  # values still win in the rendered pod (confirmed by direct inspection
-  # of the running pod's env after setting the override). Direct
-  # reproduction from an ad hoc pod on the same image proved network/TLS/
-  # DNS all work fine outside the job wrapper - the hardcoded offline env
-  # is the sole cause, not the environment.
+  # Two independent TrustyAI operator bugs (3.5.0-ea.2, v1.37.0) make
+  # `allowOnline: true` non-functional: (1) the rendered pod hardcodes
+  # HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1/HF_DATASETS_OFFLINE=1/
+  # HF_EVALUATE_OFFLINE=1 regardless of the spec field, and (2) overriding
+  # those same names back to "0" via spec.pod.container.env does NOT take
+  # effect either - the operator's own values still win in the rendered
+  # pod. Network/TLS/DNS all work fine outside the job wrapper - the
+  # hardcoded offline env is the sole cause.
   #
-  # Workaround that actually works: HF's offline mode only blocks network
-  # calls, not reads from an already-populated local cache. datasetCachePvc
-  # names a PVC pre-populated by the operator (see the WP-10 brief's
-  # operator follow-up for the exact prefetch procedure - one
+  # Workaround: HF's offline mode only blocks network calls, not reads
+  # from an already-populated local cache. datasetCachePvc names a PVC
+  # pre-populated by the operator (see the WP-10 brief's operator
+  # follow-up for the exact prefetch procedure - one
   # `load_dataset(path, config)` call per task config, into HF_HOME) and
   # mounted here at HF_HOME; with the cache already warm, HF_*_OFFLINE=1
-  # is no longer a blocker at all - offline mode was the intended
-  # operating posture for this CRD all along, not the bug (only the
-  # non-functional allowOnline/env-override paths are bugs).
+  # is no longer a blocker - offline mode was the intended operating
+  # posture for this CRD all along, only the allowOnline/env-override
+  # paths are bugs.
   pod:
     # spec.pod.volumes (confirmed via `oc explain lmevaljob.spec.pod.volumes`)
     # is a pod-level field, sibling to pod.container - not nested under it.

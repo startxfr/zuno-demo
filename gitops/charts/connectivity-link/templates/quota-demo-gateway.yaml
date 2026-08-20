@@ -16,13 +16,12 @@
 # cert-manager Certificate needed), fronted by an OpenShift Route
 # (reencrypt) on the router's own *.apps.<domain> wildcard DNS.
 #
-# First attempt (2026-08-18) skipped the ConfigMap and let the Gateway
-# default to a LoadBalancer Service - which provisioned a genuinely
-# separate AWS ELB with its own hostname, invisible to *.apps.<domain>
-# DNS (confirmed live: curl against the demo hostname 503'd because it
-# was hitting the OpenShift router, which has no Route for it - the new
-# ELB was a different address entirely). Fixed by matching the live
-# pattern instead of the Gateway API default.
+# Don't let the Gateway default to a LoadBalancer Service by skipping this
+# ConfigMap: that provisions a genuinely separate AWS ELB with its own
+# hostname, invisible to *.apps.<domain> DNS (curl against the demo
+# hostname 503'd, hitting the OpenShift router instead, which has no Route
+# for it - the ELB was a different address entirely). This ConfigMap fixes
+# it by matching the live pattern instead of the Gateway API default.
 #
 # Rollback: set quotaEnforcement.enabled back to false and sync - ArgoCD's
 # selfHeal removes every object below (and the RateLimitPolicy in the
@@ -33,9 +32,8 @@
 # quotaEnforcement.enabled is a plain chart default with no per-Application
 # override - without this extra guard -d0 rendered these objects too, in
 # the same explicit namespaces as -d1, and the two Applications fought over
-# ownership of the same live resources (ArgoCD SharedResourceWarning,
-# confirmed live 2026-08-18, sync never settled). Only -d1 sets
-# kuadrant.enabled: true.
+# ownership of the same live resources (ArgoCD SharedResourceWarning, sync
+# never settling). Only -d1 sets kuadrant.enabled: true.
 {{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
 ---
 apiVersion: v1
@@ -143,11 +141,11 @@ spec:
           # jwksUrl (direct fetch), not issuerUrl (OIDC discovery): Authorino
           # runs in-cluster and does not trust the CA signing the externally-
           # issued Keycloak route cert, so OIDC discovery against the
-          # external issuer 500'd with "certificate signed by unknown
-          # authority" (confirmed live, 2026-08-18) - the same class of
-          # problem ADR-0347/ADR-0411 solve for other in-cluster consumers.
-          # The internal JWKS Service endpoint is plain HTTP, sidestepping
-          # TLS trust entirely - the same split-brain issuer/JWKS default
-          # every other Keycloak consumer chart in this repo already uses.
+          # external issuer 500s with "certificate signed by unknown
+          # authority" - the same class of problem ADR-0347/ADR-0411 solve
+          # for other in-cluster consumers. The internal JWKS Service
+          # endpoint is plain HTTP, sidestepping TLS trust entirely - the
+          # same split-brain issuer/JWKS default every other Keycloak
+          # consumer chart in this repo already uses.
           jwksUrl: {{ .Values.quotaEnforcement.keycloakJwksUrl }}
 {{- end }}

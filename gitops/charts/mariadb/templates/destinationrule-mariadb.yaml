@@ -6,7 +6,7 @@
 # terminates TLS on. This pins client-side TLS OFF for this one host so
 # every consumer - meshed or not - speaks plaintext MySQL to it inside
 # the cluster network. First DestinationRule in this repo; the istio
-# control plane serves networking.istio.io/v1 (verified live 2026-08-18).
+# control plane serves networking.istio.io/v1.
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:

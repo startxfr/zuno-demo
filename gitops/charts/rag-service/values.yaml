@@ -41,9 +41,9 @@ resources:
     cpu: 500m
     memory: 1Gi
 
-# Direct-to-primary, NOT PgBouncer - VERIFIED live (2026-08-15, WP-21
-# verification): the per-domain pools pass search_path as a connection
-# startup option, which PgBouncer's transaction pooling rejects
+# Direct-to-primary, NOT PgBouncer: the per-domain pools pass search_path
+# as a connection startup option, which PgBouncer's transaction pooling
+# rejects
 # ("unsupported startup parameter: search_path" - the per-domain
 # schema-apply Jobs hit the identical failure), and asyncpg's implicit
 # prepared statements are unreliable through transaction pooling anyway.
@@ -94,8 +94,8 @@ knowledgeDomains:
     vaultPath: rag/postgresql-app
     secretName: rag-service-db-ragtech
     seed: true
-  # Enabled 2026-08-15 (WP-21 operator follow-up executed live): the
-  # ragsales Vault credential is seeded, the rag-sales database + role
+  # Enabled (WP-21 operator follow-up executed live): the ragsales Vault
+  # credential is seeded, the rag-sales database + role
   # exist on the PGO cluster, and the one-time superuser
   # GRANT/CREATE EXTENSION documented by configmap-init-sql.yaml has been
   # applied - discharging the ADR-0204 acceptance criterion "at least two

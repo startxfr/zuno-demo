@@ -2,8 +2,8 @@
 # ADR-0413: merges dashboard-infra.yaml's node/pod/deployment health with
 # node- and pod-level CPU/RAM/GPU/disk-IO/network-IO/error panels, the
 # database exporters WP-A (gitops/charts/postgresql|mariadb|redis) adds,
-# and ArgoCD sync health (argocd_app_info - VERIFIED live 2026-08-19,
-# already queryable, no scrape change needed).
+# and ArgoCD sync health (argocd_app_info - already queryable, no scrape
+# change needed).
 #
 # Node-level panels (CPU/memory/disk/network) use node-exporter's own
 # "instance" label, NOT "node" - node_cpu_seconds_total etc. have no

@@ -1,21 +1,21 @@
 {{- if .Values.mariadbOperand.enabled }}
-# WP-06 follow-up (2026-08-19): a second database on the same shared
-# `mariadb` instance, for mlops-dspa - mirrors templates/database-pipeline.yaml
-# exactly (Database/User/Grant, k8s.mariadb.com/v1alpha1, confirmed live
-# working for the mlpipeline database this same pattern already serves).
-# Existing before this: mlops-dspa used DSPO's own embeddedMariaDB mode (a
-# self-managed pod DSPO creates, entirely outside this chart's or the
-# service mesh's control) - its DatabaseAvailable condition failed
-# permanently after a cluster restart ("context deadline exceeded"): DSPO's
-# own health-check probe is a non-mesh client and that embedded pod's
-# inbound port 3306 has no exclusion from istio's protocol sniffing (no CRD
-# field exists to set one on DSPO's self-managed pod - unlike this chart's
-# own `mariadb` CR, see templates/mariadb.yaml's excludeInboundPorts
-# annotation). Moving to this same shared, already-mesh-excluded instance
-# (externalMySQL mode, gitops/charts/mlops/values.yaml) is the real fix -
-# not a workaround, the same architecture rag-dspa already uses
-# successfully. The embedded MariaDB's own `mlpipeline` database had zero
-# tables (confirmed live before this change) - nothing to migrate.
+# WP-06 follow-up: a second database on the same shared `mariadb`
+# instance, for mlops-dspa - mirrors templates/database-pipeline.yaml
+# exactly (Database/User/Grant, k8s.mariadb.com/v1alpha1, the same pattern
+# already serving the mlpipeline database). Existing before this:
+# mlops-dspa used DSPO's own embeddedMariaDB mode (a self-managed pod DSPO
+# creates, entirely outside this chart's or the service mesh's control) -
+# its DatabaseAvailable condition failed permanently after a cluster
+# restart ("context deadline exceeded"): DSPO's own health-check probe is
+# a non-mesh client and that embedded pod's inbound port 3306 has no
+# exclusion from istio's protocol sniffing (no CRD field exists to set one
+# on DSPO's self-managed pod - unlike this chart's own `mariadb` CR, see
+# templates/mariadb.yaml's excludeInboundPorts annotation). Moving to this
+# same shared, already-mesh-excluded instance (externalMySQL mode,
+# gitops/charts/mlops/values.yaml) is the real fix, not a workaround - the
+# same architecture rag-dspa already uses successfully. The embedded
+# MariaDB's own `mlpipeline` database had zero tables - nothing to
+# migrate.
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: Database
 metadata:

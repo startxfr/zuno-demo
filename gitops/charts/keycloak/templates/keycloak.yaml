@@ -83,11 +83,11 @@ spec:
         volumes:
           # File names follow Keycloak's file vault provider convention
           # <realm>_<key> with underscores INSIDE the realm/key escaped as
-          # "__" - VERIFIED live (2026-08-15): resolving
-          # ${vault.openshift_client_secret} in realm zuno, Keycloak looked
-          # for zuno_openshift__client__secret (FilesPlainTextVaultProvider
-          # warning in the server log). Single-underscore names silently
-          # fail every runtime lookup.
+          # "__": resolving ${vault.openshift_client_secret} in realm zuno,
+          # Keycloak looks for zuno_openshift__client__secret
+          # (FilesPlainTextVaultProvider warning in the server log
+          # otherwise). Single-underscore names silently fail every
+          # runtime lookup.
           - name: vault-secrets
             projected:
               sources:

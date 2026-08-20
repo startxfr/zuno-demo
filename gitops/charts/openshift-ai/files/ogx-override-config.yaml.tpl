@@ -1,4 +1,4 @@
-# WP-06/ADR-0322 full config.yaml for OGXServer.spec.overrideConfig (2026-08-19).
+# WP-06/ADR-0322 full config.yaml for OGXServer.spec.overrideConfig.
 #
 # Two real, upstream bugs made the two earlier CR-driven modes unusable:
 #

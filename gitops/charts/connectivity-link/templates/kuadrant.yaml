@@ -5,9 +5,9 @@
 # gitops/charts/external-secrets's OperatorConfig and
 # gitops/charts/cert-manager's CertManager CR. Empty spec: no
 # Gateway/AuthPolicy/RateLimitPolicy exists yet for it to enforce
-# (ADR-0317 installs the operator ahead of any consumer). VERIFIED live,
-# 2026-08-13: this Kuadrant CRD version (kuadrant.io/v1beta1) exposes no
-# override field for its Authorino/Limitador operands at all
+# (ADR-0317 installs the operator ahead of any consumer). This Kuadrant
+# CRD version (kuadrant.io/v1beta1) exposes no override field for its
+# Authorino/Limitador operands at all
 # (`oc explain kuadrant.spec` only shows components.developerPortal, mtls,
 # observability - no spec.authorino) - a spec.authorino block here would be
 # silently pruned by structural-schema validation, not applied. MaaS's

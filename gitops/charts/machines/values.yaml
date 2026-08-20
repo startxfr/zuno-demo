@@ -5,7 +5,7 @@
 # nothing destructive.
 #
 # ADR-0351 background: this replaces the five hand-deployed
-# startx-cluster-machine-* Applications (deployed 2026-08-17 straight from
+# startx-cluster-machine-* Applications (deployed straight from
 # startxfr/helm-repository@devel, outside this repo). Every machine they
 # created Failed with "no security group found" because their cluster.id
 # parameter (def7f838-...) was not this cluster's real infra id - every AWS
@@ -20,8 +20,8 @@ cluster-machine:
 
   cluster:
     # REAL infra id (`oc get infrastructure cluster -o jsonpath
-    # '{.status.infrastructureName}'`, verified 2026-08-17) - the IAM
-    # instance profile ({id}-worker-profile) and the kubernetes.io/cluster/
+    # '{.status.infrastructureName}'`) - the IAM instance profile
+    # ({id}-worker-profile) and the kubernetes.io/cluster/
     # {id}=owned AWS tag are derived from this by the subchart, and both
     # match what the working IPI machinesets use.
     id: demo222-kpkqk
@@ -45,7 +45,7 @@ cluster-machine:
 
   machineSet:
     enabled: false # flipped by zuno-machines-d0
-    # Common facts for all three groups (verified live/AWS 2026-08-17):
+    # Common facts for all three groups, verified live against AWS:
     # - AMI ami-00667f67a54be771a: same RHCOS AMI the IPI workergpu
     #   machinesets use.
     # - securityGroupName demo222-kpkqk-node: the OCP 4.16+ CAPA installer
@@ -142,8 +142,8 @@ cluster-machine:
         # Keeps everything except the tolerating train pod (gitops/charts/
         # mlops's training.gpu.toleration) off this node, so no stray pod
         # ever blocks the autoscaler's scale-down. The NVIDIA GPU-operator
-        # daemonsets only tolerate nvidia.com/gpu by default (verified live
-        # 2026-08-17) - ansible/roles/nvidia_gpu's ClusterPolicy overlay
+        # daemonsets only tolerate nvidia.com/gpu by default -
+        # ansible/roles/nvidia_gpu's ClusterPolicy overlay
         # adds a zuno.io/gpu-burst toleration to them, or the driver would
         # never start here and the node would never advertise its GPU.
         additionnalsTaints: |-
@@ -159,7 +159,7 @@ cluster-machine:
         # `minReplicas: {{ .minReplicas | default 1 }}` and an integer 0 is
         # falsy in Helm - it silently becomes 1 (a permanently-on burst
         # node). The string "0" survives `default` and renders as a valid
-        # integer (verified by test render, 2026-08-17).
+        # integer.
         minReplicas: "0"
         maxReplicas: 1
 

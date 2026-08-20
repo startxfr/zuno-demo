@@ -2,19 +2,19 @@
 # ADR-0029's model-usage metrics: zuno.model_calls/zuno.model_tokens/
 # zuno.model_cost_usd (components/ai-gateway/app/telemetry.py) and
 # zuno_bff_requests_total (components/agent-bff), scraped by prometheus-k8s
-# via gitops/charts/observability's ServiceMonitor - confirmed-live
-# 2026-08-18 (docs/platform/slo.md). Queried through thanos-querier
-# in-cluster (not its external Route, for the same 100%-in-cluster style
+# via gitops/charts/observability's ServiceMonitor (see docs/platform/slo.md).
+# Queried through thanos-querier in-cluster (not its external Route, for
+# the same 100%-in-cluster style
 # every other datasource in this repo uses), Bearer-authenticated with the
 # grafana-prometheus-reader ServiceAccount's cluster-monitoring-view token
 # (serviceaccount-prometheus-reader.yaml).
 #
 # secureJsonData.httpHeaderValue1 is templated in directly from
 # .Values.prometheusReaderBearer (see values.yaml's own comment) rather
-# than via spec.valuesFrom/secretKeyRef - VERIFIED live, 2026-08-18, that
-# valuesFrom does not actually deliver its resolved value into Grafana for
-# this nested secureJsonData path on grafana-operator v5.24.0, while an
-# inline value in the same spot works immediately. Only rendered once that
+# than via spec.valuesFrom/secretKeyRef: valuesFrom does not actually
+# deliver its resolved value into Grafana for this nested secureJsonData
+# path on grafana-operator v5.24.0, while an inline value in the same spot
+# works immediately. Only rendered once that
 # value is known (two-phase apply, same pattern nvidia_gpu's ClusterPolicy
 # discovery uses) so this datasource is never created half-configured.
 #

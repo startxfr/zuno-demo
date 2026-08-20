@@ -63,15 +63,13 @@ platformNamespaces:
     # zuno-postgresql (MaaS prerequisite - see
     # gitops/charts/openshift-ai/templates/externalsecret-maas-db.yaml).
     # zuno-ai-build: rag-dspa's DSP components (MLMD + KFP apiserver)
-    # reach their mlpipeline MariaDB - VERIFIED live 2026-08-18: this
-    # missing entry was the FINAL layer of the rag-dspa outage (masked
-    # until then by the istio server-first stall, c3f5d2d) - MLMD's
-    # mysql_real_connect timed out with an empty error against a
-    # firewalled 3306 while the DSPO's own probe passed from
-    # redhat-ods-applications, which IS allowed above.
+    # reach their mlpipeline MariaDB - without this entry, MLMD's
+    # mysql_real_connect times out against a firewalled 3306, even though
+    # the DSPO's own probe passes fine from redhat-ods-applications, which
+    # IS allowed above.
     # zuno-mlops: mlops-dspa's own MLMD/apiserver, same MariaDB, same
-    # reasoning - split into its own namespace 2026-08-19 (see zuno-mlops's
-    # own description above).
+    # reasoning - split into its own namespace (see zuno-mlops's own
+    # description above).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-vault
@@ -81,10 +79,10 @@ platformNamespaces:
       - zuno-mlops
     # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
     # lives here and is called synchronously by the API server on every
-    # MariaDB/Grant/User write - confirmed live 2026-08-14: without this,
-    # the webhook call timed out ("context deadline exceeded") and the
-    # MariaDB CR sat in Degraded forever, same failure class as ESO's
-    # secretstore-validate webhook above.
+    # MariaDB/Grant/User write - without this, the webhook call times out
+    # ("context deadline exceeded") and the MariaDB CR sits in Degraded
+    # forever, same failure class as ESO's secretstore-validate webhook
+    # above.
     allowApiServerWebhooks: true
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 2).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
@@ -104,10 +102,10 @@ platformNamespaces:
     # openshift-grafana-operator: the Grafana operator's controller calls
     # back into its own managed Grafana instance's :3000 admin API
     # (grafana-service) to provision datasources/dashboards - blocked by
-    # this default-deny policy otherwise (VERIFIED live, 2026-08-18:
-    # GrafanaReconciler's `failed to authenticate with instance` /
-    # `request canceled while waiting for connection` while same-namespace
-    # traffic to the same Service/port succeeded).
+    # this default-deny policy otherwise (GrafanaReconciler's `failed to
+    # authenticate with instance` / `request canceled while waiting for
+    # connection`, even though same-namespace traffic to the same
+    # Service/port succeeds).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
@@ -218,39 +216,35 @@ platformNamespaces:
       - zuno-auth
       - zuno-ai-run
       - zuno-ai-build
-      # VERIFIED live (2026-08-15): redhat-ods-applications is namespace-
-      # injected (istio-injection: enabled below) but was missing from this
-      # allowlist - its sidecars could never reach istiod's XDS or
-      # cert-manager-istio-csr's CA, leaving every meshed RHOAI pod
-      # (rhods-dashboard, maas-api/controller, model-serving-api,
-      # dashboard-redirect) crash-looping on the istio-proxy startup probe
-      # from the moment this default-deny policy first applied.
+      # redhat-ods-applications is namespace-injected (istio-injection:
+      # enabled below); without this entry its sidecars can't reach
+      # istiod's XDS or cert-manager-istio-csr's CA, leaving every meshed
+      # RHOAI pod (rhods-dashboard, maas-api/controller, model-serving-api,
+      # dashboard-redirect) crash-looping on the istio-proxy startup probe.
       - redhat-ods-applications
-      # VERIFIED live (2026-08-17): openshift-console's dynamic plugin proxy calls
-      # ossmconsole/kiali directly (ConsolePlugin backend + kiali proxy) - missing
-      # from this allowlist left the OSSM console plugin timing out
-      # ("context deadline exceeded") intermittently since this policy first applied.
+      # openshift-console's dynamic plugin proxy calls ossmconsole/kiali
+      # directly (ConsolePlugin backend + kiali proxy); without this entry
+      # the OSSM console plugin times out intermittently ("context deadline
+      # exceeded").
       - openshift-console
-      # VERIFIED live (2026-08-18): grafana's mesh-prometheus GrafanaDatasource
-      # (gitops/charts/grafana/templates/datasource-mesh-prometheus.yaml) calls
-      # mesh-monitoring-prometheus.zuno-mesh.svc directly - missing from this
-      # allowlist left every network-mesh Grafana dashboard panel dark (8s
-      # connect timeout from the grafana pod), same failure class as the two
-      # entries above.
+      # grafana's mesh-prometheus GrafanaDatasource
+      # (gitops/charts/grafana/templates/datasource-mesh-prometheus.yaml)
+      # calls mesh-monitoring-prometheus.zuno-mesh.svc directly; without
+      # this entry every network-mesh Grafana dashboard panel goes dark
+      # (8s connect timeout from the grafana pod), same failure class as
+      # the two entries above.
       - zuno-monitoring
-      # mlops-dspa's own meshed pods, split out of zuno-ai-build 2026-08-19 -
-      # same istiod/cert-manager-istio-csr bootstrap need as every other
-      # entry here.
+      # mlops-dspa's own meshed pods, split out of zuno-ai-build - same
+      # istiod/cert-manager-istio-csr bootstrap need as every other entry
+      # here.
       - zuno-mlops
-      # VERIFIED live (2026-08-20): same class of bug as
-      # redhat-ods-applications above - rhoai-model-registries is
-      # istio-injection: enabled but was missing from this allowlist, so
-      # model-catalog's istio-proxy could never reach cert-manager-istio-csr
-      # ("dial tcp <ClusterIP>:443: i/o timeout" on every CSR attempt,
-      # invisible to NetworkPolicy checks scoped to that namespace alone
-      # since the block is on this side) and crash-looped on its startup
-      # probe indefinitely once the ResourceQuota fix let it finally
-      # schedule.
+      # Same class of bug as redhat-ods-applications above:
+      # rhoai-model-registries is istio-injection: enabled but was missing
+      # from this allowlist, so model-catalog's istio-proxy could never
+      # reach cert-manager-istio-csr ("dial tcp <ClusterIP>:443: i/o
+      # timeout" on every CSR attempt - the block is on this side, so it's
+      # invisible to NetworkPolicy checks scoped to that namespace alone)
+      # and crash-loops on its startup probe.
       - rhoai-model-registries
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
@@ -285,13 +279,12 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
     resourceQuota:
-      # Sized to the live rhods-operator deployment (VERIFIED 2026-08-18,
-      # second pass): 3.5.0-ea.2 runs replicas: 3, each pod requests
-      # 500m/256Mi with limits 500m/4Gi - so the deployment alone needs
-      # requests 1.5cpu/768Mi and limits 1.5cpu/12Gi. The earlier same-day
-      # fit (1cpu/1Gi requests, 2cpu/6Gi limits) was sized to a single
-      # replica and left the CSV Failed with 2 of 3 pods FailedCreate.
-      # Headroom on top covers OLM job pods.
+      # Sized to the live rhods-operator deployment: 3.5.0-ea.2 runs
+      # replicas: 3, each pod requests 500m/256Mi with limits 500m/4Gi - so
+      # the deployment alone needs requests 1.5cpu/768Mi and limits
+      # 1.5cpu/12Gi. Sizing for a single replica instead leaves the CSV
+      # Failed with 2 of 3 pods FailedCreate. Headroom on top covers OLM
+      # job pods.
       requests: { cpu: "2", memory: "2Gi" }
       limits: { cpu: "3", memory: "14Gi" }
     limitRange:
@@ -316,22 +309,21 @@ platformNamespaces:
       opendatahub.io/application-namespace: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
-    # Sized live (2026-08-15): RHOAI's own pods ship many containers with no
-    # explicit limits (rhods-dashboard alone has 10), so the limitRange
-    # default below assigns them ~15.6 cores of limits; the ~18
-    # controller-managers add ~11 real cores - ~27 cores of limits when
-    # healthy, against the previous 16. Limits are overcommit (only
-    # requests reserve node capacity), so 32 is headroom, not reservation.
-    # RESIZED live (2026-08-18): actual usage had grown to 9.07 CPU /
-    # 15.6Gi of REQUESTS (MaaS controller, model registry, gateway
-    # controllers... landed after the 2026-08-15 sizing) - over the old
-    # 8/12Gi cap, which a ResourceQuota only enforces on NEW pods, so
-    # everything kept running while every new admission was refused. First
-    # visible casualty: DSPO's ds-pipelines-webhook (150m/320Mi,
-    # "exceeded quota" FailedCreate), which silently blocked the whole
-    # rag-dspa KFP stack (WebhookReady=False) and with it all corpus
-    # ingestion. 12/20Gi = current real usage + the webhook + modest
-    # growth headroom, same overcommit reasoning as the limits line above.
+    # RHOAI's own pods ship many containers with no explicit limits
+    # (rhods-dashboard alone has 10), so the limitRange default below
+    # assigns them ~15.6 cores of limits; the ~18 controller-managers add
+    # ~11 real cores - ~27 cores of limits when healthy, against the
+    # previous 16. Limits are overcommit (only requests reserve node
+    # capacity), so 32 is headroom, not reservation.
+    # requests: sized to actual measured usage (MaaS controller, model
+    # registry, gateway controllers, ...) plus modest growth headroom. A
+    # ResourceQuota only enforces requests on NEW pods, so if real usage
+    # ever creeps past the requests cap, existing pods keep running while
+    # every new admission gets refused - the first visible casualty here
+    # was DSPO's ds-pipelines-webhook ("exceeded quota" FailedCreate),
+    # which silently blocked the whole rag-dspa KFP stack
+    # (WebhookReady=False) and with it all corpus ingestion. Re-measure
+    # and bump requests if that pattern recurs.
     resourceQuota:
       requests: { cpu: "12", memory: "20Gi" }
       limits: { cpu: "32", memory: "48Gi" }
@@ -350,24 +342,20 @@ platformNamespaces:
       - zuno-ai-run
       # mlops-dspa's push-registry pipeline stage registers a PASSING
       # adapter here directly (components/mlops/src/mlops.py) - needs the
-      # same access zuno-ai-build got, from its own namespace since
-      # 2026-08-19.
+      # same access zuno-ai-build got, from its own namespace.
       - zuno-mlops
     allowApiServerWebhooks: false
     extraLabels:
       istio-injection: enabled
       zuno.io/managed: "true"
-    # RESIZED live (2026-08-20): limits.cpu was sized for the app alone
-    # (limitRange.default.cpu: 1) before istio-injection was turned on
-    # above. The sidecar has no explicit cpu limit either, so it also
-    # takes the 1-core LimitRange default - app (1) + proxy (1) = 2.5
-    # measured (proxy's actual default settles under 1 core), exceeding
-    # the old 2-core cap on every single pod creation. model-catalog had
-    # zero running replicas for ~2 days as a result (FailedCreate:
-    # "requested: limits.cpu=2500m ... limited: limits.cpu=2"). 3/5Gi
-    # gives the sidecar's measured ~1 core/~1Gi room alongside the
-    # existing 2-core/4Gi app budget; requests already had headroom
-    # (250m/576Mi used of 500m/1Gi) so left as-is.
+    # limits.cpu must cover both the app AND its istio-proxy sidecar: the
+    # sidecar has no explicit cpu limit either, so it also takes the
+    # 1-core LimitRange default - app (1) + proxy (~1, measured under 1
+    # core) = ~2.5 measured, exceeding a 2-core cap on every pod creation
+    # (FailedCreate: "requested: limits.cpu=2500m ... limited:
+    # limits.cpu=2"). 3/5Gi gives the sidecar's measured ~1 core/~1Gi room
+    # alongside the existing 2-core/4Gi app budget; requests already had
+    # headroom (250m/576Mi used of 500m/1Gi) so left as-is.
     resourceQuota:
       requests: { cpu: "500m", memory: "1Gi" }
       limits: { cpu: "3", memory: "5Gi" }
@@ -407,8 +395,8 @@ platformNamespaces:
 # one slice per inference workload: embeddings + gpt-oss-20b on the
 # 24GB slices, the qwen chat predictor on the 48GB one (gitops/charts/
 # models). Replaces the earlier whole-GPU count quota (1->2->3 as L4 nodes
-# were added through 2026-08-16; that history and its admission-refusal
-# evidence lives in git).
+# were added; that history and its admission-refusal evidence lives in
+# git).
 # nvidia.com/gpu is pinned to 0: whole GPUs only exist on the tainted
 # gpu-burst node and belong to training in zuno-ai-build (the DSPA
 # namespace, which has no quota) - an inference workload in zuno-ai-run

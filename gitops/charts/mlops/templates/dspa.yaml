@@ -9,11 +9,10 @@ metadata:
     {{- include "mlops.labels" . | nindent 4 }}
 spec:
   dspVersion: v2
-  # VERIFIED live 2026-08-19 (mlops-dspa restart-recovery incident, same
-  # class as rag-dspa's 2026-08-18 fix - see gitops/charts/rag-ingestion/
-  # templates/dspa.yaml's dated comment for the full mechanism): DSPO
-  # defaults podToPodTLS to true, demanding TLS on MySQL connections the
-  # external MariaDB (gitops/charts/mariadb, no spec.tls) doesn't serve.
+  # DSPO defaults podToPodTLS to true, demanding TLS on MySQL connections
+  # the external MariaDB (gitops/charts/mariadb, no spec.tls) doesn't
+  # serve - same class of issue as rag-dspa's fix, see
+  # gitops/charts/rag-ingestion/templates/dspa.yaml for the full mechanism.
   podToPodTLS: false
   apiServer:
     deploy: true
@@ -40,15 +39,15 @@ spec:
     mariaDB:
       deploy: true
 {{- else if eq .Values.pipelineServer.metadataDatabase.mode "externalMySQL" }}
-    # VERIFIED live 2026-08-19: the DSPO controller's pre-deploy DB probe
-    # runs in redhat-ods-applications, OUTSIDE the mesh - and the shared
-    # mariadb instance (zuno-data, istio-injected) never delivers the
+    # The DSPO controller's pre-deploy DB probe runs in
+    # redhat-ods-applications, OUTSIDE the mesh - the shared mariadb
+    # instance (zuno-data, istio-injected) never delivers the
     # server-first MySQL greeting to a plaintext non-mesh client, so the
     # probe fails "context deadline exceeded" forever. The pipeline pods
-    # themselves reach MariaDB through the same excludeInboundPorts:3306
-    # path rag-dspa's apiserver/mlmd already use successfully - the probe
-    # is the only non-mesh client, so it is disabled rather than
-    # un-meshing port 3306 for everyone.
+    # themselves reach MariaDB fine through the same
+    # excludeInboundPorts:3306 path rag-dspa's apiserver/mlmd already
+    # use - the probe is the only non-mesh client, so it is disabled
+    # rather than un-meshing port 3306 for everyone.
     disableHealthCheck: true
     externalDB:
       host: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.host | quote }}

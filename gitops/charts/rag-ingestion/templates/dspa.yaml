@@ -9,12 +9,11 @@ metadata:
     {{- include "rag-ingestion.labels" . | nindent 4 }}
 spec:
   dspVersion: v2
-  # VERIFIED live 2026-08-18 (rag-dspa recovery, after the DB-probe and
-  # istio-3306 fixes): DSPO defaults podToPodTLS to true, which makes BOTH
-  # MLMD (--mysql_config_sslrootcert=/dsp-custom-certs/dsp-ca.crt) and the
+  # DSPO defaults podToPodTLS to true, which makes BOTH MLMD
+  # (--mysql_config_sslrootcert=/dsp-custom-certs/dsp-ca.crt) and the
   # apiserver demand TLS on their MySQL connections - but the external
   # MariaDB (gitops/charts/mariadb, no spec.tls) serves none, so MLMD
-  # fatal-looped on mysql_real_connect and the apiserver on "[mysql]
+  # fatal-loops on mysql_real_connect and the apiserver on "[mysql]
   # unexpected EOF" mid-handshake, indefinitely. The metadata path is
   # in-cluster-only and NetworkPolicy-scoped; enabling MariaDB TLS with
   # DSP's own CA is the eventual alternative if that posture changes.
@@ -44,15 +43,15 @@ spec:
     mariaDB:
       deploy: true
 {{- else if eq .Values.pipelineServer.metadataDatabase.mode "externalMySQL" }}
-    # VERIFIED live 2026-08-18: the DSPO controller's pre-deploy DB probe
-    # runs in redhat-ods-applications, OUTSIDE the mesh - and mariadb-0
-    # (zuno-data, istio-injected since the service-mesh phase 2 rollout)
-    # never delivers the server-first MySQL greeting to a plaintext
-    # non-mesh client (12s, zero bytes; instant on localhost inside the
-    # pod), so the probe fails "context deadline exceeded" forever and
-    # the whole KFP stack never deploys. The pipeline pods themselves run
-    # in zuno-ai-build (istio-injected) and reach MariaDB through mesh
-    # mTLS exactly like mcp-sales-db already does - the probe is the ONLY
+    # The DSPO controller's pre-deploy DB probe runs in
+    # redhat-ods-applications, OUTSIDE the mesh - and mariadb-0 (zuno-data,
+    # istio-injected since the service-mesh phase 2 rollout) never
+    # delivers the server-first MySQL greeting to a plaintext non-mesh
+    # client (12s, zero bytes; instant on localhost inside the pod), so
+    # the probe fails "context deadline exceeded" forever and the whole
+    # KFP stack never deploys. The pipeline pods themselves run in
+    # zuno-ai-build (istio-injected) and reach MariaDB through mesh mTLS
+    # exactly like mcp-sales-db already does - the probe is the ONLY
     # non-mesh client, so it is disabled rather than un-meshing port 3306
     # for everyone. A genuinely broken credential now surfaces as the
     # apiserver pod's own crashloop/logs instead of the CR condition.

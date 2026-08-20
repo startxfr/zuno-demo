@@ -25,35 +25,33 @@ spec:
       networkPolicy:
         enabled: true
       proxy:
-        # 2026-08-16: was failureThreshold: 4 (unexplained since this
-        # component's first commit) - at this probe's own periodSeconds=1/
+        # Was failureThreshold: 4 - at this probe's own periodSeconds=1/
         # timeoutSeconds=3, that gave every sidecar only a ~4s budget to
         # bootstrap before kubelet killed it, well short of how long Envoy
         # can actually take to complete cert issuance + its first xDS sync
-        # under real control-plane load - VERIFIED live: every freshly
-        # admitted pod's istio-proxy (tekos-frontend and, independently,
-        # agent-runtime) crash-looped on this probe for 20+ minutes,
-        # consistently killed ~3-4s in, on multiple nodes, both before and
-        # after an unrelated cert-manager-webhook blip resolved. 600 is
-        # Istio's own stock default for this field (~10min ceiling, only
-        # actually consumed if boot is unusually slow) - restores the
-        # intended generous first-boot grace period; ADR-0343's
-        # "Operational considerations" already flagged this exact symptom
-        # on maas-api-key-cleanup and deferred this same tuning.
+        # under real control-plane load: every freshly admitted pod's
+        # istio-proxy (tekos-frontend and, independently, agent-runtime)
+        # crash-looped on this probe for 20+ minutes. 600 is Istio's own
+        # stock default for this field (~10min ceiling, only actually
+        # consumed if boot is unusually slow) - restores the intended
+        # generous first-boot grace period; ADR-0343's "Operational
+        # considerations" already flagged this exact symptom on
+        # maas-api-key-cleanup and deferred this same tuning.
         startupProbe:
           enabled: true
           failureThreshold: 600
-        # 2026-08-15: Istio's stock sidecar default (2-core/1Gi limit,
-        # requests.cpu=100m/requests.memory=128Mi) was never right-sized for
-        # this cluster - VERIFIED live: it alone put redhat-ods-applications
-        # ~90+ cores over its 16-core zuno-platform-quota (many of that
-        # namespace's own app containers carry no CPU limit of their own at
-        # all, e.g. rhods-dashboard/maas-api/model-serving-api - the entire
-        # overage was sidecar tax, not real usage), on a 5-node/~69.5-core
-        # cluster that can never satisfy the stock default at this pod
-        # count. Still generous for this demo's actual per-service traffic
-        # (compare agent-bff/agent-runtime/etc.'s own much smaller
-        # requests/limits in their respective charts).
+        # Istio's stock sidecar default (2-core/1Gi limit,
+        # requests.cpu=100m/requests.memory=128Mi) was never right-sized
+        # for this cluster: it alone put redhat-ods-applications ~90+
+        # cores over its 16-core zuno-platform-quota (many of that
+        # namespace's own app containers carry no CPU limit of their own
+        # at all, e.g. rhods-dashboard/maas-api/model-serving-api - the
+        # entire overage was sidecar tax, not real usage), on a
+        # 5-node/~69.5-core cluster that can never satisfy the stock
+        # default at this pod count. Still generous for this demo's
+        # actual per-service traffic (compare agent-bff/agent-runtime/
+        # etc.'s own much smaller requests/limits in their respective
+        # charts).
         resources:
           requests: { cpu: 50m, memory: 64Mi }
           limits: { cpu: 500m, memory: 256Mi }
@@ -66,14 +64,14 @@ spec:
     pilot:
       env:
         ENABLE_CA_SERVER: "false"
-        # ADR-0201/WP-27 (2026-08-16): required for LLMInferenceService's
+        # ADR-0201/WP-27: required for LLMInferenceService's
         # router.scheduler (Gateway API Inference Extension InferencePool) -
-        # VERIFIED live, the CRD's own defaulting always adds
-        # spec.router.scheduler: {} to a gateway-enabled LLMInferenceService
-        # (removing it from our own manifest had no effect), and the
-        # generated HTTPRoute stayed NotReady with "InferencePool is not
-        # enabled" until this flag is set. Additive/off-by-default feature
-        # gate, no effect on existing Istio routing for anything else.
+        # the CRD's own defaulting always adds spec.router.scheduler: {} to
+        # a gateway-enabled LLMInferenceService (removing it from our own
+        # manifest had no effect), and the generated HTTPRoute stays
+        # NotReady with "InferencePool is not enabled" until this flag is
+        # set. Additive/off-by-default feature gate, no effect on existing
+        # Istio routing for anything else.
         ENABLE_GATEWAY_API_INFERENCE_EXTENSION: "true"
     # redhat-ods-applications is namespace-injected (istio-injection: enabled,
     # gitops/charts/namespaces), but these two RHOAI-managed workloads are
@@ -81,30 +79,29 @@ spec:
     # 1001419999, the namespace range's last uid) are injected: RHOAI's own
     # run-as-ray-user SCC pins uid 1000 for kuberay, and
     # openshift-ai-localmodel-scc does the same for the localmodelnode agent
-    # - the mixed-uid pod satisfies neither (VERIFIED live, 2026-08-13:
-    # kuberay-operator ReplicaSet and kserve-localmodelnode-agent DaemonSet
-    # both FailedCreate with "unable to validate against any security context
-    # constraint", leaving DataScienceCluster's RayReady False at 0/1).
-    # RHOAI owns those pod templates, so a per-pod inject=false annotation
-    # isn't available - excluded here at the injector instead.
+    # - the mixed-uid pod satisfies neither (kuberay-operator ReplicaSet
+    # and kserve-localmodelnode-agent DaemonSet both FailedCreate with
+    # "unable to validate against any security context constraint",
+    # leaving DataScienceCluster's RayReady False at 0/1). RHOAI owns
+    # those pod templates, so a per-pod inject=false annotation isn't
+    # available - excluded here at the injector instead.
     #
-    # 2026-08-15: widened to the rest of redhat-ods-applications' pure
-    # controller-manager/operator pods (VERIFIED live: zuno-platform-quota's
-    # 16-core limits.cpu was sized for these controllers' own ~11 real cores,
-    # never revisited after namespace-wide mesh injection added a 2-core/1Gi
-    # istio-proxy native sidecar to every one of the namespace's ~27 pods -
-    # ~90+ cores of sidecar tax alone, blocking kserve-controller-manager
-    # from scheduling at all, which cascades to both local model predictors
-    # via the admission webhook). Re-verified the original comment's own
-    # premise before widening rather than just copying the precedent: no
-    # PeerAuthentication exists anywhere on this cluster (no mesh-wide STRICT
-    # mTLS), Postgres auth here is Vault-sourced username/password not mTLS
-    # client certs, and zuno-data's own default-deny NetworkPolicy already
-    # allows ingress from the whole redhat-ods-applications namespace by
-    # plain namespace-selector (ADR-0343's own "NetworkPolicy widening",
-    # independent of mesh identity) - so losing the sidecar does not expose
-    # an application data path for these either, the same reasoning
-    # ADR-0343 already used for kuberay/localmodelnode-agent. Deliberately
+    # Widened to the rest of redhat-ods-applications' pure
+    # controller-manager/operator pods: zuno-platform-quota's 16-core
+    # limits.cpu was sized for these controllers' own ~11 real cores,
+    # never revisited after namespace-wide mesh injection added a
+    # 2-core/1Gi istio-proxy native sidecar to every one of the
+    # namespace's ~27 pods - ~90+ cores of sidecar tax alone, blocking
+    # kserve-controller-manager from scheduling at all, which cascades to
+    # both local model predictors via the admission webhook. Same premise
+    # as above applies here too: no PeerAuthentication exists anywhere on
+    # this cluster (no mesh-wide STRICT mTLS), Postgres auth here is
+    # Vault-sourced username/password not mTLS client certs, and
+    # zuno-data's own default-deny NetworkPolicy already allows ingress
+    # from the whole redhat-ods-applications namespace by plain
+    # namespace-selector (ADR-0343's own "NetworkPolicy widening",
+    # independent of mesh identity) - so losing the sidecar does not
+    # expose an application data path for these either. Deliberately
     # NOT excluding maas-api, maas-controller or model-serving-api (these
     # carry real application/API traffic, not just controller-to-apiserver
     # reconciliation) or rhods-dashboard/dashboard-redirect (user-facing UI

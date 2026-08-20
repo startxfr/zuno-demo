@@ -2,7 +2,7 @@
 # ExternalSecret (tracked resource, wave 0) within the same Sync phase.
 # NOT a PreSync hook - the Sync phase only starts after every PreSync hook
 # succeeds, so a PreSync consumer of a Sync-phase Secret deadlocks forever
-# (incident 2026-08-14, see ADR-0313's incident note).
+# (see ADR-0313's incident note).
 # `hook-delete-policy: BeforeHookCreation` deletes the previous run's Job
 # since Jobs are immutable.
 #
@@ -24,7 +24,7 @@ spec:
   backoffLimit: 2
   # psql over 3 small files takes seconds; without a deadline a pod stuck in
   # CreateContainerConfigError (not a pod *failure*, so backoffLimit never
-  # triggers) hangs the whole sync operation forever - incident 2026-08-14.
+  # triggers) hangs the whole sync operation forever.
   activeDeadlineSeconds: 300
   template:
     spec:

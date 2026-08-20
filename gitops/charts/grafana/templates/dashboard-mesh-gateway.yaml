@@ -11,12 +11,12 @@
 #   raw pod/NIC bandwidth panel the old network-mesh dashboard carried on
 #   the "prometheus" datasource moved to dashboard-infra-data.yaml instead
 #   (same split, better home).
-# - Kuadrant (Authorino/Limitador) panels are VERIFIED empty by design as
-#   of 2026-08-18: Authorino's auth-decision metrics need real traffic past
-#   the live "maas-gateway-auth" AuthPolicy, blocked today by ADR-0201's
-#   noted mTLS gap; Limitador's per-limit counters need a RateLimitPolicy
-#   (none attached). Both populate with zero further Grafana work once
-#   those two gaps close upstream.
+# - Kuadrant (Authorino/Limitador) panels are empty by design: Authorino's
+#   auth-decision metrics need real traffic past the live
+#   "maas-gateway-auth" AuthPolicy, blocked today by ADR-0201's noted mTLS
+#   gap; Limitador's per-limit counters need a RateLimitPolicy (none
+#   attached). Both populate with zero further Grafana work once those two
+#   gaps close upstream.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -200,7 +200,7 @@ spec:
           "title": "Why is this empty?",
           "type": "text",
           "gridPos": {"h": 4, "w": 6, "x": 18, "y": 32},
-          "options": {"mode": "markdown", "content": "Panels 8-11 are empty by design (VERIFIED live, 2026-08-18): Authorino needs real traffic past the `maas-gateway-auth` AuthPolicy, blocked by ADR-0201's mTLS gap; Limitador needs a RateLimitPolicy (none attached). Both populate automatically once those close."}
+          "options": {"mode": "markdown", "content": "Panels 8-11 are empty by design: Authorino needs real traffic past the `maas-gateway-auth` AuthPolicy, blocked by ADR-0201's mTLS gap; Limitador needs a RateLimitPolicy (none attached). Both populate automatically once those close."}
         },
         {
           "id": 13,

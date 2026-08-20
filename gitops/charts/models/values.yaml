@@ -13,7 +13,7 @@ namespace: zuno-ai-run
 # only). Note this only covers the three classic InferenceServices this
 # chart owns directly; the MaaS LLMInferenceService backend
 # (templates/maas.yaml) is already scraped independently by RHOAI's own
-# LLMInferenceService controller (VERIFIED live 2026-08-19: job
+# LLMInferenceService controller (job
 # "zuno-ai-run/kserve-llm-isvc-vllm-engine-default" already reports
 # vllm:num_requests_running for qwen2.5-7b-instruct-maas) - no
 # ServiceMonitor needed here for that one.
@@ -29,9 +29,9 @@ modelId: Qwen/Qwen2.5-7B-Instruct
 # platform-wide canonical model id every consumer routes by
 # (platform/ai-gateway/provider-routing.yaml, ai-gateway's
 # LOCAL_MODEL_NAME, policies/model-routing, policies/optimization).
-# VERIFIED live (2026-08-16): serving under the HF id instead made
-# every local chat completion 404 ("The model `qwen2.5-7b-instruct`
-# does not exist") - the two ids are different concerns.
+# Serving under the HF id instead made every local chat completion 404
+# ("The model `qwen2.5-7b-instruct` does not exist") - the two ids are
+# different concerns.
 servedModelName: qwen2.5-7b-instruct
 
 image:
@@ -112,8 +112,8 @@ loraAdapters: []
 # size.
 modelStorage:
   # Feature flag (ansible passes zuno_models_download_enabled, default
-  # false since 2026-08-18 - the model is staged in modelsS3 below, so the
-  # HF predownload is opt-in, no longer a Day 1 step). Gates pvc-model.yaml
+  # false - the model is staged in modelsS3 below, so the HF predownload
+  # is opt-in, no longer a Day 1 step). Gates pvc-model.yaml
   # and job-model-download.yaml TOGETHER and flips inferenceservice.yaml's
   # storageUri in the same conditional - never gate the Job alone: with
   # this app's automated.prune a skipped PVC gets deleted under the
@@ -132,17 +132,16 @@ modelStorage:
   # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
   # PVC's first consumer) and the predictor must land in the same zone, or
   # the predictor's mount fails with a volume node-affinity conflict once
-  # the PVC is bound elsewhere. RESOLVED 2026-08-17: no zone is pinned here
-  # anymore - a hardcoded value stopped matching the live GPU node's actual
-  # zone the moment the demo's GPU topology changed underneath it (this
-  # cluster is now down to one GPU node, in a third zone neither predictor
-  # nor MaaS backend was pinned to), which is exactly why both went
-  # Pending. Both job-model-download.yaml and inferenceservice.yaml now
-  # nodeSelect on the generic `nvidia.com/gpu.present: "true"` NFD label
-  # instead: WaitForFirstConsumer means the PVC only binds once the
-  # download Job's pod actually lands, so it always binds in whichever
-  # zone that GPU node turns out to be in - no zone value to keep in sync,
-  # and it keeps working as more GPU nodes are added in other zones.
+  # the PVC is bound elsewhere. No zone is pinned here: a hardcoded value
+  # stops matching the live GPU node's actual zone the moment the demo's
+  # GPU topology changes underneath it, driving both the predictor and the
+  # MaaS backend Pending. Both job-model-download.yaml and
+  # inferenceservice.yaml instead nodeSelect on the generic
+  # `nvidia.com/gpu.present: "true"` NFD label: WaitForFirstConsumer means
+  # the PVC only binds once the download Job's pod actually lands, so it
+  # always binds in whichever zone that GPU node turns out to be in - no
+  # zone value to keep in sync, and it keeps working as more GPU nodes are
+  # added in other zones.
   # Pinned to the odh-kserve-storage-initializer image this cluster's own
   # KServe controller already generates for the hf:// init container
   # (read off the live InferenceService's generated pod spec) - unlike
@@ -161,10 +160,10 @@ modelStorage:
 # (gitops/charts/rag-ingestion/values.yaml's s3: block) - the models/
 # prefix keeps weights and corpus objects apart. Layout is
 # <prefix>/<servedModelName>/: models/qwen2.5-7b-instruct/ (uploaded
-# out-of-cluster 2026-08-18 during the hf:// hang incident, see maas.yaml),
-# models/gpt-oss-20b/ (served by gptOssModel below since ADR-0412), and
-# models/gpt-oss-120b/ (NOT servable on this cluster's GPUs - transit
-# storage for the operator's own workstation only).
+# out-of-cluster - in-cluster hf:// downloads hang unreliably here, see
+# maas.yaml), models/gpt-oss-20b/ (served by gptOssModel below since
+# ADR-0412), and models/gpt-oss-120b/ (NOT servable on this cluster's
+# GPUs - transit storage for the operator's own workstation only).
 modelsS3:
   bucket: zuno-demo-rag-corpus
   prefix: models
@@ -299,7 +298,7 @@ gptOssModel:
 # acceptance suites"). Continuous/scheduled benchmarking across models is
 # WP-40 (ADR-0305), explicitly out of scope here - this is a
 # manually-declared, one-shot comparison job per entry. Lives in this
-# chart (Day 1 "models" component, moved 2026-08-14 from
+# chart (Day 1 "models" component, moved from
 # gitops/charts/openshift-ai which is Day 0) since it benchmarks a model
 # this chart deploys and belongs to the same install/uninstall lifecycle.
 maas:
@@ -353,8 +352,7 @@ maas:
 
 lmEval:
   enabled: true
-  # First real run (2026-08-14, roadmap WP-10 test pass): benchmarks the
-  # one model actually deployed by this chart (see
+  # Benchmarks the one model actually deployed by this chart (see
   # inferenceServiceName/modelId above), same base_url convention as
   # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL.
   jobs:
@@ -365,33 +363,32 @@ lmEval:
           value: http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1/completions
         - name: model
           value: qwen2.5-7b-instruct
-        # VERIFIED live 2026-08-18: lm-eval-harness's TemplateAPI defaults
-        # to AutoTokenizer.from_pretrained(model) when `tokenizer` is
-        # unset - `model` here is the in-cluster served-model name, not a
-        # valid HF repo id, so that lookup 404s against huggingface.co
+        # lm-eval-harness's TemplateAPI defaults to
+        # AutoTokenizer.from_pretrained(model) when `tokenizer` is unset -
+        # `model` here is the in-cluster served-model name, not a valid HF
+        # repo id, so that lookup 404s against huggingface.co
         # ("qwen2.5-7b-instruct is not the path to a directory..."). The
         # real public HF repo for the S3-hosted weights this predictor
-        # serves is Qwen/Qwen2.5-7B-Instruct (Inspected the image's own
-        # lm_eval.models.api_models.TemplateAPI.__init__ signature to
-        # confirm `tokenizer` is a distinct, real field).
+        # serves is Qwen/Qwen2.5-7B-Instruct (`tokenizer` is a distinct,
+        # real lm_eval.models.api_models.TemplateAPI field).
         - name: tokenizer
           value: Qwen/Qwen2.5-7B-Instruct
-      # VERIFIED live 2026-08-18: the full `mmlu` group task (57 subjects)
-      # expands to 56,168 loglikelihood requests - too much sustained
-      # load for this demo cluster's shared single-GPU-plus-MIG capacity
-      # (qwen + gpt-oss-20b + the MaaS backend model all serve
-      # concurrently); the predictor started 503ing under that volume
-      # partway through, a real capacity constraint, not a bug. Scoped to
-      # one real native subject task (mmlu_abstract_algebra, ~100 test
-      # examples x 4 choices ≈ 400 requests) - a genuine, complete,
-      # right-sized GPU-backed run rather than a capacity-planning
-      # exercise. Extend taskNames back to `mmlu` (or add more subjects)
-      # once dedicated eval-time GPU capacity exists.
+      # The full `mmlu` group task (57 subjects) expands to 56,168
+      # loglikelihood requests - too much sustained load for this demo
+      # cluster's shared single-GPU-plus-MIG capacity (qwen + gpt-oss-20b +
+      # the MaaS backend model all serve concurrently); the predictor
+      # starts 503ing under that volume partway through, a real capacity
+      # constraint, not a bug. Scoped to one real native subject task
+      # (mmlu_abstract_algebra, ~100 test examples x 4 choices ≈ 400
+      # requests) - a genuine, complete, right-sized GPU-backed run rather
+      # than a capacity-planning exercise. Extend taskNames back to `mmlu`
+      # (or add more subjects) once dedicated eval-time GPU capacity
+      # exists.
       taskNames: [mmlu_abstract_algebra]
-      # allowOnline stays false: VERIFIED live 2026-08-18 it has no effect
-      # either way (the operator hardcodes the HF offline env vars
-      # regardless - see lmevaljob.yaml's dated comment). The real fix is
-      # datasetCachePvc below: mmlu's dataset (hails/mmlu_no_train, one
+      # allowOnline stays false: it has no effect either way (the operator
+      # hardcodes the HF offline env vars regardless - see lmevaljob.yaml's
+      # comment). The real fix is datasetCachePvc below: mmlu's dataset
+      # (hails/mmlu_no_train, one
       # HF `load_dataset(path, config)` call per of its 57 subject
       # configs - NOT the "all" aggregate config, which has a real,
       # separate bug returning 0 examples per split) AND the

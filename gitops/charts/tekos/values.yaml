@@ -27,9 +27,9 @@ frontend:
     # Router default backend timeout is ~30s - well under agent-bff's own
     # 120s streaming / 55s sync budget (components/agent-bff/main.go), so
     # a real chat turn gets cut off by the Router before the app's own
-    # generous timeouts ever engage (VERIFIED live 2026-08-16: this is
-    # what produced the 504 consultant-01 hit). 150s gives ~30s margin
-    # past the 120s streaming ceiling.
+    # generous timeouts ever engage (this is what produced the 504
+    # consultant-01 hit). 150s gives ~30s margin past the 120s streaming
+    # ceiling.
     timeout: 150s
     timeoutTunnel: 150s
   resources:
@@ -72,7 +72,7 @@ keycloak:
   issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
   # Where the BFF actually fetches the JWKS (issuerUrl stays the iss
   # comparison string) - the in-cluster Service path avoids the external
-  # Route's Vault-internal CA (VERIFIED live 2026-08-16).
+  # Route's Vault-internal CA.
   jwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
   # matches the Keycloak CR's actual Route hostname, see
   # gitops/charts/keycloak/templates/keycloak.yaml

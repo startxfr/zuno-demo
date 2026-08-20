@@ -36,10 +36,9 @@ data:
         service.beta.openshift.io/serving-cert-secret-name: "maas-gateway-service-tls"
     spec:
       type: ClusterIP
-  # VERIFIED live (2026-08-18): the auto-provisioned gateway pod OOMKilled
-  # repeatedly (30 restarts in 13h, exitCode 137) at Istio's own default
-  # gateway-proxy sizing (500m/256Mi limit) - this pod terminates TLS,
-  # runs the Kuadrant AuthPolicy's OPA evaluation and routes all MaaS
+  # The auto-provisioned gateway pod OOMKilled repeatedly at Istio's own
+  # default gateway-proxy sizing (500m/256Mi limit) - this pod terminates
+  # TLS, runs the Kuadrant AuthPolicy's OPA evaluation and routes all MaaS
   # traffic, materially heavier than a plain sidecar. Same
   # infrastructure.parametersRef ConfigMap mechanism as the `service` key
   # above, keyed by resource kind, per Istio's Gateway API deployer.
@@ -113,13 +112,11 @@ spec:
   host: maas.{{ .Values.maasGateway.clusterBaseDomain }}
   to:
     kind: Service
-    # RESOLVED live (2026-08-18): Istio's Gateway API controller actually
-    # names the auto-deployed Service "<gateway-name>-istio", not identical
-    # to the Gateway object - confirmed via `oc get svc -n openshift-ingress`
-    # (maas-default-gateway-istio, not maas-default-gateway). The prior
-    # value here was never live-verified and silently 503'd every external
-    # request through this Route since it was first applied (the router
-    # couldn't resolve a same-named Service that doesn't exist).
+    # Istio's Gateway API controller actually names the auto-deployed
+    # Service "<gateway-name>-istio", not identical to the Gateway object
+    # (maas-default-gateway-istio, not maas-default-gateway) - a
+    # same-named value here silently 503s every external request through
+    # this Route (the router can't resolve a Service that doesn't exist).
     name: maas-default-gateway-istio
     weight: 100
   port:

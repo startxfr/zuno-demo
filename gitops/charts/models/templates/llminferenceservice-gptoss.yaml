@@ -60,8 +60,7 @@ spec:
   router:
     # Same explicit Gateway ref maas.yaml's old LLMInferenceService used -
     # an empty gateway: {} does not auto-create/reuse an existing Gateway
-    # on this RHOAI build (VERIFIED live 2026-08-16, see maas.yaml's own
-    # comment history).
+    # on this RHOAI build (see maas.yaml's own comment history).
     gateway:
       refs:
         - name: maas-default-gateway
@@ -69,5 +68,5 @@ spec:
     route: {}
     # scheduler: {} is not optional - the controller's own defaulting
     # always adds it to a gateway-enabled LLMInferenceService regardless
-    # of what this manifest sends (VERIFIED live 2026-08-16).
+    # of what this manifest sends.
     scheduler: {}

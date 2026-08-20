@@ -7,7 +7,7 @@
 #   because the GPU node's 75GB ephemeral root disk couldn't hold the CUDA
 #   vLLM image + a fresh ~15GB hf:// download + NVIDIA driver build
 #   artifacts at once (verified on-cluster: kubelet evicted the pod).
-# - disabled (install-time default since 2026-08-18): storageUri: s3://
+# - disabled (install-time default): storageUri: s3://
 #   reads the copy staged in modelsS3, authenticated through
 #   templates/s3-serving-credentials.yaml's ServiceAccount - same
 #   mechanism the MaaS LLMInferenceService already uses (maas.yaml). The

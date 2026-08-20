@@ -58,8 +58,7 @@ vault:
 # "file" (standalone.config above), not Raft/integrated storage, so
 # there is no `vault operator raft snapshot` API to call - the storage
 # backend's own snapshot mechanism for a plain filesystem PVC is a CSI
-# VolumeSnapshot of the volume itself. Confirmed real and available on
-# the live test cluster, 2026-08-14: `oc get volumesnapshotclass` shows
+# VolumeSnapshot of the volume itself. `oc get volumesnapshotclass` shows
 # `csi-aws-vsc` (driver ebs.csi.aws.com, matching gp3-csi's own
 # provisioner) and `oc explain volumesnapshot.spec` confirms the schema
 # used below.

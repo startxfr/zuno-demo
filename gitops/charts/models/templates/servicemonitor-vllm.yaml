@@ -2,9 +2,9 @@
 # vLLM serves its own Prometheus /metrics endpoint on the predictor's normal
 # serving port (the vllm:* series: num_requests_running/waiting,
 # time_to_first_token_seconds, gpu_cache_usage_perc, prompt/generation
-# tokens, request_success_total) - VERIFIED live 2026-08-19: entirely
-# unscraped before this file (only the MaaS LLMInferenceService backend had
-# its own separate scrape, see values.yaml's comment on metrics.enabled).
+# tokens, request_success_total) - entirely unscraped before this file
+# (only the MaaS LLMInferenceService backend had its own separate scrape,
+# see values.yaml's comment on metrics.enabled).
 #
 # apiVersion is deliberately monitoring.coreos.com/v1, not the
 # monitoring.rhobs/v1 the mesh-monitoring MonitoringStack also installs on
@@ -17,16 +17,16 @@
 # One ServiceMonitor for the two classic-predictor Services this chart
 # still owns (qwen25-7b-instruct-predictor, embeddings-predictor) via
 # matchExpressions on the label KServe stamps on every predictor Service,
-# rather than near-identical CRs per model - VERIFIED live: both expose
-# port 80 (name "http") -> targetPort 8080, the same port
-# templates/servingruntime*.yaml's --port=8080 and the NetworkPolicy
-# ingress rules below assume. The embeddings runtime may not populate the
-# vllm:* series the same way the chat runtime does (pooling/embed mode,
-# not generation) - harmless either way, it simply contributes no series.
+# rather than near-identical CRs per model - both expose port 80 (name
+# "http") -> targetPort 8080, the same port templates/servingruntime*.yaml's
+# --port=8080 and the NetworkPolicy ingress rules below assume. The
+# embeddings runtime may not populate the vllm:* series the same way the
+# chat runtime does (pooling/embed mode, not generation) - harmless
+# either way, it simply contributes no series.
 # ADR-0414: gpt-oss-20b is no longer a classic predictor - it's an
 # LLMInferenceService now (templates/llminferenceservice-gptoss.yaml),
 # scraped independently by RHOAI's own LLMInferenceService controller
-# (same mechanism already proven live for the old qwen-maas-backend:
+# (same mechanism already used for the old qwen-maas-backend:
 # vllm:num_requests_running was already present for it with no
 # ServiceMonitor from this chart) - no entry needed here.
 apiVersion: monitoring.coreos.com/v1

@@ -13,14 +13,13 @@ instead, folding what were two separate GPU-consuming deployments into
 one.
 */ -}}
 {{- if .Values.maas.enabled }}
-# VERIFIED live (2026-08-16): MaaSAuthPolicy's admission webhook rejected
-# the whole batch with "namespace zuno-ai-run is not enabled for MaaS
-# tenant resources. Create a Tenant CR in this namespace to enable it." -
-# not documented anywhere in this chart before hitting it live. Tenant is
-# namespace-scoped and CEL-enforced as a singleton named "default-tenant"
-# per namespace (v1alpha1). gatewayRef sets the tenant-wide default; the
-# LLMInferenceService's own router.gateway.refs below is still explicit
-# for clarity/defense-in-depth.
+# MaaSAuthPolicy's admission webhook rejects the whole batch unless a
+# Tenant CR exists first ("namespace zuno-ai-run is not enabled for MaaS
+# tenant resources. Create a Tenant CR in this namespace to enable it.").
+# Tenant is namespace-scoped and CEL-enforced as a singleton named
+# "default-tenant" per namespace (v1alpha1). gatewayRef sets the
+# tenant-wide default; the LLMInferenceService's own router.gateway.refs
+# below is still explicit for clarity/defense-in-depth.
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: Tenant
 metadata:
@@ -57,21 +56,18 @@ apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSSubscription
 metadata:
   name: {{ .name }}
-  # VERIFIED live (2026-08-18): the maas-controller Deployment carries
+  # The maas-controller Deployment carries
   # MAAS_SUBSCRIPTION_NAMESPACE=models-as-a-service (an operator-generated,
-  # hardcoded namespace it creates itself at startup - "managed namespace
-  # ready", opendatahub.io/generated-namespace: true) and its tenant
-  # controller has never reconciled anything outside that namespace in its
-  # entire runtime (checked full logs) - our own Tenant CR in
-  # .Values.namespace (below) never leaves an empty status. MaaSSubscription/
-  # MaaSAuthPolicy created in .Values.namespace alongside the ModelRef never
-  # get discovered for pairing ("No active subscription and auth policy
-  # pairing found" on the ModelRef, indefinitely). MaaSModelRef itself
-  # reconciles fine wherever it lives (RuntimeReady confirmed once the
-  # backend came up) - only Subscription/AuthPolicy are namespace-
-  # centralized in this build. modelRefs[].namespace below still points at
-  # the real ModelRef's namespace - that's how the CRD supports the
-  # cross-namespace reference.
+  # hardcoded namespace it creates itself at startup) and its tenant
+  # controller never reconciles anything outside that namespace - our own
+  # Tenant CR in .Values.namespace (below) never leaves an empty status,
+  # and MaaSSubscription/MaaSAuthPolicy created in .Values.namespace
+  # alongside the ModelRef never get discovered for pairing ("No active
+  # subscription and auth policy pairing found" on the ModelRef,
+  # indefinitely). MaaSModelRef itself reconciles fine wherever it lives -
+  # only Subscription/AuthPolicy are namespace-centralized in this build.
+  # modelRefs[].namespace below still points at the real ModelRef's
+  # namespace - that's how the CRD supports the cross-namespace reference.
   namespace: models-as-a-service
   labels:
     zuno.io/managed-by: argocd

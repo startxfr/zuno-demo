@@ -47,23 +47,23 @@ resources:
 # apps.mycluster.example.com is the substitution placeholder
 # (ansible/tasks/apply_gitops_app.yml rewrites it in the Application
 # manifest, which passes it back here via helm values - same pattern as
-# gitops/charts/tekos). VERIFIED live (2026-08-15): the previous
-# hardcoded keycloak-zuno.apps.mycluster.example.com default shipped
-# as-is (no Application passed a value) AND used the retired
-# keycloak-zuno.<domain> host alias - JWT validation failed on its
-# first real exercise with an unresolvable JWKS hostname.
+# gitops/charts/tekos). Don't reintroduce a hardcoded
+# keycloak-zuno.apps.mycluster.example.com-style default: it used the
+# retired keycloak-zuno.<domain> host alias, which broke JWT validation
+# with an unresolvable JWKS hostname the first time no Application
+# overrode it.
 clusterBaseDomain: apps.mycluster.example.com
 # Empty means "https://keycloak.<clusterBaseDomain>/realms/zuno".
 keycloakIssuer: ""
 # JWKS is fetched over the in-cluster Service, not the external Route -
 # the issuer string above is only compared against the token's iss
 # claim, while this URL is what actually gets dialed (the two are
-# separate env vars in app/auth.py for exactly this). VERIFIED live
-# (2026-08-15): fetching via the Route fails TLS verification (the
-# chain ends at Vault's internal root CA, not in the container's
-# system store), and the in-cluster hop stays plain-HTTP by Keycloak's
-# own design (spec.http.httpEnabled, edge termination) inside the
-# mesh/NetworkPolicy boundary (zuno-auth allows zuno-ai-run).
+# separate env vars in app/auth.py for exactly this). Fetching via the
+# Route fails TLS verification (the chain ends at Vault's internal root
+# CA, not in the container's system store); the in-cluster hop stays
+# plain-HTTP by Keycloak's own design (spec.http.httpEnabled, edge
+# termination) inside the mesh/NetworkPolicy boundary (zuno-auth allows
+# zuno-ai-run).
 keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
 ragServiceUrl: http://rag-service.zuno-data.svc:8080
 mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
@@ -78,9 +78,8 @@ aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 # CHECKPOINT_PG* IS configured (as it is here), the Postgres path is a hard
 # dependency: lifespan fails startup on any connection error rather than
 # silently degrading to MemorySaver, so a Postgres outage loudly crash-loops
-# the pod instead of quietly losing run resumability - confirmed as the
-# intended behavior after the 2026-08-14 incident (missing database), which
-# this dependency correctly surfaced as a crash rather than masking it.
+# the pod instead of quietly losing run resumability - this is intended:
+# a missing/unreachable database should surface as a crash, not be masked.
 checkpointDb:
   # PGO's own PgBouncer Service in front of the shared zuno-postgresql
   # PostgresCluster - same pooled-connection convention as
@@ -90,8 +89,8 @@ checkpointDb:
   database: agent-checkpoints
   # PGO's PgBouncer requires TLS; explicit sslmode avoids psycopg's default
   # `prefer` behavior of silently retrying a plaintext connection after any
-  # TLS failure, which produced a misleading "SSL required" error masking
-  # the 2026-08-14 incident's real cause (a missing database).
+  # TLS failure, which can produce a misleading "SSL required" error that
+  # masks the real cause (e.g. a missing database).
   sslmode: require
   credentials:
     vaultPath: agent-runtime/postgresql-app
