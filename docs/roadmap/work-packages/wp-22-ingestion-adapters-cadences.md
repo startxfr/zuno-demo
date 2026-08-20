@@ -4,7 +4,12 @@
 - **State (2026-08-15, repo work):** ADR-0105 promoted to a full record; fetch stages refactored behind one SourceAdapter interface with a per-run domain guard (fail closed) and first-ever fixture tests for the pipeline (`components/rag-ingestion/tests/test_source_adapters.py`); `fetch-salesforce`/`fetch-aramis`/`load-sxa-dump` adapters added (fixture-driven, snapshot_id/import-timestamp/checksum on sxa records); normalize writes `domain` + canonical `technology` (redhat slug map + explicit per-Confluence-source values) and the runtime forwards `technology`; chart gained a `domains:` map (per-domain ConfigMaps/ExternalSecrets/Pipeline CRs, per-domain S3 prefixes, all shipped `enabled: false`), one schedule ConfigMap per scheduled domain, and `ansible/roles/rag_ingestion` now creates recurring runs from those ConfigMaps (values cron is finally authoritative). Awaiting the operator follow-up below: Salesforce/Aramis credentials, an approved SXA snapshot, per-domain live runs and KFP schedule confirmation.
 - **ADRs:** ADR-0204 part 2 (-> Implemented with WP-21); ADR-0105 (Proposed -> To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-21 (merged), WP-07 (merged)
-- **Blocks:** WP-23, WP-33, WP-35
+- **Blocks:** — (2026-08-20 correction: previously listed WP-23/WP-33/WP-35
+  here, but all three needed only the fixture-driven `load-sxa-dump`/
+  `fetch-salesforce`/`fetch-aramis` adapters below, merged 2026-08-15 —
+  not the recurring-cadence/live-credential automation this WP's
+  Operator-pending state still tracks. That automation blocks nothing
+  downstream today.)
 - **Estimated files touched:** ~10
 
 > Execute this brief as a standalone task from the repository root.
