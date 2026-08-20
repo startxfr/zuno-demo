@@ -62,17 +62,24 @@ scenarios:
     message: "Draft a DAT for the OpenShift AI GPU sizing project"
 
   - id: 8
-    title: First-token latency is under the 6-second interactive objective
+    title: First-token latency is under the 6-second interactive objective (workshop-presentation)
     type: chat_first_token_latency
     persona: consultant-02
-    message: "Draft a DAT for the Keycloak SSO migration project"
+    # ADR-0514: exercises workshop-presentation instead of a second DAT
+    # message - scenario 7 already covers DAT drafting, this covers the
+    # newer kind through the same shape.
+    message: "Prepare an Odyssey workshop for the Keycloak SSO migration project"
     max_seconds: 6
 
   - id: 9
-    title: Streaming chat emits token events followed by a done event
+    title: Streaming chat emits token events followed by a done event (structure-demo)
     type: chat_streaming_sse
     persona: consultant-01
-    message: "Summarize what a DAT is in one sentence."
+    # WP-6: exercises structure-demo's early-exit branch over SSE instead
+    # of a generic DAT-summary message - still a short reply, same
+    # streaming-shape assertion, now real capability coverage instead of
+    # an incidental "summarize" ask.
+    message: "Structure a demo for the OpenShift AI GPU sizing project"
 
   - id: 10
     title: Drafting a DAT includes live Confluence context in its citations

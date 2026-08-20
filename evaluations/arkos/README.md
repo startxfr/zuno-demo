@@ -43,8 +43,11 @@ type-specific parameters) - the exact same `type` vocabulary
 handlers are generic HTTP call patterns, not Tekos-specific code.
 
 Coverage: portal/tile access gating (scenarios 1, 2, 4-6), authentication
-(3), the chat contract synchronous and streaming (7-9), DAT drafting
-folding in live Confluence context alongside the RAG corpus (10-11, the
+(3), the chat contract synchronous and streaming (7-9 - 7 is DAT
+drafting, 8 is workshop-presentation's latency, ADR-0514's kind-aware
+draft path via the same shape, 9 is structure-demo's early-exit branch
+over SSE, WP-6), DAT drafting folding in live Confluence context
+alongside the RAG corpus (10-11, the
 concrete proof of ADR-0326's "live Jira/Confluence actions without
 physical endpoint coupling" bullet - Jira itself waits on its own MCP
 server, not yet scheduled), MCP Gateway policy enforcement (12-13, 18),
