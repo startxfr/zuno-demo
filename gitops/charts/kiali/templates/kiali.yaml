@@ -18,6 +18,17 @@ metadata:
 spec:
   auth:
     strategy: openshift
+  server:
+    # TLS passthrough (see deployment.ingress below) means the router never
+    # terminates HTTP, so it can't inject X-Forwarded-* headers - Kiali has
+    # no way to guess its own external port and falls back to its internal
+    # listen port (20001), which it then bakes into the browser-side
+    # /api/auth/redirect URL, producing an unroutable
+    # host:20001 the OAuth login button sends the browser to. Pin the real
+    # external address explicitly instead of relying on header-guessing.
+    web_fqdn: kiali-{{ .Values.meshNamespace }}.{{ .Values.appsDomain }}
+    web_schema: https
+    web_port: "443"
   deployment:
     accessible_namespaces:
       - '**'

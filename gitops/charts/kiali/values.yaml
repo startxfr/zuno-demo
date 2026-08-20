@@ -57,3 +57,4 @@ kiali:
   enabled: false
 
 meshNamespace: zuno-mesh
+appsDomain: apps.demo222.startx.fr

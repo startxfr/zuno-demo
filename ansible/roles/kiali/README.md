@@ -9,6 +9,7 @@ The web UI for the service mesh - istiod status/config, mesh topology and
 traffic graph (from `mesh_monitoring`'s Prometheus), and distributed traces
 (from `tempo`'s Tempo). The operator auto-creates and owns its own Route
 (passthrough TLS, since Kiali serves HTTPS natively). `auth.strategy:
-anonymous` is a demo-scope choice - revisit with OAuth before treating this
-as more than an internal/demo tool. Depends on `service_mesh`,
+openshift` gates login behind the cluster's own OAuth; `spec.server.web_fqdn`
+is pinned explicitly since passthrough TLS gives Kiali no `X-Forwarded-*`
+headers to guess its external URL from otherwise. Depends on `service_mesh`,
 `mesh_monitoring` and `tempo`.
