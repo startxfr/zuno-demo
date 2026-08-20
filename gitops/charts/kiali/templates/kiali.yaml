@@ -32,6 +32,54 @@ spec:
   deployment:
     accessible_namespaces:
       - '**'
+    discovery_selectors:
+      default:
+        # discovery_selectors is unset by default, and Kiali silently falls
+        # back to hiding every openshift-*/kube-* namespace from its own
+        # namespace list (separate from accessible_namespaces/RBAC above,
+        # both of which already allow everything) - confirmed live via
+        # /api/namespaces returning 22 namespaces, none openshift-*/kube-*
+        # prefixed, out of 107 on the cluster. That's why HTTPRoutes
+        # pointing at the shared ingress Gateways in openshift-ingress
+        # (maas-default-gateway, data-science-gateway, zuno-agent-gateway -
+        # OpenShift's own Gateway API control plane, separate from
+        # zuno-mesh's) always showed a red/invalid icon in Kiali despite
+        # being genuinely healthy (Accepted=True/ResolvedRefs=True/
+        # Programmed=True) - Kiali could never resolve the cross-namespace
+        # parentRef into a namespace it couldn't see.
+        #
+        # Setting this field REPLACES that implicit fallback rather than
+        # adding to it (same discoverySelectors semantics as Istio's own
+        # meshConfig.discoverySelectors), so every previously-visible
+        # namespace must be matched here too, not just the one being added.
+        # The four label rules below were checked by hand against a live
+        # label dump of all 22 previously-visible namespaces; the literal
+        # name list covers the three (`default`, `cert-manager`,
+        # `wva-system`) that carry none of those labels, plus the new
+        # addition, `openshift-ingress`. A namespace created later that
+        # doesn't carry zuno.io/managed, istio-injection,
+        # opendatahub.io/generated-namespace, or app.startx.fr/scope will
+        # need adding to the name list to show up in Kiali.
+        - matchExpressions:
+            - key: zuno.io/managed
+              operator: Exists
+        - matchExpressions:
+            - key: istio-injection
+              operator: Exists
+        - matchExpressions:
+            - key: opendatahub.io/generated-namespace
+              operator: Exists
+        - matchExpressions:
+            - key: app.startx.fr/scope
+              operator: Exists
+        - matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: In
+              values:
+                - default
+                - cert-manager
+                - wva-system
+                - openshift-ingress
     ingress:
       # Kiali serves its own UI over HTTPS by default (self-signed cert,
       # spec.external_services.istio aside) - the operator's own default
@@ -76,18 +124,16 @@ spec:
       # place instead of relying on an implicit operator default.
       #
       # KIA1401 ("Route is pointing to a non-existent or inaccessible K8s
-      # gateway"): openshift-ingress runs its own independent istiod
-      # (openshift-gateway-istiod, OpenShift's built-in Gateway API support,
-      # provisioned outside zuno-mesh) that Kiali has no visibility into -
-      # external_services.istio above pins Kiali to zuno-mesh's control
-      # plane only. Every HTTPRoute that correctly targets the shared
-      # ingress Gateways living in openshift-ingress (maas-default-gateway,
-      # data-science-gateway, zuno-agent-gateway) will always trip this
-      # false positive even though their real Gateway API status is
-      # Accepted=True/ResolvedRefs=True/Programmed=True - verified against
-      # the live cluster. Suppress rather than chase a real fix: joining
-      # openshift-ingress to zuno-mesh would sidecar-inject the OpenShift
-      # router, and Kiali only supports one control plane per cluster.
+      # gateway"): fires for HTTPRoutes whose parentRef Gateway lives in a
+      # namespace Kiali can't see (see deployment.discovery_selectors above
+      # for the real fix - this namespace-visibility gap is what actually
+      # broke cross-namespace resolution for maas-default-gateway/
+      # data-science-gateway/zuno-agent-gateway in openshift-ingress).
+      # Ignoring the check code alone only suppresses the message, not the
+      # underlying invalid/red status (Kiali computes that from a separate,
+      # unfiltered reference-resolution step) - kept here anyway since it's
+      # harmless and matches the existing KIA1301 precedent, but
+      # discovery_selectors is what actually clears the icon.
       ignore:
         - KIA1301
         - KIA1401

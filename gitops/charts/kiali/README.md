@@ -35,11 +35,25 @@ own (`external_services.istio.root_namespace`/`istiod_url` above), and a
 second, separate one OpenShift provisions automatically for its built-in
 Gateway API support (`openshift-gateway-istiod` in `openshift-ingress`,
 backing the shared `maas-default-gateway`/`data-science-gateway`/
-`zuno-agent-gateway`). Kiali only supports one control plane per cluster, so
-it can read HTTPRoute/Gateway objects in `openshift-ingress` (RBAC and
-`accessible_namespaces` are cluster-wide) but can't validate them against a
-control plane it doesn't know about, and flags every route pointing there
-with a false-positive `KIA1401` ("Route is pointing to a non-existent or
-inaccessible K8s gateway") even though their real Gateway API status is
-healthy. `kiali_feature_flags.validations.ignore` suppresses `KIA1401`
-mesh-wide for this reason - it is not silencing a real bug.
+`zuno-agent-gateway`). `deployment.discovery_selectors` had to be set
+explicitly to make `openshift-ingress` visible to Kiali: unlike
+`accessible_namespaces` (an RBAC-adjacent wildcard, already `['**']`),
+`discovery_selectors` is a separate namespace-visibility gate that - when
+left unset, as it was by default - silently falls back to hiding every
+`openshift-*`/`kube-*` namespace, the modern (undocumented-as-such,
+no-longer-configurable-via-`api.namespaces.exclude`) equivalent of that
+deprecated field's old default regex. Without it, Kiali could never resolve
+HTTPRoutes' cross-namespace `parentRef` into `openshift-ingress`'s Gateways
+and flagged them red (`KIA1401`, "Route is pointing to a non-existent or
+inaccessible K8s gateway") even though their real Gateway API status was
+healthy throughout. Because `discoverySelectors` semantics (Kiali mirrors
+Istio's `meshConfig.discoverySelectors` here) *replace* rather than augment
+the implicit default once set, every previously-visible namespace has to be
+matched by one of the selector's rules too, not just `openshift-ingress` -
+see the inline comment in `templates/kiali.yaml` for exactly how each of the
+22 pre-existing namespaces is covered.
+`kiali_feature_flags.validations.ignore` additionally suppresses the
+`KIA1401`/`KIA1301` check messages mesh-wide; kept mostly for tidiness now
+that `discovery_selectors` fixes the underlying resolution (ignoring a check
+code alone only hides its message, not the red/invalid status itself, which
+Kiali computes from a separate, unfiltered reference-resolution step).
