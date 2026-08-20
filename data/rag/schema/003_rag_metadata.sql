@@ -56,6 +56,17 @@ ALTER TABLE document_embeddings ALTER COLUMN embedding DROP NOT NULL;
 -- way 004 guards its own constraint: only add it on a table that has
 -- neither constraint yet (a true pre-004 fresh database) - a no-op
 -- everywhere else.
+-- The 2026-08-20 guard above (checking pg_constraint) only stops a
+-- *successful* run from re-attempting this - it doesn't help the first
+-- run against a domain where real chunked ingestion already happened
+-- before this job ever succeeded once: the table legitimately has
+-- multiple rows per source (verified live, 2026-08-20: 66762 rows across
+-- 1440 sources, zero duplicate (source, chunk_index) pairs), so ADD
+-- CONSTRAINT ... UNIQUE (source) always hits a unique_violation and,
+-- under this script's ON_ERROR_STOP=1, aborts before 004_rag_chunking.sql
+-- ever runs - the file that actually supersedes this constraint with the
+-- correct compound one. Catch that one exception and move on: 004 runs
+-- next in this same script and adds UNIQUE (source, chunk_index) instead.
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -63,7 +74,11 @@ BEGIN
     ) AND NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'uq_document_embeddings_source_chunk'
     ) THEN
-        ALTER TABLE document_embeddings ADD CONSTRAINT uq_document_embeddings_source UNIQUE (source);
+        BEGIN
+            ALTER TABLE document_embeddings ADD CONSTRAINT uq_document_embeddings_source UNIQUE (source);
+        EXCEPTION WHEN unique_violation THEN
+            NULL;
+        END;
     END IF;
 END $$;
 
