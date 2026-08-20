@@ -140,6 +140,19 @@ platformNamespaces:
       - zuno-data
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 4).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
+    # KNOWN BENIGN (2026-08-20): every BuildConfig *-build pod here logs
+    # "Startup probe failed: dial tcp ...:15021: connect: connection
+    # refused" from its injected istio-proxy - the sidecar loses the race
+    # against the short-lived build container. Builds still report
+    # BuildCompleted successfully; this is cosmetic (drives the console's
+    # Service Mesh data-plane card into "Failure" for this namespace, no
+    # functional impact). Same root cause already patched mesh-wide for
+    # long-running workloads via global.proxy.startupProbe.failureThreshold
+    # (gitops/charts/service-mesh/templates/istio.yaml, raised 4->600 on
+    # 2026-08-16) - build pods are just too short-lived to ever benefit
+    # from a higher threshold. Deliberately left as namespace-wide
+    # injection rather than excluding build pods, to preserve this
+    # namespace's phase-4 mTLS-enforcement staging above.
     extraLabels:
       istio-injection: enabled
       zuno.io/managed: "true"
