@@ -116,9 +116,9 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `identify-new-business-with-po` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `monthly-sales-report` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `check-my-drive-and-mail` | `C2` | `local` | `local-gpt-oss`, `openai`, `anthropic` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `answer-project-question` (primary; prompt: `prompts/answer-project-question.md`) | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `identify-new-business-with-po` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `monthly-sales-report` | `C2` | `local-gpt-oss` | `local`, `openai`, `anthropic`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-and-mail` | `C2` | `local` | `local-gpt-oss`, `openai`, `anthropic`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->
