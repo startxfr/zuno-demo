@@ -150,9 +150,19 @@ type apiChatRequest struct {
 }
 
 // apiChatResponse is the frontend-facing response body (see README.md).
+//
+// ADR-0215: RunID/SourceMode added - the synchronous JSON path had no way
+// to resume a conversation at all before this (only the SSE `start` event
+// exposed run_id), which meant a synchronous caller (e.g. the Tekos
+// evaluation harness's scenario 7 follow-up turn, evaluations/tekos/
+// run_scenarios.py) could never actually exercise multi-turn history -
+// its own run_id-dependent branch silently never ran. Additive-only: an
+// existing consumer that ignores unknown JSON fields is unaffected.
 type apiChatResponse struct {
-	Reply     string             `json:"reply"`
-	Citations []runtime.Citation `json:"citations"`
+	Reply      string             `json:"reply"`
+	Citations  []runtime.Citation `json:"citations"`
+	RunID      string             `json:"run_id"`
+	SourceMode string             `json:"source_mode"`
 }
 
 type apiErrorResponse struct {
@@ -325,8 +335,10 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(apiChatResponse{
-			Reply:     resp.Reply,
-			Citations: resp.Citations,
+			Reply:      resp.Reply,
+			Citations:  resp.Citations,
+			RunID:      resp.RunID,
+			SourceMode: resp.SourceMode,
 		})
 	}
 }

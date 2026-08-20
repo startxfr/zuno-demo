@@ -216,10 +216,13 @@
       },
       "ChatResponse": {
         "type": "object",
-        "required": ["reply", "citations"],
+        "description": "ADR-0215: run_id/source_mode added to the synchronous JSON reply - previously only the SSE 'start' event exposed run_id, so a synchronous caller had no way to resume the conversation for a follow-up turn.",
+        "required": ["reply", "citations", "run_id", "source_mode"],
         "properties": {
           "reply": { "type": "string" },
-          "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } }
+          "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } },
+          "run_id": { "type": "string", "description": "ADR-0212/ADR-0215: identifies this conversation - pass it as the request's run_id to resume with history on a later turn." },
+          "source_mode": { "type": "string", "enum": ["indexed", "live", "both", "none"], "description": "ADR-0205: whether this reply used indexed knowledge, a live tool call, or both." }
         }
       },
       "Conversation": {

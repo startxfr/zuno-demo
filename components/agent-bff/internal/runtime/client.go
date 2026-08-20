@@ -112,9 +112,20 @@ type ArchiveResponse struct {
 }
 
 // ChatResponse is the Agent Runtime's documented response body.
+//
+// ADR-0215: RunID/SourceMode were silently dropped here until this fix -
+// encoding/json ignores unknown response fields by default, so the Agent
+// Runtime's actual `run_id`/`source_mode` JSON keys (see components/
+// agent-runtime/app/main.py's agent_chat) were present on the wire but
+// never reached apiChatResponse below. That made this BFF's synchronous
+// JSON path unable to resume a conversation at all - only the SSE `start`
+// event (ChatStream, proxySSE) ever exposed run_id - discovered live
+// while verifying ADR-0215's multi-turn history on demo222.
 type ChatResponse struct {
-	Reply     string     `json:"reply"`
-	Citations []Citation `json:"citations"`
+	Reply      string     `json:"reply"`
+	Citations  []Citation `json:"citations"`
+	RunID      string     `json:"run_id"`
+	SourceMode string     `json:"source_mode"`
 }
 
 // Client calls one agent's chat endpoint on the shared Agent Runtime.
