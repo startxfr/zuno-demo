@@ -183,6 +183,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume gpt-oss-120b via OVHcloud AI Endpoints |
 | [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Proposed | Consume Codestral via the Mistral API |
 | [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Proposed | Execute Day 0 and Day 1 operations as AAP Job Templates |
+| [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Proposed | Split model preference into preferred/fallback, with prompt-slot overrides |
 
 ## OKF stream
 
