@@ -106,6 +106,19 @@ spec:
   network:
     externalAccess:
       enabled: false
+    # WP-06/ADR-0322 parity run (2026-08-21): the operator-generated
+    # NetworkPolicy only allows ingress from within redhat-ods-applications
+    # and the ingress-router namespace by default - rag-service (zuno-data)
+    # had never called into zuno-ogx before the provider-parity test and
+    # was silently blocked. Namespace-wide, not pod-specific, matching the
+    # embeddings NetworkPolicy fix earlier this WP (RHOAI's own operator
+    # manages zuno-data's pod labels, not this chart).
+    policy:
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: zuno-data
   workload:
     replicas: {{ .Values.ogxServer.replicas }}
     # spec.providers can no longer carry the pgvector password (mutually
