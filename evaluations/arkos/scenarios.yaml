@@ -91,7 +91,15 @@ scenarios:
     title: Drafting a DAT includes live Confluence context in its citations
     type: chat_triggers_tool
     persona: consultant-01
-    message: "Draft a DAT for the OpenShift AI GPU sizing project"
+    # ADR-0330's live space enumeration (2026-08-18) found startxfr.atlassian.net's
+    # real content tree covers Openshift/Terraform/Vault/AnsibleAutomationPlatform/
+    # Gitlab/Satellite procedures only - no OpenShift AI, no GPU sizing.
+    # Scenario 7 (above) reuses the old "GPU sizing" message deliberately
+    # unchanged - it only asserts a reply+citations exist, which RAG's
+    # docs.redhat.com-sourced content already satisfies regardless of
+    # topic. This scenario specifically needs confluence.page.search to
+    # find a real hit, so it targets a topic that actually exists there.
+    message: "Draft a DAT for the OpenShift platform upgrade project"
     expect_tool: confluence.page.search
     # See scenario 7's own comment - same structurally-slow DAT-drafting
     # shape, same timeout override.
