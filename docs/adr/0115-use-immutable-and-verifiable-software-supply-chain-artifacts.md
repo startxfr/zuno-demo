@@ -7,6 +7,80 @@
 - **Renumbered:** formerly ADR-0051, retargeted v0 -> v0.1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
 - **Last reviewed:** 2026-08-12
 
+## Implementation note (2026-08-21) — local-registry immutable tagging
+
+The user clarified the actual goal behind the failed stage-3 attempt
+below: Quay publishing (`build-publish.yml`, on every `v*` tag) should
+keep happening as the supply-chain provenance proof - that already
+works - but deployment should keep consuming the local `zuno-ai-build`
+ImageStream, not Quay. Reframed the problem: give the *local* registry a
+real immutable tag too, instead of repointing `image.repository` to Quay.
+
+New `platform/supply-chain/tag_local_release.py`: for each of the 12
+components with a real in-cluster BuildConfig, temporarily repoints
+`spec.output.to.name` from `<component>:latest` to
+`<component>:<release_tag>`, runs `oc start-build --commit=<release_tag>
+--wait` (building from the *exact* tagged commit, so the local and Quay
+images are provably the same source), then always reverts
+`spec.output.to.name` back to `:latest` - `:latest` is never the build
+output at any point, so live pods pulling it (`imagePullPolicy: Always`)
+are undisturbed even if one restarts mid-run. Verified live: `:latest`'s
+digest was confirmed byte-identical before and after, for every
+component.
+
+Ran this for real against `v0.1.0` for all 12 components (`agent-bff`,
+`agent-frontend`, `agent-runtime`, `ai-gateway`, `aiagent-operator`,
+`mcp-confluence`, `mcp-gateway`, `mcp-git-forge`, `mcp-sales-db`,
+`mcp-salesforce`, `rag-ingestion`, `rag-service`) - each build reached
+`Complete`, each produced a real, distinct local `:v0.1.0` `ImageStreamTag`
+digest. `--emit-manifest` then reads those *already-tagged* live
+ImageStreamTags (no cluster mutation) and prints a manifest in
+`pin_release.py`'s exact existing format, so `pin_release.py` itself is
+reused unchanged - `image.repository` fields are never touched, exactly
+as it already guaranteed.
+
+Running `pin_release.py` against that manifest found one of its own
+pre-existing bugs, never previously exercised: `_apply_pins_to_file`
+counted every literal `tag:` line in a file and assumed a 1:1
+correspondence with the manifest's pins for that file - correct as long
+as a file's fields are either all pinned or all skipped, but
+`rag-ingestion/values.yaml` has two `tag:` lines with *one* pinned
+(`images.ingestion.tag`, now locally buildable) and *one* skipped
+(`images.compiler.tag`, no BuildConfig exists for `rag-pipeline-compiler`
+at all). Fixed: the function now correlates each literal `tag:` line to
+its YAML path (via the same document-order walk `_current_findings()`
+already produces) and only edits lines whose path is actually pinned,
+skipped lines included, in file order. `python3 -m py_compile` and the
+existing `check_no_latest_tags.py` both confirm no regression;
+`tests/test_pin_release.py` has 3 pre-existing failures (stale fixture
+manifest against the repo's much-expanded chart set) unrelated to this
+fix - confirmed identical with and without it via `git stash`.
+
+Result: 16 of 18 previously-`latest` fields are now pinned to a real,
+live-verified local `v0.1.0` tag (`helm lint` clean on all 16 touched
+charts; the rendered `image:` reference for a spot-checked component
+matched its live digest exactly). The remaining 2 (`mlops`, no
+BuildConfig at all; `rag-ingestion`'s `images.compiler.tag`, an unwired
+`rag-pipeline-compiler`) are a separate, pre-existing gap - out of scope
+here, not silently worked around. `check_no_latest_tags.py` therefore
+still exits 1 on those two; `lint.yml`'s gate stays `continue-on-error:
+true` deliberately - flipping it now would fail every PR over an issue
+this change didn't create, not just the fields it actually closed.
+
+**Honest limit, not closed by this mechanism**: gap 6 (signature
+verification as a deployment gate). Local in-cluster builds have no
+GitHub OIDC identity, so they are never cosign-signed -
+`verify_signatures.py` correctly finds nothing to verify for these
+images, same as before. Staying local means immutable and traceable, not
+cryptographically verified at deploy time - that remains a Quay-path-only
+property.
+
+**Also deliberately not touched**: gap 4, `targetRevision: main`.
+Retargeting `gitops/apps/*` to a tag would pin ArgoCD's *manifest*
+source too, and `v0.1.0` is now stale against `main` - a much bigger
+regression than the stage-3 near-miss below. A future decision, tied to
+a *fresh* release tag, not this one.
+
 ## Implementation note (2026-08-21) — stage 3 attempted and reverted
 
 Ran `pin_release.py` against the real `v0.1.0` manifest (WP-04 stage 2's
@@ -222,8 +296,8 @@ themselves are sourced from.
 ### Gaps preventing `Implemented` status
 
 1. ~~The build inventory is stale.~~ **Resolved by ADR-0324** (2026-08-11, same review cycle as this gap list, which wasn't updated at the time): the `postgresql-pgvector` matrix entry is gone from `.github/workflows/build-publish.yml`, and `platform/supply-chain/check_build_matrix.py` passes (7/7 matrix entries valid, every first-party Dockerfile tracked).
-2. **Deployable charts still use `tag: latest`.** `check_no_latest_tags.py` reports 8 fields across 7 charts as of 2026-08-12: `agent-runtime`, `ai-gateway`, `mcp-gateway`, `mcp-sales-db`, `rag-service`, `tekos` (`image.tag`), plus `rag-ingestion` (`images.ingestion.tag`, `images.compiler.tag`, added by ADR-0330 after this gap list was first written). **Genuinely blocked on gap 7**: pinning these to a real immutable reference now, before any real build-publish-sign cycle has run, would mean writing a tag that doesn't exist in the registry - the honest fix is a real release, not a placeholder SHA. `pin_release.py` (2026-08-14) makes applying the fix mechanical once gap 7 produces a real manifest - see RELEASING.md step 4.
-3. **The immutable-tag policy is non-blocking.** `lint.yml` still sets `continue-on-error: true` for `check_no_latest_tags.py`. Deliberately left non-blocking until gap 2 is actually closed - flipping it now would just make every merge fail on the still-open `latest` references above, not surface new information.
+2. **Deployable charts still use `tag: latest`.** ~~Mostly resolved 2026-08-21~~: 16 of 18 fields `check_no_latest_tags.py` reports are now pinned to a real, live-verified local `v0.1.0` tag via `platform/supply-chain/tag_local_release.py` + `pin_release.py`, without moving `image.repository` off the in-cluster ImageStream - see the 2026-08-21 "local-registry immutable tagging" note above. **Genuinely still open, 2 fields**: `mlops` (`images.mlops.tag`, no BuildConfig exists for it at all) and `rag-ingestion`'s `images.compiler.tag` (`rag-pipeline-compiler`, never wired to a BuildConfig) - a separate, pre-existing gap this pass didn't create and doesn't close.
+3. **The immutable-tag policy is non-blocking.** `lint.yml` still sets `continue-on-error: true` for `check_no_latest_tags.py`. Deliberately left non-blocking: the 2 fields above still fail it, and flipping it now would fail every PR over an issue unrelated to today's fix, not surface new information about it.
 4. **GitOps still tracks moving Git refs.** Argo CD Applications continue to use `targetRevision: main`; deployment state is therefore not yet tied to a reviewed release revision. Same dependency as gap 2: there is no reviewed release tag to point at until gap 7 produces one.
 5. ~~Two first-party Dockerfiles still inherit moving base images.~~ **Resolved 2026-08-12**: `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` now pin `registry.access.redhat.com/ubi9/ubi-minimal` by digest (`sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221`, version 9.8, confirmed live via `skopeo inspect` against the real Red Hat registry) rather than `:latest`. This gap was independent of the others - it depends on Red Hat's registry, not this repository's own release pipeline.
 6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. `verify_signatures.py` (2026-08-14) is the verification gate itself, CI-wired non-blocking; it still finds nothing to verify because gap 7 means nothing has been signed for real yet - the remaining blocker is gap 7 alone, not building the check.

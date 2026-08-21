@@ -7,7 +7,7 @@ namespace: zuno-ai-run
 image:
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-sales-db
   # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
-  tag: latest
+  tag: v0.1.0
   # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
   pullPolicy: Always
 

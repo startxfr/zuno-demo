@@ -82,3 +82,79 @@ releases:
     reason: built exclusively by the in-cluster OpenShift BuildConfig (ansible/roles/rag_ingestion_build),
       never by build-publish.yml - no real Quay artifact from this release to pin
       to
+- release_tag: v0.1.0
+  pinned_at: '2026-08-21T12:05:03Z'
+  pins:
+  - chart_values: gitops/charts/advantage/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:b536d0e9975efac8db780ed72aba9e641acc9b1a15079407ed8b1cd8fc9c1976
+  - chart_values: gitops/charts/agent-runtime/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:074f8b03a781a400059fc184b6c3885710b8f1a8d7c38668784c7ee7c3d6f54a
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:60a59baaaa68cdc6341fa000de3b9cdc03c2cd7099af60900ef8c76bb3b3ede7
+  - chart_values: gitops/charts/aiagent-operator/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:daab786ca28b25e72e9de05a6661e6e003018024ac6390c93a0c39cc6f5ec9e3
+  - chart_values: gitops/charts/arkos/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:b536d0e9975efac8db780ed72aba9e641acc9b1a15079407ed8b1cd8fc9c1976
+  - chart_values: gitops/charts/comage/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:b536d0e9975efac8db780ed72aba9e641acc9b1a15079407ed8b1cd8fc9c1976
+  - chart_values: gitops/charts/finage/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:b536d0e9975efac8db780ed72aba9e641acc9b1a15079407ed8b1cd8fc9c1976
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:95942f1f94f60f69fb3494bed3b55d851c2fb817eadaeb6718c72c49b86717fb
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:5c6bc918cb32c7cb97d827c0eb3687ace2ff77cdca80c03e483d071f183eafcf
+  - chart_values: gitops/charts/mcp-git-forge/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:ea3b1b136f5648656373116fd95efc9056b3da4a27e4fedd94ecd1e31f03b1e4
+  - chart_values: gitops/charts/mcp-sales-db/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:feb663b91c8d4cf11e0ff42410bf0658a185cc6cbb44620f82e0b9f0df9d90fb
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:6c4b1ac1ded7c07a962606c10978b072e11bc64460a5bb02b711837b2ff6a20f
+  - chart_values: gitops/charts/naveo/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:b536d0e9975efac8db780ed72aba9e641acc9b1a15079407ed8b1cd8fc9c1976
+  - chart_values: gitops/charts/rag-ingestion/values.yaml
+    path: images.ingestion.tag
+    tag: v0.1.0
+    digest: sha256:3a70561b48cafc05c70848590786a814a629ffd73b5365921f751045219e0268
+  - chart_values: gitops/charts/rag-service/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:6f3bea8d0f27462c7a31e2fac79c1a19e63721247fbdc7d1f4d8a92d6473ca42
+  - chart_values: gitops/charts/tekos/values.yaml
+    path: image.tag
+    tag: v0.1.0
+    digest: sha256:b536d0e9975efac8db780ed72aba9e641acc9b1a15079407ed8b1cd8fc9c1976
+  skipped:
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    reason: no in-cluster BuildConfig/ImageStream exists for mlops at all - a separate,
+      pre-existing gap
+  - chart_values: gitops/charts/rag-ingestion/values.yaml
+    path: images.compiler.tag
+    reason: rag-pipeline-compiler has no BuildConfig - unused by any template today
+      per the chart's own comment

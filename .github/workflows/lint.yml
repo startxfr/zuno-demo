@@ -20,11 +20,18 @@ jobs:
           python-version: "3.11"
       - run: pip install pyyaml openapi-spec-validator
       - uses: sigstore/cosign-installer@v3
-      # ADR-0115 - known-failing today (6 charts still use tag: latest,
-      # pending the build-publish.yml pipeline actually publishing
-      # immutable tags for them to reference) - see
-      # platform/supply-chain/README.md. Not made a hard CI gate yet for
-      # that reason; report only.
+      # ADR-0115 (2026-08-21, WP-04 local-registry tagging): 16 of 18
+      # previously-latest fields are now pinned via
+      # platform/supply-chain/tag_local_release.py + pin_release.py, both
+      # exercised against the real v0.1.0 tag without moving
+      # image.repository off the in-cluster BuildConfig/ImageStream
+      # (operator decision: stay local, Quay stays the provenance-proof
+      # path only - see ADR-0115's dated notes). Still known-failing: 2
+      # fields with no in-cluster build path at all (mlops has no
+      # BuildConfig; rag-ingestion's images.compiler targets an unwired
+      # rag-pipeline-compiler image) - a separate, pre-existing gap.
+      # Staying non-blocking until those close too; flipping this now
+      # would fail every PR over an issue this change didn't create.
       - name: Reject non-immutable image tags (ADR-0115)
         run: python3 platform/supply-chain/check_no_latest_tags.py
         continue-on-error: true

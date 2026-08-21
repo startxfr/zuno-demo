@@ -134,23 +134,49 @@ def _load_manifest(manifest_path: pathlib.Path) -> Dict[str, Any]:
     return doc
 
 
-def _apply_pins_to_file(chart_values: str, ordered_pins: List[Dict[str, Any]], dry_run: bool) -> str:
+def _apply_pins_to_file(
+    chart_values: str, ordered_pins: List[Dict[str, Any]], all_paths_in_order: List[str], dry_run: bool
+) -> str:
     """`ordered_pins` must be in the same top-to-bottom order as the
-    file's own literal `tag:` lines - guaranteed by the caller, which
-    zips each file's pins against `_current_findings()`'s walk order
-    (itself provably identical to file order: `yaml.safe_load` preserves
-    key order, and `_walk` iterates `dict.items()` in that order)."""
+    file's own literal `tag:` lines that are actually PINNED - guaranteed
+    by the caller, which zips each file's pins against
+    `_current_findings()`'s walk order (itself provably identical to file
+    order: `yaml.safe_load` preserves key order, and `_walk` iterates
+    `dict.items()` in that order).
+
+    `all_paths_in_order` is that same file's FULL document-order path
+    list, including paths this manifest chose to `skip` rather than pin
+    (e.g. rag-ingestion's `images.compiler.tag` sits between other
+    charts' single `image.tag` line and would otherwise be miscounted) -
+    needed to correlate each literal `tag:` line to its YAML path so a
+    skipped line in the middle of a file doesn't shift every pin below it
+    by one line. `len(all_paths_in_order)` must equal the file's total
+    literal `tag:` line count; a file with only pinned fields (the common
+    case) has `all_paths_in_order == [p["path"] for p in ordered_pins]`.
+    """
     file_path = REPO_ROOT / chart_values
     lines = file_path.read_text().splitlines(keepends=True)
 
     tag_line_indices = [i for i, line in enumerate(lines) if TAG_LINE_RE.match(line)]
-    if len(tag_line_indices) != len(ordered_pins):
+    if len(tag_line_indices) != len(all_paths_in_order):
         raise ValueError(
             f"{chart_values}: found {len(tag_line_indices)} literal 'tag:' line(s) but "
+            f"{len(all_paths_in_order)} pinned+skipped path(s) are known for this file - "
+            "refusing to guess which is which"
+        )
+    pinned_paths = {p["path"] for p in ordered_pins}
+    pinned_line_indices = [
+        line_index
+        for line_index, path in zip(tag_line_indices, all_paths_in_order)
+        if path in pinned_paths
+    ]
+    if len(pinned_line_indices) != len(ordered_pins):
+        raise ValueError(
+            f"{chart_values}: matched {len(pinned_line_indices)} pinned 'tag:' line(s) but "
             f"{len(ordered_pins)} pin(s) target this file - refusing to guess which is which"
         )
 
-    for line_index, pin in zip(tag_line_indices, ordered_pins):
+    for line_index, pin in zip(pinned_line_indices, ordered_pins):
         match = TAG_LINE_RE.match(lines[line_index])
         assert match is not None
         indent = match.group(1)
@@ -238,7 +264,7 @@ def main() -> int:
         # order.
         order = [f.path for f in current if f.chart_values == chart_values]
         ordered_pins = sorted(pins, key=lambda p: order.index(p["path"]))
-        _apply_pins_to_file(chart_values, ordered_pins, args.dry_run)
+        _apply_pins_to_file(chart_values, ordered_pins, order, args.dry_run)
         for pin in ordered_pins:
             ledger_entries.append(
                 {
