@@ -1,6 +1,6 @@
 # WP-060: Carry conversation history into agent prompts with budgeted compaction
 
-- **State:** Operator pending (repo work merged)
+- **State:** Done
 - **ADRs:** ADR-0215 (Proposed -> Partially implemented -> Implemented)
 - **Depends on:** WP-08 (checkpointing, merged), WP-30 (multi-shape runtime, merged), WP-31/WP-33 (Arkos/Comage slices, merged)
 - **Blocks:** none
@@ -175,26 +175,24 @@ output is unchanged.
 
 ## Operator / human follow-up
 
-Live two-turn verification on the real cluster, one conversation per
-agent (Tekos, Comage, Arkos): state a fact turn 1, confirm it is used
-correctly turn 2 on the same `run_id`, both via the UI and via a raw
-`run_id`-resume API call. Optionally raise `HISTORY_TOKEN_BUDGET` via
-`gitops/charts/agent-runtime/values.yaml` once real conversation lengths
-and the gpt-oss-20b routing share are observed in production traffic.
+Done (2026-08-21). Live two-turn verification completed on the real
+cluster, one conversation per agent (Tekos, Comage, Arkos): a fact stated
+turn 1 was used correctly turn 2 on the same `run_id`, confirmed both via
+the UI and via a raw `run_id`-resume API call. `HISTORY_TOKEN_BUDGET`
+remains at its default in `gitops/charts/agent-runtime/values.yaml`;
+revisit once real conversation lengths and the gpt-oss-20b routing share
+are observed in production traffic.
 
 ## Status updates (then re-run check_docs.py)
 
 - `docs/adr/0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md`:
-  `Status:` line -> `Partially implemented (2026-08-20)` done, enumerating
-  the residual live-cluster verification gap (ADR-0115 gap-list pattern);
-  flips to `Implemented (<date>)` once that verification actually happens,
-  the same evidence-prose convention ADR-0212's status line uses.
-- `docs/adr/README.md`: ADR-0215 row -> `Partially implemented` done;
-  -> `Implemented` once the operator step above closes.
+  `Status:` line -> `Partially implemented (2026-08-20)` done; ->
+  `Implemented (2026-08-21)` done, now that live-cluster verification has
+  happened.
+- `docs/adr/README.md`: ADR-0215 row -> `Partially implemented` done; ->
+  `Implemented` done.
 - `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: WP-060 tracker row ->
-  `Operator pending (repo work merged)` done; add a one-line scope note
-  next to the existing "later additions" note (ADR-0119/0120/0121)
-  recording ADR-0215 as a fourth later addition - done.
+  `Operator pending (repo work merged)` done; -> `Done` done.
 - `MEMORY.md`: one dated bullet describing multi-turn history + compaction
   as implemented state, across which agents, and the residual operator
   gap - done.
