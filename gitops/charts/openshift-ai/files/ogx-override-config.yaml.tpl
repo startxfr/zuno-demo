@@ -35,8 +35,20 @@
 # distro's other 20-odd placeholder cloud/vector providers removed, they
 # were never going to be used), with real Helm-templated connection values
 # in place of the upstream template's ${env.*} placeholders.
-# registered_resources.models emptied - the upstream defaults referenced
-# provider_id: all, meaningless once only one inference provider exists.
+# registered_resources.models: registers the one real embedding model
+# (bge-small-en-v1.5 via the zuno-vllm provider) - the upstream defaults
+# referenced provider_id: all, meaningless once only one inference
+# provider exists. WP-06 (2026-08-21 live finding): POST /v1/vector_stores
+# itself calls ogx/core/stack.py's validate_vector_stores_config(), which
+# resolves vector_stores.default_embedding_model against this list even
+# for the raw /v1/vector-io/insert+query path with caller-supplied
+# embeddings - an empty models list makes EVERY vector store creation
+# fail ("Model 'None' not found"), not just OGX's own file-search/embed-
+# at-rest convenience layer. default_reranker_model is deliberately left
+# unset (no reranker model exists to register) - ogx/core/stack.py's
+# _validate_reranker_model only runs `if default_reranker_model is not
+# None`, so this embedding-only registration cannot retrigger the earlier
+# reranker crash ("Reranker model '.../Qwen3-Reranker-0.6B' not found").
 # The pgvector password is injected as a real env var by
 # spec.workload.overrides.env (ogxserver.yaml) from the same
 # ogx-pgvector-password Secret the typed-provider path already used.
@@ -160,21 +172,29 @@ storage:
       table_name: connectors
       backend: sql_default
 registered_resources:
-  models: []
+  models:
+    - model_id: bge-small-en-v1.5
+      provider_id: zuno-vllm
+      provider_model_id: bge-small-en-v1.5
+      model_type: embedding
+      metadata:
+        embedding_dimension: 384
   vector_stores: []
 server:
   port: 8321
 vector_stores:
   default_provider_id: zuno-pgvector
-  # default_embedding_model/default_reranker_model deliberately omitted:
-  # validated only `if not None` (ogx/core/stack.py's
-  # validate_vector_stores_config) against registered_resources.models,
-  # which this override leaves empty - WP-06's corpus-proof/provider-
-  # parity scope tests vector_io directly with pre-computed embeddings
-  # (matching rag-service's own pattern), not OGX's file-search/embed-at-
-  # rest convenience layer. Setting either without a matching model
-  # registration crashes startup (confirmed live: "Reranker model
-  # '.../Qwen3-Reranker-0.6B' not found. Available reranker models: []").
+  default_embedding_model:
+    provider_id: zuno-vllm
+    model_id: bge-small-en-v1.5
+  # default_reranker_model deliberately omitted: no reranker model exists
+  # to register, and ogx/core/stack.py's _validate_reranker_model only
+  # runs `if default_reranker_model is not None` - setting it without a
+  # matching registration crashes startup (confirmed live: "Reranker
+  # model '.../Qwen3-Reranker-0.6B' not found. Available reranker models:
+  # []"). The embedding model above is registered and validated - see the
+  # registered_resources.models comment for why an embedding-model
+  # registration is required even for the raw vector-io insert/query path.
   file_search_params:
     header_template: 'file_search tool found {num_chunks} chunks:
 
