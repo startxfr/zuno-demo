@@ -400,5 +400,15 @@ ogxServer:
   # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL already
   # assumes. Placeholder: confirm the real Service name/namespace for the
   # target model before enabling (`oc get inferenceservice -A`).
-  vllmEndpoint: http://embeddings-predictor.zuno-ai-run.svc:8080
+  # WP-06 (2026-08-21 live finding): needs the /v1 suffix - OGX's internal
+  # OpenAI-compatible client (openai/resources/embeddings.py) appends
+  # /embeddings directly to base_url, expecting it to already end in /v1
+  # (standard OpenAI SDK convention). Without it every internal embedding
+  # call 404s (confirmed live: POST .../8080/embeddings -> 404, POST
+  # .../8080/v1/embeddings -> 200) - this is what made /v1/vector-io/query
+  # and /v1/vector_stores/{id}/search fail even after the NetworkPolicy
+  # and embedding-model registration fixes; direct-embedding insert
+  # (/v1/vector-io/insert, caller supplies the vector) never called this
+  # path, so it worked before this fix too.
+  vllmEndpoint: http://embeddings-predictor.zuno-ai-run.svc:8080/v1
 
