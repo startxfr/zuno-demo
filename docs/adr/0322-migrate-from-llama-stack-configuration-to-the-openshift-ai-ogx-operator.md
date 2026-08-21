@@ -1,12 +1,46 @@
 # ADR-0322: Migrate from Llama Stack configuration to the OpenShift AI OGX Operator
 
-- **Status:** Partially implemented - DSC migration, health checks, OGX provider and parity tests merged and live; `zuno-ogx` (the actual OGX Operator data-plane server, previously blocked entirely) is now live and healthy on the cluster (2026-08-19): `DeploymentReady`/`ServiceReady`/`HealthCheck` all `True`, `GET /v1/health` returns `{"status":"OK"}`, real PostgreSQL/pgvector connection confirmed (`Vector extension version 0.8.2` against the live `ogx` database). Getting here required finding and fixing three independent, real upstream bugs in the OGX operator (3.5.0-ea.2 / `github.com/ogx-ai/ogx-k8s-operator` + `github.com/ogx-ai/ogx`), each confirmed by reading the operator's actual source and verified live, not guessed: (1) its OCI-manifest-fetch client (`pkg/config/oci_fetcher.go`) is anonymous-only by design and never performs the registry auth challenge, so no registry (`registry.redhat.io`, an internal zuno-ai-build mirror, even a real public `docker.io` image) can ever satisfy it - worked around with `spec.overrideConfig`, the CRD's own documented full-config bypass; (2) `pkg/config/provider.go`'s `expandPgvectorProvider()` never sets a `persistence` field for `remote::pgvector`, crashing the server at startup (`AttributeError: 'NoneType' object has no attribute 'backend'`) - the CRD's typed `PgvectorProvider` field has no way to supply one either, so the whole typed `spec.providers` path is unusable for pgvector; (3) `vector_stores.default_embedding_model`/`default_reranker_model` are validated against `registered_resources.models` and crash startup if referenced without a matching registration - removed, since WP-06's corpus-proof/provider-parity scope doesn't need OGX's file-search convenience layer. `files/ogx-override-config.yaml.tpl` is a full hand-authored config.yaml (real distribution-starter content, trimmed to the real `zuno-vllm`/`zuno-pgvector` providers with real Helm-templated connection values); the pgvector password is injected via `spec.workload.overrides.env`. The server being healthy is a necessary precondition, not the finish line: the corpus proof and live provider-parity run (real data through the live server, compared against pgvector) are still open and are what actually completes this ADR - do not claim `Implemented` until those run.
+- **Status:** Partially implemented - DSC migration, health checks, OGX provider/parity tests, and (2026-08-21) a real live corpus proof through `zuno-ogx` are all merged and live; only the deliberately-deferred side-by-side provider-parity run (an operator/user scheduling decision, not a technical blocker) is still open, see the 2026-08-21 "Corpus proof" note below.
 - **Target:** v0.1
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) and [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) for OGX product mapping and implementation lifecycle
 
-## Implementation note (2026-08-21)
+## Implementation note (2026-08-19)
+
+`zuno-ogx` (the actual OGX Operator data-plane server, previously blocked
+entirely) went live and healthy on the cluster:
+`DeploymentReady`/`ServiceReady`/`HealthCheck` all `True`, `GET /v1/health`
+returns `{"status":"OK"}`, real PostgreSQL/pgvector connection confirmed
+(`Vector extension version 0.8.2` against the live `ogx` database).
+Getting here required finding and fixing three independent, real upstream
+bugs in the OGX operator (3.5.0-ea.2 / `github.com/ogx-ai/
+ogx-k8s-operator` + `github.com/ogx-ai/ogx`), each confirmed by reading
+the operator's actual source and verified live, not guessed: (1) its
+OCI-manifest-fetch client (`pkg/config/oci_fetcher.go`) is anonymous-only
+by design and never performs the registry auth challenge, so no registry
+(`registry.redhat.io`, an internal zuno-ai-build mirror, even a real
+public `docker.io` image) can ever satisfy it - worked around with
+`spec.overrideConfig`, the CRD's own documented full-config bypass; (2)
+`pkg/config/provider.go`'s `expandPgvectorProvider()` never sets a
+`persistence` field for `remote::pgvector`, crashing the server at
+startup (`AttributeError: 'NoneType' object has no attribute 'backend'`)
+- the CRD's typed `PgvectorProvider` field has no way to supply one
+either, so the whole typed `spec.providers` path is unusable for
+pgvector; (3) `vector_stores.default_embedding_model`/
+`default_reranker_model` are validated against
+`registered_resources.models` and crash startup if referenced without a
+matching registration - at the time, removed entirely rather than fixed
+(see the 2026-08-21 corpus-proof note below for why that had to be
+revisited). `files/ogx-override-config.yaml.tpl` is a full hand-authored
+config.yaml (real distribution-starter content, trimmed to the real
+`zuno-vllm`/`zuno-pgvector` providers with real Helm-templated connection
+values); the pgvector password is injected via
+`spec.workload.overrides.env`. The server being healthy was a necessary
+precondition, not the finish line - the corpus proof and live
+provider-parity run were still open.
+
+## Implementation note (2026-08-21) — network path
 
 Attempted the corpus proof (index/query a controlled test corpus through
 the live `zuno-ogx` server) and hit a real, fourth architecture gap before
@@ -37,9 +71,83 @@ maintainable than tracking OGX's pod labels across operator upgrades.
 `gitops/charts/models/templates/networkpolicy-embedding.yaml`'s
 `embeddings` NetworkPolicy gained a `redhat-ods-applications`
 namespaceSelector ingress rule; `helm lint`/`helm template` verified
-before commit. Live reconciliation and the actual corpus proof/parity run
-are the residual operator follow-up - this closes the network path, not
-the acceptance criteria themselves.
+before commit. Live reconciliation confirmed: a curl from inside a fresh
+`zuno-ogx` pod to `embeddings-predictor.zuno-ai-run.svc:8080/v1/models`
+now returns a real 200. Closing the network path surfaced two more real
+bugs, in order.
+
+## Implementation note (2026-08-21) — model registration
+
+`POST /v1/vector_stores` itself calls `ogx/core/stack.py`'s
+`validate_vector_stores_config()`, which resolves
+`vector_stores.default_embedding_model` against
+`registered_resources.models` **even for the raw `/v1/vector-io/insert`
++`/v1/vector-io/query` path with caller-supplied embeddings** - the
+2026-08-19 note's "removed entirely" fix for the reranker-validation
+crash had left `registered_resources.models: []`, which made every
+vector store creation fail (`"Model 'None' not found"`), not just OGX's
+own file-search/embed-at-rest convenience layer this was scoped around
+avoiding. Confirmed by reading `ogx/core/stack.py`'s
+`_validate_embedding_model()`/`_validate_reranker_model()` directly
+inside the running container: the reranker validator only runs `if
+default_reranker_model is not None`, so registering exactly one
+embedding model (`bge-small-en-v1.5` via `zuno-vllm`) and setting
+`vector_stores.default_embedding_model` to match - while leaving
+`default_reranker_model` unset - closes the vector-store-creation gap
+without reopening the reranker crash. Live-tested before commit (server
+dry-run apply), then verified by tracking the actual GitOps deploy: fresh
+pod, 0 restarts, `GET /v1/models` lists the registered model.
+
+## Implementation note (2026-08-21) — vLLM endpoint /v1 suffix
+
+With a model registered, vector store creation succeeded and
+`/v1/vector-io/insert` worked immediately (`204`) - but
+`/v1/vector-io/query` and `/v1/vector_stores/{id}/search` both 404'd.
+The pod's own logs showed why: querying makes OGX embed the caller's
+*query text* internally via its OpenAI-compatible client
+(`openai/resources/embeddings.py`), and that internal call was what
+404'd, not the outer route. `ogxServer.vllmEndpoint` was
+`http://embeddings-predictor.zuno-ai-run.svc:8080` (no `/v1`) - the
+OpenAI SDK appends `/embeddings` directly to `base_url`, assuming it
+already ends in `/v1` (standard convention). Confirmed live:
+`POST .../8080/embeddings` → 404, `POST .../8080/v1/embeddings` → 200.
+Insert never hit this path (the caller already supplies the embedding),
+which is why it worked before this fix and made the query-side bug easy
+to miss. Fixed by appending `/v1` to the configured endpoint.
+
+## Corpus proof (2026-08-21) — succeeded
+
+With all three fixes live (NetworkPolicy, model registration, `/v1`
+suffix), ran the actual corpus proof end to end against the live
+`zuno-ogx` server: embedded two real documents via the real
+`embeddings-predictor` service (same contract `rag-service`'s own
+`app/embeddings.py` uses), created a vector store, inserted the embedded
+chunks with real ADR-0046-shaped metadata (`classification`, `language`,
+`product`, `version`, `acl_groups`), then queried by text
+("How do I size a GPU for OpenShift AI?"). The query embedded the text
+internally, ran the vector search, and returned the correct chunk with
+every metadata field preserved exactly as inserted (title, source,
+product, version, language, classification, `acl_groups` as a real
+array) - this is the acceptance criterion "an OGX-backed RAG proof can
+index/query a controlled test corpus through PostgreSQL/pgvector",
+proven live, not mocked.
+
+Also confirmed, as a useful side effect: OGX's OpenAI-shaped
+`/v1/vector_stores/{id}/search` convenience endpoint rejects the same
+request with a `400` (`attributes.acl_groups` must be a flat
+string/number/boolean, not an array) - direct evidence that ADR-0322's
+own design choice to route this through the raw vector-io API rather
+than that convenience layer was correct, not just cautious: the
+convenience layer literally cannot represent RAG's real ACL-array
+metadata shape.
+
+**Still open, unchanged from the 2026-08-19 note**: the side-by-side
+live provider-parity run (the same real corpus through both OGX and
+pgvector, diffed) remains a deliberately deferred operator/user
+scheduling decision, not a technical blocker - `test_provider_parity.py`
+already proves the two providers' row-mapping functions agree
+structurally, and this note now additionally proves OGX's real backend
+round-trips real metadata correctly.
 
 ## Context
 
