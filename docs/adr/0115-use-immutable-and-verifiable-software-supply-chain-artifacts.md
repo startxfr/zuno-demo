@@ -61,6 +61,15 @@ implemented`. Not attempting either decision unilaterally - both are
 architecture/timing calls for the operator, not something to infer from
 the existing brief text.
 
+**Operator decision (2026-08-21):** stay on the in-cluster BuildConfig
+path for now - no Quay repository cutover. `v0.1.0`'s artifacts remain
+valid proof the release pipeline itself works end to end (ADR-0115's core
+completion criterion), but production deployment stays on `:latest`
+in-cluster images; stage 3's tag-pinning/`targetRevision` retargeting
+stays deferred indefinitely, not scheduled. If a future release is ever
+needed for a real reason, it must be cut fresh against `main` at that
+time - `v0.1.0` should not be reused once stale.
+
 ## Context
 
 Several GitOps applications track `targetRevision: main` and multiple component Helm values still use `tag: latest`. This makes a deployed environment non-reproducible and weakens rollback, auditability and provenance in a public-source project.
