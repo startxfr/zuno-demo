@@ -110,9 +110,17 @@ spec:
                   optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            # ADR-0106/WP-05: fail-closed only once every okfSignedAgents
+            # entry has a real, verified signature - see values.yaml's
+            # own comment and configmap-signatures.yaml.
+            - name: ZUNO_REQUIRE_SIGNED_BUNDLES
+              value: {{ .Values.requireSignedBundles | quote }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: okf-signatures
+              mountPath: /app/okf-signatures
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /healthz
@@ -130,3 +138,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: okf-signatures
+          configMap:
+            name: agent-runtime-okf-signatures
+            optional: true

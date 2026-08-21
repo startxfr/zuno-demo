@@ -115,3 +115,25 @@ conversationsDb:
     secretName: agent-runtime-conversations-credentials
     secretStoreName: vault-backend
     refreshInterval: 1h
+
+# ADR-0106/WP-05: OKF bundle signature distribution. registry.py's
+# _verify_signature() reads a flat {name}.sig/{name}.pem pair per agent
+# from ZUNO_OKF_SIGNATURES_DIR - templates/configmap-signatures.yaml
+# renders one ConfigMap from files/okf-signatures/<agent>.{sig,pem}
+# (committed to git, public signature material, not secret - same
+# "public release artifact" convention as WP-04's pinned-releases.yaml),
+# mounted read-only at /app/okf-signatures. requireSignedBundles stays
+# false until every one of okfSignedAgents actually has both files
+# present and verified live - flipping it early fail-closed crash-loops
+# every pod with no signature to check against (see ADR-0106's
+# 2026-08-21 note).
+okfSignedAgents:
+  - tekos
+  - comage
+  - advantage
+  - finage
+  - arkos
+  - naveo
+  - soursage
+  - cognos
+requireSignedBundles: false

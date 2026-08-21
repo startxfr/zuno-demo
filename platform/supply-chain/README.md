@@ -110,7 +110,15 @@ python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \
 cannot succeed locally; `verify` needs only the bundle plus its
 signature/certificate files, no credentials. Wired into
 `build-publish.yml` as a `sign-okf-bundles` job (one signature per agent,
-uploaded as a build artifact, never committed to git).
+uploaded as an ephemeral GitHub Actions artifact). ADR-0106/WP-05
+(2026-08-22): that artifact has no downstream consumer on its own - the
+real, verified pairs are committed to
+`gitops/charts/agent-runtime/files/okf-signatures/<agent>.{sig,pem}`
+(public signature material, safe to commit, unlike a private key) and
+distributed into the running pod via
+`gitops/charts/agent-runtime/templates/configmap-signatures.yaml`, the
+same one-time-handoff convention `platform/supply-chain/pinned-releases.yaml`
+already uses for release-pin proof.
 
 `validate_okf_bundle.py` checks two other dimensions - schema validity
 (OKF structure) and policy validity (every declared tool resolves
