@@ -225,10 +225,12 @@ d1: $(if $(DAY_VERB),credentials-check)
 # neither verb ever changes cluster state, only observes/exercises it.
 # report_format defaults to "text" (ADR-0057 decision 4: raw table always
 # printed; json/csv are additional artifacts, selected via REPORT_FORMAT=
-# or EXTRA_VARS="-e report_format=..."). "stresstest" today just dispatches
-# straight through (WP-062 scope: day2_stresstest.yml is a stub until
-# WP-063/ADR-0058 fills in real content and this recipe's bulk-interaction
-# prompt).
+# or EXTRA_VARS="-e report_format=..."). "stresstest" additionally reads
+# BULK (ADR-0058 decision 3): unset in an interactive shell prompts for a
+# bulk-interaction count with a default of 10; unset in a non-interactive
+# shell (stdin not a TTY, e.g. CI) silently defaults to 10 without
+# prompting, so this recipe never blocks a non-interactive caller. BULK=0
+# runs the functional layers only, no bulk-interaction load pass.
 define DAY2_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
@@ -245,9 +247,10 @@ if [[ -z "$$verb" ]]; then \
     '  $(DAY2_COMPONENTS)' \
     '' \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
+    'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     '' \
     'Example: make d2 test agents' \
-    'Example: make d2 stresstest'; \
+    'Example: make d2 stresstest BULK=25'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
@@ -256,7 +259,17 @@ case " $(DAY2_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported da
 report_format="$${REPORT_FORMAT:-text}"; \
 case "$$verb" in \
   test) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
-  stresstest) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+  stresstest) \
+    bulk="$${BULK:-}"; \
+    if [[ -z "$$bulk" ]]; then \
+      if [[ -t 0 ]]; then \
+        read -r -p "Bulk interaction count [10]: " bulk; \
+        bulk="$${bulk:-10}"; \
+      else \
+        bulk=10; \
+      fi; \
+    fi; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" $(EXTRA_VARS) ;; \
 esac
 endef
 

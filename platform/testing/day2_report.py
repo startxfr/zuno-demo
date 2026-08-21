@@ -52,9 +52,14 @@ def summarize(results: List[Day2Result]) -> Dict[str, object]:
 
 
 def render_text(results: List[Day2Result]) -> str:
-    lines = [f"{'AGENT':<14}{'LAYER':<16}{'ID':<26}{'PASS':<6}{'CATEGORY':<16}"]
+    # A literal separator (not just fixed-width padding) between columns -
+    # id values can be arbitrarily long (e.g. contract-test suite paths
+    # like "contract/test_bundle_self_consistency.py"), and padding alone
+    # would let a long id run straight into the next column with no
+    # visible boundary.
+    lines = [f"{'AGENT':<14} {'LAYER':<12} {'PASS':<6} {'CATEGORY':<14} ID"]
     for r in results:
-        lines.append(f"{r.agent:<14}{r.layer:<16}{r.id:<26}{'PASS' if r.passed else 'FAIL':<6}{r.category:<16}")
+        lines.append(f"{r.agent:<14} {r.layer:<12} {'PASS' if r.passed else 'FAIL':<6} {r.category:<14} {r.id}")
         if not r.passed and r.detail:
             lines.append(f"      -> {r.detail}")
 

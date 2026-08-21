@@ -1,6 +1,6 @@
 # ADR-0058: Aggregate existing agent test content into `make d2 stresstest`, with a bulk-interaction load mode
 
-- **Status:** Proposed
+- **Status:** Partially implemented - repo work merged: `make day2|d2 stresstest [agents|platform|all]` aggregates contract/scenario/security/gate/stress_test content per discovered agent (contract tests attributed via a control-node-only pass; the other four layers via a generalized, per-agent in-cluster Job reusing the ADR-0053 acceptance-gate Job mechanism), plus a bulk-interaction load mode (interactive `BULK=<n>` prompt, or non-interactive default) replaying each agent's own `scenarios.yaml` message content (WP-063, 2026-08-21). Live cluster confirmation (an actual `make d2 stresstest` run against a real cluster) is still pending.
 - **Target:** v0
 - **Date:** 2026-08-21
 - **Decision owners:** Zuno Demo architecture team

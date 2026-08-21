@@ -1,6 +1,32 @@
 # WP-063: Stresstest content aggregation + bulk-interaction mode (delivers ADR-0058)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-21) - executed with several
+  refinements over this brief's original sketch (acceptance criteria
+  unchanged): agent discovery for the stresstest Job loop intersects
+  `agents/*/agent.okf.md` with `evaluations/*/run_scenarios.py`
+  (dynamic, per ADR-0058 decision 4's binding auto-coverage rule) rather
+  than a hardcoded `tekos arkos comage advantage finage naveo` list -
+  it resolved to exactly that same six-agent set today, since all six
+  already have real `scenarios.yaml`/`security_checks.py` (confirmed
+  live: only `gate_checks.py` and `stress_test.py` remain genuinely
+  Tekos-only, no wrapper exists for either); the generalized per-agent
+  Job lives in two files
+  (`ansible/roles/day2/tasks/stresstest_job.yml` orchestrates discovery,
+  credentials and the final combined report,
+  `stresstest_job_run_one.yml` is one loop iteration's Job
+  create/wait/fetch) rather than one; contract-test attribution is a
+  separate control-node-only script
+  (`platform/testing/day2_contract_attribution.py`, parsing
+  `run_agent_contract_tests.py`'s per-agent-prefixed stdout lines) since
+  that runner has no per-agent hook and needs no cluster access, so
+  running it inside the per-agent Job would repeat the same whole-repo
+  scan six times for nothing; bulk mode
+  (`platform/testing/day2_bulk.py`) runs inside the *same* per-agent Job
+  as the functional layers rather than a second Job, since both need
+  identical `AGENT`/credential/mount setup. `make day1 check agents`'s
+  own mandatory-gate invocation of `run_acceptance_gate.yml` is
+  untouched - fully additive. Live cluster confirmation (`make d2
+  stresstest` against a real cluster) is the remaining operator step.
 - **ADRs:** ADR-0058
 - **Depends on:** WP-062 (Day 2 chassis, report engine and agent-discovery
   mechanism must exist first; this WP fills in the stub

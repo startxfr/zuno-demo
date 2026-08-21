@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: zuno-ai-run
+configMapGenerator:
+  # Canonical, shared implementation (ADR-0342/WP-31) - identical every
+  # agent iteration. requirements.txt is evaluations/tekos's own (httpx +
+  # PyYAML; day2_stresstest.py/day2_bulk.py need nothing beyond that -
+  # unlike the ADR-0053 acceptance-gate Job, this one never needs the
+  # `kubernetes` client).
+  - name: day2-stresstest-scripts
+    files:
+      - requirements.txt=../../../../../evaluations/tekos/requirements.txt
+      - run_scenarios.py=../../../../../evaluations/tekos/run_scenarios.py
+      - gate_checks.py=../../../../../evaluations/tekos/gate_checks.py
+      - stress_test.py=../../../../../evaluations/tekos/stress_test.py
+      - day2_report.py=../../../../../platform/testing/day2_report.py
+      - day2_stresstest.py=../../../../../platform/testing/day2_stresstest.py
+      - day2_bulk.py=../../../../../platform/testing/day2_bulk.py
+      # Repo policy/routing files security_checks.py, gate_checks.py and
+      # stress_test.py each read relative to their own resolved location
+      # once mounted (same ConfigMap-symlink-indirection arithmetic
+      # ansible/roles/agents/tasks/run_acceptance_gate.yml's own comments
+      # already document) - projected into the exact paths
+      # stresstest_job.yml's volumeMounts expect.
+      - classification.yaml=../../../../../policies/data-classification/classification.yaml
+      - tool-policy.yaml=../../../../../policies/tools/tool-policy.yaml
+      - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
+      - model-routing-policy.yaml=../../../../../policies/model-routing/model-routing-policy.yaml
+      # Per-agent content (genuinely per-agent, never shared) - key
+      # prefixed by agent name since ConfigMap keys are flat and every
+      # agent's file is literally named "scenarios.yaml"/
+      # "security_checks.py".
+      - tekos-scenarios.yaml=../../../../../evaluations/tekos/scenarios.yaml
+      - tekos-security_checks.py=../../../../../evaluations/tekos/security_checks.py
+      - arkos-scenarios.yaml=../../../../../evaluations/arkos/scenarios.yaml
+      - arkos-security_checks.py=../../../../../evaluations/arkos/security_checks.py
+      - comage-scenarios.yaml=../../../../../evaluations/comage/scenarios.yaml
+      - comage-security_checks.py=../../../../../evaluations/comage/security_checks.py
+      - advantage-scenarios.yaml=../../../../../evaluations/advantage/scenarios.yaml
+      - advantage-security_checks.py=../../../../../evaluations/advantage/security_checks.py
+      - finage-scenarios.yaml=../../../../../evaluations/finage/scenarios.yaml
+      - finage-security_checks.py=../../../../../evaluations/finage/security_checks.py
+      - naveo-scenarios.yaml=../../../../../evaluations/naveo/scenarios.yaml
+      - naveo-security_checks.py=../../../../../evaluations/naveo/security_checks.py
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    zuno.io/managed-by: zuno-ansible

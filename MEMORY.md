@@ -516,9 +516,37 @@ not here.
   (`platform/testing/day2_report.py`, text/json/csv, text always printed)
   is new, shared, and has its own local test suite
   (`platform/testing/tests/test_day2_report.py`, no cluster needed).
-  `make d2 stresstest` ships as a dispatch-only stub pending WP-063
-  (ADR-0058). Repo work merged; live cluster confirmation (`make d2
-  test` against a real cluster) still pending.
+  `make d2 stresstest` shipped as a dispatch-only stub in this WP,
+  filled in by WP-063. Repo work merged; live cluster confirmation
+  (`make d2 test` against a real cluster) still pending.
+- **ADR-0058 (WP-063, 2026-08-21)**: `make day2|d2 stresstest` runs
+  every existing test layer per agent, generalized off the ADR-0053
+  acceptance-gate Job (Tekos-only until now) rather than hardcoded to
+  it — the Python layer (`run_scenarios.py`/`run_acceptance_gate.py`)
+  was already agent-parameterized since ADR-0342/WP-31 via thin
+  per-agent wrappers; what generalized here is the Ansible/Job layer
+  (`ansible/roles/day2/tasks/stresstest_job.yml` +
+  `stresstest_job_run_one.yml`), one Job per agent, discovered by
+  intersecting `agents/*/agent.okf.md` with
+  `evaluations/*/run_scenarios.py` — resolves today to all six agents
+  with real content (Tekos/Arkos/Comage/Advantage/Finage/Naveo); only
+  `gate_checks.py`/`stress_test.py` stay Tekos-only (no wrapper exists
+  for either). Contract-test attribution
+  (`platform/testing/day2_contract_attribution.py`) runs once from the
+  control node (no cluster needed) rather than once per agent, parsing
+  `run_agent_contract_tests.py`'s own output — while building it, it
+  surfaced a real, pre-existing, unrelated finding: five agents'
+  deployment snapshots are stale relative to their current charts
+  (`platform/okf/generate_deployment_snapshot.py` needs a re-run) —
+  left alone, out of this WP's scope. Bulk-interaction load mode
+  (`platform/testing/day2_bulk.py`) replays each agent's own
+  `scenarios.yaml` message content, no new prompts authored; the
+  Makefile's `make d2 stresstest` prompts interactively for `BULK`
+  (skipped when set, or non-interactive, defaulting to 10). `make day1
+  check agents` (the ADR-0053 mandatory gate) is untouched — this WP is
+  purely additive/informational, never wired into it. Repo work merged;
+  live cluster confirmation (`make d2 stresstest` with a real `BULK`
+  value) still pending.
 
 ### Dated entries (roadmap work packages, v0.1) — current status per ADR
 

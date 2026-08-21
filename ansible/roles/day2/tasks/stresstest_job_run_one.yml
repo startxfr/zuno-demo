@@ -1,0 +1,194 @@
+---
+# One iteration of stresstest_job.yml's per-agent loop
+# (loop_var: day2_stress_agent). Delete-then-recreate idempotency, same
+# as run_acceptance_gate.yml. Runs day2_stresstest.py, then day2_bulk.py
+# in the same container when bulk_interactions > 0 (both need the exact
+# same AGENT/credential/mount setup - a second Job would just duplicate
+# it for no benefit).
+- name: "day2-stresstest | delete any previous stresstest Job for {{ day2_stress_agent }} (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: "zuno-day2-stresstest-{{ day2_stress_agent }}"
+    namespace: zuno-ai-run
+    wait: true
+
+- name: "day2-stresstest | run the stresstest Job for {{ day2_stress_agent }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "zuno-day2-stresstest-{{ day2_stress_agent }}"
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 0
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: acceptance-gate
+          spec:
+            restartPolicy: Never
+            priorityClassName: zuno-platform-weak
+            serviceAccountName: acceptance-gate
+            containers:
+              - name: day2-stresstest
+                image: "docker.io/library/python:3.12-slim"
+                command:
+                  - sh
+                  - -c
+                  # Same certifi-append trick as run_acceptance_gate.yml's
+                  # Job (every Route this dials chains to Vault's internal
+                  # root). day2_bulk.py only runs when BULK_INTERACTIONS
+                  # is set and > 0; either way the container's own exit
+                  # code reflects whichever step actually failed.
+                  - >-
+                    pip install --quiet --no-cache-dir -r /gate/requirements.txt &&
+                    CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
+                    cat /gate-ca/ca.crt >> "$CERTIFI" &&
+                    export SSL_CERT_FILE="$CERTIFI" &&
+                    python3 /gate/day2_stresstest.py; stresstest_rc=$?;
+                    if [ "${BULK_INTERACTIONS:-0}" -gt 0 ]; then
+                      python3 /gate/day2_bulk.py; bulk_rc=$?;
+                    else
+                      bulk_rc=0;
+                    fi;
+                    if [ "$stresstest_rc" -ne 0 ]; then exit "$stresstest_rc"; else exit "$bulk_rc"; fi
+                workingDir: /gate
+                resources:
+                  requests:
+                    cpu: 200m
+                    memory: 256Mi
+                  limits:
+                    cpu: "1"
+                    memory: 512Mi
+                env:
+                  - name: PYTHONUNBUFFERED
+                    value: "1"
+                  # Restricted SCC -> random UID, no HOME - same fix as
+                  # run_acceptance_gate.yml's Job.
+                  - name: HOME
+                    value: /tmp
+                  - name: PYTHONUSERBASE
+                    value: /tmp/.pyuser
+                  - name: AGENT
+                    value: "{{ day2_stress_agent }}"
+                  - name: FRONTEND_URL
+                    value: "https://{{ day2_stress_agent }}.{{ cluster_base_domain }}"
+                  - name: BULK_INTERACTIONS
+                    value: "{{ bulk_interactions | default(0) }}"
+                  - name: DEMO_PERSONA_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: day2-stresstest-credentials
+                        key: demo-persona-password
+                  - name: "{{ (day2_stress_agent | upper | replace('-', '_')) }}_FRONTEND_CLIENT_SECRET"
+                    valueFrom:
+                      secretKeyRef:
+                        name: day2-stresstest-credentials
+                        key: "{{ day2_stress_agent }}-client-secret"
+                volumeMounts:
+                  - name: gate
+                    mountPath: /gate
+                  # WP-31's ConfigMap-key-can't-contain-'/' constraint,
+                  # generalized by agent: projects THIS agent's own
+                  # scenarios.yaml/security_checks.py into the
+                  # per-agent subdirectory run_scenarios.py/
+                  # security_checks.py each resolve relative to their own
+                  # mounted location (see
+                  # ansible/roles/day2/kustomize/stresstest-scripts's own
+                  # header comment).
+                  - name: gate-agent
+                    mountPath: "/gate/{{ day2_stress_agent }}"
+                  - name: gate-policies
+                    mountPath: /gate/policies
+                  - name: gate-platform
+                    mountPath: /platform/ai-gateway
+                  - name: gate-model-routing-policy
+                    mountPath: /policies/model-routing
+                  - name: gate-ca
+                    mountPath: /gate-ca
+            volumes:
+              - name: gate
+                configMap:
+                  name: day2-stresstest-scripts
+              - name: gate-agent
+                configMap:
+                  name: day2-stresstest-scripts
+                  items:
+                    - key: "{{ day2_stress_agent }}-scenarios.yaml"
+                      path: scenarios.yaml
+                    - key: "{{ day2_stress_agent }}-security_checks.py"
+                      path: security_checks.py
+              - name: gate-policies
+                configMap:
+                  name: day2-stresstest-scripts
+                  items:
+                    - key: classification.yaml
+                      path: data-classification/classification.yaml
+                    - key: tool-policy.yaml
+                      path: tools/tool-policy.yaml
+              - name: gate-platform
+                configMap:
+                  name: day2-stresstest-scripts
+                  items:
+                    - key: provider-routing.yaml
+                      path: provider-routing.yaml
+              - name: gate-model-routing-policy
+                configMap:
+                  name: day2-stresstest-scripts
+                  items:
+                    - key: model-routing-policy.yaml
+                      path: model-routing-policy.yaml
+              - name: gate-ca
+                configMap:
+                  name: day2-stresstest-ca
+
+- name: "day2-stresstest | wait for the {{ day2_stress_agent }} Job to reach a terminal state"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-run
+    name: "zuno-day2-stresstest-{{ day2_stress_agent }}"
+  register: _day2_stress_job
+  until: >-
+    (_day2_stress_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_day2_stress_job.resources[0].status.failed | default(0)) > 0
+  retries: 60
+  delay: 15
+
+- name: "day2-stresstest | find the {{ day2_stress_agent }} Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-run
+    label_selectors:
+      - "job-name=zuno-day2-stresstest-{{ day2_stress_agent }}"
+  register: _day2_stress_pod
+
+- name: "day2-stresstest | fetch the {{ day2_stress_agent }} Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-run
+    name: "{{ _day2_stress_pod.resources[0].metadata.name }}"
+  register: _day2_stress_log
+  when: (_day2_stress_pod.resources | default([]) | length) > 0
+
+# day2_stresstest.py prints one JSON-array line; day2_bulk.py prints a
+# second one when it ran - both matched and flattened into one result
+# list, accumulated across every agent in the outer loop.
+- name: "day2-stresstest | parse and accumulate {{ day2_stress_agent }}'s results"
+  ansible.builtin.set_fact:
+    _day2_stress_results: >-
+      {{
+        (_day2_stress_results | default([])) +
+        (
+          (_day2_stress_log.log_lines | default([]))
+          | select('match', '^\[.*\]$')
+          | map('from_json')
+          | list
+          | flatten
+        )
+      }}

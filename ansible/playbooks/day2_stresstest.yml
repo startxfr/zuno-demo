@@ -1,9 +1,12 @@
 ---
 # ADR-0058: `make day2|d2 stresstest [agents|platform|all]`. Runs every
-# existing test layer per agent, plus an optional bulk-interaction load
-# pass. WP-062 ships this playbook as a dispatch-only stub
-# (ansible/roles/day2/tasks/stresstest.yml prints a placeholder message);
-# WP-063 fills in the real content.
+# existing test layer per agent (contract/scenario/security/gate/
+# stress_test), generalizing the ADR-0053 acceptance-gate Job mechanism
+# across every discovered agent with real evaluations/<agent>/ content,
+# plus an optional bulk-interaction load pass when the Makefile's
+# `bulk_interactions` extra-var is set and > 0. Informational only -
+# never wired into `make day1 check agents` / the ADR-0053 mandatory
+# gate (see ansible/roles/day2/tasks/stresstest_job.yml).
 - name: "Day 2: stresstest"
   hosts: localhost
   gather_facts: false

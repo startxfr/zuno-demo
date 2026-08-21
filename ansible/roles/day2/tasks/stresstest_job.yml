@@ -1,0 +1,220 @@
+---
+# ADR-0058 decisions 1, 2 and 4: for every agent that BOTH exists
+# (agents/*/agent.okf.md) AND has real evaluations/<agent>/ content
+# (discovered, never a hand-maintained list - decision 4's binding
+# auto-coverage rule), runs platform/testing/day2_stresstest.py (and,
+# when bulk_interactions is set, platform/testing/day2_bulk.py) inside a
+# generalized per-agent Job - the same ConfigMap-bundling/credential-
+# mounting/internal-CA-trust mechanism
+# ansible/roles/agents/tasks/run_acceptance_gate.yml already has,
+# parameterized by agent name instead of hardcoded "tekos" (decision 2).
+# `make day1 check agents`'s own mandatory-gate invocation of that file is
+# untouched - this is additive, informational, never wired into it.
+
+- name: "day2-stresstest | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "day2-stresstest | ensure the zuno-ai-run namespace exists"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/namespace"
+
+- name: "day2-stresstest | discover agents/*/agent.okf.md bundles"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/agents"
+    patterns: "agent.okf.md"
+    recurse: true
+    depth: 2
+  register: _day2_stress_agent_bundles
+
+- name: "day2-stresstest | discover evaluations/*/run_scenarios.py (agents with real stresstest content)"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/evaluations"
+    patterns: "run_scenarios.py"
+    recurse: true
+    depth: 2
+  register: _day2_stress_eval_scripts
+
+- name: "day2-stresstest | resolve the candidate agent list (exists AND has evaluations content)"
+  ansible.builtin.set_fact:
+    day2_stresstest_agents: >-
+      {{
+        (_day2_stress_agent_bundles.files | map(attribute='path') | map('dirname') | map('basename') | list)
+        | intersect(_day2_stress_eval_scripts.files | map(attribute='path') | map('dirname') | map('basename') | list)
+        | sort
+      }}
+
+- name: "day2-stresstest | read the platform's internal root CA from openshift-config"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: openshift-config
+    name: keycloak-serving-ca
+  register: _day2_stress_ca_cm
+
+- name: "day2-stresstest | fail if the internal root CA ConfigMap is missing"
+  ansible.builtin.fail:
+    msg: >-
+      openshift-config/keycloak-serving-ca not found - run
+      `make d0 install openshift-oauth` first (see
+      ansible/roles/agents/tasks/run_acceptance_gate.yml's own identical
+      precondition).
+  when: (_day2_stress_ca_cm.resources | default([]) | length) == 0
+
+- name: "day2-stresstest | copy the internal root CA into a zuno-ai-run ConfigMap the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: day2-stresstest-ca
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        ca.crt: "{{ _day2_stress_ca_cm.resources[0].data['ca.crt'] }}"
+
+- name: "day2-stresstest | read the demo-persona password from zuno-auth (ADR-0041)"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: demo-personas-password
+  register: _day2_stress_demo_password_secret
+  no_log: true
+
+- name: "day2-stresstest | fail if the demo-persona password Secret is missing"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-auth/demo-personas-password not found - run `make d0 install
+      keycloak` first.
+  when: (_day2_stress_demo_password_secret.resources | default([]) | length) == 0
+
+# Not every discovered agent necessarily has a Keycloak frontend client
+# secret provisioned yet (a brand-new agent might have evaluations
+# content authored before its Keycloak client exists) - flag any gap
+# instead of silently skipping it without explanation.
+- name: "day2-stresstest | read each candidate agent's frontend-client-secret from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: "{{ item }}-frontend-client-secret"
+  register: _day2_stress_client_secrets
+  loop: "{{ day2_stresstest_agents }}"
+  loop_control:
+    label: "{{ item }}"
+  no_log: true
+
+- name: "day2-stresstest | resolve agents actually ready to stresstest (credential precondition)"
+  ansible.builtin.set_fact:
+    _day2_stress_ready_agents: >-
+      {{
+        _day2_stress_client_secrets.results
+        | selectattr('resources', 'defined')
+        | rejectattr('resources', 'equalto', [])
+        | map(attribute='item')
+        | list
+      }}
+    _day2_stress_missing_agents: >-
+      {{
+        day2_stresstest_agents
+        | difference(
+            _day2_stress_client_secrets.results
+            | selectattr('resources', 'defined')
+            | rejectattr('resources', 'equalto', [])
+            | map(attribute='item')
+            | list
+          )
+      }}
+
+- name: "day2-stresstest | warn about any agent missing its frontend-client-secret"
+  ansible.builtin.debug:
+    msg: >-
+      Skipping stresstest content for: {{ _day2_stress_missing_agents | join(', ') }} -
+      no <agent>-frontend-client-secret found in zuno-auth yet.
+  when: _day2_stress_missing_agents | length > 0
+
+- name: "day2-stresstest | build the combined per-agent credentials data"
+  ansible.builtin.set_fact:
+    _day2_stress_secret_data: >-
+      {{
+        _day2_stress_secret_data | default({'demo-persona-password': _day2_stress_demo_password_secret.resources[0].data.password})
+        | combine({(item.item + '-client-secret'): item.resources[0].data.client_secret})
+      }}
+  loop: "{{ _day2_stress_client_secrets.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: (item.resources | default([]) | length) > 0
+  no_log: true
+
+- name: "day2-stresstest | copy the combined credentials into one zuno-ai-run Secret the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: day2-stresstest-credentials
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      data: "{{ _day2_stress_secret_data | default({}) }}"
+  no_log: true
+  when: (_day2_stress_ready_agents | default([]) | length) > 0
+
+- name: "day2-stresstest | build the day2-stresstest-scripts ConfigMap"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
+  vars:
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/day2/kustomize/stresstest-scripts"
+  when: (_day2_stress_ready_agents | default([]) | length) > 0
+
+# platform/okf/run_agent_contract_tests.py has no per-agent CLI hook and
+# needs no cluster access at all (pure repo-side file/subprocess work) -
+# runs once, directly from the control node, not once per agent inside a
+# Job (ADR-0058's own Context/decision 1 explains why). Seeds the
+# accumulator the per-agent Job loop below appends to.
+- name: "day2-stresstest | run the control-node contract-test attribution"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_contract_attribution.py"
+    chdir: "{{ zuno_repo_root }}"
+  register: _day2_stress_contract
+  changed_when: false
+  failed_when: false
+
+- name: "day2-stresstest | seed the accumulator with the contract-test results"
+  ansible.builtin.set_fact:
+    _day2_stress_results: "{{ (_day2_stress_contract.stdout | from_json) if _day2_stress_contract.stdout else [] }}"
+
+- name: "day2-stresstest | run one Job per ready agent"
+  ansible.builtin.include_tasks: stresstest_job_run_one.yml
+  loop: "{{ _day2_stress_ready_agents | default([]) }}"
+  loop_control:
+    loop_var: day2_stress_agent
+
+- name: "day2-stresstest | render the combined report (platform/testing/day2_report.py)"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component agents"
+    stdin: "{{ _day2_stress_results | default([]) | to_json }}"
+  register: _day2_stress_report
+  changed_when: false
+  failed_when: false
+  when: (_day2_stress_results | default([]) | length) > 0
+
+- name: "day2-stresstest | print the combined report"
+  ansible.builtin.debug:
+    msg: "{{ _day2_stress_report.stdout_lines | default(['No stresstest content ran - see any warning above.']) }}"
+
+# Informational, never mandatory (ADR-0058): this exit code is never read
+# by make day1 check agents / the ADR-0053 gate - it's a separate
+# playbook nothing else invokes - but `make d2 stresstest` should still
+# tell an operator/script whether anything failed, the same way every
+# evaluations/*.py script's own main() does.
+- name: "day2-stresstest | fail if any stresstest check did not pass (informational - see above)"
+  ansible.builtin.fail:
+    msg: >-
+      One or more stresstest checks did not pass - see the report above
+      for which one(s). This is informational only and does not affect
+      `make day1 check agents` / the ADR-0053 mandatory gate.
+  when:
+    - _day2_stress_report is defined
+    - (_day2_stress_report.rc | default(0)) != 0
