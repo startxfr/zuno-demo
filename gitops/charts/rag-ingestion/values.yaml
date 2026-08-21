@@ -1570,7 +1570,9 @@ domains:
     # ADR-0217/WP-067: a distinct domain from sxa-legacy above - an
     # already-anonymized weekly corpus export (schema.sql + data.sql, no
     # MariaDB import, no MCP tools), parsed directly by fetch-sxa.
-    enabled: false
+    # Enabled 2026-08-21 (Part B): dedicated bucket live, rag-sxa database
+    # and Vault credentials provisioned.
+    enabled: true
     fetchStages: [fetch-sxa]
     postgres:
       database: rag-sxa
