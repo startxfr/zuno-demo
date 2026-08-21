@@ -18,6 +18,17 @@ configMapGenerator:
       - classification.yaml=../../../../../policies/data-classification/classification.yaml
       - tool-policy.yaml=../../../../../policies/tools/tool-policy.yaml
       - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
+      # gate_checks.py's two write-code/DAT-boundary checks (added
+      # alongside stress_test.py's gaps) read these at /policies/model-
+      # routing/model-routing-policy.yaml and /agents/tekos/(agent.okf.md,
+      # tasks/*.md) - same repo_root=/ resolution as provider-routing.yaml
+      # above, so they need the same treatment or FileNotFoundError.
+      - model-routing-policy.yaml=../../../../../policies/model-routing/model-routing-policy.yaml
+      - tekos-agent-okf.md=../../../../../agents/tekos/agent.okf.md
+      - tekos-task-answer-technical-question.md=../../../../../agents/tekos/tasks/answer-technical-question.md
+      - tekos-task-find-relevant-docs.md=../../../../../agents/tekos/tasks/find-relevant-docs.md
+      - tekos-task-check-my-drive-docs.md=../../../../../agents/tekos/tasks/check-my-drive-docs.md
+      - tekos-task-write-code.md=../../../../../agents/tekos/tasks/write-code.md
 generatorOptions:
   disableNameSuffixHash: true
   labels:

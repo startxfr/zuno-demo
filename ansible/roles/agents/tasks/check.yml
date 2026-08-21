@@ -26,22 +26,22 @@
 # (run_acceptance_gate.yml, Layers 1-3) as an in-cluster Job.
 #
 # Catalog-only agents (comage/advantage/finage/arkos) get a structural check
-# instead: their agent.okf.md bundle must still parse and declare
-# zuno.status: placeholder, so a future status: active flip isn't starting
-# from a silently-rotted definition. All four - Arkos (ADR-0326/WP-31),
-# Comage (ADR-0326/WP-33), Advantage (ADR-0326/WP-35) and Finage
-# (ADR-0326/WP-36, closing the four-agent generalization) - are
-# deliberately still in this list even though their bundles/graph-shapes/
-# charts are now real: `status` stays `placeholder` until the operator
-# confirms each one's live acceptance gate passes (each
-# WP's own Status-updates section), so they correctly report `placeholder`
-# here too - this loop only checks structural validity + the declared
-# status value, not whether real content exists behind it. Their frontends
-# each get their OWN reachability smoke test below (deployed, but BFF
-# calls 404 until Agent Runtime's generic dispatch sees `status: active` -
-# see app/main.py's _active_agent_or_404) - deliberately NOT their
-# evaluations/<agent>/ gates, which require the human scenario review each
-# WP's part (c) gates on before any cluster gate run counts (see
+# instead: their agent.okf.md bundle must still parse and declare the
+# right zuno.status, so a future status flip isn't starting from a
+# silently-rotted definition. Two of the seven have since flipped to
+# `active` at the operator's explicit direction - Arkos (ADR-0326/WP-31,
+# flipped by WP-11) and Comage (ADR-0326/WP-33, flipped by its own
+# follow-up) - while Advantage (ADR-0326/WP-35), Finage (ADR-0326/WP-36),
+# Naveo (ADR-0410/ADR-0307/WP-41) and the identity-footprint-only Soursage/
+# Cognos (ADR-0349 §6) remain genuinely `placeholder`. This loop now checks
+# each agent's declared status against its own expected value
+# (_agents_catalog_expected_status below) rather than one shared literal -
+# it only checks structural validity + the declared status value, not
+# whether real content exists behind it. Every deployed agent's frontend
+# gets its OWN reachability smoke test below (ansible/tasks/
+# day2_availability_check.yml, unconditional on status) - deliberately NOT
+# the evaluations/<agent>/ gates, which require the human scenario review
+# each WP's part (c) gates on before any cluster gate run counts (see
 # run_acceptance_gate.yml's own docstring for the day this becomes
 # automatic once that review is done).
 #
@@ -71,22 +71,32 @@
   ansible.builtin.fail:
     msg: >-
       agents/{{ catalog_okf.key }}/agent.okf.md is structurally invalid: expected
-      okf_version v0.2, type agent, zuno.status placeholder -
+      okf_version v0.2, type agent, zuno.status
+      {{ _agents_catalog_expected_status[catalog_okf.key] }} -
       got okf_version={{ catalog_okf.value.okf_version | default('missing') }}
       type={{ catalog_okf.value.type | default('missing') }}
       status={{ (catalog_okf.value.zuno | default({})).status | default('missing') }}.
   when: >-
     catalog_okf.value.okf_version | default('') != 'v0.2' or
     catalog_okf.value.type | default('') != 'agent' or
-    (catalog_okf.value.zuno | default({})).status | default('') != 'placeholder'
+    (catalog_okf.value.zuno | default({})).status | default('') != _agents_catalog_expected_status[catalog_okf.key]
   loop: "{{ _agents_catalog_okf | dict2items }}"
   loop_control:
     loop_var: catalog_okf
     label: "{{ catalog_okf.key }}"
+  vars:
+    _agents_catalog_expected_status:
+      comage: active
+      advantage: placeholder
+      finage: placeholder
+      arkos: active
+      naveo: placeholder
+      soursage: placeholder
+      cognos: placeholder
 
 - name: "agents | catalog-only structural check summary"
   ansible.builtin.debug:
-    msg: "All 7 catalog-only agent definitions (comage, advantage, finage, arkos, naveo, soursage, cognos) are structurally valid placeholders (ADR-0031/ADR-0349)."
+    msg: "All 7 catalog-only agent definitions (comage, advantage, finage, arkos, naveo, soursage, cognos) are structurally valid, each against its own expected status - active for comage/arkos, placeholder for the rest (ADR-0031/ADR-0349)."
 
 - name: "agents | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"

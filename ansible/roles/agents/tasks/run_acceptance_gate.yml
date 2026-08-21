@@ -268,6 +268,15 @@
                   # provider-routing read lands at /platform/ai-gateway.
                   - name: gate-platform
                     mountPath: /platform/ai-gateway
+                  # Same / resolution: tekos_write_code_prefers_mistral_codestral
+                  # reads /policies/model-routing/model-routing-policy.yaml.
+                  - name: gate-model-routing
+                    mountPath: /policies/model-routing
+                  # Same / resolution: tekos_declares_no_dat_or_image_generation_capability
+                  # reads /agents/tekos/agent.okf.md and every declared
+                  # task's /agents/tekos/tasks/<task>.md.
+                  - name: gate-tekos-bundle
+                    mountPath: /agents/tekos
                   - name: gate-ca
                     mountPath: /gate-ca
             volumes:
@@ -299,6 +308,26 @@
                   items:
                     - key: provider-routing.yaml
                       path: provider-routing.yaml
+              - name: gate-model-routing
+                configMap:
+                  name: acceptance-gate-scripts
+                  items:
+                    - key: model-routing-policy.yaml
+                      path: model-routing-policy.yaml
+              - name: gate-tekos-bundle
+                configMap:
+                  name: acceptance-gate-scripts
+                  items:
+                    - key: tekos-agent-okf.md
+                      path: agent.okf.md
+                    - key: tekos-task-answer-technical-question.md
+                      path: tasks/answer-technical-question.md
+                    - key: tekos-task-find-relevant-docs.md
+                      path: tasks/find-relevant-docs.md
+                    - key: tekos-task-check-my-drive-docs.md
+                      path: tasks/check-my-drive-docs.md
+                    - key: tekos-task-write-code.md
+                      path: tasks/write-code.md
               - name: gate-ca
                 configMap:
                   name: acceptance-gate-ca
