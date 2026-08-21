@@ -355,6 +355,11 @@ lmEval:
   # Benchmarks the one model actually deployed by this chart (see
   # inferenceServiceName/modelId above), same base_url convention as
   # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL.
+  cache:
+    # pvc-lmeval-cache.yaml's size - real payload is tiny (~11MB tokenizer
+    # + one MMLU subject config), generous headroom still costs nothing on
+    # gp3-csi.
+    size: 1Gi
   jobs:
     - name: qwen25-7b-instruct-mmlu
       model: local-completions
@@ -367,12 +372,18 @@ lmEval:
         # AutoTokenizer.from_pretrained(model) when `tokenizer` is unset -
         # `model` here is the in-cluster served-model name, not a valid HF
         # repo id, so that lookup 404s against huggingface.co
-        # ("qwen2.5-7b-instruct is not the path to a directory..."). The
-        # real public HF repo for the S3-hosted weights this predictor
-        # serves is Qwen/Qwen2.5-7B-Instruct (`tokenizer` is a distinct,
-        # real lm_eval.models.api_models.TemplateAPI field).
+        # ("qwen2.5-7b-instruct is not the path to a directory..."). A
+        # local directory path (not the Qwen/Qwen2.5-7B-Instruct repo id)
+        # so AutoTokenizer.from_pretrained loads straight off disk with no
+        # HF Hub resolution at all - HF_HUB_OFFLINE=1 is irrelevant either
+        # way. job-lmeval-cache-prefetch.yaml's tokenizer-prefetch init
+        # container populates this path from this cluster's own S3 model
+        # bucket (modelsS3, same prefix the predictor serves from) rather
+        # than huggingface.co; it reads this exact value back out via a
+        # `range .modelArgs` lookup, so it's the single source of truth -
+        # change it here only.
         - name: tokenizer
-          value: Qwen/Qwen2.5-7B-Instruct
+          value: /cache/tokenizers/qwen2.5-7b-instruct
       # The full `mmlu` group task (57 subjects) expands to 56,168
       # loglikelihood requests - too much sustained load for this demo
       # cluster's shared single-GPU-plus-MIG capacity (qwen + gpt-oss-20b +
@@ -402,8 +413,19 @@ lmEval:
       # allowCodeExecution stays false.
       allowOnline: false
       allowCodeExecution: false
-      # Operator-populated PVC (see the WP-10 brief's operator follow-up
-      # for the exact prefetch procedure). Must exist and be pre-warmed
-      # before this job runs, or every task falls back to a live HF
-      # network call that the operator's own offline env vars will block.
+      # Chart-managed PVC (pvc-lmeval-cache.yaml), pre-warmed by
+      # job-lmeval-cache-prefetch.yaml before this job's pod can schedule -
+      # both pinned to the same ArgoCD sync-wave as this PVC's first
+      # consumer, same pattern as modelStorage's pvc-model.yaml/
+      # job-model-download.yaml. Must exist and be pre-warmed before this
+      # job runs, or every task falls back to a live HF network call that
+      # the operator's own offline env vars will block.
       datasetCachePvc: lmeval-hf-cache
+      # Consumed by job-lmeval-cache-prefetch.yaml's dataset-prefetch
+      # container: one load_dataset(datasetHfRepo, datasetHfConfig) call,
+      # matching taskNames above (mmlu_abstract_algebra -> the
+      # hails/mmlu_no_train dataset's abstract_algebra config - NOT the
+      # "all" aggregate config, which has a real, separate bug returning 0
+      # examples per split). Update both together if taskNames changes.
+      datasetHfRepo: hails/mmlu_no_train
+      datasetHfConfig: abstract_algebra

@@ -1,0 +1,175 @@
+{{- /*
+Pre-warms pvc-lmeval-cache.yaml's PVC before the operator's LMEvalJob pod
+(lmevaljob.yaml) ever tries to mount it - see that file's comment for the
+two real TrustyAI operator bugs this works around. Two sequential
+containers in ONE pod (Kubernetes' native initContainer ordering) rather
+than two Jobs: each step needs a different already-proven library and
+neither image has both, so instead of guessing which image has what,
+each step gets the image already confirmed to have it, and initContainer
+ordering guarantees the S3 tokenizer fetch completes before the dataset
+fetch starts - both write into the same PVC, mounted once per container,
+no separate wave or RWO-remount race needed.
+
+A normal sync-wave resource, not an ArgoCD hook - same sync-wave (-15) as
+pvc-lmeval-cache.yaml, same reasoning as job-model-download.yaml (the PVC's
+first consumer must share its wave or a fresh sync deadlocks on the
+WaitForFirstConsumer PVC). activeDeadlineSeconds is set explicitly (unlike
+job-model-download.yaml) - in-cluster HF/S3 transfers have hung silently
+for 11+h before on this cluster (a suspected xet range-get race, not
+specific to this Job's payload), so this must fail loud within one
+timeout, matching job-schema-apply.yaml's documented reasoning.
+*/ -}}
+{{- if .Values.lmEval.enabled }}
+{{- range .Values.lmEval.jobs }}
+{{- if .datasetCachePvc }}
+{{- $tokenizerDir := "" }}
+{{- range .modelArgs }}
+{{- if eq .name "tokenizer" }}
+{{- $tokenizerDir = .value }}
+{{- end }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .name }}-cache-prefetch
+  namespace: {{ $.Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: model-quality-gate
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lm-eval
+        app.kubernetes.io/component: model-quality-gate
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: tokenizer-prefetch
+          image: {{ $.Values.modelStorage.initializerImage }}
+          command:
+            - python3
+            - -c
+            - |
+              import os, time
+              import boto3
+              from botocore.config import Config
+
+              bucket = {{ $.Values.modelsS3.bucket | quote }}
+              prefix = {{ printf "%s/%s" $.Values.modelsS3.prefix $.Values.servedModelName | quote }}
+              dest = {{ $tokenizerDir | quote }}
+              files = ["tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"]
+
+              os.makedirs(dest, exist_ok=True)
+              s3 = boto3.client(
+                  "s3",
+                  endpoint_url={{ printf "https://%s" $.Values.modelsS3.endpoint | quote }},
+                  region_name={{ $.Values.modelsS3.region | quote }},
+                  config=Config(signature_version="s3v4"),
+              )
+
+              for name in files:
+                  key = f"{prefix}/{name}"
+                  target = os.path.join(dest, name)
+                  last_err = None
+                  for attempt in range(1, 4):
+                      try:
+                          s3.download_file(bucket, key, target)
+                          print(f"downloaded s3://{bucket}/{key} -> {target}")
+                          last_err = None
+                          break
+                      except Exception as e:
+                          last_err = e
+                          print(f"attempt {attempt} failed for {key}: {e}")
+                          time.sleep(5 * attempt)
+                  if last_err is not None:
+                      raise last_err
+
+              print("tokenizer prefetch complete:", os.listdir(dest))
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: lmeval-hf-cache-s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lmeval-hf-cache-s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: 128Mi
+            limits:
+              cpu: "500m"
+              memory: 256Mi
+          volumeMounts:
+            - name: dataset-cache
+              mountPath: /cache
+      containers:
+        - name: dataset-prefetch
+          image: registry.redhat.io/rhoai/odh-ta-lmes-job-rhel9@sha256:ca784ca932e8d5bb24fe4b25fb7e81b511d2d5f0a0612a5f16f01d8f544535ed
+          command:
+            - python3
+            - -c
+            - |
+              import time
+              from datasets import load_dataset
+
+              repo = {{ .datasetHfRepo | quote }}
+              config = {{ .datasetHfConfig | quote }}
+
+              last_err = None
+              for attempt in range(1, 4):
+                  try:
+                      ds = load_dataset(repo, config)
+                      print(f"loaded {repo}/{config}: {ds}")
+                      last_err = None
+                      break
+                  except Exception as e:
+                      last_err = e
+                      print(f"attempt {attempt} failed: {e}")
+                      time.sleep(5 * attempt)
+              if last_err is not None:
+                  raise last_err
+
+              print("dataset prefetch complete")
+          env:
+            - name: HF_HOME
+              value: /cache/hf_home
+            - name: HF_HUB_DISABLE_TELEMETRY
+              value: "1"
+            - name: DO_NOT_TRACK
+              value: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: 256Mi
+            limits:
+              cpu: "500m"
+              memory: 512Mi
+          volumeMounts:
+            - name: dataset-cache
+              mountPath: /cache
+      volumes:
+        - name: dataset-cache
+          persistentVolumeClaim:
+            claimName: {{ .datasetCachePvc }}
+{{- end }}
+{{- end }}
+{{- end }}

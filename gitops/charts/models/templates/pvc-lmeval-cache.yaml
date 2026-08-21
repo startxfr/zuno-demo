@@ -1,0 +1,37 @@
+{{- /*
+Backs lmEval.jobs[].datasetCachePvc (see lmevaljob.yaml's comment for why
+this PVC has to exist and be pre-warmed before the LMEvalJob pod can run).
+A normal sync-wave resource, not an ArgoCD hook - same reasoning as
+pvc-model.yaml: kept at the SAME sync-wave as
+job-lmeval-cache-prefetch.yaml (-15), not one wave ahead, since gp3-csi is
+WaitForFirstConsumer and a PVC alone in an earlier wave deadlocks a fresh
+sync (ArgoCD's default PVC health treats WaitForFirstConsumer Pending as
+Progressing forever with nothing in-wave to bind it). In one shared wave,
+ArgoCD applies the PVC before the Job (kind ordering), the Job's pod
+schedules, the PVC binds, and the wave turns healthy.
+*/ -}}
+{{- if .Values.lmEval.enabled }}
+{{- range .Values.lmEval.jobs }}
+{{- if .datasetCachePvc }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .datasetCachePvc }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: model-quality-gate
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $.Values.modelStorage.storageClassName }}
+  resources:
+    requests:
+      storage: {{ $.Values.lmEval.cache.size }}
+{{- end }}
+{{- end }}
+{{- end }}
