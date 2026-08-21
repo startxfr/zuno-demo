@@ -13,7 +13,17 @@ import {
   Spinner,
   TextInput,
 } from "@patternfly/react-core";
-import { EllipsisVIcon, GripVerticalIcon, StarIcon } from "@patternfly/react-icons";
+import {
+  BanIcon,
+  CloneIcon,
+  EllipsisVIcon,
+  GripVerticalIcon,
+  OutlinedStarIcon,
+  PencilAltIcon,
+  ShareIcon,
+  StarIcon,
+  TrashIcon,
+} from "@patternfly/react-icons";
 import {
   cloneConversation,
   deleteConversation,
@@ -413,6 +423,7 @@ export function ConversationList({
                     <DropdownList>
                       <DropdownItem
                         key="rename"
+                        icon={<PencilAltIcon />}
                         onClick={() => {
                           setOpenKebabRunId(null);
                           startRename(c.run_id, c.title);
@@ -422,6 +433,7 @@ export function ConversationList({
                       </DropdownItem>
                       <DropdownItem
                         key="star"
+                        icon={c.starred ? <OutlinedStarIcon /> : <StarIcon />}
                         onClick={() => {
                           setOpenKebabRunId(null);
                           void toggleStar(c.run_id, !c.starred);
@@ -431,6 +443,7 @@ export function ConversationList({
                       </DropdownItem>
                       <DropdownItem
                         key="share"
+                        icon={<ShareIcon />}
                         onClick={() => {
                           setOpenKebabRunId(null);
                           setSharing({ runId: c.run_id, title: c.title });
@@ -440,6 +453,7 @@ export function ConversationList({
                       </DropdownItem>
                       <DropdownItem
                         key="clone"
+                        icon={<CloneIcon />}
                         isDisabled={cloning === c.run_id}
                         onClick={() => {
                           setOpenKebabRunId(null);
@@ -450,6 +464,7 @@ export function ConversationList({
                       </DropdownItem>
                       <DropdownItem
                         key="delete"
+                        icon={<TrashIcon />}
                         onClick={() => {
                           setOpenKebabRunId(null);
                           void deleteConversationRow(c.run_id, c.title);
@@ -459,6 +474,7 @@ export function ConversationList({
                       </DropdownItem>
                       <DropdownItem
                         key="hard-delete"
+                        icon={<BanIcon />}
                         isDanger
                         onClick={() => {
                           setOpenKebabRunId(null);

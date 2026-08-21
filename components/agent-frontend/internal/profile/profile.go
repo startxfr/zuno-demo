@@ -58,8 +58,9 @@ type pageView struct {
 
 // Handler serves the read-only profile page, gated on being signed in
 // (same redirect-to-/login behavior as chat.PageHandler - unlike the
-// portal, which tolerates signed-out visitors).
-func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset) http.HandlerFunc {
+// portal, which tolerates signed-out visitors). clusterBaseDomain - see
+// portal.BuildTiles's own doc comment.
+func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset, clusterBaseDomain string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := sessions.Load(r)
 		if err != nil || sess == nil {
@@ -75,7 +76,7 @@ func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset) 
 			HomeURL:         "/",
 			LogoutURL:       "/logout",
 			ProfileURL:      "/profile",
-			Tiles:           portal.BuildTiles(agents, sess),
+			Tiles:           portal.BuildTiles(agents, sess, clusterBaseDomain),
 		}
 		// json.Marshal HTML-escapes '<', '>' and '&' by default - safe to
 		// embed directly in a <script> tag, see portal.go's identical

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/assets"
@@ -47,6 +48,13 @@ func main() {
 		log.Printf("agent-frontend: warning: ACTIVE_AGENT %q has status %q, not \"active\" - its chat UI will refuse all traffic as unauthorized by design", cfg.ActiveAgent, activeAgent.Zuno.Status)
 	}
 	log.Printf("agent-frontend: loaded %d agent definitions from %q; serving chat UI for %q", len(agents), cfg.AgentsDir, cfg.ActiveAgent)
+
+	// clusterBaseDomain is the platform-wide Route suffix (e.g.
+	// "apps.demo222.startx.fr") shared by every agent-frontend Deployment -
+	// derived from this pod's own external URL rather than a new env var,
+	// since every agent's hostname follows the same "<name>.<domain>"
+	// pattern (ADR-0008). See portal.BuildTiles's doc comment.
+	clusterBaseDomain := strings.TrimPrefix(cfg.SelfBaseURL, "https://"+cfg.ActiveAgent+".")
 
 	// ADR-0044: the Vite build (components/agent-frontend/web) must run
 	// before this server starts - `npm run build` locally, or the
@@ -106,14 +114,14 @@ func main() {
 
 	mux.Handle(staticBase, http.StripPrefix(staticBase, http.FileServer(http.Dir(cfg.WebDistDir))))
 
-	mux.HandleFunc("/", portal.Handler(agents, sessions, portalAsset))
-	mux.HandleFunc("/profile", profile.Handler(agents, sessions, profileAsset))
+	mux.HandleFunc("/", portal.Handler(agents, sessions, portalAsset, clusterBaseDomain))
+	mux.HandleFunc("/profile", profile.Handler(agents, sessions, profileAsset, clusterBaseDomain))
 
 	mux.HandleFunc("/login", loginHandler(oidcClient, sessions))
 	mux.HandleFunc("/callback", callbackHandler(oidcClient, sessions))
 	mux.HandleFunc("/logout", logoutHandler(oidcClient, sessions, cfg.SelfBaseURL))
 
-	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, agents, sessions, chatAsset))
+	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, agents, sessions, chatAsset, clusterBaseDomain))
 	mux.HandleFunc("/api/chat", chat.APIHandler(activeAgent, cfg.BFFBaseURL, sessions))
 
 	// ADR-0212: persistent conversations, same session-gated reverse-proxy

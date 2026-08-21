@@ -16,6 +16,7 @@ package portal
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 
@@ -56,7 +57,16 @@ type config struct {
 // a signed-in-or-not session. Shared by Handler (all agents, for the
 // portal grid) and internal/profile.Handler (the same computation, viewed
 // as "your entitlements" on the profile page).
-func BuildTiles(agents []okf.Agent, sess *session.Session) []TileConfig {
+//
+// clusterBaseDomain is the platform-wide Route suffix (e.g.
+// "apps.demo222.startx.fr") every agent-frontend Deployment already
+// resolves to for its own hostname (config.Config.SelfBaseURL); every
+// tile's Href is a full cross-origin URL (https://<name>.<domain>/<name>)
+// because each agent is its own separate Deployment/Route (ADR-0008), not
+// a path under this page's own origin - found live 2026-08-21: the old
+// relative "/"+name href silently 404'd for every agent except whichever
+// one happens to be this Deployment's own ACTIVE_AGENT.
+func BuildTiles(agents []okf.Agent, sess *session.Session, clusterBaseDomain string) []TileConfig {
 	tiles := make([]TileConfig, 0, len(agents))
 	for _, a := range agents {
 		authorized := sess != nil && a.AllowsAnyGroup(sess.Groups)
@@ -69,7 +79,7 @@ func BuildTiles(agents []okf.Agent, sess *session.Session) []TileConfig {
 			Status:          a.Zuno.Status,
 			Authorized:      authorized,
 			Clickable:       a.IsActive() && authorized,
-			Href:            "/" + a.Zuno.Name,
+			Href:            fmt.Sprintf("https://%s.%s/%s", a.Zuno.Name, clusterBaseDomain, a.Zuno.Name),
 		})
 	}
 	return tiles
@@ -101,8 +111,9 @@ type pageView struct {
 
 // Handler returns an http.HandlerFunc that renders the portal page.
 // asset is web/src/portal/main.tsx's resolved Vite manifest entry (see
-// internal/assets and main.go's wiring).
-func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset) http.HandlerFunc {
+// internal/assets and main.go's wiring). clusterBaseDomain - see
+// BuildTiles's own doc comment.
+func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset, clusterBaseDomain string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, _ := sessions.Load(r)
 
@@ -117,7 +128,7 @@ func Handler(agents []okf.Agent, sessions *session.Manager, asset assets.Asset) 
 			cfg.UserDisplayName = sess.DisplayName()
 		}
 
-		cfg.Tiles = BuildTiles(agents, sess)
+		cfg.Tiles = BuildTiles(agents, sess, clusterBaseDomain)
 
 		// json.Marshal (the package-level function, unlike a custom
 		// Encoder) HTML-escapes '<', '>' and '&' by default - safe to embed

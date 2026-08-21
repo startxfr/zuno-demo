@@ -109,7 +109,8 @@ type pageView struct {
 // agents is the full agent list (ADR-0515: source for the cross-agent
 // masthead nav strip, the same list portal.Handler already receives).
 // asset is web/src/chat/main.tsx's resolved Vite manifest entry.
-func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager, asset assets.Asset) http.HandlerFunc {
+// clusterBaseDomain - see portal.BuildTiles's own doc comment.
+func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager, asset assets.Asset, clusterBaseDomain string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := sessions.Load(r)
 		if err != nil || sess == nil {
@@ -131,7 +132,7 @@ func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager,
 			ApiURL:           "/api/chat",
 			ConversationsURL: "/api/conversations",
 			ColleaguesURL:    "/api/colleagues",
-			AgentNavStrip:    buildAgentNavStrip(agents, sess),
+			AgentNavStrip:    buildAgentNavStrip(agents, sess, clusterBaseDomain),
 			PromptExamples:   agent.PrimaryTaskPromptExamples(),
 		}
 		configJSON, err := json.Marshal(cfg) // HTML-escaped by default - see portal.go's comment
@@ -157,8 +158,8 @@ func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager,
 // can't reach yet (unauthorized) or that has no live chat page to route
 // to (placeholder, not yet active) would be a dead link here, unlike on
 // the portal grid where those tiles still render disabled for visibility.
-func buildAgentNavStrip(agents []okf.Agent, sess *session.Session) []agentNavEntry {
-	tiles := portal.BuildTiles(agents, sess)
+func buildAgentNavStrip(agents []okf.Agent, sess *session.Session, clusterBaseDomain string) []agentNavEntry {
+	tiles := portal.BuildTiles(agents, sess, clusterBaseDomain)
 	strip := make([]agentNavEntry, 0, len(tiles))
 	for _, t := range tiles {
 		if !t.Clickable {

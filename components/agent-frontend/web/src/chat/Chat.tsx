@@ -28,7 +28,7 @@ import {
   ToolbarGroup,
   ToolbarItem,
 } from "@patternfly/react-core";
-import { TimesIcon } from "@patternfly/react-icons";
+import { StarIcon, TimesIcon } from "@patternfly/react-icons";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
 import { ConversationList } from "../shared/ConversationList";
@@ -489,7 +489,24 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
               <Tab
                 key={tab.id}
                 eventKey={tab.id}
-                title={<TabTitleText>{tab.title || "New conversation"}</TabTitleText>}
+                title={
+                  <TabTitleText>
+                    {tab.starred && (
+                      <span
+                        aria-label="Starred"
+                        style={{ display: "inline-flex", marginRight: "0.375rem", color: "var(--pf-t--global--icon--color--favorite--default)" }}
+                      >
+                        <StarIcon />
+                      </span>
+                    )}
+                    {tab.sending && (
+                      <span style={{ display: "inline-flex", marginRight: "0.375rem" }}>
+                        <Spinner size="sm" aria-label="Thinking" />
+                      </span>
+                    )}
+                    {tab.title || "New conversation"}
+                  </TabTitleText>
+                }
                 actions={
                   <TabAction
                     onClick={(e) => {
