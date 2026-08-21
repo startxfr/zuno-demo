@@ -1,6 +1,6 @@
 # WP-062: Day 2 test/stresstest chassis (delivers ADR-0057)
 
-- **State:** Repo work merged (2026-08-21) - executed with three
+- **State:** Done (2026-08-21) - executed with three
   file-path refinements over this brief's original sketch (acceptance
   criteria unchanged): the per-agent availability-check loop lives at
   `ansible/tasks/day2_availability_check.yml` (shared, not inside any
@@ -48,6 +48,17 @@
 
   A second live-cluster confirmation run after these fixes is the
   remaining operator step.
+
+  **Second live-cluster confirmation (2026-08-21):** ran `make d2 test`
+  against the real cluster - `14/14 passed overall - PASS`. All six
+  deployed agent frontends (advantage/arkos/comage/finage/naveo/tekos)
+  and all four platform services (agent-runtime, ai-gateway, mcp-gateway,
+  rag-service, healthz+readyz) passed; `soursage`/`cognos` correctly
+  absent from the agent list and no individual MCP server rows appeared,
+  confirming both false-positive fixes hold. `check.yml`'s consolidated
+  loop-driven task list is confirmed live-equivalent to the old
+  six-block form. ADR-0057's acceptance criteria are now fully
+  discharged - flipped to Done/Implemented.
 - **ADRs:** ADR-0057
 - **Depends on:** WP-31 (agent-parameterized `run_scenarios.py`, the
   precedent this generalizes further), WP-43 (agent maturity model / OKF

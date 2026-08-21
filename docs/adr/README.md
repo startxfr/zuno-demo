@@ -69,8 +69,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0055](0055-repository-review-change-set-index.md) | v0.1 | Implemented | Repository review change-set index |
 | [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | v0 | Implemented | Restructure deployment into Day 0 / Day 1 sequencing |
-| [ADR-0057](0057-introduce-day-2-agent-availability-test-and-stresstest-operations.md) | v0 | Partially implemented | Introduce Day 2 agent availability-test and stresstest operations |
-| [ADR-0058](0058-aggregate-existing-test-content-into-a-bulk-interaction-stresstest.md) | v0 | Partially implemented | Aggregate existing test content into make d2 stresstest, with a bulk-interaction load mode |
+| [ADR-0057](0057-introduce-day-2-agent-availability-test-and-stresstest-operations.md) | v0 | Implemented | Introduce Day 2 agent availability-test and stresstest operations |
+| [ADR-0058](0058-aggregate-existing-test-content-into-a-bulk-interaction-stresstest.md) | v0 | Implemented | Aggregate existing test content into make d2 stresstest, with a bulk-interaction load mode |
 | [ADR-0059](0059-auto-redeploy-on-in-cluster-build-via-image-triggers.md) | v0 | Implemented | Auto-redeploy consuming pods when an in-cluster build completes |
 
 ## version 0.1

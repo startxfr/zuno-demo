@@ -1,6 +1,6 @@
 # WP-063: Stresstest content aggregation + bulk-interaction mode (delivers ADR-0058)
 
-- **State:** Repo work merged (2026-08-21) - executed with several
+- **State:** Done (2026-08-21) - executed with several
   refinements over this brief's original sketch (acceptance criteria
   unchanged): agent discovery for the stresstest Job loop intersects
   `agents/*/agent.okf.md` with `evaluations/*/run_scenarios.py`
@@ -27,6 +27,29 @@
   own mandatory-gate invocation of `run_acceptance_gate.yml` is
   untouched - fully additive. Live cluster confirmation (`make d2
   stresstest` against a real cluster) is the remaining operator step.
+
+  **Live cluster confirmation (2026-08-21):** ran `make d2 stresstest
+  BULK=25` against the real cluster. The mechanism itself is fully
+  proven live: it discovered and ran contract/scenario/security/gate/
+  stress_test content for all six agents, honored `BULK=25`
+  non-interactively (a `bulk_load PASS` row rendered for every agent),
+  and correctly exited non-zero when checks failed - all of ADR-0058's
+  acceptance criteria are met. Overall content result:
+  `166/178 passed overall - FAIL`, a real finding, not a mechanism bug -
+  12 genuine live failures surfaced, new and separate from this WP's own
+  scope: `tekos/code_generation` 0/6 (`reply_len=99 has_fence=False` on
+  every prompt - terraform/helm/python/bash/fenced_block/snippet_phrase);
+  `tekos/layer1_model_routing` 0/2 (`status=429` on both
+  `local-gpt-oss`- and `mistral-codestral`-routed prompts); one tekos
+  scenario 10 fail (`source_mode=none citations=[]`); three arkos
+  scenario fails (7: `status=502`; 9: `saw_token=False saw_done=True`;
+  10: `status=500`). The 429s and the uniform 99-char no-fence replies
+  may share one root cause (a rate-limited/fallback response), and may
+  relate to the open [WP-54](wp-54-quota-policy-and-kuadrant-translation.md)
+  Kuadrant wasm-shim defect - not confirmed, needs its own follow-up.
+  Flagged to the operator rather than investigated further here, since
+  root-causing 12 failures across two agents is new scope beyond running
+  this WP's acceptance criteria.
 - **ADRs:** ADR-0058
 - **Depends on:** WP-062 (Day 2 chassis, report engine and agent-discovery
   mechanism must exist first; this WP fills in the stub
