@@ -56,21 +56,10 @@
       detail: "status={{ item.status | default('no response') }}"
       duration_ms: "{{ ((item.elapsed | default(0)) | float) * 1000 }}"
 
-- name: "day2-availability | render the report (platform/testing/day2_report.py)"
-  ansible.builtin.command:
-    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component agents"
-    stdin: "{{ _day2_availability_results | to_json }}"
-  register: _day2_availability_report
-  changed_when: false
-  failed_when: false
-
-- name: "day2-availability | print the report"
-  ansible.builtin.debug:
-    msg: "{{ _day2_availability_report.stdout_lines }}"
-
-- name: "day2-availability | fail if any agent frontend did not report healthy"
-  ansible.builtin.fail:
-    msg: >-
-      One or more agent frontends failed their /healthz check - see the
-      report above for which one(s).
-  when: _day2_availability_report.rc != 0
+# Pure fact-producer, deliberately no rendering/failing here: this file
+# is reused both by ansible/roles/agents/tasks/check.yml (Day 1's own
+# agents-only gate) and ansible/roles/day2/tasks/test.yml (Day 2's
+# combined agents+platform report), each of which needs a different
+# result set rendered/decided at a different point - see
+# ansible/tasks/day2_render_and_fail.yml, which both now call themselves
+# once they have the results list they actually want to report on.

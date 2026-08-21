@@ -1,0 +1,37 @@
+---
+# Shared by every Day 2 caller (and Day 1's agents check) that has
+# accumulated a list of platform/testing/day2_report.py::Day2Result-
+# shaped dicts in `_day2_render_results` and wants ONE clean, complete
+# report printed before any pass/fail decision - never a per-check
+# Ansible failure aborting mid-way through a batch of checks that hasn't
+# finished running yet (that early-abort bug is exactly what
+# ansible/roles/day2/tasks/test.yml hit before this file existed: an
+# agents-only fail task aborted the play before the platform check ever
+# ran). Mirrors `make d0 check`'s own precedent
+# (ansible/tasks/record_state.yml: "not installed yet is a normal,
+# reportable outcome" - report everything, decide once, at the end).
+#
+# Vars: `_day2_render_results` (required, set by the caller),
+# `day2_render_component` (default 'agents'),
+# `day2_render_fail_inline` (default true - set false for a caller that
+# only ever wants to report, never fail).
+- name: "day2-report | render the combined report (platform/testing/day2_report.py)"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component {{ day2_render_component | default('agents') }}"
+    stdin: "{{ _day2_render_results | default([]) | to_json }}"
+  register: _day2_render_report
+  changed_when: false
+  failed_when: false
+
+- name: "day2-report | print the combined report"
+  ansible.builtin.debug:
+    msg: "{{ _day2_render_report.stdout_lines | default(['No results to report.']) }}"
+
+- name: "day2-report | fail if anything did not pass"
+  ansible.builtin.fail:
+    msg: >-
+      One or more checks did not pass - see the report above for which
+      one(s).
+  when:
+    - day2_render_fail_inline | default(true)
+    - (_day2_render_report.rc | default(0)) != 0

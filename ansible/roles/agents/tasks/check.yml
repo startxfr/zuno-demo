@@ -116,6 +116,12 @@
 - name: "agents | run the Day 2 availability check for every discovered agent (ADR-0057)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
 
+- name: "agents | report and gate on the availability check (ADR-0057)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
+  vars:
+    _day2_render_results: "{{ _day2_availability_results | default([]) }}"
+    day2_render_component: agents
+
 # ADR-0327's own acceptance bullet ("status.conditions provides useful
 # readiness/error state consumed by `make check`") discharged here, for
 # Arkos specifically - this repo's one CR-managed agent (WP-38 migration

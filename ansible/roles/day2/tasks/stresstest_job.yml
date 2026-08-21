@@ -191,30 +191,16 @@
   loop_control:
     loop_var: day2_stress_agent
 
-- name: "day2-stresstest | render the combined report (platform/testing/day2_report.py)"
-  ansible.builtin.command:
-    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component agents"
-    stdin: "{{ _day2_stress_results | default([]) | to_json }}"
-  register: _day2_stress_report
-  changed_when: false
-  failed_when: false
-  when: (_day2_stress_results | default([]) | length) > 0
-
-- name: "day2-stresstest | print the combined report"
-  ansible.builtin.debug:
-    msg: "{{ _day2_stress_report.stdout_lines | default(['No stresstest content ran - see any warning above.']) }}"
-
 # Informational, never mandatory (ADR-0058): this exit code is never read
 # by make day1 check agents / the ADR-0053 gate - it's a separate
 # playbook nothing else invokes - but `make d2 stresstest` should still
 # tell an operator/script whether anything failed, the same way every
-# evaluations/*.py script's own main() does.
-- name: "day2-stresstest | fail if any stresstest check did not pass (informational - see above)"
-  ansible.builtin.fail:
-    msg: >-
-      One or more stresstest checks did not pass - see the report above
-      for which one(s). This is informational only and does not affect
-      `make day1 check agents` / the ADR-0053 mandatory gate.
-  when:
-    - _day2_stress_report is defined
-    - (_day2_stress_report.rc | default(0)) != 0
+# evaluations/*.py script's own main() does. Shared renderer (also used
+# by ansible/roles/day2/tasks/test.yml and
+# ansible/roles/agents/tasks/check.yml) - report everything first, then
+# decide once.
+- name: "day2-stresstest | report and decide on the combined stresstest results"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
+  vars:
+    _day2_render_results: "{{ _day2_stress_results | default([]) }}"
+    day2_render_component: agents

@@ -154,24 +154,11 @@
   register: _day2_platform_log
   when: (_day2_platform_pod.resources | default([]) | length) > 0
 
-# Rendering happens on the control node (platform/testing/day2_report.py
-# is a real repo file here, unlike inside the bare python:3.12-slim
-# container) - same split as ansible/tasks/day2_availability_check.yml.
-- name: "day2-platform | render the report (platform/testing/day2_report.py)"
-  ansible.builtin.command:
-    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component platform"
-    stdin: "{{ _day2_platform_log.log }}"
-  register: _day2_platform_report
-  changed_when: false
-  failed_when: false
-
-- name: "day2-platform | print the report"
-  ansible.builtin.debug:
-    msg: "{{ _day2_platform_report.stdout_lines }}"
-
-- name: "day2-platform | fail if any shared platform service did not report healthy"
-  ansible.builtin.fail:
-    msg: >-
-      One or more shared platform services failed their /healthz or
-      /readyz check - see the report above for which one(s).
-  when: _day2_platform_report.rc != 0
+# Pure fact-producer, deliberately no rendering/failing here - same
+# reasoning as ansible/tasks/day2_availability_check.yml's own trailer
+# comment: ansible/roles/day2/tasks/test.yml combines this with the
+# agents results and renders/decides once, via
+# ansible/tasks/day2_render_and_fail.yml.
+- name: "day2-platform | parse the Job's output into _day2_platform_results"
+  ansible.builtin.set_fact:
+    _day2_platform_results: "{{ (_day2_platform_log.log | default('[]')) | from_json }}"

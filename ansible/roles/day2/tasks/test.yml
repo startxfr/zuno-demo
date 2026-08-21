@@ -5,6 +5,14 @@
 # a lightweight in-cluster Job (the shared services have no Route - see
 # platform_health_check.yml). Both are availability-only: no chat traffic,
 # no credentials beyond what a /healthz GET already needs.
+#
+# Both included files are pure fact-producers (no rendering/failing of
+# their own) specifically so that, with target_component=all, one
+# unhealthy agent can never prevent the platform check from running -
+# both always run to completion, and only the combined result of both is
+# reported/decided, once, at the end. Matches `make d0 check`'s own
+# report-everything-then-decide-once precedent
+# (ansible/tasks/record_state.yml).
 - name: "day2-test | run the agents availability check"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
   when: target_component in ['agents', 'all']
@@ -12,3 +20,9 @@
 - name: "day2-test | run the platform availability check"
   ansible.builtin.include_tasks: platform_health_check.yml
   when: target_component in ['platform', 'all']
+
+- name: "day2-test | combine agents + platform results into one report"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
+  vars:
+    _day2_render_results: "{{ (_day2_availability_results | default([])) + (_day2_platform_results | default([])) }}"
+    day2_render_component: "{{ target_component }}"
