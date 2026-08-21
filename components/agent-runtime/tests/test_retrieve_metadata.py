@@ -13,6 +13,7 @@ Run directly:
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import pathlib
 import sys
@@ -23,13 +24,23 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 # app.graph.nodes (which imports app.registry and eagerly constructs an
 # AgentRegistry at its own module level) is ever imported in this process.
 os.environ.setdefault("AGENTS_DIR", str(_REPO_ROOT / "agents"))
+# Same timing constraint as AGENTS_DIR above - app.graph.nodes constructs a
+# module-level KnowledgePolicyStore(KNOWLEDGE_POLICY_PATH) at import time
+# (see that module), needed here so resolve_authorized_domains actually
+# authorizes knowledge.tech instead of denying everything - same pattern
+# tests/test_history.py and friends already use.
+os.environ.setdefault("KNOWLEDGE_POLICY_PATH", str(_REPO_ROOT / "policies" / "knowledge" / "knowledge-policy.yaml"))
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
+from app.graph import nodes as nodes_module  # noqa: E402
 from app.graph.nodes import (  # noqa: E402
+    _ANSWER_TASK,
+    _TEKOS,
     _detect_language,
     _escalate,
     _extract_product_version,
+    _make_retrieve_node,
 )
 
 
@@ -63,6 +74,39 @@ def test_openshift_ai_pattern_takes_precedence_over_bare_openshift() -> None:
     product, version = _extract_product_version("compare OpenShift AI 3.5 to OpenShift AI 2.16")
     assert product == "openshift-ai"
     assert version == "3.5"  # first match wins, deterministic
+
+
+def test_retrieve_node_stops_filtering_by_the_broken_product_field() -> None:
+    """Live-cluster-confirmed 2026-08-22 (tekos scenario 10 stuck at
+    source_mode=none): rag_ingestion.py tags metadata.product with the raw
+    per-source doc slug (e.g. "red-hat-openshift-ai-self-managed"), never
+    the canonical value _extract_product_version returns - rag-service's
+    product filter has no fallback for a miss (unlike technology's
+    grandfather clause), so passing product= here silently zeroed every
+    RAG result for any message this detection fires on. technology= (the
+    same canonical value, the working, correct cross-source filter) must
+    still be passed through unchanged."""
+    captured: dict = {}
+
+    async def fake_search(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    retrieve_node = _make_retrieve_node(_TEKOS, _ANSWER_TASK)
+    saved_search = nodes_module.search
+    nodes_module.search = fake_search
+    try:
+        asyncio.run(
+            retrieve_node(
+                {"message": "what's new in OpenShift 4.20 networking", "groups": ["consultant"], "errors": []}
+            )
+        )
+    finally:
+        nodes_module.search = saved_search
+
+    assert captured.get("product") is None
+    assert captured.get("technology") == "openshift"
+    assert captured.get("version") == "4.20"
 
 
 def test_detects_french_via_accented_characters() -> None:
@@ -103,6 +147,7 @@ TESTS = [
     test_falls_back_to_bare_openshift_product,
     test_no_match_returns_none_none,
     test_openshift_ai_pattern_takes_precedence_over_bare_openshift,
+    test_retrieve_node_stops_filtering_by_the_broken_product_field,
     test_detects_french_via_accented_characters,
     test_detects_french_via_stopword_without_accents,
     test_english_returns_none_not_en,

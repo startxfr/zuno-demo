@@ -272,7 +272,6 @@ def _make_retrieve_node(agent: AgentDefinition, task: TaskDefinition):
             docs = await search(
                 query=state["message"],
                 top_k=rag_top_k,
-                product=product,
                 version=version,
                 language=language,
                 caller_groups=caller_groups,
@@ -281,8 +280,17 @@ def _make_retrieve_node(agent: AgentDefinition, task: TaskDefinition):
                 # "openshift-ai") ARE canonical technology_vocabulary entries
                 # (knowledge/tech/domain.yaml), so the same detection doubles as
                 # the cross-source technology filter that matches web AND
-                # Confluence chunks - the per-source `product` vocabulary never
-                # did (its deprecation as a filter key is flagged for v0.3).
+                # Confluence chunks. The per-source `product` vocabulary never
+                # did (rag_ingestion.py tags metadata.product with the raw
+                # per-source doc slug, e.g. "red-hat-openshift-ai-self-managed",
+                # never this canonical form) - rag-service's product filter has
+                # no fallback for a miss (unlike technology's grandfather
+                # clause), so passing product= here silently zeroed every RAG
+                # result for any message this detection fires on. Deprecated
+                # as a filter key per this comment's own prior note (targeted
+                # for v0.3) - live-cluster-confirmed 2026-08-22 via tekos
+                # scenario 10 (source_mode stuck at "none"), removed now
+                # rather than waiting.
                 technology=product,
                 project_id=project_id,
                 caller_sub=state.get("user_sub"),
