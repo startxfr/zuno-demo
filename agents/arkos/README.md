@@ -7,15 +7,15 @@
 
 ## Stage (ADR-0502)
 
-**Stage 1, promotion steps 1-4 of `platform/templates/agent/
-PROMOTION.md` complete** (the legacy full-skeleton shape: the empty
-`policies/`/`rag/`/`tools/` directories are retained, not deleted, and
-still await real content - `deployment/` and `tests/` no longer are, see
-below).
+**`zuno.status: active` (WP-11, 2026-08-21)** — promoted at the
+operator's explicit direction, ahead of `platform/templates/agent/
+PROMOTION.md` steps 1 and 3 formally closing out (see below); the legacy
+full-skeleton shape still applies otherwise (the empty `policies/`/
+`rag/`/`tools/` directories are retained, not deleted, and still await
+real content - `deployment/` and `tests/` no longer are, see below).
 
-- `zuno.status: placeholder` — the portal renders "coming soon" and
-  Agent Runtime's generic dispatch 404s `/v1/agents/arkos/chat` until
-  the flip.
+- `zuno.status: active` — the portal renders Arkos's tile as enabled and
+  Agent Runtime's generic dispatch serves `/v1/agents/arkos/chat`.
 - **CR-managed live**: `gitops/charts/arkos/` renders a single
   `AIAgent` CR (the WP-38 migration proof; all five status conditions
   confirmed `True` in-cluster 2026-08-17). Arkos is the walking example
@@ -34,15 +34,16 @@ below).
 - Evaluations: `evaluations/arkos/scenarios.yaml` authored and updated
   for the two new tasks (WP-10 - scenarios 8/9 now exercise
   workshop-presentation/structure-demo instead of generic DAT text).
-  **Human scenario review and the live 75 % gate run remain the open
-  promotion steps** (plus Google + Confluence live verification, per
-  WP-31) - PROMOTION.md steps 1 and 3.
+  **A formal human scenario-review sign-off and a live 75 % gate run
+  (`run_acceptance_gate.py`) are still outstanding as separate,
+  documented checkpoints** - PROMOTION.md steps 1 and 3 - even though the
+  agent is already live (WP-11 flipped status ahead of them, at the
+  operator's own risk/judgment call).
 
-**Next step:** `platform/templates/agent/PROMOTION.md` step 1 (your
-human scenario review of `evaluations/arkos/scenarios.yaml`, especially
-the updated scenarios 8/9), then step 3 (live `run_acceptance_gate.py`)
-and step 5 (flip `zuno.status: active`) — Arkos is otherwise ready for
-Stage 2.
+**Next step:** run `platform/templates/agent/PROMOTION.md` steps 1 and 3
+retroactively (human scenario review of `evaluations/arkos/scenarios.yaml`,
+then the live gate) to close out the paperwork the status flip jumped
+ahead of.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 
