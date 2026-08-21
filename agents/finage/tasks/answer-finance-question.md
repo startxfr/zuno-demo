@@ -7,6 +7,7 @@ zuno:
     - web_search
   allowed_knowledge:
     - knowledge.project
+    - knowledge.sxa
 ---
 
 # Answer a finance or billing question
@@ -30,13 +31,17 @@ state["message"]}` calling convention the way a search-shaped capability
 does, so those tools stay declared-but-not-live-routed (v1 scope) rather
 than forcing a mismatched integration here.
 
-**Documented gap (WP-36's own brief anticipates this)**: no
-finance-specific RAG knowledge domain exists in this repository, and
-`policies/knowledge/knowledge-policy.yaml`'s `knowledge.sxa-legacy` entry
-deliberately excludes `finance` from its `allowed_groups` (ADR-0340's own
-access-intent table, WP-32) - legacy commercial data stays narrower than
-the live domains even for finance. `allowed_knowledge` above is therefore
-`knowledge.project` only; no new domain is invented to fill the gap. This
-task never declares the sales or ADV knowledge domains, or any
-Salesforce/Aramis capability - Finage proves finance-scoped access
-without inheriting broader Sales/ADV access (ADR-0326).
+**Documented gap (WP-36's own brief anticipates this), now partially
+closed**: `policies/knowledge/knowledge-policy.yaml`'s `knowledge.sxa-legacy`
+entry still deliberately excludes `finance` from its `allowed_groups`
+(ADR-0340's own access-intent table, WP-32) - that specific domain stays
+narrower than the live domains even for finance, unchanged. ADR-0217/WP-067
+adds a second, distinct `knowledge.sxa` domain (a weekly, already-anonymized
+commercial corpus, not the MariaDB-backed legacy snapshot) with
+`finance` deliberately included in its `allowed_groups` - the two decisions
+do not conflict, since they gate two different domains. `allowed_knowledge`
+above is therefore `knowledge.project` and `knowledge.sxa`, still never
+`knowledge.sxa-legacy`, `knowledge.sales`, or `knowledge.adv`. This task
+still declares no Salesforce/Aramis capability - Finage proves
+finance-scoped access without inheriting broader Sales/ADV access
+(ADR-0326).

@@ -18,7 +18,9 @@ ADR-0204 (WP-22): the fetch stages are implementations of one source-adapter
 interface (SOURCE_ADAPTERS below), each bound to exactly one logical knowledge
 domain: fetch-redhat + fetch-confluence -> knowledge.tech, fetch-salesforce ->
 knowledge.sales, fetch-aramis -> knowledge.adv, load-sxa-dump ->
-knowledge.sxa-legacy. A pipeline run targets one domain (--domain /
+knowledge.sxa-legacy, fetch-sxa -> knowledge.sxa (ADR-0217: a distinct,
+already-anonymized weekly SXA source - no MariaDB, no MCP tools, unlike
+load-sxa-dump). A pipeline run targets one domain (--domain /
 INGESTION_DOMAIN): running a fetch stage against the wrong domain aborts
 before writing anything (fail closed - the per-domain databases of ADR-0204
 must never receive another domain's records), and every raw record is stamped
@@ -54,6 +56,7 @@ STAGES = (
     "fetch-salesforce",
     "fetch-aramis",
     "load-sxa-dump",
+    "fetch-sxa",
     "detect-changes",
     "normalize",
     "chunk",
@@ -171,6 +174,19 @@ class IngestionConfig:
     sxa_mariadb_password: Optional[str]
     sxa_mariadb_database: str
 
+    # ADR-0217 (WP-067): fetch-sxa's own dedicated bucket - a distinct
+    # source from sxa_dump_s3_key/sxa_mariadb_* above (knowledge.sxa-legacy).
+    # No MariaDB fields: this domain is RAG-only, no live query target.
+    sxa_corpus_schema_s3_key: Optional[str]
+    sxa_corpus_data_s3_key: Optional[str]
+    sxa_corpus_snapshot_id: Optional[str]
+    sxa_corpus_s3_endpoint: str
+    sxa_corpus_s3_bucket: str
+    sxa_corpus_s3_region: str
+    sxa_corpus_s3_path_style: bool
+    sxa_corpus_aws_access_key_id: Optional[str]
+    sxa_corpus_aws_secret_access_key: Optional[str]
+
     # ADR-0205/WP-24: this run's domain's freshness objective, realized as
     # a duration spec ("7d"/"4h"/"5m"/"none") - see _parse_duration_spec.
     # Mirrors knowledge/<domain>/domain.yaml's freshness.operation_classes.
@@ -272,6 +288,15 @@ def load_config() -> IngestionConfig:
         sxa_mariadb_user=os.environ.get("SXA_MARIADB_USER"),
         sxa_mariadb_password=os.environ.get("SXA_MARIADB_PASSWORD"),
         sxa_mariadb_database=os.environ.get("SXA_MARIADB_DATABASE", ""),
+        sxa_corpus_schema_s3_key=os.environ.get("SXA_CORPUS_SCHEMA_S3_KEY"),
+        sxa_corpus_data_s3_key=os.environ.get("SXA_CORPUS_DATA_S3_KEY"),
+        sxa_corpus_snapshot_id=os.environ.get("SXA_CORPUS_SNAPSHOT_ID"),
+        sxa_corpus_s3_endpoint=os.environ.get("SXA_CORPUS_S3_ENDPOINT", ""),
+        sxa_corpus_s3_bucket=os.environ.get("SXA_CORPUS_S3_BUCKET", ""),
+        sxa_corpus_s3_region=os.environ.get("SXA_CORPUS_S3_REGION", ""),
+        sxa_corpus_s3_path_style=_env_bool("SXA_CORPUS_S3_PATH_STYLE", False),
+        sxa_corpus_aws_access_key_id=os.environ.get("SXA_CORPUS_AWS_ACCESS_KEY_ID"),
+        sxa_corpus_aws_secret_access_key=os.environ.get("SXA_CORPUS_AWS_SECRET_ACCESS_KEY"),
         stale_after_spec=os.environ.get("STALE_AFTER"),
         s3_endpoint=os.environ.get("S3_ENDPOINT", ""),
         s3_bucket=_env("S3_BUCKET", required=True),
@@ -1148,6 +1173,317 @@ def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
 
 
 # --------------------------------------------------------------------------
+# fetch-sxa (knowledge.sxa)
+# --------------------------------------------------------------------------
+
+_CREATE_TABLE_RE = re.compile(
+    r"CREATE\s+TABLE\s+`?(?P<table>\w+)`?\s*\((?P<body>.*)\)\s*ENGINE",
+    re.IGNORECASE | re.DOTALL,
+)
+_INSERT_RE = re.compile(
+    r"^INSERT\s+INTO\s+`?(?P<table>\w+)`?\s*"
+    r"(?:\((?P<columns>[^)]*)\)\s*)?"
+    r"VALUES\s*(?P<values>.+)$",
+    re.IGNORECASE | re.DOTALL,
+)
+_TABLE_CONSTRAINT_KEYWORDS = (
+    "PRIMARY KEY", "UNIQUE KEY", "UNIQUE", "KEY", "INDEX", "CONSTRAINT",
+    "FOREIGN KEY", "FULLTEXT", "SPATIAL", "CHECK",
+)
+
+
+def _split_top_level(text: str, sep: str) -> list:
+    """Splits `text` on `sep` at paren-depth 0, quote-aware (single/double/
+    backtick) - the same escaping rules as _split_sql_statements, generalized
+    to any separator/depth rather than only top-level semicolons. Used for
+    both a CREATE TABLE body's column/constraint definitions and a VALUES
+    clause's row tuples (sep=",", called with the text already stripped to
+    one row's parenthesized contents) - mysqldump output is machine-generated
+    and well-formed, so this doesn't need to handle adversarial input, only
+    normal escaping and nested parens (column type precision, e.g.
+    DECIMAL(10,2))."""
+    parts = []
+    current: list = []
+    depth = 0
+    in_string: Optional[str] = None
+    escaped = False
+    for ch in text:
+        if escaped:
+            current.append(ch)
+            escaped = False
+            continue
+        if ch == "\\" and in_string in ("'", '"'):
+            current.append(ch)
+            escaped = True
+            continue
+        if in_string:
+            current.append(ch)
+            if ch == in_string:
+                in_string = None
+            continue
+        if ch in ("'", '"', "`"):
+            in_string = ch
+            current.append(ch)
+            continue
+        if ch == "(":
+            depth += 1
+            current.append(ch)
+            continue
+        if ch == ")":
+            depth -= 1
+            current.append(ch)
+            continue
+        if ch == sep and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(ch)
+    tail = "".join(current)
+    if tail.strip():
+        parts.append(tail)
+    return [p.strip() for p in parts]
+
+
+def _split_row_tuples(values_clause: str) -> list:
+    """Splits a VALUES clause ("(1,'a'),(2,'b')") into each row's raw inner
+    text ("1,'a'" / "2,'b'"), quote-aware so a literal containing `),(`
+    never splits mid-row. Trailing `;`/whitespace already stripped by the
+    caller (_split_sql_statements)."""
+    rows = []
+    depth = 0
+    in_string: Optional[str] = None
+    escaped = False
+    current: list = []
+    for ch in values_clause:
+        if escaped:
+            if depth > 0:
+                current.append(ch)
+            escaped = False
+            continue
+        if ch == "\\" and in_string in ("'", '"'):
+            escaped = True
+            if depth > 0:
+                current.append(ch)
+            continue
+        if in_string:
+            if depth > 0:
+                current.append(ch)
+            if ch == in_string:
+                in_string = None
+            continue
+        if ch in ("'", '"'):
+            in_string = ch
+            if depth > 0:
+                current.append(ch)
+            continue
+        if ch == "(":
+            depth += 1
+            if depth > 1:
+                current.append(ch)
+            continue
+        if ch == ")":
+            depth -= 1
+            if depth == 0:
+                rows.append("".join(current))
+                current = []
+            else:
+                current.append(ch)
+            continue
+        if depth > 0:
+            current.append(ch)
+    return rows
+
+
+def _convert_sql_literal(token: str) -> Any:
+    """Converts one raw VALUES-tuple token into a Python value: quoted
+    strings are unescaped, NULL/numeric literals convert, anything else
+    (hex blobs, date/function literals mysqldump rarely emits per-row) is
+    kept as the raw token - good enough for _render_record_text's "Field:
+    value" rendering, which only needs a str() anyway."""
+    token = token.strip()
+    if token.upper() == "NULL":
+        return None
+    if len(token) >= 2 and token[0] == "'" and token[-1] == "'":
+        inner = token[1:-1]
+        return inner.replace("\\'", "'").replace('\\"', '"').replace("\\\\", "\\")
+    try:
+        if re.match(r"^-?\d+$", token):
+            return int(token)
+        return float(token)
+    except ValueError:
+        return token
+
+
+def _parse_create_table_columns(schema_text: str) -> Dict[str, list]:
+    """Extracts {table: [column, ...]} in declared order from a
+    mysqldump-style schema file, skipping table-level constraint
+    definitions (PRIMARY KEY/KEY/CONSTRAINT/...) that share the same
+    top-level comma-separated body as real column definitions."""
+    columns_by_table: Dict[str, list] = {}
+    for statement in _split_sql_statements(schema_text):
+        match = _CREATE_TABLE_RE.search(statement)
+        if not match:
+            continue
+        table = match.group("table")
+        columns = []
+        for fragment in _split_top_level(match.group("body"), ","):
+            fragment = fragment.strip()
+            if not fragment.startswith("`"):
+                upper = fragment.upper()
+                if any(upper.startswith(kw) for kw in _TABLE_CONSTRAINT_KEYWORDS):
+                    continue
+            col_match = re.match(r"`(?P<name>[^`]+)`", fragment)
+            if col_match:
+                columns.append(col_match.group("name"))
+        if columns:
+            columns_by_table[table] = columns
+    return columns_by_table
+
+
+def _parse_insert_rows(data_text: str, columns_by_table: Dict[str, list]):
+    """Yields (table, row_dict) for every row in every INSERT statement in
+    a mysqldump-style data file - no SQL engine involved (ADR-0217): the
+    column order comes from the INSERT's own explicit column list when
+    present, otherwise from columns_by_table (the CREATE TABLE-declared
+    order mysqldump's own default `INSERT INTO t VALUES (...)` form
+    relies on implicitly)."""
+    for statement in _split_sql_statements(data_text):
+        match = _INSERT_RE.match(statement.strip())
+        if not match:
+            continue
+        table = match.group("table")
+        if match.group("columns"):
+            columns = [c.strip().strip("`") for c in match.group("columns").split(",")]
+        else:
+            columns = columns_by_table.get(table)
+        if not columns:
+            logger.warning(
+                "fetch-sxa: no column order known for table %s (missing from "
+                "schema and INSERT has no explicit column list) - skipping its rows",
+                table,
+            )
+            continue
+        for row_text in _split_row_tuples(match.group("values")):
+            tokens = _split_top_level(row_text, ",")
+            if len(tokens) != len(columns):
+                logger.warning(
+                    "fetch-sxa: row in table %s has %d values but %d known columns - skipping",
+                    table, len(tokens), len(columns),
+                )
+                continue
+            yield table, {col: _convert_sql_literal(tok) for col, tok in zip(columns, tokens)}
+
+
+def _fetch_sxa_corpus_bytes(config: IngestionConfig, key: str) -> Optional[bytes]:
+    """Fetches one object from fetch-sxa's own dedicated bucket (ADR-0217) -
+    a separate client from CorpusStore, same pattern as
+    _fetch_sxa_dump_bytes's separate client for sxa-legacy's own dedicated
+    bucket. Distinct buckets: this source's provenance/trust model is not
+    shared with sxa-legacy's."""
+    from botocore.config import Config as BotoClientConfig
+
+    client_kwargs: dict = {
+        "region_name": config.sxa_corpus_s3_region or None,
+        "aws_access_key_id": config.sxa_corpus_aws_access_key_id,
+        "aws_secret_access_key": config.sxa_corpus_aws_secret_access_key,
+        "config": BotoClientConfig(
+            s3={"addressing_style": "path" if config.sxa_corpus_s3_path_style else "auto"},
+            connect_timeout=10,
+            read_timeout=60,
+            retries={"max_attempts": 4, "mode": "standard"},
+        ),
+    }
+    if config.sxa_corpus_s3_endpoint:
+        client_kwargs["endpoint_url"] = config.sxa_corpus_s3_endpoint
+    client = boto3.client("s3", **client_kwargs)
+    try:
+        resp = client.get_object(Bucket=config.sxa_corpus_s3_bucket, Key=key)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404"):
+            return None
+        raise
+    return resp["Body"].read()
+
+
+def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
+    """ADR-0217 (WP-067): a weekly, already-anonymized SXA corpus export -
+    distinct from load-sxa-dump/knowledge.sxa-legacy above. Parses
+    schema.sql + data.sql directly in Python (no MariaDB, no SQL engine at
+    all: mysqldump output is machine-generated and well-formed, the same
+    assumption _split_sql_statements already relies on elsewhere in this
+    file), audits (never redacts - the operator asserts this export is
+    already anonymized) each row via sxa_anonymize.audit_pii_patterns, and
+    emits one raw record per row. Idempotent per snapshot id, same
+    discipline as load-sxa-dump: a re-run against byte-identical
+    schema/data produces byte-identical records (detect-changes sees
+    unchanged sha256s)."""
+    if not config.sxa_corpus_schema_s3_key or not config.sxa_corpus_data_s3_key:
+        raise SystemExit(
+            "fetch-sxa: SXA_CORPUS_SCHEMA_S3_KEY/SXA_CORPUS_DATA_S3_KEY not set - "
+            "upload the approved weekly export to the dedicated SXA corpus "
+            "bucket and point this at it"
+        )
+    schema_bytes = _fetch_sxa_corpus_bytes(config, config.sxa_corpus_schema_s3_key)
+    if schema_bytes is None:
+        raise SystemExit(
+            f"fetch-sxa: no object at s3://{config.sxa_corpus_s3_bucket}/{config.sxa_corpus_schema_s3_key}"
+        )
+    data_bytes = _fetch_sxa_corpus_bytes(config, config.sxa_corpus_data_s3_key)
+    if data_bytes is None:
+        raise SystemExit(
+            f"fetch-sxa: no object at s3://{config.sxa_corpus_s3_bucket}/{config.sxa_corpus_data_s3_key}"
+        )
+    schema_text = schema_bytes.decode("utf-8", errors="replace")
+    data_text = data_bytes.decode("utf-8", errors="replace")
+    checksum = hashlib.sha256(schema_bytes + b"\n" + data_bytes).hexdigest()
+    snapshot_id = config.sxa_corpus_snapshot_id or f"sha256-{checksum[:16]}"
+    fetched_at = _utcnow_iso()
+
+    if "CREATE TABLE" not in schema_text.upper():
+        raise SystemExit(
+            "fetch-sxa: no CREATE TABLE statements found in schema.sql - "
+            "not a mysqldump-style schema export, refusing to parse an unvalidated shape"
+        )
+
+    columns_by_table = _parse_create_table_columns(schema_text)
+    written = 0
+    for table, row in _parse_insert_rows(data_text, columns_by_table):
+        sxa_anonymize.audit_pii_patterns(table, row)
+        text = _render_record_text(row)
+        if not text.strip():
+            continue
+        row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
+        record_url = f"sxa-corpus://{table}/{row_id}"
+        doc_id = doc_id_for(record_url)
+        record = {
+            "doc_id": doc_id,
+            "url": record_url,
+            "title": f"SXA {table} #{row_id}",
+            "text": text,
+            "domain": "knowledge.sxa",
+            "product": None,
+            "version": None,
+            "language": "fr",
+            "source_type": "sxa-corpus",
+            "classification": "C3",
+            "acl_groups": [],
+            "fetched_at": fetched_at,
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "provenance": f"sxa corpus weekly export snapshot {snapshot_id}",
+            "sxa": {
+                "snapshot_id": snapshot_id,
+                "import_timestamp": fetched_at,
+                "checksum": checksum,
+                "table": table,
+            },
+        }
+        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+        written += 1
+    return written
+
+
+# --------------------------------------------------------------------------
 # Adapter registry
 # --------------------------------------------------------------------------
 
@@ -1159,6 +1495,7 @@ SOURCE_ADAPTERS = {
         SourceAdapter("fetch-salesforce", "knowledge.sales", _fetch_salesforce),
         SourceAdapter("fetch-aramis", "knowledge.adv", _fetch_aramis),
         SourceAdapter("load-sxa-dump", "knowledge.sxa-legacy", _load_sxa_dump),
+        SourceAdapter("fetch-sxa", "knowledge.sxa", _fetch_sxa),
     )
 }
 

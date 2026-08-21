@@ -72,6 +72,10 @@ data:
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragAdvDatabase.owner }};
 
+    \connect {{ .Values.ragSxaDatabase.name }}
+    CREATE EXTENSION IF NOT EXISTS vector;
+    GRANT ALL ON SCHEMA public TO {{ .Values.ragSxaDatabase.owner }};
+
     \connect {{ .Values.ragProjectDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragProjectDatabase.owner }};

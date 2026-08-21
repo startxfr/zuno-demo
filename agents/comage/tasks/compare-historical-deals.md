@@ -8,6 +8,7 @@ zuno:
     - sxa.aggregate.revenue-by-year
   allowed_knowledge:
     - knowledge.sxa-legacy
+    - knowledge.sxa
 ---
 
 # Compare historical deals
@@ -19,6 +20,11 @@ revenue figures predating the live Salesforce cutover - using the
 `knowledge.sales`/`salesforce.opportunity.*` surfaces (ADR-0206: current
 Salesforce knowledge and legacy SXA are kept strictly separate, in both
 directions).
+
+`knowledge.sxa` (ADR-0217/WP-067) is a second, distinct legacy-commercial
+domain - a weekly, already-anonymized corpus export, separate from
+`knowledge.sxa-legacy`'s own MariaDB-backed, on-demand snapshot. Both are
+available to this task; neither supersedes the other.
 
 Declared for the OKF catalog (ADR-0038); no distinct Agent Runtime route
 exists for it yet in v0 - the single `POST /v1/agents/comage/chat`

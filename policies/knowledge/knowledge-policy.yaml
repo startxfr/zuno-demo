@@ -102,6 +102,20 @@ domains:
       - board
     min_classification: C3
 
+  knowledge.sxa:
+    # ADR-0217/WP-067: a distinct domain from knowledge.sxa-legacy above -
+    # an already-anonymized weekly export, deliberately opened to all four
+    # of Comage/Cognos/Advantage/Finage's business roles (unlike
+    # sxa-legacy's narrower sales/board-only posture, which stays
+    # unchanged). cdp is not listed: no stated need, unlike the
+    # "policy-defined" cells ADR-0340 calls out for knowledge.sales/adv.
+    allowed_groups:
+      - sales
+      - board
+      - adv
+      - finance
+    min_classification: C3
+
   knowledge.adv:
     allowed_groups:
       - adv

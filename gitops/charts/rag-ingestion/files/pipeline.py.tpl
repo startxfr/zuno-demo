@@ -35,6 +35,13 @@ CONFIG_KEYS = {
     "SXA_MARIADB_PORT": "SXA_MARIADB_PORT",
     "SXA_MARIADB_USER": "SXA_MARIADB_USER",
     "SXA_MARIADB_DATABASE": "SXA_MARIADB_DATABASE",
+    "SXA_CORPUS_SCHEMA_S3_KEY": "SXA_CORPUS_SCHEMA_S3_KEY",
+    "SXA_CORPUS_DATA_S3_KEY": "SXA_CORPUS_DATA_S3_KEY",
+    "SXA_CORPUS_SNAPSHOT_ID": "SXA_CORPUS_SNAPSHOT_ID",
+    "SXA_CORPUS_S3_ENDPOINT": "SXA_CORPUS_S3_ENDPOINT",
+    "SXA_CORPUS_S3_BUCKET": "SXA_CORPUS_S3_BUCKET",
+    "SXA_CORPUS_S3_REGION": "SXA_CORPUS_S3_REGION",
+    "SXA_CORPUS_S3_PATH_STYLE": "SXA_CORPUS_S3_PATH_STYLE",
     "S3_ENDPOINT": "S3_ENDPOINT",
     "S3_BUCKET": "S3_BUCKET",
     "S3_REGION": "S3_REGION",
@@ -99,6 +106,12 @@ SOURCE_SECRETS = {
     "{{ $name }}": (
         "{{ $domain.aramis.secretName }}",
         {"ARAMIS_BASE_URL": "ARAMIS_BASE_URL", "ARAMIS_TOKEN": "ARAMIS_TOKEN"},
+    ),
+{{- end }}
+{{- if and $domain.enabled $domain.sxaCorpus }}
+    "{{ $name }}": (
+        "{{ $domain.sxaCorpus.s3.secretName }}",
+        {"SXA_CORPUS_AWS_ACCESS_KEY_ID": "SXA_CORPUS_AWS_ACCESS_KEY_ID", "SXA_CORPUS_AWS_SECRET_ACCESS_KEY": "SXA_CORPUS_AWS_SECRET_ACCESS_KEY"},
     ),
 {{- end }}
 {{- end }}
@@ -182,6 +195,7 @@ fetch_confluence = component("fetch-confluence")
 fetch_salesforce = component("fetch-salesforce")
 fetch_aramis = component("fetch-aramis")
 load_sxa_dump = component("load-sxa-dump")
+fetch_sxa = component("fetch-sxa")
 detect_changes = component("detect-changes")
 normalize = component("normalize")
 chunk = component("chunk")
@@ -196,6 +210,7 @@ FETCH_COMPONENTS = {
     "fetch-salesforce": fetch_salesforce,
     "fetch-aramis": fetch_aramis,
     "load-sxa-dump": load_sxa_dump,
+    "fetch-sxa": fetch_sxa,
 }
 
 

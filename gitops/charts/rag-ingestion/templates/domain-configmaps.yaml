@@ -40,6 +40,18 @@ data:
   SXA_MARIADB_USER: {{ $domain.sxaDump.mariadb.username | quote }}
   SXA_MARIADB_DATABASE: {{ $domain.sxaDump.mariadb.database | quote }}
   {{- end }}
+  {{- if $domain.sxaCorpus }}
+  # ADR-0217/WP-067: fetch-sxa's own dedicated bucket - distinct from both
+  # S3_BUCKET (shared corpus) and SXA_S3_BUCKET (sxa-legacy's MariaDB-import
+  # bucket) above.
+  SXA_CORPUS_SCHEMA_S3_KEY: {{ $domain.sxaCorpus.schemaS3Key | default "" | quote }}
+  SXA_CORPUS_DATA_S3_KEY: {{ $domain.sxaCorpus.dataS3Key | default "" | quote }}
+  SXA_CORPUS_SNAPSHOT_ID: {{ $domain.sxaCorpus.snapshotId | default "" | quote }}
+  SXA_CORPUS_S3_ENDPOINT: {{ (ternary $domain.sxaCorpus.s3.endpoint (printf "https://s3.%s.amazonaws.com" $domain.sxaCorpus.s3.region) (ne $domain.sxaCorpus.s3.endpoint "")) | quote }}
+  SXA_CORPUS_S3_BUCKET: {{ $domain.sxaCorpus.s3.bucket | quote }}
+  SXA_CORPUS_S3_REGION: {{ $domain.sxaCorpus.s3.region | quote }}
+  SXA_CORPUS_S3_PATH_STYLE: {{ $domain.sxaCorpus.s3.pathStyle | quote }}
+  {{- end }}
   S3_ENDPOINT: {{ include "rag-ingestion.s3Endpoint" $root | quote }}
   S3_BUCKET: {{ $root.Values.s3.bucket | quote }}
   S3_REGION: {{ $root.Values.s3.region | quote }}

@@ -117,6 +117,17 @@ knowledgeDomains:
     vaultPath: rag-sxa-legacy/postgresql-app
     secretName: rag-service-db-ragsxalegacy
     seed: false
+  # knowledge.sxa (ADR-0217/WP-067) - distinct from sxa-legacy above.
+  # Starts dark like every other new-domain entry: its Vault credential and
+  # rag-sxa database only exist after the operator provisions them.
+  - domain: sxa
+    enabled: false
+    database: rag-sxa
+    schema: rag
+    envPrefix: RAGSXA
+    vaultPath: rag-sxa/postgresql-app
+    secretName: rag-service-db-ragsxa
+    seed: false
   - domain: adv
     enabled: false
     database: rag-adv

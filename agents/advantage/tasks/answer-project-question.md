@@ -12,6 +12,7 @@ zuno:
   allowed_knowledge:
     - knowledge.adv
     - knowledge.project
+    - knowledge.sxa
 ---
 
 # Answer a project or bid question
@@ -33,9 +34,17 @@ adapter, not a real-time query tool), so this task is indexed-read only -
 (ADR-0326).
 
 ADR-0326's signature proof for this slice: `allowed_knowledge` above
-never includes Comage's own current-sales knowledge domain, and
-`allowed_tools` never includes any live-CRM/legacy-SXA capability -
-Advantage proves the cross-domain authorization boundary by explicit
-omission, not by a runtime filter. Any cross-domain commercial access
-this agent might need in a future iteration must be added here
-explicitly and policy-controlled, never inherited from Comage.
+never includes Comage's own current-sales knowledge domain or
+`knowledge.sxa-legacy`, and `allowed_tools` never includes any
+live-CRM/legacy-SXA MCP capability - Advantage proves the cross-domain
+authorization boundary by explicit omission, not by a runtime filter. Any
+cross-domain commercial access this agent might need in a future
+iteration must be added here explicitly and policy-controlled, never
+inherited from Comage.
+
+`knowledge.sxa` (ADR-0217/WP-067) is the one exception, added deliberately:
+a weekly, already-anonymized commercial corpus distinct from
+`knowledge.sxa-legacy` - opened to Advantage from the start, unlike
+`knowledge.sxa-legacy`'s sales/board-only restriction (WP-35's negative
+test for Advantage against `knowledge.sxa-legacy` specifically is
+unaffected by this grant).

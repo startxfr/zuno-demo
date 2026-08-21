@@ -1,0 +1,225 @@
+# WP-067: Weekly, already-anonymized SXA corpus as a new RAG domain (promotes ADR-0217)
+
+- **State:** Repo work merged (2026-08-21 - Part A complete: `knowledge.sxa`
+  domain/policy/binding wiring, `fetch-sxa` source adapter (pure-Python
+  mysqldump parsing, no MariaDB/SQL engine), `sxa_anonymize.audit_pii_patterns()`,
+  weekly schedule, `rag-sxa` database wiring across postgresql/rag-ingestion/
+  rag-service charts, agent access grants for Comage/Advantage/Finage, a
+  declared-but-inert grant for Cognos, and fixture-driven tests - all passing.
+  Part B (dedicated bucket, real export upload, live verification) is still
+  open.)
+- **ADRs:** ADR-0217 (To be implemented -> Partially implemented); related to
+  but does not modify ADR-0216/WP-065
+- **Depends on:** none (independent of WP-065/WP-23's own open operator work)
+- **Blocks:** nothing - `knowledge.sxa-legacy` and its tests are untouched
+- **Estimated files touched:** ~20
+
+> Execute this brief as a standalone task from the repository root. Read
+> ADR-0217 in full before editing - it's the source of truth for every
+> decision below. Part A is pure repo work (chart/code/docs/tests, no real
+> export or bucket needed); Part B is operator-only.
+
+## Goal
+
+Give Comage, Advantage, and Finage weekly-refreshed RAG access to an
+already-anonymized SXA commercial corpus (`sxa.schema.sql` + `sxa.data.sql`,
+mysqldump format), without building or depending on a MariaDB import or any
+new MCP tool - RAG-only, distinct from `knowledge.sxa-legacy`
+(ADR-0216/WP-065).
+
+## ADR references
+
+Primary: [docs/adr/0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md](../../adr/0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md) -
+read all 5 Decision clauses and the Security considerations section (the
+"trust the upstream anonymization claim" posture is a named, explicit
+trade-off, not an oversight).
+
+Related: ADR-0216/WP-065 (the related-but-distinct MariaDB-backed effort -
+this WP does not modify it), ADR-0202/ADR-0203/ADR-0204 (logical knowledge
+domains, policy-intersection authorization, multi-domain RAG platform), ADR-0206
+(sales/SXA domain-separation precedent this extends), ADR-0326 (Comage/
+Advantage/Finage's existing cross-domain authorization boundaries - Advantage's
+and Finage's exclusion from `knowledge.sxa-legacy` stays intact; this WP adds a
+new, separate grant rather than touching that boundary), ADR-0340 (the
+access-intent matrix `knowledge.sxa`'s `allowed_groups` should be read
+alongside, without editing that matrix's existing sxa-legacy row).
+
+## Preconditions (verify before starting)
+
+- `python3 platform/docs/check_docs.py` and
+  `python3 platform/docs/check_knowledge_refs.py` both exit 0.
+- Read: `knowledge/sxa-legacy/domain.yaml` and
+  `gitops/charts/rag-ingestion/values.yaml`'s `domains.sxa-legacy` block (the
+  patterns being deliberately NOT reused - MariaDB import, on-demand
+  schedule, sales/board-only access); `components/rag-ingestion/src/
+  rag_ingestion.py`'s `_fetch_salesforce`/`_fetch_aramis` (the plain-adapter
+  shape `fetch-sxa` follows) and `_split_sql_statements` (the quote-aware
+  parsing idiom `fetch-sxa`'s own parser extends); `gitops/charts/rag-ingestion/
+  files/pipeline.py.tpl` in full (CONFIG_KEYS/SOURCE_SECRETS wiring a new
+  domain must extend in two places or a key silently drops - the
+  `mcp-gateway-test-venv`-adjacent "CONFIG_KEYS fix" precedent this repo has
+  already hit once).
+
+## Repo changes (step by step)
+
+### Part A - repo work, no real export/bucket needed
+
+1. **Knowledge domain**: `knowledge/sxa/domain.yaml` (new) - `id:
+   knowledge.sxa`, weekly freshness objective (not on-demand),
+   `exempt_from_freshness_enforcement: false` (unlike sxa-legacy). A `sxa:`
+   block added to `knowledge/metadata-schema.yaml`'s `domains:` section,
+   mirroring sxa-legacy's taxonomy fields.
+2. **Policy + binding**: `policies/knowledge/knowledge-policy.yaml` gains a
+   `knowledge.sxa` entry, `allowed_groups: [sales, board, adv, finance]`,
+   `min_classification: C3`. `platform/bindings/knowledge/bindings.yaml`
+   gains a `knowledge.sxa -> rag-sxa` entry (`RAGSXA` credential prefix).
+3. **Postgres database**: `gitops/charts/postgresql/values.yaml`'s
+   `ragSxaDatabase` block (owner `ragsxa`, database `rag-sxa`), wired into
+   `templates/postgrescluster.yaml`'s `spec.users`,
+   `templates/configmap-init-sql.yaml`'s one-time `CREATE EXTENSION
+   vector`/`GRANT` block, and a new
+   `templates/externalsecret-ragsxa.yaml` mirroring
+   `externalsecret-ragsxalegacy.yaml`.
+4. **rag-service wiring**: `gitops/charts/rag-service/values.yaml`'s
+   `knowledgeDomains` list gains a `sxa` entry (`enabled: false` until the
+   operator provisions credentials, same as every other new domain) - no
+   template changes needed, that chart's ExternalSecret/Deployment/
+   schema-apply templates already range generically over this list.
+5. **Source adapter**: `fetch-sxa` in `components/rag-ingestion/src/
+   rag_ingestion.py` - `_parse_create_table_columns()` (extracts column
+   order per table from `schema.sql`, skipping `PRIMARY KEY`/`KEY`/
+   `CONSTRAINT`/etc. table-level definitions), `_parse_insert_rows()`
+   (yields `(table, row_dict)` from `data.sql`'s `INSERT ... VALUES`
+   statements via a quote-aware, paren-depth-aware tokenizer -
+   `_split_top_level`/`_split_row_tuples`/`_convert_sql_literal`), and
+   `_fetch_sxa()` tying it together: fetch both files from the dedicated
+   bucket, parse, call `sxa_anonymize.audit_pii_patterns()` per row (never
+   `redact_row()` - this source is trusted pre-anonymized), render via the
+   existing `_render_record_text`, emit one raw record per row stamped
+   `domain: knowledge.sxa`. No SQL engine, ephemeral or persistent, is
+   involved anywhere in this path.
+6. **Audit function**: `components/rag-ingestion/src/sxa_anonymize.py`
+   gains `audit_pii_patterns(table, row) -> list[str]` - reuses the
+   existing `PII_COLUMNS` map and the email/phone regexes, logs a warning
+   per row/column hit, never alters a value. Additive; `redact_row()`/
+   `redact_value()` (WP-065's enforcing path) are unchanged.
+7. **Chart wiring**: `gitops/charts/rag-ingestion/values.yaml`'s
+   `domains.sxa` entry (`fetchStages: [fetch-sxa]`, its own
+   `sxaCorpus.s3` block - a bucket dedicated to this source, distinct from
+   both the shared corpus bucket and sxa-legacy's own dedicated
+   `sxaDump` bucket - `postgres.database: rag-sxa`,
+   `schedule: {enabled: true, cron: "0 0 4 * * 0"}`). `templates/
+   domain-configmaps.yaml` and `templates/external-secrets.yaml` gain
+   `if $domain.sxaCorpus` blocks emitting `SXA_CORPUS_*` env vars and the
+   bucket-credential ExternalSecret. `files/pipeline.py.tpl` gains the
+   `SXA_CORPUS_*` `CONFIG_KEYS` entries, a `fetch_sxa` component, and a
+   `SOURCE_SECRETS` entry for its bucket credential (the plain one-secret
+   pattern salesforce/aramis use, not the two-secret `SXA_SOURCE_SECRETS`
+   pattern sxa-legacy needs for its extra MariaDB credential).
+8. **Agent access**: `agents/comage/tasks/compare-historical-deals.md`,
+   `agents/advantage/tasks/answer-project-question.md`, and
+   `agents/finage/tasks/answer-finance-question.md` each gain
+   `knowledge.sxa` in `allowed_knowledge`. `agents/cognos/tasks/
+   review-historical-commercial-data.md` (new) declares
+   `allowed_knowledge: [knowledge.sxa]` - Cognos's `agent.okf.md` gains it
+   in its `tasks:` list, but this grant is inert: Cognos has no gitops
+   chart/Application/running workflow (`status: placeholder`,
+   `agents/cognos/NEXT_STEPS.md`), so nothing serves it until a separate
+   future promotion. `knowledge.sxa-legacy`'s existing `allowed_knowledge`
+   entries and WP-35's negative test for Advantage are untouched.
+9. **Tests**: `components/rag-ingestion/tests/test_source_adapters.py`
+    gains fixture-driven coverage for `_parse_create_table_columns`,
+    `_parse_insert_rows` (quoted commas, escaped quotes, `NULL`), the
+    `fetch-sxa` adapter end-to-end (one record per row, idempotent
+    re-import, refuses missing keys/non-schema content) and
+    `audit_pii_patterns` (flags without mutating). All run via the
+    component's own venv (`mcp-gateway-test-venv`-style precedent).
+
+### Part B - operator steps (not executable by the model)
+
+1. Create the dedicated SXA corpus S3 bucket; supply its name/region and
+   provision Vault credentials at `sxa-corpus/s3` (the path this WP's repo
+   work references).
+2. Upload the approved weekly `sxa.schema.sql` + `sxa.data.sql` export; set
+   `sxaCorpus.schemaS3Key`/`dataS3Key`/`snapshotId` to the real values.
+3. Seed the new `rag-sxa` Postgres database's Vault-sourced credentials
+   (`rag-sxa/postgresql-app`), sync `gitops/charts/postgresql` (creates the
+   database + runs the one-time `CREATE EXTENSION vector`/`GRANT`), then
+   flip `domains.sxa.enabled: true` in both the `rag-ingestion` and
+   `rag-service` charts and sync both.
+4. Extend `ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml`'s
+   domain loop (currently `tech`-only, per its own comment: "extend this
+   loop to cover enabled domains when WP-22 flips one on") to also
+   compile+apply the `sxa` pipeline version, verified live against this
+   cluster's actual KFP/DataSciencePipelinesApplication setup rather than
+   guessed - deferred to here rather than Part A because it's
+   infrastructure-orchestration code this WP's author cannot validate
+   without a live cluster.
+5. Run the ingestion pipeline once; confirm real rows land in
+   `document_embeddings` (row count, not just "the Job succeeded").
+6. Confirm the weekly schedule ConfigMap was picked up by
+   `ansible/roles/rag_ingestion/tasks/install.yml`'s recurring-run
+   reconciliation (`oc get configmap -l zuno.io/rag-ingestion-schedule=true`,
+   then the KFP recurring run itself).
+7. Spot-check retrieval as Comage/Advantage/Finage (real or fixture
+   Keycloak users with the matching business roles) and confirm a user
+   without `sales`/`board`/`adv`/`finance` cannot retrieve `knowledge.sxa`
+   content.
+8. Re-run a second time against an unchanged export; confirm
+   `document_embeddings` row count and `updated_at` are unchanged
+   (idempotent no-op).
+
+## What NOT to touch
+
+- `knowledge/sxa-legacy/domain.yaml`, `gitops/charts/rag-ingestion/values.yaml`'s
+  `domains.sxa-legacy` block, `components/rag-ingestion/src/rag_ingestion.py`'s
+  `_load_sxa_dump`/`_import_sxa_dump_native`/`_mariadb_connect`,
+  `sxa_anonymize.redact_row`/`redact_value` - WP-065's own path, unaffected.
+- `policies/knowledge/knowledge-policy.yaml`'s existing `knowledge.sxa-legacy`
+  entry and `policies/tools/tool-policy.yaml`'s `sxa.*` capabilities -
+  unchanged; this WP adds a new domain, never edits an existing one's
+  `allowed_groups`.
+- `agents/advantage/**` beyond the one `allowed_knowledge` addition -
+  Advantage's exclusion from `knowledge.sxa-legacy` (ADR-0326, WP-35) is not
+  touched or reversed.
+- `gitops/apps/*` `targetRevision`; chart image tags (WP-04).
+
+## Acceptance checks (run from repo root; all must pass)
+
+- `helm lint`/`helm template` on `postgresql`, `rag-ingestion`, and
+  `rag-service` charts.
+- Component test suite (own venv) for `rag_ingestion.py`/`sxa_anonymize.py` -
+  `tests/test_source_adapters.py`, `tests/test_sxa_anonymize.py`,
+  `tests/test_reconcile_acls.py`.
+- `python3 platform/docs/check_docs.py` → `RESULT: PASS`.
+- `python3 platform/docs/check_knowledge_refs.py` → `RESULT: PASS`.
+- `python3 platform/okf/generate_authorization_matrix.py` regenerates
+  Comage/Advantage/Finage/Cognos's `agent.okf.md` authorization matrices
+  cleanly (no manual edits to the generated block).
+
+## Operator / human follow-up
+
+See Part B above in full - every step there is operator-only.
+
+## Status updates (then re-run check_docs.py)
+
+- After Part A merge: ADR-0217 → `Partially implemented (knowledge.sxa
+  domain/policy/binding wiring, fetch-sxa adapter, weekly schedule, agent
+  access grants, and tests merged; dedicated bucket/real export and live
+  verification pending)`; index row to match; tracker → `Operator pending`;
+  this file's State.
+- After Part B: ADR-0217 → `Implemented`; index row `Implemented`; tracker →
+  `Done`; MEMORY.md dated bullet.
+
+## Out of scope / deferred
+
+- A MariaDB import or any new MCP deterministic-lookup tool for this source
+  - the user chose RAG-only; revisit only via a new ADR if a live-lookup
+    need for this specific corpus emerges later.
+- Converging `knowledge.sxa` and `knowledge.sxa-legacy` into one domain -
+  ADR-0217 explicitly keeps them separate; a future ADR could revisit this.
+- Promoting Cognos out of `status: placeholder` - its `knowledge.sxa` grant
+  is declared and ready but inert until a separate future WP does that
+  promotion (gitops chart, Application, evaluations skeleton, ADR-0502
+  Stage-1 -> Stage-2 checklist).
+- The write-request gate for any future SXA write capability - WP-068.

@@ -84,6 +84,7 @@ def test_every_fetch_stage_has_an_adapter_bound_to_one_domain():
         "fetch-salesforce": "knowledge.sales",
         "fetch-aramis": "knowledge.adv",
         "load-sxa-dump": "knowledge.sxa-legacy",
+        "fetch-sxa": "knowledge.sxa",
     }
     assert {s: a.domain for s, a in SOURCE_ADAPTERS.items()} == expected
     for stage in expected:
@@ -504,6 +505,132 @@ def test_split_sql_statements_skips_comment_only_lines():
     assert rag_ingestion._split_sql_statements(dump) == ["SELECT 1"]
 
 
+# --- fetch-sxa (knowledge.sxa, ADR-0217) -------------------------------------
+
+_SXA_CORPUS_SCHEMA = """
+CREATE TABLE `customers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `revenue` decimal(10,2) DEFAULT NULL,
+  `notes` text,
+  PRIMARY KEY (`id`),
+  KEY `idx_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+"""
+
+_SXA_CORPUS_DATA = (
+    "INSERT INTO `customers` VALUES "
+    "(1,'Acme, Inc.',1234.50,'Note with a comma, and a \\'quote\\''),"
+    "(2,'Beta Corp',NULL,NULL);"
+)
+
+
+def test_parse_create_table_columns_skips_constraints_keeps_declared_order():
+    columns = rag_ingestion._parse_create_table_columns(_SXA_CORPUS_SCHEMA)
+    assert columns == {"customers": ["id", "name", "revenue", "notes"]}
+
+
+def test_parse_insert_rows_handles_quoted_commas_escaped_quotes_and_null():
+    columns = rag_ingestion._parse_create_table_columns(_SXA_CORPUS_SCHEMA)
+    rows = list(rag_ingestion._parse_insert_rows(_SXA_CORPUS_DATA, columns))
+    assert [r for _, r in rows] == [
+        {"id": 1, "name": "Acme, Inc.", "revenue": 1234.5, "notes": "Note with a comma, and a 'quote'"},
+        {"id": 2, "name": "Beta Corp", "revenue": None, "notes": None},
+    ]
+
+
+def test_fetch_sxa_writes_one_record_per_row_without_any_sql_engine():
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa",
+        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
+        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
+        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
+    )
+    store = FakeStore()
+
+    def fake_fetch(_config, key):
+        if key.endswith("schema.sql"):
+            return _SXA_CORPUS_SCHEMA.encode("utf-8")
+        return _SXA_CORPUS_DATA.encode("utf-8")
+
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
+
+    records = list(store.json.values())
+    assert len(records) == 2
+    (record,) = [r for r in records if "customers/1" in r["url"]]
+    assert record["domain"] == "knowledge.sxa"
+    assert record["classification"] == "C3"
+    assert record["source_type"] == "sxa-corpus"
+    assert record["sxa"]["table"] == "customers"
+    assert len(record["sxa"]["checksum"]) == 64
+    # Not redacted (ADR-0217 trusts the upstream anonymization claim) -
+    # unlike load-sxa-dump, real-shaped values pass through as-is.
+    assert "Acme" in record["text"]
+
+
+def test_fetch_sxa_reimport_of_same_export_is_idempotent():
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa",
+        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
+        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
+        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
+    )
+    store = FakeStore()
+
+    def fake_fetch(_config, key):
+        if key.endswith("schema.sql"):
+            return _SXA_CORPUS_SCHEMA.encode("utf-8")
+        return _SXA_CORPUS_DATA.encode("utf-8")
+
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
+        first = {k: dict(v) for k, v in store.json.items()}
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
+    assert set(store.json) == set(first)
+    for key, record in store.json.items():
+        assert record["sha256"] == first[key]["sha256"]
+
+
+def test_fetch_sxa_refuses_non_schema_content_and_missing_keys():
+    config = _config(INGESTION_DOMAIN="knowledge.sxa", SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket")
+    try:
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, FakeStore())
+        raise AssertionError("expected SystemExit for missing keys")
+    except SystemExit as exc:
+        assert "SXA_CORPUS_SCHEMA_S3_KEY" in str(exc)
+
+    config2 = _config(
+        INGESTION_DOMAIN="knowledge.sxa",
+        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
+        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
+        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
+    )
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", return_value=b"not a schema file"):
+        try:
+            _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config2, FakeStore())
+            raise AssertionError("expected SystemExit for non-schema content")
+        except SystemExit as exc:
+            assert "refusing to parse" in str(exc)
+
+
+def test_audit_pii_patterns_flags_without_altering_the_value():
+    import sxa_anonymize
+
+    row = {"name": "Real Person", "revenue": 1000}
+    # "name" isn't in contacts' PII_COLUMNS map (first_name/last_name are)
+    # and carries no email/phone-shaped value, so nothing is flagged.
+    assert sxa_anonymize.audit_pii_patterns("contacts", row) == []
+    assert row == {"name": "Real Person", "revenue": 1000}  # never mutated
+
+    row2 = {"first_name": "Real Person", "notes": "contact me at real@example.com"}
+    hits2 = sxa_anonymize.audit_pii_patterns("contacts", row2)
+    assert "contacts.first_name" in hits2  # listed column
+    assert "contacts.notes" in hits2  # unlisted column, email-shaped value
+    assert row2["first_name"] == "Real Person"  # still unaltered
+    assert row2["notes"] == "contact me at real@example.com"
+
+
 # --- normalize carries domain/technology/extensions -------------------------
 
 
@@ -763,6 +890,12 @@ TESTS = [
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
     test_split_sql_statements_handles_semicolons_inside_quoted_values,
     test_split_sql_statements_skips_comment_only_lines,
+    test_parse_create_table_columns_skips_constraints_keeps_declared_order,
+    test_parse_insert_rows_handles_quoted_commas_escaped_quotes_and_null,
+    test_fetch_sxa_writes_one_record_per_row_without_any_sql_engine,
+    test_fetch_sxa_reimport_of_same_export_is_idempotent,
+    test_fetch_sxa_refuses_non_schema_content_and_missing_keys,
+    test_audit_pii_patterns_flags_without_altering_the_value,
     test_normalize_carries_domain_technology_and_extensions_into_metadata,
     test_normalize_defaults_missing_domain_to_the_run_domain,
     test_parse_duration_spec_supports_days_hours_minutes_and_none,

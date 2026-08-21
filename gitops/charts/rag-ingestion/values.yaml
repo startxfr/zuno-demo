@@ -1566,6 +1566,52 @@ domains:
     # exempt_from_freshness_enforcement - never compute a stale_after for
     # this domain's chunks.
     staleAfter: none
+  sxa:
+    # ADR-0217/WP-067: a distinct domain from sxa-legacy above - an
+    # already-anonymized weekly corpus export (schema.sql + data.sql, no
+    # MariaDB import, no MCP tools), parsed directly by fetch-sxa.
+    enabled: false
+    fetchStages: [fetch-sxa]
+    postgres:
+      database: rag-sxa
+      schema: rag
+      secretName: rag-postgres-sxa
+      externalSecret:
+        remoteKey: "rag-sxa/postgresql-app"
+        usernameProperty: username
+        passwordProperty: password
+    sxaCorpus:
+      # Operator-supplied: the approved weekly export's keys in the
+      # dedicated bucket below and an optional explicit snapshot id
+      # (falls back to a checksum-derived one, same as sxaDump.snapshotId
+      # above).
+      schemaS3Key: ""
+      dataS3Key: ""
+      snapshotId: ""
+      # A dedicated bucket, separate from s3.bucket above (shared corpus
+      # content) and from sxa-legacy's own dedicated sxaDump bucket -
+      # this source has its own provenance/trust model (ADR-0217) and
+      # should not share infrastructure with either.
+      s3:
+        type: aws
+        endpoint: ""
+        bucket: ""              # OPERATOR-SUPPLIED - see ADR-0217
+        region: ""               # OPERATOR-SUPPLIED - see ADR-0217
+        pathStyle: false
+        secretName: rag-sxa-corpus-s3
+        externalSecret:
+          remoteKey: "sxa-corpus/s3"
+          accessKeyProperty: accessKeyId
+          secretKeyProperty: secretAccessKey
+    # ADR-0217: a real weekly cadence, unlike sxa-legacy's on-demand-only
+    # schedule - this source is an operator-refreshed weekly export.
+    schedule:
+      enabled: true
+      cron: "0 0 4 * * 0"
+      timezone: Europe/Paris
+    # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/sxa/domain.yaml's
+    # freshness.operation_classes.semantic-read.max_staleness.
+    staleAfter: 7d
 
 # Runtime image is built imperatively by the day1-build Ansible role
 # (ansible/roles/rag_ingestion_build, ansible/tasks/apply_openshift_build.yml)

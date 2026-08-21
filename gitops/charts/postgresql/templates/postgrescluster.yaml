@@ -130,22 +130,24 @@ spec:
             name: {{ .Values.backups.s3.secretName }}
 {{- end }}
 
-  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and ten
+  # Creates the zuno database owned by {{ .Values.cluster.owner }}, and eleven
   # further dedicated databases/roles - Keycloak (ADR-0315), the
   # rag-ingestion pipeline's rag-tech corpus/index database, RHOAI's
   # Models-as-a-Service maas database, the Agent Runtime's LangGraph
   # checkpoint database (ADR-0103), the OGX-backed RAG provider
   # prototype's vector I/O database (ADR-0322), one database per
   # additional logical knowledge domain (ADR-0204: rag-sales,
-  # rag-sxa-legacy, rag-adv; ADR-0209/WP-28: rag-project), and the Agent
-  # Runtime's persistent-conversation metadata database (ADR-0212) - each
-  # adopting the password already seeded into its own pguser Secret by
+  # rag-sxa-legacy, rag-adv; ADR-0217/WP-067: rag-sxa; ADR-0209/WP-28:
+  # rag-project), and the Agent Runtime's persistent-conversation metadata
+  # database (ADR-0212) - each adopting the password already seeded into
+  # its own pguser Secret by
   # templates/externalsecret.yaml / templates/externalsecret-keycloak.yaml /
   # templates/externalsecret-ragtech.yaml / templates/externalsecret-maas.yaml /
   # templates/externalsecret-checkpoint.yaml / templates/externalsecret-ogx.yaml /
   # templates/externalsecret-ragsales.yaml /
   # templates/externalsecret-ragsxalegacy.yaml /
   # templates/externalsecret-ragadv.yaml /
+  # templates/externalsecret-ragsxa.yaml /
   # templates/externalsecret-ragproject.yaml /
   # templates/externalsecret-conversations.yaml
   # ("bring your own password") rather than generating its own.
@@ -177,6 +179,9 @@ spec:
     - name: {{ .Values.ragAdvDatabase.owner }}
       databases:
         - {{ .Values.ragAdvDatabase.name }}
+    - name: {{ .Values.ragSxaDatabase.owner }}
+      databases:
+        - {{ .Values.ragSxaDatabase.name }}
     - name: {{ .Values.ragProjectDatabase.owner }}
       databases:
         - {{ .Values.ragProjectDatabase.name }}

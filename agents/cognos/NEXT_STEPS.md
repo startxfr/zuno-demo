@@ -19,13 +19,15 @@ someone chooses to build Cognos, per WP-43's own scope). Statuses:
    `cognos-entitlement-only-user-01` fixture exists yet - add it with
    the first real task (it only matters once there is a tool boundary
    to prove).
-3. **Add policy entries** - OPEN, deliberately empty today:
-   `tasks/coming-soon.md` declares `allowed_tools: []` and no
-   knowledge domains, so there is nothing to grant. When real tasks
-   are authored, add `board` to `allowed_groups` for each declared
-   tool/domain in `policies/tools/tool-policy.yaml` /
-   `policies/knowledge/knowledge-policy.yaml` - only if not already
-   present.
+3. **Add policy entries** - PARTIALLY DONE (2026-08-21, ADR-0217/WP-067):
+   `tasks/review-historical-commercial-data.md` declares
+   `allowed_knowledge: [knowledge.sxa]`; `board` was already present in
+   that domain's `allowed_groups` (`policies/knowledge/
+   knowledge-policy.yaml`), so no policy edit was needed for this one
+   grant. `tasks/coming-soon.md` still declares `allowed_tools: []` and
+   no knowledge domains - still nothing to grant there. Remaining tools/
+   domains from the intended build (ADR-0349 §6) still need this same
+   step when their real tasks are authored.
 4. **Register the GitOps Application** - OPEN: no
    `gitops/charts/cognos/` or `gitops/apps/cognos/` exists (WP-43
    scope: charts arrive when someone chooses to deploy Cognos). Run
