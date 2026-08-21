@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """ADR-0322 tests for the OGX-backed RAG provider prototype:
-app/ogx_provider.py. Mocks the HTTP layer (no live OGXServer exists to
-call against - see that module's docstring) to prove the *selection*
-gate, the *filter* logic (product/version/ACL fail-closed, mirroring
-app/search.py:_filter_clause's semantics) and the *response mapping*
-(OpenAI Vector Store search shape -> app/schemas.py:SearchResult shape)
-are each correct in isolation.
+app/ogx_provider.py. Mocks the HTTP layer (see that module's docstring
+for the 2026-08-21 live-verified request/response shape and the reason
+it targets the raw vector-io API, not the OpenAI Vector Stores
+convenience endpoint) to prove the *selection* gate, the *filter* logic
+(product/version/ACL fail-closed, mirroring app/search.py:_filter_clause's
+semantics) and the *response mapping* (`/v1/vector-io/query` chunk shape
+-> app/schemas.py:SearchResult shape) are each correct in isolation.
 
 Same plain-function/no-pytest style as tests/test_search_filters.py.
 
@@ -77,12 +78,11 @@ def test_passes_filters_acl_fail_closed() -> None:
     assert ogx_provider._passes_filters(unrestricted, None, None, caller_groups=[]) is True
 
 
-def test_row_to_result_maps_openai_vector_store_shape() -> None:
-    row = {
-        "file_id": "doc-42",
-        "score": 0.87654,
-        "content": [{"text": "first part. "}, {"text": "second part."}],
-        "attributes": {
+def test_row_to_result_maps_vector_io_query_shape() -> None:
+    chunk = {
+        "chunk_id": "doc-42",
+        "content": "first part. second part.",
+        "metadata": {
             "source": "https://docs.redhat.com/x",
             "title": "Sizing GPUs",
             "classification": "C2",
@@ -91,11 +91,11 @@ def test_row_to_result_maps_openai_vector_store_shape() -> None:
             "version": "3.5",
         },
     }
-    doc = ogx_provider._row_to_result(row)
+    doc = ogx_provider._row_to_result(chunk, 0.87654)
     assert doc["id"] == "doc-42"
     assert doc["source"] == "https://docs.redhat.com/x"
     assert doc["title"] == "Sizing GPUs"
-    assert doc["snippet"] == "first part.  second part."
+    assert doc["snippet"] == "first part. second part."
     assert doc["score"] == 0.87654
     assert doc["classification"] == "C2"
     assert doc["language"] == "fr"
@@ -108,12 +108,12 @@ def test_row_to_result_defaults_untagged_classification_to_c1() -> None:
     """ADR-0046: a document with no classification tag defaults to C1,
     the same baseline app/search.py:_row_to_doc uses - never invent a
     higher-than-declared classification."""
-    doc = ogx_provider._row_to_result({"file_id": "x", "attributes": {}})
+    doc = ogx_provider._row_to_result({"chunk_id": "x", "metadata": {}})
     assert doc["classification"] == "C1"
 
 
 def test_row_to_result_computes_staleness_via_shared_helper() -> None:
-    doc = ogx_provider._row_to_result({"file_id": "x", "attributes": {"stale_after": "2020-01-01"}})
+    doc = ogx_provider._row_to_result({"chunk_id": "x", "metadata": {"stale_after": "2020-01-01"}})
     assert doc["stale"] is True
 
 
@@ -122,13 +122,13 @@ def test_row_to_result_flags_freshness_untrusted_via_shared_helper() -> None:
     app/search.py:_row_to_doc, computed through the shared
     _is_freshness_untrusted helper - schema parity between the two
     providers is the ADR-0322 acceptance bar (this module's docstring)."""
-    untrusted = ogx_provider._row_to_result({"file_id": "x", "attributes": {}})
+    untrusted = ogx_provider._row_to_result({"chunk_id": "x", "metadata": {}})
     assert untrusted["freshness_untrusted"] is True
 
-    trusted = ogx_provider._row_to_result({"file_id": "y", "attributes": {"indexed_at": "2026-08-01T00:00:00Z"}})
+    trusted = ogx_provider._row_to_result({"chunk_id": "y", "metadata": {"indexed_at": "2026-08-01T00:00:00Z"}})
     assert trusted["freshness_untrusted"] is False
 
-    exempt = ogx_provider._row_to_result({"file_id": "z", "attributes": {"domain": "knowledge.sxa-legacy"}})
+    exempt = ogx_provider._row_to_result({"chunk_id": "z", "metadata": {"domain": "knowledge.sxa-legacy"}})
     assert exempt["freshness_untrusted"] is False
 
 
@@ -174,10 +174,10 @@ class _FakeAsyncClient:
         return _FakeResponse(self._body)
 
 
-def test_ogx_search_calls_the_documented_vector_store_search_url() -> None:
+def test_ogx_search_calls_the_documented_vector_io_query_url() -> None:
     _reset_provider_env(RAG_PROVIDER="ogx", OGX_BASE_URL="http://ogx.example:8321", OGX_VECTOR_STORE_ID="vs-zuno")
     captured = {}
-    body = {"data": []}
+    body = {"chunks": [], "scores": []}
 
     async def run():
         with mock.patch("httpx.AsyncClient", return_value=_FakeAsyncClient(body, captured)):
@@ -185,7 +185,8 @@ def test_ogx_search_calls_the_documented_vector_store_search_url() -> None:
         assert result == {"results": [], "vector_search_used": True}
 
     asyncio.run(run())
-    assert captured["url"] == "http://ogx.example:8321/v1/vector_stores/vs-zuno/search"
+    assert captured["url"] == "http://ogx.example:8321/v1/vector-io/query"
+    assert captured["json"]["vector_store_id"] == "vs-zuno"
     assert captured["json"]["query"] == "gpu sizing"
 
 
@@ -196,13 +197,14 @@ def test_ogx_search_applies_client_side_acl_and_product_filters_and_truncates_to
     never leaks a filtered-out row."""
     _reset_provider_env(RAG_PROVIDER="ogx", OGX_BASE_URL="http://ogx.example:8321", OGX_VECTOR_STORE_ID="vs-zuno")
     body = {
-        "data": [
-            {"file_id": "allowed-1", "score": 0.9, "content": [], "attributes": {"product": "openshift-ai"}},
-            {"file_id": "wrong-product", "score": 0.8, "content": [], "attributes": {"product": "other"}},
-            {"file_id": "acl-restricted", "score": 0.7, "content": [], "attributes": {"acl_groups": ["secret"]}},
-            {"file_id": "allowed-2", "score": 0.6, "content": [], "attributes": {"product": "openshift-ai"}},
-            {"file_id": "allowed-3", "score": 0.5, "content": [], "attributes": {"product": "openshift-ai"}},
-        ]
+        "chunks": [
+            {"chunk_id": "allowed-1", "content": "", "metadata": {"product": "openshift-ai"}},
+            {"chunk_id": "wrong-product", "content": "", "metadata": {"product": "other"}},
+            {"chunk_id": "acl-restricted", "content": "", "metadata": {"acl_groups": ["secret"]}},
+            {"chunk_id": "allowed-2", "content": "", "metadata": {"product": "openshift-ai"}},
+            {"chunk_id": "allowed-3", "content": "", "metadata": {"product": "openshift-ai"}},
+        ],
+        "scores": [0.9, 0.8, 0.7, 0.6, 0.5],
     }
 
     async def run():
@@ -236,12 +238,12 @@ TESTS = [
     test_ogx_enabled_only_when_explicitly_selected,
     test_passes_filters_product_and_version_exact_match,
     test_passes_filters_acl_fail_closed,
-    test_row_to_result_maps_openai_vector_store_shape,
+    test_row_to_result_maps_vector_io_query_shape,
     test_row_to_result_defaults_untagged_classification_to_c1,
     test_row_to_result_computes_staleness_via_shared_helper,
     test_row_to_result_flags_freshness_untrusted_via_shared_helper,
     test_ogx_search_without_endpoint_fails_loudly,
-    test_ogx_search_calls_the_documented_vector_store_search_url,
+    test_ogx_search_calls_the_documented_vector_io_query_url,
     test_ogx_search_applies_client_side_acl_and_product_filters_and_truncates_to_top_k,
     test_ogx_search_wraps_a_real_httpx_failure,
 ]

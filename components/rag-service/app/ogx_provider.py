@@ -9,24 +9,22 @@ against the Red Hat OpenShift AI OGX Operator's data-plane API instead of
 the local pgvector+full-text hybrid search in search.py.
 
 OGX's own documented positioning is "OpenAI-compatible APIs and
-vector-store integrations" (ADR-0322 Context), so this adapter targets the
-OpenAI Vector Stores search convention
-(`POST /v1/vector_stores/{vector_store_id}/search`).
-`spec.components.ogx.managementState: Managed` on this cluster's
-zuno-dsc only installs the OGX Operator/controller (`oc get svc -n
-redhat-ods-applications` shows only
-ogx-k8s-operator-controller-manager-metrics-service/-webhook-service, no
-API-serving Service) - a separate namespaced `OGXServer` CR
-(`ogxservers.ogx.io/v1beta1`, confirmed via `oc explain ogxserver.spec`)
-is what stands up the actual data-plane API, and none exists on this
-cluster yet (`oc get ogxserver -A` returns no resources). See
-gitops/charts/openshift-ai/templates/ogxserver.yaml (disabled by default)
-for the CR that would create one. This adapter has therefore never been
-exercised against a live OGX endpoint - its HTTP request/response mapping
-follows the documented OpenAI Vector Stores API shape, not a verified OGX
-wire capture; treat it as a prototype pending a live OGXServer to test
-against (ADR-0322 v0.1 scope explicitly calls for a prototype-then-parity-
-test step, not a finished integration).
+vector-store integrations" (ADR-0322 Context), so this adapter originally
+targeted the OpenAI Vector Stores search convention
+(`POST /v1/vector_stores/{vector_store_id}/search`). Live-tested against
+a real `OGXServer` (`spec.components.ogx.managementState: Managed`
+installs only the OGX Operator/controller - a separate namespaced
+`OGXServer` CR, `ogxservers.ogx.io/v1beta1`, stands up the actual
+data-plane API; see gitops/charts/openshift-ai/templates/ogxserver.yaml)
+during the 2026-08-21 WP-06 provider-parity run: that convenience
+endpoint unconditionally rejects any array-valued attribute, which breaks
+on ADR-0046's `acl_groups` (a real list, never a flat scalar) for any
+ACL-restricted document - the OpenAI Vector Stores attribute schema has
+no array type. This adapter now targets the raw
+`POST /v1/vector-io/query` API instead (its write-side sibling was
+already validated live by the 2026-08-21 corpus-proof note), which
+round-trips `acl_groups` correctly - both the request/response shape and
+the ACL-array fix are live-verified, not merely schema-inferred.
 
 Same additive/opt-in shape as components/ai-gateway/app/maas_adapter.py:
 - **additive**: app/search.py and the default /v1/search behavior are
@@ -136,29 +134,41 @@ def _passes_filters(
     return True
 
 
-def _row_to_result(row: Dict[str, Any]) -> Dict[str, Any]:
-    """Maps one OpenAI Vector Store search result item
-    (`{"file_id", "score", "content": [{"text": ...}], "attributes": {...}}`)
-    to the exact app/schemas.py:SearchResult shape app/search.py's
-    _row_to_doc already produces, so main.py can return either provider's
-    output through the same SearchResponse model unchanged. `attributes`
-    is expected to carry the same metadata keys ADR-0046 already writes
-    into document_embeddings.metadata (classification/language/product/
-    version/stale/acl_groups) - a parity proof requires both providers to
-    expose the same caller-facing fields, not just the same ranking, and
-    populating an OGX-indexed corpus with those attributes is this WP's
-    documented residual operator action (see the WP-06 brief), not
-    something this adapter performs.
+def _row_to_result(chunk: Dict[str, Any], score: float = 0.0) -> Dict[str, Any]:
+    """Maps one `/v1/vector-io/query` chunk
+    (`{"content", "chunk_id", "metadata": {...}, "chunk_metadata": {...}}`,
+    score passed separately - the raw API returns a top-level `scores` list
+    parallel to `chunks`, not one embedded per chunk) to the exact
+    app/schemas.py:SearchResult shape app/search.py's _row_to_doc already
+    produces, so main.py can return either provider's output through the
+    same SearchResponse model unchanged. `metadata` is expected to carry
+    the same keys ADR-0046 already writes into document_embeddings.metadata
+    (classification/language/product/version/stale/acl_groups) - a parity
+    proof requires both providers to expose the same caller-facing fields,
+    not just the same ranking, and populating an OGX-indexed corpus with
+    those attributes is this WP's documented residual operator action (see
+    the WP-06 brief), not something this adapter performs.
+
+    2026-08-21 (WP-06 live parity run): this module originally targeted
+    OGX's OpenAI-shaped `/v1/vector_stores/{id}/search` convenience
+    endpoint - live-tested and found to unconditionally reject any
+    `acl_groups` attribute with more than zero elements (`attributes.
+    acl_groups` must be a flat string/number/boolean, the OpenAI Vector
+    Stores attribute schema has no array type), which breaks ACL
+    enforcement for exactly the metadata shape ADR-0046 requires. Switched
+    to the raw `/v1/vector-io/query` API (its sibling write-side endpoint
+    was already proven live in the 2026-08-21 corpus-proof note), which
+    round-trips `acl_groups` as a real array correctly - confirmed by this
+    same live parity run.
     """
-    attributes = row.get("attributes") or {}
-    content_parts = row.get("content") or []
-    text = " ".join(part.get("text", "") for part in content_parts if isinstance(part, dict))
+    attributes = chunk.get("metadata") or {}
+    text = chunk.get("content") or ""
     return {
-        "id": str(row.get("file_id", "")),
+        "id": str(chunk.get("chunk_id", "")),
         "source": attributes.get("source", ""),
         "title": attributes.get("title", ""),
         "snippet": text[:400],
-        "score": float(row.get("score", 0.0)),
+        "score": float(score),
         # ADR-0046: untagged rows default to C1, same baseline as
         # app/search.py:_row_to_doc - never invent a higher classification.
         "classification": attributes.get("classification", "C1"),
@@ -233,8 +243,16 @@ async def ogx_search(
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    payload: Dict[str, Any] = {"query": query, "max_num_results": fetch_n}
-    url = f"{OGX_BASE_URL.rstrip('/')}/v1/vector_stores/{OGX_VECTOR_STORE_ID}/search"
+    # Raw vector-io API, not the OpenAI-shaped `/v1/vector_stores/{id}/search`
+    # convenience endpoint - see _row_to_result's 2026-08-21 docstring note
+    # for why (that endpoint rejects any array-valued attribute, including
+    # ADR-0046's acl_groups).
+    payload: Dict[str, Any] = {
+        "vector_store_id": OGX_VECTOR_STORE_ID,
+        "query": query,
+        "params": {"max_chunks": fetch_n},
+    }
+    url = f"{OGX_BASE_URL.rstrip('/')}/v1/vector-io/query"
 
     try:
         async with httpx.AsyncClient(timeout=OGX_TIMEOUT_SECONDS) as client:
@@ -244,10 +262,11 @@ async def ogx_search(
     except Exception as exc:
         raise OgxProviderError(f"OGX vector-store search failed: {exc}") from exc
 
-    rows = body.get("data", [])
+    chunks = body.get("chunks", [])
+    scores = body.get("scores", [])
     filtered = []
-    for row in rows:
-        doc = _row_to_result(row)
+    for chunk, score in zip(chunks, scores):
+        doc = _row_to_result(chunk, score)
         attributes = doc.pop("_attributes")
         if not _passes_filters(attributes, product, version, caller_groups, domains, technology):
             continue

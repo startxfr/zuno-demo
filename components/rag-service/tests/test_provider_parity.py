@@ -56,10 +56,9 @@ _PGVECTOR_ROW = {
 }
 
 _OGX_ROW = {
-    "file_id": "doc-42",
-    "score": 0.91,
-    "content": [{"text": _BODY_TEXT}],
-    "attributes": {
+    "chunk_id": "doc-42",
+    "content": _BODY_TEXT,
+    "metadata": {
         "source": "https://docs.redhat.com/openshift-ai/gpu-sizing",
         "title": "Sizing GPUs for OpenShift AI",
         "classification": "C2",
@@ -69,6 +68,7 @@ _OGX_ROW = {
         "stale_after": "2020-01-01",
     },
 }
+_OGX_SCORE = 0.91
 
 _PARITY_FIELDS = ("source", "title", "snippet", "classification", "language", "product", "version", "stale")
 
@@ -82,7 +82,7 @@ def test_row_mappers_agree_on_metadata_classification_and_staleness_for_the_same
     same document's source/title/classification/language/product/version/
     staleness/snippet must come back identical regardless of provider."""
     pg_doc = _row_to_doc(_PGVECTOR_ROW)
-    ogx_doc = ogx_provider._row_to_result(_OGX_ROW)
+    ogx_doc = ogx_provider._row_to_result(_OGX_ROW, _OGX_SCORE)
 
     assert _project(pg_doc) == _project(ogx_doc), (
         f"provider parity mismatch:\n  pgvector={_project(pg_doc)}\n  ogx={_project(ogx_doc)}"
@@ -91,7 +91,7 @@ def test_row_mappers_agree_on_metadata_classification_and_staleness_for_the_same
 
 def test_row_mappers_default_untagged_documents_to_c1_identically() -> None:
     pg_doc = _row_to_doc({"id": 1, "source": "s", "title": "t", "content": "c", "metadata": {}})
-    ogx_doc = ogx_provider._row_to_result({"file_id": "1", "content": [], "attributes": {}})
+    ogx_doc = ogx_provider._row_to_result({"chunk_id": "1", "content": "", "metadata": {}})
     assert pg_doc["classification"] == ogx_doc["classification"] == "C1"
 
 
@@ -125,7 +125,7 @@ def test_ogx_search_full_response_validates_against_the_shared_search_response_s
             pass
 
         def json(self):
-            return {"data": [_OGX_ROW]}
+            return {"chunks": [_OGX_ROW], "scores": [_OGX_SCORE]}
 
     class _FakeAsyncClient:
         async def __aenter__(self):

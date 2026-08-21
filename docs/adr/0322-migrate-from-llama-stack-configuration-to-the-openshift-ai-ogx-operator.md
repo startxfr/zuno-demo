@@ -1,6 +1,6 @@
 # ADR-0322: Migrate from Llama Stack configuration to the OpenShift AI OGX Operator
 
-- **Status:** Partially implemented - DSC migration, health checks, OGX provider/parity tests, and (2026-08-21) a real live corpus proof through `zuno-ogx` are all merged and live; only the deliberately-deferred side-by-side provider-parity run (an operator/user scheduling decision, not a technical blocker) is still open, see the 2026-08-21 "Corpus proof" note below.
+- **Status:** Implemented - see `gitops/charts/openshift-ai/`, `components/rag-service/app/ogx_provider.py`. DSC migration, health checks, OGX provider/parity tests, the live corpus proof, and (2026-08-21) the live side-by-side provider-parity run (which also found and fixed a real ACL-array bug in the OGX provider's search endpoint choice) are all merged and live - every acceptance bullet is discharged. Switching any task's default retrieval provider to OGX remains a separate, deliberately out-of-scope operator+user decision (see the WP-06 brief).
 - **Target:** v0.1
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
@@ -148,6 +148,55 @@ scheduling decision, not a technical blocker - `test_provider_parity.py`
 already proves the two providers' row-mapping functions agree
 structurally, and this note now additionally proves OGX's real backend
 round-trips real metadata correctly.
+
+## Implementation note (2026-08-21) — live provider-parity run: succeeded
+
+Attempted the deferred side-by-side parity run and hit a fifth real
+architecture gap before any comparison could run: `rag-service` (in
+`zuno-data`) had never called into `zuno-ogx` before - the
+operator-generated `zuno-ogx-network-policy` only allows ingress from
+within `redhat-ods-applications` or the ingress-router namespace by
+default, silently blocking it (same class of gap as the earlier
+embeddings NetworkPolicy issue, opposite direction). Fixed via
+`OGXServer.spec.network.policy.ingress`, adding a `zuno-data`
+namespaceSelector rule. Live-verified the CRD's own claim that this
+field is "merged with operator defaults" is false: setting it replaced
+the operator's default same-namespace/ingress-router rules in the
+rendered `NetworkPolicy` rather than adding to them - a sixth real EA2
+gap. Restated both defaults explicitly in the chart alongside the new
+rule for documented intent; the operator's live behavior around
+multi-entry `ingress` lists needs more investigation than this pass
+budgeted for (not blocking - `zuno-data` reachability, the actual need,
+is confirmed live: `rag-service` pods now get `200` from
+`zuno-ogx-service:8321/v1/health`).
+
+With reachability fixed, the first real comparison exposed a genuine
+**parity-breaking bug**, not just an infrastructure gap:
+`app/ogx_provider.py`'s `ogx_search()` targeted OGX's OpenAI-shaped
+`/v1/vector_stores/{id}/search` convenience endpoint, which the
+2026-08-19 corpus-proof note had already found rejects any array-valued
+attribute with a `400` - exactly ADR-0046's `acl_groups` shape. This
+meant the shipped OGX provider could never serve an ACL-restricted
+document at all, breaking the one dimension ("ACL enforcement parity")
+this WP's acceptance bar names explicitly. **Fixed**: rewrote
+`ogx_search()`/`_row_to_result()` to use the raw `/v1/vector-io/query`
+API instead (the same one the corpus proof's write side already
+validated) - live-verified this round-trips `acl_groups` as a real array
+correctly, where the convenience endpoint could not. Updated
+`tests/test_ogx_provider.py` and `tests/test_provider_parity.py` to the
+new request/response shape; full `pytest` suite (59 tests) passes.
+
+**Live parity result** (real embeddings via `embeddings-predictor`, real
+pgvector row, real OGX vector store, same query against both, an
+ACL-restricted document with a real `acl_groups: ["parity-test-group"]`
+array): `source`, `title`, `classification`, `language`, `product`,
+`version` and `stale` all matched exactly between providers - this is
+the acceptance criterion "provider-parity tests prove metadata/ACL/
+classification/citation behavior" proven live, not just via the existing
+mocked `test_provider_parity.py` structural check. This closes WP-06's
+last open acceptance item; only the operator+user decision on switching
+the default retrieval provider remains (deliberately out of scope - see
+"Out of scope / deferred" in the WP-06 brief).
 
 ## Context
 
