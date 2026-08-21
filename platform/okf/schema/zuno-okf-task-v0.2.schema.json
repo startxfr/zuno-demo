@@ -81,6 +81,14 @@
             "pattern": "^knowledge\\.[a-z][a-z0-9_-]*$"
           },
           "uniqueItems": true
+        },
+        "prompt_examples": {
+          "description": "ADR-0515/WP-061: example prompts shown as clickable starters in the agent frontend's empty-state (\"Create new chat\") view when this task's owning agent has no conversation history yet. UX only - purely decorative, never parsed/enforced server-side. Optional/omitted renders the empty state with no starters.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }

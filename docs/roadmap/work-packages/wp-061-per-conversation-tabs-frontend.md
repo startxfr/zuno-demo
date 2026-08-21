@@ -1,6 +1,6 @@
 # WP-061: Per-conversation tabs, one browser tab per agent (promotes ADR-0515)
 
-- **State:** Not started
+- **State:** Operator pending (repo work merged, 2026-08-21)
 - **ADRs:** ADR-0515 (supersedes WP-47/ADR-0505 — Abandoned, no code was
   written against that brief)
 - **Depends on:** WP-44 Part A (schema/validator chain; already `Done`).
@@ -104,6 +104,14 @@ parameters); `policies/` untouched; do not resurrect or edit
   and owner-scoping negative tests.
 - Manual/automated check: opening an agent already open in another
   browser tab focuses it rather than duplicating it.
+
+**Done (2026-08-21):** bundle validation, matrix `--check`, and the
+Runtime/BFF/frontend suites (including new `reorder_conversations`/
+`hard_delete_conversation` fail-closed tests and new BFF
+`ReorderRequest`/`ReorderResponse`/`HardDeleteResponse` contract tests)
+all pass; `tsc --noEmit` is clean. The tab-reuse/drag-reorder/hard-delete
+checks below remain live/manual - no frontend unit-test runner exists in
+this component yet (no vitest/jest ever set up here) to automate them.
 
 ## Operator / human follow-up (not executable by the model)
 

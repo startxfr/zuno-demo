@@ -35,7 +35,7 @@ from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
 
 import app.conversations as conversations_module  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
-from app.conversations import _conninfo, _derive_title, archive_conversation, list_conversations, pool_context, rename_conversation, resolve_owner, set_star  # noqa: E402
+from app.conversations import _conninfo, _derive_title, archive_conversation, hard_delete_conversation, list_conversations, pool_context, rename_conversation, reorder_conversations, resolve_owner, set_star  # noqa: E402
 from app.graph.nodes import _ANSWER_TASK, _TEKOS  # noqa: E402
 from app.graph.shapes.retrieve_reason_respond import build as _build  # noqa: E402
 from app.main import _resolve_run_id  # noqa: E402
@@ -161,6 +161,18 @@ async def test_archive_conversation_fails_closed_on_a_none_pool() -> None:
     await _expect_503(archive_conversation(None, run_id="run-abc", owner_sub="alice"))
 
 
+async def test_reorder_conversations_fails_closed_on_a_none_pool() -> None:
+    """ADR-0515: same fail-closed posture as every other writer in this
+    module besides record_turn."""
+    await _expect_503(reorder_conversations(None, agent_name="tekos", owner_sub="alice", run_ids=["run-abc"]))
+
+
+async def test_hard_delete_conversation_fails_closed_on_a_none_pool() -> None:
+    """ADR-0515: same fail-closed posture as archive_conversation - an
+    irreversible operation must never silently proceed unrestricted."""
+    await _expect_503(hard_delete_conversation(None, run_id="run-abc", owner_sub="alice"))
+
+
 async def test_record_turn_silently_no_ops_on_a_none_pool() -> None:
     """The one deliberate exception to the fail-closed rule above (see
     conversations.py's own docstring): ordinary chat must keep working
@@ -216,6 +228,8 @@ TESTS = [
     test_rename_conversation_fails_closed_on_a_none_pool,
     test_set_star_fails_closed_on_a_none_pool,
     test_archive_conversation_fails_closed_on_a_none_pool,
+    test_reorder_conversations_fails_closed_on_a_none_pool,
+    test_hard_delete_conversation_fails_closed_on_a_none_pool,
     test_record_turn_silently_no_ops_on_a_none_pool,
     test_resolve_run_id_still_defaults_to_checkpoint_only_check,
 ]

@@ -113,7 +113,7 @@ func main() {
 	mux.HandleFunc("/callback", callbackHandler(oidcClient, sessions))
 	mux.HandleFunc("/logout", logoutHandler(oidcClient, sessions, cfg.SelfBaseURL))
 
-	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, sessions, chatAsset))
+	mux.HandleFunc("/"+activeAgent.Zuno.Name, chat.PageHandler(activeAgent, agents, sessions, chatAsset))
 	mux.HandleFunc("/api/chat", chat.APIHandler(activeAgent, cfg.BFFBaseURL, sessions))
 
 	// ADR-0212: persistent conversations, same session-gated reverse-proxy
@@ -125,6 +125,9 @@ func main() {
 	mux.HandleFunc("PUT /api/conversations/{run_id}/star", conversationsProxy)
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/star", conversationsProxy)
 	mux.HandleFunc("DELETE /api/conversations/{run_id}", conversationsProxy)
+	// ADR-0515: manual drag-reorder and irreversible hard-delete.
+	mux.HandleFunc("PUT /api/conversations/reorder", conversationsProxy)
+	mux.HandleFunc("DELETE /api/conversations/{run_id}/hard-delete", conversationsProxy)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,

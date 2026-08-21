@@ -154,6 +154,41 @@
         }
       }
     },
+    "/api/conversations/reorder": {
+      "put": {
+        "operationId": "reorderConversations",
+        "summary": "Persist a drag-drop reorder of the caller's conversation list (ADR-0515)",
+        "description": "The caller's full desired run_id order for this agent - each entry's index becomes its server-side sort_order. run_ids the caller doesn't own are silently skipped rather than failing the whole request.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReorderRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Reordered.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReorderResponse" } } } },
+          "400": { "description": "Invalid request body (empty run_ids).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}/hard-delete": {
+      "delete": {
+        "operationId": "hardDeleteConversation",
+        "summary": "Permanently delete a conversation (ADR-0515)",
+        "description": "Irreversible - unlike DELETE /api/conversations/{run_id} (soft-delete/archive), this purges both the conversation's metadata row and its underlying LangGraph checkpoint/message history. The frontend requires an explicit user confirmation before calling this.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Deleted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HardDeleteResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
     "/api/conversations/{run_id}/star": {
       "put": {
         "operationId": "starConversation",
@@ -285,6 +320,29 @@
         "required": ["archived"],
         "properties": {
           "archived": { "type": "boolean" }
+        }
+      },
+      "ReorderRequest": {
+        "type": "object",
+        "description": "ADR-0515: the caller's full desired conversation order for this agent.",
+        "required": ["run_ids"],
+        "properties": {
+          "run_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        }
+      },
+      "ReorderResponse": {
+        "type": "object",
+        "required": ["updated"],
+        "properties": {
+          "updated": { "type": "integer", "description": "Count of conversations actually reordered - run_ids the caller doesn't own are silently skipped." }
+        }
+      },
+      "HardDeleteResponse": {
+        "type": "object",
+        "description": "ADR-0515: irreversible, unlike ArchiveResponse's soft-delete.",
+        "required": ["deleted"],
+        "properties": {
+          "deleted": { "type": "boolean" }
         }
       },
       "ErrorResponse": {

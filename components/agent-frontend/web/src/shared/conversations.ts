@@ -67,3 +67,25 @@ export async function deleteConversation(conversationsURL: string, runId: string
     await fetch(`${conversationsURL}/${encodeURIComponent(runId)}`, { method: "DELETE" }),
   );
 }
+
+// ADR-0515: persists a drag-drop reorder - runIds is the full desired
+// order for this agent's conversation list.
+export async function reorderConversations(conversationsURL: string, runIds: string[]): Promise<void> {
+  await parseOrThrow(
+    await fetch(`${conversationsURL}/reorder`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_ids: runIds }),
+    }),
+  );
+}
+
+// ADR-0515: irreversible - unlike deleteConversation above (soft-delete/
+// archive), this purges the conversation's metadata row and its
+// underlying message history entirely. Callers must confirm with the
+// user before calling this.
+export async function hardDeleteConversation(conversationsURL: string, runId: string): Promise<void> {
+  await parseOrThrow(
+    await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/hard-delete`, { method: "DELETE" }),
+  );
+}

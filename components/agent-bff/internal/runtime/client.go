@@ -125,6 +125,27 @@ type ArchiveResponse struct {
 	Archived bool `json:"archived"`
 }
 
+// ReorderConversationsRequest is the Agent Runtime's documented request
+// body for PUT /v1/agents/{agent}/conversations/reorder (ADR-0515) - the
+// caller's full desired run_id order for this agent.
+type ReorderConversationsRequest struct {
+	RunIDs []string `json:"run_ids"`
+}
+
+// ReorderConversationsResponse is that endpoint's documented response
+// body: the count of conversations actually reordered (run_ids the
+// caller doesn't own are silently skipped server-side).
+type ReorderConversationsResponse struct {
+	Updated int `json:"updated"`
+}
+
+// HardDeleteResponse is the documented response body for
+// DELETE .../runs/{run_id}/hard-delete (ADR-0515) - irreversible, unlike
+// ArchiveResponse's soft-delete.
+type HardDeleteResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
 // ChatResponse is the Agent Runtime's documented response body.
 //
 // ADR-0215: RunID/SourceMode were silently dropped here until this fix -
@@ -351,6 +372,32 @@ func (c *Client) SetStar(ctx context.Context, bearerToken, runID string, starred
 func (c *Client) ArchiveConversation(ctx context.Context, bearerToken, runID string) (*ArchiveResponse, error) {
 	path := fmt.Sprintf("/v1/agents/%s/runs/%s", c.agentName, url.PathEscape(runID))
 	var out ArchiveResponse
+	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ReorderConversations calls PUT /v1/agents/{agent}/conversations/reorder
+// (ADR-0515) - persists a drag-drop reorder of the caller's own
+// conversation list for this agent.
+func (c *Client) ReorderConversations(ctx context.Context, bearerToken string, runIDs []string) (*ReorderConversationsResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/conversations/reorder", c.agentName)
+	var out ReorderConversationsResponse
+	body := ReorderConversationsRequest{RunIDs: runIDs}
+	if err := c.doJSON(ctx, http.MethodPut, bearerToken, path, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// HardDeleteConversation calls DELETE
+// /v1/agents/{agent}/runs/{run_id}/hard-delete (ADR-0515) - irreversibly
+// purges the conversation's metadata row and its LangGraph checkpoint,
+// unlike ArchiveConversation's soft-delete above.
+func (c *Client) HardDeleteConversation(ctx context.Context, bearerToken, runID string) (*HardDeleteResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s/hard-delete", c.agentName, url.PathEscape(runID))
+	var out HardDeleteResponse
 	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, path, nil, &out); err != nil {
 		return nil, err
 	}

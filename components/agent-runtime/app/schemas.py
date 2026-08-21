@@ -62,3 +62,10 @@ class ChatResponse(BaseModel):
 class RenameConversationRequest(BaseModel):
     # ADR-0212: PATCH /v1/agents/{agent}/runs/{run_id} body.
     title: str = Field(min_length=1, max_length=200)
+
+
+class ReorderConversationsRequest(BaseModel):
+    # ADR-0515: PUT /v1/agents/{agent}/conversations/reorder body - the
+    # caller's full desired run_id order for this agent (as returned by
+    # GET .../conversations); each entry's index becomes its sort_order.
+    run_ids: List[str] = Field(min_length=1)

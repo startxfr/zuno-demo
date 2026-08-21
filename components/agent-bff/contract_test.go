@@ -100,6 +100,8 @@ func TestOpenAPISpecIsWellFormed(t *testing.T) {
 		"/api/conversations/{run_id}/transcript",
 		"/api/conversations/{run_id}",
 		"/api/conversations/{run_id}/star",
+		"/api/conversations/reorder",
+		"/api/conversations/{run_id}/hard-delete",
 	}
 	for _, path := range paths {
 		if _, ok := doc.Paths[path]; !ok {
@@ -148,4 +150,18 @@ func TestStarResponseMatchesOpenAPISpec(t *testing.T) {
 
 func TestArchiveResponseMatchesOpenAPISpec(t *testing.T) {
 	assertMatchesSchema(t, loadOpenAPISpec(t), apiArchiveResponse{}, "ArchiveResponse")
+}
+
+// ADR-0515 wire structs.
+
+func TestReorderRequestMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiReorderRequest{}, "ReorderRequest")
+}
+
+func TestReorderResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiReorderResponse{}, "ReorderResponse")
+}
+
+func TestHardDeleteResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiHardDeleteResponse{}, "HardDeleteResponse")
 }

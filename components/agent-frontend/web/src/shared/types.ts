@@ -29,6 +29,16 @@ export interface PortalConfig {
   tiles: PortalTile[];
 }
 
+// ADR-0515: one entry of ChatConfig.agentNavStrip - mirrors
+// components/agent-frontend/internal/chat/chat.go's agentNavEntry
+// field-for-field.
+export interface AgentNavEntry {
+  name: string;
+  displayName: string;
+  color: string;
+  href: string;
+}
+
 export interface ChatConfig {
   // The AGENT's display name (e.g. "Tekos") - not the signed-in user's.
   displayName: string;
@@ -47,6 +57,14 @@ export interface ChatConfig {
   // shared/ConversationList.tsx builds the transcript/rename/star
   // endpoints by appending to this base at request time.
   conversationsURL: string;
+  // ADR-0515: every OTHER agent this signed-in caller is entitled to and
+  // that is active/clickable, entitlement-filtered server-side
+  // (internal/chat/chat.go's buildAgentNavStrip, reusing
+  // portal.BuildTiles) - rendered as the masthead's cross-agent nav strip.
+  agentNavStrip: AgentNavEntry[];
+  // ADR-0515/WP-061: this agent's primary task's declared
+  // zuno.prompt_examples - clickable starters in the chat empty state.
+  promptExamples: string[];
 }
 
 // Shape of the JSON config Go injects for the read-only /profile page

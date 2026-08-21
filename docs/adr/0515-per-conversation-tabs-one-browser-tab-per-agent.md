@@ -1,6 +1,6 @@
 # ADR-0515: Open per-conversation tabs with one browser tab per agent
 
-- **Status:** Proposed
+- **Status:** Partially implemented (2026-08-21) - WP-061's repo work is merged: `zuno.prompt_examples` is a real OKF task-schema field, `conversations` gained a `sort_order` column plus reorder/hard-delete endpoints (Agent Runtime + BFF + frontend proxy), `tabTracker.ts` is now agent-keyed (one browser tab per agent), `chat/Chat.tsx` renders a closable, starred-first in-app `Tabs` bar with a "Create new chat" empty state, `ConversationList.tsx` gained a drag handle and a kebab menu (rename/star/soft-delete/hard-delete), and the masthead gained a cross-agent nav strip sourced from `portal.BuildTiles`. Bundle validation, the ADR-0503 authorization matrix `--check`, and the Agent Runtime/BFF/frontend test suites (including new reorder/hard-delete fail-closed and OpenAPI contract tests) all pass; `tsc --noEmit` is clean. Residual gaps before `Implemented`: (1) the operator demo itself - rebuild/redeploy `agent-frontend`/`agent-bff`/`agent-runtime`, run the `sort_order` migration, and confirm live cross-agent tab-reuse, drag-reorder persistence and hard-delete irreversibility; (2) no frontend unit-test suite exists in this component yet (no vitest/jest ever set up here), so the in-app tab/kebab/drag-reorder behavior is verified only by `tsc` type-checking and manual/live confirmation, not automated frontend tests.
 - **Target:** OKF v0.1
 - **Date:** 2026-08-21
 - **Decision owners:** Zuno Demo architecture team

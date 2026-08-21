@@ -7,6 +7,8 @@ import {
   ContentVariants,
   EmptyState,
   EmptyStateBody,
+  Flex,
+  FlexItem,
   Form,
   Label,
   Masthead,
@@ -16,19 +18,24 @@ import {
   Page,
   PageSection,
   Spinner,
+  Tab,
+  TabAction,
+  Tabs,
+  TabTitleText,
   TextArea,
   Toolbar,
   ToolbarContent,
   ToolbarGroup,
   ToolbarItem,
 } from "@patternfly/react-core";
-import { Flex, FlexItem } from "@patternfly/react-core";
+import { TimesIcon } from "@patternfly/react-icons";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
 import { ConversationList } from "../shared/ConversationList";
-import { getTranscript } from "../shared/conversations";
+import { getTranscript, listConversations } from "../shared/conversations";
 import { Footer } from "../shared/Footer";
 import { SSEParser } from "../shared/sse";
+import { openAgentTab } from "../shared/tabTracker";
 import { UserMenu } from "../shared/UserMenu";
 import type {
   ChatMessage,
@@ -46,31 +53,62 @@ function newId(): string {
   return `msg-${nextId}`;
 }
 
+let nextTabId = 0;
+function newTempTabId(): string {
+  nextTabId += 1;
+  return `new-${nextTabId}`;
+}
+
+function newSessionId(): string {
+  return `sess-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+
+// ADR-0515: one open in-app tab - each holds its own conversation
+// independently (own run_id/transcript/composer state), superseding the
+// single-conversation-per-page-load model. `id` is the run_id once known,
+// or a client-only placeholder ("new-N") for a not-yet-started
+// conversation - stable either way, so React keys and lookups never churn.
+interface TabState {
+  id: string;
+  runId: string | null;
+  title: string;
+  starred: boolean;
+  sessionId: string;
+  messages: ChatMessage[];
+  input: string;
+  sending: boolean;
+  toolStatus: string | null;
+  loadingHistory: boolean;
+  error: string | null;
+}
+
+function newTab(opts: { runId: string | null; title?: string; starred?: boolean; input?: string }): TabState {
+  return {
+    id: opts.runId ?? newTempTabId(),
+    runId: opts.runId,
+    title: opts.title ?? "",
+    starred: opts.starred ?? false,
+    sessionId: newSessionId(),
+    messages: [],
+    input: opts.input ?? "",
+    sending: false,
+    toolStatus: null,
+    loadingHistory: opts.runId !== null,
+    error: null,
+  };
+}
+
 // Renders the Tekos chat UI (ADR-0044) and drives the end-to-end SSE
 // stream (ADR-0045): fetch() -> this frontend's /api/chat -> agent-bff ->
 // agent-runtime, with `token`/`tool`/`done`/`error` frames from
 // components/agent-runtime/app/main.py:_sse relayed unmodified through
 // every hop and rendered here as they arrive.
 export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
-  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
-  const [input, setInput] = React.useState("");
-  const [sending, setSending] = React.useState(false);
-  const [toolStatus, setToolStatus] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const abortRef = React.useRef<AbortController | null>(null);
+  const [tabs, setTabs] = React.useState<TabState[]>([]);
+  const [activeTabId, setActiveTabId] = React.useState<string | null>(null);
+  const abortRefs = React.useRef<Map<string, AbortController>>(new Map());
   const logRef = React.useRef<HTMLDivElement | null>(null);
-  // session_id (ADR-0045) is a per-page-load tracing/correlation id,
-  // unrelated to run_id below - the backend still requires it on every
-  // request regardless of whether this turn starts or resumes a
-  // conversation.
-  const sessionId = React.useRef(`sess-${Math.random().toString(36).slice(2)}-${Date.now()}`);
-  // ADR-0212: identifies the conversation - null until either seeded from
-  // a `?run_id=` URL param (a reopened conversation, below) or captured
-  // from the SSE "start" event on this tab's first message (a brand new
-  // one).
-  const [runId, setRunId] = React.useState<string | null>(null);
-  const [loadingHistory, setLoadingHistory] = React.useState(false);
-  // Bumped whenever this tab's own action should be reflected in the left
+  // Bumped whenever a tab's own action should be reflected in the left
   // panel (a new conversation appearing, a title changing) - the sidebar
   // has no other way to know, since this app has no shared store/context.
   const [conversationsRefreshToken, setConversationsRefreshToken] = React.useState(0);
@@ -88,66 +126,152 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
     window.localStorage.setItem("zuno.sidebarWidth", String(clamped));
   }
 
+  function updateTab(id: string, updater: (t: TabState) => TabState) {
+    setTabs((prev) => prev.map((t) => (t.id === id ? updater(t) : t)));
+  }
+
+  function updateTabMessage(tabId: string, msgId: string, patch: Partial<ChatMessage>) {
+    updateTab(tabId, (t) => ({
+      ...t,
+      messages: t.messages.map((m) => (m.id === msgId ? { ...m, ...patch } : m)),
+    }));
+  }
+
+  function loadTranscriptInto(tabId: string, runId: string) {
+    getTranscript(config.conversationsURL, runId)
+      .then((turns) => {
+        updateTab(tabId, (t) => ({
+          ...t,
+          messages: turns.map((turn) => ({
+            id: newId(),
+            role: turn.role === "user" ? "user" : "agent",
+            content: turn.content,
+            images: turn.images,
+          })),
+          loadingHistory: false,
+        }));
+      })
+      .catch((err) => {
+        updateTab(tabId, (t) => ({
+          ...t,
+          error: err instanceof Error ? err.message : String(err),
+          loadingHistory: false,
+        }));
+      });
+  }
+
   React.useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [messages, toolStatus]);
+  }, [tabs, activeTabId]);
 
-  // ADR-0212: the frontend half of ADR-0103's resume contract, exercised
-  // end to end for the first time - seeded from a `?run_id=` query
-  // parameter (set either by shared/tabTracker.ts's window.open or by
-  // this same effect's own history.replaceState below on a fresh
-  // conversation's first reply), fetching the exact prior message
-  // history rather than starting empty.
+  // ADR-0515 decision 3: first visit opens on the most recent conversation
+  // if history exists (or a deep-linked ?run_id=, e.g. from the masthead
+  // nav strip's tab-reuse reopening this agent's tab); otherwise the
+  // "Create new chat" empty state renders instead (no tabs open at all).
   React.useEffect(() => {
     const seeded = new URLSearchParams(window.location.search).get("run_id");
-    if (!seeded) {
+    if (seeded) {
+      const tab = newTab({ runId: seeded });
+      setTabs([tab]);
+      setActiveTabId(tab.id);
+      loadTranscriptInto(tab.id, seeded);
       return;
     }
-    setRunId(seeded);
-    setLoadingHistory(true);
-    getTranscript(config.conversationsURL, seeded)
-      .then((turns) => {
-        setMessages(
-          turns.map((t) => ({
-            id: newId(),
-            role: t.role === "user" ? "user" : "agent",
-            content: t.content,
-            images: t.images,
-          })),
-        );
+    listConversations(config.conversationsURL)
+      .then((list) => {
+        if (list.length === 0) {
+          return;
+        }
+        // list_conversations' own default order (ADR-0515: the caller's
+        // manual drag-reorder, "most recent" absent a manual reorder).
+        const mostRecent = list[0];
+        const tab = newTab({ runId: mostRecent.run_id, title: mostRecent.title, starred: mostRecent.starred });
+        setTabs([tab]);
+        setActiveTabId(tab.id);
+        loadTranscriptInto(tab.id, mostRecent.run_id);
       })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => setLoadingHistory(false));
-    // Intentionally run once on mount only - run_id is captured into
-    // state above and driven by the SSE "start" event thereafter, not by
-    // watching the URL.
+      .catch(() => {
+        // Best-effort - the empty state renders regardless of a listing
+        // failure, same as before this ADR (no history = no error shown).
+      });
+    // Intentionally run once on mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function updateMessage(id: string, patch: Partial<ChatMessage>) {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-  }
-
-  async function send() {
-    const text = input.trim();
-    if (!text || sending) {
+  // Keeps the URL's ?run_id= in sync with the ACTIVE tab only, so a
+  // reload or a copy-pasted link reopens the same conversation - mirrors
+  // what a reopened conversation's own seeded ?run_id= already provides.
+  React.useEffect(() => {
+    const active = tabs.find((t) => t.id === activeTabId);
+    const desired = active?.runId ?? null;
+    const url = new URL(window.location.href);
+    const current = url.searchParams.get("run_id");
+    if (current === desired) {
       return;
     }
-    setError(null);
-    setInput("");
-    setSending(true);
-    setToolStatus(null);
+    if (desired) {
+      url.searchParams.set("run_id", desired);
+    } else {
+      url.searchParams.delete("run_id");
+    }
+    window.history.replaceState(null, "", url.toString());
+  }, [activeTabId, tabs]);
 
-    setMessages((prev) => [...prev, { id: newId(), role: "user", content: text }]);
+  function openConversation(runId: string, title: string, starred: boolean) {
+    const existing = tabs.find((t) => t.runId === runId);
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+    const tab = newTab({ runId, title, starred });
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+    loadTranscriptInto(tab.id, runId);
+  }
+
+  function openNewConversation(prefill = "") {
+    const tab = newTab({ runId: null, input: prefill });
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+  }
+
+  function closeTab(id: string) {
+    abortRefs.current.get(id)?.abort();
+    abortRefs.current.delete(id);
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === id);
+      const next = prev.filter((t) => t.id !== id);
+      if (activeTabId === id) {
+        const neighbor = next[idx] ?? next[idx - 1];
+        setActiveTabId(neighbor ? neighbor.id : null);
+      }
+      return next;
+    });
+  }
+
+  async function send(tab: TabState) {
+    const text = tab.input.trim();
+    if (!text || tab.sending) {
+      return;
+    }
+
+    updateTab(tab.id, (t) => ({ ...t, input: "", sending: true, toolStatus: null, error: null }));
+
+    const userMessageId = newId();
     const agentMessageId = newId();
-    setMessages((prev) => [...prev, { id: agentMessageId, role: "agent", content: "", pending: true }]);
+    updateTab(tab.id, (t) => ({
+      ...t,
+      messages: [
+        ...t.messages,
+        { id: userMessageId, role: "user", content: text },
+        { id: agentMessageId, role: "agent", content: "", pending: true },
+      ],
+    }));
 
     const controller = new AbortController();
-    abortRef.current = controller;
+    abortRefs.current.set(tab.id, controller);
 
     try {
       const resp = await fetch(config.apiURL, {
@@ -157,9 +281,9 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           Accept: "text/event-stream",
         },
         body: JSON.stringify({
-          session_id: sessionId.current,
+          session_id: tab.sessionId,
           message: text,
-          run_id: runId ?? undefined,
+          run_id: tab.runId ?? undefined,
         }),
         signal: controller.signal,
       });
@@ -192,31 +316,22 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         for (const evt of events) {
           if (evt.event === "start") {
             const data = JSON.parse(evt.data) as StartEventData;
-            setRunId(data.run_id);
+            updateTab(tab.id, (t) => ({ ...t, runId: data.run_id }));
             setConversationsRefreshToken((n) => n + 1);
-            // A brand new conversation's first reply: the URL had no
-            // run_id yet, so a refresh (or copy-pasting the link) would
-            // otherwise lose it - matches what a reopened conversation's
-            // ?run_id= already provides.
-            const url = new URL(window.location.href);
-            if (url.searchParams.get("run_id") !== data.run_id) {
-              url.searchParams.set("run_id", data.run_id);
-              window.history.replaceState(null, "", url.toString());
-            }
             // eslint-disable-next-line no-console
             console.debug("zuno chat request_id", data.request_id);
           } else if (evt.event === "tool") {
             const data = JSON.parse(evt.data) as ToolEventData;
-            setToolStatus(data.status === "started" ? `Using ${data.name}…` : null);
+            updateTab(tab.id, (t) => ({ ...t, toolStatus: data.status === "started" ? `Using ${data.name}…` : null }));
           } else if (evt.event === "token") {
             const data = JSON.parse(evt.data) as { delta: string };
             accumulated += data.delta;
-            updateMessage(agentMessageId, { content: accumulated, pending: true });
+            updateTabMessage(tab.id, agentMessageId, { content: accumulated, pending: true });
           } else if (evt.event === "done") {
             const data = JSON.parse(evt.data) as DoneEventData;
             citations = data.citations;
             images = data.images;
-            setToolStatus(null);
+            updateTab(tab.id, (t) => ({ ...t, toolStatus: null }));
           } else if (evt.event === "error") {
             const data = JSON.parse(evt.data) as ErrorEventData;
             throw new Error(data.message);
@@ -224,7 +339,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         }
       }
 
-      updateMessage(agentMessageId, {
+      updateTabMessage(tab.id, agentMessageId, {
         content: accumulated || "(empty reply)",
         citations,
         images,
@@ -236,18 +351,25 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         : err instanceof Error
           ? err.message
           : String(err);
-      updateMessage(agentMessageId, { content: message, role: "error", pending: false });
-      setError(message);
-      setToolStatus(null);
+      updateTabMessage(tab.id, agentMessageId, { content: message, role: "error", pending: false });
+      updateTab(tab.id, (t) => ({ ...t, error: message, toolStatus: null }));
     } finally {
-      setSending(false);
-      abortRef.current = null;
+      updateTab(tab.id, (t) => ({ ...t, sending: false }));
+      abortRefs.current.delete(tab.id);
     }
   }
 
-  function stop() {
-    abortRef.current?.abort();
+  function stop(tabId: string) {
+    abortRefs.current.get(tabId)?.abort();
   }
+
+  // ADR-0515 decision 5: starred conversations sort left among open
+  // in-app tabs - a stable sort so tabs otherwise keep their open order.
+  const orderedTabs = React.useMemo(
+    () => [...tabs].sort((a, b) => Number(b.starred) - Number(a.starred)),
+    [tabs],
+  );
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
 
   const masthead = (
     <Masthead>
@@ -265,6 +387,28 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       <MastheadContent>
         <Toolbar>
           <ToolbarContent>
+            {config.agentNavStrip.length > 0 && (
+              // ADR-0515: cross-agent nav - each link reuses/focuses that
+              // agent's own browser tab (tabTracker.ts), never navigates
+              // this tab away.
+              <ToolbarGroup>
+                {config.agentNavStrip.map((entry) => (
+                  <ToolbarItem key={entry.name}>
+                    <Button
+                      variant="link"
+                      isInline
+                      style={{ color: entry.color || undefined }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        openAgentTab(entry.name, entry.href);
+                      }}
+                    >
+                      {entry.displayName}
+                    </Button>
+                  </ToolbarItem>
+                ))}
+              </ToolbarGroup>
+            )}
             <ToolbarGroup align={{ default: "alignEnd" }}>
               <ToolbarItem>
                 <UserMenu
@@ -301,94 +445,149 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       }
       sidebar={
         <ConversationList
-          agent={config.displayName}
           conversationsURL={config.conversationsURL}
-          chatURL={window.location.pathname}
-          activeRunId={runId}
+          activeRunId={activeTab?.runId ?? null}
           refreshSignal={conversationsRefreshToken}
           width={sidebarWidth}
           onWidthChange={handleSidebarWidthChange}
+          onOpenConversation={openConversation}
+          onNewConversation={() => openNewConversation()}
         />
       }
       masthead={masthead}
     >
-      <PageSection isFilled aria-label="Chat transcript">
-        <div ref={logRef} style={{ height: "100%", overflowY: "auto" }}>
-          {loadingHistory ? (
-            <EmptyState titleText="Loading conversation…" headingLevel="h2">
-              <EmptyStateBody>
-                <Spinner size="lg" aria-label="Loading conversation history" />
-              </EmptyStateBody>
-            </EmptyState>
-          ) : messages.length === 0 ? (
-            <EmptyState titleText="Ask a technical question" headingLevel="h2">
-              <EmptyStateBody>
-                {config.displayName} answers from Zuno's technical documentation and, when relevant,
-                live Confluence search.
-              </EmptyStateBody>
-            </EmptyState>
-          ) : (
-            <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
-              {messages.map((m) => (
-                <FlexItem key={m.id} alignSelf={{ default: m.role === "user" ? "alignSelfFlexEnd" : "alignSelfFlexStart" }}>
-                  <MessageBubble message={m} />
-                </FlexItem>
-              ))}
-              {toolStatus && (
-                <FlexItem>
-                  <Content component={ContentVariants.small}>
-                    <Spinner size="sm" isInline aria-label="Tool call in progress" /> {toolStatus}
-                  </Content>
-                </FlexItem>
-              )}
-            </Flex>
-          )}
-        </div>
-      </PageSection>
-      <PageSection stickyOnBreakpoint={{ default: "bottom" }}>
-        {error && (
-          <Alert variant="danger" isInline title="Something went wrong" style={{ marginBottom: "1rem" }}>
-            {error}
-          </Alert>
-        )}
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send();
-          }}
-        >
-          <Flex alignItems={{ default: "alignItemsFlexEnd" }} gap={{ default: "gapSm" }}>
-            <FlexItem grow={{ default: "grow" }}>
-              <TextArea
-                aria-label="Ask a technical question"
-                placeholder="Ask a technical question…"
-                value={input}
-                onChange={(_e, value) => setInput(value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                autoResize
-                isDisabled={sending}
-                rows={1}
+      {orderedTabs.length > 0 && (
+        <PageSection type="tabs">
+          <Tabs
+            activeKey={activeTabId ?? undefined}
+            onSelect={(_e, key) => setActiveTabId(String(key))}
+            aria-label="Open conversations"
+          >
+            {orderedTabs.map((tab) => (
+              <Tab
+                key={tab.id}
+                eventKey={tab.id}
+                title={<TabTitleText>{tab.title || "New conversation"}</TabTitleText>}
+                actions={
+                  <TabAction
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab.id);
+                    }}
+                    aria-label={`Close ${tab.title || "New conversation"}`}
+                  >
+                    <TimesIcon />
+                  </TabAction>
+                }
               />
-            </FlexItem>
-            <FlexItem>
-              {sending ? (
-                <Button variant="secondary" onClick={stop}>
-                  Stop
-                </Button>
+            ))}
+          </Tabs>
+        </PageSection>
+      )}
+      {activeTab === null ? (
+        <PageSection isFilled aria-label="Create new chat">
+          <EmptyState titleText="Create new chat" headingLevel="h2">
+            <EmptyStateBody>
+              {config.promptExamples.length > 0 ? (
+                <Flex direction={{ default: "column" }} alignItems={{ default: "alignItemsCenter" }} gap={{ default: "gapSm" }}>
+                  {config.promptExamples.map((example) => (
+                    <FlexItem key={example}>
+                      <Button variant="secondary" onClick={() => openNewConversation(example)}>
+                        {example}
+                      </Button>
+                    </FlexItem>
+                  ))}
+                </Flex>
               ) : (
-                <Button variant="primary" type="submit" isDisabled={!input.trim()}>
-                  Send
-                </Button>
+                <>Start a new conversation to begin.</>
               )}
-            </FlexItem>
-          </Flex>
-        </Form>
-      </PageSection>
+            </EmptyStateBody>
+            <Button variant="primary" onClick={() => openNewConversation()}>
+              New conversation
+            </Button>
+          </EmptyState>
+        </PageSection>
+      ) : (
+        <>
+          <PageSection isFilled aria-label="Chat transcript">
+            <div ref={logRef} style={{ height: "100%", overflowY: "auto" }}>
+              {activeTab.loadingHistory ? (
+                <EmptyState titleText="Loading conversation…" headingLevel="h2">
+                  <EmptyStateBody>
+                    <Spinner size="lg" aria-label="Loading conversation history" />
+                  </EmptyStateBody>
+                </EmptyState>
+              ) : activeTab.messages.length === 0 ? (
+                <EmptyState titleText="Ask a technical question" headingLevel="h2">
+                  <EmptyStateBody>
+                    {config.displayName} answers from Zuno's technical documentation and, when relevant,
+                    live Confluence search.
+                  </EmptyStateBody>
+                </EmptyState>
+              ) : (
+                <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+                  {activeTab.messages.map((m) => (
+                    <FlexItem key={m.id} alignSelf={{ default: m.role === "user" ? "alignSelfFlexEnd" : "alignSelfFlexStart" }}>
+                      <MessageBubble message={m} />
+                    </FlexItem>
+                  ))}
+                  {activeTab.toolStatus && (
+                    <FlexItem>
+                      <Content component={ContentVariants.small}>
+                        <Spinner size="sm" isInline aria-label="Tool call in progress" /> {activeTab.toolStatus}
+                      </Content>
+                    </FlexItem>
+                  )}
+                </Flex>
+              )}
+            </div>
+          </PageSection>
+          <PageSection stickyOnBreakpoint={{ default: "bottom" }}>
+            {activeTab.error && (
+              <Alert variant="danger" isInline title="Something went wrong" style={{ marginBottom: "1rem" }}>
+                {activeTab.error}
+              </Alert>
+            )}
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send(activeTab);
+              }}
+            >
+              <Flex alignItems={{ default: "alignItemsFlexEnd" }} gap={{ default: "gapSm" }}>
+                <FlexItem grow={{ default: "grow" }}>
+                  <TextArea
+                    aria-label="Ask a technical question"
+                    placeholder="Ask a technical question…"
+                    value={activeTab.input}
+                    onChange={(_e, value) => updateTab(activeTab.id, (t) => ({ ...t, input: value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void send(activeTab);
+                      }
+                    }}
+                    autoResize
+                    isDisabled={activeTab.sending}
+                    rows={1}
+                  />
+                </FlexItem>
+                <FlexItem>
+                  {activeTab.sending ? (
+                    <Button variant="secondary" onClick={() => stop(activeTab.id)}>
+                      Stop
+                    </Button>
+                  ) : (
+                    <Button variant="primary" type="submit" isDisabled={!activeTab.input.trim()}>
+                      Send
+                    </Button>
+                  )}
+                </FlexItem>
+              </Flex>
+            </Form>
+          </PageSection>
+        </>
+      )}
     </Page>
     <Footer />
     </div>

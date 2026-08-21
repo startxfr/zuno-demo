@@ -1,26 +1,33 @@
 import * as React from "react";
 import {
   Button,
+  Dropdown,
+  DropdownItem,
+  DropdownList,
   EmptyState,
   EmptyStateBody,
+  MenuToggle,
+  type MenuToggleElement,
   PageSidebar,
   PageSidebarBody,
   Spinner,
   TextInput,
 } from "@patternfly/react-core";
-import { OutlinedStarIcon, StarIcon, TrashIcon } from "@patternfly/react-icons";
-import { deleteConversation, listConversations, renameConversation, setStar, type Conversation } from "./conversations";
-import { openConversationTab } from "./tabTracker";
+import { EllipsisVIcon, GripVerticalIcon, StarIcon } from "@patternfly/react-icons";
+import {
+  deleteConversation,
+  hardDeleteConversation,
+  listConversations,
+  renameConversation,
+  reorderConversations,
+  setStar,
+  type Conversation,
+} from "./conversations";
 
 export interface ConversationListProps {
-  agent: string;
   conversationsURL: string;
-  // This page's own URL with no query string (window.location.pathname) -
-  // every conversation opens as "{chatURL}?run_id={run_id}" (ADR-0212).
-  chatURL: string;
-  // The run_id this tab currently has open, if any - highlighted in the
-  // list, and refreshed into once this component's own actions
-  // (star/rename) change it.
+  // The run_id of the currently active in-app tab, if any - highlighted
+  // in the list.
   activeRunId: string | null;
   // Bump this (e.g. on every SSE "start" event) to force a re-fetch from
   // outside this component - this codebase has no shared store/context,
@@ -34,6 +41,12 @@ export interface ConversationListProps {
   // persist/restore it.
   width: number;
   onWidthChange: (width: number) => void;
+  // ADR-0515: opening or creating a conversation now activates an in-app
+  // tab in chat/Chat.tsx - this list never navigates or opens a browser
+  // tab itself (shared/tabTracker.ts is agent-scoped now, used only by
+  // the masthead's cross-agent nav strip).
+  onOpenConversation: (runId: string, title: string, starred: boolean) => void;
+  onNewConversation: () => void;
 }
 
 const MIN_SIDEBAR_WIDTH = 220;
@@ -113,40 +126,32 @@ function ResizeHandle({
 }
 
 // Left-hand conversation list (ADR-0212), rendered via PatternFly Page's
-// sidebar prop (unused elsewhere in this codebase until now). No context/
-// store, prop-driven like shared/UserMenu.tsx - this codebase has no
-// client-side router, so every conversation open/focus goes through
-// shared/tabTracker.ts's window.open, never in-place navigation.
+// sidebar prop. No context/store, prop-driven like shared/UserMenu.tsx -
+// opening/creating a conversation is delegated to the parent (Chat.tsx)
+// via onOpenConversation/onNewConversation, which own the in-app tab set
+// (ADR-0515) - this component only ever renders and reorders the list.
 //
-// ADR-0214 (part 3): every row carries @patternfly/react-icons icons -
-// filled/outline StarIcon for the star toggle, TrashIcon to delete. The
-// title itself is the row's link (single click opens/focuses the
-// conversation's tab; double click renames) - no separate per-row icon
-// for that. Rename stays double-click-to-edit (no kebab menu yet) -
-// deliberately scoped down from ADR-0214's original text, which
-// described the kebab's actions (share, clone, rename) as an ADR-0213
-// dependency this codebase doesn't have yet; it lands once ADR-0213 does.
+// ADR-0515 (WP-061): every row now carries a drag handle (manual reorder,
+// persisted via reorderConversations) and a right-aligned kebab menu
+// consolidating rename/star/soft-delete/hard-delete - replacing ADR-0214's
+// standalone star/trash buttons and double-click-to-rename stopgap.
 export function ConversationList({
-  agent,
   conversationsURL,
-  chatURL,
   activeRunId,
   refreshSignal,
   width,
   onWidthChange,
+  onOpenConversation,
+  onNewConversation,
 }: ConversationListProps): React.ReactElement {
   const [conversations, setConversations] = React.useState<Conversation[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [renamingRunId, setRenamingRunId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
+  const [openKebabRunId, setOpenKebabRunId] = React.useState<string | null>(null);
+  const [draggedRunId, setDraggedRunId] = React.useState<string | null>(null);
   const renameInputRef = React.useRef<HTMLInputElement | null>(null);
-  // The title is both the open-tab click target and the rename
-  // double-click target - a double click's two constituent click events
-  // would otherwise open two stray tabs before the dblclick handler ever
-  // runs. Delaying the single-click action lets a following dblclick
-  // cancel it (the standard click-vs-dblclick disambiguation pattern).
-  const clickTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (renamingRunId !== null) {
@@ -164,35 +169,6 @@ export function ConversationList({
     refresh();
   }, [refresh, refreshSignal]);
 
-  function openExisting(runId: string) {
-    openConversationTab(agent, runId, `${chatURL}?run_id=${encodeURIComponent(runId)}`);
-  }
-
-  function openNew() {
-    // No stable identity to track for a not-yet-started conversation -
-    // always a fresh tab, never routed through tabTracker.
-    window.open(chatURL, "_blank");
-  }
-
-  function handleTitleClick(runId: string) {
-    if (clickTimerRef.current !== null) {
-      window.clearTimeout(clickTimerRef.current);
-    }
-    clickTimerRef.current = window.setTimeout(() => {
-      openExisting(runId);
-      clickTimerRef.current = null;
-    }, 250);
-  }
-
-  function handleTitleDoubleClick(runId: string, title: string) {
-    if (clickTimerRef.current !== null) {
-      window.clearTimeout(clickTimerRef.current);
-      clickTimerRef.current = null;
-    }
-    setRenamingRunId(runId);
-    setRenameValue(title);
-  }
-
   async function toggleStar(runId: string, starred: boolean) {
     try {
       await setStar(conversationsURL, runId, starred);
@@ -203,7 +179,7 @@ export function ConversationList({
   }
 
   async function deleteConversationRow(runId: string, title: string) {
-    if (!window.confirm(`Delete "${title || "Untitled conversation"}"? This can't be undone from here.`)) {
+    if (!window.confirm(`Delete "${title || "Untitled conversation"}"? This hides it from your list, but keeps its history.`)) {
       return;
     }
     try {
@@ -212,6 +188,27 @@ export function ConversationList({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  async function hardDeleteConversationRow(runId: string, title: string) {
+    if (
+      !window.confirm(
+        `Permanently delete "${title || "Untitled conversation"}"? This cannot be undone - its entire message history is erased.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await hardDeleteConversation(conversationsURL, runId);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function startRename(runId: string, title: string) {
+    setRenamingRunId(runId);
+    setRenameValue(title);
   }
 
   async function commitRename(runId: string, title: string) {
@@ -228,6 +225,36 @@ export function ConversationList({
     }
   }
 
+  // ADR-0515: manual drag-reorder, disabled while a search filter is
+  // active - reordering a filtered subset's *visual* order against the
+  // full underlying list's positions is ambiguous, so this pass simply
+  // doesn't offer it while filtered.
+  const dragEnabled = search.trim() === "";
+
+  function handleDrop(targetRunId: string) {
+    const draggedId = draggedRunId;
+    setDraggedRunId(null);
+    if (!draggedId || draggedId === targetRunId || conversations === null) {
+      return;
+    }
+    const list = [...conversations];
+    const fromIdx = list.findIndex((c) => c.run_id === draggedId);
+    const toIdx = list.findIndex((c) => c.run_id === targetRunId);
+    if (fromIdx === -1 || toIdx === -1) {
+      return;
+    }
+    const [moved] = list.splice(fromIdx, 1);
+    list.splice(toIdx, 0, moved);
+    setConversations(list);
+    reorderConversations(
+      conversationsURL,
+      list.map((c) => c.run_id),
+    ).catch((err) => {
+      setError(err instanceof Error ? err.message : String(err));
+      refresh();
+    });
+  }
+
   const filtered = (conversations ?? []).filter((c) =>
     c.title.toLowerCase().includes(search.trim().toLowerCase()),
   );
@@ -237,7 +264,7 @@ export function ConversationList({
       <ResizeHandle width={width} onWidthChange={onWidthChange} />
       <PageSidebarBody>
         <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", height: "100%" }}>
-          <Button variant="primary" isBlock onClick={openNew}>
+          <Button variant="primary" isBlock onClick={onNewConversation}>
             New conversation
           </Button>
           <TextInput
@@ -262,33 +289,49 @@ export function ConversationList({
               {filtered.map((c) => (
                 <div
                   key={c.run_id}
+                  draggable={dragEnabled}
+                  onDragStart={() => dragEnabled && setDraggedRunId(c.run_id)}
+                  onDragOver={(e) => {
+                    if (dragEnabled) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (!dragEnabled) {
+                      return;
+                    }
+                    e.preventDefault();
+                    handleDrop(c.run_id);
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.5rem",
+                    gap: "0.375rem",
                     padding: "0.5rem",
                     borderRadius: "var(--pf-t--global--border-radius--medium, 4px)",
+                    opacity: draggedRunId === c.run_id ? 0.5 : 1,
                     background:
                       c.run_id === activeRunId
                         ? "var(--pf-t--global--background--color--secondary--default)"
                         : undefined,
                   }}
                 >
-                  <button
-                    type="button"
-                    aria-label={c.starred ? "Unstar conversation" : "Star conversation"}
-                    onClick={() => void toggleStar(c.run_id, !c.starred)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                      display: "flex",
-                      color: c.starred ? "var(--pf-t--global--icon--color--favorite--default)" : undefined,
-                    }}
-                  >
-                    {c.starred ? <StarIcon /> : <OutlinedStarIcon />}
-                  </button>
+                  {dragEnabled && (
+                    <span
+                      aria-hidden="true"
+                      style={{ cursor: "grab", display: "flex", color: "var(--pf-t--global--icon--color--subtle)" }}
+                    >
+                      <GripVerticalIcon />
+                    </span>
+                  )}
+                  {c.starred && (
+                    <span
+                      aria-label="Starred"
+                      style={{ display: "flex", color: "var(--pf-t--global--icon--color--favorite--default)" }}
+                    >
+                      <StarIcon />
+                    </span>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {renamingRunId === c.run_id ? (
                       <TextInput
@@ -303,24 +346,18 @@ export function ConversationList({
                         onBlur={() => void commitRename(c.run_id, renameValue)}
                       />
                     ) : (
-                      // The title itself is the row's link (ADR-0214
-                      // follow-up) - single click opens/focuses the
-                      // conversation's tab (delayed, so a following
-                      // dblclick can cancel it - see handleTitleClick),
-                      // double click renames.
-                      <a
-                        href={`${chatURL}?run_id=${encodeURIComponent(c.run_id)}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleTitleClick(c.run_id);
-                        }}
-                        onDoubleClick={(e) => {
-                          e.preventDefault();
-                          handleTitleDoubleClick(c.run_id, c.title);
-                        }}
+                      <button
+                        type="button"
+                        onClick={() => onOpenConversation(c.run_id, c.title, c.starred)}
                         title={c.title || "Untitled conversation"}
                         style={{
                           display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -328,24 +365,64 @@ export function ConversationList({
                         }}
                       >
                         {c.title || "Untitled conversation"}
-                      </a>
+                      </button>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    aria-label="Delete conversation"
-                    onClick={() => void deleteConversationRow(c.run_id, c.title)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                      display: "flex",
-                      color: "var(--pf-t--global--icon--color--subtle)",
-                    }}
+                  <Dropdown
+                    isOpen={openKebabRunId === c.run_id}
+                    onOpenChange={(isOpen) => setOpenKebabRunId(isOpen ? c.run_id : null)}
+                    toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        aria-label={`Actions for ${c.title || "Untitled conversation"}`}
+                        variant="plain"
+                        onClick={() => setOpenKebabRunId(openKebabRunId === c.run_id ? null : c.run_id)}
+                        isExpanded={openKebabRunId === c.run_id}
+                      >
+                        <EllipsisVIcon />
+                      </MenuToggle>
+                    )}
                   >
-                    <TrashIcon />
-                  </button>
+                    <DropdownList>
+                      <DropdownItem
+                        key="rename"
+                        onClick={() => {
+                          setOpenKebabRunId(null);
+                          startRename(c.run_id, c.title);
+                        }}
+                      >
+                        Rename
+                      </DropdownItem>
+                      <DropdownItem
+                        key="star"
+                        onClick={() => {
+                          setOpenKebabRunId(null);
+                          void toggleStar(c.run_id, !c.starred);
+                        }}
+                      >
+                        {c.starred ? "Unstar" : "Star"}
+                      </DropdownItem>
+                      <DropdownItem
+                        key="delete"
+                        onClick={() => {
+                          setOpenKebabRunId(null);
+                          void deleteConversationRow(c.run_id, c.title);
+                        }}
+                      >
+                        Delete
+                      </DropdownItem>
+                      <DropdownItem
+                        key="hard-delete"
+                        isDanger
+                        onClick={() => {
+                          setOpenKebabRunId(null);
+                          void hardDeleteConversationRow(c.run_id, c.title);
+                        }}
+                      >
+                        Delete permanently
+                      </DropdownItem>
+                    </DropdownList>
+                  </Dropdown>
                 </div>
               ))}
             </div>

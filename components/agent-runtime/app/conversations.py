@@ -64,6 +64,33 @@ CREATE TABLE IF NOT EXISTS conversation_stars (
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (run_id, subject)
 );
+
+-- ADR-0515: manual drag-reorder of the caller's own conversation list,
+-- replacing the old implicit updated_at-DESC/starred-first ordering.
+-- Nullable (no column-level NOT NULL) rather than a two-step ADD-then-
+-- SET-NOT-NULL migration - every INSERT below always supplies a value,
+-- and the backfill just after this ALTER clears every pre-existing NULL
+-- in the same startup pass before the pool is ever handed to a request.
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS sort_order bigint;
+
+-- Idempotent: only rows still NULL (pre-ADR-0515 conversations, or a
+-- fresh row from a version-skewed replica before this ALTER lands there)
+-- are touched - a rerun on an already-backfilled table is a no-op. Most
+-- recently created gets the smallest sort_order (rn=1) so ascending
+-- sort_order reproduces today's "most recent first" default exactly;
+-- record_turn's INSERT below then keeps assigning new conversations a
+-- value below the current minimum, so a brand new conversation always
+-- lands above this reconstructed order too.
+WITH ranked AS (
+    SELECT run_id, row_number() OVER (
+        PARTITION BY agent_name, owner_sub ORDER BY created_at DESC
+    ) AS rn
+    FROM conversations
+    WHERE sort_order IS NULL
+)
+UPDATE conversations SET sort_order = ranked.rn
+FROM ranked
+WHERE conversations.run_id = ranked.run_id;
 """
 
 
@@ -152,11 +179,18 @@ async def record_turn(
         async with conn.cursor() as cur:
             await cur.execute(
                 """
-                INSERT INTO conversations (run_id, agent_name, owner_sub, title)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO conversations (run_id, agent_name, owner_sub, title, sort_order)
+                VALUES (
+                    %(run_id)s, %(agent_name)s, %(owner_sub)s, %(title)s,
+                    COALESCE(
+                        (SELECT MIN(sort_order) FROM conversations
+                         WHERE agent_name = %(agent_name)s AND owner_sub = %(owner_sub)s),
+                        1
+                    ) - 1
+                )
                 ON CONFLICT (run_id) DO UPDATE SET updated_at = now()
                 """,
-                (run_id, agent_name, owner_sub, title),
+                {"run_id": run_id, "agent_name": agent_name, "owner_sub": owner_sub, "title": title},
             )
 
 
@@ -192,7 +226,14 @@ async def list_conversations(
     """
     if starred_only:
         query += " AND s.run_id IS NOT NULL"
-    query += " ORDER BY starred DESC, c.updated_at DESC"
+    # ADR-0515: the list's own order is now the caller's manual
+    # drag-reorder (sort_order), not an automatic starred-first rule -
+    # starred is still returned per row, but only drives ordering of the
+    # *open in-app tabs* client-side (chat/Chat.tsx), a separate concern.
+    # updated_at DESC only breaks ties among rows that still share a
+    # sort_order (never happens through this module's own writers, but
+    # keeps the order deterministic against any future direct SQL).
+    query += " ORDER BY COALESCE(c.sort_order, 9223372036854775807) ASC, c.updated_at DESC"
 
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
@@ -266,4 +307,54 @@ async def set_star(pool: Optional[AsyncConnectionPool], *, run_id: str, owner_su
                 await cur.execute(
                     "DELETE FROM conversation_stars WHERE run_id = %s AND subject = %s", (run_id, owner_sub)
                 )
+    return True
+
+
+async def reorder_conversations(
+    pool: Optional[AsyncConnectionPool], *, agent_name: str, owner_sub: str, run_ids: List[str]
+) -> int:
+    """ADR-0515: persists a drag-drop reorder as an explicit sort_order per
+    conversation, ascending - index 0 sorts first (list_conversations'
+    ORDER BY). Scoped to (agent_name, owner_sub), the same per-user/
+    per-agent boundary every other function in this module enforces; a
+    run_id absent from that scope (wrong owner, wrong agent, or simply
+    stale/unknown - e.g. a client racing a delete against a reorder) is
+    silently skipped rather than failing the whole request. Returns the
+    count actually updated so the caller can detect a stale client list."""
+    pool = _require_pool(pool)
+    updated = 0
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            for position, run_id in enumerate(run_ids):
+                await cur.execute(
+                    "UPDATE conversations SET sort_order = %s WHERE run_id = %s AND agent_name = %s AND owner_sub = %s",
+                    (position, run_id, agent_name, owner_sub),
+                )
+                updated += cur.rowcount
+    return updated
+
+
+async def hard_delete_conversation(pool: Optional[AsyncConnectionPool], *, run_id: str, owner_sub: str) -> bool:
+    """ADR-0515: irreversible - unlike archive_conversation's archived_at
+    soft-hide, this purges the conversations row (and its
+    conversation_stars rows) outright. Does not touch the LangGraph
+    checkpoint itself - that lives in a separate pool this module
+    deliberately never opens (see module docstring); app/main.py's
+    hard_delete_conversation_endpoint purges it separately via
+    graph.checkpointer.adelete_thread once this call confirms ownership.
+    A SELECT-then-delete (not a bare DELETE ... RETURNING) because
+    conversation_stars.run_id REFERENCES conversations(run_id) with no
+    ON DELETE CASCADE - stars must be cleared first or the conversations
+    DELETE below would violate that FK constraint. Same "collapsed to one
+    not-found case" rationale as rename_conversation/archive_conversation."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT 1 FROM conversations WHERE run_id = %s AND owner_sub = %s", (run_id, owner_sub)
+            )
+            if await cur.fetchone() is None:
+                return False
+            await cur.execute("DELETE FROM conversation_stars WHERE run_id = %s", (run_id,))
+            await cur.execute("DELETE FROM conversations WHERE run_id = %s AND owner_sub = %s", (run_id, owner_sub))
     return True

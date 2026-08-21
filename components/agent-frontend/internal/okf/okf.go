@@ -37,9 +37,13 @@ type Zuno struct {
 	Name      string   `yaml:"name"`
 	Status    string   `yaml:"status"` // "active" | "placeholder"
 	TaskNames []string `yaml:"tasks"`
-	Model     Model    `yaml:"model"`
-	Access    Access   `yaml:"access"`
-	UI        UI       `yaml:"ui"`
+	// PrimaryTask (ADR-0342/WP-33) names which entry in TaskNames this
+	// agent's chat route actually executes - ADR-0515/WP-061 also uses it
+	// to pick which task's PromptExamples seed the chat empty state.
+	PrimaryTask string `yaml:"primary_task"`
+	Model       Model  `yaml:"model"`
+	Access      Access `yaml:"access"`
+	UI          UI     `yaml:"ui"`
 }
 
 // Task is a resolved agents/<name>/tasks/<task>.md bundle.
@@ -47,6 +51,9 @@ type Task struct {
 	Name         string
 	Title        string
 	AllowedTools []string
+	// PromptExamples (ADR-0515/WP-061): example prompts shown as clickable
+	// starters in the chat empty state. Optional - nil renders no starters.
+	PromptExamples []string
 }
 
 // taskFrontmatter mirrors zuno-okf-task-v0.2.schema.json.
@@ -55,7 +62,8 @@ type taskFrontmatter struct {
 	Type       string `yaml:"type"`
 	Title      string `yaml:"title"`
 	Zuno       struct {
-		AllowedTools []string `yaml:"allowed_tools"`
+		AllowedTools   []string `yaml:"allowed_tools"`
+		PromptExamples []string `yaml:"prompt_examples"`
 	} `yaml:"zuno"`
 }
 
@@ -188,12 +196,26 @@ func loadTasks(agentDir string, taskNames []string) ([]Task, error) {
 			return nil, fmt.Errorf("parsing %q frontmatter: %w", path, err)
 		}
 		tasks = append(tasks, Task{
-			Name:         name,
-			Title:        tf.Title,
-			AllowedTools: tf.Zuno.AllowedTools,
+			Name:           name,
+			Title:          tf.Title,
+			AllowedTools:   tf.Zuno.AllowedTools,
+			PromptExamples: tf.Zuno.PromptExamples,
 		})
 	}
 	return tasks, nil
+}
+
+// PrimaryTaskPromptExamples (ADR-0515/WP-061) returns the primary task's
+// declared prompt_examples, or nil if the agent has no primary task or
+// that task declared none - the chat empty state then simply renders with
+// no starter prompts.
+func (a Agent) PrimaryTaskPromptExamples() []string {
+	for _, t := range a.Tasks {
+		if t.Name == a.Zuno.PrimaryTask {
+			return t.PromptExamples
+		}
+	}
+	return nil
 }
 
 // Find returns the agent with the given zuno.name, if loaded.

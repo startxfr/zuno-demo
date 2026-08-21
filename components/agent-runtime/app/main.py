@@ -29,7 +29,7 @@ from app.graph.classification import _escalate
 from app.graph.nodes import _model_router
 from app.memory import MemoryExtractionError, extract_memory
 from app.registry import AgentDefinition, AgentRegistry
-from app.schemas import ChatRequest, ChatResponse, RenameConversationRequest
+from app.schemas import ChatRequest, ChatResponse, RenameConversationRequest, ReorderConversationsRequest
 from app.telemetry import graph_run_span, init_telemetry
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -501,6 +501,28 @@ async def list_conversations_endpoint(
     )
 
 
+@app.put("/v1/agents/{agent}/conversations/reorder")
+async def reorder_conversations_endpoint(
+    agent: str,
+    payload: ReorderConversationsRequest,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> Dict[str, int]:
+    """ADR-0515: persists a drag-drop reorder of the caller's own
+    conversation list for this agent. run_ids the caller doesn't own (or
+    that belong to a different agent) are silently skipped rather than
+    failing the whole request - conversations.reorder_conversations scopes
+    every row by (agent_name, owner_sub)."""
+    agent_def = _active_agent_or_404(agent)
+    updated = await conversations.reorder_conversations(
+        request.app.state.conversations_pool,
+        agent_name=agent_def.name,
+        owner_sub=identity.sub,
+        run_ids=payload.run_ids,
+    )
+    return {"updated": updated}
+
+
 @app.get("/v1/agents/{agent}/runs/{run_id}/transcript")
 async def transcript_endpoint(
     agent: str,
@@ -596,6 +618,30 @@ async def archive_conversation_endpoint(
     if not ok:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
     return {"archived": True}
+
+
+@app.delete("/v1/agents/{agent}/runs/{run_id}/hard-delete")
+async def hard_delete_conversation_endpoint(
+    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, bool]:
+    """ADR-0515: irreversible. Unlike archive_conversation_endpoint (soft
+    delete, hides the row only), this purges both the conversations
+    metadata row and the underlying LangGraph checkpoint/message history.
+    The metadata row is deleted first (fail-closed 404 for both unknown
+    and not-owned, same collapsed-case rationale as every other
+    conversation-management endpoint here) and the checkpoint second, so a
+    crash between the two calls leaves at worst an orphaned checkpoint no
+    longer reachable through this caller's conversation list - never a
+    visible conversation whose history silently vanished."""
+    agent_def = _active_agent_or_404(agent)
+    ok = await conversations.hard_delete_conversation(
+        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    graph = request.app.state.graph_factory.graph_for(agent_def)
+    await graph.checkpointer.adelete_thread(run_id)
+    return {"deleted": True}
 
 
 async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict[str, Any], *, session_id: str, request_id: str):

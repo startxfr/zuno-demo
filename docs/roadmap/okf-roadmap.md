@@ -87,7 +87,7 @@ component-code package.
 | WP-45 | [wp-45](work-packages/wp-45-deployment-dir-content.md) | 0503 (deployment) | WP-43 | Done | none |
 | WP-46 | [wp-46](work-packages/wp-46-tests-target-structure.md) | 0504 | WP-43 | Done | none |
 | WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
-| WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Not started | rebuild/redeploy 3 components; cross-agent tab-reuse + drag-reorder + hard-delete demo |
+| WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Operator pending (repo work merged) | rebuild/redeploy 3 components; cross-agent tab-reuse + drag-reorder + hard-delete demo |
 | WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Operator pending (Parts A+B merged 2026-08-18) | attach agent chat HTTPRoute + AuthPolicy, enable quotaEnforcement, live 429 demo |
 | WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-061A rec.) | Not started | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap) |
 | WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |

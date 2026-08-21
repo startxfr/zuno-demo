@@ -23,6 +23,7 @@ import (
 
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/assets"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/okf"
+	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/portal"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/reqid"
 	"github.com/startxfr/zuno-demo/components/agent-frontend/internal/session"
 )
@@ -70,6 +71,26 @@ type chatConfig struct {
 	// (transcript/rename/star) by appending to this base at request time,
 	// since each also needs a run_id it doesn't know until then.
 	ConversationsURL string `json:"conversationsURL"`
+	// AgentNavStrip (ADR-0515) is the cross-agent masthead navigation
+	// strip: every OTHER agent this signed-in caller is entitled to and
+	// that is actually active/clickable - the same entitlement-filtered
+	// set portal.BuildTiles already computes for the portal tile grid,
+	// reused here rather than re-deriving it.
+	AgentNavStrip []agentNavEntry `json:"agentNavStrip"`
+	// PromptExamples (ADR-0515/WP-061) are this agent's primary task's
+	// declared zuno.prompt_examples - rendered as clickable starters in
+	// the chat empty state when the caller has no conversation history
+	// yet. Empty/nil renders no starters.
+	PromptExamples []string `json:"promptExamples"`
+}
+
+// agentNavEntry is one entry of AgentNavStrip above - mirrors
+// web/src/shared/types.ts's AgentNavEntry field-for-field.
+type agentNavEntry struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	Color       string `json:"color"`
+	Href        string `json:"href"`
 }
 
 type pageView struct {
@@ -81,8 +102,10 @@ type pageView struct {
 
 // PageHandler serves the chat UI for one active agent, gated on the caller
 // being signed in and authorized (their groups intersect access.groups).
+// agents is the full agent list (ADR-0515: source for the cross-agent
+// masthead nav strip, the same list portal.Handler already receives).
 // asset is web/src/chat/main.tsx's resolved Vite manifest entry.
-func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset) http.HandlerFunc {
+func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager, asset assets.Asset) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := sessions.Load(r)
 		if err != nil || sess == nil {
@@ -103,6 +126,8 @@ func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset)
 			ProfileURL:       "/profile",
 			ApiURL:           "/api/chat",
 			ConversationsURL: "/api/conversations",
+			AgentNavStrip:    buildAgentNavStrip(agents, sess),
+			PromptExamples:   agent.PrimaryTaskPromptExamples(),
 		}
 		configJSON, err := json.Marshal(cfg) // HTML-escaped by default - see portal.go's comment
 		if err != nil {
@@ -119,6 +144,29 @@ func PageHandler(agent okf.Agent, sessions *session.Manager, asset assets.Asset)
 		}
 		_ = tmpl.Execute(w, view)
 	}
+}
+
+// buildAgentNavStrip (ADR-0515) reuses portal.BuildTiles's own
+// entitlement computation rather than re-deriving it, then narrows to the
+// entries actually worth showing in the masthead: an agent this caller
+// can't reach yet (unauthorized) or that has no live chat page to route
+// to (placeholder, not yet active) would be a dead link here, unlike on
+// the portal grid where those tiles still render disabled for visibility.
+func buildAgentNavStrip(agents []okf.Agent, sess *session.Session) []agentNavEntry {
+	tiles := portal.BuildTiles(agents, sess)
+	strip := make([]agentNavEntry, 0, len(tiles))
+	for _, t := range tiles {
+		if !t.Clickable {
+			continue
+		}
+		strip = append(strip, agentNavEntry{
+			Name:        t.Name,
+			DisplayName: t.DisplayName,
+			Color:       t.Color,
+			Href:        t.Href,
+		})
+	}
+	return strip
 }
 
 // chatRequest is what the browser JS POSTs to this frontend's /api/chat.
