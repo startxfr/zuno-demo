@@ -113,7 +113,7 @@ ADR-0027/0028).
 
 Stage is auditable from the repository alone (criteria a, c, d) plus one
 cluster fact (criterion b's gate run, recorded in the evaluation
-artifacts). `make day1 check agents` (the ADR-0053 gate) continues to
+artifacts). `make day2 check agents` (the ADR-0053 gate) continues to
 validate structure; the stage criteria give its findings a vocabulary.
 
 ## Acceptance criteria

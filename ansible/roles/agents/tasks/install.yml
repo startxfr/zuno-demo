@@ -1,7 +1,7 @@
 ---
-# agent-bff/agent-frontend are images built by the separate "agent" Day 1 build
+# agent-bff/agent-frontend are images built by the separate "agent" Day 2 build
 # component; its name doesn't match this run-component's own name ("agents"),
-# so `make day1 install agents` would otherwise never trigger it, leaving these
+# so `make day2 install agents` would otherwise never trigger it, leaving these
 # Deployments in permanent ImagePullBackOff on a fresh cluster. Ensuring it here
 # keeps the install self-sufficient (apply_openshift_build.yml documents the
 # idempotency guarantee - it's a status check, not a rebuild, once the image exists).

@@ -8,8 +8,8 @@ Tekos's (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008), Arkos's
 WP-36 (ADR-0326), Finage's (`gitops/apps/finage` → `gitops/charts/finage`,
 kept a distinct app-directory name rather than reusing `api`'s legacy
 name so each later agent's Application doesn't have to fight over it) -
-closing ADR-0326's four-agent generalization. This is Day 1's `agents`
-component (ADR-0056) - `precheck.yml` reports (never fails) whether
+closing ADR-0326's four-agent generalization. This is Day 2's `agents`
+component (ADR-0056/ADR-0060) - `precheck.yml` reports (never fails) whether
 every one of the `zuno-{api,arkos,comage,advantage,finage}-{d0,d1}`
 Applications is Synced+Healthy. No operator involved, so all of this
 component's content is `-d1` - the `-d0` Applications are no-ops (see
@@ -23,10 +23,10 @@ namespaces` must run first. The formerly separate `api` role/
 CONFIG_SCOPE was retired in the same change: once this role stopped
 applying namespaces, it was doing exactly what `api` did (apply the
 Tekos workloads Application, nothing else) - one role for that job is
-enough, and `agents` is the name Day 1's component list uses.
+enough, and `agents` is the name Day 2's component list uses.
 
-`check.yml` (`make day1|d1 check agents`) is the ADR-0053 layered
-acceptance and security gate - `day1_check.yml` runs it *instead of*
+`check.yml` (`make day2|d2 check agents`) is the ADR-0053 layered
+acceptance and security gate - `day2_check.yml` runs it *instead of*
 `precheck.yml` for this role specifically (a full functional/security
 gate is a stronger "is this installed and working" signal than a
 lightweight Application state check). `precheck.yml` still exists for

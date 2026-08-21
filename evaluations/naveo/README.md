@@ -9,7 +9,7 @@ implementation in `evaluations/tekos/` (ADR-0342); `scenarios.yaml`,
 (scaffolded skeleton - review/adjust scenario messages before the human
 review checkpoint WP-41 gates on).
 
-**Not yet wired into `make day1|d1 check agents`'s automatic path** -
+**Not yet wired into `make day2|d2 check agents`'s automatic path** -
 running this gate against a live cluster requires the human
 scenario-review checkpoint. Once that review has happened, the operator
 runs it explicitly:

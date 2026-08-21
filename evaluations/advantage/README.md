@@ -9,7 +9,7 @@ shared code lives there rather than being copied per agent);
 `scenarios.yaml`, `gate_config.yaml` and `security_checks.py` are
 Advantage's own, real content.
 
-**Not yet wired into `make day1|d1 check agents`'s automatic path**
+**Not yet wired into `make day2|d2 check agents`'s automatic path**
 (`ansible/roles/agents/tasks/check.yml` only smoke-tests Advantage's
 frontend `/healthz` today) - running this gate against a live cluster
 requires the human scenario-review checkpoint WP-35's own brief gates on

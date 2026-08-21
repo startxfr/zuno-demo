@@ -131,7 +131,7 @@ this adds a trust boundary.
 1. Operator: after WP-04 stage 2 credentials exist, run the signing job so
    every agent bundle has a real signature.
 2. Operator: flip `ZUNO_REQUIRE_SIGNED_BUNDLES` on and make the lint
-   verification step blocking; run `make d1 check agents`.
+   verification step blocking; run `make d2 check agents`.
 
 ## Status updates (then re-run check_docs.py)
 

@@ -132,7 +132,7 @@ python3 platform/supply-chain/validate_okf_bundle.py [agents/<name> ...]
 
 Wired into `.github/workflows/lint.yml` as a **hard gate** (unlike the two
 signature-related checks above). Also run by `ansible/roles/agents`' Day
-1 check (`make d1 check agents`).
+2 check (`make d2 check agents`).
 
 The Agent Runtime (`components/agent-runtime/app/registry.py`) enforces
 signature verification at startup when `ZUNO_REQUIRE_SIGNED_BUNDLES=true`

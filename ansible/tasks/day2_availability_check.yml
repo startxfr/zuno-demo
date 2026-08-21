@@ -6,7 +6,7 @@
 # with no code change. Every discovered agent's frontend has a public
 # Route, so this runs entirely from the Ansible control node (no in-cluster
 # Job needed, unlike the "platform" component's shared-service probes -
-# see ansible/roles/day2/tasks/platform_health_check.yml).
+# see ansible/roles/day3/tasks/platform_health_check.yml).
 #
 # Not every discovered bundle has a real deployment to check - soursage/
 # cognos (ADR-0349 §6) are identity-footprint-only, no chart at all - so
@@ -14,9 +14,9 @@
 # checking anything (live-cluster-confirmed 2026-08-21: without this,
 # both always reported a false 503).
 #
-# Shared by ansible/roles/agents/tasks/check.yml (Day 1's existing
-# reachability step, ADR-0053) and ansible/roles/day2/tasks/test.yml (the
-# new, standalone `make d2 test agents` command) - one implementation, two
+# Shared by ansible/roles/agents/tasks/check.yml (Day 2's existing
+# reachability step, ADR-0053) and ansible/roles/day3/tasks/test.yml (the
+# standalone `make d3 test agents` command) - one implementation, two
 # callers, replacing the six near-identical per-agent blocks check.yml
 # used to hand-copy (Tekos, Arkos, Comage, Advantage, Finage, Naveo).
 - name: "day2-availability | resolve the cluster base domain"
@@ -35,7 +35,7 @@
 # runtime/chart at all" - their /healthz would never exist, by design, not
 # because anything is broken. Intersecting with gitops/charts/<agent>/
 # existing (same "intersect two find results" pattern
-# ansible/roles/day2/tasks/stresstest_job.yml already uses for its own
+# ansible/roles/day3/tasks/stresstest_job.yml already uses for its own
 # agent discovery) filters them out today and automatically includes
 # either one the moment a real chart lands for it - no further code
 # change, same auto-coverage principle as the bundle discovery itself.
@@ -89,8 +89,8 @@
       duration_ms: "{{ ((item.elapsed | default(0)) | float) * 1000 }}"
 
 # Pure fact-producer, deliberately no rendering/failing here: this file
-# is reused both by ansible/roles/agents/tasks/check.yml (Day 1's own
-# agents-only gate) and ansible/roles/day2/tasks/test.yml (Day 2's
+# is reused both by ansible/roles/agents/tasks/check.yml (Day 2's own
+# agents-only gate) and ansible/roles/day3/tasks/test.yml (Day 3's
 # combined agents+platform report), each of which needs a different
 # result set rendered/decided at a different point - see
 # ansible/tasks/day2_render_and_fail.yml, which both now call themselves

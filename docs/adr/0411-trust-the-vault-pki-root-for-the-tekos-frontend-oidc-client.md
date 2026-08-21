@@ -48,7 +48,7 @@ No secret material is created or exposed - `keycloak-serving-ca`'s `ca.crt` is p
 
 ## Operational considerations
 
-- If the Vault PKI root is ever regenerated, the `zuno-ai-run` ConfigMap goes stale until the next `make d1 install agents`, which re-syncs from the live `openshift-config/keycloak-serving-ca` (itself kept current by `make d0 install/reconcile openshift-oauth`).
+- If the Vault PKI root is ever regenerated, the `zuno-ai-run` ConfigMap goes stale until the next `make d2 install agents`, which re-syncs from the live `openshift-config/keycloak-serving-ca` (itself kept current by `make d0 install/reconcile openshift-oauth`).
 - No cleanup-on-uninstall logic was added for the `agent-frontend-keycloak-ca` ConfigMap, matching the existing `acceptance-gate-ca` precedent of leaving Ansible-managed ConfigMaps in `zuno-ai-run` after uninstall.
 - `run_acceptance_gate.yml`'s own inline CA copy (`acceptance-gate-ca`) was left as-is rather than refactored onto the new shared task - both now exist and work independently; DRYing them up is an optional future cleanup, not required for correctness.
 

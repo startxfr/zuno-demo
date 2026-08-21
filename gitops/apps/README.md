@@ -7,8 +7,10 @@ install and other cluster-scoped resources - `<app>-d0`) and
 service itself - `<app>-d1`). The matching Ansible role applies both
 manifests directly (`-d0` first, then `-d1` once `-d0` is Synced+Healthy)
 during `make day0|d0 install <component>` / `make day1|d1 install
-<component>` (see `ansible/tasks/apply_gitops_app.yml`) - the only
-mechanism `make day0|d0`/`day1|d1` uses to reconcile these Applications.
+<component>` / `make day2|d2 install <component>` - whichever macro tier
+that component now lives in (ADR-0060) - see
+`ansible/tasks/apply_gitops_app.yml` - the only mechanism
+`make day0|d0`/`day1|d1`/`day2|d2` uses to reconcile these Applications.
 
 Most components have real content on only one side - a component with no
 OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
@@ -17,8 +19,9 @@ that chart's README). `mcp-sales-db` and `namespaces` have real content on
 *both* sides: `mcp-sales-db`'s `-d0` (`gitops/charts/sql-schema`) is a
 schema/fixtures prerequisite, not an operator. `namespaces`' `-d0`
 (Namespace objects) and `-d1` (ResourceQuota/NetworkPolicy) also span the
-*macro* Day 0/Day 1 split (`day0_install.yml` and `day1_install.yml`
-respectively) - see `ansible/roles/namespaces/README.md`.
+*macro* Day 0/Day 2 split (`day0_install.yml` and `day2_install.yml`
+respectively, per ADR-0060 - moved from Day 1) - see
+`ansible/roles/namespaces/README.md`.
 
 Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
 `default` project - a dedicated `AppProject`
@@ -47,7 +50,7 @@ exception - it installs itself and creates the `AppProject` (`zuno`) every
 directly via `ansible/tasks/apply_kustomize.yml`. `admin_context` avoids
 this since Day 0 now runs `argocd` first - see `admin-context` in the
 table below. `vault`'s imperative unseal is a one-shot action, not a
-standing component. `mlops` is out of scope for v0.
+standing component.
 
 `sql_schema`'s and `rag`'s one-shot SQL `Job`s (schema/fixtures applies
 against PostgreSQL) are covered here too, unlike `vault`'s unseal: each is
@@ -154,9 +157,10 @@ Directories present:
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) - no operator, `-d0` is a no-op |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` - no operator, `-d0` is a no-op |
 | `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |
+| `mlops` | local chart, `gitops/charts/mlops` - no operator, `-d0` is a no-op |
 | `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) - no operator, `-d0` is a no-op |
 | `agent-runtime` | local chart, `gitops/charts/agent-runtime` (applied by the `llm` role, see its README) - no operator, `-d0` is a no-op |
-| `namespaces` | local chart, `gitops/charts/namespaces` (`-d0`: Namespace objects, `namespace.enabled`; `-d1`: ResourceQuota/NetworkPolicy scaffolding, `policy.enabled` - spans the macro Day 0/Day 1 split, not just this component's own internal ordering) |
+| `namespaces` | local chart, `gitops/charts/namespaces` (`-d0`: Namespace objects, `namespace.enabled`; `-d1`: ResourceQuota/NetworkPolicy scaffolding, `policy.enabled` - spans the macro Day 0/Day 2 split (ADR-0060), not just this component's own internal ordering) |
 | `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
 | `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) - no operator, `-d0` is a no-op |

@@ -1,11 +1,11 @@
 ---
-# Shared by every Day 2 caller (and Day 1's agents check) that has
+# Shared by every Day 3 caller (and Day 2's agents check) that has
 # accumulated a list of platform/testing/day2_report.py::Day2Result-
 # shaped dicts in `_day2_render_results` and wants ONE clean, complete
 # report printed before any pass/fail decision - never a per-check
 # Ansible failure aborting mid-way through a batch of checks that hasn't
 # finished running yet (that early-abort bug is exactly what
-# ansible/roles/day2/tasks/test.yml hit before this file existed: an
+# ansible/roles/day3/tasks/test.yml hit before this file existed: an
 # agents-only fail task aborted the play before the platform check ever
 # ran). Mirrors `make d0 check`'s own precedent
 # (ansible/tasks/record_state.yml: "not installed yet is a normal,
