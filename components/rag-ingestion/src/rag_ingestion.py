@@ -2058,8 +2058,30 @@ def _iter_live_confluence_pages(config: IngestionConfig, auth) -> Dict[str, Opti
     Raises SystemExit on any source-listing failure, before any caller
     can act on a partial result - a transient Confluence outage must
     never be mistaken for "every page was deleted".
+
+    Config commonly declares several sources against the SAME space (a
+    real knowledge.tech config observed live 2026-08-21, WP-25: six
+    sources - satellite-archi/build/run, openshift-archi/build/run - all
+    pointing at one space, "SXSI", differing only in which directories/
+    excludeLabels/requiredGroups they apply afterward). The CQL query
+    itself (`space=X and type=page`) is identical across every source
+    sharing a space; only the post-listing filtering below differs per
+    source. `_raw_pages` caches each unique (base_url, space) listing so
+    it is fetched over the network once no matter how many sources
+    reference it, instead of once per source - a real 6x redundant
+    network cost this reconcile pass was paying before this cache
+    existed, plausibly most of why a single run took over 2 hours
+    against this space.
     """
     live: Dict[str, Optional[list]] = {}
+    raw_pages_by_space: Dict[tuple, list] = {}
+
+    def _raw_pages(base_url: str, space: str) -> list:
+        key = (base_url, space)
+        if key not in raw_pages_by_space:
+            raw_pages_by_space[key] = _list_confluence_space_pages(base_url, space, auth)
+        return raw_pages_by_space[key]
+
     for source in config.confluence_sources:
         if not source.get("enabled", True):
             continue
@@ -2070,50 +2092,64 @@ def _iter_live_confluence_pages(config: IngestionConfig, auth) -> Dict[str, Opti
         preserve_acl = source.get("preserveAcl", True)
 
         for space in source.get("spaces") or []:
-            start = 0
-            limit = 25
-            while True:
-                params = {
-                    "cql": f'space="{space}" and type=page',
-                    "start": start,
-                    "limit": limit,
-                    "expand": "ancestors,metadata.labels",
-                }
-                try:
-                    resp = requests.get(
-                        f"{base_url}/wiki/rest/api/content/search",
-                        params=params,
-                        auth=auth,
-                        timeout=HTTP_TIMEOUT_SECONDS,
-                    )
-                    resp.raise_for_status()
-                except requests.RequestException as exc:
-                    raise SystemExit(
-                        f"reconcile-acls: listing failed for space '{space}' ({exc}) - "
-                        "aborting with zero deletions rather than treating a transient "
-                        "outage as 'every page was deleted'"
-                    ) from exc
-                payload = resp.json()
-                results = payload.get("results", [])
-                for page in results:
-                    labels = {
-                        label["name"]
-                        for label in page.get("metadata", {}).get("labels", {}).get("results", [])
-                    }
-                    if labels & exclude_labels:
-                        continue
-                    ancestor_titles = [a["title"] for a in page.get("ancestors", [])]
-                    if directories and not any(
-                        _ancestor_path_matches(ancestor_titles, directory) for directory in directories
-                    ):
-                        continue
-                    web_ui = page.get("_links", {}).get("webui", "")
-                    page_url = f"{base_url}/wiki{web_ui}"
-                    live[page_url] = required_groups if preserve_acl else None
-                if len(results) < limit:
-                    break
-                start += limit
+            for page in _raw_pages(base_url, space):
+                if page["labels"] & exclude_labels:
+                    continue
+                if directories and not any(
+                    _ancestor_path_matches(page["ancestor_titles"], directory) for directory in directories
+                ):
+                    continue
+                live[page["page_url"]] = required_groups if preserve_acl else None
     return live
+
+
+def _list_confluence_space_pages(base_url: str, space: str, auth) -> list:
+    """Raw CQL page listing for one (base_url, space) pair - every field a
+    caller might need to apply its own directory/label filtering
+    afterward (labels, ancestor_titles, page_url), with no per-source
+    filtering applied here. Cached by _iter_live_confluence_pages so each
+    unique space is only ever listed once per reconcile-acls run,
+    regardless of how many sources reference it.
+    """
+    pages: list = []
+    start = 0
+    limit = 25
+    while True:
+        params = {
+            "cql": f'space="{space}" and type=page',
+            "start": start,
+            "limit": limit,
+            "expand": "ancestors,metadata.labels",
+        }
+        try:
+            resp = requests.get(
+                f"{base_url}/wiki/rest/api/content/search",
+                params=params,
+                auth=auth,
+                timeout=HTTP_TIMEOUT_SECONDS,
+            )
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            raise SystemExit(
+                f"reconcile-acls: listing failed for space '{space}' ({exc}) - "
+                "aborting with zero deletions rather than treating a transient "
+                "outage as 'every page was deleted'"
+            ) from exc
+        payload = resp.json()
+        results = payload.get("results", [])
+        for page in results:
+            labels = {
+                label["name"]
+                for label in page.get("metadata", {}).get("labels", {}).get("results", [])
+            }
+            ancestor_titles = [a["title"] for a in page.get("ancestors", [])]
+            web_ui = page.get("_links", {}).get("webui", "")
+            page_url = f"{base_url}/wiki{web_ui}"
+            pages.append({"labels": labels, "ancestor_titles": ancestor_titles, "page_url": page_url})
+        if len(results) < limit:
+            break
+        start += limit
+    return pages
 
 
 def stage_reconcile_acls(config: IngestionConfig, store: CorpusStore) -> None:
