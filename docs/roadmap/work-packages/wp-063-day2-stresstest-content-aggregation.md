@@ -43,13 +43,37 @@
   `local-gpt-oss`- and `mistral-codestral`-routed prompts); one tekos
   scenario 10 fail (`source_mode=none citations=[]`); three arkos
   scenario fails (7: `status=502`; 9: `saw_token=False saw_done=True`;
-  10: `status=500`). The 429s and the uniform 99-char no-fence replies
-  may share one root cause (a rate-limited/fallback response), and may
-  relate to the open [WP-54](wp-54-quota-policy-and-kuadrant-translation.md)
-  Kuadrant wasm-shim defect - not confirmed, needs its own follow-up.
-  Flagged to the operator rather than investigated further here, since
-  root-causing 12 failures across two agents is new scope beyond running
-  this WP's acceptance criteria.
+  10: `status=500`).
+
+  **Follow-up investigation (2026-08-21, same day):** re-ran all 11 of
+  the 12 failing checks in isolation, directly against `agent-runtime`/
+  `ai-gateway` with a correctly-labelled (`app.kubernetes.io/name:
+  acceptance-gate`, satisfying both services' NetworkPolicy), correctly-
+  issued (external Keycloak route, matching the issuer `ai-gateway`
+  validates) token - **11 of 12 passed cleanly** (`code_generation` 6/6,
+  `layer1_model_routing` 2/2 with correct `zuno_provider` routing, arkos
+  scenarios 7/9/10 all 200 with real content). None reproduce - the
+  original 429s/500s/502s were transient, most likely correlated with a
+  live `ai-gateway` pod restart (`ai-gateway-7bb6b86455-nw6fg`'s
+  readiness probe failed with HTTP 500 and was replaced within the same
+  general window) rather than any code or policy defect. **Not** the
+  [WP-54](wp-54-quota-policy-and-kuadrant-translation.md) Kuadrant
+  wasm-shim defect - an early debug-pod test wrongly suggested a link,
+  but that test itself was invalid (the debug pod lacked the
+  NetworkPolicy-allowlisted label, producing a false "upstream connect
+  error"); once corrected, routing worked correctly both times.
+
+  The one exception: **tekos scenario 10** ("What does the latest
+  internal Confluence doc say about the RHOAI 3.5 EA2 rollout?")
+  reproduces consistently - `source_mode=none`, no citations, a generic
+  "I don't have that information" reply. This matches the exact failure
+  class arkos scenario 10 previously had (fixed in commit `8eae0e7` by
+  retargeting the eval message at real Confluence content) - most likely
+  no real page in `startxfr.atlassian.net` matches "RHOAI 3.5 EA2
+  rollout" today, so the live-search tool has nothing to find and the
+  agent correctly declines rather than fabricate. Not yet fixed - needs
+  the same message-retargeting treatment, verified against real live
+  Confluence content first.
 - **ADRs:** ADR-0058
 - **Depends on:** WP-062 (Day 2 chassis, report engine and agent-discovery
   mechanism must exist first; this WP fills in the stub
