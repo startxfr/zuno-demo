@@ -6,8 +6,6 @@ zuno:
   allowed_tools:
     - confluence.page.read
     - confluence.page.search
-    - drive.document.create
-    - drive.document.update
     - git.repository.read
     - git.repository.list
     - git.repository.private.read
@@ -36,17 +34,28 @@ zuno:
 
 Draft a Design & Architecture Testimonial (DAT) - a long-form document
 describing an architecture, grounded in the Tekos technical RAG corpus and
-internal Confluence content, and save it to the caller's Google Drive as a
-new or updated Google Doc.
+internal Confluence content, and return it in the reply.
 
 This is the task Agent Runtime's `plan_draft_write` graph shape
 (`components/agent-runtime/app/graph/shapes/plan_draft_write.py`, ADR-0342)
 executes: plan (derive the document's topic/title from the request) ->
 retrieve (`knowledge.tech` + `knowledge.project`, topic-driven) -> draft
-(long-form generation) -> reflect (self-review pass, ADR-0416) -> write
-(`drive.document.create`/`.update`) - materially different from Tekos's
-retrieve/tool_call/reason/respond shape, proving a second agent can run a
-genuinely different workflow on the same shared runtime (ADR-0326).
+(long-form generation) -> reflect (self-review pass, ADR-0416) -> write -
+materially different from Tekos's retrieve/tool_call/reason/respond
+shape, proving a second agent can run a genuinely different workflow on
+the same shared runtime (ADR-0326).
+
+`drive.document.create`/`.update` are deliberately not in `allowed_tools`:
+no `google-workspace` MCP server is deployed anywhere in this cluster -
+not "unverified," genuinely absent. `write_node` still attempts the call
+unconditionally (no code branch skips it); MCP Gateway's ADR-0011
+intersection now denies it with a fast, deterministic 403 (this task
+never declared the capability) instead of a slow/uncertain connection
+attempt to a host that doesn't exist, and `write_node`'s existing
+`except McpClientError` fallback returns the draft as the chat reply -
+the same outcome a live Drive write failure would have produced, just
+without depending on an absent service to get there. Re-add both once a
+real `google-workspace` MCP server exists.
 
 ADR-0416: the reflect step prefers `ovhcloud-gpt-oss-120b` (same OVHcloud
 AI Endpoints account as the `image.generation.create` tool above) for its

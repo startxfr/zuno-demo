@@ -76,11 +76,12 @@ knowledgeDomains:
   - knowledge.project
 
 # Union of every agents/arkos/tasks/*.md file's own allowed_tools.
+# drive.document.create/.update deliberately absent - no google-workspace
+# MCP server is deployed in this cluster, see agents/arkos/tasks/
+# draft-architecture-testimonial.md's own note.
 toolCapabilities:
   - confluence.page.read
   - confluence.page.search
-  - drive.document.create
-  - drive.document.update
   - git.repository.read
   - git.repository.list
   - git.repository.private.read

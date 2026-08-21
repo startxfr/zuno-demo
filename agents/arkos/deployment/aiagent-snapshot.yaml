@@ -54,8 +54,6 @@ spec:
   toolCapabilities:
   - confluence.page.read
   - confluence.page.search
-  - drive.document.create
-  - drive.document.update
   - git.repository.read
   - git.repository.list
   - git.repository.private.read

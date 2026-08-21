@@ -188,12 +188,16 @@ async def test_reflect_node_is_a_noop_without_a_draft() -> None:
     assert result == {}
 
 
-def test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task() -> None:
+def test_arkos_declares_the_confluence_capabilities_from_its_task() -> None:
     """Sanity check against the real checked-in bundle - confirms the
     module-level singletons resolved the actual draft-architecture-
-    testimonial task, not a stale/empty one."""
+    testimonial task, not a stale/empty one. drive.document.* is
+    deliberately NOT asserted here - no google-workspace MCP server is
+    deployed in this cluster, so the task's own file removed it from
+    allowed_tools (write_node's McpClientError fallback still returns
+    the draft as the reply either way)."""
     assert "confluence.page.search" in arkos_nodes._DRAFT_TASK.allowed_tools
-    assert "drive.document.create" in arkos_nodes._DRAFT_TASK.allowed_tools
+    assert "drive.document.create" not in arkos_nodes._DRAFT_TASK.allowed_tools
     assert "knowledge.tech" in arkos_nodes._DRAFT_TASK.allowed_knowledge
     assert "knowledge.project" in arkos_nodes._DRAFT_TASK.allowed_knowledge
 
@@ -222,7 +226,7 @@ def test_arkos_declares_the_workshop_presentation_task() -> None:
     and its prompt file."""
     assert arkos_nodes._WORKSHOP_TASK.name == "workshop-presentation"
     assert "confluence.page.search" in arkos_nodes._WORKSHOP_TASK.allowed_tools
-    assert "drive.document.create" in arkos_nodes._WORKSHOP_TASK.allowed_tools
+    assert "drive.document.create" not in arkos_nodes._WORKSHOP_TASK.allowed_tools
     assert "knowledge.tech" in arkos_nodes._WORKSHOP_TASK.allowed_knowledge
 
 
@@ -457,7 +461,7 @@ TESTS = [
     test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_classification,
     test_reflect_node_still_honors_local_only_required,
     test_reflect_node_is_a_noop_without_a_draft,
-    test_arkos_declares_the_confluence_and_drive_capabilities_from_its_task,
+    test_arkos_declares_the_confluence_capabilities_from_its_task,
     test_reflect_slot_resolves_from_the_real_bundle,
     test_arkos_declares_the_workshop_presentation_task,
     test_workshop_reflect_slot_resolves_from_the_real_bundle,

@@ -6,8 +6,6 @@ zuno:
   allowed_tools:
     - confluence.page.read
     - confluence.page.search
-    - drive.document.create
-    - drive.document.update
     - git.repository.read
     - git.repository.list
     - git.repository.private.read
@@ -35,8 +33,17 @@ zuno:
 
 Draft an Odyssey architecture workshop presentation - a structured
 document covering what the workshop will present - grounded in the Tekos
-technical RAG corpus and internal Confluence content, and save it to the
-caller's Google Drive as a new or updated Google Doc.
+technical RAG corpus and internal Confluence content, and return it in
+the reply.
+
+`drive.document.create`/`.update` are deliberately not in `allowed_tools`,
+same reasoning as `draft-architecture-testimonial`'s own task file: no
+`google-workspace` MCP server is deployed in this cluster at all, so
+`write_node`'s unconditional Drive-write attempt now gets a fast,
+deterministic 403 from MCP Gateway instead of a slow/uncertain call to
+an absent host, and its existing `except McpClientError` fallback
+returns the draft as the chat reply either way. Re-add both once a real
+`google-workspace` MCP server exists.
 
 Reuses the exact `plan_draft_write` shape (ADR-0342) and same
 plan -> retrieve -> draft -> reflect -> write nodes

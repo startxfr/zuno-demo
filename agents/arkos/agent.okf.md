@@ -77,8 +77,9 @@ Tekos.
 
 `zuno.graph_shape: plan_draft_write` (ADR-0342) names Agent Runtime's
 LangGraph workflow module for Arkos's chat turns - plan, retrieve
-(`knowledge.tech` + `knowledge.project`), draft, write (Drive) -
-structurally distinct from Tekos's `retrieve_reason_respond` shape,
+(`knowledge.tech` + `knowledge.project`), draft, write (Drive, currently
+undeclared - see each task's own file) - structurally distinct from
+Tekos's `retrieve_reason_respond` shape,
 proving the graph-shape mechanism WP-30 built generalizes past one
 hardcoded workflow. Arkos has no agent-level `zuno.allowed_knowledge`
 field either (ADR-0203), for the same reason Tekos doesn't: its knowledge
@@ -106,8 +107,6 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 |---|---|---|---|---|---|---|---|---|
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `confluence.page.read` | tool | `confluence.page.read` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `confluence.page.read` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `confluence.page.search` | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `search_confluence` |
-| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `drive.document.create` | tool | `drive.document.create` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.create` |
-| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `drive.document.update` | tool | `drive.document.update` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.update` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `git.repository.read` | tool | `git.repository.read` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.read` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `git.repository.list` | tool | `git.repository.list` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.list` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `git.repository.private.read` | tool | `git.repository.private.read` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.private.read` |
@@ -119,8 +118,6 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `confluence.page.read` | tool | `confluence.page.read` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `confluence.page.read` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `confluence.page.search` | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `search_confluence` |
-| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `drive.document.create` | tool | `drive.document.create` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.create` |
-| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `drive.document.update` | tool | `drive.document.update` @ google-workspace | C1 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `drive.document.update` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.read` | tool | `git.repository.read` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.read` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.list` | tool | `git.repository.list` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.list` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.private.read` | tool | `git.repository.private.read` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.private.read` |
