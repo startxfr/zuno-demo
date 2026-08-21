@@ -154,12 +154,18 @@
   retries: 20
   delay: 5
 
+# Selects on controller-uid, not job-name - see
+# ansible/roles/day2/tasks/stresstest_job_run_one.yml's own comment on
+# this exact same fix (live-cluster-confirmed 2026-08-21: Job deletion
+# does not reliably garbage-collect its pods within this task's own
+# runtime, so job-name + resources[0] can pick a previous run's stale
+# pod).
 - name: "day2-platform | find the Job's pod"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-ai-run
     label_selectors:
-      - "job-name=zuno-day2-platform-health"
+      - "controller-uid={{ _day2_platform_job.resources[0].metadata.uid }}"
   register: _day2_platform_pod
 
 - name: "day2-platform | fetch the Job's output (a JSON array of Day2Result-shaped rows)"

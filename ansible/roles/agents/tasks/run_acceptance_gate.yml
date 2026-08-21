@@ -316,12 +316,23 @@
   retries: 60
   delay: 15
 
+# Selects on controller-uid, not job-name - live-cluster-confirmed
+# 2026-08-21 (ADR-0058/WP-063's own generalized stresstest Job, same
+# pattern as this one): Job deletion does not reliably garbage-collect
+# its pods within this task's own runtime, so a previous run's leftover
+# pod can still carry the same job-name label - job-name + resources[0]
+# has no guarantee of picking the CURRENT run's pod over a stale one.
+# controller-uid is set by the Job controller itself and is unique per
+# Job object, even across same-named recreations, so this can never
+# match a stale pod. See
+# ansible/roles/day2/tasks/stresstest_job_run_one.yml for the run that
+# surfaced this.
 - name: "acceptance-gate | find the Job's pod"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-ai-run
     label_selectors:
-      - "job-name=zuno-acceptance-gate"
+      - "controller-uid={{ _gate_job.resources[0].metadata.uid }}"
   register: _gate_pod
 
 - name: "acceptance-gate | fetch the gate's full output (scenario table, security checks, JSON summary)"

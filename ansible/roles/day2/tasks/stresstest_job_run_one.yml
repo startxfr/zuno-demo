@@ -192,12 +192,21 @@
   retries: 60
   delay: 15
 
+# Selects on controller-uid (unique per Job instance), not job-name
+# (stable across delete-then-recreate) - live-cluster-confirmed
+# 2026-08-21: Job deletion does not reliably garbage-collect its pods
+# within this task's own runtime, so a previous run's pod can still carry
+# the same job-name label when the next run's "find the Job's pod" task
+# runs, and label_selectors + resources[0] has no guarantee of picking
+# the newest one. controller-uid is set by the Job controller itself and
+# is different for every Job object, even ones sharing a name across
+# recreations, so this can never match a stale pod.
 - name: "day2-stresstest | find the {{ day2_stress_agent }} Job's pod"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-ai-run
     label_selectors:
-      - "job-name=zuno-day2-stresstest-{{ day2_stress_agent }}"
+      - "controller-uid={{ _day2_stress_job.resources[0].metadata.uid }}"
   register: _day2_stress_pod
 
 - name: "day2-stresstest | fetch the {{ day2_stress_agent }} Job's output"
