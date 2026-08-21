@@ -1,6 +1,16 @@
 # WP-065: Real SXA content via S3 → MariaDB, served through MCP and anonymized RAG (promotes ADR-0216)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-21 - Part A complete: MariaDB
+  `Database`/`User`/`Grant` CRDs + self-generated Vault credential
+  (`gitops/charts/mariadb`), dedicated SXA S3 bucket wiring with
+  operator-placeholder name/region (`gitops/charts/rag-ingestion`), the
+  native mysqldump-into-MariaDB import stage replacing the old raw-DDL
+  chunker, `components/rag-ingestion/src/sxa_anonymize.py`'s deterministic
+  column-map redaction, `sales-db`'s `SXA_DB_ENGINE` mode switch, and
+  fixture-driven tests across all of it (`test_sxa_anonymize.py`,
+  updated `test_source_adapters.py`, updated `test_mcp_protocol.py` -
+  all passing). Part B (real bucket/dump, live import, live verification)
+  is still open.)
 - **ADRs:** ADR-0216 (To be implemented -> Partially implemented -> Implemented); supersedes ADR-0016's live-target clause
 - **Depends on:** WP-23 (repo work merged — policy/tooling/metadata-separation this WP extends)
 - **Blocks:** WP-23's remaining "real snapshot load" operator action, which now targets this WP instead

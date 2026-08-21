@@ -1522,10 +1522,42 @@ domains:
         usernameProperty: username
         passwordProperty: password
     sxaDump:
-      # Operator-supplied: the approved snapshot's key in the corpus bucket
-      # (ADR-0025: the dump itself never lives in git) and its version ID.
+      # Operator-supplied: the approved snapshot's key in the SXA bucket
+      # below (ADR-0025: the dump itself never lives in git) and its
+      # version ID.
       s3Key: ""
       snapshotId: ""
+      # ADR-0216/WP-065: a dedicated bucket, separate from s3.bucket above
+      # (which holds Confluence/Red Hat-docs/model corpus content) - real
+      # SXA business data gets its own bucket rather than sharing one with
+      # unrelated content. OPERATOR-SUPPLIED, like s3.bucket - this repo
+      # provisions no AWS infrastructure (no Terraform, no AWS Ansible
+      # collections); only the bucket name/region and Vault-sourced
+      # credentials are wired here, never bucket creation itself.
+      s3:
+        type: aws
+        endpoint: ""
+        bucket: ""              # OPERATOR-SUPPLIED - see ADR-0216
+        region: ""               # OPERATOR-SUPPLIED - see ADR-0216
+        pathStyle: false
+        secretName: rag-sxa-s3
+        externalSecret:
+          remoteKey: "sxa/s3"
+          accessKeyProperty: accessKeyId
+          secretKeyProperty: secretAccessKey
+      # ADR-0216/WP-065: the MariaDB database the dump imports into
+      # natively (gitops/charts/mariadb's sxaDatabase) - separate from the
+      # postgres block above, which stays the local-dev/CI fixture path
+      # (ADR-0016, superseded for the live target only).
+      mariadb:
+        host: "mariadb.zuno-data.svc.cluster.local"
+        port: 3306
+        username: sxa
+        database: sxa
+        secretName: rag-sxa-mariadb
+        externalSecret:
+          remoteKey: "sxa/mariadb-db"
+          passwordProperty: password
     # ADR-0105: immutable legacy source - on-demand only, never scheduled.
     # Manual refresh: make d1 install rag-ingestion (see README).
     schedule:

@@ -1,6 +1,6 @@
 # ADR-0216: Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG
 
-- **Status:** To be implemented
+- **Status:** Partially implemented (WP-065 Part A merged 2026-08-21: MariaDB database wiring, dedicated S3 bucket wiring, native mysqldump import stage, `sxa_anonymize.py` redaction module, `sales-db` engine-select mode, and fixture-driven tests throughout; real dump/bucket and live verification pending)
 - **Target:** v0.2
 - **Date:** 2026-08-21
 - **Decision owners:** Zuno Demo architecture team

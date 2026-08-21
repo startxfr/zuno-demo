@@ -216,6 +216,42 @@ async def test_lookup_record_rejects_a_record_type_outside_the_allow_list(transp
     )
 
 
+async def test_connect_dispatches_to_postgres_by_default(transport) -> None:
+    """ADR-0216/WP-065: unused `transport` param only for TESTS-list
+    uniformity - this is a unit-level check of _connect()'s engine
+    dispatch, not a protocol round-trip."""
+    with mock.patch.object(server, "DB_ENGINE", "postgres"), \
+         mock.patch("psycopg.AsyncConnection.connect", new=mock.AsyncMock(return_value="pg-conn")) as fake_pg:
+        result = await server._connect()
+    assert result == "pg-conn"
+    fake_pg.assert_called_once()
+
+
+async def test_connect_dispatches_to_mariadb_when_engine_is_mariadb(transport) -> None:
+    fake_aiomysql = mock.MagicMock()
+    fake_aiomysql.connect = mock.AsyncMock(return_value="mariadb-conn")
+    fake_aiomysql.DictCursor = object()
+    with mock.patch.object(server, "DB_ENGINE", "mariadb"), \
+         mock.patch.object(server, "MARIADB_USER", "sxa"), \
+         mock.patch.object(server, "MARIADB_PASSWORD", "secret"), \
+         mock.patch.dict(sys.modules, {"aiomysql": fake_aiomysql}):
+        result = await server._connect()
+    assert result == "mariadb-conn"
+    fake_aiomysql.connect.assert_called_once()
+    assert fake_aiomysql.connect.call_args.kwargs["db"] == server.MARIADB_DATABASE
+
+
+async def test_connect_fails_closed_without_mariadb_credentials(transport) -> None:
+    with mock.patch.object(server, "DB_ENGINE", "mariadb"), \
+         mock.patch.object(server, "MARIADB_USER", None), \
+         mock.patch.object(server, "MARIADB_PASSWORD", None):
+        try:
+            await server._connect()
+            raise AssertionError("expected RuntimeError for missing MariaDB credentials")
+        except RuntimeError as exc:
+            assert "SXA_MARIADB_USER" in str(exc)
+
+
 TESTS = [
     test_unauthenticated_call_rejected_before_any_protocol_handling,
     test_tools_list_reports_exactly_the_five_declared_tools,
@@ -225,6 +261,9 @@ TESTS = [
     test_aggregate_revenue_by_year_rejects_an_unknown_status,
     test_lookup_record_round_trip_for_an_allow_listed_type,
     test_lookup_record_rejects_a_record_type_outside_the_allow_list,
+    test_connect_dispatches_to_postgres_by_default,
+    test_connect_dispatches_to_mariadb_when_engine_is_mariadb,
+    test_connect_fails_closed_without_mariadb_credentials,
 ]
 
 

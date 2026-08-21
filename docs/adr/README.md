@@ -115,7 +115,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.2 | Proposed | Introduce role-based conversation sharing between colleagues |
 | [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) | v0.2 | Implemented | Refresh agent-frontend chrome: branding, footer and menu icons |
 | [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Implemented | Carry conversation history into agent prompts with budgeted compaction |
-| [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md) | v0.2 | To be implemented | Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG |
+| [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md) | v0.2 | Partially implemented | Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG |
 
 ## version 0.3
 

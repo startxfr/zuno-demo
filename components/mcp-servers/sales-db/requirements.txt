@@ -2,3 +2,6 @@ fastapi==0.141.1
 uvicorn[standard]==0.32.0
 psycopg[binary]==3.2.1
 mcp==2.0.0
+# ADR-0216/WP-065: engine-select target for real SXA content, only
+# imported when SXA_DB_ENGINE=mariadb.
+aiomysql==0.2.0

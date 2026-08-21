@@ -5,3 +5,6 @@ lxml>=5.4,<6
 psycopg[binary]>=3.2,<4
 pgvector>=0.4,<1
 tiktoken>=0.11,<1
+# ADR-0216/WP-065: native import target for real SXA content - pure
+# Python, no libmysqlclient/MariaDB Connector/C build dependency needed.
+PyMySQL>=1.1,<2

@@ -44,6 +44,8 @@ from bs4 import BeautifulSoup, NavigableString
 from botocore.exceptions import ClientError
 from pgvector.psycopg import register_vector
 
+import sxa_anonymize
+
 logger = logging.getLogger("rag_ingestion")
 
 STAGES = (
@@ -145,10 +147,29 @@ class IngestionConfig:
     aramis_base_url: Optional[str]
     aramis_token: Optional[str]
 
-    # load-sxa-dump reads the operator-supplied, approved snapshot from the
-    # corpus bucket itself (ADR-0025: no dump ever lives in git).
+    # load-sxa-dump reads the operator-supplied, approved snapshot from its
+    # own dedicated bucket (ADR-0025: no dump ever lives in git; ADR-0216:
+    # a separate bucket from s3_bucket above, which holds unrelated corpus
+    # content).
     sxa_dump_s3_key: Optional[str]
     sxa_snapshot_id: Optional[str]
+    sxa_s3_endpoint: str
+    sxa_s3_bucket: str
+    sxa_s3_region: str
+    sxa_s3_path_style: bool
+    sxa_aws_access_key_id: Optional[str]
+    sxa_aws_secret_access_key: Optional[str]
+
+    # ADR-0216: the MariaDB database the dump imports natively into - the
+    # live query target for real SXA content (sales-db in mariadb mode);
+    # separate from pg_host/pg_database above, which stays the
+    # local-dev/CI fixture path (ADR-0016, superseded for the live target
+    # only).
+    sxa_mariadb_host: str
+    sxa_mariadb_port: int
+    sxa_mariadb_user: Optional[str]
+    sxa_mariadb_password: Optional[str]
+    sxa_mariadb_database: str
 
     # ADR-0205/WP-24: this run's domain's freshness objective, realized as
     # a duration spec ("7d"/"4h"/"5m"/"none") - see _parse_duration_spec.
@@ -240,6 +261,17 @@ def load_config() -> IngestionConfig:
         aramis_token=os.environ.get("ARAMIS_TOKEN"),
         sxa_dump_s3_key=os.environ.get("SXA_DUMP_S3_KEY"),
         sxa_snapshot_id=os.environ.get("SXA_SNAPSHOT_ID"),
+        sxa_s3_endpoint=os.environ.get("SXA_S3_ENDPOINT", ""),
+        sxa_s3_bucket=os.environ.get("SXA_S3_BUCKET", ""),
+        sxa_s3_region=os.environ.get("SXA_S3_REGION", ""),
+        sxa_s3_path_style=_env_bool("SXA_S3_PATH_STYLE", False),
+        sxa_aws_access_key_id=os.environ.get("SXA_AWS_ACCESS_KEY_ID"),
+        sxa_aws_secret_access_key=os.environ.get("SXA_AWS_SECRET_ACCESS_KEY"),
+        sxa_mariadb_host=os.environ.get("SXA_MARIADB_HOST", ""),
+        sxa_mariadb_port=_env_int("SXA_MARIADB_PORT", 3306),
+        sxa_mariadb_user=os.environ.get("SXA_MARIADB_USER"),
+        sxa_mariadb_password=os.environ.get("SXA_MARIADB_PASSWORD"),
+        sxa_mariadb_database=os.environ.get("SXA_MARIADB_DATABASE", ""),
         stale_after_spec=os.environ.get("STALE_AFTER"),
         s3_endpoint=os.environ.get("S3_ENDPOINT", ""),
         s3_bucket=_env("S3_BUCKET", required=True),
@@ -926,72 +958,192 @@ def _split_sxa_dump(dump_text: str) -> dict:
     return sections
 
 
+def _fetch_sxa_dump_bytes(config: IngestionConfig) -> Optional[bytes]:
+    """Fetches the real dump from its own dedicated S3 bucket (ADR-0216) -
+    a separate client from CorpusStore, which is bound to the shared
+    corpus bucket and unrelated content."""
+    from botocore.config import Config as BotoClientConfig
+
+    client_kwargs: dict = {
+        "region_name": config.sxa_s3_region or None,
+        "aws_access_key_id": config.sxa_aws_access_key_id,
+        "aws_secret_access_key": config.sxa_aws_secret_access_key,
+        "config": BotoClientConfig(
+            s3={"addressing_style": "path" if config.sxa_s3_path_style else "auto"},
+            connect_timeout=10,
+            read_timeout=60,
+            retries={"max_attempts": 4, "mode": "standard"},
+        ),
+    }
+    if config.sxa_s3_endpoint:
+        client_kwargs["endpoint_url"] = config.sxa_s3_endpoint
+    client = boto3.client("s3", **client_kwargs)
+    try:
+        resp = client.get_object(Bucket=config.sxa_s3_bucket, Key=config.sxa_dump_s3_key)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404"):
+            return None
+        raise
+    return resp["Body"].read()
+
+
+def _mariadb_connect(config: IngestionConfig):
+    """ADR-0216: the live import/query target. A thin wrapper so tests can
+    mock this one call rather than the whole pymysql API."""
+    import pymysql
+    import pymysql.cursors
+
+    return pymysql.connect(
+        host=config.sxa_mariadb_host,
+        port=config.sxa_mariadb_port,
+        user=config.sxa_mariadb_user,
+        password=config.sxa_mariadb_password,
+        database=config.sxa_mariadb_database,
+        charset="utf8mb4",
+        cursorclass=pymysql.cursors.DictCursor,
+        connect_timeout=10,
+    )
+
+
+def _split_sql_statements(dump_text: str) -> list:
+    """Splits a SQL script into individual statements on unquoted,
+    top-level semicolons - quote-aware (single/double/backtick) so a `;`
+    inside a VARCHAR value or a backtick-quoted identifier never splits a
+    statement early. Deliberately not a full SQL parser: mysqldump output
+    is machine-generated and well-formed, this only needs to handle
+    normal escaping, not adversarial input.
+
+    Comment lines (`-- ...`) are stripped per-line *before* splitting, not
+    by checking whether a whole (possibly multi-line) statement starts
+    with `--` - a comment line immediately followed by a real statement on
+    the next line is not itself a comment once joined."""
+    lines = [line for line in dump_text.splitlines() if not line.strip().startswith("--")]
+    stripped_text = "\n".join(lines)
+
+    statements = []
+    current: list = []
+    in_string: Optional[str] = None
+    escaped = False
+    for ch in stripped_text:
+        current.append(ch)
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\" and in_string in ("'", '"'):
+            escaped = True
+            continue
+        if in_string:
+            if ch == in_string:
+                in_string = None
+            continue
+        if ch in ("'", '"', "`"):
+            in_string = ch
+            continue
+        if ch == ";":
+            statements.append("".join(current[:-1]))
+            current = []
+    tail = "".join(current).strip()
+    if tail:
+        statements.append(tail)
+    return [s.strip() for s in statements if s.strip()]
+
+
+def _import_sxa_dump_native(conn, dump_text: str) -> None:
+    """Executes the real mysqldump SQL directly against MariaDB - no
+    schema re-derivation (ADR-0216: the dump's own format is already
+    MySQL-native, unlike ADR-0016's superseded Postgres-translation
+    path)."""
+    with conn.cursor() as cur:
+        for statement in _split_sql_statements(dump_text):
+            cur.execute(statement)
+    conn.commit()
+
+
 def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
-    """Validated SQL dump snapshot -> one raw record per legacy table
-    (schema DDL + sample rows as text), with the versioned snapshot ID,
-    import timestamp and checksum ADR-0206 requires on every sxa-legacy
-    record. The dump itself is operator-uploaded to the corpus bucket
-    (ADR-0025: never in git); records use stable sxa-dump://<table> URLs so
-    re-importing the SAME snapshot upserts identical rows (idempotent -
-    detect-changes sees unchanged sha256s) and a NEW snapshot version
-    replaces content under the same identity with new snapshot metadata."""
+    """ADR-0216 (WP-065): real per-record content, replacing the previous
+    raw-DDL-chunk placeholder (never exercised against a real dump because
+    none ever existed). Fetches the real dump from its own dedicated S3
+    bucket, imports it NATIVELY into MariaDB (no schema translation), then
+    extracts real per-record text from every imported table, redacts PII
+    per sxa_anonymize's schema-aware column map (real values keep flowing
+    unredacted through the access-controlled sales-db MCP path - this
+    stage governs only what reaches the shared RAG vector index), and
+    emits one raw record per row. Idempotent per snapshot id: mysqldump
+    output's own `DROP TABLE IF EXISTS` makes re-running the same snapshot
+    re-import identical data, so records come out byte-identical
+    (detect-changes sees unchanged sha256s) and a new snapshot version
+    replaces content under the same identity with new snapshot metadata -
+    the same discipline ADR-0206 already required."""
     if not config.sxa_dump_s3_key:
         raise SystemExit(
             "load-sxa-dump: SXA_DUMP_S3_KEY not set - upload the approved "
-            "snapshot to the corpus bucket and point this at it"
+            "snapshot to the dedicated SXA bucket and point this at it"
         )
-    raw_bytes = store.get_bytes(config.sxa_dump_s3_key)
+    raw_bytes = _fetch_sxa_dump_bytes(config)
     if raw_bytes is None:
         raise SystemExit(
-            f"load-sxa-dump: no object at s3://{config.s3_bucket}/{config.sxa_dump_s3_key}"
+            f"load-sxa-dump: no object at s3://{config.sxa_s3_bucket}/{config.sxa_dump_s3_key}"
         )
     dump_text = raw_bytes.decode("utf-8", errors="replace")
     checksum = hashlib.sha256(raw_bytes).hexdigest()
     snapshot_id = config.sxa_snapshot_id or f"sha256-{checksum[:16]}"
     imported_at = _utcnow_iso()
 
-    sections = _split_sxa_dump(dump_text)
-    if not sections:
+    if not _SXA_TABLE_PATTERN.search(dump_text):
         raise SystemExit(
             "load-sxa-dump: no '-- Table structure for table' sections found - "
-            "not a mysqldump-style export, refusing to index an unvalidated shape"
+            "not a mysqldump-style export, refusing to import an unvalidated shape"
         )
-    written = 0
-    for table, section in sections.items():
-        lines = section.splitlines()
-        if len(lines) > _SXA_MAX_ROW_LINES:
-            omitted = len(lines) - _SXA_MAX_ROW_LINES
-            lines = lines[:_SXA_MAX_ROW_LINES] + [f"-- ({omitted} further lines omitted)"]
-        text = "\n".join(lines)
-        record_url = f"sxa-dump://{table}"
-        doc_id = doc_id_for(record_url)
-        record = {
-            "doc_id": doc_id,
-            "url": record_url,
-            "title": f"SXA legacy table {table}",
-            "text": text,
-            "domain": "knowledge.sxa-legacy",
-            "product": None,
-            "version": None,
-            "language": "fr",
-            "source_type": "sxa-dump",
-            # Historical commercial data: C3 by default (ADR-0206) until the
-            # field-level review WP-23 records says otherwise.
-            "classification": "C3",
-            "acl_groups": [],
-            "fetched_at": imported_at,
-            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            "provenance": f"sxa-dump snapshot {snapshot_id}",
-            # ADR-0206 snapshot discipline + ADR-0202 sxa-legacy extensions.
-            "sxa": {
-                "snapshot_id": snapshot_id,
-                "imported_at": imported_at,
-                "snapshot_checksum": checksum,
-                "table": table,
-            },
-        }
-        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
-        written += 1
+
+    conn = _mariadb_connect(config)
+    try:
+        _import_sxa_dump_native(conn, dump_text)
+        written = 0
+        with conn.cursor() as cur:
+            cur.execute("SHOW TABLES")
+            tables = [next(iter(row.values())) for row in cur.fetchall()]
+        for table in tables:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT * FROM `{table}`")
+                rows = cur.fetchall()
+            for row in rows:
+                redacted = sxa_anonymize.redact_row(table, row)
+                text = _render_record_text(redacted)
+                if not text.strip():
+                    continue
+                row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
+                record_url = f"sxa-mariadb://{table}/{row_id}"
+                doc_id = doc_id_for(record_url)
+                record = {
+                    "doc_id": doc_id,
+                    "url": record_url,
+                    "title": f"SXA {table} #{row_id}",
+                    "text": text,
+                    "domain": "knowledge.sxa-legacy",
+                    "product": None,
+                    "version": None,
+                    "language": "fr",
+                    "source_type": "sxa-mariadb",
+                    # Historical commercial data: C3 by default (ADR-0206) until the
+                    # field-level review WP-23 records says otherwise.
+                    "classification": "C3",
+                    "acl_groups": [],
+                    "fetched_at": imported_at,
+                    "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "provenance": f"sxa MariaDB import snapshot {snapshot_id}",
+                    # ADR-0206 snapshot discipline + ADR-0202 sxa-legacy extensions.
+                    "sxa": {
+                        "snapshot_id": snapshot_id,
+                        "imported_at": imported_at,
+                        "snapshot_checksum": checksum,
+                        "table": table,
+                    },
+                }
+                store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+                written += 1
+    finally:
+        conn.close()
     return written
 
 

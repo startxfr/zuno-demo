@@ -335,7 +335,7 @@ def test_fetch_aramis_writes_adv_metadata_from_fixture_export():
     assert record["adv"]["customer"] == "ACME"
 
 
-# --- load-sxa-dump (knowledge.sxa-legacy) -----------------------------------
+# --- load-sxa-dump (knowledge.sxa-legacy, ADR-0216/WP-065) ------------------
 
 
 _SXA_DUMP = """-- MySQL dump 10.11
@@ -356,37 +356,113 @@ INSERT INTO `devis` VALUES (10),(11);
 """
 
 
-def test_load_sxa_dump_writes_one_record_per_table_with_snapshot_discipline():
+class FakeMariaDBCursor:
+    """Test double for pymysql's DictCursor - real enough to prove
+    _load_sxa_dump's import/extraction flow without a live MariaDB.
+    SHOW TABLES / SELECT * FROM <table> are served from the connection's
+    pre-seeded fixture rows rather than actually interpreting the
+    executed SQL - _import_sxa_dump_native's own statement-splitting is
+    exercised separately (test_split_sql_statements_*)."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self._result: list = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def execute(self, sql):
+        self._conn.executed.append(sql)
+        stripped = sql.strip()
+        if stripped.upper() == "SHOW TABLES":
+            self._result = [{"Tables_in_sxa": t} for t in self._conn.tables]
+        elif stripped.upper().startswith("SELECT * FROM"):
+            table = stripped.split("`")[1]
+            self._result = self._conn.rows.get(table, [])
+        else:
+            self._result = []
+
+    def fetchall(self):
+        return self._result
+
+
+class FakeMariaDBConnection:
+    def __init__(self, tables, rows):
+        self.tables = tables  # SHOW TABLES order
+        self.rows = rows  # table -> list of dict rows
+        self.executed: list = []
+        self.committed = False
+        self.closed = False
+
+    def cursor(self):
+        return FakeMariaDBCursor(self)
+
+    def commit(self):
+        self.committed = True
+
+    def close(self):
+        self.closed = True
+
+
+def test_load_sxa_dump_natively_imports_and_writes_one_record_per_row():
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy",
         SXA_DUMP_S3_KEY="dumps/sxa-2026-08.sql",
         SXA_SNAPSHOT_ID="2026-08",
+        SXA_S3_BUCKET="sxa-bucket",
     )
     store = FakeStore()
-    store.raw["dumps/sxa-2026-08.sql"] = _SXA_DUMP.encode("utf-8")
-    _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
-    records = {r["url"]: r for r in store.json.values()}
-    assert set(records) == {"sxa-dump://affaire", "sxa-dump://devis"}
-    affaire = records["sxa-dump://affaire"]
-    assert affaire["domain"] == "knowledge.sxa-legacy"
-    assert affaire["classification"] == "C3"
-    assert affaire["sxa"]["snapshot_id"] == "2026-08"
-    assert affaire["sxa"]["table"] == "affaire"
-    assert len(affaire["sxa"]["snapshot_checksum"]) == 64
-    assert affaire["sxa"]["imported_at"]
-    assert "CREATE TABLE `affaire`" in affaire["text"]
+    fake_conn = FakeMariaDBConnection(
+        tables=["customers"],
+        rows={"customers": [{"id": 1, "name": "Acme Corp", "phone": "0102030405"}]},
+    )
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=_SXA_DUMP.encode("utf-8")), \
+         mock.patch.object(rag_ingestion, "_mariadb_connect", return_value=fake_conn):
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
+
+    # The dump's own CREATE TABLE/INSERT statements were actually executed
+    # against the connection (native import, no schema translation).
+    assert any("CREATE TABLE `affaire`" in s for s in fake_conn.executed)
+    assert any("INSERT INTO `affaire`" in s for s in fake_conn.executed)
+    assert fake_conn.committed
+    assert fake_conn.closed
+
+    records = list(store.json.values())
+    assert len(records) == 1
+    record = records[0]
+    assert record["domain"] == "knowledge.sxa-legacy"
+    assert record["classification"] == "C3"
+    assert record["source_type"] == "sxa-mariadb"
+    assert record["acl_groups"] == []
+    assert record["sxa"]["snapshot_id"] == "2026-08"
+    assert record["sxa"]["table"] == "customers"
+    assert len(record["sxa"]["snapshot_checksum"]) == 64
+    assert record["sxa"]["imported_at"]
+    # PII redacted before it ever reaches the record that gets embedded.
+    assert "Acme Corp" not in record["text"]
+    assert "0102030405" not in record["text"]
 
 
 def test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent():
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy",
         SXA_DUMP_S3_KEY="dumps/sxa-2026-08.sql",
+        SXA_S3_BUCKET="sxa-bucket",
     )
     store = FakeStore()
-    store.raw["dumps/sxa-2026-08.sql"] = _SXA_DUMP.encode("utf-8")
-    _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
-    first = {k: dict(v) for k, v in store.json.items()}
-    _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
+    rows = {"customers": [{"id": 1, "name": "Acme Corp"}]}
+
+    def _new_conn(*_args, **_kwargs):
+        return FakeMariaDBConnection(tables=["customers"], rows=rows)
+
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=_SXA_DUMP.encode("utf-8")), \
+         mock.patch.object(rag_ingestion, "_mariadb_connect", side_effect=_new_conn):
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
+        first = {k: dict(v) for k, v in store.json.items()}
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
     # Same keys, same content sha256s: detect-changes will see every doc
     # as unchanged, so re-running the same snapshot re-indexes nothing.
     assert set(store.json) == set(first)
@@ -398,20 +474,34 @@ def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy",
         SXA_DUMP_S3_KEY="dumps/not-a-dump.sql",
+        SXA_S3_BUCKET="sxa-bucket",
     )
-    store = FakeStore()
-    store.raw["dumps/not-a-dump.sql"] = b"SELECT 1; -- no table sections"
-    try:
-        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
-        raise AssertionError("expected SystemExit for non-dump content")
-    except SystemExit as exc:
-        assert "refusing to index" in str(exc)
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=b"SELECT 1; -- no table sections"):
+        try:
+            _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, FakeStore())
+            raise AssertionError("expected SystemExit for non-dump content")
+        except SystemExit as exc:
+            assert "refusing to import" in str(exc)
     config2 = _config(INGESTION_DOMAIN="knowledge.sxa-legacy")
     try:
         _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config2, FakeStore())
         raise AssertionError("expected SystemExit for missing key")
     except SystemExit as exc:
         assert "SXA_DUMP_S3_KEY" in str(exc)
+
+
+def test_split_sql_statements_handles_semicolons_inside_quoted_values():
+    dump = "INSERT INTO `t` VALUES (1,'a;b'),(2,\"c;d\");\nCREATE TABLE `u` (`id` int);"
+    statements = rag_ingestion._split_sql_statements(dump)
+    assert statements == [
+        "INSERT INTO `t` VALUES (1,'a;b'),(2,\"c;d\")",
+        "CREATE TABLE `u` (`id` int)",
+    ]
+
+
+def test_split_sql_statements_skips_comment_only_lines():
+    dump = "-- just a comment\nSELECT 1;"
+    assert rag_ingestion._split_sql_statements(dump) == ["SELECT 1"]
 
 
 # --- normalize carries domain/technology/extensions -------------------------
@@ -668,9 +758,11 @@ TESTS = [
     test_fetch_salesforce_writes_sales_metadata_from_fixture_records,
     test_fetch_salesforce_without_credentials_fails_closed,
     test_fetch_aramis_writes_adv_metadata_from_fixture_export,
-    test_load_sxa_dump_writes_one_record_per_table_with_snapshot_discipline,
+    test_load_sxa_dump_natively_imports_and_writes_one_record_per_row,
     test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
+    test_split_sql_statements_handles_semicolons_inside_quoted_values,
+    test_split_sql_statements_skips_comment_only_lines,
     test_normalize_carries_domain_technology_and_extensions_into_metadata,
     test_normalize_defaults_missing_domain_to_the_run_domain,
     test_parse_duration_spec_supports_days_hours_minutes_and_none,

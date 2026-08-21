@@ -27,6 +27,14 @@ CONFIG_KEYS = {
     "ARAMIS_SOURCES_JSON": "ARAMIS_SOURCES_JSON",
     "SXA_DUMP_S3_KEY": "SXA_DUMP_S3_KEY",
     "SXA_SNAPSHOT_ID": "SXA_SNAPSHOT_ID",
+    "SXA_S3_ENDPOINT": "SXA_S3_ENDPOINT",
+    "SXA_S3_BUCKET": "SXA_S3_BUCKET",
+    "SXA_S3_REGION": "SXA_S3_REGION",
+    "SXA_S3_PATH_STYLE": "SXA_S3_PATH_STYLE",
+    "SXA_MARIADB_HOST": "SXA_MARIADB_HOST",
+    "SXA_MARIADB_PORT": "SXA_MARIADB_PORT",
+    "SXA_MARIADB_USER": "SXA_MARIADB_USER",
+    "SXA_MARIADB_DATABASE": "SXA_MARIADB_DATABASE",
     "S3_ENDPOINT": "S3_ENDPOINT",
     "S3_BUCKET": "S3_BUCKET",
     "S3_REGION": "S3_REGION",
@@ -96,6 +104,27 @@ SOURCE_SECRETS = {
 {{- end }}
 }
 
+# ADR-0216/WP-065: load-sxa-dump needs TWO extra secrets (the dedicated
+# SXA S3 bucket credentials AND the MariaDB import target's password) -
+# SOURCE_SECRETS above only carries one per domain, so this is a separate,
+# additive map rather than a restructure of that existing one.
+SXA_SOURCE_SECRETS = {
+{{- range $name, $domain := .Values.domains }}
+{{- if and $domain.enabled $domain.sxaDump }}
+    "{{ $name }}": [
+        (
+            "{{ $domain.sxaDump.s3.secretName }}",
+            {"SXA_AWS_ACCESS_KEY_ID": "SXA_AWS_ACCESS_KEY_ID", "SXA_AWS_SECRET_ACCESS_KEY": "SXA_AWS_SECRET_ACCESS_KEY"},
+        ),
+        (
+            "{{ $domain.sxaDump.mariadb.secretName }}",
+            {"SXA_MARIADB_PASSWORD": "SXA_MARIADB_PASSWORD"},
+        ),
+    ],
+{{- end }}
+{{- end }}
+}
+
 
 def component(stage: str):
     @dsl.container_component
@@ -133,6 +162,9 @@ def configure(task, *, domain="tech", confluence=False, postgres=False, embeddin
     if source_secret and domain in SOURCE_SECRETS:
         secret_name, secret_map = SOURCE_SECRETS[domain]
         kubernetes.use_secret_as_env(task, secret_name=secret_name, secret_key_to_env=secret_map)
+    if source_secret and domain in SXA_SOURCE_SECRETS:
+        for secret_name, secret_map in SXA_SOURCE_SECRETS[domain]:
+            kubernetes.use_secret_as_env(task, secret_name=secret_name, secret_key_to_env=secret_map)
 {{- if .Values.embedding.auth.enabled }}
     if embedding:
         kubernetes.use_secret_as_env(

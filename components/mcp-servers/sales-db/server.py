@@ -60,6 +60,20 @@ DB_NAME = os.getenv("PGDATABASE", "zuno")
 DB_USER = os.getenv("PGUSER")
 DB_PASSWORD = os.getenv("PGPASSWORD")
 
+# ADR-0216/WP-065: engine-select, default "postgres" (this component's
+# original, still-tested fixture path - ADR-0016, superseded for the live
+# target only). Mirrors ADR-0352's embeddedMariaDB/externalMySQL
+# mode-switch precedent exactly: same tool set, same parameterized-query
+# posture (ADR-0017), same allowed_groups/min_classification gates in
+# policies/tools/tool-policy.yaml - only the connection target changes,
+# and only once WP-065 Part B confirms real MariaDB data is loaded.
+DB_ENGINE = os.getenv("SXA_DB_ENGINE", "postgres").strip().lower()
+MARIADB_HOST = os.getenv("SXA_MARIADB_HOST", "mariadb.zuno-data.svc.cluster.local")
+MARIADB_PORT = int(os.getenv("SXA_MARIADB_PORT", "3306"))
+MARIADB_DATABASE = os.getenv("SXA_MARIADB_DATABASE", "sxa")
+MARIADB_USER = os.getenv("SXA_MARIADB_USER")
+MARIADB_PASSWORD = os.getenv("SXA_MARIADB_PASSWORD")
+
 # ADR-0037: required, not optional - unlike the gateway's own copy of this
 # value (which degrades a single tool call to a 502 if unset), this server
 # has no other purpose than serving the gateway, so a missing token is a
@@ -80,7 +94,31 @@ def _conninfo() -> str:
     )
 
 
-async def _connect() -> psycopg.AsyncConnection:
+async def _connect():
+    """Engine-select (ADR-0216/WP-065). Every tool below uses the same
+    `async with await _connect() as conn: async with conn.cursor() as cur:`
+    shape regardless of engine - aiomysql's Connection/Cursor both support
+    the same async-context-manager protocol psycopg's AsyncConnection
+    does, and aiomysql.DictCursor gives the same dict-row shape
+    `row_factory=dict_row` does, so no tool body needs an engine-specific
+    branch."""
+    if DB_ENGINE == "mariadb":
+        import aiomysql
+
+        if not MARIADB_USER or not MARIADB_PASSWORD:
+            raise RuntimeError(
+                "SXA_MARIADB_USER/SXA_MARIADB_PASSWORD are required when "
+                "SXA_DB_ENGINE=mariadb (sourced from an ExternalSecret "
+                "against secret/zuno/sxa/mariadb-db, ADR-0216)"
+            )
+        return await aiomysql.connect(
+            host=MARIADB_HOST,
+            port=MARIADB_PORT,
+            db=MARIADB_DATABASE,
+            user=MARIADB_USER,
+            password=MARIADB_PASSWORD,
+            cursorclass=aiomysql.DictCursor,
+        )
     return await psycopg.AsyncConnection.connect(_conninfo(), row_factory=dict_row)
 
 
