@@ -1,7 +1,18 @@
 # WP-54: Quota policy and Kuadrant translation (promotes ADR-0511)
 
-- **State:** Operator pending (Parts A+B merged 2026-08-18, two
-  commits). **Placement decision (Part B step 5):** Kuadrant-native —
+- **State:** Operator pending (Parts A+B merged 2026-08-18; demo
+  Gateway/HTTPRoute/AuthPolicy attached and `quotaEnforcement.enabled`
+  flipped `true` the same day, discovering and fixing six further live
+  bugs — see the connectivity-link chart README. 2026-08-21: with all six
+  fixed and RateLimitPolicy/AuthPolicy both `Enforced: True`, the 429 demo
+  still 500s on every request. Root-caused to a genuine Kuadrant wasm-shim
+  defect (not Authorino, not our config) — see ADR-0511's 2026-08-21
+  implementation note for the full trace. A direct gRPC call to Authorino,
+  bypassing the wasm-shim, proves Authorino cleanly ALLOWs a fresh token
+  and cleanly DENYs an expired one; the same fresh token through the real
+  gateway still 500s. Not fixable from this repo — flagging for upstream
+  Red Hat Connectivity Link, staying `Operator pending`.)
+  **Placement decision (Part B step 5):** Kuadrant-native —
   the generated per-class `RateLimitPolicy`s live in the
   connectivity-link chart (it owns the Kuadrant plane), values-gated
   off (`quotaEnforcement.enabled: false`) because agent chat enters
@@ -105,6 +116,10 @@ generator's output.
 Apply/sync the generated chart; demo: one user exceeds a request limit
 (explicit quota error), token-budget exhaustion visible in metrics;
 confirm counters keyed correctly per dimension in Limitador.
+**Blocked as of 2026-08-21** on a Kuadrant wasm-shim defect external to
+this repo (ADR-0511's 2026-08-21 note) — the request-limit half of this
+demo cannot complete until Red Hat ships a fix or a workaround is found;
+re-attempt after any Connectivity Link operator upgrade.
 
 ## Status updates (then re-run check_docs.py)
 

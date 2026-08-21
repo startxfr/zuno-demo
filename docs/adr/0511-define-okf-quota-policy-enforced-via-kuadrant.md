@@ -1,9 +1,50 @@
 # ADR-0511: Define OKF quota policy enforced via Kuadrant
 
-- **Status:** Partially implemented (WP-54 repo work merged 2026-08-18: quota-policy.yaml + schema + lint + matrix column + generated Kuadrant RateLimitPolicies in the connectivity-link chart, values-gated off + AI Gateway token-budget enforcement with tests; remaining: operator attaches the agent chat HTTPRoute + AuthPolicy and enables quotaEnforcement, then the live quota-denial demo)
+- **Status:** Partially implemented (WP-54: policy/generator/AI Gateway budget enforcement merged 2026-08-18; the demo Gateway/HTTPRoute/AuthPolicy attached and `quotaEnforcement` enabled the same day, surfacing and fixing six real live Kuadrant/RHCL bugs (CEL predicate syntax, RateLimitPolicy `Overridden` status, demo Gateway ClusterIP+Route ingress, ArgoCD `-d0`/`-d1` ownership conflict, Authorino TLS issuer trust, Limitador CEL quote-escaping crash — see this chart's README for detail); the actual 429-exceedance demo is still blocked on a newly found platform defect, see 2026-08-21 note)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
+
+## Implementation note (2026-08-21)
+
+With every previously-found bug fixed and the RateLimitPolicy/AuthPolicy
+both `Enforced: True` live, the 429 demo still failed: every authenticated
+request to the demo route returned `500`, not the expected pass-then-429
+sequence. Root-caused via direct instrumentation (Envoy trace logging,
+`pilot-agent request POST /logging`) and a reflection-driven raw gRPC
+client (Python + `grpcio`, built from a throwaway pod against the
+mirrored `ubi9-python-311` image, since no `grpcurl`/`openssl` was
+available in-cluster):
+
+- Envoy's wasm-shim (`kuadrant-wasm-shim`) dispatches the ext_authz
+  `Check` call to Authorino's gRPC service (port 50051) and gets back
+  gRPC status **14 (`UNAVAILABLE`) in ~1.3ms** for every single request —
+  too fast to be a real evaluation, and Authorino logs nothing for any of
+  these calls even at `debug` level.
+- Calling Authorino's `envoy.service.auth.v3.Authorization/Check` gRPC
+  method **directly**, bypassing the wasm-shim entirely (via gRPC
+  reflection to build a real `CheckRequest`, since Authorino's server has
+  reflection enabled), proves Authorino itself is completely healthy: an
+  expired token gets a clean, well-formed denial (`status.code: 16`,
+  `X-Ext-Auth-Reason: oidc: token is expired`); a **freshly minted token
+  gets a clean `ok_response {}`** — a proper ALLOW. The exact same fresh
+  token sent through the real gateway route seconds later still 500s.
+- This isolates the defect to the **Kuadrant wasm-shim binary itself**
+  (`kuadrant-operator-wasm`, sha256-pinned in the generated `EnvoyFilter`)
+  — not Authorino, not our `AuthPolicy`/`RateLimitPolicy` config, not our
+  JWT/JWKS/TLS setup, all independently proven healthy. Both the
+  `authorino-operator` and `rhcl-operator` CSVs are the same `rhcl-1
+  1.4.2` release train, so this isn't cross-component version skew —
+  most likely an internal proto-schema or serialization drift between the
+  wasm-shim and Authorino builds bundled in this release.
+- This is not resolvable from this repository's chart/policy layer — it's
+  a defect in a binary Red Hat ships as part of Connectivity Link, the
+  same class of finding as ADR-0201's RHOAI 3.5-EA2 `EnvoyFilter`/mTLS
+  gap. Recorded here for whoever picks this up next: don't re-derive the
+  "everything's healthy but still 500s" investigation from scratch — the
+  wasm-shim is the confirmed fault boundary, and a raw-gRPC-vs-wasm-shim
+  comparison (as above) is the fastest way to re-confirm it after any
+  Connectivity Link version bump.
 
 ## Context
 
