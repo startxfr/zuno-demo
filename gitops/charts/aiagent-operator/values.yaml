@@ -11,7 +11,7 @@ image:
   # system:image-puller RoleBinding.
   repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/aiagent-operator
   # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
-  tag: v0.1.0
+  tag: latest
   # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
   pullPolicy: Always
 
