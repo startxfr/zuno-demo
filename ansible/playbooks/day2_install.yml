@@ -7,7 +7,7 @@
 # stays `_d1`/`-d1`, an implementation detail, not renamed with the
 # macro tier) is in place before any other Day 2 workload rolls out.
 # `llm`/`models` run next, before content-ingestion, since rag/agents
-# need models available. Moved here from Day 1 (ADR-0516) - Day 1 is now
+# need models available. Moved here from Day 1 (ADR-0060) - Day 1 is now
 # the AI-platform-operator stack only.
 - name: "Day 2: install components"
   hosts: localhost

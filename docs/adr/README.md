@@ -72,6 +72,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0057](0057-introduce-day-2-agent-availability-test-and-stresstest-operations.md) | v0 | Implemented | Introduce Day 2 agent availability-test and stresstest operations |
 | [ADR-0058](0058-aggregate-existing-test-content-into-a-bulk-interaction-stresstest.md) | v0 | Implemented | Aggregate existing test content into make d2 stresstest, with a bulk-interaction load mode |
 | [ADR-0059](0059-auto-redeploy-on-in-cluster-build-via-image-triggers.md) | v0 | Implemented | Auto-redeploy consuming pods when an in-cluster build completes |
+| [ADR-0060](0060-restructure-day-0-day-1-day-2-day-3-deployment-sequencing.md) | v0 | Implemented | Restructure deployment into Day 0 / Day 1 / Day 2 / Day 3 sequencing |
 
 ## version 0.1
 

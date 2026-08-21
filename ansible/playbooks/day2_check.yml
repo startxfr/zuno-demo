@@ -5,7 +5,7 @@
 # only - see ansible/roles/namespaces/README.md; internal task naming
 # stays `precheck_d1`, an implementation detail. `mlops` has no
 # precheck.yml yet, excluded from state-checking. Moved here from Day 1
-# (ADR-0516).
+# (ADR-0060).
 - name: "Day 2: check install state"
   hosts: localhost
   gather_facts: false

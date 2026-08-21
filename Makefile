@@ -5,7 +5,7 @@ ANSIBLE_PLAYBOOK ?= ansible-playbook
 INVENTORY ?= ansible/inventories/demo/hosts.yml
 EXTRA_VARS ?=
 
-# ADR-0056/ADR-0516: Day 0 (cluster prerequisites) / Day 1 (AI-platform-
+# ADR-0056/ADR-0060: Day 0 (cluster prerequisites) / Day 1 (AI-platform-
 # operator stack) / Day 2 (AI infrastructure + content ingestion) / Day 3
 # (agent test/stresstest operations) sequencing.
 DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets openshift-oauth smtp machines nfd nvidia-gpu custom-metrics-autoscaler
@@ -23,7 +23,7 @@ DAY1_VERBS := check install build uninstall all reinstall
 
 # Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
 # content ingestion (sql-schema, rag, rag-ingestion, mcp, agents, mlops) -
-# moved here from Day 1 (ADR-0516). "namespaces" is here despite being a
+# moved here from Day 1 (ADR-0060). "namespaces" is here despite being a
 # Day 0 component everywhere else in this Makefile - only its
 # quota/network-policy overlay is Day 2 now, see
 # ansible/roles/namespaces/README.md (internal task/Application naming
@@ -231,7 +231,7 @@ d1: $(if $(DAY_VERB),credentials-check)
 	$(DAY1_RECIPE)
 
 # day2/d2 share this exact recipe - structurally identical to Day 1's
-# (ADR-0516: Day 2 is now a full install tier, not the old test tier;
+# (ADR-0060: Day 2 is now a full install tier, not the old test tier;
 # see day3 below for where the old day2 test/stresstest moved).
 define DAY2_RECIPE
 @verb="$(DAY_VERB)"; \

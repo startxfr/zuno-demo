@@ -1,7 +1,7 @@
 ---
 # Day 2 build (`make day2 build`). Builds content-ingestion component
 # images via OpenShift BuildConfig/ImageStream. Moved here from Day 1
-# (ADR-0516) - Day 1's build list is now just ai_gateway_build.
+# (ADR-0060) - Day 1's build list is now just ai_gateway_build.
 - name: "Day 2: build component images"
   hosts: localhost
   gather_facts: false

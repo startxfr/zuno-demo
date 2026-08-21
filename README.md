@@ -68,14 +68,14 @@ make d0 check namespaces
 make d0 install
 make d0 all argocd   # check + install, one component
 
-# Day 1 (ADR-0516): the AI-platform-operator stack - mesh, Keycloak,
+# Day 1 (ADR-0060): the AI-platform-operator stack - mesh, Keycloak,
 # databases, Kueue, OpenShift AI, etc.
 make d1 check
 make d1 check keycloak
 make d1 install
 make d1 all openshift-ai   # check + install, one component
 
-# Day 2 (ADR-0516): AI infrastructure (llm, models) and content
+# Day 2 (ADR-0060): AI infrastructure (llm, models) and content
 # ingestion - build the platform's own component images, then run them.
 make d2 build
 make d2 install
