@@ -25,11 +25,16 @@ scenarios:
     expect_groups: [consultant, agent_naveo]
 
   - id: 4
-    title: "Naveo tile is enabled for a consultant-group, agent_naveo-entitled user"
+    # Naveo is status:placeholder (platform/architecture/agent-platform-separation.md:
+    # only tekos/arkos are status:active in v0), so portal.go's
+    # Clickable = IsActive() && authorized is false regardless of
+    # entitlement - this stays disabled even for an otherwise-entitled
+    # user until Naveo is promoted to active.
+    title: "Naveo tile stays disabled for a consultant-group, agent_naveo-entitled user (agent is placeholder-status)"
     type: portal_tile_state
     persona: consultant-01
     agent: naveo
-    expect_enabled: true
+    expect_enabled: false
 
   - id: 5
     title: "Naveo tile is disabled for a non-entitled user (sales persona)"

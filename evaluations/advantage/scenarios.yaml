@@ -32,11 +32,16 @@ scenarios:
     expect_groups: [adv, agent_advantage]
 
   - id: 4
-    title: Advantage tile is enabled for an adv-group, agent_advantage-entitled user
+    # Advantage is status:placeholder (platform/architecture/agent-platform-separation.md:
+    # only tekos/arkos are status:active in v0), so portal.go's
+    # Clickable = IsActive() && authorized is false regardless of
+    # entitlement - this stays disabled even for an otherwise-entitled
+    # user until Advantage is promoted to active.
+    title: Advantage tile stays disabled for an adv-group, agent_advantage-entitled user (agent is placeholder-status)
     type: portal_tile_state
     persona: adv-01
     agent: advantage
-    expect_enabled: true
+    expect_enabled: false
 
   - id: 5
     # ADR-0349: was board-01 - board-01 now HOLDS agent_advantage

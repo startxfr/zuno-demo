@@ -31,11 +31,16 @@ scenarios:
     expect_groups: [sales, agent_comage]
 
   - id: 4
-    title: Comage tile is enabled for a sales-group, agent_comage-entitled user
+    # Comage is status:placeholder (platform/architecture/agent-platform-separation.md:
+    # only tekos/arkos are status:active in v0), so portal.go's
+    # Clickable = IsActive() && authorized is false regardless of
+    # entitlement - this stays disabled even for an otherwise-entitled
+    # user until Comage is promoted to active.
+    title: Comage tile stays disabled for a sales-group, agent_comage-entitled user (agent is placeholder-status)
     type: portal_tile_state
     persona: sale-01
     agent: comage
-    expect_enabled: true
+    expect_enabled: false
 
   - id: 5
     title: Comage tile is disabled for a non-entitled user (board persona)

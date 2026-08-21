@@ -32,11 +32,16 @@ scenarios:
     expect_groups: [finance, agent_finage]
 
   - id: 4
-    title: Finage tile is enabled for a finance-group, agent_finage-entitled user
+    # Finage is status:placeholder (platform/architecture/agent-platform-separation.md:
+    # only tekos/arkos are status:active in v0), so portal.go's
+    # Clickable = IsActive() && authorized is false regardless of
+    # entitlement - this stays disabled even for an otherwise-entitled
+    # user until Finage is promoted to active.
+    title: Finage tile stays disabled for a finance-group, agent_finage-entitled user (agent is placeholder-status)
     type: portal_tile_state
     persona: finance-01
     agent: finage
-    expect_enabled: true
+    expect_enabled: false
 
   - id: 5
     # ADR-0349: was board-01 - board-01 now HOLDS agent_finage
