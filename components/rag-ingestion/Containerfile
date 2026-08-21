@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm -f /tmp/requirements.txt
 
 COPY src/rag_ingestion.py /opt/app-root/src/rag_ingestion.py
+COPY src/sxa_anonymize.py /opt/app-root/src/sxa_anonymize.py
 COPY rag-ingestion /opt/app-root/src/rag-ingestion
 RUN chmod 0755 /opt/app-root/src/rag-ingestion
 
