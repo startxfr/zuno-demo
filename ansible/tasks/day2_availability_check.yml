@@ -1,0 +1,76 @@
+---
+# ADR-0057 decisions 3 and 5: discovers agents/*/agent.okf.md the same way
+# ansible/roles/mcp_build/tasks/build.yml discovers
+# components/mcp-servers/*/Dockerfile (ADR-0119/WP-057) - one loop, not a
+# hand-maintained list, so a new agent bundle is checked automatically
+# with no code change. Every discovered agent's frontend has a public
+# Route, so this runs entirely from the Ansible control node (no in-cluster
+# Job needed, unlike the "platform" component's shared-service probes -
+# see ansible/roles/day2/tasks/platform_health_check.yml).
+#
+# Shared by ansible/roles/agents/tasks/check.yml (Day 1's existing
+# reachability step, ADR-0053) and ansible/roles/day2/tasks/test.yml (the
+# new, standalone `make d2 test agents` command) - one implementation, two
+# callers, replacing the six near-identical per-agent blocks check.yml
+# used to hand-copy (Tekos, Arkos, Comage, Advantage, Finage, Naveo).
+- name: "day2-availability | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "day2-availability | discover agents/*/agent.okf.md bundles"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/agents"
+    patterns: "agent.okf.md"
+    recurse: true
+    depth: 2
+  register: _day2_agent_bundles
+
+- name: "day2-availability | GET each discovered agent frontend's /healthz"
+  ansible.builtin.uri:
+    url: "https://{{ item.path | dirname | basename }}.{{ cluster_base_domain }}/healthz"
+    method: GET
+    status_code: 200
+    validate_certs: false
+    timeout: 10
+  register: _day2_agent_health
+  failed_when: false
+  loop: "{{ _day2_agent_bundles.files }}"
+  loop_control:
+    label: "{{ item.path | dirname | basename }}"
+
+# Builds one platform/testing/day2_report.py::Day2Result-shaped dict per
+# agent - "item.item" is the uri task's own looped-over "find" result
+# (Ansible's standard per-iteration registration shape), not a typo.
+- name: "day2-availability | build the Day2Result list"
+  ansible.builtin.set_fact:
+    _day2_availability_results: "{{ _day2_availability_results | default([]) + [_day2_row] }}"
+  loop: "{{ _day2_agent_health.results }}"
+  loop_control:
+    label: "{{ item.item.path | dirname | basename }}"
+  vars:
+    _day2_row:
+      agent: "{{ item.item.path | dirname | basename }}"
+      layer: availability
+      id: healthz
+      category: frontend
+      passed: "{{ (item.status | default(0)) == 200 }}"
+      detail: "status={{ item.status | default('no response') }}"
+      duration_ms: "{{ ((item.elapsed | default(0)) | float) * 1000 }}"
+
+- name: "day2-availability | render the report (platform/testing/day2_report.py)"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component agents"
+    stdin: "{{ _day2_availability_results | to_json }}"
+  register: _day2_availability_report
+  changed_when: false
+  failed_when: false
+
+- name: "day2-availability | print the report"
+  ansible.builtin.debug:
+    msg: "{{ _day2_availability_report.stdout_lines }}"
+
+- name: "day2-availability | fail if any agent frontend did not report healthy"
+  ansible.builtin.fail:
+    msg: >-
+      One or more agent frontends failed their /healthz check - see the
+      report above for which one(s).
+  when: _day2_availability_report.rc != 0

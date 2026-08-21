@@ -1,0 +1,20 @@
+---
+# ADR-0058: `make day2|d2 stresstest [agents|platform|all]`. Runs every
+# existing test layer per agent, plus an optional bulk-interaction load
+# pass. WP-062 ships this playbook as a dispatch-only stub
+# (ansible/roles/day2/tasks/stresstest.yml prints a placeholder message);
+# WP-063 fills in the real content.
+- name: "Day 2: stresstest"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Run the Day 2 stresstest
+      ansible.builtin.include_role:
+        name: day2
+        tasks_from: stresstest
+      vars:
+        target_component: "{{ target_component | default('all') }}"

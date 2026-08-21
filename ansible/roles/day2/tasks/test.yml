@@ -1,0 +1,14 @@
+---
+# ADR-0057 decision 5: `make d2 test [agents|platform|all]`. "agents" runs
+# entirely from the control node (every agent frontend has a public
+# Route - see ansible/tasks/day2_availability_check.yml); "platform" runs
+# a lightweight in-cluster Job (the shared services have no Route - see
+# platform_health_check.yml). Both are availability-only: no chat traffic,
+# no credentials beyond what a /healthz GET already needs.
+- name: "day2-test | run the agents availability check"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
+  when: target_component in ['agents', 'all']
+
+- name: "day2-test | run the platform availability check"
+  ansible.builtin.include_tasks: platform_health_check.yml
+  when: target_component in ['platform', 'all']

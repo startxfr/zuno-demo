@@ -1,6 +1,31 @@
 # WP-062: Day 2 test/stresstest chassis (delivers ADR-0057)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-21) - executed with three
+  file-path refinements over this brief's original sketch (acceptance
+  criteria unchanged): the per-agent availability-check loop lives at
+  `ansible/tasks/day2_availability_check.yml` (shared, not inside any
+  role, matching this repo's existing home for cross-role snippets like
+  `resolve_cluster_base_domain.yml`) rather than
+  `ansible/roles/agents/tasks/availability_check.yml`, since it needed to
+  be `include_tasks`-able from both `check.yml` (the `agents` role) and
+  the new Day 2 playbooks; the `platform` Job and the `test`/`stresstest`
+  dispatch tasks live in a new `ansible/roles/day2/` role, not inside
+  `agents`, since they aren't agent-specific; and
+  `ansible/inventories/demo/group_vars/all.yml` does not exist as a
+  single file - `day2_report_format: text` was added to
+  `ansible/inventories/demo/group_vars/all/main.yml` instead. The
+  `platform` Job's shared-service URL list was confirmed against each
+  service's actual `gitops/charts/*/templates/service.yaml` (Service
+  name/port/namespace) rather than assumed from `SERVICE_HEALTH_URLS`
+  alone, and includes `ai-gateway` (not present in that Python map) plus
+  the four MCP servers that actually have a deployed chart today
+  (confluence, git-forge, sales-db, salesforce - not the two
+  not-yet-deployed ones, google-workspace/lucidchart).
+  `platform/testing/day2_report.py` also grew a small `--format`/stdin
+  CLI (beyond this brief's library-only sketch) so Ansible/Jinja-built
+  results can be rendered without duplicating renderer logic in YAML.
+  Live cluster confirmation (`make d2 test` against a real cluster) is
+  the remaining operator step.
 - **ADRs:** ADR-0057
 - **Depends on:** WP-31 (agent-parameterized `run_scenarios.py`, the
   precedent this generalizes further), WP-43 (agent maturity model / OKF

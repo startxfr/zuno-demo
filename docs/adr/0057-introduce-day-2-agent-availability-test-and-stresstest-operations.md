@@ -1,6 +1,6 @@
 # ADR-0057: Introduce Day 2 agent availability-test and stresstest operations
 
-- **Status:** Proposed
+- **Status:** Partially implemented - repo work merged: `make day2|d2 test [agents|platform|all]`, the `platform/testing/day2_report.py` report engine (text/json/csv), and the discovery-driven availability checks are in place, and `ansible/roles/agents/tasks/check.yml`'s six hand-copied per-agent blocks are replaced by one shared, loop-driven include (WP-062, 2026-08-21). Live cluster confirmation (an actual `make d2 test` run against a real cluster) is still pending.
 - **Target:** v0
 - **Date:** 2026-08-21
 - **Decision owners:** Zuno Demo architecture team

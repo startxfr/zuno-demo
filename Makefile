@@ -27,10 +27,23 @@ DAY1_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp ai
 DAY1_BUILD_COMPONENTS := mcp rag rag-ingestion agent ai-gateway mlops aiagent-operator
 DAY1_VERBS := check install build uninstall all reinstall
 
+# ADR-0057/ADR-0058: Day 2 (agent test / stresstest operations), the third
+# stage after Day 0 (cluster prerequisites) and Day 1 (build + run the
+# platform). "test" only ever proves availability (agent frontends'
+# /healthz, shared platform services' /healthz+/readyz); "stresstest" runs
+# every existing test layer per agent (contract/scenarios/security/gate/
+# stress_test) plus an optional bulk-interaction load pass. Component
+# granularity matches Day 1's "agents" (every agent bundle, collectively)
+# plus a new "platform" component for the shared services - which agents/
+# services actually exist is resolved dynamically from
+# agents/*/agent.okf.md at Ansible run time, never a list here.
+DAY2_COMPONENTS := agents platform
+DAY2_VERBS := test stresstest
+
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 new-mcp-server $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 new-mcp-server $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -57,11 +70,16 @@ help:
 	  '  make day1|d1 all [component]        check + build + install, whichever apply to the component' \
 	  '  make day1|d1 reinstall [component]  Uninstall then install one/all Day 1 components' \
 	  '' \
+	  '  make day2|d2 test [component]        Check availability only (ADR-0057)' \
+	  '  make day2|d2 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
+	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
 	  'Day 1 components (check/install): $(DAY1_RUN_COMPONENTS)' \
-	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)'
+	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)' \
+	  'Day 2 components: $(DAY2_COMPONENTS)' \
+	  'Day 2 report format: text (default) | json | csv - set via REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"'
 
 # ADR-0119: scaffold a new MCP server from the confluence-shaped template
 # instead of hand-copying an existing server directory-by-directory.
@@ -202,9 +220,55 @@ day1: $(if $(DAY_VERB),credentials-check)
 d1: $(if $(DAY_VERB),credentials-check)
 	$(DAY1_RECIPE)
 
+# day2/d2 share this exact recipe. Only two components (agents, platform)
+# and two verbs (test, stresstest) - no build/run split like Day 1, since
+# neither verb ever changes cluster state, only observes/exercises it.
+# report_format defaults to "text" (ADR-0057 decision 4: raw table always
+# printed; json/csv are additional artifacts, selected via REPORT_FORMAT=
+# or EXTRA_VARS="-e report_format=..."). "stresstest" today just dispatches
+# straight through (WP-062 scope: day2_stresstest.yml is a stub until
+# WP-063/ADR-0058 fills in real content and this recipe's bulk-interaction
+# prompt).
+define DAY2_RECIPE
+@verb="$(DAY_VERB)"; \
+component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
+if [[ -z "$$verb" ]]; then \
+  printf '%s\n' \
+    'Zuno Demo - Day 2 (agent test / stresstest operations)' \
+    '' \
+    'Usage: make day2|d2 <verb> [component]' \
+    '' \
+    '  test         Check availability only (agent frontends'"'"' /healthz, shared platform services'"'"' /healthz+/readyz)' \
+    '  stresstest   Run every existing test layer per agent, plus an optional bulk-interaction load pass (ADR-0058)' \
+    '' \
+    'Components (optional, default: all):' \
+    '  $(DAY2_COMPONENTS)' \
+    '' \
+    'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
+    '' \
+    'Example: make d2 test agents' \
+    'Example: make d2 stresstest'; \
+  exit 0; \
+fi; \
+if [[ -z "$$component" ]]; then component=all; fi; \
+case " $(DAY2_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day2 verb: '$$verb' (expected one of: $(DAY2_VERBS))" >&2; exit 2;; esac; \
+case " $(DAY2_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 component: '$$component' (expected one of: $(DAY2_COMPONENTS) or all)" >&2; exit 2;; esac; \
+report_format="$${REPORT_FORMAT:-text}"; \
+case "$$verb" in \
+  test) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+  stresstest) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+esac
+endef
+
+day2: $(if $(DAY_VERB),credentials-check)
+	$(DAY2_RECIPE)
+
+d2: $(if $(DAY_VERB),credentials-check)
+	$(DAY2_RECIPE)
+
 # Verb/component tokens are intentionally no-op Make targets. The day0/d0/
-# day1/d1 recipes read MAKECMDGOALS words 2 and 3 directly, so e.g.
+# day1/d1/day2/d2 recipes read MAKECMDGOALS words 2 and 3 directly, so e.g.
 # `make d0 check postgresql` needs "check" and "postgresql" to resolve to
 # *something* as Make goals without erroring as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS)):
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_COMPONENTS)):
 	@:

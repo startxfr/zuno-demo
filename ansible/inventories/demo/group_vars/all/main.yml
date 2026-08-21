@@ -7,3 +7,8 @@ zuno_envId: demo
 
 zuno_admin_password: "{{ zuno_admin_mainpwd | default('AbcdeF_Ghi123') }}"
 zuno_admin_token: "token-{{ zuno_admin_password }}"
+
+# ADR-0057: default report format for `make day2|d2 test|stresstest` -
+# text (raw table, always printed regardless) | json | csv. Override
+# per-run with EXTRA_VARS="-e report_format=<fmt>" or REPORT_FORMAT=<fmt>.
+day2_report_format: text

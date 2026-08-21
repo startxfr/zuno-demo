@@ -497,6 +497,29 @@ not here.
   placeholder agents carry no namespace footprint until their FE/BFF
   charts exist.
 
+### Dated entries (roadmap work packages, v0) — current status per ADR
+
+- **ADR-0057 (WP-062, 2026-08-21)**: `make day2|d2 test|stresstest
+  [agents|platform|all]` — the Day 2 chassis, extending ADR-0056's Day
+  0/Day 1 Makefile/Ansible dispatch idiom. `test` is availability-only
+  (agent frontends' `/healthz` via `ansible/tasks/
+  day2_availability_check.yml`, run from the control node since every
+  agent frontend has a public Route; the shared platform tier's
+  `/healthz`+`/readyz` via a lightweight in-cluster Job,
+  `ansible/roles/day2/tasks/platform_health_check.yml`, since those
+  services have no Route). Also replaced
+  `ansible/roles/agents/tasks/check.yml`'s six hand-copied per-agent
+  `/healthz` blocks (Tekos/Arkos/Comage/Advantage/Finage/Naveo) with one
+  discovery-driven include (`agents/*/agent.okf.md`, mirroring
+  `mcp_build`'s Dockerfile-discovery idiom) — `make day1 check agents`
+  now shares the same implementation. Report engine
+  (`platform/testing/day2_report.py`, text/json/csv, text always printed)
+  is new, shared, and has its own local test suite
+  (`platform/testing/tests/test_day2_report.py`, no cluster needed).
+  `make d2 stresstest` ships as a dispatch-only stub pending WP-063
+  (ADR-0058). Repo work merged; live cluster confirmation (`make d2
+  test` against a real cluster) still pending.
+
 ### Dated entries (roadmap work packages, v0.1) — current status per ADR
 
 - **ADR-0116 (WP-01)**: MCP Gateway routes tool calls through a

@@ -1,0 +1,177 @@
+---
+# ADR-0057 decision 5 ("platform" component): agent-runtime, ai-gateway,
+# mcp-gateway and rag-service (plus the deployed MCP servers - confluence,
+# git-forge, sales-db, salesforce; only these five/four have a real
+# gitops/charts/mcp-* Service today, confirmed against each chart's
+# templates/service.yaml rather than the full components/mcp-servers/
+# source-directory list, which also contains not-yet-deployed
+# google-workspace/lucidchart/web-search servers) have no OpenShift
+# Route - only in-cluster Service DNS - so this runs as a lightweight
+# in-cluster Job, modeled on ansible/roles/vault/tasks/install.yml's
+# unseal-configure Job (delete-then-recreate, inline spec, simple
+# succeeded/failed polling) rather than
+# ansible/roles/agents/tasks/run_acceptance_gate.yml's heavier
+# ConfigMap-bundled pattern - this Job needs no bundled Python scripts,
+# just stdlib urllib against a fixed URL list.
+#
+# Reuses the acceptance-gate Job's own ServiceAccount name and
+# app.kubernetes.io/name: acceptance-gate pod label rather than a new
+# identity: that label is what the platform services' NetworkPolicies
+# already allow-list (see run_acceptance_gate.yml's own header comment -
+# "explicitly allow-listed in the relevant NetworkPolicies, never a
+# namespace-wide baseline"); a differently-labeled pod would be blocked by
+# those same NetworkPolicies fail-closed (ADR-0037/ADR-0052).
+- name: "day2-platform | ensure the acceptance-gate ServiceAccount exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: acceptance-gate
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+
+- name: "day2-platform | delete any previous platform health-check Job (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: zuno-day2-platform-health
+    namespace: zuno-ai-run
+    wait: true
+
+- name: "day2-platform | run the platform health-check Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: zuno-day2-platform-health
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 0
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: acceptance-gate
+          spec:
+            restartPolicy: Never
+            priorityClassName: zuno-platform-weak
+            serviceAccountName: acceptance-gate
+            containers:
+              - name: day2-platform-health
+                image: "docker.io/library/python:3.12-slim"
+                # stdlib only (json/urllib/time) - no pip install, unlike
+                # run_acceptance_gate.yml's Job, which needs httpx/PyYAML
+                # for its much larger scenario/security-check payload.
+                command:
+                  - python3
+                  - -c
+                  - |
+                    import json
+                    import time
+                    import urllib.error
+                    import urllib.request
+
+                    TARGETS = [
+                        ("agent-runtime", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080/healthz"),
+                        ("agent-runtime", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080/readyz"),
+                        ("ai-gateway", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080/healthz"),
+                        ("ai-gateway", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080/readyz"),
+                        ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/healthz"),
+                        ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/readyz"),
+                        ("rag-service", "http://rag-service.zuno-data.svc.cluster.local:8080/healthz"),
+                        ("rag-service", "http://rag-service.zuno-data.svc.cluster.local:8080/readyz"),
+                        ("confluence-mcp", "http://confluence-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
+                        ("git-forge-mcp", "http://git-forge-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
+                        ("sales-db-mcp", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
+                        ("salesforce-mcp", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
+                    ]
+
+                    results = []
+                    for service, url in TARGETS:
+                        check_id = url.rsplit("/", 1)[-1]
+                        start = time.monotonic()
+                        try:
+                            with urllib.request.urlopen(url, timeout=10) as resp:
+                                passed = resp.status == 200
+                                detail = "" if passed else "status=" + str(resp.status)
+                        except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
+                            passed = False
+                            detail = str(exc)
+                        results.append({
+                            "agent": service,
+                            "layer": "availability",
+                            "id": check_id,
+                            "category": "platform",
+                            "passed": passed,
+                            "detail": detail,
+                            "duration_ms": (time.monotonic() - start) * 1000,
+                        })
+
+                    print(json.dumps(results))
+                env:
+                  - name: PYTHONUNBUFFERED
+                    value: "1"
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 64Mi
+                  limits:
+                    cpu: 200m
+                    memory: 128Mi
+
+- name: "day2-platform | wait for the Job to reach a terminal state"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-run
+    name: zuno-day2-platform-health
+  register: _day2_platform_job
+  until: >-
+    (_day2_platform_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_day2_platform_job.resources[0].status.failed | default(0)) > 0
+  retries: 20
+  delay: 5
+
+- name: "day2-platform | find the Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-run
+    label_selectors:
+      - "job-name=zuno-day2-platform-health"
+  register: _day2_platform_pod
+
+- name: "day2-platform | fetch the Job's output (a JSON array of Day2Result-shaped rows)"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-run
+    name: "{{ _day2_platform_pod.resources[0].metadata.name }}"
+  register: _day2_platform_log
+  when: (_day2_platform_pod.resources | default([]) | length) > 0
+
+# Rendering happens on the control node (platform/testing/day2_report.py
+# is a real repo file here, unlike inside the bare python:3.12-slim
+# container) - same split as ansible/tasks/day2_availability_check.yml.
+- name: "day2-platform | render the report (platform/testing/day2_report.py)"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component platform"
+    stdin: "{{ _day2_platform_log.log }}"
+  register: _day2_platform_report
+  changed_when: false
+  failed_when: false
+
+- name: "day2-platform | print the report"
+  ansible.builtin.debug:
+    msg: "{{ _day2_platform_report.stdout_lines }}"
+
+- name: "day2-platform | fail if any shared platform service did not report healthy"
+  ansible.builtin.fail:
+    msg: >-
+      One or more shared platform services failed their /healthz or
+      /readyz check - see the report above for which one(s).
+  when: _day2_platform_report.rc != 0

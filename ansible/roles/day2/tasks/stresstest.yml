@@ -1,0 +1,12 @@
+---
+# WP-062 stub: proves the `make d2 stresstest` dispatch path end-to-end
+# (Makefile -> ansible/playbooks/day2_stresstest.yml -> here) without any
+# real content yet. WP-063/ADR-0058 replaces this with the real
+# per-agent content aggregation (contract/scenario/security/gate/
+# stress_test) and the bulk-interaction load mode.
+- name: "day2-stresstest | not yet implemented"
+  ansible.builtin.debug:
+    msg: >-
+      Day 2 stresstest content lands in WP-063 (ADR-0058) - this is a
+      dispatch-only stub for target_component={{ target_component }},
+      report_format={{ report_format | default('text') }}.
