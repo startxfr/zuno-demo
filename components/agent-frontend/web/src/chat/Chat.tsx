@@ -63,6 +63,24 @@ function newSessionId(): string {
   return `sess-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
+// Masthead nav buttons (below) are filled with each agent's own
+// zuno.ui.color - most are dark/mid-tone enough for white text, but a
+// bright one (e.g. Comage's amber #F0AB00) would wash white out, so pick
+// black vs. white by standard sRGB relative luminance rather than
+// hand-tuning per agent.
+function textColorFor(hex: string): "#000000" | "#ffffff" {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!match) {
+    return "#ffffff";
+  }
+  const n = parseInt(match[1], 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? "#000000" : "#ffffff";
+}
+
 // ADR-0515: one open in-app tab - each holds its own conversation
 // independently (own run_id/transcript/composer state), superseding the
 // single-conversation-per-page-load model. `id` is the run_id once known,
@@ -416,9 +434,16 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                 {config.agentNavStrip.map((entry) => (
                   <ToolbarItem key={entry.name}>
                     <Button
-                      variant="link"
-                      isInline
-                      style={{ color: entry.color || undefined }}
+                      variant="primary"
+                      style={
+                        entry.color
+                          ? {
+                              backgroundColor: entry.color,
+                              borderColor: entry.color,
+                              color: textColorFor(entry.color),
+                            }
+                          : undefined
+                      }
                       onClick={(e) => {
                         e.preventDefault();
                         openAgentTab(entry.name, entry.href);
