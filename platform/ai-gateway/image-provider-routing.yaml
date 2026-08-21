@@ -33,7 +33,12 @@
 image_providers:
   - name: ovhcloud-sdxl
     kind: saas-image
-    model: stable-diffusion-xl
+    # 2026-08-21: was `stable-diffusion-xl` - looked right against the
+    # catalog/getting-started docs (2026-08-20 note below) but the live
+    # /v1/models catalog's actual id is this one; the old value 404'd
+    # ("model_not_found") on every real call once OVHCLOUD_API_KEY was
+    # provisioned. Confirmed live against the real catalog response.
+    model: stable-diffusion-xl-base-v10
     # OVHcloud AI Endpoints' OpenAI-compatible images endpoint (verified
     # live against the catalog/getting-started docs, 2026-08-20) - lets
     # app/image_providers.py reuse the `openai` SDK exactly like every
