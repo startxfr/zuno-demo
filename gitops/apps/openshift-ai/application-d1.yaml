@@ -21,34 +21,16 @@ spec:
             enabled: true
         dataScienceCluster:
           enabled: true
-        # Same Application as DataScienceCluster (not application-d0.yaml -
-        # DSCInitialization above needs the Subscription already reconciled,
-        # which only happens partway through d0). Ordering relative to
-        # DataScienceCluster is handled via sync-wave within this
-        # Application instead: templates/maas-gateway.yaml's resources are
-        # sync-wave -5, DSCInitialization is -10, DataScienceCluster has no
-        # explicit wave (defaults to 0) - the Gateway this DataScienceCluster
-        # needs before it will reconcile kserve.modelsAsService is guaranteed
-        # to land first.
         maasGateway:
           enabled: true
           # Placeholder auto-substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
-        # maas-db-config Secret in redhat-ods-applications (MaaS database
-        # prerequisite, sync-wave -5 like maasGateway) - see
-        # templates/externalsecret-maas-db.yaml.
         maasDb:
           enabled: true
-        # Deliberately nulled: this chart's default prometheusK8s value
-        # (values.yaml) would otherwise make d1 also render
-        # ConfigMap/cluster-monitoring-config (openshift-monitoring),
-        # duplicating d0's ownership of it and causing ArgoCD to report the
-        # ConfigMap as shared between d0 and d1. Same pattern as
-        # cluster-ods.project.enabled: false in application-d0.yaml, which
-        # fixed the equivalent Namespace/redhat-ods-operator conflict. See
-        # templates/cluster-monitoring-config.yaml.
         prometheusK8s: null
+        userWorkloadMonitoring:
+            enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator
