@@ -393,6 +393,13 @@
         username: ragadv
         password: "{{ zuno_admin_rag_adv_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      rag-sxa/postgresql-app:
+        # knowledge.sxa's rag-sxa database (ADR-0217/WP-067) - distinct from
+        # rag-sxa-legacy above (knowledge.sxa-legacy). See
+        # rag-sales/postgresql-app above for the shared rationale.
+        username: ragsxa
+        password: "{{ zuno_admin_rag_sxa_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       rag-project/postgresql-app:
         # knowledge.project's rag-project database (ADR-0209/WP-28) - see
         # rag-sales/postgresql-app above. Unlike the other four domain
@@ -927,6 +934,24 @@
   when: >-
     zuno_rag_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
     and zuno_rag_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+# fetch-sxa's own dedicated corpus bucket (ADR-0217/WP-067 - distinct from
+# rag/s3 above, which holds unrelated corpus content, and from sxa/s3 below,
+# which is the ADR-0216/WP-065 MariaDB-import bucket). Same camelCase
+# property convention as rag/s3 above.
+- name: "vault | seed the SXA corpus S3 credentials from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/sxa-corpus/s3
+      accessKeyId={{ zuno_sxa_corpus_s3_access_key_id | quote }}
+      secretAccessKey={{ zuno_sxa_corpus_s3_secret_access_key | quote }}"
+  when: >-
+    zuno_sxa_corpus_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_sxa_corpus_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 - name: "vault | check whether operator-supplied secrets already exist"

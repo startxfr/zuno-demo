@@ -6,8 +6,12 @@
   weekly schedule, `rag-sxa` database wiring across postgresql/rag-ingestion/
   rag-service charts, agent access grants for Comage/Advantage/Finage, a
   declared-but-inert grant for Cognos, and fixture-driven tests - all passing.
-  Part B (dedicated bucket, real export upload, live verification) is still
-  open.)
+  Part B in progress (2026-08-21): dedicated bucket created and real export
+  uploaded, chart values filled in with the real bucket/keys, Vault-seeding
+  config ready - still open: run `make d0 install vault`, create the
+  `rag-sxa` database (`make d1 install postgresql`), flip
+  `domains.sxa.enabled: true` and sync `rag-ingestion`/`rag-service`, run
+  the pipeline, and live-verify.)
 - **ADRs:** ADR-0217 (To be implemented -> Partially implemented); related to
   but does not modify ADR-0216/WP-065
 - **Depends on:** none (independent of WP-065/WP-23's own open operator work)
@@ -137,16 +141,32 @@ alongside, without editing that matrix's existing sxa-legacy row).
 
 ### Part B - operator steps (not executable by the model)
 
-1. Create the dedicated SXA corpus S3 bucket; supply its name/region and
-   provision Vault credentials at `sxa-corpus/s3` (the path this WP's repo
-   work references).
-2. Upload the approved weekly `sxa.schema.sql` + `sxa.data.sql` export; set
-   `sxaCorpus.schemaS3Key`/`dataS3Key`/`snapshotId` to the real values.
+1. ~~Create the dedicated SXA corpus S3 bucket~~ DONE 2026-08-21:
+   `zuno-demo-sxa-corpus` (eu-west-2). `sxa.schema.sql`/`sxa.data.sql` moved
+   there from the shared `zuno-demo-rag-corpus` bucket (size-verified,
+   originals deleted). A dedicated, bucket-scoped IAM user
+   (`zuno-sxa-corpus-s3`, policy limited to `GetObject`/`PutObject`/
+   `DeleteObject`/`ListBucket` on this one bucket) was created rather than
+   reusing broad admin credentials. `gitops/charts/rag-ingestion/values.yaml`'s
+   `domains.sxa.sxaCorpus` block now has the real bucket/region/keys filled
+   in (`schemaS3Key`/`dataS3Key` point at the two uploaded files).
+   `ansible/confidential.yml` (gitignored) and
+   `ansible/confidential.example.yml`/`ansible/roles/vault/tasks/
+   install.yml` (committed) have the matching `zuno_sxa_corpus_s3_*`
+   variables and `zuno/sxa-corpus/s3` Vault-seed task ready.
+   **Still open**: run `make d0 install vault` to actually seed the Vault
+   path live (config is ready, not yet applied to the cluster).
+2. ~~Upload the approved weekly export; set the real S3 keys~~ DONE
+   2026-08-21, folded into step 1 above.
 3. Seed the new `rag-sxa` Postgres database's Vault-sourced credentials
-   (`rag-sxa/postgresql-app`), sync `gitops/charts/postgresql` (creates the
-   database + runs the one-time `CREATE EXTENSION vector`/`GRANT`), then
-   flip `domains.sxa.enabled: true` in both the `rag-ingestion` and
-   `rag-service` charts and sync both.
+   (`rag-sxa/postgresql-app` - the self-generated entry added to
+   `ansible/roles/vault/tasks/install.yml`'s credential loop is ready, not
+   yet applied - same `make d0 install vault` run as step 1 covers both),
+   sync `gitops/charts/postgresql` (`make d1 install postgresql` - creates
+   the database + runs the one-time `CREATE EXTENSION vector`/`GRANT`),
+   then flip `domains.sxa.enabled: true` in both the `rag-ingestion` and
+   `rag-service` charts and sync both (`make d1 install rag-ingestion
+   rag-service`).
 4. Extend `ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml`'s
    domain loop (currently `tech`-only, per its own comment: "extend this
    loop to cover enabled domains when WP-22 flips one on") to also

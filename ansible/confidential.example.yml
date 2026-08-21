@@ -107,6 +107,14 @@ zuno_gitlab_token: "xxxxxx"
 zuno_rag_s3_access_key_id: "xxxxxx"
 zuno_rag_s3_secret_access_key: "xxxxxx"
 
+# --- SXA corpus S3 bucket (ADR-0217/WP-067: fetch-sxa's dedicated bucket for
+# the already-anonymized weekly schema.sql/data.sql export - bucket/region
+# are chart config, not secret: see gitops/charts/rag-ingestion/values.yaml's
+# domains.sxa.sxaCorpus.s3 block. Use a dedicated, bucket-scoped IAM user,
+# never the account's admin credentials.) --------------------------------
+zuno_sxa_corpus_s3_access_key_id: "xxxxxx"
+zuno_sxa_corpus_s3_secret_access_key: "xxxxxx"
+
 # --- Model weights storage (gitops/charts/models) ---------------------------
 # Not secrets - listed here because this file is where every ansible-driven
 # feature flag/S3 knob lives; all three have defaults in

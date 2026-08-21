@@ -1585,18 +1585,19 @@ domains:
       # dedicated bucket below and an optional explicit snapshot id
       # (falls back to a checksum-derived one, same as sxaDump.snapshotId
       # above).
-      schemaS3Key: ""
-      dataS3Key: ""
+      schemaS3Key: "sxa.schema.sql"
+      dataS3Key: "sxa.data.sql"
       snapshotId: ""
       # A dedicated bucket, separate from s3.bucket above (shared corpus
       # content) and from sxa-legacy's own dedicated sxaDump bucket -
       # this source has its own provenance/trust model (ADR-0217) and
-      # should not share infrastructure with either.
+      # should not share infrastructure with either. Created 2026-08-21,
+      # IAM access scoped to only this bucket (zuno-sxa-corpus-s3 user).
       s3:
         type: aws
         endpoint: ""
-        bucket: ""              # OPERATOR-SUPPLIED - see ADR-0217
-        region: ""               # OPERATOR-SUPPLIED - see ADR-0217
+        bucket: "zuno-demo-sxa-corpus"
+        region: "eu-west-2"
         pathStyle: false
         secretName: rag-sxa-corpus-s3
         externalSecret:
