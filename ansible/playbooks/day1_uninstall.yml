@@ -1,17 +1,16 @@
 ---
-# Day 1 uninstall (`make day1 uninstall`). Reverses day1_install.yml's order.
-# `namespaces` runs last, removing its Day 1 half (ResourceQuota/NetworkPolicy
-# overlay - see ansible/roles/namespaces/README.md) only after every other
-# Day 1 workload it may constrain is already gone. Content-ingestion
-# components moved to Day 2 - see day2_uninstall.yml.
+# Day 1 uninstall (`make day1 uninstall`). Reverses day1_install.yml's
+# order. `namespaces`, `llm`, `models`, and content-ingestion moved to
+# Day 2 - see day2_uninstall.yml. `aiagent_operator` runs first here
+# (last in install) - reverse of operator-before-CR: nothing left in
+# Day 1 depends on it once uninstall starts.
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day1_components:
-      - models
-      - llm
+      - aiagent_operator
       - openshift_ai
       - kueue
       - jobset
@@ -27,7 +26,6 @@
       - service_mesh
       - observability
       - redis
-      - namespaces
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -41,7 +39,7 @@
     - name: Uninstall Day 1 components
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: "{{ 'uninstall_d1' if item == 'namespaces' else 'uninstall' }}"
+        tasks_from: uninstall
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

@@ -36,7 +36,7 @@ Each agent has a dedicated frontend and BFF deployment while consuming shared pl
   across two group dimensions — agent entitlement and business role
   (ADR-0040/0041).
 - **Comage, Advantage, Finage, Arkos** are catalog-only: OKF definitions
-  (structurally validated by `make day1|d1 check agents`), reserved
+  (structurally validated by `make day2|d2 check agents`), reserved
   namespaces, access-gated portal tiles — no running workflow yet.
   Business-functional builds move to v1; see
   `platform/architecture/agent-platform-separation.md`.
@@ -64,14 +64,25 @@ ansible-galaxy collection install -r ansible/requirements.yml
 # Day 0 (ADR-0056): cluster prerequisites - operators, CRDs, namespaces,
 # secrets. "d0" is a short alias for "day0".
 make d0 check
-make d0 check keycloak
+make d0 check namespaces
 make d0 install
-make d0 all openshift-ai   # check + install, one component
+make d0 all argocd   # check + install, one component
 
-# Day 1: build the platform's own component images, then run the platform.
-make d1 build
+# Day 1 (ADR-0516): the AI-platform-operator stack - mesh, Keycloak,
+# databases, Kueue, OpenShift AI, etc.
+make d1 check
+make d1 check keycloak
 make d1 install
-make d1 check              # ADR-0053 acceptance/security gate for `agents`
+make d1 all openshift-ai   # check + install, one component
+
+# Day 2 (ADR-0516): AI infrastructure (llm, models) and content
+# ingestion - build the platform's own component images, then run them.
+make d2 build
+make d2 install
+make d2 check              # ADR-0053 acceptance/security gate for `agents`
+
+# Day 3 (ADR-0057/0058): agent availability test and stresstest.
+make d3 test
 ```
 
 See [docs/README.md](docs/README.md).

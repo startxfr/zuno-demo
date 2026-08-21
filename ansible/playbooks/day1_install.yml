@@ -1,14 +1,13 @@
 ---
-# Day 1 install (`make day1 install`) - AI infrastructure (llm, models, the
-# AI-platform-operator stack: mesh, Keycloak, databases, Kueue, OpenShift AI,
-# etc.) plus API platform components. `namespaces` runs first so the
-# ResourceQuota/NetworkPolicy overlay (its Day 1 half - see
-# ansible/roles/namespaces/README.md) is in place before any other Day 1
-# workload rolls out. The 15 components arriving here from Day 0 run next,
-# before `llm`/`models`, since `openshift_ai`/`kueue` back `models`' KServe/
-# RHOAI serving path and `keycloak` provides auth broadly across this tier.
-# Content-ingestion components (sql_schema/rag/rag_ingestion/mcp/agents/
-# mlops) moved to Day 2 - see day2_install.yml.
+# Day 1 install (`make day1 install`) - the AI-platform-operator stack
+# only (mesh, Keycloak, databases, Kueue, OpenShift AI, etc.) plus
+# aiagent_operator. `openshift_ai`/`kueue` back `models`' KServe/RHOAI
+# serving path and `keycloak` provides auth broadly across this tier, so
+# both precede `aiagent_operator`. `aiagent_operator` runs last -
+# standard operator-before-CR ordering: it must be running before Day 2's
+# `agents` component creates any `AIAgent` CRs. `namespaces`, `llm`,
+# `models`, and content-ingestion (sql_schema/rag/rag_ingestion/mcp/
+# agents/mlops) all moved to Day 2 - see day2_install.yml.
 - name: "Day 1: install components"
   hosts: localhost
   gather_facts: false
@@ -20,7 +19,6 @@
     # silently trigger a rebuild.
     day1_verb: install
     day1_components:
-      - namespaces
       - redis
       - observability
       - service_mesh
@@ -36,8 +34,7 @@
       - jobset
       - kueue
       - openshift_ai
-      - llm
-      - models
+      - aiagent_operator
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -51,7 +48,7 @@
     - name: Install Day 1 components
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: "{{ 'install_d1' if item == 'namespaces' else 'install' }}"
+        tasks_from: install
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"

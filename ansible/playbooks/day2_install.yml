@@ -1,0 +1,48 @@
+---
+# Day 2 install (`make day2 install`) - namespace policy overlay, AI
+# infrastructure (llm, models), and content-ingestion (sql_schema, rag,
+# rag_ingestion, mcp, agents, mlops). `namespaces` runs first so the
+# ResourceQuota/NetworkPolicy overlay (its Day 2 half - see
+# ansible/roles/namespaces/README.md; internal task/Application naming
+# stays `_d1`/`-d1`, an implementation detail, not renamed with the
+# macro tier) is in place before any other Day 2 workload rolls out.
+# `llm`/`models` run next, before content-ingestion, since rag/agents
+# need models available. Moved here from Day 1 (ADR-0516) - Day 1 is now
+# the AI-platform-operator stack only.
+- name: "Day 2: install components"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    # Read by ansible/tasks/apply_openshift_build.yml (reached indirectly
+    # by a handful of install.yml roles ensuring their own image exists)
+    # to keep today's re-verify-only behavior - installs must never
+    # silently trigger a rebuild.
+    day2_verb: install
+    day2_components:
+      - namespaces
+      - llm
+      - models
+      - sql_schema
+      - rag
+      - rag_ingestion
+      - mcp
+      - agents
+      - mlops
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve requested Day 2 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day2_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Install Day 2 components
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: "{{ 'install_d1' if item == 'namespaces' else 'install' }}"
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

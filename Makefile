@@ -5,45 +5,55 @@ ANSIBLE_PLAYBOOK ?= ansible-playbook
 INVENTORY ?= ansible/inventories/demo/hosts.yml
 EXTRA_VARS ?=
 
-# ADR-0056: Day 0 (cluster prerequisites) / Day 1 (build + run the
-# platform) sequencing, replacing the former precheck/prepare/configure/
-# install/check interface outright.
-DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets keycloak openshift-oauth redis postgresql mariadb service-mesh tempo mesh-monitoring kiali grafana smtp machines nfd nvidia-gpu observability connectivity-link lws custom-metrics-autoscaler jobset kueue openshift-ai
+# ADR-0056/ADR-0516: Day 0 (cluster prerequisites) / Day 1 (AI-platform-
+# operator stack) / Day 2 (AI infrastructure + content ingestion) / Day 3
+# (agent test/stresstest operations) sequencing.
+DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets openshift-oauth smtp machines nfd nvidia-gpu custom-metrics-autoscaler
 DAY0_VERBS := check install uninstall reconcile all reinstall
 
-# Day 1 has two different valid component sets depending on the verb:
-# "build" only knows how to build the 5 named image groups (mcp, rag,
-# rag-ingestion, agent, ai-gateway - see
-# ansible/roles/{mcp,rag,rag_ingestion,agent,ai_gateway}_build);
-# "check"/"install" operate on the 9 deployable components
-# (models/sql-schema/mlops go beyond your original "llm, rag, mcp,
-# agents" list deliberately - see ansible/playbooks/day1_check.yml's
-# header comment for why dropping them would be a functional regression,
-# not just a naming choice). "namespaces" is also here despite being a
-# Day 0 component everywhere else in this Makefile - only its
-# quota/network-policy overlay is Day 1, see
-# ansible/roles/namespaces/README.md.
-DAY1_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp aiagent-operator agents mlops
-DAY1_BUILD_COMPONENTS := mcp rag rag-ingestion agent ai-gateway mlops aiagent-operator
+# Day 1 is the AI-platform-operator stack only (mesh, Keycloak, databases,
+# Kueue, OpenShift AI, etc.) plus aiagent-operator, which runs last -
+# standard operator-before-CR ordering, since Day 2's "agents" component
+# creates the AIAgent CRs it reconciles. No build/run split beyond
+# ai-gateway (the only image built here - see
+# ansible/roles/ai_gateway_build).
+DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak connectivity-link lws jobset kueue openshift-ai aiagent-operator
+DAY1_BUILD_COMPONENTS := ai-gateway
 DAY1_VERBS := check install build uninstall all reinstall
 
-# ADR-0057/ADR-0058: Day 2 (agent test / stresstest operations), the third
-# stage after Day 0 (cluster prerequisites) and Day 1 (build + run the
-# platform). "test" only ever proves availability (agent frontends'
-# /healthz, shared platform services' /healthz+/readyz); "stresstest" runs
-# every existing test layer per agent (contract/scenarios/security/gate/
-# stress_test) plus an optional bulk-interaction load pass. Component
-# granularity matches Day 1's "agents" (every agent bundle, collectively)
-# plus a new "platform" component for the shared services - which agents/
-# services actually exist is resolved dynamically from
-# agents/*/agent.okf.md at Ansible run time, never a list here.
-DAY2_COMPONENTS := agents platform
-DAY2_VERBS := test stresstest
+# Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
+# content ingestion (sql-schema, rag, rag-ingestion, mcp, agents, mlops) -
+# moved here from Day 1 (ADR-0516). "namespaces" is here despite being a
+# Day 0 component everywhere else in this Makefile - only its
+# quota/network-policy overlay is Day 2 now, see
+# ansible/roles/namespaces/README.md (internal task/Application naming
+# stays "_d1"/"-d1", an implementation detail, not renamed with the macro
+# tier). "build" only knows how to build the 5 named image groups (mcp,
+# rag, rag-ingestion, agent, mlops - see
+# ansible/roles/{mcp,rag,rag_ingestion,agent,mlops}_build); "check"/
+# "install" operate on the 9 deployable components.
+DAY2_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp agents mlops
+DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
+DAY2_VERBS := check install build uninstall all reinstall
+
+# ADR-0057/ADR-0058: Day 3 (agent test / stresstest operations), the
+# fourth stage after Day 0 (cluster prerequisites), Day 1 (AI-platform-
+# operator stack), and Day 2 (AI infrastructure + content ingestion).
+# "test" only ever proves availability (agent frontends' /healthz, shared
+# platform services' /healthz+/readyz); "stresstest" runs every existing
+# test layer per agent (contract/scenarios/security/gate/stress_test)
+# plus an optional bulk-interaction load pass. Component granularity
+# matches Day 2's "agents" (every agent bundle, collectively) plus a new
+# "platform" component for the shared services - which agents/services
+# actually exist is resolved dynamically from agents/*/agent.okf.md at
+# Ansible run time, never a list here.
+DAY3_COMPONENTS := agents platform
+DAY3_VERBS := test stresstest
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 new-mcp-server $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -63,23 +73,32 @@ help:
 	  '  make day0|d0 all [component]        check + install, in order' \
 	  '  make day0|d0 reinstall [component]  Uninstall then install one/all Day 0 prerequisites' \
 	  '' \
-	  '  make day1|d1 check [component]      Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
+	  '  make day1|d1 check [component]      Check one/all Day 1 components'"'"' install state' \
 	  '  make day1|d1 build [component]      Build one/all Day 1 component images' \
 	  '  make day1|d1 install [component]    Install/deploy one/all Day 1 components (no component: builds first)' \
 	  '  make day1|d1 uninstall [component]  Uninstall one/all Day 1 components (reverse order)' \
 	  '  make day1|d1 all [component]        check + build + install, whichever apply to the component' \
 	  '  make day1|d1 reinstall [component]  Uninstall then install one/all Day 1 components' \
 	  '' \
-	  '  make day2|d2 test [component]        Check availability only (ADR-0057)' \
-	  '  make day2|d2 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
+	  '  make day2|d2 check [component]      Check one/all Day 2 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
+	  '  make day2|d2 build [component]      Build one/all Day 2 component images' \
+	  '  make day2|d2 install [component]    Install/deploy one/all Day 2 components (no component: builds first)' \
+	  '  make day2|d2 uninstall [component]  Uninstall one/all Day 2 components (reverse order)' \
+	  '  make day2|d2 all [component]        check + build + install, whichever apply to the component' \
+	  '  make day2|d2 reinstall [component]  Uninstall then install one/all Day 2 components' \
+	  '' \
+	  '  make day3|d3 test [component]        Check availability only (ADR-0057)' \
+	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
 	  'Day 1 components (check/install): $(DAY1_RUN_COMPONENTS)' \
 	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)' \
-	  'Day 2 components: $(DAY2_COMPONENTS)' \
-	  'Day 2 report format: text (default) | json | csv - set via REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"'
+	  'Day 2 components (check/install): $(DAY2_RUN_COMPONENTS)' \
+	  'Day 2 components (build):         $(DAY2_BUILD_COMPONENTS)' \
+	  'Day 3 components: $(DAY3_COMPONENTS)' \
+	  'Day 3 report format: text (default) | json | csv - set via REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"'
 
 # ADR-0119: scaffold a new MCP server from the confluence-shaped template
 # instead of hand-copying an existing server directory-by-directory.
@@ -141,28 +160,19 @@ day0: $(if $(DAY_VERB),credentials-check)
 d0: $(if $(DAY_VERB),credentials-check)
 	$(DAY0_RECIPE)
 
-# day1/d1 share this exact recipe. "all" is handled specially: build
-# components (mcp, rag, agent, ai-gateway) and run components (mcp, models, sql-schema,
-# rag, mcp, agents, mlops) are different, overlapping-but-not-identical
-# sets (most visibly: "agent" builds, "agents" runs - singular vs plural,
-# a real name, not a typo), so `make d1 all <component>` runs whichever of
-# check/build/install actually apply to that specific component instead
-# of assuming one shared list. `install` with no component (component
-# defaults to "all") also runs build first, same as `all` does - a named
-# single-component install (`make d1 install rag`) does not, build/install
-# stay separate verbs there (`make d1 install rag` alone can deploy a
-# Deployment whose image was never built, a permanent ImagePullBackOff -
-# "install everything" must never do that).
+# day1/d1 share this exact recipe. Structurally generic over its
+# component-list variables - see day2's identical recipe below, which
+# this one is the template for.
 define DAY1_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
 if [[ -z "$$verb" ]]; then \
   printf '%s\n' \
-    'Zuno Demo - Day 1 (build + run the platform)' \
+    'Zuno Demo - Day 1 (AI-platform-operator stack)' \
     '' \
     'Usage: make day1|d1 <verb> [component]' \
     '' \
-    '  check       Check one/all Day 1 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
+    '  check       Check one/all Day 1 components'"'"' install state' \
     '  build       Build one/all Day 1 component images' \
     '  install     Install/deploy one/all Day 1 components (no component: builds first)' \
     '  uninstall   Uninstall one/all Day 1 components (reverse order)' \
@@ -175,7 +185,7 @@ if [[ -z "$$verb" ]]; then \
     'Components (build; optional, default: all):' \
     '  $(DAY1_BUILD_COMPONENTS)' \
     '' \
-    'Example: make d1 install rag'; \
+    'Example: make d1 install keycloak'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
@@ -220,45 +230,116 @@ day1: $(if $(DAY_VERB),credentials-check)
 d1: $(if $(DAY_VERB),credentials-check)
 	$(DAY1_RECIPE)
 
-# day2/d2 share this exact recipe. Only two components (agents, platform)
-# and two verbs (test, stresstest) - no build/run split like Day 1, since
-# neither verb ever changes cluster state, only observes/exercises it.
-# report_format defaults to "text" (ADR-0057 decision 4: raw table always
-# printed; json/csv are additional artifacts, selected via REPORT_FORMAT=
-# or EXTRA_VARS="-e report_format=..."). "stresstest" additionally reads
-# BULK (ADR-0058 decision 3): unset in an interactive shell prompts for a
-# bulk-interaction count with a default of 10; unset in a non-interactive
-# shell (stdin not a TTY, e.g. CI) silently defaults to 10 without
-# prompting, so this recipe never blocks a non-interactive caller. BULK=0
-# runs the functional layers only, no bulk-interaction load pass.
+# day2/d2 share this exact recipe - structurally identical to Day 1's
+# (ADR-0516: Day 2 is now a full install tier, not the old test tier;
+# see day3 below for where the old day2 test/stresstest moved).
 define DAY2_RECIPE
 @verb="$(DAY_VERB)"; \
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
 if [[ -z "$$verb" ]]; then \
   printf '%s\n' \
-    'Zuno Demo - Day 2 (agent test / stresstest operations)' \
+    'Zuno Demo - Day 2 (AI infrastructure + content ingestion)' \
     '' \
     'Usage: make day2|d2 <verb> [component]' \
+    '' \
+    '  check       Check one/all Day 2 components'"'"' install state (agents runs the ADR-0053 acceptance gate)' \
+    '  build       Build one/all Day 2 component images' \
+    '  install     Install/deploy one/all Day 2 components (no component: builds first)' \
+    '  uninstall   Uninstall one/all Day 2 components (reverse order)' \
+    '  all         check + build + install, whichever apply to the component' \
+    '  reinstall   Uninstall then install one/all Day 2 components' \
+    '' \
+    'Components (check/install/uninstall/all; optional, default: all):' \
+    '  $(DAY2_RUN_COMPONENTS)' \
+    '' \
+    'Components (build; optional, default: all):' \
+    '  $(DAY2_BUILD_COMPONENTS)' \
+    '' \
+    'Example: make d2 install rag'; \
+  exit 0; \
+fi; \
+if [[ -z "$$component" ]]; then component=all; fi; \
+case " $(DAY2_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day2 verb: '$$verb' (expected one of: $(DAY2_VERBS))" >&2; exit 2;; esac; \
+run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_build() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_build.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_install() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_install.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+case "$$verb" in \
+  check) \
+    case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 check component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_check ;; \
+  build) \
+    case " $(DAY2_BUILD_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 build component: '$$component' (expected one of: $(DAY2_BUILD_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_build ;; \
+  install) \
+    case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 install component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    if [[ "$$component" == "all" ]]; then run_build || exit $$?; fi; \
+    run_install ;; \
+  uninstall) \
+    case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 uninstall component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_uninstall ;; \
+  all) \
+    is_run=0; is_build=0; \
+    case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) is_run=1;; esac; \
+    case " $(DAY2_BUILD_COMPONENTS) all " in *" $$component "*) is_build=1;; esac; \
+    if [[ $$is_run -eq 0 && $$is_build -eq 0 ]]; then \
+      echo "Unsupported day2 component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) or all)" >&2; exit 2; \
+    fi; \
+    if [[ $$is_run -eq 1 ]]; then run_check || exit $$?; fi; \
+    if [[ $$is_build -eq 1 ]]; then run_build || exit $$?; fi; \
+    if [[ $$is_run -eq 1 ]]; then run_install || exit $$?; fi ;; \
+  reinstall) \
+    case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 reinstall component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_uninstall && run_install ;; \
+esac
+endef
+
+day2: $(if $(DAY_VERB),credentials-check)
+	$(DAY2_RECIPE)
+
+d2: $(if $(DAY_VERB),credentials-check)
+	$(DAY2_RECIPE)
+
+# day3/d3 share this exact recipe. Only two components (agents, platform)
+# and two verbs (test, stresstest) - no build/run split like Day 1/Day 2,
+# since neither verb ever changes cluster state, only observes/exercises
+# it. report_format defaults to "text" (ADR-0057 decision 4: raw table
+# always printed; json/csv are additional artifacts, selected via
+# REPORT_FORMAT= or EXTRA_VARS="-e report_format=..."). "stresstest"
+# additionally reads BULK (ADR-0058 decision 3): unset in an interactive
+# shell prompts for a bulk-interaction count with a default of 10; unset
+# in a non-interactive shell (stdin not a TTY, e.g. CI) silently defaults
+# to 10 without prompting, so this recipe never blocks a non-interactive
+# caller. BULK=0 runs the functional layers only, no bulk-interaction
+# load pass.
+define DAY3_RECIPE
+@verb="$(DAY_VERB)"; \
+component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
+if [[ -z "$$verb" ]]; then \
+  printf '%s\n' \
+    'Zuno Demo - Day 3 (agent test / stresstest operations)' \
+    '' \
+    'Usage: make day3|d3 <verb> [component]' \
     '' \
     '  test         Check availability only (agent frontends'"'"' /healthz, shared platform services'"'"' /healthz+/readyz)' \
     '  stresstest   Run every existing test layer per agent, plus an optional bulk-interaction load pass (ADR-0058)' \
     '' \
     'Components (optional, default: all):' \
-    '  $(DAY2_COMPONENTS)' \
+    '  $(DAY3_COMPONENTS)' \
     '' \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     '' \
-    'Example: make d2 test agents' \
-    'Example: make d2 stresstest BULK=25'; \
+    'Example: make d3 test agents' \
+    'Example: make d3 stresstest BULK=25'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
-case " $(DAY2_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day2 verb: '$$verb' (expected one of: $(DAY2_VERBS))" >&2; exit 2;; esac; \
-case " $(DAY2_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 component: '$$component' (expected one of: $(DAY2_COMPONENTS) or all)" >&2; exit 2;; esac; \
+case " $(DAY3_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day3 verb: '$$verb' (expected one of: $(DAY3_VERBS))" >&2; exit 2;; esac; \
+case " $(DAY3_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 component: '$$component' (expected one of: $(DAY3_COMPONENTS) or all)" >&2; exit 2;; esac; \
 report_format="$${REPORT_FORMAT:-text}"; \
 case "$$verb" in \
-  test) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+  test) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
   stresstest) \
     bulk="$${BULK:-}"; \
     if [[ -z "$$bulk" ]]; then \
@@ -269,19 +350,20 @@ case "$$verb" in \
         bulk=10; \
       fi; \
     fi; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" $(EXTRA_VARS) ;; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" $(EXTRA_VARS) ;; \
 esac
 endef
 
-day2: $(if $(DAY_VERB),credentials-check)
-	$(DAY2_RECIPE)
+day3: $(if $(DAY_VERB),credentials-check)
+	$(DAY3_RECIPE)
 
-d2: $(if $(DAY_VERB),credentials-check)
-	$(DAY2_RECIPE)
+d3: $(if $(DAY_VERB),credentials-check)
+	$(DAY3_RECIPE)
 
 # Verb/component tokens are intentionally no-op Make targets. The day0/d0/
-# day1/d1/day2/d2 recipes read MAKECMDGOALS words 2 and 3 directly, so e.g.
-# `make d0 check postgresql` needs "check" and "postgresql" to resolve to
-# *something* as Make goals without erroring as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_COMPONENTS)):
+# day1/d1/day2/d2/day3/d3 recipes read MAKECMDGOALS words 2 and 3
+# directly, so e.g. `make d0 check postgresql` needs "check" and
+# "postgresql" to resolve to *something* as Make goals without erroring
+# as unknown targets.
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS)):
 	@:

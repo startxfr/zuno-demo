@@ -1,0 +1,37 @@
+---
+# Day 2 build (`make day2 build`). Builds content-ingestion component
+# images via OpenShift BuildConfig/ImageStream. Moved here from Day 1
+# (ADR-0516) - Day 1's build list is now just ai_gateway_build.
+- name: "Day 2: build component images"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    # Read by ansible/tasks/apply_openshift_build.yml to force a genuinely
+    # fresh Build here - an explicit `make d2 build X` always means
+    # "build," unlike the implicit "ensure an image exists" dependency
+    # path day2_install.yml's roles fall back to.
+    day2_verb: build
+    day2_build_components:
+      - mcp_build
+      - rag_build
+      - rag_ingestion_build
+      - agent_build
+      - mlops_build
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve requested Day 2 build component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day2_build_components if target_component | default('all') == 'all'
+             else [(target_component | replace('-', '_')) + '_build'] }}
+
+    - name: Build Day 2 component images
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: build
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"
