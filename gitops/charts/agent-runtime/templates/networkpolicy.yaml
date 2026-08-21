@@ -1,7 +1,13 @@
-# Precise ingress allow-list, not a namespace-wide baseline: only Tekos's
-# BFF and the acceptance-gate test Job may call this service. Tekos's BFF
-# runs in this same zuno-ai-run namespace (gitops/charts/tekos), so its
-# `from` peer below is a podSelector with no namespaceSelector.
+# Precise ingress allow-list, not a namespace-wide baseline: any agent's
+# BFF and the acceptance-gate test Job may call this service.
+# agent-runtime is the shared runtime every agent's chat turns route
+# through (app/registry.py loads every agents/<name>/ bundle, GraphFactory
+# builds whichever graph_shape the caller's task needs) - the `from` peer
+# below matches on app.kubernetes.io/component: bff alone, deliberately
+# not scoped to a single zuno.io/agent value, so onboarding a new agent's
+# BFF (gitops/charts/<name>) never requires touching this policy. Every
+# agent's BFF runs in this same zuno-ai-run namespace, so the peer is a
+# podSelector with no namespaceSelector.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -22,7 +28,6 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/component: bff
-              zuno.io/agent: tekos
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: acceptance-gate
