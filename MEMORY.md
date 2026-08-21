@@ -517,8 +517,20 @@ not here.
   is new, shared, and has its own local test suite
   (`platform/testing/tests/test_day2_report.py`, no cluster needed).
   `make d2 stresstest` shipped as a dispatch-only stub in this WP,
-  filled in by WP-063. Repo work merged; live cluster confirmation
-  (`make d2 test` against a real cluster) still pending.
+  filled in by WP-063. First live `make d2 test` run (2026-08-21) found
+  two real bugs, both fixed same-day: (1) `target_component=all` aborted
+  the whole play the instant the agents check hit a failure, so the
+  platform check never ran - fixed with a shared
+  `ansible/tasks/day2_render_and_fail.yml` step (report everything, decide
+  once, matching `make d0 check`'s own `record_state.yml` precedent) both
+  `test.yml` and `check.yml` now call; (2) the target lists themselves
+  were wrong - agent discovery checked `soursage`/`cognos` (no
+  deployment at all, ADR-0349 §6) and the platform Job probed all four
+  MCP servers directly even though their NetworkPolicies only allow
+  `mcp-gateway`'s pod label (ADR-0037) - both fixed by narrowing
+  discovery (`gitops/charts/<agent>/` intersection) and the target list.
+  Repo work merged; a second live cluster confirmation run is still
+  pending.
 - **ADR-0058 (WP-063, 2026-08-21)**: `make day2|d2 stresstest` runs
   every existing test layer per agent, generalized off the ADR-0053
   acceptance-gate Job (Tekos-only until now) rather than hardcoded to

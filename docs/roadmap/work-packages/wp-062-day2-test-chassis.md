@@ -17,15 +17,37 @@
   `platform` Job's shared-service URL list was confirmed against each
   service's actual `gitops/charts/*/templates/service.yaml` (Service
   name/port/namespace) rather than assumed from `SERVICE_HEALTH_URLS`
-  alone, and includes `ai-gateway` (not present in that Python map) plus
-  the four MCP servers that actually have a deployed chart today
-  (confluence, git-forge, sales-db, salesforce - not the two
-  not-yet-deployed ones, google-workspace/lucidchart).
+  alone, and includes `ai-gateway` (not present in that Python map).
   `platform/testing/day2_report.py` also grew a small `--format`/stdin
   CLI (beyond this brief's library-only sketch) so Ansible/Jinja-built
   results can be rendered without duplicating renderer logic in YAML.
-  Live cluster confirmation (`make d2 test` against a real cluster) is
-  the remaining operator step.
+
+  **First live-cluster run (2026-08-21)** found and fixed two
+  false-positive sources, plus a real bug (both documented as findings
+  from this WP's own "Operator / human follow-up" step, not a change of
+  scope): (1) the agents component originally checked every discovered
+  `agents/*/agent.okf.md` bundle, including `soursage`/`cognos` -
+  identity-footprint-only per ADR-0349 §6, no chart/deployment at all -
+  which always 503'd; discovery now intersects with
+  `gitops/charts/<agent>/` existing (same pattern
+  `ansible/roles/day2/tasks/stresstest_job.yml` already uses), excluding
+  them today and auto-including either the moment a real chart lands.
+  (2) The platform component originally also probed the four MCP servers
+  (confluence, git-forge, sales-db, salesforce) directly; live-confirmed
+  every one of their `NetworkPolicy` resources accepts ingress only from
+  `app.kubernetes.io/name: mcp-gateway` (ADR-0037) - this Job's
+  `acceptance-gate` identity was never going to reach any of them, by
+  design, so they were dropped from the target list entirely (their real
+  reachability is proven the authorized way, through
+  `make d2 stresstest`'s scenario checks, instead). (3) The early-abort
+  bug in `ansible/roles/day2/tasks/test.yml` (an agents-only fail task
+  aborted the play before the platform check ever ran) was fixed
+  separately by introducing `ansible/tasks/day2_render_and_fail.yml`, a
+  shared report-then-decide-once step both this command and
+  `ansible/roles/agents/tasks/check.yml` now use.
+
+  A second live-cluster confirmation run after these fixes is the
+  remaining operator step.
 - **ADRs:** ADR-0057
 - **Depends on:** WP-31 (agent-parameterized `run_scenarios.py`, the
   precedent this generalizes further), WP-43 (agent maturity model / OKF

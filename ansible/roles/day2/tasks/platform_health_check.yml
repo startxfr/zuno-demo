@@ -1,26 +1,41 @@
 ---
 # ADR-0057 decision 5 ("platform" component): agent-runtime, ai-gateway,
-# mcp-gateway and rag-service (plus the deployed MCP servers - confluence,
-# git-forge, sales-db, salesforce; only these five/four have a real
-# gitops/charts/mcp-* Service today, confirmed against each chart's
-# templates/service.yaml rather than the full components/mcp-servers/
-# source-directory list, which also contains not-yet-deployed
-# google-workspace/lucidchart/web-search servers) have no OpenShift
-# Route - only in-cluster Service DNS - so this runs as a lightweight
-# in-cluster Job, modeled on ansible/roles/vault/tasks/install.yml's
-# unseal-configure Job (delete-then-recreate, inline spec, simple
-# succeeded/failed polling) rather than
-# ansible/roles/agents/tasks/run_acceptance_gate.yml's heavier
-# ConfigMap-bundled pattern - this Job needs no bundled Python scripts,
-# just stdlib urllib against a fixed URL list.
+# mcp-gateway and rag-service have no OpenShift Route - only in-cluster
+# Service DNS - so this runs as a lightweight in-cluster Job, modeled on
+# ansible/roles/vault/tasks/install.yml's unseal-configure Job
+# (delete-then-recreate, inline spec, simple succeeded/failed polling)
+# rather than ansible/roles/agents/tasks/run_acceptance_gate.yml's
+# heavier ConfigMap-bundled pattern - this Job needs no bundled Python
+# scripts, just stdlib urllib against a fixed URL list.
+#
+# Deliberately does NOT probe the individual MCP servers (confluence,
+# git-forge, sales-db, salesforce), even though each has a real
+# gitops/charts/mcp-* Service - live-cluster-confirmed 2026-08-21: every
+# one of their NetworkPolicies (gitops/charts/mcp-*/templates/
+# networkpolicy.yaml) accepts ingress ONLY from pods labeled
+# app.kubernetes.io/name: mcp-gateway (ADR-0037's workload-identity
+# boundary; sales-db-mcp's own chart comment: "must accept traffic ONLY
+# from the MCP Gateway, not other same-namespace pods"). This Job's own
+# acceptance-gate identity was never going to reach any of them, by
+# design, regardless of their actual health - always-failing rows with
+# no signal. mcp-gateway itself has no aggregate backend-status endpoint
+# to check them indirectly either (components/mcp-gateway/app/main.py:
+# only its own /healthz+/readyz). Their real reachability is proven a
+# different way, through the properly-authorized path, by `make d2
+# stresstest`'s scenario checks (evaluations/*/run_scenarios.py's
+# chat_triggers_tool-style scenarios route real tool calls through
+# mcp-gateway to these servers).
 #
 # Reuses the acceptance-gate Job's own ServiceAccount name and
 # app.kubernetes.io/name: acceptance-gate pod label rather than a new
-# identity: that label is what the platform services' NetworkPolicies
-# already allow-list (see run_acceptance_gate.yml's own header comment -
-# "explicitly allow-listed in the relevant NetworkPolicies, never a
-# namespace-wide baseline"); a differently-labeled pod would be blocked by
-# those same NetworkPolicies fail-closed (ADR-0037/ADR-0052).
+# identity: that label is what agent-runtime/ai-gateway/mcp-gateway/
+# rag-service's own NetworkPolicies already allow-list (see
+# run_acceptance_gate.yml's own header comment - "explicitly allow-listed
+# in the relevant NetworkPolicies, never a namespace-wide baseline",
+# live-confirmed for these four); a differently-labeled pod would be
+# blocked by those same NetworkPolicies fail-closed (ADR-0037/ADR-0052) -
+# exactly what happens against the four MCP servers above, which
+# allow-list a different label entirely.
 - name: "day2-platform | ensure the acceptance-gate ServiceAccount exists"
   kubernetes.core.k8s:
     state: present
@@ -87,10 +102,10 @@
                         ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/readyz"),
                         ("rag-service", "http://rag-service.zuno-data.svc.cluster.local:8080/healthz"),
                         ("rag-service", "http://rag-service.zuno-data.svc.cluster.local:8080/readyz"),
-                        ("confluence-mcp", "http://confluence-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
-                        ("git-forge-mcp", "http://git-forge-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
-                        ("sales-db-mcp", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
-                        ("salesforce-mcp", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000/healthz"),
+                        # The four MCP servers are deliberately NOT probed
+                        # here - see this file's own header comment for
+                        # why (NetworkPolicy restricts their ingress to
+                        # mcp-gateway's pod label only, ADR-0037).
                     ]
 
                     results = []

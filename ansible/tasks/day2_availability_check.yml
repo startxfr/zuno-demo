@@ -8,6 +8,12 @@
 # Job needed, unlike the "platform" component's shared-service probes -
 # see ansible/roles/day2/tasks/platform_health_check.yml).
 #
+# Not every discovered bundle has a real deployment to check - soursage/
+# cognos (ADR-0349 §6) are identity-footprint-only, no chart at all - so
+# discovery intersects with gitops/charts/<agent>/ existing before
+# checking anything (live-cluster-confirmed 2026-08-21: without this,
+# both always reported a false 503).
+#
 # Shared by ansible/roles/agents/tasks/check.yml (Day 1's existing
 # reachability step, ADR-0053) and ansible/roles/day2/tasks/test.yml (the
 # new, standalone `make d2 test agents` command) - one implementation, two
@@ -24,31 +30,57 @@
     depth: 2
   register: _day2_agent_bundles
 
-- name: "day2-availability | GET each discovered agent frontend's /healthz"
+# Not every agent bundle has a deployed frontend to check: soursage/cognos
+# (ADR-0349 §6) are "identity footprint + coming-soon bundle only, no
+# runtime/chart at all" - their /healthz would never exist, by design, not
+# because anything is broken. Intersecting with gitops/charts/<agent>/
+# existing (same "intersect two find results" pattern
+# ansible/roles/day2/tasks/stresstest_job.yml already uses for its own
+# agent discovery) filters them out today and automatically includes
+# either one the moment a real chart lands for it - no further code
+# change, same auto-coverage principle as the bundle discovery itself.
+- name: "day2-availability | discover gitops/charts/*/ (agents with a real deployment)"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/gitops/charts"
+    file_type: directory
+    recurse: false
+  register: _day2_agent_charts
+
+- name: "day2-availability | resolve the agents that actually have a deployed frontend"
+  ansible.builtin.set_fact:
+    _day2_deployed_agents: >-
+      {{
+        (_day2_agent_bundles.files | map(attribute='path') | map('dirname') | map('basename') | list)
+        | intersect(_day2_agent_charts.files | map(attribute='path') | map('basename') | list)
+        | sort
+      }}
+
+- name: "day2-availability | GET each deployed agent frontend's /healthz"
   ansible.builtin.uri:
-    url: "https://{{ item.path | dirname | basename }}.{{ cluster_base_domain }}/healthz"
+    url: "https://{{ item }}.{{ cluster_base_domain }}/healthz"
     method: GET
     status_code: 200
     validate_certs: false
     timeout: 10
   register: _day2_agent_health
   failed_when: false
-  loop: "{{ _day2_agent_bundles.files }}"
+  loop: "{{ _day2_deployed_agents }}"
   loop_control:
-    label: "{{ item.path | dirname | basename }}"
+    label: "{{ item }}"
 
 # Builds one platform/testing/day2_report.py::Day2Result-shaped dict per
-# agent - "item.item" is the uri task's own looped-over "find" result
-# (Ansible's standard per-iteration registration shape), not a typo.
+# agent - "item.item" is the uri task's own looped-over element (each a
+# plain agent-name string from _day2_deployed_agents, Ansible's standard
+# per-iteration registration shape), not a typo.
 - name: "day2-availability | build the Day2Result list"
   ansible.builtin.set_fact:
     _day2_availability_results: "{{ _day2_availability_results | default([]) + [_day2_row] }}"
   loop: "{{ _day2_agent_health.results }}"
   loop_control:
-    label: "{{ item.item.path | dirname | basename }}"
+    label: "{{ item.item }}"
   vars:
     _day2_row:
-      agent: "{{ item.item.path | dirname | basename }}"
+      agent: "{{ item.item }}"
       layer: availability
       id: healthz
       category: frontend
