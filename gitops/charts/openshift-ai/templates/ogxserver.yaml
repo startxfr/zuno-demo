@@ -113,12 +113,27 @@ spec:
     # was silently blocked. Namespace-wide, not pod-specific, matching the
     # embeddings NetworkPolicy fix earlier this WP (RHOAI's own operator
     # manages zuno-data's pod labels, not this chart).
+    #
+    # CRD note: `oc explain ogxserver.spec.network.policy.ingress` claims
+    # this list is "merged with operator defaults" - live-verified false
+    # (2026-08-21): setting `ingress` here REPLACED the operator's own
+    # same-namespace/ingress-router default rules in the rendered
+    # NetworkPolicy rather than adding to them. The two defaults are
+    # restated explicitly below so this change is additive in practice,
+    # not just in the CRD's documented intent - a fourth real EA2 gap in
+    # this operator, on top of the three the 2026-08-19/21 notes found.
     policy:
       ingress:
         - from:
             - namespaceSelector:
                 matchLabels:
                   kubernetes.io/metadata.name: zuno-data
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: redhat-ods-applications
+            - namespaceSelector:
+                matchLabels:
+                  network.openshift.io/policy-group: ingress
   workload:
     replicas: {{ .Values.ogxServer.replicas }}
     # spec.providers can no longer carry the pgvector password (mutually
