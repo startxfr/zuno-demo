@@ -2146,6 +2146,16 @@ def _list_confluence_space_pages(base_url: str, space: str, auth) -> list:
             web_ui = page.get("_links", {}).get("webui", "")
             page_url = f"{base_url}/wiki{web_ui}"
             pages.append({"labels": labels, "ancestor_titles": ancestor_titles, "page_url": page_url})
+        if pages and len(pages) % 200 == 0:
+            # WP-25 2026-08-21: this listing call is the only work
+            # stage_reconcile_acls does before its own next log line -
+            # against a large real space, a live diagnostic run sat
+            # completely silent for over an hour with no way to tell
+            # "still working" from "stuck" short of exec'ing in to check
+            # CPU/network activity directly. A line every 200 pages (8
+            # batches of `limit`) costs nothing for a small space and
+            # gives real mid-flight visibility for a large one.
+            logger.info("reconcile-acls: listed %d page(s) so far in space '%s'", len(pages), space)
         if len(results) < limit:
             break
         start += limit
