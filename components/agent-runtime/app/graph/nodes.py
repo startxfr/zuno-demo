@@ -508,6 +508,10 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
                 request_id=state.get("request_id"),
                 agent_name=agent.name,
                 task_name=code_task.name,
+                # ADR-0511/ADR-0512 (WP-55): only a verified binding may
+                # draw project quota - gated on the task's own mark, never
+                # on state["project_id"] being merely truthy.
+                project_id=state.get("project_id") if code_task.project_required else None,
             )
         except ModelRouterError as exc:
             logger.error("code generation model call failed: %s", exc)
@@ -588,6 +592,10 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 request_id=state.get("request_id"),
                 agent_name=agent.name,
                 task_name=task.name,
+                # ADR-0511/ADR-0512 (WP-55): only a verified binding may
+                # draw project quota - gated on the task's own mark, never
+                # on state["project_id"] being merely truthy.
+                project_id=state.get("project_id") if task.project_required else None,
                 tools=[_GENERATE_IMAGE_TOOL_SCHEMA] if image_generation_enabled else None,
             )
         except ModelRouterError as exc:
@@ -674,6 +682,10 @@ async def _resolve_image_generation_call(
             request_id=state.get("request_id"),
             agent_name=agent.name,
             task_name=task.name,
+            # ADR-0511/ADR-0512 (WP-55): only a verified binding may draw
+            # project quota - gated on the task's own mark, never on
+            # state["project_id"] being merely truthy.
+            project_id=state.get("project_id") if task.project_required else None,
         )
     except ModelRouterError as exc:
         logger.error("follow-up model call after generate_image failed: %s", exc)

@@ -73,6 +73,11 @@
           "type": "string",
           "enum": ["standard", "intensive"]
         },
+        "project_required": {
+          "description": "ADR-0512 (WP-55): whether this task demands a Salesforce-verified project id as mandatory session context before any tool call, retrieval or model action. Optional - absent means false. Agent Runtime blocks execution fail-closed until the binding is verified via the MCP Gateway's salesforce.opportunity.read under the caller's own identity; a project_required task must declare at least one project-scopable resource in allowed_tools/allowed_knowledge (ADR-0504 contract test).",
+          "type": "boolean",
+          "default": false
+        },
         "allowed_knowledge": {
           "description": "Logical knowledge-domain IDs (knowledge/<domain>/domain.yaml, ADR-0202) this task may retrieve from. Declared independently of allowed_tools (ADR-0203). Effective authorization is the intersection of this list with the agent's declared-knowledge ceiling (the union of every task's allowed_knowledge - see components/agent-runtime/app/registry.py:AgentDefinition.declared_knowledge()), the caller's group rights and policies/knowledge/knowledge-policy.yaml - this field is a ceiling, not a grant on its own. Optional/omitted for tasks that never call RAG retrieval.",
           "type": "array",

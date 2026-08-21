@@ -89,7 +89,7 @@ component-code package.
 | WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
 | WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Done | none |
 | WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Operator pending (2026-08-21 — blocked on an external Kuadrant wasm-shim defect, see brief) | live 429 demo — blocked until Red Hat fixes the Connectivity Link wasm-shim (not a repo/config gap) |
-| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-061A rec.) | Not started | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap) |
+| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-061A rec.) | Repo work merged | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap); `finance` group missing from `salesforce.opportunity.read`'s `allowed_groups` (separate policy decision) |
 | WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
 
 ### Phase 2 — OKF v0.2: extraction

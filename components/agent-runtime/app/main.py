@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 
-from app import conversations
+from app import conversations, project_binding
 from app.auth import CallerIdentity, validate_token
 from app.clients import project_memory_client
 from app.graph import history as history_mod
@@ -811,6 +811,59 @@ async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict
         return await graph.ainvoke(initial_state, config=config)
 
 
+async def _bind_project_if_required(
+    agent_def: AgentDefinition,
+    payload: ChatRequest,
+    identity: CallerIdentity,
+    conversations_pool: Optional[Any],
+    run_id: str,
+) -> Optional[str]:
+    """ADR-0512/WP-55: for a project_required primary task, resolves and
+    verifies the caller-supplied candidate project (payload.project_id)
+    through app/project_binding.py before any tool call, retrieval or
+    model action runs - called from agent_chat between
+    _seed_history_backfill and record_turn, so the verified id can be
+    written atomically into the same INSERT/UPDATE record_turn already
+    performs (see that function's own docstring for why). Returns None
+    for every task that doesn't set zuno.project_required: true -
+    agent_chat then behaves exactly as before this ADR landed.
+
+    Checks app/conversations.py's cached binding first
+    (project_binding.is_binding_still_valid against
+    project_id_verified_at) so a resumed conversation within the validity
+    window skips a fresh Salesforce call entirely - ADR-0512's own
+    Operational considerations: "latency lands once per conversation, not
+    per turn." conversations_pool must be configured for a
+    project_required task (get_project_binding fails closed, 503,
+    otherwise) - there is nowhere to cache or trust a prior verification
+    without it.
+    """
+    task = agent_def.tasks.get(agent_def.primary_task) if agent_def.primary_task else None
+    if task is None or not task.project_required:
+        return None
+
+    existing = await conversations.get_project_binding(conversations_pool, run_id=run_id)
+    if existing is not None and project_binding.is_binding_still_valid(existing["project_id_verified_at"]):
+        return existing["project_id"]
+
+    try:
+        return await project_binding.verify_project_binding(
+            payload.project_id,
+            bearer_token=identity.token,
+            agent_name=agent_def.name,
+            task_name=task.name,
+        )
+    except project_binding.ProjectCandidateMissingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except project_binding.ProjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except project_binding.ProjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except project_binding.ProjectBindingUnreachableError as exc:
+        logger.error("project binding verification unreachable for run_id=%s: %s", run_id, exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.post("/v1/agents/{agent}/chat")
 async def agent_chat(
     agent: str,
@@ -834,16 +887,25 @@ async def agent_chat(
     conversations_pool = request.app.state.conversations_pool
     run_id = await _resolve_run_id(graph, payload, identity, conversations_pool)
     await _seed_history_backfill(graph, run_id, payload.run_id is not None, initial_state, agent_def)
+    # ADR-0512/WP-55: fail-closed before any graph action for a
+    # project_required primary task - raises HTTPException itself on any
+    # denial/failure, so nothing below this line runs unverified.
+    verified_project_id = await _bind_project_if_required(agent_def, payload, identity, conversations_pool, run_id)
+    if verified_project_id is not None:
+        initial_state["project_id"] = verified_project_id
     # ADR-0212: creates the conversations row on first use of run_id
     # (title derived from this opening message) or just bumps updated_at
     # on resume - no-ops if conversation persistence isn't configured, so
-    # chat itself never depends on this pool being up.
+    # chat itself never depends on this pool being up. project_id here is
+    # the ADR-0512-verified value above (None for every non-project_required
+    # task, leaving that row's project_id/project_id_verified_at untouched).
     await conversations.record_turn(
         conversations_pool,
         run_id=run_id,
         agent_name=agent_def.name,
         owner_sub=identity.sub,
         opening_message=payload.message,
+        project_id=verified_project_id,
     )
 
     # ADR-0213: a resumed conversation requires a write-capable role

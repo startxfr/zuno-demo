@@ -120,6 +120,12 @@ class TaskDefinition:
     # derived from caller/state data. None means this task's shape never
     # attempts a live read (tool_call_node degrades to a no-op).
     live_read_tool: Optional[str] = None
+    # ADR-0512/WP-55: whether this task demands a Salesforce-verified
+    # project binding as mandatory session context before any tool call,
+    # retrieval or model action - checked against agent_def.primary_task
+    # in main.py:agent_chat before the graph is ever invoked. False for
+    # every task that doesn't declare zuno.project_required: true.
+    project_required: bool = False
     # ADR-0419: `zuno.prompts` - named prompt slots keyed by slot name (see
     # PromptSlot above). Empty for every task that doesn't declare any -
     # today, only arkos's draft-architecture-testimonial does.
@@ -338,6 +344,7 @@ class AgentRegistry:
             allowed_knowledge=list(zuno.get("allowed_knowledge", [])),
             prompt=prompt,
             live_read_tool=zuno.get("live_read_tool"),
+            project_required=bool(zuno.get("project_required", False)),
             prompts=prompts,
         )
 

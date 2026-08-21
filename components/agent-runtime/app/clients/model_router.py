@@ -58,6 +58,7 @@ class ModelRouter:
         request_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         task_name: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> BaseChatModel:
         headers = {
             "X-Zuno-Data-Classification": classification.upper(),
@@ -83,6 +84,17 @@ class ModelRouter:
             # turn - see components/ai-gateway/app/telemetry.py's
             # model_call_span and app/maas_adapter.py.
             headers["X-Zuno-Request-Id"] = request_id
+        if project_id:
+            # ADR-0511/ADR-0512 (WP-55): only ever set by a caller that
+            # already confirmed task.project_required (app/graph/nodes.py's
+            # call sites below) - an ordinary task's optional, client-
+            # asserted state["project_id"] must never reach this header,
+            # or a caller could shift its own consumption onto an
+            # arbitrary project's quota bucket just by asserting a
+            # project_id string nothing ever verified. ai-gateway's own
+            # quota.py draws the project budget down first when this
+            # header is present (ADR-0511 clause 2's precedence).
+            headers["X-Zuno-Project-Id"] = project_id
         return ChatOpenAI(
             base_url=f"{AI_GATEWAY_URL}/v1",
             # ADR-0032: forward the same validated end-user token the
@@ -115,6 +127,7 @@ class ModelRouter:
         request_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         task_name: Optional[str] = None,
+        project_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         tools: Optional[List[Any]] = None,
     ):
@@ -144,7 +157,9 @@ class ModelRouter:
         callers inspect `result.tool_calls` themselves (reason_node), same
         as they already read `result.content`.
         """
-        model = self.chat_model_for(classification, bearer_token, local_only, request_id, agent_name, task_name)
+        model = self.chat_model_for(
+            classification, bearer_token, local_only, request_id, agent_name, task_name, project_id
+        )
         if tools:
             model = model.bind_tools(tools)
         try:

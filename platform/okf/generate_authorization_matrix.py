@@ -237,6 +237,8 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
         flags = []
         if task_name == primary_task:
             flags.append("primary")
+        if task_zuno.get("project_required"):
+            flags.append("project-required")
         prompt_path = agent_dir / "prompts" / f"{task_name}.md"
         if prompt_path.is_file():
             flags.append(f"prompt: `prompts/{task_name}.md`")

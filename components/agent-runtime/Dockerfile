@@ -48,6 +48,10 @@ COPY agents ./agents
 # mcp-gateway's policy files if this is ever absent at build time - see
 # app/knowledge.py's KnowledgePolicyStore.
 COPY policies/knowledge ./policies/knowledge
+# ADR-0511/ADR-0512: project_binding.validity_window - app/project_binding.py
+# reads this at import time to decide how long a verified Salesforce
+# binding stays cached before a resumed conversation must re-verify.
+COPY policies/quotas ./policies/quotas
 # ADR-0106: the same digest/verify logic build-publish.yml's signing job
 # and platform/supply-chain/verify_signatures.py use - imported by
 # app/registry.py as `app._sign_okf_bundle`, never duplicated, so the
@@ -58,6 +62,7 @@ ENV AGENTS_DIR=/app/agents \
     ZUNO_REQUIRE_SIGNED_BUNDLES=false \
     ZUNO_OKF_SIGNATURES_DIR=/app/okf-signatures \
     KNOWLEDGE_POLICY_PATH=/app/policies/knowledge/knowledge-policy.yaml \
+    QUOTA_POLICY_PATH=/app/policies/quotas/quota-policy.yaml \
     PYTHONUNBUFFERED=1
 
 # No provider-routing config or provider API keys here anymore (ADR-0009

@@ -7,7 +7,7 @@ gateway's ADR-0011 policy check runs against the real end user's identity
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -16,7 +16,16 @@ MCP_TIMEOUT_SECONDS = float(os.getenv("MCP_TIMEOUT_SECONDS", "20"))
 
 
 class McpClientError(Exception):
-    pass
+    """status_code is None for a transport-level failure (timeout,
+    connection refused, DNS) and set to the response status for an
+    HTTP-level failure (e.g. 403 from the gateway's policy denial) - callers
+    that need to distinguish "denied" from "unreachable" (ADR-0512's binding
+    step) read this instead of parsing the message string.
+    """
+
+    def __init__(self, message: str, status_code: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 async def invoke_tool(
@@ -47,5 +56,6 @@ async def invoke_tool(
             )
         resp.raise_for_status()
     except httpx.HTTPError as exc:
-        raise McpClientError(str(exc)) from exc
+        status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+        raise McpClientError(str(exc), status_code=status_code) from exc
     return resp.json()

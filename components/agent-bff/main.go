@@ -162,7 +162,11 @@ type apiChatRequest struct {
 	Message   string `json:"message"`
 	// ADR-0209: optional - forwarded to the Agent Runtime as-is, same
 	// identity-propagation pattern as ADR-0032/0033. This BFF never
-	// validates project membership itself.
+	// validates project membership itself. ADR-0512 (WP-55): for a
+	// project_required task the Agent Runtime treats this as an
+	// unverified CANDIDATE and verifies it against Salesforce before
+	// trusting it (or blocks the request) - this BFF's own handling is
+	// unchanged either way, it always just forwards the field as-is.
 	ProjectID string `json:"project_id,omitempty"`
 	// ADR-0212: optional - omit to start a new conversation, or supply a
 	// prior response's run_id (captured from the SSE "start" event) to

@@ -68,7 +68,11 @@ type ChatRequest struct {
 	Message   string `json:"message"`
 	// ADR-0209: optional - see components/agent-runtime/app/schemas.py's
 	// ChatRequest.project_id. Empty means no project memory is read or
-	// written for this turn.
+	// written for this turn. ADR-0512 (WP-55): for a project_required
+	// task the Agent Runtime treats this as an unverified CANDIDATE,
+	// verified server-side against Salesforce before use (or the request
+	// is blocked) - this client's contract is unchanged, it always just
+	// forwards whatever value it was given.
 	ProjectID string `json:"project_id,omitempty"`
 	// ADR-0212: optional - omit to start a new conversation (the Agent
 	// Runtime mints a fresh run_id and returns it in the SSE "start"

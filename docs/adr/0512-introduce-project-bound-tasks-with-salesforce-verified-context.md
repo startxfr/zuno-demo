@@ -1,6 +1,6 @@
 # ADR-0512: Introduce project-bound tasks with Salesforce-verified context
 
-- **Status:** Proposed
+- **Status:** Partially implemented (schema, prompts, runtime binding and scoping merged; live Salesforce verification pending)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
@@ -111,6 +111,46 @@ rather than hardcoded.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives,
 Migration/evolution and Review evidence.
+
+## Implementation note (2026-08-21) — WP-55 repo work merged; a real policy-grant gap found and left for the operator
+
+All four Decision clauses landed: the `zuno.project_required` schema mark
+(`platform/okf/schema/zuno-okf-task-v0.2.schema.json`), Finage's
+`identify-business-ready-to-invoice`/`monthly-invoice-report` tasks marked
+and given dedicated prompts that open by requesting the project;
+`components/agent-runtime/app/project_binding.py` (new) verifies a
+candidate via `salesforce.opportunity.read` under the caller's own
+identity, fail-closed with three distinguishable causes (unknown project
+/ no access / unreachable → 404/403/503), never routed through
+`tool_call_node` so it never reaches the model's own context (preserves
+the Comage/Finage Salesforce-content boundary this ADR's own Security
+considerations draw); a verified binding is cached on
+`conversations.project_id`/new `project_id_verified_at`
+(`app/conversations.py`) and re-verified past
+`policies/quotas/quota-policy.yaml`'s `project_binding.validity_window`;
+`X-Zuno-Project-Id` now reaches ai-gateway's quota ledger, gated strictly
+on the task's own `project_required` mark (never merely on `project_id`
+being truthy — closes an abuse channel an ungated implementation would
+have opened); `knowledge.project` retrieval scoping needed no new code,
+only a verified value fed into machinery already fail-closed on it.
+
+**A real, load-bearing gap found live in the repo, not fixed here per
+this WP's own "what NOT to touch"**: `salesforce.opportunity.read`
+(`policies/tools/tool-policy.yaml`) is granted only to
+`allowed_groups: [sales, board]`. Finage's real business-role group is
+`finance` (`platform/identity/README.md`), which is not in that list —
+the `salesforce` MCP server's own module docstring frames the capability
+as "Comage's live Salesforce integration" (ADR-0326/WP-33). As merged, no
+real Finage user can successfully bind a project today — every attempt
+correctly fails closed with `no_access` — until a separate, reviewed
+`tool-policy.yaml` grant change adds the right group. This is a
+standalone operator/policy decision, not a repo defect.
+
+MCP Gateway: zero changes, as this ADR's Decision text requires —
+verification rides the existing `salesforce.opportunity.read`
+authorization intersection unchanged. Live Salesforce verification
+(the operator follow-up below) remains blocked on the standing WP-22/
+WP-33 sandbox credential gap, same as WP-23/WP-065's own live pass.
 
 ## Related ADRs
 

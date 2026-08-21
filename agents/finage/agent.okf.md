@@ -117,10 +117,14 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 |---|---|---|---|---|---|---|---|---|
 | `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `web_search` |
 | `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
-| `identify-business-ready-to-invoice` | `sxa.customer.read` | tool | `sxa.customer.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_customer` |
-| `identify-business-ready-to-invoice` | `sxa.quote.read` | tool | `sxa.quote.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_quote` |
-| `monthly-invoice-report` | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
-| `monthly-invoice-report` | `sxa.record.lookup` | tool | `sxa.record.lookup` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `lookup_record` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `sxa.customer.read` | tool | `sxa.customer.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_customer` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `sxa.quote.read` | tool | `sxa.quote.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_quote` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `salesforce.opportunity.read` | tool | `salesforce.opportunity.read` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.read` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `sxa.record.lookup` | tool | `sxa.record.lookup` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `lookup_record` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `salesforce.opportunity.read` | tool | `salesforce.opportunity.read` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.read` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
 | `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
 | `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
 
@@ -131,8 +135,8 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
 | `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `C2` | `local` | `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `identify-business-ready-to-invoice` | `C2` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `monthly-invoice-report` | `C2` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `C2` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `C2` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `check-my-drive-and-mail` | `C2` | `local` | `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
 
 **Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local`, `local-gpt-oss`.

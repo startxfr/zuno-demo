@@ -114,6 +114,17 @@ CREATE TABLE IF NOT EXISTS conversation_memberships (
 CREATE INDEX IF NOT EXISTS ix_conversation_memberships_run_id ON conversation_memberships (run_id);
 CREATE INDEX IF NOT EXISTS ix_conversation_memberships_subject ON conversation_memberships (subject);
 
+-- ADR-0512/WP-55: the Salesforce-verified project binding for a
+-- project_required conversation, and when it was last verified.
+-- project_id itself (above) is unchanged in shape/meaning for every other
+-- task - it stays client-asserted and unverified; only project_required
+-- conversations ever populate project_id_verified_at, and app/main.py
+-- treats its presence (and freshness against
+-- policies/quotas/quota-policy.yaml's project_binding.validity_window) as
+-- the signal that project_id on this row is a verified value, not a
+-- client assertion.
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id_verified_at timestamptz;
+
 CREATE TABLE IF NOT EXISTS conversation_write_locks (
     run_id           text        PRIMARY KEY REFERENCES conversations(run_id),
     holder_sub       text        NOT NULL,
@@ -193,6 +204,7 @@ async def record_turn(
     agent_name: str,
     owner_sub: str,
     opening_message: str,
+    project_id: Optional[str] = None,
 ) -> None:
     """Called from app/main.py's agent_chat right after _resolve_run_id -
     inserts a new conversations row on first use of run_id (title derived
@@ -208,7 +220,22 @@ async def record_turn(
     transiently; since this call is incidental bookkeeping bolted onto the
     hot /chat path (app/main.py's agent_chat), not something the caller
     asked for, it must degrade the same way an unconfigured pool already
-    does rather than 500 the whole chat reply over a missed metadata row."""
+    does rather than 500 the whole chat reply over a missed metadata row.
+
+    project_id (ADR-0512/WP-55): pass the ALREADY-VERIFIED project id for
+    a project_required task's turn (app/main.py's binding step runs before
+    this call and never lets an unverified value reach here) - None for
+    every other task, leaving project_id/project_id_verified_at untouched.
+    Writing it here rather than via a separate post-verification UPDATE
+    avoids an ordering problem: on a brand-new run_id this INSERT is what
+    creates the row in the first place, so a verified binding for the very
+    first turn of a conversation has nowhere else to land atomically.
+    Passed again on every subsequent turn of an already-bound conversation
+    (main.py re-supplies the cached value when still fresh) - the ON
+    CONFLICT branch below re-stamps project_id_verified_at each time,
+    which is harmless (it only widens the cached-freshness window) and
+    keeps this function's SQL a single unconditional statement rather than
+    two conditional variants."""
     if pool is None:
         return
     title = _derive_title(opening_message)
@@ -217,24 +244,66 @@ async def record_turn(
             async with conn.cursor() as cur:
                 await cur.execute(
                     """
-                    INSERT INTO conversations (run_id, agent_name, owner_sub, title, sort_order)
+                    INSERT INTO conversations (
+                        run_id, agent_name, owner_sub, title, sort_order,
+                        project_id, project_id_verified_at
+                    )
                     VALUES (
                         %(run_id)s, %(agent_name)s, %(owner_sub)s, %(title)s,
                         COALESCE(
                             (SELECT MIN(sort_order) FROM conversations
                              WHERE agent_name = %(agent_name)s AND owner_sub = %(owner_sub)s),
                             1
-                        ) - 1
+                        ) - 1,
+                        %(project_id)s,
+                        CASE WHEN %(project_id)s IS NOT NULL THEN now() ELSE NULL END
                     )
-                    ON CONFLICT (run_id) DO UPDATE SET updated_at = now()
+                    ON CONFLICT (run_id) DO UPDATE SET
+                        updated_at = now(),
+                        project_id = COALESCE(EXCLUDED.project_id, conversations.project_id),
+                        project_id_verified_at = CASE
+                            WHEN EXCLUDED.project_id IS NOT NULL THEN now()
+                            ELSE conversations.project_id_verified_at
+                        END
                     """,
-                    {"run_id": run_id, "agent_name": agent_name, "owner_sub": owner_sub, "title": title},
+                    {
+                        "run_id": run_id,
+                        "agent_name": agent_name,
+                        "owner_sub": owner_sub,
+                        "title": title,
+                        "project_id": project_id,
+                    },
                 )
     except (PoolTimeout, psycopg.OperationalError) as exc:
         logger.warning(
             "conversations pool unavailable, skipping metadata write: run_id=%s agent=%s: %s",
             run_id, agent_name, exc,
         )
+
+
+async def get_project_binding(pool: Optional[AsyncConnectionPool], *, run_id: str) -> Optional[Dict[str, Any]]:
+    """ADR-0512/WP-55: the cached verified binding for run_id, or None if
+    no conversations row exists yet (a brand-new run_id - not a failure)
+    or the row exists but has never been bound (project_id_verified_at is
+    NULL, e.g. an ordinary task's client-asserted-but-unverified
+    project_id). app/main.py checks this before deciding whether a
+    project_required task's turn can skip a fresh Salesforce call
+    (project_binding.is_binding_still_valid against the returned
+    project_id_verified_at). Fails closed (503) on an unconfigured pool,
+    like every function here except record_turn - a project_required task
+    cannot be offered at all without conversation persistence, since there
+    would be nowhere to cache or trust a prior verification."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT project_id, project_id_verified_at FROM conversations WHERE run_id = %s",
+                (run_id,),
+            )
+            row = await cur.fetchone()
+    if row is None or row["project_id_verified_at"] is None:
+        return None
+    return {"project_id": row["project_id"], "project_id_verified_at": row["project_id_verified_at"]}
 
 
 async def resolve_owner(pool: Optional[AsyncConnectionPool], run_id: str) -> Optional[str]:

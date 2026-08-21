@@ -26,6 +26,16 @@ class ChatRequest(BaseModel):
     # Forwarded from components/agent-bff's own optional ChatRequest.
     # project_id field, following the same identity-propagation pattern
     # ADR-0032/0033 already use.
+    #
+    # ADR-0512 (WP-55): for a project_required task, this is only ever
+    # treated as a CANDIDATE - app/main.py's pre-graph binding step
+    # verifies it via the MCP Gateway's salesforce.opportunity.read under
+    # the caller's own identity before trusting it, and overwrites
+    # initial_state["project_id"] with the verified id (or blocks the
+    # request fail-closed). This field only "stops being client-asserted"
+    # for that specific class of task; for every other task it remains
+    # exactly what it always was - an optional, unverified value passed
+    # straight through.
     project_id: Optional[str] = Field(default=None, min_length=1)
 
 
