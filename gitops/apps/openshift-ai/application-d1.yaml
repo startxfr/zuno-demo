@@ -40,6 +40,15 @@ spec:
         # templates/externalsecret-maas-db.yaml.
         maasDb:
           enabled: true
+        # Deliberately nulled: this chart's default prometheusK8s value
+        # (values.yaml) would otherwise make d1 also render
+        # ConfigMap/cluster-monitoring-config (openshift-monitoring),
+        # duplicating d0's ownership of it and causing ArgoCD to report the
+        # ConfigMap as shared between d0 and d1. Same pattern as
+        # cluster-ods.project.enabled: false in application-d0.yaml, which
+        # fixed the equivalent Namespace/redhat-ods-operator conflict. See
+        # templates/cluster-monitoring-config.yaml.
+        prometheusK8s: null
   destination:
     server: https://kubernetes.default.svc
     namespace: redhat-ods-operator
