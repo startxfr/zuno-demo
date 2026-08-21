@@ -206,16 +206,24 @@ func loadTasks(agentDir string, taskNames []string) ([]Task, error) {
 }
 
 // PrimaryTaskPromptExamples (ADR-0515/WP-061) returns the primary task's
-// declared prompt_examples, or nil if the agent has no primary task or
-// that task declared none - the chat empty state then simply renders with
-// no starter prompts.
+// declared prompt_examples, or an empty (never nil) slice if the agent has
+// no primary task or that task declared none - the chat empty state then
+// simply renders with no starter prompts. Never nil matters: this value
+// round-trips through encoding/json into chatConfig.PromptExamples (no
+// `omitempty`, chat.go), and a nil Go slice marshals to JSON `null`, not
+// `[]` - found live 2026-08-21 crashing Chat.tsx's `.length` check on
+// `null` and blanking the whole page for every agent (none declare
+// prompt_examples yet).
 func (a Agent) PrimaryTaskPromptExamples() []string {
 	for _, t := range a.Tasks {
 		if t.Name == a.Zuno.PrimaryTask {
+			if t.PromptExamples == nil {
+				return []string{}
+			}
 			return t.PromptExamples
 		}
 	}
-	return nil
+	return []string{}
 }
 
 // Find returns the agent with the given zuno.name, if loaded.

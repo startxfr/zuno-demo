@@ -488,9 +488,9 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         <PageSection isFilled aria-label="Create new chat">
           <EmptyState titleText="Create new chat" headingLevel="h2">
             <EmptyStateBody>
-              {config.promptExamples.length > 0 ? (
+              {(config.promptExamples ?? []).length > 0 ? (
                 <Flex direction={{ default: "column" }} alignItems={{ default: "alignItemsCenter" }} gap={{ default: "gapSm" }}>
-                  {config.promptExamples.map((example) => (
+                  {(config.promptExamples ?? []).map((example) => (
                     <FlexItem key={example}>
                       <Button variant="secondary" onClick={() => openNewConversation(example)}>
                         {example}
