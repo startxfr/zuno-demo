@@ -282,11 +282,20 @@ def portal_tile_state(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
+    # timeout_seconds: most chat scenarios are interactive lookups (30s is
+    # ample), but a handful (e.g. arkos's DAT drafting) structurally chain
+    # multiple full-document LLM calls, `draft` forced onto a local model
+    # with its own 60s-per-candidate timeout in ai-gateway - MEMORY.md
+    # documents "long document workflows may take up to 10 minutes" as the
+    # accepted SLO for exactly that shape. Per-scenario override, not a
+    # blanket bump, so a genuinely-slow interactive reply still fails loud
+    # at the default.
+    timeout = s.get("timeout_seconds", 30)
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
         headers=auth_headers(s["persona"]),
         json={"session_id": "eval-7", "message": s["message"]},
-        timeout=30,
+        timeout=timeout,
     )
     if resp.status_code != 200:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
@@ -307,7 +316,7 @@ def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
             f"{BFF_URL}/api/chat",
             headers=auth_headers(s["persona"]),
             json={"session_id": "eval-7", "message": follow_up, "run_id": run_id},
-            timeout=30,
+            timeout=timeout,
         )
         follow_up_ok = resp2.status_code == 200 and bool(resp2.json().get("reply"))
         ok = ok and follow_up_ok
@@ -364,11 +373,13 @@ def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
+    # timeout_seconds: see chat_basic_qa's own comment - same per-scenario
+    # override for structurally-slow workflows (e.g. arkos's DAT drafting).
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
         headers=auth_headers(s["persona"]),
         json={"session_id": "eval-11", "user_sub": s["persona"], "message": s["message"]},
-        timeout=30,
+        timeout=s.get("timeout_seconds", 30),
     )
     if resp.status_code != 200:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")

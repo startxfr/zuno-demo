@@ -60,6 +60,12 @@ scenarios:
     type: chat_basic_qa
     persona: consultant-01
     message: "Draft a DAT for the OpenShift AI GPU sizing project"
+    # DAT drafting chains two full-document local-model LLM calls
+    # (draft then reflect, each with its own 60s-per-candidate timeout in
+    # ai-gateway) - MEMORY.md documents "long document workflows may take
+    # up to 10 minutes" as the accepted SLO for this shape; 30s (this
+    # handler's default) is calibrated for interactive lookups, not this.
+    timeout_seconds: 180
 
   - id: 8
     title: First-token latency is under the 6-second interactive objective (workshop-presentation)
@@ -87,6 +93,9 @@ scenarios:
     persona: consultant-01
     message: "Draft a DAT for the OpenShift AI GPU sizing project"
     expect_tool: confluence.page.search
+    # See scenario 7's own comment - same structurally-slow DAT-drafting
+    # shape, same timeout override.
+    timeout_seconds: 180
 
   - id: 11
     title: RAG retrieval contributes at least one citation for a technical topic
