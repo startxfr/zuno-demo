@@ -325,4 +325,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md)
 - [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md)
 - [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md)
+- [ADR-0059](0059-auto-redeploy-on-in-cluster-build-via-image-triggers.md) - why release pinning must revert to `:latest` after proving itself: that annotation-based trigger only fires for the tag it watches.
 - ADR-0353 (v0.3, not yet written) - decides whether/how to optionally source first-party runtime images from Quay/an external registry instead of the internal mirror + BuildConfig default this ADR keeps unchanged.

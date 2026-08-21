@@ -780,3 +780,16 @@ per-agent ConfigMap projections + an internal CA. Remaining gate failures
 are scenario-design/harness/credential issues, not platform defects.
 Credential-blocked pending operator action: Route53 (ADR-0211),
 Salesforce, Aramis, rag-S3, MaaS key.
+
+**2026-08-21: ADR-0059 formalizes the in-cluster build → auto-redeploy
+trigger** (`image.openshift.io/triggers`, shipped by commit `649243c`
+hours before this ADR was written) — a `make d1 build <component>` now
+rolls a fresh Deployment automatically via an OpenShift annotation-based
+controller, with matching ArgoCD `ignoreDifferences` and an
+`aiagent-operator` reconcile guard so neither fights the patch. `:latest`
+tracking is load-bearing for this: this same session's WP-04 release pin
+(`v0.1.0`) briefly broke the trigger for 16 components by repointing
+chart `image.tag` off `latest` — confirmed live (another session's fresh
+`agent-bff:latest` build sat undeployed) and reverted same-day. Release
+pinning is a point-in-time snapshot proof, not a standing chart-tracking
+target; revert to `latest` immediately after proving it.

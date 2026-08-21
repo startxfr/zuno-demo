@@ -217,7 +217,7 @@ func (r *AIAgentReconciler) applyOwned(ctx context.Context, agent *zunov1alpha1.
 }
 
 // preserveLiveImages keeps an OpenShift image-change trigger
-// (image.openshift.io/triggers, ADR-0411 follow-up) in effect across
+// (image.openshift.io/triggers, ADR-0059) in effect across
 // reconciles. This controller watches the Deployments it owns
 // (Owns(&appsv1.Deployment{}) in SetupWithManager), so the trigger
 // controller's own patch of spec.template.spec.containers[].image to a

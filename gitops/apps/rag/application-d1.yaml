@@ -19,7 +19,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: zuno-data
   ignoreDifferences:
-    # ADR-0411 follow-up: image.openshift.io/triggers patches this field
+    # ADR-0059: image.openshift.io/triggers patches this field
     # directly from the ImageStream whenever a fresh Build completes, so
     # ArgoCD must not treat that patch as drift from the Git-declared
     # :latest tag and revert it (selfHeal below would otherwise fight the
