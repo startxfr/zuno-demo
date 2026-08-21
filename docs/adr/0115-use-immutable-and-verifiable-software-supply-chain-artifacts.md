@@ -7,6 +7,60 @@
 - **Renumbered:** formerly ADR-0051, retargeted v0 -> v0.1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
 - **Last reviewed:** 2026-08-12
 
+## Implementation note (2026-08-21) — stage 3 attempted and reverted
+
+Ran `pin_release.py` against the real `v0.1.0` manifest (WP-04 stage 2's
+real release, run 32273454405) as WP-04 stage 3's first step. It
+succeeded mechanically - 15 fields pinned, 3 correctly skipped (added
+`mcp-git-forge`, a chart created after this release ran, to the skip
+list alongside `rag-ingestion`'s pre-existing two) - but produced a
+**real, would-be-live outage** before anything was committed, caught by
+inspecting the diff: every one of those 15 charts' `image.repository`
+still points at the in-cluster `zuno-ai-build` ImageStream
+(`ansible/roles/<component>_build`'s BuildConfig), which has never
+produced and will never produce a `:v0.1.0` tag - only `:latest`. Pinning
+`.tag` to `v0.1.0` without also repointing `.repository` to
+`quay.io/zuno/<component>` renders an image reference
+(`zuno-ai-build/<component>:v0.1.0`) that does not exist, which every
+Application syncs live via `automated: {selfHeal: true}` - this would
+have ImagePullBackOff'd tekos, arkos, comage, advantage, finage, naveo,
+agent-runtime, ai-gateway, rag-service, aiagent-operator, mcp-gateway,
+mcp-confluence, mcp-sales-db and mcp-salesforce simultaneously.
+`platform/supply-chain/README.md` already named this exact failure mode
+("the manifest-unknown ImagePullBackOff this repo has hit repeatedly...
+all reverted back to latest each time") - reproduced it once more here,
+caught before commit, and reverted every touched file
+(`git checkout --` on the 15 chart `values.yaml`s plus
+`pinned-releases.yaml`/`release-v0.1.0-manifest.yaml`) without disturbing
+unrelated uncommitted work already present in the tree.
+
+`pin_release.py`'s own docstring already flagged repository repointing as
+"an explicit, reviewed decision for the operator to make chart-by-chart,
+not something this tool should infer or automate" - the WP-04 brief's
+stage 3 steps don't call that decision out as a precondition of step 1,
+which is what let this get as far as a real diff. Two things need
+deciding before stage 3 can safely proceed, together, not stage-3-step-1
+alone:
+
+1. **Cut over each chart's `image.repository` to `quay.io/zuno/<component>`
+   at the same time as pinning `.tag`** - a real architecture decision
+   (leave the in-cluster BuildConfig path as the deployment mechanism for
+   day-to-day dev, or actually start consuming the Quay images the release
+   pipeline produces) that changes how this cluster gets images going
+   forward, not a mechanical follow-up.
+2. **`v0.1.0` is now three days stale** against `main` (real fixes landed
+   across nearly every one of these 15 components since 2026-08-19 -
+   agent-runtime, rag-service, arkos, and others each had genuine bugs
+   found and fixed live in that window) - pinning to it today would pin
+   production to code with known, already-fixed defects. A fresh real
+   release (re-running `build-publish.yml` against current `main`) is the
+   honest way to close this, not reusing the existing manifest.
+
+Left `false`/`latest` everywhere, ADR-0115 unchanged at `Partially
+implemented`. Not attempting either decision unilaterally - both are
+architecture/timing calls for the operator, not something to infer from
+the existing brief text.
+
 ## Context
 
 Several GitOps applications track `targetRevision: main` and multiple component Helm values still use `tag: latest`. This makes a deployed environment non-reproducible and weakens rollback, auditability and provenance in a public-source project.
