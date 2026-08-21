@@ -6,6 +6,41 @@
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) and [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) for OGX product mapping and implementation lifecycle
 
+## Implementation note (2026-08-21)
+
+Attempted the corpus proof (index/query a controlled test corpus through
+the live `zuno-ogx` server) and hit a real, fourth architecture gap before
+any indexing could run: `zuno-ogx`'s `zuno-vllm` inference provider is
+configured (`gitops/charts/openshift-ai/values.yaml`'s `ogxServer.
+vllmEndpoint`) to reach `http://embeddings-predictor.zuno-ai-run.svc:8080`
+for embeddings, but `gitops/charts/models/templates/networkpolicy-
+embedding.yaml`'s `embeddings` NetworkPolicy in `zuno-ai-run` only
+allow-lists ingress from `rag-service` pods in `zuno-data` and
+KFP-component pods in `zuno-ai-build` - `redhat-ods-applications` (where
+`zuno-ogx` runs) is not in that list. Confirmed live: a curl from inside
+the current `zuno-ogx` pod to that Service times out; the identical call
+from `rag-service`'s own pod (an allow-listed source) is not itself
+provably broken by this policy. `zuno-ogx`'s own `/v1/models` and
+`/v1/vector_stores` both return empty lists, consistent with an OGX
+deployment that has never successfully called out for an embedding.
+
+This is a real least-privilege NetworkPolicy doing its job, not a bug -
+widening it is a security-boundary change this session's guardrails
+correctly withheld without the operator's explicit approval, the same
+posture ADR-0201's own 2026-08-18 note took on its analogous
+mesh-injection question.
+
+**Operator decision (2026-08-21):** widen the whole `redhat-ods-applications`
+namespace, not just the `zuno-ogx` pod - RHOAI's own operator manages that
+namespace's pod labels, not this chart, so a namespace-wide rule is more
+maintainable than tracking OGX's pod labels across operator upgrades.
+`gitops/charts/models/templates/networkpolicy-embedding.yaml`'s
+`embeddings` NetworkPolicy gained a `redhat-ods-applications`
+namespaceSelector ingress rule; `helm lint`/`helm template` verified
+before commit. Live reconciliation and the actual corpus proof/parity run
+are the residual operator follow-up - this closes the network path, not
+the acceptance criteria themselves.
+
 ## Context
 
 The repository currently configures:

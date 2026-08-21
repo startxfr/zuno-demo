@@ -1,6 +1,9 @@
 # Precise ingress allow-list, not a namespace-wide baseline. rag-service
-# (query-time embedding) and rag-ingestion's KFP pipeline pods
-# (fetch-time embedding, zuno-ai-build) are both allowed - see
+# (query-time embedding), rag-ingestion's KFP pipeline pods (fetch-time
+# embedding, zuno-ai-build) and the whole redhat-ods-applications
+# namespace (zuno-ogx's OGX Operator data-plane server, ADR-0322 -
+# whole-namespace rather than a podSelector since RHOAI's own operator
+# manages that namespace's pod labels, not this chart) are allowed - see
 # templates/networkpolicy.yaml for the equivalent chat-model policy.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -31,6 +34,12 @@ spec:
           podSelector:
             matchLabels:
               pipelines.kubeflow.org/v2_component: "true"
+        # ADR-0322 (WP-06, 2026-08-21 live finding): zuno-ogx's zuno-vllm
+        # inference provider calls this Service for embeddings and was
+        # silently timing out - redhat-ods-applications wasn't allowed.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-applications
       ports:
         - protocol: TCP
           port: 8080
