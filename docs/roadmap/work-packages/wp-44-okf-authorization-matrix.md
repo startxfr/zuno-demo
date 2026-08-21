@@ -12,7 +12,9 @@
   `standard (implicit)` pending WP-54, as briefed.
 - **ADRs:** ADR-0503 (with WP-45 completing its deployment half)
 - **Depends on:** WP-43
-- **Blocks:** WP-48, WP-54; soft-blocks WP-47 (tab schema rides the same validator)
+- **Blocks:** WP-48, WP-54; soft-blocks WP-061 (prompt-example schema
+  rides the same validator; WP-47, its abandoned predecessor, carried the
+  same soft-block)
 - **Estimated files touched:** ~6 (Part A) + ~6 (Part B)
 
 > Execute this brief as a standalone task from the repository root.

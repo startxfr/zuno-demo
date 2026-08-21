@@ -3,8 +3,13 @@
 - **State:** Not started
 - **ADRs:** ADR-0512
 - **Depends on:** WP-54 (quota substrate; the binding validity window
-  lives in quota-policy.yaml); WP-47 Part A recommended first (the
-  `task` parameter names which task demands the binding)
+  lives in quota-policy.yaml); WP-061 Part A recommended first
+  (prompt-example schema chain). Note: WP-47 (abandoned, superseded by
+  WP-061/ADR-0515) would have added a chat-contract `task` parameter to
+  name which task demands the binding — WP-061 does not add one, so this
+  brief must confirm at implementation time how a `project_required` task
+  is identified at conversation start under ADR-0515's per-conversation
+  model.
 - **Estimated files touched:** ~14
 
 > Execute this brief as a standalone task from the repository root.

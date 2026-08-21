@@ -13,14 +13,16 @@ copy would drift unvalidated).
 
 ## Milestones
 
-- **OKF v0.1 — content excellence, in-repo** (ADR-0502 – 0505, 0511, 0512,
-  0513): the two-stage agent maturity model, the generated per-agent
+- **OKF v0.1 — content excellence, in-repo** (ADR-0502 – 0504, 0511 – 0513,
+  0515): the two-stage agent maturity model, the generated per-agent
   authorization matrix ("who can use what, for what, under which policy —
   and how much"), real `deployment/` content, the `tests/` target
-  structure, per-agent task tabs in the frontend, quota policy enforced via
-  Kuadrant, project-bound tasks with Salesforce-verified context, and a
-  real schema for `rag/`/`tools/`/`policies/` content. `agents/` stays in
-  this repository throughout.
+  structure, per-conversation frontend tabs with one browser tab per
+  agent, quota policy enforced via Kuadrant, project-bound tasks with
+  Salesforce-verified context, and a real schema for
+  `rag/`/`tools/`/`policies/` content. ADR-0505, the original per-task tab
+  decision, was abandoned before implementation and superseded by
+  ADR-0515. `agents/` stays in this repository throughout.
 - **OKF v0.2 — extraction** (ADR-0506 – 0508): the `zuno-okf` repository is
   bootstrapped (history-preserving), this repository consumes it through a
   single pinned reference (baked-image build model unchanged), then the
@@ -72,9 +74,10 @@ merged | Operator pending | Done`.
 
 Order rationale: WP-43 (stages + READMEs) first — every later package
 writes into the structure it fixes. WP-44/45/46 are independent once it
-merges; WP-44 Part A unblocks the quota column (WP-54) and the tab
-schema (WP-47 soft). WP-54 → WP-55 is strict (the binding's validity
-window and precedence live in quota policy). WP-47 is the phase's only
+merges; WP-44 Part A unblocks the quota column (WP-54) and the
+prompt-example schema (WP-061 soft). WP-54 → WP-55 is strict (the
+binding's validity window and precedence live in quota policy). WP-47 is
+Abandoned; WP-061 (its replacement, ADR-0515) is the phase's only
 component-code package.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
@@ -83,9 +86,10 @@ component-code package.
 | WP-44 | [wp-44](work-packages/wp-44-okf-authorization-matrix.md) | 0503 (matrix) | WP-43 | Done | none |
 | WP-45 | [wp-45](work-packages/wp-45-deployment-dir-content.md) | 0503 (deployment) | WP-43 | Done | none |
 | WP-46 | [wp-46](work-packages/wp-46-tests-target-structure.md) | 0504 | WP-43 | Done | none |
-| WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Not started | rebuild/redeploy 3 components; tab demo |
+| WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
+| WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Not started | rebuild/redeploy 3 components; cross-agent tab-reuse + drag-reorder + hard-delete demo |
 | WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Operator pending (Parts A+B merged 2026-08-18) | attach agent chat HTTPRoute + AuthPolicy, enable quotaEnforcement, live 429 demo |
-| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-47A rec.) | Not started | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap) |
+| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 | WP-54 (+WP-061A rec.) | Not started | live Salesforce bind/deny pass (needs sandbox creds — WP-22/33 gap) |
 | WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
 
 ### Phase 2 — OKF v0.2: extraction
@@ -121,7 +125,7 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
        │         │              │                  └─ WP-51 ─┘
        ├─ WP-45 ─┤              │
        ├─ WP-46 ─┘              │
-       │         (WP-44A soft) ─┴─ WP-47
+       │         (WP-44A soft) ─┴─ WP-061  (WP-47 abandoned)
        ├─ WP-44A ── WP-54 ── WP-55
        └─ WP-56
 ```
@@ -132,3 +136,6 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
   their WP briefs.
 - 2026-08-19 — WP-56 (ADR-0513: real schema for `rag/`/`tools/`/`policies/`)
   added and executed against Tekos.
+- 2026-08-21 — WP-47 (ADR-0505: per-task tabs) abandoned before
+  implementation; replaced by WP-061 (ADR-0515: per-conversation tabs,
+  one browser tab per agent).

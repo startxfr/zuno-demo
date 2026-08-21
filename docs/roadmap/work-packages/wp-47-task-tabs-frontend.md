@@ -1,7 +1,8 @@
 # WP-47: Concurrent per-agent task tabs (promotes ADR-0505)
 
-- **State:** Not started
-- **ADRs:** ADR-0505
+- **State:** Abandoned — superseded by WP-061 (ADR-0515)
+- **Superseded:** 2026-08-21 by [WP-061](wp-061-per-conversation-tabs-frontend.md), implementing [ADR-0515](../../adr/0515-per-conversation-tabs-one-browser-tab-per-agent.md); no code was written against this brief.
+- **ADRs:** ADR-0505 (see [ADR-0515](../../adr/0515-per-conversation-tabs-one-browser-tab-per-agent.md))
 - **Depends on:** none hard; soft: WP-44 Part A (schema/validator chain
   in place before the `zuno.ui` task-block addition), ADR-0212's
   conversation substrate (persistent `run_id` + transcript reload) —

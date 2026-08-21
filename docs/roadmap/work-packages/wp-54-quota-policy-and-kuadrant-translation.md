@@ -19,7 +19,8 @@
   so only non-streaming consumption is metered; the group counter keys
   the full sorted group-set, not per-group; the
   X-Zuno-Quota-Class/X-Zuno-Project-Id headers are accepted but no
-  caller sends them yet (agent-runtime wiring lands with WP-55/WP-47).
+  caller sends them yet (agent-runtime wiring lands with WP-55/WP-061;
+  WP-47, originally named here, was abandoned and replaced by WP-061).
   ai-gateway suite: 84 passed (python3.12 venv — NOTE: redis==8.1.0
   needs ≥3.10, system 3.9 venv fails at install). helm lint clean;
   enabled render = 2 RLPs, disabled = none.

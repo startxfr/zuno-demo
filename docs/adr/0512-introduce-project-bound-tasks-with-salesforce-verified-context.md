@@ -27,9 +27,11 @@ project identity is verified, not asserted.
 1. **A task can be marked project-only in its frontmatter:**
    `zuno.project_required: true` (schema addition in
    `platform/okf/schema/zuno-okf-task-v0.2.schema.json`, default
-   `false`). The ADR-0503 matrix and ADR-0505 tab metadata surface the
-   mark; the ADR-0504 contract tests validate it (a `project_required`
-   task must declare at least one project-scopable resource).
+   `false`). The ADR-0503 matrix surfaces the mark to operators, and
+   ADR-0515's conversation-creation flow surfaces it to the user before a
+   `project_required` task starts; the ADR-0504 contract tests validate it
+   (a `project_required` task must declare at least one project-scopable
+   resource).
 
 2. **The prompt collects the project before any action.** For a
    `project_required` task, the task's prompt template must open by
@@ -120,5 +122,5 @@ Migration/evolution and Review evidence.
 - [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md)
 - [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md)
 - [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md)
-- [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md)
 - [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md)
+- [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md)

@@ -111,7 +111,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) | v0.2 | Implemented | Introduce persistent, navigable chat conversations |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.2 | Proposed | Introduce role-based conversation sharing between colleagues |
 | [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) | v0.2 | Implemented | Refresh agent-frontend chrome: branding, footer and menu icons |
-| [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Partially implemented | Carry conversation history into agent prompts with budgeted compaction |
+| [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Implemented | Carry conversation history into agent prompts with budgeted compaction |
 
 ## version 0.3
 
@@ -193,7 +193,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | OKF v0.1 | Implemented | Formalize the two-stage agent maturity model |
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | OKF v0.1 | Implemented | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | OKF v0.1 | Implemented | Define the agent tests directory structure and promotion gate |
-| [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Proposed | Open OKF tasks as concurrent per-agent frontend tabs |
+| [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Superseded by ADR-0515 (Abandoned before implementation) | Open OKF tasks as concurrent per-agent frontend tabs |
 | [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | OKF v0.2 | Proposed | Extract OKF content into a standalone zuno-okf repository |
 | [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | OKF v0.2 | Proposed | Consume the zuno-okf repository through a single pinned reference |
 | [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | OKF v0.2 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
@@ -203,6 +203,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | OKF v0.1 | Proposed | Introduce project-bound tasks with Salesforce-verified context |
 | [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | OKF v0.1 | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | OKF v0.1 | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
+| [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Proposed | Open per-conversation tabs with one browser tab per agent |
 
 ## Standard clauses
 
