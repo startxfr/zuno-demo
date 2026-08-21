@@ -20,6 +20,25 @@ export interface TranscriptTurn {
   images?: { data_base64: string; mime_type: string; alt: string }[];
 }
 
+// ADR-0213: role-based conversation sharing.
+export type MembershipRole = "reader" | "actor" | "cloner";
+
+export interface Member {
+  subject: string;
+  role: MembershipRole;
+  granted_by: string;
+  created_at: string;
+}
+
+export interface Colleague {
+  sub: string;
+  displayName: string;
+  // Ineligible candidates are still included so the caller can render
+  // them greyed out rather than hide them, per the ADR's explicit
+  // product requirement.
+  eligible: boolean;
+}
+
 async function parseOrThrow<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
@@ -88,4 +107,58 @@ export async function hardDeleteConversation(conversationsURL: string, runId: st
   await parseOrThrow(
     await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/hard-delete`, { method: "DELETE" }),
   );
+}
+
+// ADR-0213: role-based conversation sharing.
+
+export async function listMembers(conversationsURL: string, runId: string): Promise<Member[]> {
+  return parseOrThrow<Member[]>(await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/members`));
+}
+
+export async function grantMembership(
+  conversationsURL: string,
+  runId: string,
+  subject: string,
+  role: MembershipRole,
+): Promise<void> {
+  await parseOrThrow(
+    await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/members/${encodeURIComponent(subject)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }),
+  );
+}
+
+export async function revokeMembership(conversationsURL: string, runId: string, subject: string): Promise<void> {
+  await parseOrThrow(
+    await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/members/${encodeURIComponent(subject)}`, {
+      method: "DELETE",
+    }),
+  );
+}
+
+export async function transferOwnership(conversationsURL: string, runId: string, newOwnerSub: string): Promise<void> {
+  await parseOrThrow(
+    await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/owner`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ new_owner_sub: newOwnerSub }),
+    }),
+  );
+}
+
+// Returns the new, independently-owned conversation's run_id.
+export async function cloneConversation(conversationsURL: string, runId: string): Promise<string> {
+  const result = await parseOrThrow<{ run_id: string }>(
+    await fetch(`${conversationsURL}/${encodeURIComponent(runId)}/clone`, { method: "POST" }),
+  );
+  return result.run_id;
+}
+
+// Debounced by the caller (ShareDialog.tsx) - this is a plain type-ahead
+// wrapper, no debounce logic of its own.
+export async function getColleagues(colleaguesURL: string, query: string): Promise<Colleague[]> {
+  const url = query ? `${colleaguesURL}?q=${encodeURIComponent(query)}` : colleaguesURL;
+  return parseOrThrow<Colleague[]>(await fetch(url));
 }

@@ -29,7 +29,14 @@ from app.graph.classification import _escalate
 from app.graph.nodes import _model_router
 from app.memory import MemoryExtractionError, extract_memory
 from app.registry import AgentDefinition, AgentRegistry
-from app.schemas import ChatRequest, ChatResponse, RenameConversationRequest, ReorderConversationsRequest
+from app.schemas import (
+    ChatRequest,
+    ChatResponse,
+    GrantMembershipRequest,
+    RenameConversationRequest,
+    ReorderConversationsRequest,
+    TransferOwnershipRequest,
+)
 from app.telemetry import graph_run_span, init_telemetry
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -251,6 +258,12 @@ async def _resolve_run_id(
     checkpoint-only check (additive, no backfill, per that ADR's
     Operational considerations). conversations_pool defaults to None so
     every existing call site/test keeps today's exact behavior unchanged.
+
+    ADR-0213 widens it again: any granted role (owner/reader/actor/
+    cloner), not owner alone, may resolve/resume a run_id - this is the
+    *read/resume* gate only. agent_chat additionally requires owner or
+    actor specifically before letting a resumed run_id actually accept a
+    new message (see its own write-role check).
     """
     if payload.run_id is None:
         return str(uuid.uuid4())
@@ -262,6 +275,9 @@ async def _resolve_run_id(
 
     stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
     if conversations_pool is not None:
+        role = await conversations.get_role(conversations_pool, run_id=payload.run_id, subject=identity.sub)
+        if role is not None:
+            return payload.run_id
         owner_sub = await conversations.resolve_owner(conversations_pool, payload.run_id)
         if owner_sub is not None:
             stored_sub = owner_sub
@@ -534,7 +550,9 @@ async def transcript_endpoint(
     its exact prior message history from here. Reuses the same 404
     (unknown run)/403 (wrong subject) split as extract_memory_endpoint,
     widened by conversations.resolve_owner the same way _resolve_run_id
-    is (see that function's docstring)."""
+    is (see that function's docstring). ADR-0213: any granted role
+    (owner/reader/actor/cloner) may read the transcript - reading is the
+    minimum right every role carries."""
     agent_def = _active_agent_or_404(agent)
     graph = request.app.state.graph_factory.graph_for(agent_def)
     config = {"configurable": {"thread_id": run_id}}
@@ -543,7 +561,12 @@ async def transcript_endpoint(
         raise HTTPException(status_code=404, detail=f"no workflow run found for run_id '{run_id}'")
 
     stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
-    owner_sub = await conversations.resolve_owner(request.app.state.conversations_pool, run_id)
+    conversations_pool = request.app.state.conversations_pool
+    if conversations_pool is not None:
+        role = await conversations.get_role(conversations_pool, run_id=run_id, subject=identity.sub)
+        if role is not None:
+            return await _build_transcript_structured(graph, run_id)
+    owner_sub = await conversations.resolve_owner(conversations_pool, run_id)
     if owner_sub is not None:
         stored_sub = owner_sub
     if stored_sub != identity.sub:
@@ -644,6 +667,131 @@ async def hard_delete_conversation_endpoint(
     return {"deleted": True}
 
 
+@app.get("/v1/agents/{agent}/runs/{run_id}/members")
+async def list_members_endpoint(
+    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> List[Dict[str, Any]]:
+    """ADR-0213: owner-only - lists every granted membership (never
+    includes the owner, who is not a membership row). 404 rather than
+    403 for a non-owner caller, same collapsed-case rationale as every
+    other conversation-management endpoint here - this never confirms
+    another subject's run_id exists, or that the caller merely lacks
+    owner rights on one that does."""
+    _active_agent_or_404(agent)
+    pool = request.app.state.conversations_pool
+    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
+    if role != "owner":
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return await conversations.list_members(pool, run_id=run_id)
+
+
+@app.put("/v1/agents/{agent}/runs/{run_id}/members/{subject}")
+async def grant_membership_endpoint(
+    agent: str,
+    run_id: str,
+    subject: str,
+    payload: GrantMembershipRequest,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> Dict[str, str]:
+    """ADR-0213: owner-only. Eligibility of `subject` (holds this agent's
+    entitlement AND shares a business-role group with the caller) is
+    computed by agent-bff's colleague-lookup endpoint before this call is
+    ever made - this endpoint trusts its sole caller (agent-bff, over the
+    same in-cluster-only network path every other conversation-management
+    route already uses) and does not re-verify Keycloak group membership
+    itself. This is the ADR's own explicitly-accepted trust boundary, not
+    an oversight - see the ADR's Security considerations."""
+    _active_agent_or_404(agent)
+    pool = request.app.state.conversations_pool
+    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
+    if role != "owner":
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    await conversations.grant_membership(
+        pool, run_id=run_id, subject=subject, role=payload.role, granted_by=identity.sub
+    )
+    return {"subject": subject, "role": payload.role}
+
+
+@app.delete("/v1/agents/{agent}/runs/{run_id}/members/{subject}")
+async def revoke_membership_endpoint(
+    agent: str, run_id: str, subject: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, bool]:
+    """ADR-0213: owner-only, soft revocation only (the ADR's own Decision)
+    - no live kick; the collaborator's already-open tab keeps working
+    until their next access, which then fails the fail-closed role check
+    _resolve_run_id/transcript_endpoint/agent_chat all apply."""
+    _active_agent_or_404(agent)
+    pool = request.app.state.conversations_pool
+    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
+    if role != "owner":
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    ok = await conversations.revoke_membership(pool, run_id=run_id, subject=subject)
+    return {"revoked": ok}
+
+
+@app.patch("/v1/agents/{agent}/runs/{run_id}/owner")
+async def transfer_ownership_endpoint(
+    agent: str,
+    run_id: str,
+    payload: TransferOwnershipRequest,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> Dict[str, str]:
+    """ADR-0213: owner-only. The outgoing owner is downgraded to an actor
+    membership, never losing access outright
+    (conversations.transfer_ownership)."""
+    _active_agent_or_404(agent)
+    pool = request.app.state.conversations_pool
+    ok = await conversations.transfer_ownership(
+        pool, run_id=run_id, current_owner_sub=identity.sub, new_owner_sub=payload.new_owner_sub
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return {"run_id": run_id, "owner_sub": payload.new_owner_sub}
+
+
+@app.post("/v1/agents/{agent}/runs/{run_id}/clone")
+async def clone_conversation_endpoint(
+    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, str]:
+    """ADR-0213: owner or cloner only - copies the source checkpoint's
+    channel_values into a fresh thread_id (a full checkpoint snapshot,
+    not an incremental write - no live sync back to the original) and
+    creates a new, independently-owned conversations row. Fails closed
+    (404) for both an unknown run_id and a role that isn't owner/cloner,
+    same collapsed-case rationale as every other conversation-management
+    endpoint here."""
+    agent_def = _active_agent_or_404(agent)
+    pool = request.app.state.conversations_pool
+    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
+    if role not in ("owner", "cloner"):
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+
+    graph = request.app.state.graph_factory.graph_for(agent_def)
+    tuple_ = await graph.checkpointer.aget_tuple({"configurable": {"thread_id": run_id}})
+    if tuple_ is None:
+        raise HTTPException(status_code=404, detail=f"no workflow run found for run_id '{run_id}'")
+
+    new_run_id = str(uuid.uuid4())
+    new_checkpoint = dict(tuple_.checkpoint)
+    new_checkpoint["id"] = str(uuid.uuid4())
+    channel_values = dict(new_checkpoint.get("channel_values") or {})
+    channel_values["user_sub"] = identity.sub
+    new_checkpoint["channel_values"] = channel_values
+    await graph.checkpointer.aput(
+        {"configurable": {"thread_id": new_run_id}},
+        new_checkpoint,
+        tuple_.metadata or {},
+        new_checkpoint.get("channel_versions") or {},
+    )
+
+    ok = await conversations.clone_conversation(pool, source_run_id=run_id, new_run_id=new_run_id, owner_sub=identity.sub)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
+    return {"run_id": new_run_id, "source_run_id": run_id}
+
+
 async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict[str, Any], *, session_id: str, request_id: str):
     """One bounded retry for a checkpoint DB connection that was already
     dead at the moment of use (psycopg.OperationalError) - lifespan's
@@ -683,24 +831,49 @@ async def agent_chat(
     accept = request.headers.get("accept", "")
     request_id = _request_id(request)
     initial_state = _initial_state(payload, identity, request_id)
-    run_id = await _resolve_run_id(graph, payload, identity, request.app.state.conversations_pool)
+    conversations_pool = request.app.state.conversations_pool
+    run_id = await _resolve_run_id(graph, payload, identity, conversations_pool)
     await _seed_history_backfill(graph, run_id, payload.run_id is not None, initial_state, agent_def)
     # ADR-0212: creates the conversations row on first use of run_id
     # (title derived from this opening message) or just bumps updated_at
     # on resume - no-ops if conversation persistence isn't configured, so
     # chat itself never depends on this pool being up.
     await conversations.record_turn(
-        request.app.state.conversations_pool,
+        conversations_pool,
         run_id=run_id,
         agent_name=agent_def.name,
         owner_sub=identity.sub,
         opening_message=payload.message,
     )
+
+    # ADR-0213: a resumed conversation requires a write-capable role
+    # (owner/actor - _resolve_run_id above only proved *read* access,
+    # any of the four roles) and the single-active-writer lease. Checked
+    # only after record_turn above, which guarantees a conversations row
+    # exists for run_id by now - conversation_write_locks has a foreign
+    # key on conversations.run_id, so acquiring any earlier could fail
+    # for a run_id resuming a genuinely pre-ADR-0212 checkpoint. A brand
+    # new conversation (payload.run_id was None) has no role to check
+    # yet and no lease to contend for.
+    write_lock_holder: Optional[str] = None
+    if payload.run_id is not None and conversations_pool is not None:
+        role = await conversations.get_role(conversations_pool, run_id=run_id, subject=identity.sub)
+        if role is not None and role not in ("owner", "actor"):
+            raise HTTPException(status_code=403, detail="this role cannot send messages in this conversation")
+        if not await conversations.acquire_write_lock(conversations_pool, run_id=run_id, holder_sub=identity.sub):
+            raise HTTPException(
+                status_code=409, detail="another collaborator is currently writing to this conversation"
+            )
+        write_lock_holder = identity.sub
+
     config = {"configurable": {"thread_id": run_id}}
 
     if "text/event-stream" in accept:
         return StreamingResponse(
-            _stream_chat(graph, initial_state, config, request_id, run_id),
+            _stream_chat(
+                graph, initial_state, config, request_id, run_id,
+                conversations_pool=conversations_pool, write_lock_holder=write_lock_holder,
+            ),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -719,6 +892,9 @@ async def agent_chat(
     except Exception as exc:
         logger.error("graph execution failed for session=%s request_id=%s: %s", payload.session_id, request_id, exc)
         raise HTTPException(status_code=500, detail=f"agent workflow failed: {exc}") from exc
+    finally:
+        if write_lock_holder is not None:
+            await conversations.release_write_lock(conversations_pool, run_id=run_id, holder_sub=write_lock_holder)
 
     return ChatResponse(
         reply=final_state.get("reply", ""),
@@ -743,7 +919,14 @@ _TOOL_NODES = {"tool_call": "search_confluence"}
 
 
 async def _stream_chat(
-    graph, initial_state: Dict[str, Any], config: Dict[str, Any], request_id: str, run_id: str
+    graph,
+    initial_state: Dict[str, Any],
+    config: Dict[str, Any],
+    request_id: str,
+    run_id: str,
+    *,
+    conversations_pool: Optional[Any] = None,
+    write_lock_holder: Optional[str] = None,
 ) -> AsyncIterator[str]:
     """Streams token deltas from the `reason` node's underlying chat model
     via LangGraph's `astream_events` (v2), which surfaces
@@ -752,75 +935,87 @@ async def _stream_chat(
     surfaces `tool` events (start/end of `_TOOL_NODES` entries) and a
     `start` event carrying request_id and run_id (ADR-0045, ADR-0103) -
     the frontend needs run_id to resume this exact workflow later.
-    """
-    yield _sse("start", {"request_id": request_id, "run_id": run_id})
 
-    citations: Any = []
-    images: Any = []
-    source_mode = "indexed"
-    # One bounded retry, same rationale as _ainvoke_with_retry, but only
-    # safe to take before any token has reached the client (ADR-0029-style
-    # precedent: components/ai-gateway/app/main.py's _stream_completion
-    # never silently retries a candidate that already streamed partial
-    # content, since the client has content a fresh run wouldn't continue
-    # coherently) - sent_any tracks that boundary.
-    sent_any = False
-    attempts_remaining = 2
-    while attempts_remaining:
-        attempts_remaining -= 1
-        try:
-            async for event in graph.astream_events(initial_state, config=config, version="v2"):
-                kind = event.get("event")
-                name = event.get("name")
-                if kind == "on_chat_model_stream":
-                    # ADR-0215: the history-compaction node's own internal
-                    # summarization call is a real nested chat-model
-                    # invocation inside this same graph run, so it emits
-                    # on_chat_model_stream events too - tagged
-                    # "zuno-internal" (app/clients/model_router.py) so it
-                    # never reaches the user as a chat token.
-                    if "zuno-internal" in (event.get("tags") or []):
-                        continue
-                    chunk = event["data"].get("chunk")
-                    token = getattr(chunk, "content", "") if chunk is not None else ""
-                    if token:
-                        sent_any = True
-                        yield _sse("token", {"delta": token})
-                elif kind == "on_chain_start" and name in _TOOL_NODES:
-                    yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
-                elif kind == "on_chain_end" and name in _TOOL_NODES:
-                    yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
-                elif kind == "on_chain_end" and name == "respond":
-                    output = event["data"].get("output") or {}
-                    citations = output.get("citations", [])
-                    # ADR-0205/WP-24: same field the non-streaming response
-                    # carries - the streaming path must not silently omit it.
-                    source_mode = output.get("source_mode", "indexed")
-                elif kind == "on_chain_end" and name in ("reason", "draft"):
-                    # ADR-0415: generate_image results are returned by
-                    # whichever node actually calls the model
-                    # (retrieve_reason_respond's "reason", plan_draft_write's
-                    # "draft") - unlike citations/source_mode above, there is
-                    # no later node in either shape that re-assembles this,
-                    # so it's captured here directly.
-                    output = event["data"].get("output") or {}
-                    if output.get("generated_images"):
-                        images = output["generated_images"]
-        except psycopg.OperationalError as exc:
-            if sent_any or attempts_remaining == 0:
+    ADR-0213: when write_lock_holder is set (a resumed, lease-guarded
+    conversation - agent_chat only passes it then), the outer `finally`
+    releases the write lease on every exit path, including a client
+    disconnect - an async generator's `finally` runs when FastAPI closes
+    it mid-iteration, which is exactly the "on-disconnect handler" the
+    ADR's Decision text asks for. The lease's own TTL is the fallback if
+    even this never runs (a hard crash).
+    """
+    try:
+        yield _sse("start", {"request_id": request_id, "run_id": run_id})
+
+        citations: Any = []
+        images: Any = []
+        source_mode = "indexed"
+        # One bounded retry, same rationale as _ainvoke_with_retry, but only
+        # safe to take before any token has reached the client (ADR-0029-style
+        # precedent: components/ai-gateway/app/main.py's _stream_completion
+        # never silently retries a candidate that already streamed partial
+        # content, since the client has content a fresh run wouldn't continue
+        # coherently) - sent_any tracks that boundary.
+        sent_any = False
+        attempts_remaining = 2
+        while attempts_remaining:
+            attempts_remaining -= 1
+            try:
+                async for event in graph.astream_events(initial_state, config=config, version="v2"):
+                    kind = event.get("event")
+                    name = event.get("name")
+                    if kind == "on_chat_model_stream":
+                        # ADR-0215: the history-compaction node's own internal
+                        # summarization call is a real nested chat-model
+                        # invocation inside this same graph run, so it emits
+                        # on_chat_model_stream events too - tagged
+                        # "zuno-internal" (app/clients/model_router.py) so it
+                        # never reaches the user as a chat token.
+                        if "zuno-internal" in (event.get("tags") or []):
+                            continue
+                        chunk = event["data"].get("chunk")
+                        token = getattr(chunk, "content", "") if chunk is not None else ""
+                        if token:
+                            sent_any = True
+                            yield _sse("token", {"delta": token})
+                    elif kind == "on_chain_start" and name in _TOOL_NODES:
+                        yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
+                    elif kind == "on_chain_end" and name in _TOOL_NODES:
+                        yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
+                    elif kind == "on_chain_end" and name == "respond":
+                        output = event["data"].get("output") or {}
+                        citations = output.get("citations", [])
+                        # ADR-0205/WP-24: same field the non-streaming response
+                        # carries - the streaming path must not silently omit it.
+                        source_mode = output.get("source_mode", "indexed")
+                    elif kind == "on_chain_end" and name in ("reason", "draft"):
+                        # ADR-0415: generate_image results are returned by
+                        # whichever node actually calls the model
+                        # (retrieve_reason_respond's "reason", plan_draft_write's
+                        # "draft") - unlike citations/source_mode above, there is
+                        # no later node in either shape that re-assembles this,
+                        # so it's captured here directly.
+                        output = event["data"].get("output") or {}
+                        if output.get("generated_images"):
+                            images = output["generated_images"]
+            except psycopg.OperationalError as exc:
+                if sent_any or attempts_remaining == 0:
+                    logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
+                    yield _sse("error", {"message": str(exc)})
+                    return
+                logger.warning(
+                    "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
+                    request_id, exc,
+                )
+                continue
+            except Exception as exc:
                 logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
                 yield _sse("error", {"message": str(exc)})
                 return
-            logger.warning(
-                "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
-                request_id, exc,
-            )
-            continue
-        except Exception as exc:
-            logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
-            yield _sse("error", {"message": str(exc)})
-            return
-        else:
-            break
+            else:
+                break
 
-    yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
+        yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
+    finally:
+        if conversations_pool is not None and write_lock_holder is not None:
+            await conversations.release_write_lock(conversations_pool, run_id=run_id, holder_sub=write_lock_holder)

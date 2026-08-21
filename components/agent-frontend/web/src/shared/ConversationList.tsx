@@ -15,6 +15,7 @@ import {
 } from "@patternfly/react-core";
 import { EllipsisVIcon, GripVerticalIcon, StarIcon } from "@patternfly/react-icons";
 import {
+  cloneConversation,
   deleteConversation,
   hardDeleteConversation,
   listConversations,
@@ -23,9 +24,13 @@ import {
   setStar,
   type Conversation,
 } from "./conversations";
+import { ShareDialog } from "./ShareDialog";
 
 export interface ConversationListProps {
   conversationsURL: string;
+  // ADR-0213: same-origin colleague-search endpoint, passed straight
+  // through to ShareDialog - this component never calls it directly.
+  colleaguesURL: string;
   // The run_id of the currently active in-app tab, if any - highlighted
   // in the list.
   activeRunId: string | null;
@@ -137,6 +142,7 @@ function ResizeHandle({
 // standalone star/trash buttons and double-click-to-rename stopgap.
 export function ConversationList({
   conversationsURL,
+  colleaguesURL,
   activeRunId,
   refreshSignal,
   width,
@@ -151,6 +157,11 @@ export function ConversationList({
   const [renameValue, setRenameValue] = React.useState("");
   const [openKebabRunId, setOpenKebabRunId] = React.useState<string | null>(null);
   const [draggedRunId, setDraggedRunId] = React.useState<string | null>(null);
+  // ADR-0213: the conversation currently open in the share dialog, if
+  // any - null closes it. Only run_id/title are needed (ShareDialog
+  // fetches its own member list once open).
+  const [sharing, setSharing] = React.useState<{ runId: string; title: string } | null>(null);
+  const [cloning, setCloning] = React.useState<string | null>(null);
   const renameInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
@@ -203,6 +214,22 @@ export function ConversationList({
       refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function cloneConversationRow(runId: string, title: string) {
+    setCloning(runId);
+    try {
+      const newRunId = await cloneConversation(conversationsURL, runId);
+      refresh();
+      // ADR-0213: the clone is immediately usable and solely owned by
+      // the caller - open it right away rather than leaving them to
+      // find it in the (now-refreshed) list themselves.
+      onOpenConversation(newRunId, title, false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCloning(null);
     }
   }
 
@@ -403,6 +430,25 @@ export function ConversationList({
                         {c.starred ? "Unstar" : "Star"}
                       </DropdownItem>
                       <DropdownItem
+                        key="share"
+                        onClick={() => {
+                          setOpenKebabRunId(null);
+                          setSharing({ runId: c.run_id, title: c.title });
+                        }}
+                      >
+                        Share
+                      </DropdownItem>
+                      <DropdownItem
+                        key="clone"
+                        isDisabled={cloning === c.run_id}
+                        onClick={() => {
+                          setOpenKebabRunId(null);
+                          void cloneConversationRow(c.run_id, c.title);
+                        }}
+                      >
+                        {cloning === c.run_id ? "Cloning…" : "Clone"}
+                      </DropdownItem>
+                      <DropdownItem
                         key="delete"
                         onClick={() => {
                           setOpenKebabRunId(null);
@@ -429,6 +475,16 @@ export function ConversationList({
           )}
         </div>
       </PageSidebarBody>
+      {sharing && (
+        <ShareDialog
+          isOpen
+          onClose={() => setSharing(null)}
+          conversationsURL={conversationsURL}
+          colleaguesURL={colleaguesURL}
+          runId={sharing.runId}
+          title={sharing.title}
+        />
+      )}
     </PageSidebar>
   );
 }

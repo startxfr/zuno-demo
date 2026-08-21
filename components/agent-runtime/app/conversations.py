@@ -23,11 +23,17 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
+# ADR-0213: the four access levels a subject can hold on a conversation -
+# "owner" is never a conversation_memberships row (see get_role below),
+# the other three are.
+Role = Literal["owner", "reader", "actor", "cloner"]
+
+import psycopg
 from fastapi import HTTPException
 from psycopg.rows import dict_row
-from psycopg_pool import AsyncConnectionPool
+from psycopg_pool import AsyncConnectionPool, PoolTimeout
 
 logger = logging.getLogger("agent_runtime.conversations")
 
@@ -91,6 +97,29 @@ WITH ranked AS (
 UPDATE conversations SET sort_order = ranked.rn
 FROM ranked
 WHERE conversations.run_id = ranked.run_id;
+
+-- ADR-0213: role-based sharing. Owner stays a plain conversations.owner_sub
+-- column (never a membership row - see get_role) so there is never a
+-- possibility of two disagreeing "owner" rows; these two tables hold
+-- everything else this ADR adds.
+CREATE TABLE IF NOT EXISTS conversation_memberships (
+    id          bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    run_id      text        NOT NULL REFERENCES conversations(run_id),
+    subject     text        NOT NULL,
+    role        text        NOT NULL CHECK (role IN ('reader', 'actor', 'cloner')),
+    granted_by  text        NOT NULL,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_conversation_memberships_run_subject UNIQUE (run_id, subject)
+);
+CREATE INDEX IF NOT EXISTS ix_conversation_memberships_run_id ON conversation_memberships (run_id);
+CREATE INDEX IF NOT EXISTS ix_conversation_memberships_subject ON conversation_memberships (subject);
+
+CREATE TABLE IF NOT EXISTS conversation_write_locks (
+    run_id           text        PRIMARY KEY REFERENCES conversations(run_id),
+    holder_sub       text        NOT NULL,
+    acquired_at      timestamptz NOT NULL DEFAULT now(),
+    lease_expires_at timestamptz NOT NULL
+);
 """
 
 
@@ -169,29 +198,43 @@ async def record_turn(
     inserts a new conversations row on first use of run_id (title derived
     from opening_message), or just bumps updated_at on resume (title is
     deliberately left untouched by the ON CONFLICT branch: a rename must
-    survive later turns). Silently no-ops when pool is None, unlike every
+    survive later turns). Silently no-ops when pool is None, and also when
+    a configured pool can't hand out a connection in time (PoolTimeout) or
+    hands back one that's already dead (OperationalError) - unlike every
     other function in this module - see this module's own docstring for
-    why record_turn alone must not fail closed."""
+    why record_turn alone must not fail closed. A live-cluster incident
+    (2026-08-21: repeated PoolTimeouts under concurrent multi-agent load,
+    single agent-runtime replica) showed this pool can genuinely time out
+    transiently; since this call is incidental bookkeeping bolted onto the
+    hot /chat path (app/main.py's agent_chat), not something the caller
+    asked for, it must degrade the same way an unconfigured pool already
+    does rather than 500 the whole chat reply over a missed metadata row."""
     if pool is None:
         return
     title = _derive_title(opening_message)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                INSERT INTO conversations (run_id, agent_name, owner_sub, title, sort_order)
-                VALUES (
-                    %(run_id)s, %(agent_name)s, %(owner_sub)s, %(title)s,
-                    COALESCE(
-                        (SELECT MIN(sort_order) FROM conversations
-                         WHERE agent_name = %(agent_name)s AND owner_sub = %(owner_sub)s),
-                        1
-                    ) - 1
+    try:
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO conversations (run_id, agent_name, owner_sub, title, sort_order)
+                    VALUES (
+                        %(run_id)s, %(agent_name)s, %(owner_sub)s, %(title)s,
+                        COALESCE(
+                            (SELECT MIN(sort_order) FROM conversations
+                             WHERE agent_name = %(agent_name)s AND owner_sub = %(owner_sub)s),
+                            1
+                        ) - 1
+                    )
+                    ON CONFLICT (run_id) DO UPDATE SET updated_at = now()
+                    """,
+                    {"run_id": run_id, "agent_name": agent_name, "owner_sub": owner_sub, "title": title},
                 )
-                ON CONFLICT (run_id) DO UPDATE SET updated_at = now()
-                """,
-                {"run_id": run_id, "agent_name": agent_name, "owner_sub": owner_sub, "title": title},
-            )
+    except (PoolTimeout, psycopg.OperationalError) as exc:
+        logger.warning(
+            "conversations pool unavailable, skipping metadata write: run_id=%s agent=%s: %s",
+            run_id, agent_name, exc,
+        )
 
 
 async def resolve_owner(pool: Optional[AsyncConnectionPool], run_id: str) -> Optional[str]:
@@ -358,3 +401,206 @@ async def hard_delete_conversation(pool: Optional[AsyncConnectionPool], *, run_i
             await cur.execute("DELETE FROM conversation_stars WHERE run_id = %s", (run_id,))
             await cur.execute("DELETE FROM conversations WHERE run_id = %s AND owner_sub = %s", (run_id, owner_sub))
     return True
+
+
+async def get_role(pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str) -> Optional[Role]:
+    """ADR-0213: three-tier role resolution - an owner_sub match first
+    (owner is implicit, never a membership row, so there is never a
+    possibility of two disagreeing "owner" rows for one conversation),
+    then a matching conversation_memberships row, else None. None is the
+    fail-closed default every caller must deny access on - this function
+    never guesses a default role. Used by app/main.py's _resolve_run_id
+    and every other access check this ADR widens from a bare
+    owner_sub == identity.sub comparison."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT owner_sub FROM conversations WHERE run_id = %s", (run_id,))
+            row = await cur.fetchone()
+            if row is None:
+                return None
+            if row["owner_sub"] == subject:
+                return "owner"
+            await cur.execute(
+                "SELECT role FROM conversation_memberships WHERE run_id = %s AND subject = %s",
+                (run_id, subject),
+            )
+            member = await cur.fetchone()
+    return member["role"] if member else None
+
+
+async def list_members(pool: Optional[AsyncConnectionPool], *, run_id: str) -> List[Dict[str, Any]]:
+    """ADR-0213: owner-only endpoint (enforced by the caller). Returns
+    every granted membership - never includes the owner, who is not a
+    membership row."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT subject, role, granted_by, created_at FROM conversation_memberships "
+                "WHERE run_id = %s ORDER BY created_at",
+                (run_id,),
+            )
+            rows = await cur.fetchall()
+    return [
+        {
+            "subject": r["subject"],
+            "role": r["role"],
+            "granted_by": r["granted_by"],
+            "created_at": r["created_at"].isoformat(),
+        }
+        for r in rows
+    ]
+
+
+async def grant_membership(
+    pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str, role: str, granted_by: str
+) -> None:
+    """ADR-0213: idempotent upsert - re-granting an already-granted
+    subject a different role updates it in place (the natural reading of
+    "the owner changed their mind about the role") rather than erroring."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO conversation_memberships (run_id, subject, role, granted_by) "
+                "VALUES (%s, %s, %s, %s) "
+                "ON CONFLICT (run_id, subject) DO UPDATE SET role = EXCLUDED.role, granted_by = EXCLUDED.granted_by",
+                (run_id, subject, role, granted_by),
+            )
+
+
+async def revoke_membership(pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str) -> bool:
+    """ADR-0213: soft revocation only, per the ADR's own Decision - no
+    live kick. Deletes the membership row; the collaborator's next access
+    then fails the get_role() fail-closed check above."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM conversation_memberships WHERE run_id = %s AND subject = %s",
+                (run_id, subject),
+            )
+            return cur.rowcount > 0
+
+
+async def transfer_ownership(
+    pool: Optional[AsyncConnectionPool], *, run_id: str, current_owner_sub: str, new_owner_sub: str
+) -> bool:
+    """ADR-0213: the outgoing owner is downgraded to an actor membership,
+    never losing access outright. A leftover membership row the new
+    owner may already have held (e.g. they were an actor before this
+    promotion) is harmless and left as-is - get_role() checks owner_sub
+    first and never reaches it."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE conversations SET owner_sub = %s, updated_at = now() WHERE run_id = %s AND owner_sub = %s",
+                (new_owner_sub, run_id, current_owner_sub),
+            )
+            if cur.rowcount == 0:
+                return False
+            await cur.execute(
+                "INSERT INTO conversation_memberships (run_id, subject, role, granted_by) "
+                "VALUES (%s, %s, 'actor', %s) "
+                "ON CONFLICT (run_id, subject) DO UPDATE SET role = 'actor', granted_by = EXCLUDED.granted_by",
+                (run_id, current_owner_sub, new_owner_sub),
+            )
+    return True
+
+
+async def clone_conversation(
+    pool: Optional[AsyncConnectionPool],
+    *,
+    source_run_id: str,
+    new_run_id: str,
+    owner_sub: str,
+) -> bool:
+    """ADR-0213: creates the new conversations row for a clone, owned
+    solely by the cloner, with no live sync back to the original -
+    agent_name and title are copied from the source row directly (a
+    correlated INSERT...SELECT) so the caller doesn't need to fetch and
+    re-pass them. The caller (app/main.py's clone endpoint) is
+    responsible for copying the LangGraph checkpoint's channel_values
+    into new_run_id's thread_id separately - this module never opens
+    that pool (module docstring). sort_order follows record_turn's own
+    convention: always lands above everything else in the new owner's
+    list. Returns False if source_run_id doesn't exist (the caller
+    already checked a role against it, so this should only fail if the
+    source was deleted in a race)."""
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO conversations (run_id, agent_name, owner_sub, title, source_run_id, sort_order)
+                SELECT
+                    %(new_run_id)s, c.agent_name, %(owner_sub)s, c.title, %(source_run_id)s,
+                    COALESCE(
+                        (SELECT MIN(sort_order) FROM conversations
+                         WHERE agent_name = c.agent_name AND owner_sub = %(owner_sub)s),
+                        1
+                    ) - 1
+                FROM conversations c WHERE c.run_id = %(source_run_id)s
+                """,
+                {"new_run_id": new_run_id, "owner_sub": owner_sub, "source_run_id": source_run_id},
+            )
+            return cur.rowcount > 0
+
+
+_WRITE_LOCK_TTL_SECONDS = 30
+
+
+async def acquire_write_lock(pool: Optional[AsyncConnectionPool], *, run_id: str, holder_sub: str) -> bool:
+    """ADR-0213: single-active-writer lease. Like record_turn, this is
+    one of the two functions in this module that must not fail closed on
+    a None pool - chat itself must keep working when conversation
+    persistence isn't configured, and without it there is no
+    conversation_memberships row anyone else could hold to even contend
+    for this lock, so an unconfigured pool trivially always "acquires"
+    (True).
+
+    The UPDATE...WHERE guards against silently stealing a still-live
+    lease out from under its legitimate holder; it also lets the SAME
+    holder renew their own lease (the `OR holder_sub = EXCLUDED.holder_sub`
+    branch), which _stream_chat needs to do repeatedly while a reply
+    streams. Returns False (the caller maps this to 409) when someone
+    else already holds a live lease."""
+    if pool is None:
+        return True
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO conversation_write_locks (run_id, holder_sub, acquired_at, lease_expires_at)
+                VALUES (%(run_id)s, %(holder_sub)s, now(), now() + make_interval(secs => %(ttl)s))
+                ON CONFLICT (run_id) DO UPDATE SET
+                    holder_sub = EXCLUDED.holder_sub,
+                    acquired_at = EXCLUDED.acquired_at,
+                    lease_expires_at = EXCLUDED.lease_expires_at
+                WHERE conversation_write_locks.lease_expires_at < now()
+                   OR conversation_write_locks.holder_sub = EXCLUDED.holder_sub
+                """,
+                {"run_id": run_id, "holder_sub": holder_sub, "ttl": _WRITE_LOCK_TTL_SECONDS},
+            )
+            return cur.rowcount > 0
+
+
+async def release_write_lock(pool: Optional[AsyncConnectionPool], *, run_id: str, holder_sub: str) -> None:
+    """ADR-0213: released in the chat endpoint's finally/disconnect
+    handler; the lease TTL is the fallback for a hard crash that skips
+    this. Scoped to holder_sub so a lease already stolen by someone else
+    (this holder's own lease expired first) is never released out from
+    under its new legitimate holder. No-ops on an unconfigured pool, same
+    as acquire_write_lock above - nothing to release."""
+    if pool is None:
+        return
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM conversation_write_locks WHERE run_id = %s AND holder_sub = %s",
+                (run_id, holder_sub),
+            )

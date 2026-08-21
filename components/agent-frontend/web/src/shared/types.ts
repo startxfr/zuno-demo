@@ -57,6 +57,9 @@ export interface ChatConfig {
   // shared/ConversationList.tsx builds the transcript/rename/star
   // endpoints by appending to this base at request time.
   conversationsURL: string;
+  // ADR-0213: same-origin colleague-search endpoint this page's Go
+  // server proxies to the BFF - always "/api/colleagues" today.
+  colleaguesURL: string;
   // ADR-0515: every OTHER agent this signed-in caller is entitled to and
   // that is active/clickable, entitlement-filtered server-side
   // (internal/chat/chat.go's buildAgentNavStrip, reusing

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -69,3 +69,13 @@ class ReorderConversationsRequest(BaseModel):
     # caller's full desired run_id order for this agent (as returned by
     # GET .../conversations); each entry's index becomes its sort_order.
     run_ids: List[str] = Field(min_length=1)
+
+
+class GrantMembershipRequest(BaseModel):
+    # ADR-0213: PUT /v1/agents/{agent}/runs/{run_id}/members/{subject} body.
+    role: Literal["reader", "actor", "cloner"]
+
+
+class TransferOwnershipRequest(BaseModel):
+    # ADR-0213: PATCH /v1/agents/{agent}/runs/{run_id}/owner body.
+    new_owner_sub: str = Field(min_length=1)

@@ -48,17 +48,40 @@ type Config struct {
 	// during integration). Owned by a parallel track; this BFF only calls
 	// its documented HTTP contract (POST /v1/agents/{agent}/chat).
 	AgentRuntimeBaseURL string
+
+	// KeycloakAdminBaseURL, KeycloakAdminClientID and
+	// KeycloakAdminClientSecret (ADR-0213) configure the Keycloak Admin
+	// REST API trust boundary GET /api/colleagues needs - a genuinely new
+	// outbound credential class for this BFF, which otherwise only does
+	// read-only JWKS verification. All three deliberately default to
+	// empty: this trust boundary is provisioned as a separate operator
+	// step (WP-066's own Operator/human follow-up, needing explicit
+	// reviewer sign-off per the ADR's Security considerations), not
+	// something a fresh deploy has automatically. internal/keycloak's
+	// AdminClient is nil (unconfigured) unless all three are set; the
+	// colleague-search handler fails closed (503) on a nil client,
+	// same "configured but broken" vs. "off" split every other optional
+	// dependency in this codebase already uses. Base URL is a separate
+	// in-cluster-reachable host (not derived from KeycloakIssuerURL),
+	// same TLS-trust rationale as KeycloakJWKSURL above - the external
+	// Route's cert chain isn't in this container's trust store.
+	KeycloakAdminBaseURL      string
+	KeycloakAdminClientID     string
+	KeycloakAdminClientSecret string
 }
 
 // Load reads configuration from the environment.
 func Load() (*Config, error) {
 	cfg := &Config{
-		ListenAddr:          getenv("LISTEN_ADDR", ":8080"),
-		AgentName:           getenv("AGENT_NAME", "tekos"),
-		KeycloakIssuerURL:   getenv("KEYCLOAK_ISSUER_URL", ""),
-		KeycloakJWKSURL:     getenv("KEYCLOAK_JWKS_URL", ""),
-		OIDCAudience:        getenv("OIDC_AUDIENCE", "tekos-frontend"),
-		AgentRuntimeBaseURL: getenv("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
+		ListenAddr:                getenv("LISTEN_ADDR", ":8080"),
+		AgentName:                 getenv("AGENT_NAME", "tekos"),
+		KeycloakIssuerURL:         getenv("KEYCLOAK_ISSUER_URL", ""),
+		KeycloakJWKSURL:           getenv("KEYCLOAK_JWKS_URL", ""),
+		OIDCAudience:              getenv("OIDC_AUDIENCE", "tekos-frontend"),
+		AgentRuntimeBaseURL:       getenv("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
+		KeycloakAdminBaseURL:      getenv("KEYCLOAK_ADMIN_BASE_URL", ""),
+		KeycloakAdminClientID:     getenv("KEYCLOAK_ADMIN_CLIENT_ID", ""),
+		KeycloakAdminClientSecret: getenv("KEYCLOAK_ADMIN_CLIENT_SECRET", ""),
 	}
 
 	if cfg.KeycloakIssuerURL == "" {

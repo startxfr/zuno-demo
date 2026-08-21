@@ -19,10 +19,15 @@ import (
 
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/config"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/jwks"
+	"github.com/startxfr/zuno-demo/components/agent-bff/internal/keycloak"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/reqid"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/runtime"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/telemetry"
 )
+
+// zunoRealm is the single Keycloak realm this whole platform uses
+// (ADR-0012) - never per-agent, unlike AgentName.
+const zunoRealm = "zuno"
 
 func main() {
 	cfg, err := config.Load()
@@ -39,6 +44,13 @@ func main() {
 
 	verifier := jwks.NewVerifier(cfg.KeycloakIssuerURL, cfg.KeycloakJWKSURL, cfg.OIDCAudience)
 	runtimeClient := runtime.NewClient(cfg.AgentRuntimeBaseURL, cfg.AgentName)
+	// ADR-0213: nil (colleague search fails closed, 503) until an
+	// operator provisions the zuno-admin-api trust boundary - see
+	// config.Config's own doc comment.
+	adminClient := keycloak.NewAdminClient(cfg.KeycloakAdminBaseURL, zunoRealm, cfg.KeycloakAdminClientID, cfg.KeycloakAdminClientSecret)
+	if adminClient == nil {
+		log.Printf("agent-bff: KEYCLOAK_ADMIN_* not fully configured - GET /api/colleagues will fail closed (503)")
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthzHandler)
@@ -55,6 +67,14 @@ func main() {
 	// ADR-0515: manual drag-reorder and irreversible hard-delete.
 	mux.HandleFunc("PUT /api/conversations/reorder", reorderConversationsHandler(verifier, runtimeClient, cfg.AgentName))
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/hard-delete", hardDeleteConversationHandler(verifier, runtimeClient, cfg.AgentName))
+	// ADR-0213: role-based conversation sharing.
+	mux.HandleFunc("GET /api/conversations/{run_id}/members", listMembersHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("PUT /api/conversations/{run_id}/members/{subject}", grantMembershipHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("DELETE /api/conversations/{run_id}/members/{subject}", revokeMembershipHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("PATCH /api/conversations/{run_id}/owner", transferOwnershipHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("POST /api/conversations/{run_id}/clone", cloneConversationHandler(verifier, runtimeClient, cfg.AgentName))
+	// ADR-0213: BFF-only, never forwards to agent-runtime.
+	mux.HandleFunc("GET /api/colleagues", listColleaguesHandler(verifier, adminClient, cfg.AgentName))
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -232,6 +252,62 @@ type apiReorderResponse struct {
 // irreversible, unlike apiArchiveResponse's soft-delete.
 type apiHardDeleteResponse struct {
 	Deleted bool `json:"deleted"`
+}
+
+// apiMember is the frontend-facing shape of one conversation-membership
+// entry (ADR-0213, GET /api/conversations/{run_id}/members).
+type apiMember struct {
+	Subject   string `json:"subject"`
+	Role      string `json:"role"`
+	GrantedBy string `json:"granted_by"`
+	CreatedAt string `json:"created_at"`
+}
+
+// apiGrantMembershipRequest is the frontend-facing request body for
+// PUT /api/conversations/{run_id}/members/{subject} (ADR-0213).
+type apiGrantMembershipRequest struct {
+	Role string `json:"role"`
+}
+
+// apiGrantMembershipResponse is that endpoint's frontend-facing response body.
+type apiGrantMembershipResponse struct {
+	Subject string `json:"subject"`
+	Role    string `json:"role"`
+}
+
+// apiRevokeMembershipResponse is the frontend-facing response body for
+// DELETE /api/conversations/{run_id}/members/{subject} (ADR-0213).
+type apiRevokeMembershipResponse struct {
+	Revoked bool `json:"revoked"`
+}
+
+// apiTransferOwnershipRequest is the frontend-facing request body for
+// PATCH /api/conversations/{run_id}/owner (ADR-0213).
+type apiTransferOwnershipRequest struct {
+	NewOwnerSub string `json:"new_owner_sub"`
+}
+
+// apiTransferOwnershipResponse is that endpoint's frontend-facing response body.
+type apiTransferOwnershipResponse struct {
+	RunID    string `json:"run_id"`
+	OwnerSub string `json:"owner_sub"`
+}
+
+// apiCloneConversationResponse is the frontend-facing response body for
+// POST /api/conversations/{run_id}/clone (ADR-0213).
+type apiCloneConversationResponse struct {
+	RunID       string `json:"run_id"`
+	SourceRunID string `json:"source_run_id"`
+}
+
+// apiColleague is one GET /api/colleagues search result. Ineligible
+// candidates are still included (Eligible: false) so the frontend can
+// grey them out rather than hide them, per the ADR's explicit product
+// requirement.
+type apiColleague struct {
+	Sub         string `json:"sub"`
+	DisplayName string `json:"displayName"`
+	Eligible    bool   `json:"eligible"`
 }
 
 // chatHandler validates and authorizes the caller, then either proxies a
@@ -654,6 +730,231 @@ func hardDeleteConversationHandler(verifier *jwks.Verifier, runtimeClient *runti
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(apiHardDeleteResponse{Deleted: result.Deleted})
+	}
+}
+
+// listMembersHandler handles GET /api/conversations/{run_id}/members
+// (ADR-0213): owner-only.
+func listMembersHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		members, err := runtimeClient.ListMembers(ctx, token, r.PathValue("run_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime list-members call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		out := make([]apiMember, len(members))
+		for i, m := range members {
+			out[i] = apiMember{Subject: m.Subject, Role: m.Role, GrantedBy: m.GrantedBy, CreatedAt: m.CreatedAt}
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// grantMembershipHandler handles
+// PUT /api/conversations/{run_id}/members/{subject} (ADR-0213):
+// owner-only. Eligibility of {subject} is the frontend's own
+// responsibility (it only offers eligible colleagues from
+// GET /api/colleagues) - this handler and the Agent Runtime endpoint it
+// proxies to both trust that computation rather than re-verifying it,
+// the ADR's own explicitly-accepted trust boundary.
+func grantMembershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		var req apiGrantMembershipRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		switch req.Role {
+		case "reader", "actor", "cloner":
+		default:
+			writeError(w, http.StatusBadRequest, "role must be one of reader, actor, cloner")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.GrantMembership(ctx, token, r.PathValue("run_id"), r.PathValue("subject"), req.Role)
+		if err != nil {
+			log.Printf("agent-bff: agent runtime grant-membership call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiGrantMembershipResponse{Subject: result.Subject, Role: result.Role})
+	}
+}
+
+// revokeMembershipHandler handles
+// DELETE /api/conversations/{run_id}/members/{subject} (ADR-0213):
+// owner-only, soft revocation.
+func revokeMembershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.RevokeMembership(ctx, token, r.PathValue("run_id"), r.PathValue("subject"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime revoke-membership call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiRevokeMembershipResponse{Revoked: result.Revoked})
+	}
+}
+
+// transferOwnershipHandler handles PATCH /api/conversations/{run_id}/owner
+// (ADR-0213): owner-only.
+func transferOwnershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		var req apiTransferOwnershipRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if strings.TrimSpace(req.NewOwnerSub) == "" {
+			writeError(w, http.StatusBadRequest, "new_owner_sub is required")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.TransferOwnership(ctx, token, r.PathValue("run_id"), req.NewOwnerSub)
+		if err != nil {
+			log.Printf("agent-bff: agent runtime transfer-ownership call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiTransferOwnershipResponse{RunID: result.RunID, OwnerSub: result.OwnerSub})
+	}
+}
+
+// cloneConversationHandler handles POST /api/conversations/{run_id}/clone
+// (ADR-0213): owner or cloner only.
+func cloneConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.CloneConversation(ctx, token, r.PathValue("run_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime clone-conversation call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiCloneConversationResponse{RunID: result.RunID, SourceRunID: result.SourceRunID})
+	}
+}
+
+// listColleaguesHandler handles GET /api/colleagues (ADR-0213): BFF-only,
+// never forwards to agent-runtime. Fails closed (503) when adminClient is
+// nil (the zuno-admin-api trust boundary isn't provisioned yet) or when
+// the Keycloak Admin API call itself fails - never returns a silent
+// empty/wrong list. Eligibility: a candidate must hold this agent's own
+// entitlement group AND share at least one business-role group with the
+// caller - both computed here from live Keycloak group membership, never
+// re-verified by agent-runtime's grant endpoint (that endpoint trusts
+// this computation, the ADR's own explicitly-accepted trust boundary).
+func listColleaguesHandler(verifier *jwks.Verifier, adminClient *keycloak.AdminClient, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		_, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+		if adminClient == nil {
+			writeError(w, http.StatusServiceUnavailable, "colleague search is unavailable")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		users, err := adminClient.SearchUsers(ctx, r.URL.Query().Get("q"))
+		if err != nil {
+			log.Printf("agent-bff: keycloak admin user search failed: %v", err)
+			writeError(w, http.StatusServiceUnavailable, "colleague search is unavailable")
+			return
+		}
+
+		callerGroups := make(map[string]struct{}, len(identity.groups))
+		for _, g := range identity.groups {
+			callerGroups[strings.TrimPrefix(g, "/")] = struct{}{}
+		}
+
+		out := make([]apiColleague, 0, len(users))
+		for _, u := range users {
+			if u.ID == identity.sub {
+				continue // never offer the caller themselves as a share target
+			}
+			groups, err := adminClient.UserGroups(ctx, u.ID)
+			if err != nil {
+				log.Printf("agent-bff: keycloak admin group lookup failed for user %q: %v", u.ID, err)
+				continue // skip this one candidate rather than fail the whole search
+			}
+			hasEntitlement := false
+			sharesBusinessRole := false
+			for _, g := range groups {
+				if g == entitlementGroup {
+					hasEntitlement = true
+				} else if _, shared := callerGroups[g]; shared {
+					sharesBusinessRole = true
+				}
+			}
+			out = append(out, apiColleague{
+				Sub:         u.ID,
+				DisplayName: u.DisplayName(),
+				Eligible:    hasEntitlement && sharesBusinessRole,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(out)
 	}
 }
 

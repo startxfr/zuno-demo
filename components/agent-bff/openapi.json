@@ -189,6 +189,117 @@
         }
       }
     },
+    "/api/conversations/{run_id}/members": {
+      "get": {
+        "operationId": "listMembers",
+        "summary": "List a conversation's granted memberships (ADR-0213)",
+        "description": "Owner-only. Never includes the owner, who is not a membership row.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "The conversation's granted memberships.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Member" } } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}/members/{subject}": {
+      "put": {
+        "operationId": "grantMembership",
+        "summary": "Grant a colleague a role on a conversation (ADR-0213)",
+        "description": "Owner-only. Eligibility of {subject} (holds this agent's entitlement and shares a business-role group with the caller) is the frontend's own responsibility via GET /api/colleagues - this endpoint trusts that computation rather than re-verifying it, the ADR's own explicitly-accepted trust boundary.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "subject", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantMembershipRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Granted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantMembershipResponse" } } } },
+          "400": { "description": "Invalid request body (role not one of reader, actor, cloner).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "revokeMembership",
+        "summary": "Revoke a colleague's role on a conversation (ADR-0213)",
+        "description": "Owner-only, soft revocation - no live kick. The collaborator's already-open tab keeps working until their next access, which then fails the fail-closed role check.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "subject", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Revoked.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RevokeMembershipResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}/owner": {
+      "patch": {
+        "operationId": "transferOwnership",
+        "summary": "Transfer ownership of a conversation (ADR-0213)",
+        "description": "Owner-only. The outgoing owner is downgraded to an actor membership, never losing access outright.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransferOwnershipRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Transferred.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransferOwnershipResponse" } } } },
+          "400": { "description": "Invalid request body (missing/empty new_owner_sub).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/conversations/{run_id}/clone": {
+      "post": {
+        "operationId": "cloneConversation",
+        "summary": "Clone a conversation into a new, independently-owned one (ADR-0213)",
+        "description": "Owner or cloner only. Copies the source's full checkpoint into a fresh thread - no live sync back to the original.",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Cloned.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CloneConversationResponse" } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "No conversation found for this run_id owned by the caller (or the caller's role is neither owner nor cloner).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/colleagues": {
+      "get": {
+        "operationId": "listColleagues",
+        "summary": "Search colleagues eligible to be granted a role on a conversation (ADR-0213)",
+        "description": "BFF-only - does not call the Agent Runtime. Calls Keycloak's Admin REST API via a dedicated confidential client (zuno-admin-api, view-users/query-users scope only) to search users by q, then computes eligibility: a candidate is eligible only if they hold this agent's agent_<AGENT_NAME> entitlement group AND share at least one business-role group with the caller. Ineligible candidates are still returned (eligible: false) so the frontend can grey them out rather than hide them. Fails closed (503) if the Keycloak Admin API client isn't provisioned (KEYCLOAK_ADMIN_CLIENT_ID/_SECRET unset) - never returns a silent empty list.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": false, "description": "Search text (name/username/email prefix).", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Matching colleagues.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Colleague" } } } } },
+          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "503": { "description": "The Keycloak Admin API trust boundary isn't provisioned yet, or Keycloak's Admin API is unreachable.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
     "/api/conversations/{run_id}/star": {
       "put": {
         "operationId": "starConversation",
@@ -343,6 +454,73 @@
         "required": ["deleted"],
         "properties": {
           "deleted": { "type": "boolean" }
+        }
+      },
+      "Member": {
+        "type": "object",
+        "description": "ADR-0213: one granted conversation membership (never the owner, who is not a membership row).",
+        "required": ["subject", "role", "granted_by", "created_at"],
+        "properties": {
+          "subject": { "type": "string" },
+          "role": { "type": "string", "enum": ["reader", "actor", "cloner"] },
+          "granted_by": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "GrantMembershipRequest": {
+        "type": "object",
+        "required": ["role"],
+        "properties": {
+          "role": { "type": "string", "enum": ["reader", "actor", "cloner"] }
+        }
+      },
+      "GrantMembershipResponse": {
+        "type": "object",
+        "required": ["subject", "role"],
+        "properties": {
+          "subject": { "type": "string" },
+          "role": { "type": "string", "enum": ["reader", "actor", "cloner"] }
+        }
+      },
+      "RevokeMembershipResponse": {
+        "type": "object",
+        "required": ["revoked"],
+        "properties": {
+          "revoked": { "type": "boolean" }
+        }
+      },
+      "TransferOwnershipRequest": {
+        "type": "object",
+        "required": ["new_owner_sub"],
+        "properties": {
+          "new_owner_sub": { "type": "string", "minLength": 1 }
+        }
+      },
+      "TransferOwnershipResponse": {
+        "type": "object",
+        "required": ["run_id", "owner_sub"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "owner_sub": { "type": "string" }
+        }
+      },
+      "CloneConversationResponse": {
+        "type": "object",
+        "description": "ADR-0213: the newly-created, independently-owned conversation.",
+        "required": ["run_id", "source_run_id"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "source_run_id": { "type": "string" }
+        }
+      },
+      "Colleague": {
+        "type": "object",
+        "description": "ADR-0213: one GET /api/colleagues search result. Ineligible candidates are still included (eligible: false) so the frontend can grey them out rather than hide them.",
+        "required": ["sub", "displayName", "eligible"],
+        "properties": {
+          "sub": { "type": "string" },
+          "displayName": { "type": "string" },
+          "eligible": { "type": "boolean" }
         }
       },
       "ErrorResponse": {

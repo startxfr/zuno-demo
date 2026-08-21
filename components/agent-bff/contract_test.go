@@ -102,6 +102,11 @@ func TestOpenAPISpecIsWellFormed(t *testing.T) {
 		"/api/conversations/{run_id}/star",
 		"/api/conversations/reorder",
 		"/api/conversations/{run_id}/hard-delete",
+		"/api/conversations/{run_id}/members",
+		"/api/conversations/{run_id}/members/{subject}",
+		"/api/conversations/{run_id}/owner",
+		"/api/conversations/{run_id}/clone",
+		"/api/colleagues",
 	}
 	for _, path := range paths {
 		if _, ok := doc.Paths[path]; !ok {
@@ -164,4 +169,38 @@ func TestReorderResponseMatchesOpenAPISpec(t *testing.T) {
 
 func TestHardDeleteResponseMatchesOpenAPISpec(t *testing.T) {
 	assertMatchesSchema(t, loadOpenAPISpec(t), apiHardDeleteResponse{}, "HardDeleteResponse")
+}
+
+// ADR-0213 wire structs.
+
+func TestMemberMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiMember{}, "Member")
+}
+
+func TestGrantMembershipRequestMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiGrantMembershipRequest{}, "GrantMembershipRequest")
+}
+
+func TestGrantMembershipResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiGrantMembershipResponse{}, "GrantMembershipResponse")
+}
+
+func TestRevokeMembershipResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiRevokeMembershipResponse{}, "RevokeMembershipResponse")
+}
+
+func TestTransferOwnershipRequestMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiTransferOwnershipRequest{}, "TransferOwnershipRequest")
+}
+
+func TestTransferOwnershipResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiTransferOwnershipResponse{}, "TransferOwnershipResponse")
+}
+
+func TestCloneConversationResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiCloneConversationResponse{}, "CloneConversationResponse")
+}
+
+func TestColleagueMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiColleague{}, "Colleague")
 }

@@ -146,6 +146,52 @@ type HardDeleteResponse struct {
 	Deleted bool `json:"deleted"`
 }
 
+// Member mirrors one entry of the Agent Runtime's membership list
+// (ADR-0213, GET /v1/agents/{agent}/runs/{run_id}/members).
+type Member struct {
+	Subject   string `json:"subject"`
+	Role      string `json:"role"`
+	GrantedBy string `json:"granted_by"`
+	CreatedAt string `json:"created_at"`
+}
+
+// GrantMembershipRequest is the Agent Runtime's documented request body
+// for PUT /v1/agents/{agent}/runs/{run_id}/members/{subject} (ADR-0213).
+type GrantMembershipRequest struct {
+	Role string `json:"role"`
+}
+
+// GrantMembershipResponse is that endpoint's documented response body.
+type GrantMembershipResponse struct {
+	Subject string `json:"subject"`
+	Role    string `json:"role"`
+}
+
+// RevokeMembershipResponse is the documented response body for
+// DELETE /v1/agents/{agent}/runs/{run_id}/members/{subject} (ADR-0213).
+type RevokeMembershipResponse struct {
+	Revoked bool `json:"revoked"`
+}
+
+// TransferOwnershipRequest is the Agent Runtime's documented request body
+// for PATCH /v1/agents/{agent}/runs/{run_id}/owner (ADR-0213).
+type TransferOwnershipRequest struct {
+	NewOwnerSub string `json:"new_owner_sub"`
+}
+
+// TransferOwnershipResponse is that endpoint's documented response body.
+type TransferOwnershipResponse struct {
+	RunID    string `json:"run_id"`
+	OwnerSub string `json:"owner_sub"`
+}
+
+// CloneConversationResponse is the documented response body for
+// POST /v1/agents/{agent}/runs/{run_id}/clone (ADR-0213).
+type CloneConversationResponse struct {
+	RunID       string `json:"run_id"`
+	SourceRunID string `json:"source_run_id"`
+}
+
 // ChatResponse is the Agent Runtime's documented response body.
 //
 // ADR-0215: RunID/SourceMode were silently dropped here until this fix -
@@ -399,6 +445,65 @@ func (c *Client) HardDeleteConversation(ctx context.Context, bearerToken, runID 
 	path := fmt.Sprintf("/v1/agents/%s/runs/%s/hard-delete", c.agentName, url.PathEscape(runID))
 	var out HardDeleteResponse
 	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListMembers calls GET /v1/agents/{agent}/runs/{run_id}/members
+// (ADR-0213) - owner-only.
+func (c *Client) ListMembers(ctx context.Context, bearerToken, runID string) ([]Member, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s/members", c.agentName, url.PathEscape(runID))
+	var out []Member
+	if err := c.doJSON(ctx, http.MethodGet, bearerToken, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GrantMembership calls PUT /v1/agents/{agent}/runs/{run_id}/members/{subject}
+// (ADR-0213) - owner-only.
+func (c *Client) GrantMembership(ctx context.Context, bearerToken, runID, subject, role string) (*GrantMembershipResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s/members/%s", c.agentName, url.PathEscape(runID), url.PathEscape(subject))
+	var out GrantMembershipResponse
+	body := GrantMembershipRequest{Role: role}
+	if err := c.doJSON(ctx, http.MethodPut, bearerToken, path, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// RevokeMembership calls DELETE /v1/agents/{agent}/runs/{run_id}/members/{subject}
+// (ADR-0213) - owner-only, soft revocation.
+func (c *Client) RevokeMembership(ctx context.Context, bearerToken, runID, subject string) (*RevokeMembershipResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s/members/%s", c.agentName, url.PathEscape(runID), url.PathEscape(subject))
+	var out RevokeMembershipResponse
+	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// TransferOwnership calls PATCH /v1/agents/{agent}/runs/{run_id}/owner
+// (ADR-0213) - owner-only; the outgoing owner is downgraded to actor,
+// never losing access outright.
+func (c *Client) TransferOwnership(ctx context.Context, bearerToken, runID, newOwnerSub string) (*TransferOwnershipResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s/owner", c.agentName, url.PathEscape(runID))
+	var out TransferOwnershipResponse
+	body := TransferOwnershipRequest{NewOwnerSub: newOwnerSub}
+	if err := c.doJSON(ctx, http.MethodPatch, bearerToken, path, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CloneConversation calls POST /v1/agents/{agent}/runs/{run_id}/clone
+// (ADR-0213) - owner or cloner only; copies the checkpoint into a fresh,
+// independently-owned conversation with no live sync back.
+func (c *Client) CloneConversation(ctx context.Context, bearerToken, runID string) (*CloneConversationResponse, error) {
+	path := fmt.Sprintf("/v1/agents/%s/runs/%s/clone", c.agentName, url.PathEscape(runID))
+	var out CloneConversationResponse
+	if err := c.doJSON(ctx, http.MethodPost, bearerToken, path, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

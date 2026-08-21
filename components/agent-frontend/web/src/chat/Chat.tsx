@@ -80,6 +80,12 @@ interface TabState {
   toolStatus: string | null;
   loadingHistory: boolean;
   error: string | null;
+  // ADR-0213: true when the last send() hit the single-active-writer
+  // lease's 409 (another collaborator is currently writing) - the
+  // composer disables and offers a retry instead of showing this as a
+  // generic error, since it's an expected, transient contention state,
+  // not a failure.
+  busy: boolean;
 }
 
 function newTab(opts: { runId: string | null; title?: string; starred?: boolean; input?: string }): TabState {
@@ -95,6 +101,7 @@ function newTab(opts: { runId: string | null; title?: string; starred?: boolean;
     toolStatus: null,
     loadingHistory: opts.runId !== null,
     error: null,
+    busy: false,
   };
 }
 
@@ -257,7 +264,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       return;
     }
 
-    updateTab(tab.id, (t) => ({ ...t, input: "", sending: true, toolStatus: null, error: null }));
+    updateTab(tab.id, (t) => ({ ...t, input: "", sending: true, toolStatus: null, error: null, busy: false }));
 
     const userMessageId = newId();
     const agentMessageId = newId();
@@ -287,6 +294,20 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         }),
         signal: controller.signal,
       });
+
+      if (resp.status === 409) {
+        // ADR-0213: another collaborator currently holds the
+        // single-active-writer lease - no turn was actually sent, so
+        // drop the two placeholder messages just added and restore the
+        // draft rather than showing this as a generic error.
+        updateTab(tab.id, (t) => ({
+          ...t,
+          messages: t.messages.filter((m) => m.id !== userMessageId && m.id !== agentMessageId),
+          input: text,
+          busy: true,
+        }));
+        return;
+      }
 
       if (!resp.ok || !resp.body) {
         const body = await resp.text().catch(() => "");
@@ -446,6 +467,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       sidebar={
         <ConversationList
           conversationsURL={config.conversationsURL}
+          colleaguesURL={config.colleaguesURL}
           activeRunId={activeTab?.runId ?? null}
           refreshSignal={conversationsRefreshToken}
           width={sidebarWidth}
@@ -548,6 +570,25 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                 {activeTab.error}
               </Alert>
             )}
+            {activeTab.busy && (
+              // ADR-0213: another collaborator holds the write lease -
+              // expected, transient contention, not a failure. The lease
+              // is short (30s), so a plain retry (clearing busy so the
+              // composer re-enables) is the whole recovery flow.
+              <Alert
+                variant="info"
+                isInline
+                title="Someone else is currently writing to this conversation"
+                style={{ marginBottom: "1rem" }}
+                actionLinks={
+                  <Button variant="link" isInline onClick={() => updateTab(activeTab.id, (t) => ({ ...t, busy: false }))}>
+                    Retry
+                  </Button>
+                }
+              >
+                Your message wasn&rsquo;t sent. Try again in a moment.
+              </Alert>
+            )}
             <Form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -560,7 +601,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                     aria-label="Ask a technical question"
                     placeholder="Ask a technical question…"
                     value={activeTab.input}
-                    onChange={(_e, value) => updateTab(activeTab.id, (t) => ({ ...t, input: value }))}
+                    onChange={(_e, value) => updateTab(activeTab.id, (t) => ({ ...t, input: value, busy: false }))}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -568,7 +609,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                       }
                     }}
                     autoResize
-                    isDisabled={activeTab.sending}
+                    isDisabled={activeTab.sending || activeTab.busy}
                     rows={1}
                   />
                 </FlexItem>
@@ -578,7 +619,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                       Stop
                     </Button>
                   ) : (
-                    <Button variant="primary" type="submit" isDisabled={!activeTab.input.trim()}>
+                    <Button variant="primary" type="submit" isDisabled={!activeTab.input.trim() || activeTab.busy}>
                       Send
                     </Button>
                   )}

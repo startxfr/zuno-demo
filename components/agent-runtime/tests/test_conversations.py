@@ -24,6 +24,7 @@ import asyncio
 import os
 import pathlib
 import sys
+from contextlib import asynccontextmanager
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
@@ -32,10 +33,30 @@ os.environ.setdefault("AGENTS_DIR", str(_REPO_ROOT / "agents"))
 
 from fastapi import HTTPException  # noqa: E402
 from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
+from psycopg_pool import PoolTimeout  # noqa: E402
 
 import app.conversations as conversations_module  # noqa: E402
 from app.auth import CallerIdentity  # noqa: E402
-from app.conversations import _conninfo, _derive_title, archive_conversation, hard_delete_conversation, list_conversations, pool_context, rename_conversation, reorder_conversations, resolve_owner, set_star  # noqa: E402
+from app.conversations import (  # noqa: E402
+    _conninfo,
+    _derive_title,
+    acquire_write_lock,
+    archive_conversation,
+    clone_conversation,
+    get_role,
+    grant_membership,
+    hard_delete_conversation,
+    list_conversations,
+    list_members,
+    pool_context,
+    release_write_lock,
+    rename_conversation,
+    reorder_conversations,
+    resolve_owner,
+    revoke_membership,
+    set_star,
+    transfer_ownership,
+)
 from app.graph.nodes import _ANSWER_TASK, _TEKOS  # noqa: E402
 from app.graph.shapes.retrieve_reason_respond import build as _build  # noqa: E402
 from app.main import _resolve_run_id  # noqa: E402
@@ -173,12 +194,74 @@ async def test_hard_delete_conversation_fails_closed_on_a_none_pool() -> None:
     await _expect_503(hard_delete_conversation(None, run_id="run-abc", owner_sub="alice"))
 
 
+async def test_get_role_fails_closed_on_a_none_pool() -> None:
+    """ADR-0213: same fail-closed posture as every other reader in this
+    module - a caller must never treat "pool unreachable" as "no role,
+    but proceed anyway"."""
+    await _expect_503(get_role(None, run_id="run-abc", subject="alice"))
+
+
+async def test_list_members_fails_closed_on_a_none_pool() -> None:
+    await _expect_503(list_members(None, run_id="run-abc"))
+
+
+async def test_grant_membership_fails_closed_on_a_none_pool() -> None:
+    await _expect_503(grant_membership(None, run_id="run-abc", subject="bob", role="actor", granted_by="alice"))
+
+
+async def test_revoke_membership_fails_closed_on_a_none_pool() -> None:
+    await _expect_503(revoke_membership(None, run_id="run-abc", subject="bob"))
+
+
+async def test_transfer_ownership_fails_closed_on_a_none_pool() -> None:
+    await _expect_503(transfer_ownership(None, run_id="run-abc", current_owner_sub="alice", new_owner_sub="bob"))
+
+
+async def test_clone_conversation_fails_closed_on_a_none_pool() -> None:
+    await _expect_503(clone_conversation(None, source_run_id="run-abc", new_run_id="run-def", owner_sub="bob"))
+
+
+async def test_acquire_write_lock_trivially_succeeds_on_a_none_pool() -> None:
+    """ADR-0213: like record_turn, this is the other deliberate exception
+    to the fail-closed rule - without conversation persistence configured
+    there is no conversation_memberships row anyone else could hold to
+    even contend for this lock, so chat must keep working unconditionally."""
+    acquired = await acquire_write_lock(None, run_id="run-abc", holder_sub="alice")
+    assert acquired is True
+
+
+async def test_release_write_lock_silently_no_ops_on_a_none_pool() -> None:
+    await release_write_lock(None, run_id="run-abc", holder_sub="alice")  # no exception raised = pass
+
+
 async def test_record_turn_silently_no_ops_on_a_none_pool() -> None:
     """The one deliberate exception to the fail-closed rule above (see
     conversations.py's own docstring): ordinary chat must keep working
     even when conversation persistence isn't configured."""
     await conversations_module.record_turn(
         None, run_id="run-abc", agent_name="tekos", owner_sub="alice", opening_message="hi"
+    )  # no exception raised = pass
+
+
+class _FakePoolThatTimesOut:
+    """Stands in for a configured-but-transiently-unavailable pool: unlike
+    the None-pool case above, checkout itself raises - proving record_turn
+    degrades the same way, not just when the feature is off entirely."""
+
+    @asynccontextmanager
+    async def connection(self):
+        raise PoolTimeout("couldn't get a connection after 30.00 sec")
+        yield  # pragma: no cover - unreachable, keeps this an async generator
+
+
+async def test_record_turn_swallows_a_transient_pool_timeout() -> None:
+    """2026-08-21 live-cluster incident: a configured conversations pool
+    that can't hand out a connection within its checkout window must not
+    500 the whole chat reply over a missed metadata row - record_turn is
+    incidental bookkeeping on the hot /chat path, not something the caller
+    asked for."""
+    await conversations_module.record_turn(
+        _FakePoolThatTimesOut(), run_id="run-abc", agent_name="arkos", owner_sub="alice", opening_message="hi"
     )  # no exception raised = pass
 
 
@@ -230,7 +313,16 @@ TESTS = [
     test_archive_conversation_fails_closed_on_a_none_pool,
     test_reorder_conversations_fails_closed_on_a_none_pool,
     test_hard_delete_conversation_fails_closed_on_a_none_pool,
+    test_get_role_fails_closed_on_a_none_pool,
+    test_list_members_fails_closed_on_a_none_pool,
+    test_grant_membership_fails_closed_on_a_none_pool,
+    test_revoke_membership_fails_closed_on_a_none_pool,
+    test_transfer_ownership_fails_closed_on_a_none_pool,
+    test_clone_conversation_fails_closed_on_a_none_pool,
+    test_acquire_write_lock_trivially_succeeds_on_a_none_pool,
+    test_release_write_lock_silently_no_ops_on_a_none_pool,
     test_record_turn_silently_no_ops_on_a_none_pool,
+    test_record_turn_swallows_a_transient_pool_timeout,
     test_resolve_run_id_still_defaults_to_checkpoint_only_check,
 ]
 

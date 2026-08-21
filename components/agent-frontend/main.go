@@ -128,6 +128,14 @@ func main() {
 	// ADR-0515: manual drag-reorder and irreversible hard-delete.
 	mux.HandleFunc("PUT /api/conversations/reorder", conversationsProxy)
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/hard-delete", conversationsProxy)
+	// ADR-0213: role-based conversation sharing - same generic proxy,
+	// path/method-driven, no new handler logic needed.
+	mux.HandleFunc("GET /api/conversations/{run_id}/members", conversationsProxy)
+	mux.HandleFunc("PUT /api/conversations/{run_id}/members/{subject}", conversationsProxy)
+	mux.HandleFunc("DELETE /api/conversations/{run_id}/members/{subject}", conversationsProxy)
+	mux.HandleFunc("PATCH /api/conversations/{run_id}/owner", conversationsProxy)
+	mux.HandleFunc("POST /api/conversations/{run_id}/clone", conversationsProxy)
+	mux.HandleFunc("GET /api/colleagues", conversationsProxy)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,

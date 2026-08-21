@@ -71,6 +71,10 @@ type chatConfig struct {
 	// (transcript/rename/star) by appending to this base at request time,
 	// since each also needs a run_id it doesn't know until then.
 	ConversationsURL string `json:"conversationsURL"`
+	// ColleaguesURL is this same-origin page's own colleague-search
+	// endpoint (ADR-0213), always "/api/colleagues" today - same
+	// injected-rather-than-hardcoded rationale as ApiURL above.
+	ColleaguesURL string `json:"colleaguesURL"`
 	// AgentNavStrip (ADR-0515) is the cross-agent masthead navigation
 	// strip: every OTHER agent this signed-in caller is entitled to and
 	// that is actually active/clickable - the same entitlement-filtered
@@ -126,6 +130,7 @@ func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager,
 			ProfileURL:       "/profile",
 			ApiURL:           "/api/chat",
 			ConversationsURL: "/api/conversations",
+			ColleaguesURL:    "/api/colleagues",
 			AgentNavStrip:    buildAgentNavStrip(agents, sess),
 			PromptExamples:   agent.PrimaryTaskPromptExamples(),
 		}
