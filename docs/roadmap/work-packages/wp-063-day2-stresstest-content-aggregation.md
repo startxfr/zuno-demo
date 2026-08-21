@@ -65,15 +65,25 @@
 
   The one exception: **tekos scenario 10** ("What does the latest
   internal Confluence doc say about the RHOAI 3.5 EA2 rollout?")
-  reproduces consistently - `source_mode=none`, no citations, a generic
-  "I don't have that information" reply. This matches the exact failure
+  reproduced consistently - `source_mode=none`, no citations, a generic
+  "I don't have that information" reply. This matched the exact failure
   class arkos scenario 10 previously had (fixed in commit `8eae0e7` by
-  retargeting the eval message at real Confluence content) - most likely
-  no real page in `startxfr.atlassian.net` matches "RHOAI 3.5 EA2
-  rollout" today, so the live-search tool has nothing to find and the
-  agent correctly declines rather than fabricate. Not yet fixed - needs
-  the same message-retargeting treatment, verified against real live
-  Confluence content first.
+  retargeting the eval message at real Confluence content) - no real page
+  in `startxfr.atlassian.net` matches "RHOAI 3.5 EA2 rollout" (ADR-0330's
+  2026-08-18 space enumeration already documented the real tree as
+  Openshift/Terraform/Vault/AnsibleAutomationPlatform/Gitlab/Satellite
+  only, no RHOAI/OpenShift AI content at all).
+
+  **Fixed (2026-08-21, same day):** retargeted the message to "What does
+  the latest internal Confluence doc say about the OpenShift upgrade
+  procedure to version 4.14?" - live-verified first (not guessed):
+  `mcp-servers/confluence/server.py`'s `_cql_query_text` strips the
+  message down to its significant words for the CQL `text~` search, and
+  "version 4.14" matches real pages ("Procedure UPGRADE 4.13 vers 4.14
+  cluster data-preprod", "Montée de version 4.13 vers 4.14 REC", etc.),
+  confirmed live with `source_mode="both"`. All 12 of the original 178
+  checks are now accounted for - 11 transient (do not reproduce), 1 real
+  and fixed.
 - **ADRs:** ADR-0058
 - **Depends on:** WP-062 (Day 2 chassis, report engine and agent-discovery
   mechanism must exist first; this WP fills in the stub

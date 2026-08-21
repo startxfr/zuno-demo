@@ -81,7 +81,18 @@ scenarios:
     title: A question needing live data triggers the Confluence tool call
     type: chat_triggers_tool
     persona: consultant-01
-    message: "What does the latest internal Confluence doc say about the RHOAI 3.5 EA2 rollout?"
+    # ADR-0330's live space enumeration (2026-08-18) found startxfr.atlassian.net's
+    # real content tree (space SXSI) covers Openshift/Terraform/Vault/
+    # AnsibleAutomationPlatform/Gitlab/Satellite procedures only - no RHOAI,
+    # no "EA2" anything, so the original message's search_confluence call
+    # always came back empty (source_mode=none, not a bug - see WP-063's
+    # 2026-08-21 note). Live-verified replacement: search_confluence's
+    # CQL text~ query is built from the message's "significant words"
+    # (mcp-servers/confluence/server.py's _cql_query_text stopword
+    # stripping), so "version 4.14" matches real pages like "Procedure
+    # UPGRADE 4.13 vers 4.14 cluster data-preprod" - confirmed live,
+    # source_mode="both".
+    message: "What does the latest internal Confluence doc say about the OpenShift upgrade procedure to version 4.14?"
     expect_tool: search_confluence
 
   - id: 11
