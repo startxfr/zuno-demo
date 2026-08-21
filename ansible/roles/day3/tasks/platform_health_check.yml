@@ -155,7 +155,7 @@
   delay: 5
 
 # Selects on controller-uid, not job-name - see
-# ansible/roles/day2/tasks/stresstest_job_run_one.yml's own comment on
+# ansible/roles/day3/tasks/stresstest_job_run_one.yml's own comment on
 # this exact same fix (live-cluster-confirmed 2026-08-21: Job deletion
 # does not reliably garbage-collect its pods within this task's own
 # runtime, so job-name + resources[0] can pick a previous run's stale
@@ -177,7 +177,7 @@
 
 # Pure fact-producer, deliberately no rendering/failing here - same
 # reasoning as ansible/tasks/day2_availability_check.yml's own trailer
-# comment: ansible/roles/day2/tasks/test.yml combines this with the
+# comment: ansible/roles/day3/tasks/test.yml combines this with the
 # agents results and renders/decides once, via
 # ansible/tasks/day2_render_and_fail.yml.
 - name: "day2-platform | parse the Job's output into _day2_platform_results"

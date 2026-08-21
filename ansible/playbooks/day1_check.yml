@@ -1,8 +1,10 @@
 ---
-# Day 1 state check (`make day1 check`). Includes `models`/`sql_schema`
-# beyond llm/rag/mcp/agents so they stay reachable (nothing else triggers them).
+# Day 1 state check (`make day1 check`) - AI infrastructure (llm, models,
+# the AI-platform-operator stack) plus API platform components.
 # `namespaces` is first, checking its Day 1 half (ResourceQuota/NetworkPolicy
-# overlay) only - see ansible/roles/namespaces/README.md.
+# overlay) only - see ansible/roles/namespaces/README.md. Content-ingestion
+# components (sql_schema/rag/rag_ingestion/mcp/agents/mlops) moved to Day 2
+# - see day2_check.yml.
 - name: "Day 1: check install state"
   hosts: localhost
   gather_facts: false
@@ -11,14 +13,23 @@
     day1_verb: check
     day1_components:
       - namespaces
+      - redis
+      - observability
+      - service_mesh
+      - mesh_monitoring
+      - kiali
+      - grafana
+      - postgresql
+      - mariadb
+      - tempo
+      - keycloak
+      - connectivity_link
+      - lws
+      - jobset
+      - kueue
+      - openshift_ai
       - llm
       - models
-      - sql_schema
-      - rag
-      - rag_ingestion
-      - mcp
-      - agents
-      - mlops
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -29,22 +40,16 @@
           {{ day1_components if target_component | default('all') == 'all'
              else [target_component | replace('-', '_')] }}
 
-    - name: Exclude mlops from state-checking (no precheck.yml yet)
-      ansible.builtin.set_fact:
-        selected_components: "{{ selected_components | reject('equalto', 'mlops') | list }}"
-
     - name: Generate the state-report file
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
 
     - name: Run Day 1 component state checks
       ansible.builtin.include_role:
         name: "{{ item }}"
-        tasks_from: "{{ 'check' if item == 'agents' else ('precheck_d1' if item == 'namespaces' else 'precheck') }}"
+        tasks_from: "{{ 'precheck_d1' if item == 'namespaces' else 'precheck' }}"
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
-      # agents' check.yml can genuinely fail; don't abort before the report
-      # below is shown.
       ignore_errors: true
       register: _day1_check_results
 

@@ -325,7 +325,7 @@
 # controller-uid is set by the Job controller itself and is unique per
 # Job object, even across same-named recreations, so this can never
 # match a stale pod. See
-# ansible/roles/day2/tasks/stresstest_job_run_one.yml for the run that
+# ansible/roles/day3/tasks/stresstest_job_run_one.yml for the run that
 # surfaced this.
 - name: "acceptance-gate | find the Job's pod"
   kubernetes.core.k8s_info:

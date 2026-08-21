@@ -110,7 +110,7 @@
                   # per-agent subdirectory run_scenarios.py/
                   # security_checks.py each resolve relative to their own
                   # mounted location (see
-                  # ansible/roles/day2/kustomize/stresstest-scripts's own
+                  # ansible/roles/day3/kustomize/stresstest-scripts's own
                   # header comment).
                   - name: gate-agent
                     mountPath: "/gate/{{ day2_stress_agent }}"
@@ -122,7 +122,7 @@
                     mountPath: /policies/model-routing
                   # gate_checks.py's own repo_root resolution puts it at
                   # container root too - see this Job's ConfigMap
-                  # (ansible/roles/day2/kustomize/stresstest-scripts)
+                  # (ansible/roles/day3/kustomize/stresstest-scripts)
                   # header comment. Mounted for every agent (harmless;
                   # gate_checks.py only ever runs for AGENT == "tekos").
                   - name: gate-tekos-agent

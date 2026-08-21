@@ -1,13 +1,13 @@
 ---
-# ADR-0058: `make day2|d2 stresstest [agents|platform|all]`. Runs every
+# ADR-0058: `make day3|d3 stresstest [agents|platform|all]`. Runs every
 # existing test layer per agent (contract/scenario/security/gate/
 # stress_test), generalizing the ADR-0053 acceptance-gate Job mechanism
 # across every discovered agent with real evaluations/<agent>/ content,
 # plus an optional bulk-interaction load pass when the Makefile's
 # `bulk_interactions` extra-var is set and > 0. Informational only -
-# never wired into `make day1 check agents` / the ADR-0053 mandatory
-# gate (see ansible/roles/day2/tasks/stresstest_job.yml).
-- name: "Day 2: stresstest"
+# never wired into `make day2 check agents` / the ADR-0053 mandatory
+# gate (see ansible/roles/day3/tasks/stresstest_job.yml).
+- name: "Day 3: stresstest"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
@@ -15,9 +15,9 @@
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
 
-    - name: Run the Day 2 stresstest
+    - name: Run the Day 3 stresstest
       ansible.builtin.include_role:
-        name: day2
+        name: day3
         tasks_from: stresstest
       vars:
         target_component: "{{ target_component | default('all') }}"

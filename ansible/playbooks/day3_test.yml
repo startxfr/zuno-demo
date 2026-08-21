@@ -1,11 +1,11 @@
 ---
-# ADR-0057: `make day2|d2 test [agents|platform|all]`. Availability only -
+# ADR-0057: `make day3|d3 test [agents|platform|all]`. Availability only -
 # no chat traffic, no credentials beyond what a /healthz GET already
-# needs. Dispatches to ansible/roles/day2/tasks/test.yml, which itself
+# needs. Dispatches to ansible/roles/day3/tasks/test.yml, which itself
 # splits by component (agents run from the control node via public
 # Routes; platform runs a lightweight in-cluster Job - see that role's
 # task files for why).
-- name: "Day 2: availability test"
+- name: "Day 3: availability test"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
@@ -13,9 +13,9 @@
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
 
-    - name: Run the Day 2 availability test
+    - name: Run the Day 3 availability test
       ansible.builtin.include_role:
-        name: day2
+        name: day3
         tasks_from: test
       vars:
         target_component: "{{ target_component | default('all') }}"

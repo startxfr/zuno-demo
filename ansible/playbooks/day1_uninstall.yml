@@ -2,21 +2,31 @@
 # Day 1 uninstall (`make day1 uninstall`). Reverses day1_install.yml's order.
 # `namespaces` runs last, removing its Day 1 half (ResourceQuota/NetworkPolicy
 # overlay - see ansible/roles/namespaces/README.md) only after every other
-# Day 1 workload it may constrain is already gone.
+# Day 1 workload it may constrain is already gone. Content-ingestion
+# components moved to Day 2 - see day2_uninstall.yml.
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day1_components:
-      - mlops
-      - agents
-      - mcp
-      - rag_ingestion
-      - rag
-      - sql_schema
       - models
       - llm
+      - openshift_ai
+      - kueue
+      - jobset
+      - lws
+      - connectivity_link
+      - keycloak
+      - tempo
+      - mariadb
+      - postgresql
+      - grafana
+      - kiali
+      - mesh_monitoring
+      - service_mesh
+      - observability
+      - redis
       - namespaces
   tasks:
     - name: Resolve cluster API credentials

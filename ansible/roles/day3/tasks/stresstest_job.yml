@@ -165,7 +165,7 @@
 - name: "day2-stresstest | build the day2-stresstest-scripts ConfigMap"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
-    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/day2/kustomize/stresstest-scripts"
+    kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/day3/kustomize/stresstest-scripts"
   when: (_day2_stress_ready_agents | default([]) | length) > 0
 
 # platform/okf/run_agent_contract_tests.py has no per-agent CLI hook and
@@ -196,7 +196,7 @@
 # playbook nothing else invokes - but `make d2 stresstest` should still
 # tell an operator/script whether anything failed, the same way every
 # evaluations/*.py script's own main() does. Shared renderer (also used
-# by ansible/roles/day2/tasks/test.yml and
+# by ansible/roles/day3/tasks/test.yml and
 # ansible/roles/agents/tasks/check.yml) - report everything first, then
 # decide once.
 - name: "day2-stresstest | report and decide on the combined stresstest results"

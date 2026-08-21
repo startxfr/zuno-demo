@@ -7,28 +7,13 @@
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     day0_components:
-      - openshift_ai
-      - kueue
-      - jobset
       - custom_metrics_autoscaler
-      - lws
-      - connectivity_link
       - nvidia_gpu
       - nfd
       # machines after nvidia_gpu/nfd (reverse of install): tearing the GPU
       # nodes away before the GPU operator uninstall would strand its
       # node-scoped operands mid-delete.
       - machines
-      - keycloak
-      - tempo
-      - mariadb
-      - postgresql
-      - grafana
-      - kiali
-      - mesh_monitoring
-      - service_mesh
-      - observability
-      - redis
       - openshift_oauth
       - smtp
       - external_secrets

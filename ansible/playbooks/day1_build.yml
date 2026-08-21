@@ -13,10 +13,6 @@
     # path day1_install.yml's roles fall back to.
     day1_verb: build
     day1_build_components:
-      - mcp_build
-      - rag_build
-      - rag_ingestion_build
-      - agent_build
       - ai_gateway_build
   tasks:
     - name: Resolve cluster API credentials
