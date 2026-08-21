@@ -79,6 +79,21 @@ def chat_model_for(
     if candidate.kind == "local":
         from langchain_openai import ChatOpenAI
 
+        # 2026-08-21: local-gpt-oss's endpoint is https (its
+        # LLMInferenceService pod terminates real TLS, unlike qwen's classic
+        # ServingRuntime, which stays plain http) - see provider-routing.yaml's
+        # own comment on that endpoint. LOCAL_GPT_OSS_CA_BUNDLE, when set,
+        # points at the namespace's openshift-service-ca.crt ConfigMap
+        # (gitops/charts/ai-gateway's deployment.yaml) so that cert verifies
+        # instead of failing closed. Harmless for qwen's plain-http endpoint -
+        # httpx's verify= is simply unused there.
+        http_async_client = None
+        ca_bundle = os.getenv("LOCAL_GPT_OSS_CA_BUNDLE")
+        if ca_bundle:
+            import httpx
+
+            http_async_client = httpx.AsyncClient(verify=ca_bundle)
+
         return ChatOpenAI(
             base_url=cfg.get(
                 "endpoint",
@@ -94,6 +109,7 @@ def chat_model_for(
             model=adapter or cfg.get("model", os.getenv("LOCAL_MODEL_NAME", "qwen2.5-7b-instruct")),
             temperature=cfg.get("temperature", 0.2),
             timeout=cfg.get("timeout_seconds", 60),
+            http_async_client=http_async_client,
             # ADR-0029: lets a streamed call's terminal chunk carry
             # usage_metadata (vLLM's OpenAI-compatible stream_options.
             # include_usage extension) - see app/main.py's _stream_completion,

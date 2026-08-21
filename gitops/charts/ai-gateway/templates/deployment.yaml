@@ -161,9 +161,23 @@ spec:
                   optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            # 2026-08-21: local-gpt-oss's LLMInferenceService pod terminates
+            # real TLS on port 8000 (see platform/ai-gateway/
+            # provider-routing.yaml's own comment on that endpoint) with a
+            # cert issued by the cluster's openshift-service-serving-signer
+            # CA - not in this pod's default trust store. Points
+            # app/providers.py's local-candidate client at the namespace's
+            # own openshift-service-ca.crt ConfigMap (standard OpenShift
+            # per-namespace CA bundle, auto-populated, no new resource
+            # needed) instead of disabling verification.
+            - name: LOCAL_GPT_OSS_CA_BUNDLE
+              value: /etc/ssl/openshift-service-ca/service-ca.crt
           volumeMounts:
             - name: provider-routing
               mountPath: /app/config
+              readOnly: true
+            - name: openshift-service-ca
+              mountPath: /etc/ssl/openshift-service-ca
               readOnly: true
             - name: tmp
               mountPath: /tmp
@@ -185,5 +199,8 @@ spec:
         - name: provider-routing
           configMap:
             name: {{ .Values.providerRoutingConfigMap }}
+        - name: openshift-service-ca
+          configMap:
+            name: openshift-service-ca.crt
         - name: tmp
           emptyDir: {}

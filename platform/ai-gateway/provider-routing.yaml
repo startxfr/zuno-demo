@@ -83,14 +83,23 @@ providers:
   # ADR-0414: gpt-oss-20b is now an LLMInferenceService (also the
   # MaaS-published backend), not a classic InferenceService - it has no
   # <name>-predictor Service anymore. Points directly at its
-  # -kserve-workload-svc Service instead (port 8000, a real
-  # OpenAI-compatible vLLM API - VERIFIED live against the equivalent
-  # qwen-maas-backend Service), bypassing the MaaS Gateway/router entirely
-  # for this in-cluster call.
+  # -kserve-workload-svc Service instead (port 8000), bypassing the MaaS
+  # Gateway/router entirely for this in-cluster call.
+  #
+  # https, not http (fixed 2026-08-21 - was http and silently broken since
+  # ADR-0414 landed): unlike qwen's classic ServingRuntime, an
+  # LLMInferenceService's raw-deployment pod always terminates real TLS on
+  # this port (KServe injects /var/run/kserve/tls/tls.{key,crt}, see
+  # gitops/charts/models/templates/llminferenceservice-gptoss.yaml) - a
+  # plain-http request gets an immediate connection reset, logged upstream
+  # as ai-gateway's "Connection error" on every local-gpt-oss call. The
+  # cert's issuer is the cluster's own openshift-service-serving-signer CA
+  # (verified live), which app/providers.py's local-candidate client trusts
+  # via LOCAL_GPT_OSS_CA_BUNDLE (gitops/charts/ai-gateway's deployment.yaml).
   - name: local-gpt-oss
     kind: local
     model: gpt-oss-20b
-    endpoint: http://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+    endpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
     eligible_for: [C1, C2, C3]
