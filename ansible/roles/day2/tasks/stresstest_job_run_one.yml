@@ -77,6 +77,16 @@
                     value: /tmp/.pyuser
                   - name: AGENT
                     value: "{{ day2_stress_agent }}"
+                  # Live-cluster-confirmed 2026-08-21: without this,
+                  # get_token()/auth_headers() in run_scenarios.py fall
+                  # back to that module's placeholder default
+                  # (https://keycloak.apps.mycluster.example.com), which
+                  # doesn't resolve - "No address associated with
+                  # hostname" for every scenario/check needing a token.
+                  # run_acceptance_gate.yml's own Job already sets this;
+                  # this generalization had dropped it.
+                  - name: KEYCLOAK_URL
+                    value: "https://keycloak.{{ cluster_base_domain }}"
                   - name: FRONTEND_URL
                     value: "https://{{ day2_stress_agent }}.{{ cluster_base_domain }}"
                   - name: BULK_INTERACTIONS
@@ -110,6 +120,13 @@
                     mountPath: /platform/ai-gateway
                   - name: gate-model-routing-policy
                     mountPath: /policies/model-routing
+                  # gate_checks.py's own repo_root resolution puts it at
+                  # container root too - see this Job's ConfigMap
+                  # (ansible/roles/day2/kustomize/stresstest-scripts)
+                  # header comment. Mounted for every agent (harmless;
+                  # gate_checks.py only ever runs for AGENT == "tekos").
+                  - name: gate-tekos-agent
+                    mountPath: /agents/tekos
                   - name: gate-ca
                     mountPath: /gate-ca
             volumes:
@@ -144,6 +161,20 @@
                   items:
                     - key: model-routing-policy.yaml
                       path: model-routing-policy.yaml
+              - name: gate-tekos-agent
+                configMap:
+                  name: day2-stresstest-scripts
+                  items:
+                    - key: tekos-agent.okf.md
+                      path: agent.okf.md
+                    - key: tekos-tasks-answer-technical-question.md
+                      path: tasks/answer-technical-question.md
+                    - key: tekos-tasks-check-my-drive-docs.md
+                      path: tasks/check-my-drive-docs.md
+                    - key: tekos-tasks-find-relevant-docs.md
+                      path: tasks/find-relevant-docs.md
+                    - key: tekos-tasks-write-code.md
+                      path: tasks/write-code.md
               - name: gate-ca
                 configMap:
                   name: day2-stresstest-ca

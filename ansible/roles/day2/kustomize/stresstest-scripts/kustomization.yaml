@@ -42,6 +42,19 @@ configMapGenerator:
       - finage-security_checks.py=../../../../../evaluations/finage/security_checks.py
       - naveo-scenarios.yaml=../../../../../evaluations/naveo/scenarios.yaml
       - naveo-security_checks.py=../../../../../evaluations/naveo/security_checks.py
+      # gate_checks.py's own repo_root resolution (parents[2], same
+      # arithmetic as its policy-file reads above) puts it at container
+      # root - it reads agents/tekos/agent.okf.md and, for every task
+      # name that bundle declares, agents/tekos/tasks/<name>.md.
+      # gate_checks.py is Tekos-only (day2_stresstest.py only invokes it
+      # when AGENT == "tekos"), but these keys are harmless to carry for
+      # every agent's Job run. Explicit files, not a glob - kustomize's
+      # configMapGenerator needs each one named.
+      - tekos-agent.okf.md=../../../../../agents/tekos/agent.okf.md
+      - tekos-tasks-answer-technical-question.md=../../../../../agents/tekos/tasks/answer-technical-question.md
+      - tekos-tasks-check-my-drive-docs.md=../../../../../agents/tekos/tasks/check-my-drive-docs.md
+      - tekos-tasks-find-relevant-docs.md=../../../../../agents/tekos/tasks/find-relevant-docs.md
+      - tekos-tasks-write-code.md=../../../../../agents/tekos/tasks/write-code.md
 generatorOptions:
   disableNameSuffixHash: true
   labels:
