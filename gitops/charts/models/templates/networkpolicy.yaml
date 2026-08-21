@@ -47,3 +47,20 @@ spec:
         - protocol: TCP
           port: 8080
 {{- end }}
+{{- if .Values.lmEval.enabled }}
+    # ADR-0108/WP-10: admits the LMEvalJob pod's (lmevaljob.yaml) calls to
+    # this predictor. Missing this allowed every request from that pod to
+    # silently time out at the network layer regardless of path
+    # (/v1/completions and /v1/chat/completions alike) - verified live
+    # 2026-08-21: the app itself was healthy (200 OK via loopback, zero
+    # requests ever reaching its access log from the eval pod), and the
+    # 503 "connection timeout" from Envoy is the standard signature of a
+    # NetworkPolicy drop, not an mTLS/routing fault.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: lm-eval
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}
