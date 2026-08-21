@@ -255,8 +255,8 @@ async def record_turn(
                              WHERE agent_name = %(agent_name)s AND owner_sub = %(owner_sub)s),
                             1
                         ) - 1,
-                        %(project_id)s,
-                        CASE WHEN %(project_id)s IS NOT NULL THEN now() ELSE NULL END
+                        %(project_id)s::text,
+                        CASE WHEN %(project_id)s::text IS NOT NULL THEN now() ELSE NULL END
                     )
                     ON CONFLICT (run_id) DO UPDATE SET
                         updated_at = now(),
