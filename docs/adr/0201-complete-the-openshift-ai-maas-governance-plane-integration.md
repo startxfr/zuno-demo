@@ -1,6 +1,52 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the actual authenticated end-to-end request is blocked on a platform-level mTLS gap in RHOAI's own MaaS payload-processing pipeline, see 2026-08-18 notes)
+- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the actual authenticated end-to-end request is blocked on a platform-level gap in RHOAI's own MaaS payload-processing pipeline - now confirmed to be a NetworkPolicy allow-list, not solely mTLS, see 2026-08-21 note)
+
+## Implementation note (2026-08-21) — the real blocker is a NetworkPolicy allow-list, and it isn't patchable
+
+Picked this back up with the narrow sidecar-inject remediation (option a
+from the 2026-08-18 note) already live from an earlier pass:
+`payload-processing`/`payload-pre-processing` both carry a real
+`istio-proxy` native sidecar (confirmed via `sidecar.istio.io/status`,
+pods `2/2 Ready`) - injection itself was never the remaining problem.
+
+The authenticated request still 500s identically. Root-caused further:
+Envoy's `ext_proc` filter on `maas-default-gateway` reports `Received
+gRPC error on stream: 14 ... TLS_error:...Connection_reset_by_peer` on
+every attempt, but `payload-processing`'s own `istio-proxy` logs **zero**
+lines for the same window - the connection never reaches the destination
+sidecar at all. The actual cause: both RHOAI-owned NetworkPolicies in
+`openshift-ingress` (`payload-processing`, `payload-pre-processing`,
+owned by the `ModelsAsService` controller) allow port-9004 ingress only
+from pods matching `gateway.networking.k8s.io/gateway-name:
+data-science-gateway` - `maas-default-gateway` was never in the
+allow-list, so the connection is dropped before any TLS handshake is
+even attempted. The earlier note's "TLS error" framing was Envoy's own
+generic label for an upstream reset, not proof the failure was
+TLS-specific.
+
+No CRD field on `ModelsAsService.spec` (`oc explain
+modelsasservice.spec --recursive`) exposes this allow-list. A live
+`kubectl patch --type=json` adding a `maas-default-gateway` podSelector
+entry to both NetworkPolicies' `ingress[0].from` was attempted and
+**did not stick even momentarily** - re-reading the object immediately
+after a successful-looking `patched` response shows the original,
+unmodified list, with no error surfaced and no Event recorded. Something
+(most plausibly the `ModelsAsService` controller's own reconcile loop,
+possibly assisted by a webhook) enforces this spec synchronously on
+every write; there's no drift window to exploit even briefly. This isn't
+a "try again with more force" situation - it's a genuine, closed platform
+constraint in this RHOAI 3.5-EA2 build, the same class of finding as the
+`EnvoyFilter` `failure_mode_allow` gap the 2026-08-18 note already
+documented, just one layer earlier in the request path.
+
+Remaining options, per the 2026-08-18 note's own framing, are unchanged
+in kind: (a) file this as an upstream RHOAI defect and wait, since (b)
+"force it live" has now been tried at the NetworkPolicy layer too and
+doesn't hold, or (c) get out-of-band access to patch the
+`ModelsAsService` operator/controller itself (its Subscription/CSV,
+outside this repo's normal change surface) - not attempted this pass, a
+materially bigger, more consequential action than anything tried so far.
 
 ## Implementation note (2026-08-18, part 2)
 
