@@ -1,0 +1,58 @@
+---
+# Compiles and applies one domain's PipelineVersion (files/pipeline.py.tpl's
+# per-target `python pipeline.py <target>` compile step, unique-named per
+# domain since 2026-08-21 - see that file's header comment on the
+# PipelineVersion naming collision this fixed). Expects
+# `compile_pipeline_target` and the already-fetched
+# `_rag_ingestion_pipeline_source_cm` in scope from the including task.
+
+- name: "rag_ingestion | compile and apply the pipeline version for {{ compile_pipeline_target }}"
+  block:
+    - name: "rag_ingestion | create a working directory for the compile of {{ compile_pipeline_target }}"
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "rag-ingestion-pipeline-compile-{{ compile_pipeline_target }}"
+      register: _rag_ingestion_compile_dir
+
+    - name: "rag_ingestion | write the rendered pipeline.py to the working directory"
+      ansible.builtin.copy:
+        dest: "{{ _rag_ingestion_compile_dir.path }}/pipeline.py"
+        content: "{{ _rag_ingestion_pipeline_source_cm.resources[0].data['pipeline.py'] }}"
+        mode: "0644"
+
+    - name: "rag_ingestion | compile the PipelineVersion manifest for {{ compile_pipeline_target }}"
+      ansible.builtin.command:
+        cmd: "{{ zuno_repo_root }}/components/rag-ingestion/tooling/.venv/bin/python pipeline.py {{ compile_pipeline_target }}"
+        chdir: "{{ _rag_ingestion_compile_dir.path }}"
+      changed_when: true
+
+    - name: "rag_ingestion | apply the compiled PipelineVersion manifest for {{ compile_pipeline_target }}"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ _rag_ingestion_compile_dir.path }}/pipeline-kubernetes.yaml"
+        namespace: zuno-ai-build
+      register: _rag_ingestion_pipeline_version_apply
+
+    - name: "rag_ingestion | compile summary for {{ compile_pipeline_target }}"
+      ansible.builtin.debug:
+        msg: >-
+          {{ compile_pipeline_target }} pipeline version compiled and applied
+          ({{ 'changed' if _rag_ingestion_pipeline_version_apply.changed else 'already up to date' }}).
+  rescue:
+    - name: "rag_ingestion | pipeline-version compile failed, not fatal, for {{ compile_pipeline_target }}"
+      ansible.builtin.debug:
+        msg: >-
+          Compiling/applying the {{ compile_pipeline_target }} PipelineVersion
+          failed (see the task output above for the actual error) - this does
+          not block the rest of the install, nor any other domain's compile
+          in this same loop. The KFP recurring-run activation below will
+          fall back to whatever pipeline version (if any) already exists for
+          this domain. Common causes: no PyPI egress from this machine to
+          install kfp/kfp-kubernetes, or a `files/pipeline.py.tpl` compile
+          error.
+  always:
+    - name: "rag_ingestion | clean up the compile working directory for {{ compile_pipeline_target }}"
+      ansible.builtin.file:
+        path: "{{ _rag_ingestion_compile_dir.path }}"
+        state: absent
+      when: _rag_ingestion_compile_dir.path is defined

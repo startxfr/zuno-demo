@@ -275,17 +275,29 @@ PIPELINES = {
 
 
 if __name__ == "__main__":
-    # One compile per domain: `python pipeline.py [tech|sales|adv|sxa-legacy]`
+    # One compile per domain: `python pipeline.py [tech|sales|adv|sxa-legacy|sxa]`
     # (default tech, the original single-domain behavior).
     target = sys.argv[1] if len(sys.argv) > 1 else "tech"
     pipeline_func, pipeline_name = PIPELINES[target]
+    # PipelineVersion is a plain namespaced Kubernetes resource - its
+    # metadata.name is unique per (namespace, kind), NOT scoped per
+    # pipeline (spec.pipelineName doesn't disambiguate it). A single
+    # chart-wide "{{ .Values.pipeline.version }}" name here collided the
+    # moment a second domain's PipelineVersion was ever applied (confirmed
+    # live 2026-08-21: sxa's compile got rejected with "Pipeline spec is
+    # immutable" against tech's already-existing v0-3-0 object) - every
+    # non-tech domain's version name must be suffixed to stay unique.
+    _pipeline_version_name = (
+        "{{ .Values.pipeline.version }}" if target == "tech"
+        else "{{ .Values.pipeline.version }}-" + target
+    )
     compiler.Compiler().compile(
         pipeline_func=pipeline_func,
         package_path="pipeline-kubernetes.yaml",
         kubernetes_manifest_format=True,
         kubernetes_manifest_options=KubernetesManifestOptions(
             pipeline_name=pipeline_name,
-            pipeline_version_name="{{ .Values.pipeline.version }}",
+            pipeline_version_name=_pipeline_version_name,
             namespace="{{ .Values.platform.namespace }}",
             include_pipeline_manifest=False,
         ),
