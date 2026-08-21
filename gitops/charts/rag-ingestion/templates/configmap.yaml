@@ -22,6 +22,29 @@ data:
   ARAMIS_SOURCES_JSON: "[]"
   SXA_DUMP_S3_KEY: ""
   SXA_SNAPSHOT_ID: ""
+  # tech never sources from SXA - these exist only because
+  # pipeline.py.tpl's CONFIG_KEYS requires the full key contract
+  # (SXA_DUMP_S3_KEY/SXA_SNAPSHOT_ID above included) in every domain's
+  # ConfigMap, tech's included. Confirmed live 2026-08-21: a stale
+  # PipelineVersion masked this gap here for a long time (compiled before
+  # these keys existed in CONFIG_KEYS); a fresh recompile without this
+  # block would hit the same CreateContainerConfigError the sxa domain's
+  # equivalent gap caused - see templates/domain-configmaps.yaml.
+  SXA_S3_ENDPOINT: ""
+  SXA_S3_BUCKET: ""
+  SXA_S3_REGION: ""
+  SXA_S3_PATH_STYLE: ""
+  SXA_MARIADB_HOST: ""
+  SXA_MARIADB_PORT: ""
+  SXA_MARIADB_USER: ""
+  SXA_MARIADB_DATABASE: ""
+  SXA_CORPUS_SCHEMA_S3_KEY: ""
+  SXA_CORPUS_DATA_S3_KEY: ""
+  SXA_CORPUS_SNAPSHOT_ID: ""
+  SXA_CORPUS_S3_ENDPOINT: ""
+  SXA_CORPUS_S3_BUCKET: ""
+  SXA_CORPUS_S3_REGION: ""
+  SXA_CORPUS_S3_PATH_STYLE: ""
   S3_ENDPOINT: {{ include "rag-ingestion.s3Endpoint" . | quote }}
   S3_BUCKET: {{ .Values.s3.bucket | quote }}
   S3_REGION: {{ .Values.s3.region | quote }}
