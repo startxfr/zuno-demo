@@ -1,6 +1,6 @@
 # WP-061: Per-conversation tabs, one browser tab per agent (promotes ADR-0515)
 
-- **State:** Operator pending (repo work merged, 2026-08-21)
+- **State:** Done (2026-08-21)
 - **ADRs:** ADR-0515 (supersedes WP-47/ADR-0505 — Abandoned, no code was
   written against that brief)
 - **Depends on:** WP-44 Part A (schema/validator chain; already `Done`).
@@ -115,11 +115,18 @@ this component yet (no vitest/jest ever set up here) to automate them.
 
 ## Operator / human follow-up (not executable by the model)
 
-Rebuild/redeploy `agent-frontend`, `agent-bff`, `agent-runtime`; run the
-new DB migration; a demo user confirms cross-agent nav reuses an existing
-browser tab, two conversations stay open as independent in-app tabs
-inside one agent tab, drag-reorder survives a reload, and hard-delete is
-confirmed and irreversible.
+Done (2026-08-21). `agent-frontend`, `agent-bff`, `agent-runtime` rebuilt
+and redeployed on the real cluster; the `sort_order` migration applied
+cleanly (verified directly against the `agent-conversations` database).
+Note for future rebuild/redeploy passes on this cluster: `gitops/charts/tekos`
+had its frontend/BFF `image.openshift.io/triggers` still watching the
+`v0.1.0` ImageStreamTag rather than `latest`, so a fresh `make d1 build
+agent` push alone did not roll new pods - `oc tag ... latest ... v0.1.0`
+was needed to fire the existing trigger (unrelated to this WP; a
+pre-existing tag-pinning gap another track is reconciling). The operator
+then confirmed cross-agent nav reuses an existing browser tab,
+conversations stay open as independent in-app tabs, drag-reorder survives
+a reload, and hard-delete is irreversible.
 
 ## Status updates (then re-run check_docs.py)
 
