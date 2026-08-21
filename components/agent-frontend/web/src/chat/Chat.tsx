@@ -31,6 +31,7 @@ import {
 import { StarIcon, TimesIcon } from "@patternfly/react-icons";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
+import { AGENT_ICONS } from "../shared/agentIcons";
 import { ConversationList } from "../shared/ConversationList";
 import { getTranscript, listConversations } from "../shared/conversations";
 import { Footer } from "../shared/Footer";
@@ -431,28 +432,42 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
               // agent's own browser tab (tabTracker.ts), never navigates
               // this tab away.
               <ToolbarGroup>
-                {config.agentNavStrip.map((entry) => (
-                  <ToolbarItem key={entry.name}>
-                    <Button
-                      variant="primary"
-                      style={
-                        entry.color
-                          ? {
-                              backgroundColor: entry.color,
-                              borderColor: entry.color,
-                              color: textColorFor(entry.color),
-                            }
-                          : undefined
-                      }
-                      onClick={(e) => {
-                        e.preventDefault();
-                        openAgentTab(entry.name, entry.href);
-                      }}
-                    >
-                      {entry.displayName}
-                    </Button>
-                  </ToolbarItem>
-                ))}
+                {config.agentNavStrip.map((entry) => {
+                  const isCurrent = entry.name === config.agentName;
+                  const Icon = AGENT_ICONS[entry.icon];
+                  return (
+                    <ToolbarItem key={entry.name}>
+                      <Button
+                        variant="primary"
+                        icon={Icon ? <Icon /> : undefined}
+                        style={
+                          entry.color
+                            ? isCurrent
+                              ? {
+                                  backgroundColor: entry.color,
+                                  borderColor: entry.color,
+                                  color: textColorFor(entry.color),
+                                }
+                              : {
+                                  backgroundColor: "transparent",
+                                  borderWidth: "0 0 2px 0",
+                                  borderStyle: "solid",
+                                  borderColor: entry.color,
+                                  borderRadius: 0,
+                                  color: entry.color,
+                                }
+                            : undefined
+                        }
+                        onClick={(e) => {
+                          e.preventDefault();
+                          openAgentTab(entry.name, entry.href);
+                        }}
+                      >
+                        {entry.displayName}
+                      </Button>
+                    </ToolbarItem>
+                  );
+                })}
               </ToolbarGroup>
             )}
             <ToolbarGroup align={{ default: "alignEnd" }}>

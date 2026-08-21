@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Button, Card, CardBody, CardFooter, CardTitle, Content, ContentVariants, Label } from "@patternfly/react-core";
+import { AGENT_ICONS } from "./agentIcons";
 import type { PortalTile } from "./types";
 
 // One agent's tile, shared between the portal grid (portal/Portal.tsx) and
@@ -7,9 +8,15 @@ import type { PortalTile } from "./types";
 // both render the same server-computed access decision
 // (internal/portal/portal.go's BuildTiles).
 export function TileCard({ tile }: { tile: PortalTile }): React.ReactElement {
+  const Icon = AGENT_ICONS[tile.icon];
   return (
     <Card isFullHeight style={{ borderTop: `4px solid ${tile.color || "var(--pf-t--global--color--brand--default)"}` }}>
-      <CardTitle>{tile.displayName}</CardTitle>
+      <CardTitle>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+          {Icon && <Icon color={tile.color || undefined} />}
+          {tile.displayName}
+        </span>
+      </CardTitle>
       <CardBody>
         <Content component={ContentVariants.p}>{tile.tileDescription}</Content>
       </CardBody>

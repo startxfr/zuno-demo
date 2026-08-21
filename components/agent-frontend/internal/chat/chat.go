@@ -48,6 +48,11 @@ var tmpl = template.Must(template.New("chat").Parse(pageTemplate))
 
 // chatConfig mirrors web/src/shared/types.ts's ChatConfig field-for-field.
 type chatConfig struct {
+	// AgentName is this agent's slug (agent.Zuno.Name, e.g. "tekos") - lets
+	// the masthead nav strip below tell "this page's own agent" apart from
+	// every other entry, since AgentNavStrip includes the current agent
+	// too. Not to be confused with DisplayName, the human-readable label.
+	AgentName   string `json:"agentName"`
 	DisplayName string `json:"displayName"`
 	Subject     string `json:"subject"`
 	// UserDisplayName is the signed-in USER's display name (see
@@ -94,6 +99,7 @@ type agentNavEntry struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
 	Color       string `json:"color"`
+	Icon        string `json:"icon"`
 	Href        string `json:"href"`
 }
 
@@ -123,6 +129,7 @@ func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager,
 		}
 
 		cfg := chatConfig{
+			AgentName:        agent.Zuno.Name,
 			DisplayName:      agent.Zuno.UI.DisplayName,
 			Subject:          sess.Subject,
 			UserDisplayName:  sess.DisplayName(),
@@ -169,6 +176,7 @@ func buildAgentNavStrip(agents []okf.Agent, sess *session.Session, clusterBaseDo
 			Name:        t.Name,
 			DisplayName: t.DisplayName,
 			Color:       t.Color,
+			Icon:        t.Icon,
 			Href:        t.Href,
 		})
 	}

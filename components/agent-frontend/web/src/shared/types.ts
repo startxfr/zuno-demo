@@ -36,10 +36,15 @@ export interface AgentNavEntry {
   name: string;
   displayName: string;
   color: string;
+  icon: string;
   href: string;
 }
 
 export interface ChatConfig {
+  // This agent's slug (e.g. "tekos") - lets the masthead nav strip below
+  // tell "this page's own agent" apart from every other entry, since
+  // agentNavStrip includes the current agent too.
+  agentName: string;
   // The AGENT's display name (e.g. "Tekos") - not the signed-in user's.
   displayName: string;
   subject: string;
