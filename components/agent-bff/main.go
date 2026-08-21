@@ -384,8 +384,12 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 			// A full streamed reply can legitimately take longer than a
 			// single non-streaming call - bounded generously rather than
-			// left unbounded, but well past the synchronous path's 55s.
-			ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+			// left unbounded, but well past the synchronous path's 110s
+			// (raised 2026-08-21 from 55s/120s: long-form DAT/workshop
+			// drafting plus a reflect pass was routinely running past 55s
+			// even before accounting for the local-gpt-oss/image-gen
+			// issues fixed the same day).
+			ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 			defer cancel()
 
 			resp, err := runtimeClient.ChatStream(ctx, token, requestID, runtimeReq)
@@ -410,7 +414,10 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 55*time.Second)
+		// 2026-08-21: raised from 55s - long-form DAT/workshop drafting
+		// plus a reflect pass was routinely running past it, independent
+		// of the local-gpt-oss/image-gen issues fixed the same day.
+		ctx, cancel := context.WithTimeout(r.Context(), 110*time.Second)
 		defer cancel()
 
 		resp, err := runtimeClient.Chat(ctx, token, runtimeReq)
