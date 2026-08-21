@@ -31,16 +31,11 @@ scenarios:
     expect_groups: [sales, agent_comage]
 
   - id: 4
-    # Comage is status:placeholder (platform/architecture/agent-platform-separation.md:
-    # only tekos/arkos are status:active in v0), so portal.go's
-    # Clickable = IsActive() && authorized is false regardless of
-    # entitlement - this stays disabled even for an otherwise-entitled
-    # user until Comage is promoted to active.
-    title: Comage tile stays disabled for a sales-group, agent_comage-entitled user (agent is placeholder-status)
+    title: Comage tile is enabled for a sales-group, agent_comage-entitled user
     type: portal_tile_state
     persona: sale-01
     agent: comage
-    expect_enabled: false
+    expect_enabled: true
 
   - id: 5
     title: Comage tile is disabled for a non-entitled user (board persona)
@@ -58,13 +53,8 @@ scenarios:
     expect_placeholder: true
 
   - id: 7
-    # Comage is status:placeholder - agent-runtime's ADR-0007 gate
-    # (_active_agent_or_404) rejects real chat before any reply is ever
-    # generated. See chat_blocked_for_placeholder_agent's own docstring
-    # for why the BFF path only asserts != 200 rather than an exact code.
-    title: An ordinary deal-status question via the BFF is correctly blocked (agent is placeholder-status)
-    type: chat_blocked_for_placeholder_agent
-    via: bff
+    title: An ordinary deal-status question via the BFF gets a real reply with citations
+    type: chat_basic_qa
     persona: sale-01
     message: "What's the status of the Acme Renewal deal and does it have a client PO yet?"
 
@@ -76,20 +66,25 @@ scenarios:
     max_seconds: 6
 
   - id: 9
-    # Same ADR-0007 boundary as scenario 7, proven directly against
-    # agent-runtime instead of via the BFF - deterministic 404, unaffected
-    # by agent-bff's own separate JWKS-trust bug.
-    title: Streaming chat direct to agent-runtime is correctly blocked (agent is placeholder-status)
-    type: chat_blocked_for_placeholder_agent
+    title: Streaming chat direct to agent-runtime delivers token and done events
+    type: chat_streaming_sse
     persona: sale-01
     message: "Summarize the Acme Renewal deal in one sentence."
 
   - id: 10
-    # Same ADR-0007 boundary again - a live Salesforce read can never
-    # happen for a placeholder agent regardless of salesforce-mcp's own
-    # health, since agent-runtime never reaches tool dispatch for it.
-    title: A current-value question direct to agent-runtime is correctly blocked (agent is placeholder-status)
-    type: chat_blocked_for_placeholder_agent
+    # Expected to fail today: check-deal-status's live_read_tool is
+    # salesforce.opportunity.read, but salesforce-mcp has no deployment
+    # in-cluster and its Vault-sourced credentials (salesforce/technical)
+    # are still unresolved (standing operator gap, tracked separately -
+    # see agents/comage/README.md's "Known live-read gap"). agent-runtime's
+    # tool_call_node (components/agent-runtime/app/graph/nodes.py)
+    # catches the McpClientError and degrades gracefully to indexed-only
+    # context, so chat still returns 200 - it just never reaches
+    # source_mode: live/both, so this assertion fails until salesforce-mcp
+    # is deployed and the Vault secret is fixed. Left failing on purpose
+    # rather than weakened, so the gate keeps surfacing the real gap.
+    title: A current-value question direct to agent-runtime triggers the live Salesforce read
+    type: chat_triggers_tool
     persona: sale-01
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
 

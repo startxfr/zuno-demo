@@ -48,10 +48,10 @@ scenarios:
     expect_enabled: false
 
   - id: 6
-    title: Placeholder agent tiles (Comage) show "coming soon" for any user
+    title: Placeholder agent tiles (Advantage) show "coming soon" for any user
     type: portal_tile_state
     persona: sale-01
-    agent: comage
+    agent: advantage
     expect_enabled: false
     expect_placeholder: true
 

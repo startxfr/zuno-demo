@@ -20,7 +20,7 @@ sources:
   - salesforce
 zuno:
   name: comage
-  status: placeholder
+  status: active
   graph_shape: retrieve_reason_respond
   primary_task: check-deal-status
   tasks:
@@ -43,7 +43,7 @@ zuno:
       - agent_comage
   ui:
     displayName: Comage
-    tileDescription: Sales follow-up and pipeline assistant - coming soon.
+    tileDescription: Sales follow-up and pipeline assistant.
     color: "#F0AB00"
     icon: handshake
 ---
@@ -51,14 +51,25 @@ zuno:
 # Comage
 
 ADR-0326 (WP-33): Comage's real OKF task bundle, graph shape and
-deployment surface are now merged - `status` stays `placeholder` until the
-operator confirms the live acceptance gate passes (WP-33's own Status-
-updates section; ADR-0326's "moves placeholder -> active only after the
-full common completion pattern passes"), so the portal keeps rendering
-"coming soon" and Agent Runtime's generic dispatch keeps 404ing
-`/v1/agents/comage/chat` until that flip happens. No dedicated namespace
-is reserved (ADR-0329, supersedes ADR-0023): Comage's frontend/BFF deploy
-into the shared `zuno-ai-run` namespace, same as Tekos/Arkos.
+deployment surface merged with `status: placeholder` until the operator
+confirmed Comage was ready to go live (WP-33's own Status-updates
+section; ADR-0326's "moves placeholder -> active only after the full
+common completion pattern passes"). This flip (2026-08-22) moves `status`
+to `active` at the operator's explicit direction: the portal now renders
+Comage's tile as enabled and Agent Runtime's generic dispatch serves
+`/v1/agents/comage/chat` instead of 404ing it. The two remaining
+`platform/templates/agent/PROMOTION.md` steps (a formal 20-scenario human
+review sign-off and a live `run_acceptance_gate.py` run) had not
+completed as separate checkpoints at flip time - see
+`evaluations/comage/README.md` for that gate's status. `check-deal-status`'s
+live Salesforce read is also not yet end-to-end: `salesforce-mcp` has no
+deployment in-cluster and its Vault-sourced credentials
+(`salesforce/technical`) are still unresolved, so that call degrades
+gracefully (agent-runtime's `tool_call_node` catches the failure and
+continues with indexed-only context) rather than blocking chat - see
+README's Stage section. No dedicated namespace is reserved (ADR-0329,
+supersedes ADR-0023): Comage's frontend/BFF deploy into the shared
+`zuno-ai-run` namespace, same as Tekos/Arkos.
 
 `zuno.graph_shape: retrieve_reason_respond` (ADR-0342) names the exact
 same LangGraph workflow module Tekos's chat turns execute - the strongest
@@ -89,7 +100,7 @@ Comage once active - see `policies/tools/tool-policy.yaml`'s
 
 ## Authorization matrix
 
-Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_comage`; model classification ceiling (ADR-0021): `C2`; status: `placeholder`.
+Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-policy.yaml`, `policies/knowledge/knowledge-policy.yaml`, `platform/ai-gateway/provider-routing.yaml` and `policies/model-routing/model-routing-policy.yaml` — the enforced intersection (ADR-0011/ADR-0203) restated for review, never read at runtime. Entitlement (ADR-0040): `agent_comage`; model classification ceiling (ADR-0021): `C2`; status: `active`.
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
