@@ -86,9 +86,13 @@ fixtures stay synthetic (ADR-0025).
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Operator: load one approved real SXA dump snapshot on cluster via the
-   adapter; verify lineage/citation behavior and role-based denial with real
-   Keycloak users.
+1. **Superseded by WP-065 (ADR-0216, 2026-08-21)**: the real snapshot load
+   no longer targets this WP's original Postgres-fixture adapter directly —
+   the real dump is mysqldump-format and now lands via S3 into a new
+   MariaDB database instead (native import, no schema translation), with
+   `sales-db`'s existing tools pointed at it through an engine-select mode.
+   See WP-065 for the live load-and-verify (lineage/citation, role-based
+   denial with real Keycloak users) that discharges this item.
 2. User: schedule the field-level data review that could lower the C3
    default (record outcome as a policy change, not an ADR edit).
 
