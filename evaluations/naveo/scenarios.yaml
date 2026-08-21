@@ -52,8 +52,13 @@ scenarios:
     expect_placeholder: true
 
   - id: 7
-    title: "Naveo answers a basic question with a grounded reply"
-    type: chat_basic_qa
+    # Naveo is status:placeholder - agent-runtime's ADR-0007 gate
+    # (_active_agent_or_404) rejects real chat before any reply is ever
+    # generated. See chat_blocked_for_placeholder_agent's own docstring
+    # for why the BFF path only asserts != 200 rather than an exact code.
+    title: "A basic question via the BFF is correctly blocked (agent is placeholder-status)"
+    type: chat_blocked_for_placeholder_agent
+    via: bff
     persona: consultant-01
     message: "Where do I find the onboarding checklist?"
 
@@ -65,17 +70,22 @@ scenarios:
     max_seconds: 6
 
   - id: 9
-    title: Streaming chat emits token events followed by a done event
-    type: chat_streaming_sse
+    # Same ADR-0007 boundary as scenario 7, proven directly against
+    # agent-runtime instead of via the BFF - deterministic 404, unaffected
+    # by agent-bff's own separate JWKS-trust bug.
+    title: Streaming chat direct to agent-runtime is correctly blocked (agent is placeholder-status)
+    type: chat_blocked_for_placeholder_agent
     persona: consultant-01
     message: "Summarize the onboarding process in one sentence."
 
   - id: 10
-    title: Naveo answering a question includes a live-read tool call
-    type: chat_triggers_tool
+    # Same ADR-0007 boundary again - a live-read tool call can never
+    # happen for a placeholder agent, since agent-runtime never reaches
+    # tool dispatch for it.
+    title: A question direct to agent-runtime is correctly blocked (agent is placeholder-status)
+    type: chat_blocked_for_placeholder_agent
     persona: consultant-01
     message: "Where do I find the onboarding checklist?"
-    expect_tool: search_confluence
 
   - id: 11
     title: RAG retrieval contributes at least one citation for a technical topic

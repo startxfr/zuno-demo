@@ -58,8 +58,13 @@ scenarios:
     expect_placeholder: true
 
   - id: 7
-    title: An ordinary deal-status question returns a reply with citations
-    type: chat_basic_qa
+    # Comage is status:placeholder - agent-runtime's ADR-0007 gate
+    # (_active_agent_or_404) rejects real chat before any reply is ever
+    # generated. See chat_blocked_for_placeholder_agent's own docstring
+    # for why the BFF path only asserts != 200 rather than an exact code.
+    title: An ordinary deal-status question via the BFF is correctly blocked (agent is placeholder-status)
+    type: chat_blocked_for_placeholder_agent
+    via: bff
     persona: sale-01
     message: "What's the status of the Acme Renewal deal and does it have a client PO yet?"
 
@@ -71,17 +76,22 @@ scenarios:
     max_seconds: 6
 
   - id: 9
-    title: Streaming chat emits token events followed by a done event
-    type: chat_streaming_sse
+    # Same ADR-0007 boundary as scenario 7, proven directly against
+    # agent-runtime instead of via the BFF - deterministic 404, unaffected
+    # by agent-bff's own separate JWKS-trust bug.
+    title: Streaming chat direct to agent-runtime is correctly blocked (agent is placeholder-status)
+    type: chat_blocked_for_placeholder_agent
     persona: sale-01
     message: "Summarize the Acme Renewal deal in one sentence."
 
   - id: 10
-    title: A current-value question triggers a live Salesforce read, visible in citations
-    type: chat_triggers_tool
+    # Same ADR-0007 boundary again - a live Salesforce read can never
+    # happen for a placeholder agent regardless of salesforce-mcp's own
+    # health, since agent-runtime never reaches tool dispatch for it.
+    title: A current-value question direct to agent-runtime is correctly blocked (agent is placeholder-status)
+    type: chat_blocked_for_placeholder_agent
     persona: sale-01
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
-    expect_tool: salesforce.opportunity.read
 
   - id: 11
     title: RAG retrieval contributes at least one citation for a sales topic

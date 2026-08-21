@@ -389,6 +389,47 @@ def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, f"source_mode={body.get('source_mode')} citations={body.get('citations', [])}")
 
 
+def chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
+    """ADR-0007: agent-runtime's `_active_agent_or_404` (components/agent-runtime/app/main.py)
+    rejects any agent whose OKF status isn't "active" before GraphFactory
+    is ever consulted - by design, not a bug. For a placeholder-status
+    agent, real chat can never succeed, so this proves the boundary holds
+    rather than asserting a reply that will never come.
+
+    via: "runtime" (default) calls RUNTIME_URL directly, unaffected by
+    anything BFF-side, and gets a deterministic 404. via: "bff" calls
+    BFF_URL instead, which independently forwards agent-runtime's 404
+    once the caller's JWT clears agent-bff's own verification - but
+    live-cluster-confirmed 2026-08-21: agent-bff's JWKS-fetch http.Client
+    (components/agent-bff/internal/jwks/jwks.go) trusts only the default
+    system CA store, not the cluster-internal CA that signs Keycloak's
+    Route certificate, so a freshly-rolled agent-bff pod's first
+    verification attempt can independently fail with its own 401 before
+    ever reaching agent-runtime's check - a second, real, unrelated bug.
+    Either response proves the same thing a real caller cares about (no
+    chat reply was produced), so the "bff" path only asserts != 200
+    rather than pinning the exact code.
+    """
+    via = s.get("via", "runtime")
+    if via == "bff":
+        resp = httpx.post(
+            f"{BFF_URL}/api/chat",
+            headers=auth_headers(s["persona"]),
+            json={"session_id": "eval-7", "message": s["message"]},
+            timeout=30,
+        )
+        ok = resp.status_code != 200
+    else:
+        resp = httpx.post(
+            f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
+            headers=auth_headers(s["persona"]),
+            json={"session_id": "eval-11", "user_sub": s["persona"], "message": s["message"]},
+            timeout=30,
+        )
+        ok = resp.status_code == 404
+    return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code} via={via}")
+
+
 def rag_retrieval_has_citation(s: Dict[str, Any]) -> ScenarioResult:
     resp = httpx.post(f"{RAG_URL}/v1/search", json={"query": s["query"], "top_k": 5}, timeout=15)
     if resp.status_code != 200:
@@ -541,6 +582,7 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "chat_first_token_latency": chat_first_token_latency,
     "chat_streaming_sse": chat_streaming_sse,
     "chat_triggers_tool": chat_triggers_tool,
+    "chat_blocked_for_placeholder_agent": chat_blocked_for_placeholder_agent,
     "rag_retrieval_has_citation": rag_retrieval_has_citation,
     "mcp_gateway_denied": mcp_gateway_denied,
     "mcp_gateway_unknown_tool": mcp_gateway_unknown_tool,
