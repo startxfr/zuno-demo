@@ -1,11 +1,10 @@
 # ADR-0420: Sign supply-chain artifacts in-cluster with Vault Transit
 
-- **Status:** Partially implemented - WP-068 (backend) and WP-069 (OKF
-  bundle signing, `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live on the real
-  Deployment) are Done. WP-070 (image signing): all 14 first-party images
-  signed and verified live, `verify_signatures.py` not yet wired into an
-  automated in-cluster gate - see the 2026-08-22 implementation notes
-  below.
+- **Status:** Implemented - WP-068 (backend), WP-069 (OKF bundle signing,
+  `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live on the real Deployment), and
+  WP-070 (image signing, all 14 first-party images signed and an
+  automated `make d2 check supply-chain` gate live) are all Done - see the
+  2026-08-22 implementation notes below.
 - **Target:** v0.4
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team
@@ -243,6 +242,80 @@ confirmed.
 `ansible/roles/aiagent_operator_build` role existing) - signed here via a
 direct ansible invocation rather than `make d1/d2 build`. Not fixed as
 part of this ADR; a genuine, pre-existing, unrelated gap.
+
+## Implementation note (2026-08-22, WP-070 check gate + build-publish.yml decision)
+
+The two items WP-070 left open closed out in the same pass:
+
+**Automated check gate**: `make d2 check supply-chain`
+(`ansible/roles/supply_chain`, no install/build counterpart - purely a
+verification gate) resolves every first-party image's live digest locally
+(`platform/supply-chain/verify_signatures.py --list-refs` - cluster API
+access only, no registry network needed) and hands the resolved list to
+an in-cluster Job that runs the real `cosign verify`
+(`platform/supply-chain/sign_in_cluster.py`'s new `verify-images`
+subcommand, against the public key baked into `supply-chain-signer` at
+build time - no Vault access needed to verify, the same principle as
+everywhere else in this ADR). Same "resolve outside, verify inside" split
+as the signing Jobs. Live-verified both directions: a clean run reports
+`RESULT: PASS - all 13 image(s) verified`, and a deliberately tampered
+digest correctly fails the gate, naming the offending image. Folded into
+`make d2 check all` with no regressions to the other 8 Day 2 components.
+
+**`build-publish.yml`: kept, not retired.** Already fully stripped of
+every signing step in the prior pass; still does build/SBOM/Trivy-scan/
+optional-Quay-publish, gated behind `workflow_dispatch` only.
+`RELEASING.md` already frames it as a deliberately preserved, dormant
+path, and `check_build_matrix.py` still hard-depends on parsing its exact
+job names - retiring it would mean rewriting that script's entire
+validation strategy for no real benefit. Three stale doc references that
+still described the removed keyless-GitHub-OIDC mechanism as live were
+fixed instead: `.github/README.md`, `RELEASING.md` step 5, and
+`docs/security/secnumcloud-controls.md`'s Supply chain table (two rows).
+
+**Three more real bugs, found only by building the check gate against the
+live cluster, not by reading the code:**
+
+1. The first-party image filter matched on registry hostname prefix
+   alone, which also caught *mirrored* third-party images (`vault`,
+   `bitnami-kubectl` - pulled in by `ansible/roles/image_mirrors`, never
+   built or signed by this pipeline) that happen to share the
+   `zuno-ai-build` namespace. Fixed by requiring a matching `BuildConfig`
+   to exist (`_has_build_config()`) - the real first-party/mirror
+   distinguishing signal.
+2. `agent-bff`/`agent-frontend` were completely invisible to the scan:
+   every per-agent chart (tekos, comage, advantage, finage, arkos, naveo)
+   declares them via a `registry`+`frontendRepository`/`bffRepository`+
+   `tag` shape, not the `repository`+`tag` shape the walk only recognized
+   before. Extended the shape-matching logic for the second form and
+   deduplicated the resulting 6x-repeated refs (one per chart, same
+   underlying image).
+3. `cosign verify` (unlike `sign`) always initializes a local Sigstore TUF
+   trust-root cache under `$HOME/.sigstore`, even in pure `--key` mode
+   with no tlog contact at all - `HOME` is unset by default in the
+   non-root `supply-chain-signer` image, so it tried and failed to write
+   to `/`. Fixed at both layers: the verify Job sets `HOME=/tmp`
+   explicitly, and `verify_image()` itself now defaults `HOME` to a
+   writable tempdir if unset, so it works regardless of the caller's
+   environment.
+
+**A fourth, recurring finding, unrelated to any single Job**: ansible's
+"fetch the signing/verify Job's pod" step used `.resources[0]` without
+sorting - since `backoffLimit` lets multiple pods share one Job's
+`job-name` label across retries, this repeatedly displayed an arbitrary
+(often stale/failed) attempt's log instead of the one that actually
+determined the Job's final outcome. This caused real, repeated confusion
+this session - a Job that had genuinely succeeded kept showing an old FAIL
+log, several times, across both the image-signing and the new verify Job.
+Fixed once, across all three Jobs (`run_image_signing_job.yml`,
+`run_okf_signing_job.yml`, `verify_image_signatures.yml`): sort by
+`metadata.creationTimestamp` and always show the newest pod.
+
+**Also found via the all-images verification sweep this gate makes
+routine**: a concurrent session rebuilt `ai-gateway` (commit `b71d40a`,
+unrelated mariadb work) without going through the in-cluster signing step,
+leaving it unsigned again - exactly the kind of drift this check gate
+exists to catch automatically going forward. Re-signed and reconfirmed.
 
 ## Related ADRs
 

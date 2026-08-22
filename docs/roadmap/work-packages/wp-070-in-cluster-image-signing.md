@@ -1,24 +1,62 @@
 # WP-070: Cut container image signing over to in-cluster Vault Transit
 
-- **State:** Repo work merged, live-verified 2026-08-22 on
-  api.demo222.startx.fr: **all 14 first-party images** now carry a real
-  Vault Transit signature, independently confirmed with `cosign verify
-  --key` from a separate pod for every one - agent-runtime, agent-bff,
-  agent-frontend, ai-gateway, aiagent-operator, mcp-gateway,
-  mcp-confluence, mcp-git-forge, mcp-sales-db, mcp-salesforce, mlops,
-  rag-ingestion, rag-service, supply-chain-signer. (`ai-gateway`'s first
-  signing attempt had actually failed silently mid-pass - due before
-  `supply-chain-signer` picked up the `sign-image` subcommand - and was
-  caught only by this final all-images sweep; re-signed and confirmed.)
+- **State:** Done - live-verified 2026-08-22 on api.demo222.startx.fr.
+  **All 14 first-party images** carry a real Vault Transit signature,
+  independently confirmed with `cosign verify --key` for every one -
+  agent-runtime, agent-bff, agent-frontend, ai-gateway, aiagent-operator,
+  mcp-gateway, mcp-confluence, mcp-git-forge, mcp-sales-db,
+  mcp-salesforce, mlops, rag-ingestion, rag-service, supply-chain-signer.
+  (`ai-gateway`'s first signing attempt had actually failed silently
+  mid-pass - due before `supply-chain-signer` picked up the `sign-image`
+  subcommand - and was caught only by an all-images sweep; re-signed and
+  confirmed. A *second*, independent drift instance was later caught the
+  same way, when a concurrent session rebuilt `ai-gateway` without
+  triggering the signing step - re-signed and confirmed again, which is
+  exactly the automated check gate below now exists to catch on its own.)
   `aiagent-operator` has no Makefile/Day1/Day2 build-component wiring at
   all (a pre-existing, orphaned-role gap, not fixed here) - signed via a
-  direct ansible invocation instead. Remaining: `verify_signatures.py`
-  itself resolves live ImageStreamTag digests correctly (confirmed via
-  `oc get istag`) but its `cosign verify` calls need to run from inside the
-  cluster (no external route to the internal registry) - not yet wired
-  into an automated `make d1/d2 check` gate. `build-publish.yml`/
-  `check_build_matrix.py` decoupling (retire vs. keep the workflow file)
-  also remains an open decision, as originally scoped.
+  direct ansible invocation instead.
+
+  **Automated check gate**: `make d2 check supply-chain`
+  (`ansible/roles/supply_chain`) resolves every first-party image's live
+  digest locally (`verify_signatures.py --list-refs` - cluster API access
+  only, no registry network needed) and hands the list to an in-cluster
+  Job that runs the real `cosign verify` (`sign_in_cluster.py
+  verify-images`, using the public key baked into `supply-chain-signer` at
+  build time - no Vault access needed to verify). Live-verified both ways:
+  a clean run reports `RESULT: PASS - all 13 image(s) verified` (13, not
+  14 - `supply-chain-signer` itself has no gitops chart reference, so it's
+  outside this particular scan's scope by design), and a deliberately
+  tampered digest correctly fails the gate with a named image. Folded into
+  `make d2 check all` with no regressions to the other 8 components.
+
+  **`build-publish.yml` decision: keep it** - already fully stripped of
+  every signing step, still valuable for SBOM/scan/optional-Quay,
+  `RELEASING.md` already frames it as deliberately dormant, and
+  `check_build_matrix.py` still hard-depends on its exact job names.
+  Fixed three stale doc references that still described the removed
+  keyless-GitHub-OIDC mechanism as live (`.github/README.md`,
+  `RELEASING.md` step 5, `docs/security/secnumcloud-controls.md`).
+
+  Two real bugs found building the check gate's digest-resolution logic:
+  the first-party filter also matched *mirrored* third-party images
+  (`vault`, `bitnami-kubectl` - pulled via `image_mirrors`, never signed
+  by this pipeline) sharing the same internal registry namespace, fixed by
+  requiring a matching BuildConfig to exist; and `agent-bff`/
+  `agent-frontend` were entirely invisible to the scan (every per-agent
+  chart declares them via a `registry`+`frontendRepository`/
+  `bffRepository`+`tag` shape the scanner never recognized), fixed by
+  extending the shape-matching walk and deduplicating the resulting
+  6x-repeated refs. A third bug (`cosign verify`, unlike `sign`, always
+  initializes a TUF trust-root cache under `$HOME/.sigstore` even in pure
+  `--key` mode) was fixed by defaulting `HOME` to a writable dir. See
+  ADR-0420's implementation notes for the full account, including a
+  recurring ansible Job-log-display bug (an arbitrary, sometimes-stale pod
+  shown across `backoffLimit` retries) fixed across all three signing/
+  verify Jobs at once.
+
+  Remaining, deliberately out of scope: `aiagent-operator`'s missing
+  Makefile/build-component wiring (pre-existing).
 - **ADRs:** ADR-0115 (Deferred -> superseded-in-part by ADR-0420 for the
   signing mechanism), ADR-0420
 - **Depends on:** WP-068 (Vault Transit signing backend)
