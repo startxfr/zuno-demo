@@ -1,6 +1,20 @@
 # WP-068: Vault Transit signing backend (implements ADR-0420)
 
-- **State:** Repo work merged, live verification in progress.
+- **State:** Done — live-verified on api.demo222.startx.fr 2026-08-22: Vault
+  Kubernetes-auth login, sign+verify+tamper-rejection round trip, negative
+  auth (default SA correctly refused), non-exportability
+  (`transit/export/signing-key/...` correctly refused), offline verify (a
+  second pod with `VAULT_ADDR` unset and all egress denied still verifies),
+  and the audit trail (each `transit/sign` call attributed to
+  `kubernetes-zuno-ai-build-zuno-signer`) all confirmed. Two real bugs found
+  and fixed along the way: (1) `zuno-vault`'s NetworkPolicy allowlist didn't
+  include `zuno-ai-build`, so the signer couldn't reach Vault at all;
+  (2) the `platform-signer` policy only granted the bare
+  `transit/sign/zuno-platform-signer` path, but cosign's hashivault client
+  calls `transit/sign/<key>/sha2-256` - Vault policy paths are exact-match,
+  so every sign-blob call 403'd until a `/*` glob was added. A third,
+  cosmetic bug (`enable_if_new`'s "already enabled" guard didn't recognize
+  the audit device's differently-worded error) was also fixed.
 - **ADRs:** ADR-0420 (Proposed -> Partially implemented)
 - **Depends on:** —
 - **Blocks:** WP-069 (OKF bundle signing cutover), WP-070 (image signing cutover)
