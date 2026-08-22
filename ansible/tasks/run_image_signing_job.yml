@@ -68,6 +68,27 @@
                 args:
                   - sign-image
                   - "{{ _image_signing_ref }}"
+                # The internal registry serves a cert issued by the
+                # cluster's openshift-service-serving-signer CA - not in
+                # this image's default trust store. Same fix as
+                # gitops/charts/ai-gateway/templates/deployment.yaml's own
+                # LOCAL_GPT_OSS_CA_BUNDLE: point at the namespace's own
+                # openshift-service-ca.crt ConfigMap (standard OpenShift
+                # per-namespace CA bundle, auto-populated, no new resource
+                # needed) instead of disabling verification. SSL_CERT_FILE
+                # (not SSL_CERT_DIR) since this is one PEM bundle file, not
+                # a hashed-symlink directory Go's loader would expect.
+                env:
+                  - name: SSL_CERT_FILE
+                    value: /etc/ssl/openshift-service-ca/service-ca.crt
+                volumeMounts:
+                  - name: openshift-service-ca
+                    mountPath: /etc/ssl/openshift-service-ca
+                    readOnly: true
+            volumes:
+              - name: openshift-service-ca
+                configMap:
+                  name: openshift-service-ca.crt
 
 - name: "image-signing | wait for the signing Job to complete"
   kubernetes.core.k8s_info:

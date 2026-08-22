@@ -15,6 +15,33 @@
         labels:
           zuno.io/managed-by: zuno-ansible
 
+# ADR-0420/WP-070: image signing (cosign sign) both pulls the manifest and
+# pushes the signature back as a sibling OCI artifact tag - needs
+# system:image-builder (push+pull), not just system:image-puller (pull
+# only, what every OTHER namespace's ServiceAccounts get via
+# apply_openshift_build.yml's own RoleBinding loop). The BuildConfig
+# "builder" SA gets this automatically in every namespace; zuno-signer is
+# a different identity and needs its own explicit grant.
+- name: "supply_chain_signer_build | grant zuno-signer push/pull rights on zuno-ai-build's own images"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: zuno-signer-image-builder
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      subjects:
+        - kind: ServiceAccount
+          name: zuno-signer
+          namespace: zuno-ai-build
+      roleRef:
+        kind: ClusterRole
+        name: system:image-builder
+        apiGroup: rbac.authorization.k8s.io
+
 - name: "supply_chain_signer_build | build supply-chain-signer"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:

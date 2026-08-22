@@ -47,6 +47,7 @@ to (ansible/roles/vault):
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import pathlib
@@ -128,7 +129,24 @@ def export_public_key(vault_addr: str, vault_token: str, key_name: str, output: 
     print(f"public key -> {output}")
 
 
-def sign_image(vault_addr: str, vault_token: str, key_name: str, image_ref: str) -> None:
+def _registry_docker_config(image_ref: str, jwt_path: str) -> pathlib.Path:
+    """Cosign resolves registry credentials the standard Docker way (a
+    config.json), not from the ambient Kubernetes ServiceAccount token -
+    build one pointing at this pod's own token, the same "any username,
+    token as password" Basic Auth convention `oc registry login` uses
+    against OpenShift's internal registry. zuno-signer's own
+    system:image-builder RoleBinding (ansible/roles/
+    supply_chain_signer_build) is what actually authorizes this identity to
+    push/pull, once it authenticates with this token."""
+    registry = image_ref.split("/", 1)[0]
+    token = pathlib.Path(jwt_path).read_text().strip()
+    auth = base64.b64encode(f"serviceaccount:{token}".encode("utf-8")).decode("ascii")
+    config_dir = pathlib.Path(tempfile.mkdtemp())
+    (config_dir / "config.json").write_text(json.dumps({"auths": {registry: {"auth": auth}}}))
+    return config_dir
+
+
+def sign_image(vault_addr: str, vault_token: str, key_name: str, image_ref: str, jwt_path: str) -> None:
     """ADR-0420/WP-070: signs an OCI image by digest (image_ref must already
     be `<repository>@sha256:<digest>` - the caller resolves the live
     ImageStreamTag digest, this function never does, matching
@@ -138,13 +156,19 @@ def sign_image(vault_addr: str, vault_token: str, key_name: str, image_ref: str)
     setting it (never set anywhere in this repo) is the whole story, no
     extra flag needed here."""
     cosign_bin = _cosign_path()
-    result = subprocess.run(
-        [cosign_bin, "sign", "--yes", "--key", f"hashivault://{key_name}", image_ref],
-        env=_cosign_env(vault_addr, vault_token),
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    docker_config_dir = _registry_docker_config(image_ref, jwt_path)
+    try:
+        env = _cosign_env(vault_addr, vault_token)
+        env["DOCKER_CONFIG"] = str(docker_config_dir)
+        result = subprocess.run(
+            [cosign_bin, "sign", "--yes", "--key", f"hashivault://{key_name}", image_ref],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    finally:
+        shutil.rmtree(docker_config_dir, ignore_errors=True)
     if result.returncode != 0:
         raise SignerError(f"cosign sign failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
     print(f"signed {image_ref}")
@@ -337,7 +361,7 @@ def main() -> int:
             sign_blob(args.vault_addr, token, args.key_name, args.blob, args.output_signature)
         elif args.command == "sign-image":
             token = vault_login(args.vault_addr, args.role, args.jwt_path)
-            sign_image(args.vault_addr, token, args.key_name, args.image_ref)
+            sign_image(args.vault_addr, token, args.key_name, args.image_ref, args.jwt_path)
         elif args.command == "verify-blob":
             verify_blob(args.public_key, args.blob, args.signature)
         elif args.command == "dry-run":
