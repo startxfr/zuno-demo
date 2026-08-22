@@ -129,7 +129,7 @@
   retries: 20
   delay: 10
 
-- name: "supply-chain-check | fetch the verify Job's pod"
+- name: "supply-chain-check | fetch the verify Job's pod(s)"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-ai-build
@@ -137,10 +137,20 @@
       - "job-name=supply-chain-verify-images"
   register: _supply_chain_verify_pod
 
+# backoffLimit means multiple pods can share this label across retries -
+# .resources[0] (creation order from the API, not guaranteed) can pick a
+# stale/failed attempt instead of the one that actually determined the
+# Job's final outcome. Sort by creationTimestamp and take the newest.
+- name: "supply-chain-check | select the most recent pod"
+  ansible.builtin.set_fact:
+    _supply_chain_verify_pod_name: >-
+      {{ (_supply_chain_verify_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
+  when: (_supply_chain_verify_pod.resources | default([]) | length) > 0
+
 - name: "supply-chain-check | print the verify Job's output"
   kubernetes.core.k8s_log:
     namespace: zuno-ai-build
-    name: "{{ _supply_chain_verify_pod.resources[0].metadata.name }}"
+    name: "{{ _supply_chain_verify_pod_name }}"
     container: verify
   register: _supply_chain_verify_log
   when: (_supply_chain_verify_pod.resources | default([]) | length) > 0

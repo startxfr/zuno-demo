@@ -86,7 +86,7 @@
   retries: 30
   delay: 10
 
-- name: "okf-signing | fetch the signing Job's pod"
+- name: "okf-signing | fetch the signing Job's pod(s)"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-ai-build
@@ -94,10 +94,20 @@
       - "job-name=okf-bundle-signing"
   register: _okf_signing_pod
 
+# backoffLimit means multiple pods can share this label across retries -
+# .resources[0] (creation order from the API, not guaranteed) can pick a
+# stale/failed attempt instead of the one that actually determined the
+# Job's final outcome. Sort by creationTimestamp and take the newest.
+- name: "okf-signing | select the most recent pod"
+  ansible.builtin.set_fact:
+    _okf_signing_pod_name: >-
+      {{ (_okf_signing_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
+  when: (_okf_signing_pod.resources | default([]) | length) > 0
+
 - name: "okf-signing | print the signing Job's output"
   kubernetes.core.k8s_log:
     namespace: zuno-ai-build
-    name: "{{ _okf_signing_pod.resources[0].metadata.name }}"
+    name: "{{ _okf_signing_pod_name }}"
     container: sign
   register: _okf_signing_log
   when: (_okf_signing_pod.resources | default([]) | length) > 0

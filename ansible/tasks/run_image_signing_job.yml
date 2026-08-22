@@ -109,7 +109,7 @@
   retries: 20
   delay: 10
 
-- name: "image-signing | fetch the signing Job's pod"
+- name: "image-signing | fetch the signing Job's pod(s)"
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: zuno-ai-build
@@ -117,10 +117,20 @@
       - "job-name=image-signing-{{ sign_image_name }}"
   register: _image_signing_pod
 
+# backoffLimit means multiple pods can share this label across retries -
+# .resources[0] (creation order from the API, not guaranteed) can pick a
+# stale/failed attempt instead of the one that actually determined the
+# Job's final outcome. Sort by creationTimestamp and take the newest.
+- name: "image-signing | select the most recent pod"
+  ansible.builtin.set_fact:
+    _image_signing_pod_name: >-
+      {{ (_image_signing_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
+  when: (_image_signing_pod.resources | default([]) | length) > 0
+
 - name: "image-signing | print the signing Job's output"
   kubernetes.core.k8s_log:
     namespace: zuno-ai-build
-    name: "{{ _image_signing_pod.resources[0].metadata.name }}"
+    name: "{{ _image_signing_pod_name }}"
     container: sign
   register: _image_signing_log
   when: (_image_signing_pod.resources | default([]) | length) > 0
