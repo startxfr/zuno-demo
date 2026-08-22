@@ -795,6 +795,7 @@ unless the component, Operator or Custom Resource explicitly imposes another nam
 - ADR-0322 - Migrate from Llama Stack configuration to OpenShift AI OGX
 - ADR-0201 - Complete the OpenShift AI MaaS governance plane integration
 - ADR-0329 - Consolidate agent workloads into the shared zuno-ai-run namespace, retiring the namespace-per-agent isolation model
+- [ADR-0333](0333-separate-product-managed-ai-infrastructure-from-zuno-build-run-and-shared-platform-namespaces.md) - Reaffirms this ADR's build/run workload split and extends the "product-managed infrastructure stays in its own namespace" principle to OpenShift Ingress, Gateway API and Connectivity Link/Kuadrant
 
 ## Review evidence
 

@@ -131,6 +131,7 @@ evidence.
 ## Related ADRs
 
 - [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) - superseded by this ADR for `applicationsNamespace`; its build/run workload-namespace split remains in effect
+- [ADR-0333](0333-separate-product-managed-ai-infrastructure-from-zuno-build-run-and-shared-platform-namespaces.md) - reaffirms this ADR's decision to keep RHOAI in its default `redhat-ods-applications` namespace, and extends the same principle to OpenShift Ingress, Gateway API and Connectivity Link/Kuadrant
 - [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) - Manage the complete OpenShift AI prerequisite lifecycle (same precedent: disable what "would never have reached Ready on a real cluster")
 - [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) - v0.3 consumer of `trainer`/`ray`, the trigger to revisit a custom `applicationsNamespace` once RHOAI ships a fix
 - [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) - v0.3 consumer of `mlflowoperator`, same revisit trigger
