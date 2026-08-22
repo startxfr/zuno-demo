@@ -122,11 +122,12 @@ conversationsDb:
 # templates/externalsecret-okf-signatures.yaml materializes both from
 # Vault KV (zuno/okf-signatures, written by the in-cluster signing Job -
 # ansible/tasks/run_okf_signing_job.yml), mounted read-only at
-# /app/okf-signatures. requireSignedBundles stays false until every one of
-# okfSignedAgents actually has a signature present and verified live -
-# flipping it early fail-closed crash-loops every pod with no signature to
-# check against (see ADR-0106's 2026-08-21 note, superseded in mechanism
-# by ADR-0420 but not in this caution).
+# /app/okf-signatures. requireSignedBundles flipped true 2026-08-22: all 8
+# okfSignedAgents were confirmed live (AgentRegistry loaded all 8 with zero
+# errors under this exact flag, in a debug pod running the real deployed
+# image, before this chart value changed - see WP-069's live-verification
+# record). If this ever needs reverting in an emergency, false is safe -
+# every agent loads unsigned again, same as before this WP.
 okfSignedAgents:
   - tekos
   - comage
@@ -136,4 +137,4 @@ okfSignedAgents:
   - naveo
   - soursage
   - cognos
-requireSignedBundles: false
+requireSignedBundles: true
