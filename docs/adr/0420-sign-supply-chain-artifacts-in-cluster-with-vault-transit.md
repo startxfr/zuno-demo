@@ -1,12 +1,11 @@
 # ADR-0420: Sign supply-chain artifacts in-cluster with Vault Transit
 
-- **Status:** Partially implemented - Vault Transit signing backend live
-  (WP-068); OKF bundle signing (WP-069) and image signing (WP-070) both
-  cut over and live-verified 2026-08-22. Remaining: flip
-  `ZUNO_REQUIRE_SIGNED_BUNDLES` on the real chart (WP-069); sign the
-  remaining first-party images and wire `verify_signatures.py` into an
-  automated in-cluster gate (WP-070) - see the 2026-08-22 implementation
-  note below.
+- **Status:** Partially implemented - WP-068 (backend) and WP-069 (OKF
+  bundle signing, `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live on the real
+  Deployment) are Done. WP-070 (image signing): all 14 first-party images
+  signed and verified live, `verify_signatures.py` not yet wired into an
+  automated in-cluster gate - see the 2026-08-22 implementation notes
+  below.
 - **Target:** v0.4
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team
@@ -208,6 +207,42 @@ never forces a genuinely fresh Build for a component that already has one
 install would take). Worked around here with a direct `oc start-build
 --wait` for testing; the underlying Day 2 build-verb gap is a separate,
 pre-existing issue this ADR didn't introduce.
+
+## Implementation note (2026-08-22, WP-069 enforcement + WP-070 completion)
+
+**WP-069 enforcement flip**: `gitops/charts/agent-runtime/values.yaml`'s
+`requireSignedBundles` is now `true` on the real chart, synced to the
+running Deployment (`oc rollout status` confirmed a successful rollout,
+zero restarts, and the pod's own logs show all 8 agents verified at
+startup - the exact production cutover the earlier note's live-verified
+debug-pod proof was gating).
+
+**WP-070 completion**: every one of the 14 first-party images now carries
+a real signature, confirmed with `cosign verify --key` against
+`platform/supply-chain/keys/zuno-platform-signer.pub` from a separate pod:
+`agent-runtime`, `agent-bff`, `agent-frontend`, `ai-gateway`,
+`aiagent-operator`, `mcp-gateway`, `mcp-confluence`, `mcp-git-forge`,
+`mcp-sales-db`, `mcp-salesforce`, `mlops`, `rag-ingestion`, `rag-service`,
+`supply-chain-signer`.
+
+One near-miss worth recording: `ai-gateway`'s first signing attempt
+(during the original 5-image pass above) actually failed silently -
+`supply-chain-signer:latest` hadn't yet been rebuilt with the `sign-image`
+subcommand at that point in the session, so the Job errored with "invalid
+choice: 'sign-image'" and was never retried. It wasn't caught until this
+final all-14-images verification sweep, which is exactly the value of
+checking every image explicitly rather than trusting an earlier "it
+worked" from a different image's Job log - Ansible's own per-Job log
+display picked an arbitrary (sometimes stale) pod when multiple attempts
+share the `job-name` label, so a green playbook run is not sufficient
+proof; a live `cosign verify` against the real Image is. Re-signed and
+confirmed.
+
+`aiagent-operator` has no Makefile/Day1/Day2 build-component wiring at all
+(confirmed: absent from every `DAY*_BUILD_COMPONENTS` list despite its own
+`ansible/roles/aiagent_operator_build` role existing) - signed here via a
+direct ansible invocation rather than `make d1/d2 build`. Not fixed as
+part of this ADR; a genuine, pre-existing, unrelated gap.
 
 ## Related ADRs
 

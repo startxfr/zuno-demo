@@ -1,20 +1,24 @@
 # WP-070: Cut container image signing over to in-cluster Vault Transit
 
 - **State:** Repo work merged, live-verified 2026-08-22 on
-  api.demo222.startx.fr: `apply_openshift_build.yml`'s new signing step
-  successfully signed 5 real images built during this pass
-  (supply-chain-signer, ai-gateway, agent-runtime, agent-bff,
-  agent-frontend); `cosign verify --key` against the committed public key
-  succeeded from a separate pod. `verify_signatures.py` itself resolves
-  live ImageStreamTag digests correctly (confirmed via `oc get istag`) but
-  its actual `cosign verify` calls need to run from inside the cluster (no
-  external route to the internal registry) - not yet wired into an
-  automated `make d1/d2 check` gate; that wiring, plus signing the
-  remaining first-party images (mcp-gateway, rag-service, mlops,
-  aiagent-operator, every mcp-servers/* image), is left for a follow-up
-  pass. `build-publish.yml`/`check_build_matrix.py` decoupling (retire vs.
-  keep the workflow file) also remains an open decision, as originally
-  scoped.
+  api.demo222.startx.fr: **all 14 first-party images** now carry a real
+  Vault Transit signature, independently confirmed with `cosign verify
+  --key` from a separate pod for every one - agent-runtime, agent-bff,
+  agent-frontend, ai-gateway, aiagent-operator, mcp-gateway,
+  mcp-confluence, mcp-git-forge, mcp-sales-db, mcp-salesforce, mlops,
+  rag-ingestion, rag-service, supply-chain-signer. (`ai-gateway`'s first
+  signing attempt had actually failed silently mid-pass - due before
+  `supply-chain-signer` picked up the `sign-image` subcommand - and was
+  caught only by this final all-images sweep; re-signed and confirmed.)
+  `aiagent-operator` has no Makefile/Day1/Day2 build-component wiring at
+  all (a pre-existing, orphaned-role gap, not fixed here) - signed via a
+  direct ansible invocation instead. Remaining: `verify_signatures.py`
+  itself resolves live ImageStreamTag digests correctly (confirmed via
+  `oc get istag`) but its `cosign verify` calls need to run from inside the
+  cluster (no external route to the internal registry) - not yet wired
+  into an automated `make d1/d2 check` gate. `build-publish.yml`/
+  `check_build_matrix.py` decoupling (retire vs. keep the workflow file)
+  also remains an open decision, as originally scoped.
 - **ADRs:** ADR-0115 (Deferred -> superseded-in-part by ADR-0420 for the
   signing mechanism), ADR-0420
 - **Depends on:** WP-068 (Vault Transit signing backend)
