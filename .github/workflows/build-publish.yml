@@ -3,9 +3,16 @@
 # (keyless, via GitHub's OIDC identity - no pre-provisioned signing key,
 # consistent with Security considerations: "CI secrets stay outside Git").
 #
-# Runs on every push to main (continuous immutable-tagged builds, tagged
-# only with the commit SHA - never `:latest`) and on every `v*` tag push
-# (an actual release - same pipeline, plus the semantic version tag).
+# DISABLED (2026-08-22, WP-04/ADR-0115 closed - see the ADR's "closed,
+# pipeline disabled" note): the automatic push/tag triggers below are
+# removed so this never fires on its own. Deployment has never depended on
+# it - every chart is built and served from the in-cluster BuildConfig/
+# ImageStream path (RELEASING.md). The pipeline itself is proven working
+# (2026-08-19, run 32273454405, tag v0.1.0 - real signed/SBOM'd images
+# published to quay.io/zuno/*) and is left in place, runnable manually via
+# workflow_dispatch, ready to have its triggers restored under a future ADR
+# if this supply-chain stream is reactivated.
+#
 # QUAY_USERNAME/QUAY_PASSWORD must be configured as encrypted repository
 # secrets in GitHub - never committed here.
 #
@@ -18,9 +25,7 @@
 name: Build, publish and sign component images
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
+  workflow_dispatch: {}
 
 permissions:
   contents: read

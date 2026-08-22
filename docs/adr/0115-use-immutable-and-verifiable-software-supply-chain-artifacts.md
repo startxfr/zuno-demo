@@ -1,11 +1,52 @@
 # ADR-0115: Use immutable and verifiable software supply chain artifacts
 
-- **Status:** Partially implemented
+- **Status:** Deferred
 - **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
 - **Renumbered:** formerly ADR-0051, retargeted v0 -> v0.1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
-- **Last reviewed:** 2026-08-12
+- **Last reviewed:** 2026-08-22
+
+## Implementation note (2026-08-22) — closed, pipeline disabled
+
+WP-04 closed. The 2026-08-21 operator decision below (stay on the
+in-cluster BuildConfig path, no Quay repository cutover) is now formalized
+as a stop, not just a pause between attempts: gaps 2, 3, 4 and 6 all reduce
+to that same cutover decision, which the operator has decided not to make
+for now. Rather than leave this ADR indefinitely `Partially implemented`,
+it moves to **Deferred**: real, working infrastructure stays in the repo
+untouched (the proven 2026-08-19 release, `platform/supply-chain/*.py`,
+`tag_local_release.py`), but no further gap-closing work is planned until a
+**future ADR** explicitly reactivates this stream.
+
+Concrete actions taken:
+
+- `.github/workflows/build-publish.yml`'s automatic `push`/tag triggers
+  removed (now `workflow_dispatch` only) - it no longer runs on every push
+  to `main` or every `v*` tag, so nothing is published to Quay
+  automatically. The workflow file, its cosign/SBOM/Trivy steps and the
+  `QUAY_USERNAME`/`QUAY_PASSWORD` secret wiring are untouched and it
+  remains manually runnable.
+- Verified no `gitops/charts/*/values.yaml` `image.repository`/
+  `frontendRepository`/`bffRepository` field points at `quay.io/zuno/*` -
+  every first-party component still deploys from the in-cluster
+  `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/*`
+  ImageStream. The one remaining literal `quay.io` string in any chart
+  (`gitops/charts/models/values.yaml`'s `vllm: quay.io/modh/vllm:...`) is a
+  third-party OpenShift AI model-runtime fallback governed by ADR-0048, not
+  a Zuno-built image - explicitly out of scope for this ADR.
+- Verified every zuno-authored component still has a real in-cluster
+  BuildConfig: `agent-runtime`, `agent-bff`, `agent-frontend`,
+  `aiagent-operator`, `ai-gateway`, `mcp-gateway`, `mcp-confluence`,
+  `mcp-git-forge`, `mcp-sales-db`, `mcp-salesforce`, `rag-service`,
+  `rag-ingestion` and `mlops` each have an `ansible/roles/<name>_build`
+  role wired to `ansible/tasks/apply_openshift_build.yml`. This corrects
+  the 2026-08-21 note below, which believed `mlops` had none -
+  `ansible/roles/mlops_build` exists (added by the WP-34 mlops pipeline
+  work) and is wired into `ansible/playbooks/day2_build.yml`.
+
+Gaps 2, 3, 4 and 6 (below) remain genuinely open - this note does not
+resolve them, it records the decision to stop pursuing them for now.
 
 ## Implementation note (2026-08-21) — local-registry immutable tagging
 
@@ -302,6 +343,12 @@ themselves are sourced from.
 5. ~~Two first-party Dockerfiles still inherit moving base images.~~ **Resolved 2026-08-12**: `components/agent-frontend/Dockerfile` and `components/agent-bff/Dockerfile` now pin `registry.access.redhat.com/ubi9/ubi-minimal` by digest (`sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221`, version 9.8, confirmed live via `skopeo inspect` against the real Red Hat registry) rather than `:latest`. This gap was independent of the others - it depends on Red Hat's registry, not this repository's own release pipeline.
 6. **Signing is not yet a deployment verification gate.** Images are designed to be signed in CI, but GitOps/admission/release validation does not yet prove the expected signature identity before deployment. `verify_signatures.py` (2026-08-14) is the verification gate itself, CI-wired non-blocking; it still finds nothing to verify because gap 7 means nothing has been signed for real yet - the remaining blocker is gap 7 alone, not building the check.
 7. ~~The publish/sign workflow has not yet been demonstrated end to end against the real GitHub Actions + Quay environment.~~ **Resolved 2026-08-19**: [run 32273454405](https://github.com/startxfr/zuno-demo/actions/runs/32273454405) (tag `v0.1.0`, commit `c83cfcd`) published, SBOM-attested and keyless-signed all 11 first-party images for real - see the dated note above for the real digests and the three real bugs (trivy-action's yanked pin, cluster-internal base images unreachable from GitHub-hosted runners, wrong Quay org name) it took to get there. **Gaps 2, 3, 4 and 6 are not automatically closed by this** - `pin_release.py` still needs to run against this real manifest (stage 3, WP-04), and one wrinkle stage 3 must account for: `rag-ingestion`'s two `latest` fields (gap 2's list) are built exclusively by the in-cluster OpenShift BuildConfig, not this workflow, so this release has no real Quay artifact for them - `pin_release.py`'s exact-field-set manifest requirement can't be satisfied for `rag-ingestion` from this release alone. Known-open CVE debt from this run (`mlops`, `agent-runtime`, `ai-gateway`, `rag-service`, `aiagent-operator` - see the dated note above) is unrelated to gap 7 itself and stays deliberately deferred.
+
+**2026-08-22 (WP-04 closed, ADR deferred):** gaps 2, 3, 4 and 6 above stay
+genuinely open - not resolved, not silently dropped, just no longer being
+pursued. `build-publish.yml`'s automatic triggers are disabled (see the
+dated note at the top of this document); no further stage-3 work is
+planned until a future ADR reactivates this stream.
 
 ### Completion criteria
 

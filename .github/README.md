@@ -19,7 +19,11 @@ ADRs referencing ".github/workflows/ doesn't exist yet" predate this):
   SPDX SBOM, scans for HIGH/CRITICAL vulnerabilities (fails the build),
   and signs the image keylessly via `cosign` (Sigstore/Fulcio, using
   GitHub's own OIDC identity). Requires `QUAY_USERNAME`/`QUAY_PASSWORD` as
-  encrypted GitHub repository secrets, never committed.
+  encrypted GitHub repository secrets, never committed. **Disabled
+  (2026-08-22, WP-04/ADR-0115 closed)** - the push/tag triggers were
+  removed, so it no longer fires automatically; it stays manually runnable
+  via `workflow_dispatch` and ready to have its triggers restored under a
+  future ADR if this supply-chain stream is reactivated.
 
 ## What hasn't run
 

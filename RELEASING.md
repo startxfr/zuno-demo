@@ -19,14 +19,23 @@ first path and never needs anything below this note.
    `platform/supply-chain/check_no_latest_tags.py` is the live source of
    truth for which charts still need it.
 
-2. **Supply-chain release (`quay.io/zuno/*`, currently optional).**
+2. **Supply-chain release (`quay.io/zuno/*`, currently disabled).**
    Tagging `v0.1.0`, `build-publish.yml` publishing to Quay, and
-   `pin_release.py` rewriting chart `image.tag` are a **separate,
-   optional** story (SBOM, signing, immutable distribution, ADR-0115). It
-   only makes sense once a chart's `image.repository` is *also*
-   repointed at `quay.io/zuno/<component>` — skipping that and pinning
-   only `.tag` is the exact mismatch that keeps recurring. Nothing about
-   deploying today depends on this path ever having run.
+   `pin_release.py` rewriting chart `image.tag` are a **separate**
+   story (SBOM, signing, immutable distribution, ADR-0115). It only makes
+   sense once a chart's `image.repository` is *also* repointed at
+   `quay.io/zuno/<component>` — skipping that and pinning only `.tag` is
+   the exact mismatch that keeps recurring. Nothing about deploying today
+   depends on this path ever having run.
+
+   **Disabled 2026-08-22 (WP-04/ADR-0115 closed):** `build-publish.yml`'s
+   automatic push/tag triggers were removed (now `workflow_dispatch` only)
+   after the 2026-08-21 operator decision to stay on the in-cluster
+   BuildConfig path rather than cut charts over to Quay. The pipeline
+   already proved itself once (2026-08-19, run `32273454405`, tag
+   `v0.1.0` — real signed, SBOM'd images published) and is left in place
+   for a future ADR to reactivate by restoring its triggers; the
+   step-by-step process below still documents exactly how.
 
 This project has never cut a release: every GitOps `Application`
 (`gitops/apps/*/application.yaml`, `gitops/root-app-of-apps.yaml`) still

@@ -573,10 +573,18 @@ not here.
   stays merged and default-off as a delegation seam. Keep-vs-delegate and
   any cutover deferred to ADR-0201/WP-27, pending RHOAI's upstream MaaS
   mTLS defect fix and available GPU capacity.
-- **ADR-0115 stage 1 (WP-04)**: supply-chain tooling merged
+- **ADR-0115 (WP-04)**: supply-chain tooling merged
   (`platform/supply-chain/verify_signatures.py`, `pin_release.py`), wired
-  into `lint.yml` non-blocking. No credentialed release has run yet — see
-  `RELEASING.md` for the release process and current blocker.
+  into `lint.yml` non-blocking. One real credentialed release did run
+  (2026-08-19, `v0.1.0`, run `32273454405` — signed/SBOM'd images
+  published to Quay), but cutting charts' `image.repository` over to Quay
+  was rejected in favor of staying on the in-cluster BuildConfig path. **2026-08-22:
+  closed — deferred.** `build-publish.yml`'s automatic triggers disabled
+  (`workflow_dispatch` only); confirmed no chart depends on quay.io for
+  deployment; confirmed every zuno-authored component (including `mlops`)
+  still has a working in-cluster BuildConfig. Gaps 2/3/4/6 stay genuinely
+  open, not resolved — a future ADR will reactivate this stream if needed.
+  See `RELEASING.md` and ADR-0115's 2026-08-22 note for the full trace.
 - **ADR-0117 (WP-02)**: Confluence MCP server. Real MCP server
   (`components/mcp-servers/confluence/`, official SDK, streamable-HTTP)
   against the live Confluence Cloud REST API; `tool-bindings.yaml` routes
