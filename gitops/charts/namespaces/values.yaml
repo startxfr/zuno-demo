@@ -46,6 +46,10 @@ platformNamespaces:
       - zuno-ai-run
       - zuno-auth
       - zuno-data
+      # ADR-0420/WP-068: the zuno-signer ServiceAccount and every debug
+      # pod/Job that authenticates to Vault's platform-signer role live in
+      # zuno-ai-build, alongside every other in-cluster build.
+      - zuno-ai-build
     # ESO's secretstore-validate webhook (failurePolicy: Fail) lives here and
     # is called synchronously by the API server on every SecretStore write.
     allowApiServerWebhooks: true
