@@ -141,6 +141,13 @@
                       path: scenarios.yaml
                     - key: "{{ day2_stress_agent }}-security_checks.py"
                       path: security_checks.py
+                    # Only Arkos has its own stress_test.py today
+                    # (ADR-0415's image-generation coverage) - optional so
+                    # every other agent's Job pod still starts cleanly
+                    # without this key existing in the ConfigMap.
+                    - key: "{{ day2_stress_agent }}-stress_test.py"
+                      path: stress_test.py
+                      optional: true
               - name: gate-policies
                 configMap:
                   name: day2-stresstest-scripts

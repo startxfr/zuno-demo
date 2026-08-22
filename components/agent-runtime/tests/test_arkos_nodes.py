@@ -28,12 +28,13 @@ os.environ.setdefault(
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
 from app.clients.model_router import ModelRouterError, ProviderCandidate  # noqa: E402
-from app.graph import arkos_nodes  # noqa: E402
+from app.graph import arkos_nodes, nodes  # noqa: E402
 
 
 class _FakeModelResult:
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str, tool_calls=None) -> None:
         self.content = content
+        self.tool_calls = tool_calls or []
 
 
 def test_extract_topic_from_a_dat_request() -> None:
@@ -184,8 +185,133 @@ async def test_reflect_node_still_honors_local_only_required() -> None:
 
 
 async def test_reflect_node_is_a_noop_without_a_draft() -> None:
+    """Must still write a real key even on the no-op path - a bare `{}`
+    passes this direct-call test but violates LangGraph's own "a node must
+    write to at least one state key" runtime contract once this node runs
+    inside the actual compiled StateGraph (unconditionally reachable from
+    draft_node via the plan_draft_write shape's `draft -> reflect` edge).
+    See test_draft_node_then_reflect_node_survives_an_empty_image_caption
+    below for the real sequence that used to crash on this."""
     result = await arkos_nodes.reflect_node({"document_draft": None})
-    assert result == {}
+    assert result == {"document_draft": None}
+
+
+# --------------------------------------------------------------------------
+# ADR-0415: draft_node's generate_image tool-call dispatch. Previously
+# untested anywhere in the repo - the shared helper these tests exercise
+# (nodes.py:_resolve_image_generation_call) is used by both Tekos's and
+# Arkos's graph shapes, but only Arkos's task declares the tool today.
+# --------------------------------------------------------------------------
+
+
+async def test_draft_node_dispatches_a_generate_image_tool_call() -> None:
+    """draft_node's own model call may choose to call generate_image instead
+    of drafting prose directly - when it does, the tool result must land in
+    generated_images and the follow-up (tool-less) call's reply becomes the
+    document_draft, per _resolve_image_generation_call (nodes.py)."""
+    captured_tool_call = {}
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "generate_image",
+                        "args": {"prompt": "an OpenShift Operator icon"},
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        captured_tool_call.update(kwargs)
+        return {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"}
+
+    async def fake_followup_invoke(**kwargs):
+        return _FakeModelResult("Here's the OpenShift Operator icon."), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "generate an image of the openshift operator",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert captured_tool_call.get("tool_name") == "generate_image"
+    assert result["document_draft"] == "Here's the OpenShift Operator icon."
+    assert result["generated_images"] == [
+        {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"}
+    ]
+
+
+async def test_draft_node_then_reflect_node_survives_an_empty_image_caption() -> None:
+    """Regression test for the reported crash: a real user asked Arkos to
+    generate an image, the model called generate_image, and the follow-up
+    (tool-less) call composing the natural-language reply came back with
+    empty content - a real, observed failure mode for a model that just
+    executed a tool call and has nothing more to say. That left
+    document_draft falsy, and reflect_node's old `if not draft: return {}`
+    then violated LangGraph's "a node must write to at least one state key"
+    contract on the very next node, surfacing as
+    "Must write to at least one of [...]" in the chat reply."""
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "generate_image",
+                        "args": {"prompt": "an OpenShift Operator icon"},
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        return {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"}
+
+    async def fake_followup_invoke(**kwargs):
+        return _FakeModelResult(""), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "can you generate an image of the openshift operator",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        draft_result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert draft_result["document_draft"] == ""
+
+    reflect_result = await arkos_nodes.reflect_node({**state, "document_draft": draft_result["document_draft"]})
+    assert reflect_result == {"document_draft": ""}
 
 
 def test_arkos_declares_the_confluence_capabilities_from_its_task() -> None:
@@ -461,6 +587,8 @@ TESTS = [
     test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_classification,
     test_reflect_node_still_honors_local_only_required,
     test_reflect_node_is_a_noop_without_a_draft,
+    test_draft_node_dispatches_a_generate_image_tool_call,
+    test_draft_node_then_reflect_node_survives_an_empty_image_caption,
     test_arkos_declares_the_confluence_capabilities_from_its_task,
     test_reflect_slot_resolves_from_the_real_bundle,
     test_arkos_declares_the_workshop_presentation_task,

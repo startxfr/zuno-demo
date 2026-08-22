@@ -536,7 +536,7 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     """
     draft = state.get("document_draft")
     if not draft:
-        return {}
+        return {"document_draft": draft}
 
     task = _active_task(state)
     reflect_ceiling, reflect_prompt = _active_reflect(state)

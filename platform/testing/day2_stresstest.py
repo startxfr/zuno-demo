@@ -17,7 +17,10 @@ every result into platform/testing/day2_report.py::Day2Result:
                            whichever agent's module sys.path finds first).
   - gate_checks.py       - Tekos only (no other agent has this file or a
                            wrapper for it - see ADR-0058's Context).
-  - stress_test.py       - Tekos only (same reason).
+  - stress_test.py       - whichever agents have one (Tekos, and, as of
+                           ADR-0415's image-generation coverage, Arkos),
+                           dynamically loaded the same way security_checks.py
+                           already is above.
 An agent missing a given layer's file gets one explicit "coverage" row
 instead of a failure - ADR-0058 decision 1's informational, non-blocking
 posture.
@@ -111,14 +114,30 @@ def _gate_check_results() -> List[Day2Result]:
     ]
 
 
-def _stress_test_results() -> List[Day2Result]:
-    if AGENT != "tekos":
-        return [Day2Result(AGENT, "stress_test", "n/a", "coverage", True, "stress_test.py is Tekos-only today")]
-    import stress_test
+def _load_stress_test():
+    """Mirrors _load_security_checks() above: dynamically loads THIS
+    agent's own stress_test.py when it has one, rather than assuming
+    Tekos's fixed module name/path. Not every agent has this file (only
+    Tekos and, as of ADR-0415's image-generation coverage, Arkos do) - see
+    _stress_test_results()'s "coverage" fallback below for agents that
+    don't."""
+    path = SCRIPT_DIR / AGENT / "stress_test.py"
+    if not path.is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("stress_test", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
+
+def _stress_test_results() -> List[Day2Result]:
+    module = _load_stress_test()
+    if module is None:
+        return [Day2Result(AGENT, "stress_test", "n/a", "coverage", True, "no stress_test.py for this agent")]
     return [
         Day2Result(AGENT, "stress_test", r.id, r.category, r.passed, r.detail)
-        for r in stress_test.run()
+        for r in module.run()
     ]
 
 

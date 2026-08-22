@@ -34,6 +34,13 @@ configMapGenerator:
       - tekos-security_checks.py=../../../../../evaluations/tekos/security_checks.py
       - arkos-scenarios.yaml=../../../../../evaluations/arkos/scenarios.yaml
       - arkos-security_checks.py=../../../../../evaluations/arkos/security_checks.py
+      # ADR-0415 image-generation coverage - Arkos is the only agent with
+      # its own stress_test.py today (day2_stresstest.py's
+      # _load_stress_test() loads it dynamically per agent, same pattern
+      # as *-security_checks.py above; every other agent simply has no
+      # matching key, which is fine - see stresstest_job_run_one.yml's
+      # `optional: true` on this projection).
+      - arkos-stress_test.py=../../../../../evaluations/arkos/stress_test.py
       - comage-scenarios.yaml=../../../../../evaluations/comage/scenarios.yaml
       - comage-security_checks.py=../../../../../evaluations/comage/security_checks.py
       - advantage-scenarios.yaml=../../../../../evaluations/advantage/scenarios.yaml

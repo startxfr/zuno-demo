@@ -217,7 +217,7 @@ def make_history_node(agent: AgentDefinition, task: TaskDefinition, model_router
 
     async def record_history(state: AgentState) -> Dict[str, Any]:
         if not agent.history_enabled:
-            return {}
+            return {"history": state.get("history", [])}
 
         history = append_turn(state.get("history", []), state.get("message", ""), state.get("reply", ""))
         history_classification = _escalate(
