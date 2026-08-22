@@ -9,10 +9,13 @@
 # provider/model/outcome axis of ADR-0029's "by user, agent, task, model
 # and provider" bullet; dashboard-usage-cost.yaml covers user/group/agent.
 #
-# zuno_model_call_duration_ms_bucket (the gateway-traffic latency panel)
-# needs ai-gateway rebuilt/redeployed with its duration histogram - same
-# caveat the retired dashboard-model-consumption.yaml carried, unresolved.
-# The "BFF requests by agent" panel that dashboard also carried moved to
+# The latency panel's histogram is live as of 2026-08-22 (ai-gateway was
+# rebuilt with it days ago) - the panel was still empty because of a
+# double-unit-suffix bug: telemetry.py's create_histogram() passes
+# unit="ms" on a name that already ends in "_ms", so the OTel-to-
+# Prometheus translator emits zuno_model_call_duration_ms_milliseconds_bucket,
+# not the _ms_bucket name you'd guess. Panel query fixed to match; see
+# that panel's own description for detail. The "BFF requests by agent" panel that dashboard also carried moved to
 # dashboard-agents-tools-rag.yaml, which is the more natural home for
 # per-agent traffic once that dashboard exists.
 apiVersion: grafana.integreatly.org/v1beta1
@@ -118,14 +121,14 @@ spec:
           "title": "Latency p50/p95 (by provider/model)",
           "type": "timeseries",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "Empty until ai-gateway is rebuilt/redeployed with the duration histogram (unresolved since dashboard-model-consumption.yaml).",
+          "description": "The histogram is live (ai-gateway/app/telemetry.py's create_histogram(\"zuno.model_call_duration_ms\", unit=\"ms\", ...)), but the OTel-to-Prometheus translator appends a unit suffix on top of the already-unit-suffixed name, so the real series is zuno_model_call_duration_ms_milliseconds_bucket, not the _ms_bucket name you'd expect - verified live against Thanos 2026-08-22.",
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
           "fieldConfig": {"defaults": {"unit": "ms", "links": [
             {"title": "View slow model_call traces in Tempo", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22model_call%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}
           ]}},
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.50, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))", "legendFormat": "p50 {{`{{provider}}`}}/{{`{{model}}`}}"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))", "legendFormat": "p95 {{`{{provider}}`}}/{{`{{model}}`}}"}
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.50, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))", "legendFormat": "p50 {{`{{provider}}`}}/{{`{{model}}`}}"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))", "legendFormat": "p95 {{`{{provider}}`}}/{{`{{model}}`}}"}
           ]
         },
         {

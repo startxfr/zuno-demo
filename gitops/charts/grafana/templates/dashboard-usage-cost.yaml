@@ -8,10 +8,19 @@
 # panels below use increase(...[$__range]) instead so the time picker
 # actually governs the window (a deliberate behavior change from the
 # retired dashboard, not a preserved quirk). topk(20, ...) still bounds
-# panel cardinality against a growing user base. Still empty until
-# components/ai-gateway and components/agent-bff are rebuilt/redeployed
-# with their user/group labels - same live-verification gap the retired
-# dashboard's header noted.
+# panel cardinality against a growing user base. The user/group labels
+# were confirmed live 2026-08-22 (this comment previously said the
+# dashboard was still empty pending an ai-gateway/agent-bff redeploy -
+# that redeploy had already happened; don't trust this file's own history
+# without a live Thanos check first).
+#
+# Panels 10-11 (added 2026-08-22): an agent dimension on
+# zuno_model_cost_usd_total/zuno_model_tokens_total, closing ADR-0029's
+# "by user, agent, task, model and provider" bullet - ai-gateway's
+# model_call_span() previously received caller_sub/groups but never the
+# X-Zuno-Agent header agent-runtime already sends on every call (only used
+# for routing/adapter lookups until now). Requires the same rebuild/
+# redeploy of ai-gateway as any other telemetry.py change.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -179,6 +188,28 @@ spec:
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
           "targets": [
             {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user) (increase(zuno_model_tokens_total{user=~\"$user\"}[$__range])))", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Model cost by user & agent (top 20, over range)",
+          "type": "table",
+          "description": "zuno_model_cost_usd_total's agent label (ADR-0029) - populated once ai-gateway forwards X-Zuno-Agent into model_call_span, same redeploy this dashboard's other panels needed.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user, agent) (increase(zuno_model_cost_usd_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Tokens by agent (over range)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent, kind) (increase(zuno_model_tokens_total{agent=~\"$agent\", model=~\"$model\", provider=~\"$provider\"}[$__range]))", "legendFormat": "{{`{{agent}}`}} ({{`{{kind}}`}})"}
           ]
         }
       ]

@@ -75,6 +75,22 @@ spec:
       name: {{ .Values.cluster.metrics.passwordSecretKeyRef.name }}
       key: {{ .Values.cluster.metrics.passwordSecretKeyRef.key }}
       generate: {{ .Values.cluster.metrics.passwordSecretKeyRef.generate }}
+    exporter:
+      # mariadb-0 itself is not Istio-injected, but this exporter pod is
+      # (namespace-wide sidecar injection). Its /probe call dials
+      # mariadb-0:3306 in-cluster - MySQL's wire protocol is server-first
+      # (the server sends the greeting before the client sends anything),
+      # which trips Envoy's outbound protocol sniffing/mTLS origination
+      # the same way it did for MariaDB in the DSPA case - resulting in
+      # mysql_up=0 with no error on either side (verified live 2026-08-22:
+      # exporter's own /probe reachable, NetworkPolicy fine, but
+      # mysql_up=0). Excluding 3306 from the sidecar's outbound
+      # interception is the fix; the exporter gains nothing from mesh
+      # membership on this port anyway (Prometheus scrapes it over plain
+      # HTTP on 9104, unaffected by this exclusion).
+      podMetadata:
+        annotations:
+          traffic.sidecar.istio.io/excludeOutboundPorts: "3306"
     serviceMonitor:
       interval: {{ .Values.cluster.metrics.serviceMonitor.interval }}
 {{- end }}

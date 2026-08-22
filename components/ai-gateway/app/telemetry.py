@@ -166,6 +166,7 @@ def model_call_span(
     adapter: Optional[str] = None,
     caller_sub: Optional[str] = None,
     groups: Optional[List[str]] = None,
+    agent: Optional[str] = None,
 ) -> Iterator["ModelCallRecorder"]:
     """Wraps one model invocation: records a span plus the zuno.model_calls
     / zuno.model_call_duration_ms metrics (ADR-0029) unconditionally, for
@@ -204,6 +205,15 @@ def model_call_span(
     user is an accepted demo-scope trade-off, same class as this file's
     other approximations; a user with zero groups still gets one point
     with `group=""`).
+
+    `agent` (ADR-0029's "by user, agent, task, model and provider" bullet,
+    also never wired until now): the X-Zuno-Agent header agent-runtime
+    already sends on every call (app/main.py's `x_zuno_agent`) - previously
+    only used for routing/adapter lookups, never attached to these
+    counters, so `zuno_model_calls_total`/`zuno_model_tokens_total`/
+    `zuno_model_cost_usd_total` had no reliable per-agent dimension (the
+    `group` label sometimes held an `agent_<name>` placeholder for
+    service-account callers, but that's a different, unrelated fallback).
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
@@ -219,6 +229,8 @@ def model_call_span(
             span.set_attribute("zuno.user_sub", caller_sub)
         if groups:
             span.set_attribute("zuno.groups", groups)
+        if agent:
+            span.set_attribute("zuno.agent", agent)
         recorder = ModelCallRecorder(provider=provider)
         try:
             yield recorder
@@ -232,7 +244,7 @@ def model_call_span(
             latency_ms = (time.monotonic() - start) * 1000.0
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", outcome)
-            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or ""}
+            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or "", "agent": agent or ""}
             group_list = groups or [""]
             for attrs_per_group in ({**attrs, "group": g} for g in group_list):
                 if _model_call_counter is not None:

@@ -272,7 +272,7 @@ async def chat_completions(
         return StreamingResponse(
             _stream_completion(
                 candidates, classification, messages, request_id, adapter_decl,
-                identity=identity, tools=payload.tools,
+                identity=identity, tools=payload.tools, agent=x_zuno_agent,
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -293,6 +293,7 @@ async def chat_completions(
         quota_class=quota_class,
         project_id=project_id,
         tools=payload.tools,
+        agent=x_zuno_agent,
     )
 
 
@@ -387,6 +388,7 @@ async def _invoke_with_fallback(
     quota_class: str = "standard",
     project_id: Optional[str] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
+    agent: str = "",
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -440,7 +442,7 @@ async def _invoke_with_fallback(
         try:
             with model_call_span(
                 candidate.name, effective_model_name, classification, request_id,
-                adapter=adapter_name, caller_sub=caller_sub, groups=groups,
+                adapter=adapter_name, caller_sub=caller_sub, groups=groups, agent=agent,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 if tools:
@@ -528,6 +530,7 @@ async def _stream_completion(
     adapter_decl: Optional[AdapterDeclaration] = None,
     identity: Optional[CallerIdentity] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
+    agent: str = "",
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -555,6 +558,7 @@ async def _stream_completion(
                 adapter=adapter_name,
                 caller_sub=identity.sub if identity else None,
                 groups=identity.groups if identity else None,
+                agent=agent,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 if tools:
