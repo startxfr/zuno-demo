@@ -82,12 +82,20 @@
                   - verify-images
                   - --refs-file
                   - /work/refs.json
-                # Same TLS-trust fix as run_image_signing_job.yml, for the
-                # same reason: the internal registry serves a cert issued
-                # by the cluster's own service-serving CA.
                 env:
+                  # Same TLS-trust fix as run_image_signing_job.yml, for
+                  # the same reason: the internal registry serves a cert
+                  # issued by the cluster's own service-serving CA.
                   - name: SSL_CERT_FILE
                     value: /etc/ssl/openshift-service-ca/service-ca.crt
+                  # `cosign verify` (unlike `sign`) always initializes a
+                  # local Sigstore TUF trust-root cache under $HOME/.sigstore
+                  # even in pure --key mode with no tlog contact - HOME is
+                  # unset by default in this non-root image, so it tries
+                  # (and fails) to write to `/`. /tmp is writable and this
+                  # Job's pod is ephemeral, so nothing needs to persist it.
+                  - name: HOME
+                    value: /tmp
                 volumeMounts:
                   - name: openshift-service-ca
                     mountPath: /etc/ssl/openshift-service-ca

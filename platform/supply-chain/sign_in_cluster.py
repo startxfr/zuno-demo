@@ -191,12 +191,20 @@ def verify_image(public_key: pathlib.Path, image_ref: str, jwt_path: str) -> Non
     public key file - no Vault access needed, matching
     sign_okf_bundle.py's verify_bundle(). Still needs registry auth (a
     pull), built the same Docker-config-from-SA-token way sign_image()
-    builds it for a push."""
+    builds it for a push.
+
+    `cosign verify` (unlike `sign`) always initializes a local Sigstore
+    TUF trust-root cache under $HOME/.sigstore, even in pure --key mode
+    with no tlog contact - defaults HOME to a throwaway writable dir if
+    unset, so this works regardless of the caller's environment (a Job
+    with no HOME set, an interactive debug pod, ...) rather than requiring
+    every caller to remember to set it."""
     cosign_bin = _cosign_path()
     docker_config_dir = _registry_docker_config(image_ref, jwt_path)
     try:
         env = os.environ.copy()
         env["DOCKER_CONFIG"] = str(docker_config_dir)
+        env.setdefault("HOME", tempfile.gettempdir())
         result = subprocess.run(
             [cosign_bin, "verify", "--key", str(public_key), image_ref],
             env=env,
