@@ -77,23 +77,22 @@ spec:
       generate: {{ .Values.cluster.metrics.passwordSecretKeyRef.generate }}
     exporter:
       # mariadb-0 itself is not Istio-injected, but this exporter pod is
-      # (namespace-wide sidecar injection). Two separate mesh interception
-      # points broke this exporter, found live 2026-08-22:
-      #  1. Outbound: the exporter's own /probe call dials mariadb-0:3306
-      #     in-cluster - MySQL's wire protocol is server-first (the server
-      #     sends the greeting before the client sends anything), which
-      #     trips Envoy's outbound protocol sniffing/mTLS origination the
-      #     same way it did for MariaDB in the DSPA case.
-      #  2. Inbound: openshift-monitoring's Prometheus (not itself
-      #     mesh-injected) scraping this pod's :9104 would hang
-      #     indefinitely rather than fail cleanly (confirmed by execing
-      #     into prometheus-k8s-0 and curling the exporter Service - the
-      #     connection never completed) - Envoy's inbound listener on 9104
-      #     stalling on a plain-HTTP client it expected to protocol-sniff/
-      #     mTLS-negotiate with.
-      # Excluding both ports from the sidecar's interception is the fix;
-      # the exporter gains nothing from mesh membership on either port -
-      # Prometheus is outside the mesh and MariaDB itself isn't meshed.
+      # (namespace-wide sidecar injection). excludeOutboundPorts fixes a
+      # real mesh issue found live 2026-08-22: the exporter's own /probe
+      # call dials mariadb-0:3306 in-cluster, and MySQL's wire protocol is
+      # server-first (the server sends the greeting before the client
+      # sends anything), which trips Envoy's outbound protocol sniffing/
+      # mTLS origination the same way it did for MariaDB in the DSPA case
+      # - manually confirmed the probe starts succeeding once this port is
+      # excluded. excludeInboundPorts is a secondary belt-and-suspenders
+      # exclusion for Prometheus's scrape of :9104 (Prometheus isn't
+      # mesh-injected, so it gains nothing from being proxied either) -
+      # NOT the actual fix for that scrape's persistent "up=0"/TCP-connect-
+      # timeout, though: that turned out to be
+      # networkpolicy-metrics.yaml's podSelector matching the WRONG pod's
+      # labels (mariadb-0's, not this exporter Deployment's), so the
+      # namespace default-deny was silently blocking Prometheus outright -
+      # see that file's own comment.
       podMetadata:
         annotations:
           traffic.sidecar.istio.io/excludeOutboundPorts: "3306"

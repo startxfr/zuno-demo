@@ -1,14 +1,24 @@
 {{- if .Values.mariadbOperand.enabled }}
 {{- if .Values.cluster.metrics.enabled }}
-# ADR-0413: admits prometheus-k8s's scrape of the mysqld-exporter sidecar
-# mariadb-operator adds when spec.metrics.enabled (templates/mariadb.yaml) -
-# zuno-data's baseline is zuno-default-deny-other-namespaces
-# (gitops/charts/namespaces), which admits neither openshift-monitoring nor
-# openshift-user-workload-monitoring by default. mysqld-exporter's default
-# port is 9104 (mariadb-operator's own default, `spec.metrics.exporter.port`
-# left unset here) - UNVERIFIED against this live cluster's actual generated
-# pod spec; adjust if it differs once applied. Precise allow-list, same
-# pattern as gitops/charts/postgresql/templates/networkpolicy-metrics.yaml.
+# ADR-0413: admits prometheus-k8s's scrape of the mysqld-exporter
+# mariadb-operator runs as its OWN Deployment (not a sidecar on the
+# mariadb-0 StatefulSet pod) when spec.metrics.enabled
+# (templates/mariadb.yaml) - zuno-data's baseline is
+# zuno-default-deny-other-namespaces (gitops/charts/namespaces), which
+# admits neither openshift-monitoring nor openshift-user-workload-monitoring
+# by default. mysqld-exporter's default port is 9104 (mariadb-operator's
+# own default, `spec.metrics.exporter.port` left unset here) - confirmed
+# live. The podSelector below previously matched the main MariaDB pod's
+# labels (name=mariadb/instance=mariadb) instead of the actual exporter
+# Deployment's own labels - the exporter pod was never covered by any
+# ingress rule, so the namespace default-deny silently blocked every
+# Prometheus scrape (raw TCP connect timeout, confirmed live 2026-08-22 by
+# execing into prometheus-k8s-0: initially misdiagnosed as an Istio
+# mTLS/protocol-sniffing issue since the exporter pod is also
+# mesh-injected, until a direct curl from the Prometheus pod itself timed
+# out at the TCP layer, which a NetworkPolicy DROP causes and an Istio
+# sidecar issue would not). Precise allow-list, same pattern as
+# gitops/charts/postgresql/templates/networkpolicy-metrics.yaml.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -21,8 +31,8 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: mariadb
-      app.kubernetes.io/instance: mariadb
+      app.kubernetes.io/name: exporter
+      app.kubernetes.io/instance: mariadb-metrics
   policyTypes:
     - Ingress
   ingress:
