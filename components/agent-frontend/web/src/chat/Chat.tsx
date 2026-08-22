@@ -23,6 +23,7 @@ import {
   Tabs,
   TabTitleText,
   TextArea,
+  TextInput,
   Toolbar,
   ToolbarContent,
   ToolbarGroup,
@@ -33,7 +34,7 @@ import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
 import { AGENT_ICONS } from "../shared/agentIcons";
 import { ConversationList } from "../shared/ConversationList";
-import { getTranscript, listConversations } from "../shared/conversations";
+import { getTranscript, listConversations, renameConversation } from "../shared/conversations";
 import { Footer } from "../shared/Footer";
 import { SSEParser } from "../shared/sse";
 import { openAgentTab } from "../shared/tabTracker";
@@ -150,6 +151,35 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
     const clamped = Math.min(600, Math.max(220, width));
     setSidebarWidth(clamped);
     window.localStorage.setItem("zuno.sidebarWidth", String(clamped));
+  }
+
+  // Double-click-to-rename shortcut on the tab itself, alongside
+  // ConversationList's kebab-menu rename (which stays the primary path
+  // for tabs not currently open).
+  const [renamingTabId, setRenamingTabId] = React.useState<string | null>(null);
+  const [tabRenameValue, setTabRenameValue] = React.useState("");
+
+  function startTabRename(tab: TabState) {
+    if (!tab.runId) {
+      return;
+    }
+    setRenamingTabId(tab.id);
+    setTabRenameValue(tab.title);
+  }
+
+  async function commitTabRename(tab: TabState, title: string) {
+    setRenamingTabId(null);
+    const trimmed = title.trim();
+    if (!trimmed || !tab.runId || trimmed === tab.title) {
+      return;
+    }
+    updateTab(tab.id, (t) => ({ ...t, title: trimmed }));
+    try {
+      await renameConversation(config.conversationsURL, tab.runId, trimmed);
+      setConversationsRefreshToken((n) => n + 1);
+    } catch (err) {
+      updateTab(tab.id, (t) => ({ ...t, error: err instanceof Error ? err.message : String(err) }));
+    }
   }
 
   function updateTab(id: string, updater: (t: TabState) => TabState) {
@@ -443,19 +473,21 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                         style={
                           entry.color
                             ? isCurrent
-                              ? {
+                              ? ({
                                   backgroundColor: entry.color,
                                   borderColor: entry.color,
                                   color: textColorFor(entry.color),
-                                }
-                              : {
+                                  "--pf-v6-c-button__icon--Color": textColorFor(entry.color),
+                                } as React.CSSProperties)
+                              : ({
                                   backgroundColor: "transparent",
                                   borderWidth: "0 0 2px 0",
                                   borderStyle: "solid",
                                   borderColor: entry.color,
                                   borderRadius: 0,
                                   color: entry.color,
-                                }
+                                  "--pf-v6-c-button__icon--Color": entry.color,
+                                } as React.CSSProperties)
                             : undefined
                         }
                         onClick={(e) => {
@@ -519,7 +551,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       masthead={masthead}
     >
       {orderedTabs.length > 0 && (
-        <PageSection type="tabs">
+        <PageSection type="tabs" stickyOnBreakpoint={{ default: "top" }}>
           <Tabs
             activeKey={activeTabId ?? undefined}
             onSelect={(_e, key) => setActiveTabId(String(key))}
@@ -530,22 +562,37 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                 key={tab.id}
                 eventKey={tab.id}
                 title={
-                  <TabTitleText>
-                    {tab.starred && (
-                      <span
-                        aria-label="Starred"
-                        style={{ display: "inline-flex", marginRight: "0.375rem", color: "var(--pf-t--global--icon--color--favorite--default)" }}
-                      >
-                        <StarIcon />
-                      </span>
-                    )}
-                    {tab.sending && (
-                      <span style={{ display: "inline-flex", marginRight: "0.375rem" }}>
-                        <Spinner size="sm" aria-label="Thinking" />
-                      </span>
-                    )}
-                    {tab.title || "New conversation"}
-                  </TabTitleText>
+                  renamingTabId === tab.id ? (
+                    <TextInput
+                      aria-label="Rename conversation"
+                      autoFocus
+                      value={tabRenameValue}
+                      onChange={(_e, value) => setTabRenameValue(value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void commitTabRename(tab, tabRenameValue);
+                        if (e.key === "Escape") setRenamingTabId(null);
+                      }}
+                      onBlur={() => void commitTabRename(tab, tabRenameValue)}
+                    />
+                  ) : (
+                    <TabTitleText onDoubleClick={() => startTabRename(tab)}>
+                      {tab.starred && (
+                        <span
+                          aria-label="Starred"
+                          style={{ display: "inline-flex", marginRight: "0.375rem", color: "var(--pf-t--global--icon--color--favorite--default)" }}
+                        >
+                          <StarIcon />
+                        </span>
+                      )}
+                      {tab.sending && (
+                        <span style={{ display: "inline-flex", marginRight: "0.375rem" }}>
+                          <Spinner size="sm" aria-label="Thinking" />
+                        </span>
+                      )}
+                      {tab.title || "New conversation"}
+                    </TabTitleText>
+                  )
                 }
                 actions={
                   <TabAction

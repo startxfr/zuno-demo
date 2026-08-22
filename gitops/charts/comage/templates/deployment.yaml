@@ -159,6 +159,8 @@ spec:
               value: {{ .Values.bff.agentName | quote }}
             - name: KEYCLOAK_ISSUER_URL
               value: {{ include "comage.keycloakIssuerUrl" . | quote }}
+            - name: KEYCLOAK_JWKS_URL
+              value: {{ .Values.keycloak.jwksUrl | quote }}
             - name: OIDC_AUDIENCE
               value: {{ .Values.bff.oidcAudience | quote }}
             - name: AGENT_RUNTIME_BASE_URL

@@ -69,13 +69,18 @@ redis:
 
 keycloak:
   issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
+  # Where the BFF actually fetches the JWKS (issuerUrl stays the iss
+  # comparison string) - the in-cluster Service path avoids the external
+  # Route's Vault-internal CA.
+  jwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
   # matches the Keycloak CR's actual Route hostname, see
   # gitops/charts/keycloak/templates/keycloak.yaml
   # ADR-0411: ConfigMap (this chart's own namespace, key ca.crt) holding
   # the Vault PKI root that signs Keycloak's external Route - copied here
   # by the "agents" Ansible role (ansible/tasks/sync_keycloak_serving_ca.yml)
   # from openshift-config/keycloak-serving-ca, NOT rendered by this chart.
-  # Mounted read-only into the frontend so its OIDC relying-party client
-  # trusts the same chain the user's browser is redirected to. Empty
-  # disables the volume/mount/env var entirely.
+  # Mounted read-only into the frontend ONLY (bff never dials the external
+  # Route - see jwksUrl above) so its OIDC relying-party client trusts the
+  # same chain the user's browser is redirected to. Empty disables the
+  # volume/mount/env var entirely.
   caConfigMapName: agent-frontend-keycloak-ca
