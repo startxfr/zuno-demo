@@ -110,9 +110,9 @@ spec:
                   optional: true
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
-            # ADR-0106/WP-05: fail-closed only once every okfSignedAgents
+            # ADR-0106/ADR-0420: fail-closed only once every okfSignedAgents
             # entry has a real, verified signature - see values.yaml's
-            # own comment and configmap-signatures.yaml.
+            # own comment and externalsecret-okf-signatures.yaml.
             - name: ZUNO_REQUIRE_SIGNED_BUNDLES
               value: {{ .Values.requireSignedBundles | quote }}
           volumeMounts:
@@ -139,6 +139,6 @@ spec:
         - name: tmp
           emptyDir: {}
         - name: okf-signatures
-          configMap:
-            name: agent-runtime-okf-signatures
+          secret:
+            secretName: agent-runtime-okf-signatures
             optional: true

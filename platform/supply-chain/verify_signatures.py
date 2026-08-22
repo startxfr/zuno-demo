@@ -1,33 +1,29 @@
 #!/usr/bin/env python3
-"""ADR-0115 policy-as-code check, stage 1 of WP-04 (docs/roadmap/
-work-packages/wp-04-supply-chain-completion.md): "signature verification
-is exercised as part of trusted promotion/deployment." Walks every
+"""ADR-0115/ADR-0420 policy-as-code check: "signature verification is
+exercised as part of trusted promotion/deployment." Walks every
 `gitops/charts/*/values.yaml` for first-party image references (anything
-published under `REGISTRY`/`REGISTRY_NAMESPACE`, i.e. built and signed by
-`.github/workflows/build-publish.yml`) and runs `cosign verify` against
-each one that already carries an immutable tag, checking the image was
-signed by that exact workflow's keyless GitHub OIDC identity - not merely
-signed by *someone*.
+published under the internal `image-registry...svc:5000/zuno-ai-build/`
+registry - what every chart actually deploys, per RELEASING.md), resolves
+each one's LIVE `ImageStreamTag` digest (`oc get istag`), and runs
+`cosign verify --key` against it using the committed Vault Transit public
+key (`platform/supply-chain/keys/zuno-platform-signer.pub`) - not a
+keyless GitHub OIDC identity.
 
-Deliberately scopes to immutable-tagged references only: a `tag: latest`
-entry (ADR-0115 gap 2, tracked by check_no_latest_tags.py) has no
-meaningful digest to verify signatures against, and gap 7 (no real
-build-publish-sign cycle has ever run) means every first-party chart is
-on `latest` as of this check's introduction - so this genuinely finds
-nothing to verify yet and passes trivially. That is the honest, correct
-state until a real release exists (RELEASING.md), not a loosened check:
-once `pin_release.py` (stage 3) replaces a `latest` tag with a real
-immutable one, this check starts actually verifying it.
+Resolving the live digest rather than expecting an already-pinned one in
+`values.yaml` is deliberate: every chart still declares `tag: latest`
+(ADR-0115 gap 2, tracked by check_no_latest_tags.py, not solved here), but
+`:latest` is a moving `ImageStreamTag`, not a moving image - at any given
+moment it resolves to one real, signable digest. This check verifies
+*that* digest, so it is meaningful today even though gap 2 (an immutable
+tag literally written into `values.yaml`) remains open.
 
-No live cluster needed, but DOES need network access to the registry and
-a `cosign` binary on PATH once there is something to verify - exactly the
-gap-7 dependency ADR-0115's Implementation state describes. Wired into
-`.github/workflows/lint.yml` with `continue-on-error: true` until stage 3
-lands real signed images (mirrors check_no_latest_tags.py's own
-convention exactly, and for the same reason: this becomes a hard, useful
-gate only once the artifacts it inspects are real).
+Needs a live cluster (`oc get istag`) and a `cosign` binary on PATH -
+cannot run in GitHub Actions, which has no route to the internal registry
+(same reason `.github/workflows/build-publish.yml`'s own signing steps
+were removed, ADR-0420/WP-070). Run as an in-cluster check instead of a
+CI lint step.
 
-Run from the repository root:
+Run from the repository root, logged in to the target cluster (`oc login`):
 
     python3 platform/supply-chain/verify_signatures.py
 """
@@ -43,24 +39,16 @@ from typing import Any, List, Optional
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-BUILD_PUBLISH_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-publish.yml"
 
-# Matches build-publish.yml's own `env:` block (REGISTRY, REGISTRY_NAMESPACE)
-# and RELEASING.md's documented `quay.io/zuno/<component>` naming -
-# only images published under this prefix were built/signed by our own
-# workflow, so only these get verified here. Third-party images
-# (postgresql, keycloak, redis, ...) are out of scope for this check.
-FIRST_PARTY_REGISTRY_PREFIX = "quay.io/zuno/"
+# What every chart actually deploys (RELEASING.md): the in-cluster
+# BuildConfig/ImageStream path, not quay.io - no gitops/charts/*/values.yaml
+# references quay.io for a first-party image today.
+FIRST_PARTY_REGISTRY_PREFIX = "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/"
+BUILD_NAMESPACE = "zuno-ai-build"
 
-# The exact keyless-signing identity build-publish.yml signs with: GitHub's
-# OIDC token for a run of that workflow file, on this repository
-# (ADR-0004: startxfr/zuno-demo is the canonical source repository).
-EXPECTED_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
-EXPECTED_IDENTITY_REGEXP = (
-    r"^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/"
-)
+DEFAULT_PUBLIC_KEY_PATH = REPO_ROOT / "platform" / "supply-chain" / "keys" / "zuno-platform-signer.pub"
 
-IGNORED_TAG_VALUES = {"latest", ""}
+IGNORED_TAG_VALUES = {""}
 
 
 @dataclass
@@ -104,33 +92,67 @@ def _cosign_path() -> Optional[str]:
     return shutil.which("cosign")
 
 
-def _verify_one(cosign_bin: str, image: str) -> Optional[str]:
+def _resolve_live_digest(image: str) -> str:
+    """Resolves the ImageStreamTag `<name>:<tag>` component of `image`
+    (`<registry>/zuno-ai-build/<name>:<tag>`) to the real digest it
+    currently points to. Raises RuntimeError on any failure (missing `oc`,
+    not logged in, tag doesn't exist) - the caller reports this as a
+    finding, same as a cosign failure."""
+    oc_bin = shutil.which("oc")
+    if oc_bin is None:
+        raise RuntimeError("'oc' binary not found on PATH - cannot resolve a live ImageStreamTag digest")
+
+    istag = image.rsplit("/", 1)[-1]  # "<name>:<tag>"
+    result = subprocess.run(
+        [oc_bin, "get", "istag", istag, "-n", BUILD_NAMESPACE, "-o", "jsonpath={.image.metadata.name}"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    digest = result.stdout.strip()
+    if result.returncode != 0 or not digest:
+        detail = (result.stderr or result.stdout or "no output").strip()
+        raise RuntimeError(f"could not resolve ImageStreamTag {istag} in {BUILD_NAMESPACE}: {detail}")
+    return digest
+
+
+def _verify_one(cosign_bin: str, public_key: pathlib.Path, ref: "ImageRef") -> Optional[str]:
     """Returns None on success, an error message on failure. Never raises -
-    a registry/network problem is reported as a finding, not a crash,
-    matching this file's own `continue-on-error` posture in CI."""
+    a registry/cluster problem is reported as a finding, not a crash."""
+    repository = ref.image.rsplit(":", 1)[0]
     try:
+        digest = _resolve_live_digest(ref.image)
+    except RuntimeError as exc:
+        return str(exc)
+
+    image_at_digest = f"{repository}@{digest}"
+    try:
+        # Unlike `cosign sign-blob`/`verify-blob` (which default to
+        # touching Rekor unless told --tlog-upload=false/
+        # --insecure-ignore-tlog=true), plain `cosign sign`/`verify` for
+        # OCI images gate transparency-log use behind an opt-in
+        # COSIGN_EXPERIMENTAL=1 env var instead - simply not setting it
+        # (never set anywhere in this repo) is the whole story here.
         result = subprocess.run(
             [
                 cosign_bin,
                 "verify",
-                "--certificate-oidc-issuer",
-                EXPECTED_OIDC_ISSUER,
-                "--certificate-identity-regexp",
-                EXPECTED_IDENTITY_REGEXP,
-                image,
+                "--key",
+                str(public_key),
+                image_at_digest,
             ],
             capture_output=True,
             text=True,
             timeout=60,
         )
     except subprocess.TimeoutExpired:
-        return f"cosign verify timed out for {image}"
+        return f"cosign verify timed out for {image_at_digest}"
     except OSError as exc:
-        return f"failed to run cosign for {image}: {exc}"
+        return f"failed to run cosign for {image_at_digest}: {exc}"
 
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "no output").strip().splitlines()[-1:]
-        return f"signature verification failed for {image}: {'; '.join(detail) or 'unknown error'}"
+        return f"signature verification failed for {image_at_digest}: {'; '.join(detail) or 'unknown error'}"
     return None
 
 
@@ -139,47 +161,43 @@ def main() -> int:
 
     print(
         f"Scanned gitops/charts/*/values.yaml for first-party image references "
-        f"under {FIRST_PARTY_REGISTRY_PREFIX} with an immutable tag."
+        f"under {FIRST_PARTY_REGISTRY_PREFIX}, resolving each to its live ImageStreamTag digest."
     )
     if not refs:
-        print(
-            "\nRESULT: PASS - no immutable-tagged first-party image reference found yet "
-            "(every chart is still on `tag: latest` pending ADR-0115 gap 7 - a real "
-            "build-publish-sign cycle; see RELEASING.md). Nothing to verify."
-        )
+        print("\nRESULT: PASS - no first-party image reference found. Nothing to verify.")
         return 0
 
     cosign_bin = _cosign_path()
     if cosign_bin is None:
         print(
-            f"\n{len(refs)} immutable-tagged image reference(s) found, but no `cosign` "
-            "binary is on PATH to verify them with:"
+            f"\n{len(refs)} image reference(s) found, but no `cosign` binary is on PATH to verify them with:"
         )
         for ref in refs:
             print(f"  ? {ref.file}: {ref.path} = {ref.image!r}")
-        print(
-            "\nRESULT: FAIL - install cosign (`.github/workflows/build-publish.yml` uses "
-            "sigstore/cosign-installer) to actually verify these signatures."
-        )
+        print("\nRESULT: FAIL - install cosign to actually verify these signatures.")
+        return 1
+
+    if not DEFAULT_PUBLIC_KEY_PATH.is_file():
+        print(f"\nRESULT: FAIL - trust anchor not found at {DEFAULT_PUBLIC_KEY_PATH} (see WP-068).")
         return 1
 
     findings: List[Finding] = []
     for ref in refs:
         print(f"Verifying {ref.image} (from {ref.file}: {ref.path}) ...")
-        error = _verify_one(cosign_bin, ref.image)
+        error = _verify_one(cosign_bin, DEFAULT_PUBLIC_KEY_PATH, ref)
         if error:
             findings.append(Finding(error))
 
     if not findings:
-        print(f"\nRESULT: PASS - all {len(refs)} immutable-tagged first-party image(s) verified.")
+        print(f"\nRESULT: PASS - all {len(refs)} first-party image(s) verified against {DEFAULT_PUBLIC_KEY_PATH.name}.")
         return 0
 
     print(f"\n{len(findings)} signature verification failure(s):")
     for f in findings:
         print(f"  ✗ {f.message}")
     print(
-        "\nRESULT: FAIL - an immutable-tagged first-party image did not verify against "
-        f"the expected build-publish.yml keyless identity ({EXPECTED_IDENTITY_REGEXP})."
+        "\nRESULT: FAIL - a first-party image did not verify against "
+        f"{DEFAULT_PUBLIC_KEY_PATH.name}."
     )
     return 1
 

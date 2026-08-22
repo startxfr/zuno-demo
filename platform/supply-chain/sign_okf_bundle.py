@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-"""ADR-0106 OKF bundle signing: computes a deterministic digest over an
-`agents/<agent>/` tree and signs/verifies it with keyless Cosign
-blob-signing, the same GitHub OIDC identity convention
-`platform/supply-chain/verify_signatures.py` (ADR-0115) uses for container
-images - here applied to a directory of Markdown/YAML files instead of an
-OCI image, since an OKF bundle isn't a container.
+"""ADR-0106/ADR-0420 OKF bundle signing: computes a deterministic digest
+over an `agents/<agent>/` tree and signs/verifies it with Cosign, backed by
+the in-cluster Vault Transit key `platform/supply-chain/sign_in_cluster.py`
+authenticates to - here applied to a directory of Markdown/YAML files
+instead of an OCI image, since an OKF bundle isn't a container.
 
 Three independent operations:
 
     digest    - print the canonical sha256 digest of a bundle (no cosign
                 needed; always available, used by validate_okf_bundle.py
                 and the runtime too).
-    sign      - `cosign sign-blob` over that digest, producing a detached
-                signature + certificate. Needs a real GitHub Actions OIDC
-                run to work (Sigstore Fulcio/Rekor) - like
-                `.github/workflows/build-publish.yml`'s own image signing
-                step, this cannot succeed in a local sandbox and is not
-                expected to.
-    verify    - `cosign verify-blob` against the expected build-publish.yml
-                keyless identity. Needs only the bundle, its signature and
-                certificate - NO signing credentials, so this mode works
-                anywhere, including CI on every PR (continue-on-error
-                until a real signature exists, ADR-0115 stage-1
-                convention).
+    sign      - `cosign sign-blob --key hashivault://<name>` over that
+                digest, producing a detached signature (no certificate -
+                Transit signs with a fixed key, not an ephemeral Fulcio
+                cert). Needs VAULT_ADDR/VAULT_TOKEN in the environment
+                (sign_in_cluster.py's vault_login() supplies these) and can
+                only succeed against a reachable in-cluster Vault, not in a
+                local sandbox.
+    verify    - `cosign verify-blob --key <public-key-file>`. Needs only
+                the bundle, its signature and the committed public key
+                (`platform/supply-chain/keys/zuno-platform-signer.pub`) -
+                NO Vault access and NO network, so this mode works
+                anywhere, including a fully offline check.
 
 Digest determinism: sorted (relative_path, sha256(content)) pairs over
 every file in the bundle tree, joined and hashed - independent of
@@ -35,7 +34,8 @@ Run from the repository root:
     python3 platform/supply-chain/sign_okf_bundle.py digest agents/tekos
     python3 platform/supply-chain/sign_okf_bundle.py sign agents/tekos --output-dir /tmp/sigs
     python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \\
-        --signature /tmp/sigs/tekos.sig --certificate /tmp/sigs/tekos.pem
+        --signature /tmp/sigs/tekos.sig \\
+        --public-key platform/supply-chain/keys/zuno-platform-signer.pub
 """
 from __future__ import annotations
 
@@ -47,12 +47,7 @@ import subprocess
 import sys
 from typing import List
 
-EXPECTED_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
-# Same repository identity as verify_signatures.py (ADR-0115) - bundle
-# signing runs as a step in the same build-publish.yml workflow.
-EXPECTED_IDENTITY_REGEXP = (
-    r"^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/"
-)
+DEFAULT_KMS_KEY = "hashivault://zuno-platform-signer"
 
 # Files that must never affect the digest even if present (none expected
 # under agents/, but defensive: __pycache__/.DS_Store-style noise must
@@ -95,24 +90,24 @@ def _cosign_path() -> str:
     return cosign_bin
 
 
-def sign_bundle(bundle_dir: pathlib.Path, output_dir: pathlib.Path) -> None:
+def sign_bundle(bundle_dir: pathlib.Path, output_dir: pathlib.Path, kms_key: str = DEFAULT_KMS_KEY) -> None:
     digest = compute_digest(bundle_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     digest_file = output_dir / f"{bundle_dir.name}.digest"
     digest_file.write_text(digest + "\n")
 
     sig_path = output_dir / f"{bundle_dir.name}.sig"
-    cert_path = output_dir / f"{bundle_dir.name}.pem"
     cosign_bin = _cosign_path()
     result = subprocess.run(
         [
             cosign_bin,
             "sign-blob",
             "--yes",
+            "--tlog-upload=false",
+            "--key",
+            kms_key,
             "--output-signature",
             str(sig_path),
-            "--output-certificate",
-            str(cert_path),
             str(digest_file),
         ],
         capture_output=True,
@@ -122,10 +117,10 @@ def sign_bundle(bundle_dir: pathlib.Path, output_dir: pathlib.Path) -> None:
         raise BundleError(
             f"cosign sign-blob failed for {bundle_dir}: {(result.stderr or result.stdout).strip()}"
         )
-    print(f"signed {bundle_dir} -> {sig_path}, {cert_path} (digest {digest})")
+    print(f"signed {bundle_dir} -> {sig_path} (digest {digest})")
 
 
-def verify_bundle(bundle_dir: pathlib.Path, signature: pathlib.Path, certificate: pathlib.Path) -> None:
+def verify_bundle(bundle_dir: pathlib.Path, signature: pathlib.Path, public_key: pathlib.Path) -> None:
     digest = compute_digest(bundle_dir)
     cosign_bin = _cosign_path()
     # cosign verify-blob hashes the exact bytes of the file it's given, so
@@ -141,14 +136,11 @@ def verify_bundle(bundle_dir: pathlib.Path, signature: pathlib.Path, certificate
             [
                 cosign_bin,
                 "verify-blob",
-                "--certificate-oidc-issuer",
-                EXPECTED_OIDC_ISSUER,
-                "--certificate-identity-regexp",
-                EXPECTED_IDENTITY_REGEXP,
+                "--insecure-ignore-tlog=true",
+                "--key",
+                str(public_key),
                 "--signature",
                 str(signature),
-                "--certificate",
-                str(certificate),
                 str(digest_file),
             ],
             capture_output=True,
@@ -171,14 +163,15 @@ def main() -> int:
     p_digest = sub.add_parser("digest", help="print the canonical bundle digest")
     p_digest.add_argument("bundle_dir", type=pathlib.Path)
 
-    p_sign = sub.add_parser("sign", help="sign a bundle with keyless cosign (needs a real CI OIDC run)")
+    p_sign = sub.add_parser("sign", help="sign a bundle via the in-cluster Vault Transit key (needs VAULT_ADDR/VAULT_TOKEN)")
     p_sign.add_argument("bundle_dir", type=pathlib.Path)
     p_sign.add_argument("--output-dir", required=True, type=pathlib.Path)
+    p_sign.add_argument("--kms-key", default=DEFAULT_KMS_KEY)
 
-    p_verify = sub.add_parser("verify", help="verify a bundle's signature (no credentials needed)")
+    p_verify = sub.add_parser("verify", help="verify a bundle's signature (no Vault access needed)")
     p_verify.add_argument("bundle_dir", type=pathlib.Path)
     p_verify.add_argument("--signature", required=True, type=pathlib.Path)
-    p_verify.add_argument("--certificate", required=True, type=pathlib.Path)
+    p_verify.add_argument("--public-key", required=True, type=pathlib.Path)
 
     args = parser.parse_args()
 
@@ -186,9 +179,9 @@ def main() -> int:
         if args.command == "digest":
             print(compute_digest(args.bundle_dir))
         elif args.command == "sign":
-            sign_bundle(args.bundle_dir, args.output_dir)
+            sign_bundle(args.bundle_dir, args.output_dir, args.kms_key)
         elif args.command == "verify":
-            verify_bundle(args.bundle_dir, args.signature, args.certificate)
+            verify_bundle(args.bundle_dir, args.signature, args.public_key)
     except BundleError as exc:
         print(f"RESULT: FAIL - {exc}")
         return 1

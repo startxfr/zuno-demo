@@ -35,14 +35,12 @@ jobs:
       - name: Reject non-immutable image tags (ADR-0115)
         run: python3 platform/supply-chain/check_no_latest_tags.py
         continue-on-error: true
-      # ADR-0115 stage 1 (WP-04): passes trivially today (nothing
-      # immutable-tagged to verify yet - see the script's own docstring)
-      # and needs `cosign` + real registry network access to mean anything
-      # once a release exists, so it stays non-blocking alongside the
-      # check above until that release lands (RELEASING.md step 5).
-      - name: Verify first-party image signatures (ADR-0115)
-        run: python3 platform/supply-chain/verify_signatures.py
-        continue-on-error: true
+      # ADR-0420/WP-070 (2026-08-22): removed from this CI lint gate -
+      # verify_signatures.py now resolves each component's live
+      # ImageStreamTag digest via `oc get istag`, which a GitHub-hosted
+      # runner has no route to (same reason build-publish.yml's own signing
+      # steps were removed). Runs instead as an in-cluster `make d1 check`
+      # gate - see ansible/roles/agent_build or the equivalent check task.
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
       - name: MCP server conformance (ADR-0119)

@@ -1,13 +1,15 @@
 ---
-# ADR-0106: schema/policy validation (platform/supply-chain/
+# ADR-0106/ADR-0420: schema/policy validation (platform/supply-chain/
 # validate_okf_bundle.py) for every agents/*/ bundle, run locally against
 # the checked-out repo (pure file validation, no cluster access needed -
 # unlike the acceptance gate below, which needs in-cluster Service DNS).
-# Signature verification (the third ADR-0106 dimension) is intentionally
-# not run here: no bundle has a real cosign signature yet
-# (ZUNO_REQUIRE_SIGNED_BUNDLES stays off - see
-# components/agent-runtime/app/registry.py - until WP-04 stage 2's
-# credentialed CI run produces one); flip that setting once it does.
+# Signature verification (the third ADR-0106 dimension) now runs too -
+# ansible/tasks/verify_okf_signatures.yml fetches each agent's current
+# signature from Vault KV and checks it against the committed public key
+# and the bundle's current content, entirely offline once fetched. A
+# missing signature is reported, not failed (ZUNO_REQUIRE_SIGNED_BUNDLES
+# stays off until every agent has one - WP-069's operator follow-up); a
+# signature that no longer verifies is a real failure regardless.
 - name: "agents | validate every OKF bundle's schema and policy references"
   ansible.builtin.command:
     cmd: python3 platform/supply-chain/validate_okf_bundle.py
@@ -15,6 +17,9 @@
   register: _agents_okf_validation
   changed_when: false
   failed_when: false
+
+- name: "agents | verify every OKF bundle's current signature"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/verify_okf_signatures.yml"
 
 - name: "agents | fail the check if any OKF bundle failed validation"
   ansible.builtin.fail:

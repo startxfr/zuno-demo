@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ADR-0106 tests for AgentRegistry's signature-enforcement path
+"""ADR-0106/ADR-0420 tests for AgentRegistry's signature-enforcement path
 (`ZUNO_REQUIRE_SIGNED_BUNDLES`). `app/_sign_okf_bundle.py` is only baked
 into the built image (Dockerfile `COPY platform/supply-chain/
 sign_okf_bundle.py ./app/_sign_okf_bundle.py`), so these tests inject a
@@ -46,7 +46,7 @@ def _install_fake_sign_module(*, verify_error_message: str | None) -> types.Modu
     class BundleError(RuntimeError):
         pass
 
-    def verify_bundle(bundle_dir, signature, certificate):  # noqa: ANN001
+    def verify_bundle(bundle_dir, signature, public_key):  # noqa: ANN001
         if verify_error_message is not None:
             raise BundleError(verify_error_message)
 
@@ -76,7 +76,7 @@ def test_enforcement_on_refuses_a_bundle_with_no_signature_files(tmp_sig_dir) ->
         registry = AgentRegistry(
             agents_dir=str(REAL_AGENTS_DIR),
             require_signed_bundles=True,
-            signatures_dir=str(tmp_sig_dir),  # empty - no .sig/.pem present
+            signatures_dir=str(tmp_sig_dir),  # empty - no .sig/cosign.pub present
         )
     finally:
         _uninstall_fake_sign_module()
@@ -88,9 +88,9 @@ def test_enforcement_on_refuses_a_bundle_with_no_signature_files(tmp_sig_dir) ->
 def test_enforcement_on_accepts_a_bundle_whose_signature_verifies(tmp_sig_dir) -> None:
     from app.registry import AgentRegistry
 
+    (tmp_sig_dir / "cosign.pub").write_text("fake-pubkey")
     for name in _all_real_agent_names():
         (tmp_sig_dir / f"{name}.sig").write_text("fake-sig")
-        (tmp_sig_dir / f"{name}.pem").write_text("fake-cert")
 
     _install_fake_sign_module(verify_error_message=None)  # verify_bundle never raises -> "valid"
     try:
@@ -109,9 +109,9 @@ def test_enforcement_on_accepts_a_bundle_whose_signature_verifies(tmp_sig_dir) -
 def test_enforcement_on_refuses_a_tampered_or_invalid_signature(tmp_sig_dir) -> None:
     from app.registry import AgentRegistry
 
+    (tmp_sig_dir / "cosign.pub").write_text("fake-pubkey")
     for name in _all_real_agent_names():
         (tmp_sig_dir / f"{name}.sig").write_text("fake-sig")
-        (tmp_sig_dir / f"{name}.pem").write_text("fake-cert")
 
     _install_fake_sign_module(verify_error_message="digest mismatch")
     try:

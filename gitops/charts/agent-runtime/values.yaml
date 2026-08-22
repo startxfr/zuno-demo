@@ -116,17 +116,17 @@ conversationsDb:
     secretStoreName: vault-backend
     refreshInterval: 1h
 
-# ADR-0106/WP-05: OKF bundle signature distribution. registry.py's
-# _verify_signature() reads a flat {name}.sig/{name}.pem pair per agent
-# from ZUNO_OKF_SIGNATURES_DIR - templates/configmap-signatures.yaml
-# renders one ConfigMap from files/okf-signatures/<agent>.{sig,pem}
-# (committed to git, public signature material, not secret - same
-# "public release artifact" convention as WP-04's pinned-releases.yaml),
-# mounted read-only at /app/okf-signatures. requireSignedBundles stays
-# false until every one of okfSignedAgents actually has both files
-# present and verified live - flipping it early fail-closed crash-loops
-# every pod with no signature to check against (see ADR-0106's
-# 2026-08-21 note).
+# ADR-0420/WP-069: OKF bundle signature distribution. registry.py's
+# _verify_signature() reads a flat {name}.sig file plus one shared
+# cosign.pub from ZUNO_OKF_SIGNATURES_DIR -
+# templates/externalsecret-okf-signatures.yaml materializes both from
+# Vault KV (zuno/okf-signatures, written by the in-cluster signing Job -
+# ansible/tasks/run_okf_signing_job.yml), mounted read-only at
+# /app/okf-signatures. requireSignedBundles stays false until every one of
+# okfSignedAgents actually has a signature present and verified live -
+# flipping it early fail-closed crash-loops every pod with no signature to
+# check against (see ADR-0106's 2026-08-21 note, superseded in mechanism
+# by ADR-0420 but not in this caution).
 okfSignedAgents:
   - tekos
   - comage

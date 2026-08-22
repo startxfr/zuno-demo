@@ -21,3 +21,14 @@
     build_image_name: agent-frontend
     build_dockerfile_path: components/agent-frontend/Dockerfile
     build_context_dir: "."
+
+# ADR-0420/WP-069: re-sign every OKF bundle against the agent-runtime image
+# just (re)built above, only on an explicit `make d2 build agent[/all]` -
+# not on every routine install's "ensure this image exists" dependency
+# path, which would re-run this idempotent-but-not-free Job on every
+# unrelated Day 2 install. Requires ansible/roles/vault (Transit engine)
+# and ansible/roles/supply_chain_signer_build (zuno-signer ServiceAccount,
+# supply-chain-signer image) to already be applied.
+- name: "agent_build | re-sign every OKF bundle (explicit build only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
+  when: (day2_verb | default('install')) == 'build'

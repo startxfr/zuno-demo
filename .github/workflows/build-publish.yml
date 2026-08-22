@@ -1,17 +1,28 @@
 # ADR-0115: build every component in CI, publish to Quay with immutable
-# tags, generate an SBOM, scan for vulnerabilities, and sign with cosign
-# (keyless, via GitHub's OIDC identity - no pre-provisioned signing key,
-# consistent with Security considerations: "CI secrets stay outside Git").
+# tags, generate an SBOM, and scan for vulnerabilities.
+#
+# ADR-0420/WP-070 (2026-08-22): the signing steps this workflow used to run
+# here (keyless cosign via GitHub's OIDC identity, Sigstore Fulcio/Rekor)
+# are removed - a GitHub-hosted runner has no route to the in-cluster Vault
+# Transit key that replaces them, so CI can no longer sign anything.
+# Signing now runs in-cluster instead: images built via the OpenShift
+# BuildConfig/ImageStream path get signed by
+# ansible/tasks/run_okf_signing_job.yml's image-signing counterpart
+# (WP-070), and OKF bundles by run_okf_signing_job.yml itself (WP-069) -
+# see docs/adr/0420-*.md. This workflow still builds/publishes/SBOMs/scans
+# for the optional Quay release path (RELEASING.md); it just doesn't sign
+# anymore.
 #
 # DISABLED (2026-08-22, WP-04/ADR-0115 closed - see the ADR's "closed,
 # pipeline disabled" note): the automatic push/tag triggers below are
 # removed so this never fires on its own. Deployment has never depended on
 # it - every chart is built and served from the in-cluster BuildConfig/
-# ImageStream path (RELEASING.md). The pipeline itself is proven working
+# ImageStream path (RELEASING.md). The pipeline itself was proven working
 # (2026-08-19, run 32273454405, tag v0.1.0 - real signed/SBOM'd images
-# published to quay.io/zuno/*) and is left in place, runnable manually via
-# workflow_dispatch, ready to have its triggers restored under a future ADR
-# if this supply-chain stream is reactivated.
+# published to quay.io/zuno/*, back when signing still ran here) and is
+# left in place, runnable manually via workflow_dispatch, ready to have its
+# triggers restored under a future ADR if this supply-chain stream is
+# reactivated.
 #
 # QUAY_USERNAME/QUAY_PASSWORD must be configured as encrypted repository
 # secrets in GitHub - never committed here.
@@ -22,14 +33,13 @@
 # secrets are provisioned - see docs/adr/0051-*.md's Implementation state
 # and .github/README.md for the honest scope of what "implemented" means
 # here.
-name: Build, publish and sign component images
+name: Build, publish and scan component images
 
 on:
   workflow_dispatch: {}
 
 permissions:
   contents: read
-  id-token: write # cosign keyless signing (Sigstore/Fulcio via OIDC)
 
 env:
   REGISTRY: quay.io
@@ -141,6 +151,17 @@ jobs:
             build_args: |
               GOLANG_BASE_IMAGE=docker.io/library/golang:1.26
               RUNTIME_BASE_IMAGE=gcr.io/distroless/static:nonroot
+          # ADR-0420/WP-068: the in-cluster signing identity's own image -
+          # published here too so it has real SBOM/scan coverage like every
+          # other first-party component, even though its actual deployment
+          # only ever happens via the in-cluster BuildConfig path
+          # (ansible/roles/supply_chain_signer_build), same as every image
+          # in this matrix.
+          - name: supply-chain-signer
+            dockerfile: components/supply-chain-signer/Dockerfile
+            context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
     steps:
       - uses: actions/checkout@v4
 
@@ -185,7 +206,7 @@ jobs:
           name: sbom-${{ matrix.name }}
           path: sbom-${{ matrix.name }}.spdx.json
 
-      # Reports HIGH/CRITICAL findings but does not block publish/sign
+      # Reports HIGH/CRITICAL findings but does not block publish
       # (continue-on-error) - real upstream base-image/dependency CVEs exist
       # across most components today (tracked in ADR-0115's Implementation
       # state) and gating the first real release on clearing all of them
@@ -200,26 +221,12 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
-      - uses: sigstore/cosign-installer@v3
-
-      - name: Sign the image (keyless)
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}
-          DIGEST: ${{ steps.build.outputs.digest }}
-
-      - name: Attest the SBOM to the image (keyless)
-        run: cosign attest --yes --predicate "sbom-${{ matrix.name }}.spdx.json" --type spdxjson "${IMAGE}@${DIGEST}"
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}
-          DIGEST: ${{ steps.build.outputs.digest }}
-
   # ADR-0119 (WP-057): builds every MCP server discover-mcp-servers found,
-  # mirroring build-publish-sign's own build/SBOM/scan/sign/attest steps -
-  # kept as a separate job (not folded into build-publish-sign's own
-  # matrix) because its entries are homogeneous (all under
-  # components/mcp-servers/<name>, all BASE_IMAGE=python:3.12-slim) and
-  # computed, not hand-listed, unlike every entry above.
+  # mirroring build-publish-sign's own build/SBOM/scan steps - kept as a
+  # separate job (not folded into build-publish-sign's own matrix) because
+  # its entries are homogeneous (all under components/mcp-servers/<name>,
+  # all BASE_IMAGE=python:3.12-slim) and computed, not hand-listed, unlike
+  # every entry above.
   build-publish-sign-mcp-servers:
     needs: discover-mcp-servers
     if: needs.discover-mcp-servers.outputs.servers != '[]'
@@ -281,47 +288,3 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
-
-      - uses: sigstore/cosign-installer@v3
-
-      - name: Sign the image (keyless)
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}
-          DIGEST: ${{ steps.build.outputs.digest }}
-
-      - name: Attest the SBOM to the image (keyless)
-        run: cosign attest --yes --predicate "sbom-mcp-${{ matrix.name }}.spdx.json" --type spdxjson "${IMAGE}@${DIGEST}"
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}
-          DIGEST: ${{ steps.build.outputs.digest }}
-
-  # ADR-0106: sign every OKF agent bundle (agents/<agent>/) with the same
-  # keyless GitHub OIDC identity as the image signing above, over a
-  # canonical bundle digest rather than an OCI image (an OKF bundle is a
-  # directory of Markdown/YAML, not a container) - see
-  # platform/supply-chain/sign_okf_bundle.py's own docstring.
-  sign-okf-bundles:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # cosign keyless signing (Sigstore/Fulcio via OIDC)
-    strategy:
-      fail-fast: false
-      matrix:
-        agent: [tekos, comage, advantage, finage, arkos, naveo, soursage, cognos]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install pyyaml
-      - uses: sigstore/cosign-installer@v3
-      - name: Sign the ${{ matrix.agent }} OKF bundle (keyless)
-        run: |
-          python3 platform/supply-chain/sign_okf_bundle.py sign "agents/${{ matrix.agent }}" \
-            --output-dir "okf-signatures/${{ matrix.agent }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: okf-signature-${{ matrix.agent }}
-          path: okf-signatures/${{ matrix.agent }}

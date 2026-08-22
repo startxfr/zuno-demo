@@ -89,36 +89,38 @@ ledger, `pinned-releases.yaml` in this directory - never embedded in
 python3 platform/supply-chain/pin_release.py --manifest <path> [--dry-run]
 ```
 
-## sign_okf_bundle.py / validate_okf_bundle.py (WP-05)
+## sign_okf_bundle.py / validate_okf_bundle.py (WP-05, mechanism replaced by WP-069/ADR-0420)
 
-OKF agent bundle signing and validation (`agents/<agent>/`), the same
-keyless-Cosign convention as `verify_signatures.py` above, applied to a
+OKF agent bundle signing and validation (`agents/<agent>/`), applied to a
 directory of Markdown/YAML instead of an OCI image.
 
 `sign_okf_bundle.py` computes a canonical sha256 digest over a bundle
 tree (sorted `relative_path:content_hash` pairs) and signs/verifies it
-with `cosign sign-blob`/`verify-blob`:
+with `cosign sign-blob`/`verify-blob`, backed by the in-cluster Vault
+Transit key `sign_in_cluster.py` authenticates to (ADR-0420), not keyless
+GitHub OIDC/Fulcio/Rekor:
 
 ```bash
 python3 platform/supply-chain/sign_okf_bundle.py digest agents/tekos
 python3 platform/supply-chain/sign_okf_bundle.py sign agents/tekos --output-dir /tmp/sigs
 python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \
-    --signature /tmp/sigs/tekos.sig --certificate /tmp/sigs/tekos.pem
+    --signature /tmp/sigs/tekos.sig \
+    --public-key platform/supply-chain/keys/zuno-platform-signer.pub
 ```
 
-`sign` needs a real GitHub Actions OIDC run (Sigstore Fulcio/Rekor) and
-cannot succeed locally; `verify` needs only the bundle plus its
-signature/certificate files, no credentials. Wired into
-`build-publish.yml` as a `sign-okf-bundles` job (one signature per agent,
-uploaded as an ephemeral GitHub Actions artifact). ADR-0106/WP-05
-(2026-08-22): that artifact has no downstream consumer on its own - the
-real, verified pairs are committed to
-`gitops/charts/agent-runtime/files/okf-signatures/<agent>.{sig,pem}`
-(public signature material, safe to commit, unlike a private key) and
-distributed into the running pod via
-`gitops/charts/agent-runtime/templates/configmap-signatures.yaml`, the
-same one-time-handoff convention `platform/supply-chain/pinned-releases.yaml`
-already uses for release-pin proof.
+`sign` needs `VAULT_ADDR`/`VAULT_TOKEN` in the environment and can only
+succeed against a reachable in-cluster Vault, not in a local sandbox or
+CI; `verify` needs only the bundle, its signature, and the committed
+public key above - no Vault access, no network. The actual multi-bundle
+signing run is orchestrated by `sign_in_cluster.py sign-okf-bundles`
+(baked into the `supply-chain-signer` image), triggered by
+`ansible/tasks/run_okf_signing_job.yml` as an in-cluster Job right after
+the agent-runtime image builds (`ansible/roles/agent_build`, explicit
+`make d2 build agent` only). It writes every `{agent}.sig` plus the
+shared public key straight to Vault KV (`zuno/okf-signatures`), consumed
+by `gitops/charts/agent-runtime/templates/externalsecret-okf-signatures.yaml` -
+no GitHub Actions artifact, no manual "download and commit" step (the gap
+ADR-0106's 2026-08-21 note originally flagged).
 
 `validate_okf_bundle.py` checks two other dimensions - schema validity
 (OKF structure) and policy validity (every declared tool resolves

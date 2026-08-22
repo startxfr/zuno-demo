@@ -25,13 +25,13 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
 
 WORKDIR /app
 
-# ADR-0106: keyless cosign verify-blob, used by app/_sign_okf_bundle.py
-# (baked in below) only when ZUNO_REQUIRE_SIGNED_BUNDLES=true (default
-# false - see app/registry.py). Pinned to the same major release
-# .github/workflows/build-publish.yml's sigstore/cosign-installer@v3
-# currently resolves; bump both together. verify-blob needs no network
-# egress beyond Rekor/Fulcio's public endpoints, already reachable from
-# any pod with normal internet access.
+# ADR-0106/ADR-0420: cosign verify-blob against the committed
+# platform/supply-chain/keys/zuno-platform-signer.pub, used by
+# app/_sign_okf_bundle.py (baked in below) only when
+# ZUNO_REQUIRE_SIGNED_BUNDLES=true (default false - see app/registry.py).
+# Pinned to the same version components/supply-chain-signer/Dockerfile
+# uses; bump both together. Needs no network egress at all - verification
+# is a pure offline check against the local public key file.
 ARG COSIGN_VERSION=v2.4.1
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -sSL -o /usr/local/bin/cosign \

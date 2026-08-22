@@ -1,9 +1,26 @@
 # ADR-0106: Enforce OKF bundle signing and validation
 
-- **Status:** Partially implemented - signing/validation tooling and enforcement paths merged (`platform/supply-chain/sign_okf_bundle.py`, `validate_okf_bundle.py`, `components/agent-runtime/app/registry.py`'s `ZUNO_REQUIRE_SIGNED_BUNDLES` gate); WP-04 stage 2's real release (run 32273454405, tag `v0.1.0`) produced real signatures for all 8 agent bundles, but a real distribution gap blocks turning enforcement on, see 2026-08-21 note (roadmap WP-05)
+- **Status:** Partially implemented - signing mechanism superseded by ADR-0420 (2026-08-22, WP-069): `sign_okf_bundle.py` now signs via the in-cluster Vault Transit key instead of keyless GitHub-OIDC/Fulcio/Rekor, and the distribution gap the 2026-08-21 note below describes is closed - the signing Job writes straight to Vault KV, consumed by `gitops/charts/agent-runtime/templates/externalsecret-okf-signatures.yaml`. `ZUNO_REQUIRE_SIGNED_BUNDLES` stays off until an operator runs the signing Job for real and confirms all 8 agents verify - see WP-069's own Operator follow-up.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team
+
+## Implementation note (2026-08-22)
+
+WP-069 (ADR-0420) closes the distribution gap the 2026-08-21 note below
+describes, but by changing the mechanism rather than building the GitHub-
+Actions-artifact distribution path that note called for. Signing now runs
+in-cluster (`ansible/tasks/run_okf_signing_job.yml`, the
+`supply-chain-signer` image, WP-068's Vault Transit key) and writes
+directly to Vault KV (`zuno/okf-signatures`), consumed by a new
+`ExternalSecret` in the agent-runtime chart - no GitHub Actions artifact,
+no manual "download and commit" step. The signature format changed too:
+`{name}.sig` plus one shared `cosign.pub`, not a per-agent `.pem`
+certificate (Transit signs with a fixed key, not an ephemeral Fulcio cert).
+`ZUNO_REQUIRE_SIGNED_BUNDLES` remains `false` pending the operator running
+the signing Job for real and confirming all 8 agents verify (WP-069's
+Operator follow-up) - the same discipline the note below already
+established, now enforceable because the distribution path is automatic.
 
 ## Implementation note (2026-08-21)
 

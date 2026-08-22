@@ -7,15 +7,16 @@ in app/graph/nodes.py. Onboarding a sixth agent should mainly mean adding a
 new bundle under agents/<name>/, not changing this module.
 
 Schema validation here checks *shape* (required keys, matches directory
-name). ADR-0106 (2026-08-14) is the signing pipeline "loads, validates and
+name). ADR-0106/ADR-0420 is the signing pipeline "loads, validates and
 caches signed OKF bundles" was aspirational for: when
 `ZUNO_REQUIRE_SIGNED_BUNDLES` is enabled, a bundle additionally needs a
 verifiable signature (`app/_sign_okf_bundle.py`, baked in from
 `platform/supply-chain/sign_okf_bundle.py` - the exact same digest/verify
-code CI uses, never duplicated, so the runtime can never disagree with CI
-about what a bundle's digest is). Default OFF: no bundle has a real cosign
-signature yet (WP-04 stage 2's credentialed CI run hasn't happened), so
-requiring one today would refuse to start at all.
+code the in-cluster signing Job uses, never duplicated, so the runtime can
+never disagree with it about what a bundle's digest is), signed by the
+in-cluster Vault Transit key (ADR-0420) and verified here against the
+committed public key alone - no Vault access needed at verify time. Default
+OFF until WP-069 populates every agent's signature.
 """
 
 from __future__ import annotations
@@ -243,27 +244,29 @@ class AgentRegistry:
                 self.load_errors.append(str(exc))
 
     def _verify_signature(self, name: str, agent_dir: Path) -> None:
-        """ADR-0106: only called when signature enforcement is on. Requires
-        a `{name}.sig`/`{name}.pem` pair in the signatures directory (the
-        exact output shape `platform/supply-chain/sign_okf_bundle.py sign`
-        produces) and a successful `cosign verify-blob` against a freshly
-        recomputed digest - the same verification path
-        `verify_signatures.py`/CI would run, imported rather than
-        duplicated (app/_sign_okf_bundle.py, baked in by the Dockerfile -
-        imported here rather than at module top level so every normal,
-        enforcement-off run - the default, including every local test -
-        never needs that file to exist outside the built image)."""
+        """ADR-0106/ADR-0420: only called when signature enforcement is on.
+        Requires a `{name}.sig` file plus the one shared `cosign.pub` in the
+        signatures directory (the exact output shape the in-cluster Vault
+        Transit signing Job produces - see WP-069) and a successful
+        `cosign verify-blob` against a freshly recomputed digest, using only
+        the committed public key - no Vault access, no network - the same
+        verification path `verify_signatures.py`/the signing Job would run,
+        imported rather than duplicated (app/_sign_okf_bundle.py, baked in
+        by the Dockerfile - imported here rather than at module top level so
+        every normal, enforcement-off run - the default, including every
+        local test - never needs that file to exist outside the built
+        image)."""
         from app import _sign_okf_bundle  # noqa: PLC0415 - see docstring
 
         sig_path = self._signatures_dir / f"{name}.sig"
-        cert_path = self._signatures_dir / f"{name}.pem"
-        if not sig_path.is_file() or not cert_path.is_file():
+        public_key_path = self._signatures_dir / "cosign.pub"
+        if not sig_path.is_file() or not public_key_path.is_file():
             raise OkfError(
                 f"agents/{name}: signature enforcement is on but no signature found at "
-                f"{sig_path}/{cert_path}"
+                f"{sig_path} (or no public key at {public_key_path})"
             )
         try:
-            _sign_okf_bundle.verify_bundle(agent_dir, sig_path, cert_path)
+            _sign_okf_bundle.verify_bundle(agent_dir, sig_path, public_key_path)
         except _sign_okf_bundle.BundleError as exc:
             raise OkfError(f"agents/{name}: signature verification failed: {exc}") from exc
 
