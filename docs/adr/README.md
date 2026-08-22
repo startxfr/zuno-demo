@@ -85,7 +85,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.1 | Partially implemented | Automate source-specific knowledge ingestion |
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v0.1 | Partially implemented | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | v0.1 | Implemented | Introduce automated model quality gates |
-| [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Partially implemented | Automate model evaluation with LM-Eval |
+| [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | v0.1 | Implemented | Implement source freshness and trust scoring |
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | v0.1 | Partially implemented | Automate document ACL synchronization |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
@@ -153,6 +153,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | v0.1 | Implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
 | [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | v0 | Implemented | Revert OpenShift AI to the default applications namespace |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
+| [ADR-0333](0333-separate-product-managed-ai-infrastructure-from-zuno-build-run-and-shared-platform-namespaces.md) | v0 | To be implemented | Separate product-managed AI infrastructure from Zuno build, run, and shared platform namespaces |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | v0.3 | Implemented | Extend business-role authorization with CDP and scoped capabilities |
 | [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | Implemented | Support multiple agent graph shapes in Agent Runtime |
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | v0.1 | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |

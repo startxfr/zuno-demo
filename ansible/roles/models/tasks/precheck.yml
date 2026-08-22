@@ -37,7 +37,12 @@
       LMEvalJob {{ item.metadata.name }}: state={{ item.status.state | default('unknown') }}
       reason={{ item.status.reason | default('unknown') }}
       {{ ('results=' + (item.status.results | default('(none yet)')))
-         if (item.status.state | default('')) == 'Complete' else '' }}
+         if (item.status.state | default('')) == 'Complete'
+            and (item.status.reason | default('')) == 'Succeeded'
+         else '(no trustworthy results: state must be Complete AND reason '
+              + 'Succeeded - Complete alone also covers a lost/failed run, '
+              + 'e.g. reason=Failed message=ContainerStatusUnknown after a '
+              + 'node disruption - see ADR-0108)' }}
   loop: "{{ _models_lmevaljobs.resources | default([]) }}"
   loop_control:
     label: "{{ item.metadata.name | default('?') }}"

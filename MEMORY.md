@@ -622,6 +622,26 @@ not here.
   bucketing). Two-gated (chart flag AND per-model `cache_enabled`); cache
   key binds model/subject/classification/local-only/task; infra failures
   fail open (perf-only, never a security control). Implemented.
+- **ADR-0107 + ADR-0108 (WP-10)**: model quality gates + LM-Eval. ADR-0107
+  (blocking-promotion gate policy) discharged 2026-08-21 via two real
+  `make d1 check agents` runs (blocked, then passing 19/20 = 95%).
+  ADR-0108 (LM-Eval mechanism) closed 2026-08-22: the TrustyAI operator
+  (OpenShift AI 3.5.0-ea.2) never persists a completed `LMEvalJob`'s real
+  status to its own CR (`status.state` stays `Scheduled` forever, even
+  though the driver pod's own log shows it computing and logging a correct
+  `Complete`/`Succeeded` update) - confirmed live, RBAC ruled out as the
+  cause, root cause internal to the operator/driver hand-off and out of
+  this repo's control. Fixed with a workaround, not an upstream patch:
+  `evaluations/benchmark.py` now reads results directly from the job's own
+  `outputs.pvcManaged` PVC (`oc exec` into the still-running driver pod,
+  which never exits - falls back to a short-lived reader pod if it's ever
+  gone, since the PVC is `ReadWriteOnce` and can't be mounted twice
+  simultaneously). Along the way, ruled out a false lead first: a GPU node
+  had been cordoned since the prior day, starving every GPU pod
+  cluster-wide - that's what made an earlier observation
+  (`state: Complete, reason: Failed, message: ContainerStatusUnknown`)
+  look like the bug when it was really unrelated infra fallout. Both ADRs
+  now Implemented; WP-10 Done.
 - **ADR-0111 (WP-11)**: SecNumCloud hardening control matrix
   (`docs/security/secnumcloud-controls.md`) plus
   `check_workload_hardening.py`'s `check_no_hardcoded_secret_values`.

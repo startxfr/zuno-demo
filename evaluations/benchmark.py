@@ -22,11 +22,16 @@ LM-Eval results input, two mutually exclusive sources:
                                  live GPU/LMEvalJob exists in this
                                  development environment).
   --lm-eval-job-name NAME (+ --namespace) the live-cluster alternative:
-                                 shells out to `oc get lmevaljob NAME -n
-                                 NAMESPACE -o json` and reads the same
-                                 `status.results` field - what an
-                                 operator runs against a real completed
-                                 LMEvalJob.
+                                 reads a completed LMEvalJob's real results
+                                 directly from its `outputs.pvcManaged` PVC
+                                 via a short-lived reader pod, not from the
+                                 CR's own `status.results` field - a real,
+                                 confirmed-live TrustyAI operator bug
+                                 (OpenShift AI 3.5.0-ea.2) leaves that field
+                                 permanently unset even on a genuinely
+                                 succeeded run (ADR-0108's dated note has
+                                 the full trace). What an operator runs
+                                 against a real completed LMEvalJob.
   (neither)                     lm_eval is recorded as {} in the
                                  artifact - a candidate can still be
                                  benchmarked on agent gates alone if no
@@ -95,24 +100,167 @@ def read_lm_eval_results_from_file(path: str) -> Dict[str, Any]:
         return json.load(fh)
 
 
+_RESULTS_READER_IMAGE = (
+    "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ubi9-ubi-minimal:9"
+)
+
+
 def read_lm_eval_results_from_cluster(job_name: str, namespace: str = "zuno-ai-run") -> Dict[str, Any]:
-    """Operator path: reads a completed LMEvalJob's own status.results via
-    `oc` (already authenticated on a real cluster) - no new Python
-    dependency, consistent with how ansible/roles/models/tasks/precheck.yml
-    reads the same CRD via kubernetes.core rather than this repo's
-    evaluations/ scripts taking on a Kubernetes client dependency of their
-    own."""
+    """Operator path: reads a completed LMEvalJob's real results.
+
+    ADR-0108 known operator gap (confirmed live 2026-08-22, reproduced
+    cleanly against a healthy predictor after ruling out an earlier false
+    lead - a cordoned GPU node that had been contaminating every prior
+    observation): the TrustyAI operator (OpenShift AI 3.5.0-ea.2) never
+    persists a completed job's real status to the LMEvalJob CR. The
+    driver's own log shows it computing and logging a correct
+    `state: Complete, reason: Succeeded` update with full results, but the
+    CR itself stays at `state: Scheduled` indefinitely afterwards (watched
+    for 2+ minutes past the driver's own "job completed" log line, no
+    change) - not a reconcile-lag artifact. RBAC is not the blocker
+    (`default` SA in the job's namespace can patch `lmevaljobs/status`);
+    the actual failure mode is internal to the operator/driver hand-off
+    and out of this repo's control.
+
+    Workaround: the job's own `outputs.pvcManaged` PVC (named
+    `<job_name>-pvc`, gitops/charts/models/templates/lmevaljob.yaml) holds
+    the real results file (`<model>/results_<timestamp>.json`, lm-eval-
+    harness's own native output) completely independent of the broken CR
+    field.
+
+    Because the CR's `state` also never reaches a value the operator acts
+    on to tear the driver pod down, the driver pod (named exactly
+    `job_name`, confirmed via `.status.podName`) stays alive indefinitely -
+    and since the PVC is `ReadWriteOnce`, a *separate* reader pod cannot
+    mount it while that driver pod is still holding it (confirmed live:
+    `FailedAttachVolume ... Multi-Attach error ... already used by
+    pod(s) <job_name>`). So the primary path execs directly into the
+    still-running driver pod (no new volume attach needed); only if that
+    pod is already gone (e.g. cleaned up by hand, or a future operator fix
+    that actually completes the lifecycle) does this fall back to a
+    short-lived reader pod that mounts the now-unclaimed PVC itself. No new
+    Python Kubernetes-client dependency either way, consistent with how
+    ansible/roles/models/tasks/precheck.yml reads the same CRD via
+    kubernetes.core."""
+    pvc_name = f"{job_name}-pvc"
+    check = subprocess.run(
+        ["oc", "get", "pvc", pvc_name, "-n", namespace, "-o", "name"],
+        capture_output=True, text=True,
+    )
+    if check.returncode != 0:
+        raise BenchmarkError(
+            f"no output PVC {pvc_name!r} for LMEvalJob {job_name!r} in namespace {namespace!r} - "
+            f"has it run yet? ({check.stderr.strip()})"
+        )
+
+    driver_pod_check = subprocess.run(
+        ["oc", "get", "pod", job_name, "-n", namespace, "-o", "name"],
+        capture_output=True, text=True,
+    )
+    if driver_pod_check.returncode == 0:
+        return _read_results_via_exec(job_name, namespace)
+    return _read_results_from_output_pvc(job_name, pvc_name, namespace)
+
+
+def _find_latest_results_file_cmd(mount_path: str) -> str:
+    return (
+        f"f=$(find {mount_path} -name 'results_*.json' | sort | tail -1); "
+        f"if [ -z \"$f\" ]; then echo 'no results_*.json found under {mount_path}' >&2; exit 1; fi; "
+        "cat \"$f\""
+    )
+
+
+# The LMEvalJob chart (gitops/charts/models/templates/lmevaljob.yaml) does
+# not set spec.pod.container.volumeMounts for the operator-managed
+# `outputs.pvcManaged` volume - the operator's own driver image mounts it
+# at this fixed path (confirmed live via `oc exec ... find /opt/app-root/
+# src/output`), not the `/output` mountPath this module chooses for its
+# own reader-pod fallback below.
+_DRIVER_POD_OUTPUT_MOUNT = "/opt/app-root/src/output"
+
+
+def _read_results_via_exec(job_name: str, namespace: str) -> Dict[str, Any]:
     proc = subprocess.run(
-        ["oc", "get", "lmevaljob", job_name, "-n", namespace, "-o", "json"],
+        [
+            "oc", "exec", job_name, "-n", namespace, "-c", "main", "--",
+            "sh", "-c", _find_latest_results_file_cmd(_DRIVER_POD_OUTPUT_MOUNT),
+        ],
         capture_output=True, text=True,
     )
     if proc.returncode != 0:
-        raise BenchmarkError(f"could not read LMEvalJob {job_name!r} in namespace {namespace!r}: {proc.stderr.strip()}")
-    job = json.loads(proc.stdout)
-    status = job.get("status", {})
-    if status.get("state") != "Complete":
-        raise BenchmarkError(f"LMEvalJob {job_name!r} is not Complete (state={status.get('state')!r})")
-    return status.get("results", {}) or {}
+        raise BenchmarkError(
+            f"could not read results from driver pod {job_name!r} in namespace {namespace!r}: {proc.stderr.strip()}"
+        )
+    if not proc.stdout.strip():
+        raise BenchmarkError(f"driver pod {job_name!r} produced no results output")
+    raw = json.loads(proc.stdout)
+    if isinstance(raw, dict) and "results" in raw:
+        return raw["results"]
+    return raw
+
+
+def _read_results_from_output_pvc(job_name: str, pvc_name: str, namespace: str) -> Dict[str, Any]:
+    reader_pod = f"{job_name}-results-reader"
+    manifest = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": reader_pod,
+            "namespace": namespace,
+            "labels": {"app.kubernetes.io/component": "benchmark-results-reader"},
+        },
+        "spec": {
+            "restartPolicy": "Never",
+            "containers": [
+                {
+                    "name": "reader",
+                    "image": _RESULTS_READER_IMAGE,
+                    "command": ["sh", "-c", _find_latest_results_file_cmd("/output")],
+                    "volumeMounts": [{"name": "outputs", "mountPath": "/output", "readOnly": True}],
+                }
+            ],
+            "volumes": [
+                {"name": "outputs", "persistentVolumeClaim": {"claimName": pvc_name, "readOnly": True}}
+            ],
+        },
+    }
+    subprocess.run(
+        ["oc", "delete", "pod", reader_pod, "-n", namespace, "--ignore-not-found", "--wait=true"],
+        capture_output=True, text=True,
+    )
+    try:
+        apply_proc = subprocess.run(
+            ["oc", "apply", "-f", "-"], input=json.dumps(manifest), capture_output=True, text=True,
+        )
+        if apply_proc.returncode != 0:
+            raise BenchmarkError(f"could not create results-reader pod {reader_pod!r}: {apply_proc.stderr.strip()}")
+
+        wait_proc = subprocess.run(
+            [
+                "oc", "wait", "-n", namespace, f"pod/{reader_pod}",
+                "--for=jsonpath={.status.phase}=Succeeded", "--timeout=120s",
+            ],
+            capture_output=True, text=True,
+        )
+        logs_proc = subprocess.run(["oc", "logs", reader_pod, "-n", namespace], capture_output=True, text=True)
+        if wait_proc.returncode != 0:
+            raise BenchmarkError(
+                f"results-reader pod {reader_pod!r} did not reach Succeeded: {wait_proc.stderr.strip()} "
+                f"(pod logs: {logs_proc.stdout[-500:]!r})"
+            )
+        if not logs_proc.stdout.strip():
+            raise BenchmarkError(f"results-reader pod {reader_pod!r} produced no output")
+
+        raw = json.loads(logs_proc.stdout)
+    finally:
+        subprocess.run(
+            ["oc", "delete", "pod", reader_pod, "-n", namespace, "--ignore-not-found"],
+            capture_output=True, text=True,
+        )
+
+    if isinstance(raw, dict) and "results" in raw:
+        return raw["results"]
+    return raw
 
 
 def run_agent_gates(agents: List[str], candidate: str) -> Dict[str, Dict[str, Any]]:
