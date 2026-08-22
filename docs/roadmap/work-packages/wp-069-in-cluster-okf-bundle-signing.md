@@ -1,6 +1,15 @@
 # WP-069: Cut OKF bundle signing over to in-cluster Vault Transit
 
-- **State:** Not started - planned follow-up to WP-068.
+- **State:** Repo work merged, live-verified 2026-08-22 on
+  api.demo222.startx.fr: all 8 agent bundles signed by the in-cluster Job,
+  written to Vault KV, synced by the ExternalSecret into a real Secret,
+  and independently re-verified using the actual deployed
+  `app/_sign_okf_bundle.py`/`app/registry.py` code path with
+  `ZUNO_REQUIRE_SIGNED_BUNDLES=true` in a debug pod - `AgentRegistry` loaded
+  all 8 agents with zero load errors, and a tampered copy was correctly
+  rejected. Operator action remaining: flip `requireSignedBundles: true` on
+  the real chart (not yet done - a live enforcement cutover on the running
+  Deployment, held back pending explicit go-ahead).
 - **ADRs:** ADR-0106 (Partially implemented -> superseded-in-part by
   ADR-0420 for the signing mechanism), ADR-0420
 - **Depends on:** WP-068 (Vault Transit signing backend)

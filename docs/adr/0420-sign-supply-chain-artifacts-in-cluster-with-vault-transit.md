@@ -1,8 +1,12 @@
 # ADR-0420: Sign supply-chain artifacts in-cluster with Vault Transit
 
 - **Status:** Partially implemented - Vault Transit signing backend live
-  (WP-068); OKF bundle and image signing still run the ADR-0106/ADR-0115
-  GitHub-OIDC/Fulcio/Rekor mechanism this ADR supersedes, pending WP-069/070.
+  (WP-068); OKF bundle signing (WP-069) and image signing (WP-070) both
+  cut over and live-verified 2026-08-22. Remaining: flip
+  `ZUNO_REQUIRE_SIGNED_BUNDLES` on the real chart (WP-069); sign the
+  remaining first-party images and wire `verify_signatures.py` into an
+  automated in-cluster gate (WP-070) - see the 2026-08-22 implementation
+  note below.
 - **Target:** v0.4
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team
@@ -155,6 +159,55 @@ Vault this way already).
   image-signing and `sign-okf-bundles` jobs), redirect
   `check_build_matrix.py`/`verify_signatures.py`'s own parsing of that
   workflow file first.
+
+## Implementation note (2026-08-22, WP-069/WP-070)
+
+Both cutovers landed and were live-verified on api.demo222.startx.fr in the
+same pass as this ADR. One correction to the Decision text above: the
+`--tlog-upload=false`/`--insecure-ignore-tlog=true` flags are specific to
+`cosign sign-blob`/`verify-blob` (used for OKF bundles). Plain
+`cosign sign`/`verify` (used for OCI images, WP-070) has no such flags at
+all - it gates transparency-log use behind an opt-in `COSIGN_EXPERIMENTAL`
+environment variable instead, which this repo never sets anywhere. Same
+outcome (no Rekor contact), different mechanism per artifact kind.
+
+Real, non-obvious problems only live testing surfaced, each fixed in
+follow-up commits: the `platform-signer` Vault policy needed both the bare
+`transit/sign/<key>` path and a `/*` glob (cosign's hashivault client calls
+the hash-algorithm-suffixed path); the audit-device "already enabled" guard
+needed a second error-string match (`sys/audit` words it differently than
+`sys/mounts`); `zuno-vault`'s NetworkPolicy needed `zuno-ai-build` added to
+its allowlist; the image-signing path needed the internal registry's
+service-serving CA trusted (`SSL_CERT_FILE`), a Docker-config-based
+registry credential built from the pod's own ServiceAccount token (cosign
+has no ambient Kubernetes-token registry auth), a `system:image-builder`
+RoleBinding for `zuno-signer` (pull-only isn't enough - signing pushes a
+new manifest), and the `platform-signer` policy needed
+`zuno/data/okf-signatures` write access alongside its Transit paths. The
+Job-completion wait logic in both signing tasks also needed fixing:
+checking raw `succeeded`/`failed` pod counters races with
+`backoffLimit` retries and can report a false failure mid-retry, before the
+Job's real, eventual success - both now wait for a terminal
+`status.conditions` entry instead.
+
+Confirmed live: all 8 agent bundles signed, written to Vault KV, synced by
+`externalsecret-okf-signatures.yaml` into a real Secret, and independently
+re-verified using the actual deployed `app/_sign_okf_bundle.py`/
+`app/registry.py` code path with `ZUNO_REQUIRE_SIGNED_BUNDLES=true` in a
+debug pod - `AgentRegistry` loaded all 8 with zero errors, and a tampered
+bundle copy was correctly rejected. Five real images signed
+(`supply-chain-signer`, `ai-gateway`, `agent-runtime`, `agent-bff`,
+`agent-frontend`) and independently re-verified with
+`cosign verify --key` from a separate pod.
+
+Also found, out of scope to fix here: `ansible/playbooks/day2_build.yml`
+sets `day2_verb: build`, but `apply_openshift_build.yml`'s "force a fresh
+Build" task only checks `day1_verb` - `make d2 build <component>` silently
+never forces a genuinely fresh Build for a component that already has one
+(falls back to the same "ensure this image exists" re-verify path a plain
+install would take). Worked around here with a direct `oc start-build
+--wait` for testing; the underlying Day 2 build-verb gap is a separate,
+pre-existing issue this ADR didn't introduce.
 
 ## Related ADRs
 

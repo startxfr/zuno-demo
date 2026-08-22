@@ -1,6 +1,20 @@
 # WP-070: Cut container image signing over to in-cluster Vault Transit
 
-- **State:** Not started - planned follow-up to WP-068/WP-069.
+- **State:** Repo work merged, live-verified 2026-08-22 on
+  api.demo222.startx.fr: `apply_openshift_build.yml`'s new signing step
+  successfully signed 5 real images built during this pass
+  (supply-chain-signer, ai-gateway, agent-runtime, agent-bff,
+  agent-frontend); `cosign verify --key` against the committed public key
+  succeeded from a separate pod. `verify_signatures.py` itself resolves
+  live ImageStreamTag digests correctly (confirmed via `oc get istag`) but
+  its actual `cosign verify` calls need to run from inside the cluster (no
+  external route to the internal registry) - not yet wired into an
+  automated `make d1/d2 check` gate; that wiring, plus signing the
+  remaining first-party images (mcp-gateway, rag-service, mlops,
+  aiagent-operator, every mcp-servers/* image), is left for a follow-up
+  pass. `build-publish.yml`/`check_build_matrix.py` decoupling (retire vs.
+  keep the workflow file) also remains an open decision, as originally
+  scoped.
 - **ADRs:** ADR-0115 (Deferred -> superseded-in-part by ADR-0420 for the
   signing mechanism), ADR-0420
 - **Depends on:** WP-068 (Vault Transit signing backend)
