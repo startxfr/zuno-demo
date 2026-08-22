@@ -198,8 +198,11 @@ data:
     # client calls transit/sign/<key>/<hash-algorithm> (e.g.
     # transit/sign/zuno-platform-signer/sha2-256), not the bare
     # transit/sign/<key> path - Vault policy paths are exact-match, so the
-    # glob is required or every sign-blob call 403s.
-    printf 'path "transit/sign/zuno-platform-signer" {\n  capabilities = ["update"]\n}\npath "transit/sign/zuno-platform-signer/*" {\n  capabilities = ["update"]\n}\npath "transit/keys/zuno-platform-signer" {\n  capabilities = ["read"]\n}\n' | vault policy write platform-signer -
+    # glob is required or every sign-blob call 403s. zuno/data/okf-signatures
+    # (ADR-0420/WP-069): the OKF signing Job's own kv_put destination
+    # (platform/supply-chain/sign_in_cluster.py's sign-okf-bundles) - KV v2's
+    # write path is data/<path>, not the bare <path> a read would use.
+    printf 'path "transit/sign/zuno-platform-signer" {\n  capabilities = ["update"]\n}\npath "transit/sign/zuno-platform-signer/*" {\n  capabilities = ["update"]\n}\npath "transit/keys/zuno-platform-signer" {\n  capabilities = ["read"]\n}\npath "zuno/data/okf-signatures" {\n  capabilities = ["create","update"]\n}\n' | vault policy write platform-signer -
 
     # bound to the zuno-signer ServiceAccount in zuno-ai-build
     # (ansible/roles/supply_chain_signer_build creates it) - the in-cluster
