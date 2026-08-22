@@ -1,0 +1,103 @@
+---
+# ADR-0420/WP-069: verifies every agent bundle's current signature (Vault
+# KV zuno/okf-signatures, written by the in-cluster signing Job) against
+# the committed trust anchor (platform/supply-chain/keys/
+# zuno-platform-signer.pub) and the bundle's own current content - entirely
+# offline once the signature is fetched, same `cosign verify-blob` path
+# `sign_okf_bundle.py verify`/the runtime use. A missing signature is
+# reported, not failed: ZUNO_REQUIRE_SIGNED_BUNDLES stays off until every
+# agent has one (see ADR-0106's 2026-08-21 note) - this check's job is to
+# catch a signature that EXISTS but no longer verifies (stale/tampered),
+# which is a real failure regardless of the enforcement flag.
+- name: "okf-signatures | discover agent bundle directories"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/agents"
+    file_type: directory
+    depth: 1
+  register: _okf_verify_agent_dirs
+
+- name: "okf-signatures | find the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _okf_verify_vault_pod
+
+- name: "okf-signatures | read the Vault root token"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _okf_verify_vault_creds
+  no_log: true
+
+- name: "okf-signatures | skip entirely if Vault isn't reachable yet (fresh/partial install)"
+  ansible.builtin.set_fact:
+    _okf_verify_skip: >-
+      {{ (_okf_verify_vault_pod.resources | default([]) | length) == 0 or
+         (_okf_verify_vault_creds.resources | default([]) | length) == 0 }}
+
+- name: "okf-signatures | fetch each agent's current signature from Vault KV"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _okf_verify_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _okf_verify_vault_creds.resources[0].data.root_token | b64decode }}
+      vault kv get -field={{ agent_dir.path | basename }}.sig zuno/okf-signatures"
+  loop: "{{ _okf_verify_agent_dirs.files | default([]) }}"
+  loop_control:
+    loop_var: agent_dir
+    label: "{{ agent_dir.path | basename }}"
+  register: _okf_verify_fetched
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: not _okf_verify_skip
+
+- name: "okf-signatures | verify each fetched signature against the current bundle content"
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      echo {{ fetched_result.stdout | quote }} > /tmp/{{ (fetched_result.agent_dir.path | basename) }}.sig &&
+      python3 platform/supply-chain/sign_okf_bundle.py verify {{ fetched_result.agent_dir.path }}
+      --signature /tmp/{{ (fetched_result.agent_dir.path | basename) }}.sig
+      --public-key platform/supply-chain/keys/zuno-platform-signer.pub
+    chdir: "{{ zuno_repo_root }}"
+  loop: "{{ _okf_verify_fetched.results | default([]) }}"
+  loop_control:
+    loop_var: fetched_result
+    label: "{{ fetched_result.agent_dir.path | basename }}"
+  register: _okf_verify_results
+  changed_when: false
+  failed_when: false
+  when:
+    - not _okf_verify_skip
+    - fetched_result.rc == 0
+    - fetched_result.stdout | default('') | length > 0
+
+- name: "okf-signatures | fail if any fetched signature no longer verifies"
+  ansible.builtin.fail:
+    msg: >-
+      OKF bundle signature verification failed for
+      {{ bad_result.fetched_result.agent_dir.path | basename }}:
+      {{ bad_result.stdout }} {{ bad_result.stderr }}
+  loop: "{{ _okf_verify_results.results | default([]) }}"
+  loop_control:
+    loop_var: bad_result
+    label: "{{ bad_result.fetched_result.agent_dir.path | basename }}"
+  when:
+    - not _okf_verify_skip
+    - bad_result.rc | default(0) != 0
+
+- name: "okf-signatures | report which agents still have no signature yet"
+  ansible.builtin.debug:
+    msg: >-
+      {{ (_okf_verify_fetched.results | default([]) | rejectattr('rc', 'equalto', 0)
+          | map(attribute='agent_dir.path') | map('basename') | list) }}
+      have no signature in Vault KV yet (ZUNO_REQUIRE_SIGNED_BUNDLES stays
+      off until all agents do - run the signing Job:
+      `make d2 build agent` - to populate the rest).
+  when: not _okf_verify_skip

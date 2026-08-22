@@ -1,0 +1,109 @@
+---
+# ADR-0420/WP-069: signs every agents/<agent>/ OKF bundle with the
+# in-cluster Vault Transit key and writes the results to Vault KV
+# (zuno/okf-signatures), where gitops/charts/agent-runtime/templates/
+# externalsecret-okf-signatures.yaml picks them up. Runs as a Job (deleted
+# and recreated each time, same idempotency-by-recreation pattern as
+# ansible/roles/vault's vault-unseal-configure), using the
+# supply-chain-signer image and the zuno-signer ServiceAccount
+# (ansible/roles/supply_chain_signer_build).
+#
+# The initContainer copies /app/agents out of the just-built
+# agent-runtime:latest image rather than this checkout's own agents/ tree:
+# BuildConfigs clone from a moving `main` ref, so a separate checkout could
+# in principle sign a different commit's bundle content than what the
+# runtime actually loads. Copying from the built image guarantees the
+# signed bytes are, by construction, exactly what verify_bundle() will
+# later check against.
+- name: "okf-signing | delete any previous signing Job (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: okf-bundle-signing
+    namespace: zuno-ai-build
+    wait: true
+
+- name: "okf-signing | run the OKF bundle signing Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: okf-bundle-signing
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 2
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: "false"
+          spec:
+            restartPolicy: Never
+            serviceAccountName: zuno-signer
+            priorityClassName: zuno-platform-weak
+            initContainers:
+              - name: fetch-agents
+                image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-runtime:latest"
+                command: ["cp", "-a", "/app/agents", "/work/agents"]
+                volumeMounts:
+                  - name: work
+                    mountPath: /work
+            containers:
+              - name: sign
+                image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer:latest"
+                args:
+                  - sign-okf-bundles
+                  - --agents-root
+                  - /work/agents
+                volumeMounts:
+                  - name: work
+                    mountPath: /work
+            volumes:
+              - name: work
+                emptyDir: {}
+
+- name: "okf-signing | wait for the signing Job to complete"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-build
+    name: okf-bundle-signing
+  register: _okf_signing_job
+  until: >-
+    (_okf_signing_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_okf_signing_job.resources[0].status.failed | default(0)) > 0
+  retries: 30
+  delay: 10
+
+- name: "okf-signing | fetch the signing Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-build
+    label_selectors:
+      - "job-name=okf-bundle-signing"
+  register: _okf_signing_pod
+
+- name: "okf-signing | print the signing Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-build
+    name: "{{ _okf_signing_pod.resources[0].metadata.name }}"
+    container: sign
+  register: _okf_signing_log
+  when: (_okf_signing_pod.resources | default([]) | length) > 0
+
+- name: "okf-signing | show the signing Job's output"
+  ansible.builtin.debug:
+    msg: "{{ _okf_signing_log.log_lines | default(['no pod/log found']) }}"
+
+- name: "okf-signing | fail if the signing Job did not succeed"
+  ansible.builtin.fail:
+    msg: >-
+      okf-bundle-signing Job did not succeed (succeeded=
+      {{ _okf_signing_job.resources[0].status.succeeded | default(0) }}
+      failed={{ _okf_signing_job.resources[0].status.failed | default(0) }}) -
+      see the output above.
+  when: (_okf_signing_job.resources[0].status.succeeded | default(0)) == 0

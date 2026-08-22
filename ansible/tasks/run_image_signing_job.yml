@@ -1,0 +1,112 @@
+---
+# ADR-0420/WP-070: signs one component's just-built image by digest with
+# the in-cluster Vault Transit key. Included from apply_openshift_build.yml
+# right after a genuinely fresh Build completes (day1_verb: build only -
+# never on a routine "ensure this image exists" install), so every
+# component built this way gets signed, not just agent-runtime (WP-069
+# covers OKF bundles specifically; this covers every image uniformly).
+#
+# The digest is resolved here, outside the signing container (same
+# "resolve outside, sign inside" split as run_okf_signing_job.yml's
+# initContainer) - the minimal supply-chain-signer image carries no oc/
+# kubectl binary, only cosign, so it can never need cluster API access
+# beyond talking to Vault.
+#
+# Requires: sign_image_name set by the caller (e.g. "agent-runtime").
+- name: "image-signing | resolve {{ sign_image_name }}'s live ImageStreamTag digest"
+  kubernetes.core.k8s_info:
+    api_version: image.openshift.io/v1
+    kind: ImageStreamTag
+    namespace: zuno-ai-build
+    name: "{{ sign_image_name }}:latest"
+  register: _image_signing_istag
+
+- name: "image-signing | fail if the ImageStreamTag doesn't exist yet"
+  ansible.builtin.fail:
+    msg: "{{ sign_image_name }}:latest not found in zuno-ai-build - the build above should have created it."
+  when: (_image_signing_istag.resources | default([]) | length) == 0
+
+- name: "image-signing | set the image@digest fact"
+  ansible.builtin.set_fact:
+    _image_signing_ref: >-
+      image-registry.openshift-image-registry.svc:5000/zuno-ai-build/{{ sign_image_name }}@{{
+        _image_signing_istag.resources[0].image.metadata.name }}
+
+- name: "image-signing | delete any previous signing Job for {{ sign_image_name }} (idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: "image-signing-{{ sign_image_name }}"
+    namespace: zuno-ai-build
+    wait: true
+
+- name: "image-signing | run the image signing Job for {{ sign_image_name }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "image-signing-{{ sign_image_name }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 2
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: "false"
+          spec:
+            restartPolicy: Never
+            serviceAccountName: zuno-signer
+            priorityClassName: zuno-platform-weak
+            containers:
+              - name: sign
+                image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer:latest"
+                args:
+                  - sign-image
+                  - "{{ _image_signing_ref }}"
+
+- name: "image-signing | wait for the signing Job to complete"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-build
+    name: "image-signing-{{ sign_image_name }}"
+  register: _image_signing_job
+  until: >-
+    (_image_signing_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_image_signing_job.resources[0].status.failed | default(0)) > 0
+  retries: 20
+  delay: 10
+
+- name: "image-signing | fetch the signing Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-build
+    label_selectors:
+      - "job-name=image-signing-{{ sign_image_name }}"
+  register: _image_signing_pod
+
+- name: "image-signing | print the signing Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-build
+    name: "{{ _image_signing_pod.resources[0].metadata.name }}"
+    container: sign
+  register: _image_signing_log
+  when: (_image_signing_pod.resources | default([]) | length) > 0
+
+- name: "image-signing | show the signing Job's output"
+  ansible.builtin.debug:
+    msg: "{{ _image_signing_log.log_lines | default(['no pod/log found']) }}"
+
+- name: "image-signing | fail if the signing Job did not succeed"
+  ansible.builtin.fail:
+    msg: >-
+      image-signing-{{ sign_image_name }} Job did not succeed (succeeded=
+      {{ _image_signing_job.resources[0].status.succeeded | default(0) }}
+      failed={{ _image_signing_job.resources[0].status.failed | default(0) }}) -
+      see the output above.
+  when: (_image_signing_job.resources[0].status.succeeded | default(0)) == 0
