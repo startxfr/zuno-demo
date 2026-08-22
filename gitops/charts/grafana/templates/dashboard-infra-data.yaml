@@ -22,15 +22,14 @@
 # binary), so once the role exists with pg_monitor granted, its built-in
 # collectors (not Crunchy's broken custom queries) work fine and expose
 # plain pg_stat_*/pg_database_size_bytes/pg_replication_lag_seconds names
-# - no ccp_* prefix ever existed on this exporter. The role was created
-# out-of-band (CREATE ROLE ccp_monitoring LOGIN PASSWORD '<matches the
-# zuno-postgresql-monitoring secret>'; GRANT pg_monitor TO ccp_monitoring;
-# GRANT CONNECT ON DATABASE postgres TO ccp_monitoring;) since PGO won't
-# do it for this Postgres version - this manual step is NOT tracked in
-# git and will need repeating if the role or its password secret is ever
-# deleted. An OTel-receiver alternative was considered and ruled out: this
-# cluster's Red Hat OpenTelemetry Collector image ships no
-# postgresql/sqlquery receiver at all.
+# - no ccp_* prefix ever existed on this exporter. The role's creation
+# (and password, kept in sync with the zuno-postgresql-monitoring secret
+# on every sync) is automated as of 2026-08-22 by
+# gitops/charts/postgresql/templates/job-monitoring-role.yaml, an ArgoCD
+# Sync-hook Job - see that file's own header for why PGO won't do this
+# itself on this Postgres version. An OTel-receiver alternative was
+# considered and ruled out: this cluster's Red Hat OpenTelemetry
+# Collector image ships no postgresql/sqlquery receiver at all.
 #
 # MariaDB (mysqld_exporter) and Redis (oliver006/redis_exporter, bitnami's
 # default) metric names are the stable upstream defaults and were already
@@ -440,6 +439,41 @@ spec:
           ]}}},
           "targets": [
             {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(argocd_app_info{namespace=\"openshift-gitops\", sync_status!=\"Synced\"}) or vector(0)"}
+          ]
+        },
+        {
+          "id": 32,
+          "title": "PostgreSQL: cache hit ratio",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Verified live 2026-08-22 once the ccp_monitoring role fix (job-monitoring-role.yaml) landed.",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 116},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(pg_stat_database_blks_hit[5m])) / (sum(rate(pg_stat_database_blks_hit[5m])) + sum(rate(pg_stat_database_blks_read[5m])))"}
+          ]
+        },
+        {
+          "id": 33,
+          "title": "MariaDB: InnoDB buffer pool hit ratio",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 116},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - (rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]))"}
+          ]
+        },
+        {
+          "id": 34,
+          "title": "MariaDB: table lock waits",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 116},
+          "fieldConfig": {"defaults": {"unit": "ops"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_table_locks_waited[5m])", "legendFormat": "waited"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_table_locks_immediate[5m])", "legendFormat": "immediate"}
           ]
         }
       ]

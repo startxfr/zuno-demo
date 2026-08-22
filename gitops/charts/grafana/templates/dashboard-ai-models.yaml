@@ -142,6 +142,18 @@ spec:
           ]
         },
         {
+          "id": 22,
+          "title": "Estimated $ saved by semantic cache",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Cache hit rate x average cost per call - known-empty by design until SEMANTIC_CACHE_ENABLED=true is set on the ai-gateway Deployment (confirmed live 2026-08-22: currently false, zero zuno_semantic_cache_lookups_total series). Flipping that flag is a real behavior change (response freshness/cost trade-off) outside this dashboard's scope.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 80},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_semantic_cache_lookups_total{outcome=\"hit\"}[5m])) * (sum(rate(zuno_model_cost_usd_total[5m])) / sum(rate(zuno_model_calls_total[5m])))"}
+          ]
+        },
+        {
           "id": 6,
           "title": "Semantic cache hit ratio",
           "type": "stat",

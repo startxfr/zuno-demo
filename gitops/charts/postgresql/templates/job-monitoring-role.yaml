@@ -1,0 +1,96 @@
+{{- if .Values.monitoring.enabled }}
+# Automates a fix that was previously manual (see this chart's
+# postgrescluster.yaml "postgres" user comment, and the git history of
+# gitops/charts/grafana/templates/dashboard-infra-data.yaml): Crunchy PGO
+# 5.8.8 never creates the ccp_monitoring role for postgresVersion 18
+# ("postgres_exporter not supported for pg18" - it also loops a harmless
+# but noisy `schema "monitor" does not exist` reconcile error). Without
+# this role, the exporter sidecar's DSN authentication fails outright
+# (pg_up=0) and every PostgreSQL panel on dashboard-infra-data.yaml goes
+# empty, even though the exporter itself is a stock postgres_exporter
+# whose built-in collectors work fine once the role exists with
+# pg_monitor granted - no Crunchy-specific setup needed at all.
+#
+# ArgoCD Sync hook at wave 0 (same pattern as gitops/charts/sql-schema's
+# Job - see ADR-0313's incident note on why this must be a Sync hook, not
+# PreSync): both secrets this Job needs
+# ({{ .Values.cluster.name }}-pguser-postgres and
+# {{ .Values.cluster.name }}-monitoring) are PGO-native, generated as
+# part of the same PostgresCluster reconcile ArgoCD already health-gates
+# on at wave -30, not a separately-waved ExternalSecret this Job would
+# need to wait behind.
+#
+# Always resets ccp_monitoring's password (not just creates it once) -
+# this is the actual improvement over the manual fix: it self-heals if
+# {{ .Values.cluster.name }}-monitoring is ever regenerated (e.g. deleted
+# to force PGO to rotate it), rather than silently going stale again.
+# The password is threaded in via Kubernetes' own $(VAR_NAME) command/arg
+# substitution (not a shell, so no quoting/injection surface beyond what
+# psql's own :'var' interpolation already handles) - never written to a
+# file or logged.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.cluster.name }}-monitoring-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  # A handful of DDL/DCL statements takes seconds; without a deadline a pod
+  # stuck in CreateContainerConfigError (not a pod *failure*, so
+  # backoffLimit never triggers) hangs the whole sync operation forever -
+  # same reasoning as gitops/charts/{sql-schema,rag-service}'s Jobs.
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: Never
+      priorityClassName: zuno-platform-weak
+      containers:
+        - name: psql
+          image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgres:16-bookworm
+          command:
+            - psql
+          env:
+            - name: PGHOST
+              value: {{ .Values.cluster.name }}-primary.{{ .Release.Namespace }}.svc
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cluster.name }}-pguser-postgres
+                  key: password
+            - name: CCP_MONITORING_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cluster.name }}-monitoring
+                  key: password
+          args:
+            - -v
+            - ON_ERROR_STOP=1
+            - -v
+            - "pass=$(CCP_MONITORING_PASSWORD)"
+            - -c
+            - >
+              DO $$
+              BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ccp_monitoring') THEN
+                  CREATE ROLE ccp_monitoring LOGIN PASSWORD :'pass';
+                ELSE
+                  ALTER ROLE ccp_monitoring PASSWORD :'pass';
+                END IF;
+              END
+              $$;
+              GRANT pg_monitor TO ccp_monitoring;
+              GRANT CONNECT ON DATABASE postgres TO ccp_monitoring;
+{{- end }}

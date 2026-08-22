@@ -151,7 +151,19 @@ spec:
   # templates/externalsecret-ragproject.yaml /
   # templates/externalsecret-conversations.yaml
   # ("bring your own password") rather than generating its own.
+  #
+  # The "postgres" entry (added for the templates/job-monitoring-role.yaml
+  # fixup Job): `databases`/`options` are both explicitly ignored for this
+  # user by the CRD (confirmed via `oc explain postgrescluster.spec.users`)
+  # - listing it here only tells PGO to generate a normal password-managed
+  # Secret (<cluster>-pguser-postgres) for the built-in superuser, which is
+  # the documented, supported way to get a networked superuser credential
+  # out of PGO. This is a real increase in privilege surface versus not
+  # having this secret at all - still bounded by the same NetworkPolicy
+  # that already restricts who can reach port 5432, but worth knowing it's
+  # there.
   users:
+    - name: postgres
     - name: {{ .Values.cluster.owner }}
       databases:
         - {{ .Values.cluster.database }}
