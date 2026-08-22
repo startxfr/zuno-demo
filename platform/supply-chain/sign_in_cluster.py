@@ -30,6 +30,14 @@ Four operations:
                   (--kv-mount/--kv-path), where
                   gitops/charts/agent-runtime/templates/
                   externalsecret-okf-signatures.yaml picks them up.
+    verify-images - WP-070: verifies every image in a JSON refs file (the
+                  shape `verify_signatures.py --list-refs`'s "resolved"
+                  array produces) against the public key baked into this
+                  image at build time - no Vault access at all, the whole
+                  point of a verifier. Still needs registry auth (a pull),
+                  built the same way sign-image's push does. Used by
+                  ansible/tasks/verify_image_signatures.yml's in-cluster
+                  Job (make d2 check supply-chain).
 
 --tlog-upload=false / --insecure-ignore-tlog=true are load-bearing, not a
 security loosening: there is no self-hosted Rekor here (Vault's own audit
@@ -66,6 +74,10 @@ DEFAULT_KEY_NAME = "zuno-platform-signer"
 DEFAULT_JWT_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 DEFAULT_KV_MOUNT = "zuno"
 DEFAULT_KV_PATH = "okf-signatures"
+# Baked into components/supply-chain-signer/Dockerfile at build time - a
+# verifier reads this local file, never Vault, matching ADR-0420's core
+# principle.
+DEFAULT_LOCAL_PUBLIC_KEY_PATH = pathlib.Path("/app/zuno-platform-signer.pub")
 
 
 class SignerError(RuntimeError):
@@ -172,6 +184,53 @@ def sign_image(vault_addr: str, vault_token: str, key_name: str, image_ref: str,
     if result.returncode != 0:
         raise SignerError(f"cosign sign failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
     print(f"signed {image_ref}")
+
+
+def verify_image(public_key: pathlib.Path, image_ref: str, jwt_path: str) -> None:
+    """ADR-0420/WP-070: verifies an OCI image by digest against a LOCAL
+    public key file - no Vault access needed, matching
+    sign_okf_bundle.py's verify_bundle(). Still needs registry auth (a
+    pull), built the same Docker-config-from-SA-token way sign_image()
+    builds it for a push."""
+    cosign_bin = _cosign_path()
+    docker_config_dir = _registry_docker_config(image_ref, jwt_path)
+    try:
+        env = os.environ.copy()
+        env["DOCKER_CONFIG"] = str(docker_config_dir)
+        result = subprocess.run(
+            [cosign_bin, "verify", "--key", str(public_key), image_ref],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    finally:
+        shutil.rmtree(docker_config_dir, ignore_errors=True)
+    if result.returncode != 0:
+        raise SignerError(f"cosign verify failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
+    print(f"verified {image_ref}")
+
+
+def verify_images_from_file(refs_path: pathlib.Path, public_key: pathlib.Path, jwt_path: str) -> None:
+    """ADR-0420/WP-070: verifies every ref in a JSON file - the shape
+    `verify_signatures.py --list-refs`'s "resolved" array produces,
+    `[{"name", "repository", "digest"}, ...]` - against a local public
+    key. Used by ansible/tasks/verify_image_signatures.yml's in-cluster
+    Job (make d2 check supply-chain)."""
+    refs = json.loads(refs_path.read_text())
+    failures = []
+    for ref in refs:
+        image_ref = f"{ref['repository']}@{ref['digest']}"
+        try:
+            verify_image(public_key, image_ref, jwt_path)
+        except SignerError as exc:
+            print(f"FAIL {ref['name']}: {exc}")
+            failures.append(ref["name"])
+
+    if failures:
+        raise SignerError(f"{len(failures)} of {len(refs)} image(s) failed verification: {', '.join(failures)}")
+
+    print(f"RESULT: PASS - all {len(refs)} image(s) verified")
 
 
 def sign_blob(vault_addr: str, vault_token: str, key_name: str, blob: pathlib.Path, signature: pathlib.Path) -> None:
@@ -347,6 +406,10 @@ def main() -> int:
     p_okf.add_argument("--kv-mount", default=DEFAULT_KV_MOUNT)
     p_okf.add_argument("--kv-path", default=DEFAULT_KV_PATH)
 
+    p_verify_images = sub.add_parser("verify-images", help="verify every image in a JSON refs file (no Vault access needed)")
+    p_verify_images.add_argument("--refs-file", required=True, type=pathlib.Path)
+    p_verify_images.add_argument("--public-key", default=DEFAULT_LOCAL_PUBLIC_KEY_PATH, type=pathlib.Path)
+
     args = parser.parse_args()
 
     try:
@@ -371,6 +434,8 @@ def main() -> int:
                 args.vault_addr, args.role, args.key_name, args.jwt_path,
                 args.agents_root, args.kv_mount, args.kv_path,
             )
+        elif args.command == "verify-images":
+            verify_images_from_file(args.refs_file, args.public_key, args.jwt_path)
     except (SignerError, sign_okf_bundle.BundleError) as exc:
         print(f"RESULT: FAIL - {exc}")
         return 1

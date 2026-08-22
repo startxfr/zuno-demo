@@ -3,11 +3,15 @@
 #
 #   docker build -f components/supply-chain-signer/Dockerfile -t zuno/supply-chain-signer:local .
 #
-# ADR-0420/WP-068/WP-069: this image is cosign + platform/supply-chain/
-# sign_in_cluster.py + sign_okf_bundle.py, nothing else - it authenticates to
-# Vault's Transit-backed platform-signer identity via Kubernetes auth and
-# drives cosign's hashivault:// KMS mode. Backs one-off debug pods and the
-# OKF bundle signing Job; never a long-running Deployment of its own.
+# ADR-0420/WP-068/WP-069/WP-070: this image is cosign + platform/supply-chain/
+# sign_in_cluster.py + sign_okf_bundle.py + the committed Vault Transit
+# public key, nothing else. Signing (sign-image, sign-okf-bundles)
+# authenticates to Vault's platform-signer identity via Kubernetes auth
+# and drives cosign's hashivault:// KMS mode; verifying (verify-images)
+# needs the committed public key baked in below, never Vault access -
+# the whole point of a verifier under ADR-0420. Backs one-off debug pods,
+# the OKF/image signing Jobs, and the supply-chain check gate; never a
+# long-running Deployment of its own.
 ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim
 FROM ${BASE_IMAGE} AS base
 
@@ -26,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 
 COPY platform/supply-chain/sign_in_cluster.py ./sign_in_cluster.py
 COPY platform/supply-chain/sign_okf_bundle.py ./sign_okf_bundle.py
+COPY platform/supply-chain/keys/zuno-platform-signer.pub ./zuno-platform-signer.pub
 
 ENTRYPOINT ["python3", "/app/sign_in_cluster.py"]
 CMD ["dry-run"]

@@ -19,10 +19,10 @@ against a live deployment, not re-derivable from the repo alone),
 | Control | Status | Mechanism |
 |---|---|---|
 | Every first-party image is built, scanned (Trivy, HIGH/CRITICAL blocking) and SBOM'd in CI | `enforced-in-ci` | `.github/workflows/build-publish.yml` (ADR-0115) |
-| Every first-party image is keyless-signed and the build inventory is reconciled against the real Dockerfile set | `enforced-in-ci` | `build-publish.yml`'s cosign step; `platform/supply-chain/check_build_matrix.py` (ADR-0324) |
+| The build inventory is reconciled against the real Dockerfile set | `enforced-in-ci` | `platform/supply-chain/check_build_matrix.py` (ADR-0324) |
+| Every first-party image is signed with an in-cluster Vault Transit key (not keyless GitHub OIDC - ADR-0420 superseded that mechanism 2026-08-22) and verified before trusted deployment | `enforced-in-cluster` | `ansible/tasks/run_image_signing_job.yml` signs every image on an explicit build; `make d2 check supply-chain` (`ansible/roles/supply_chain`, `platform/supply-chain/verify_signatures.py`) verifies all 14 live-verified 2026-08-22 |
 | Deployable chart image tags are immutable (no `latest`) | `gap` (checker exists, non-blocking) | `platform/supply-chain/check_no_latest_tags.py`, `continue-on-error: true` in `lint.yml` until WP-04 stage 3 |
-| First-party image signatures are verified before trusted deployment | `gap` (checker exists, nothing to verify yet) | `platform/supply-chain/verify_signatures.py` - see ADR-0115's Implementation state for the exact blocker (gap 7: no real release has run yet) |
-| OKF agent bundles are signed and schema/policy-validated | `enforced-in-ci` (schema/policy); `gap` (signature - no real signed bundle yet) | `platform/supply-chain/sign_okf_bundle.py`, `validate_okf_bundle.py` (ADR-0106) |
+| OKF agent bundles are signed and schema/policy-validated | `enforced-in-cluster` (signature, `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live 2026-08-22 - ADR-0420/WP-069); `enforced-in-ci` (schema/policy) | `platform/supply-chain/sign_okf_bundle.py`, `validate_okf_bundle.py` (ADR-0106/ADR-0420) |
 
 ## Identity
 

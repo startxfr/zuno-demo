@@ -1,0 +1,151 @@
+---
+# ADR-0420/WP-070: verifies every first-party image's signature against
+# the committed Vault Transit public key (make d2 check supply-chain).
+# Same "resolve outside, verify inside" split as run_image_signing_job.yml:
+# ansible resolves refs+digests here (needs cluster API access only, which
+# it already has - confirmed `oc get istag` works from outside the
+# cluster), a Job does the actual cosign verify (needs registry network,
+# which only a pod has - confirmed the registry pull does NOT work from
+# outside the cluster).
+- name: "supply-chain-check | scan and resolve every first-party image's live digest"
+  ansible.builtin.command:
+    cmd: python3 platform/supply-chain/verify_signatures.py --list-refs
+    chdir: "{{ zuno_repo_root }}"
+  register: _supply_chain_refs
+  changed_when: false
+
+- name: "supply-chain-check | parse the resolved/unresolved ref lists"
+  ansible.builtin.set_fact:
+    _supply_chain_refs_parsed: "{{ _supply_chain_refs.stdout | from_json }}"
+
+# Mirrored third-party images (vault, bitnami-kubectl - matched by
+# registry-hostname prefix alone but never built by this pipeline) and
+# never-built components (rag-ingestion's images.compiler) are already
+# excluded upstream by _has_build_config() - so anything landing in
+# "unresolved" here is a genuinely first-party image (a real BuildConfig
+# exists) with no resolvable ImageStreamTag, a real gap worth failing on.
+- name: "supply-chain-check | fail if any first-party image has no resolvable ImageStreamTag"
+  ansible.builtin.fail:
+    msg: >-
+      The following first-party image(s) have a BuildConfig but no
+      resolvable ImageStreamTag: {{ _supply_chain_refs_parsed.unresolved }}
+  when: (_supply_chain_refs_parsed.unresolved | default([]) | length) > 0
+
+- name: "supply-chain-check | write the resolved refs into a ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: supply-chain-check-refs
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        refs.json: "{{ _supply_chain_refs_parsed.resolved | to_json }}"
+
+- name: "supply-chain-check | delete any previous verify Job (idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: supply-chain-verify-images
+    namespace: zuno-ai-build
+    wait: true
+
+- name: "supply-chain-check | run the image-verification Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: supply-chain-verify-images
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 2
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: "false"
+          spec:
+            restartPolicy: Never
+            serviceAccountName: zuno-signer
+            priorityClassName: zuno-platform-weak
+            containers:
+              - name: verify
+                image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer:latest"
+                args:
+                  - verify-images
+                  - --refs-file
+                  - /work/refs.json
+                # Same TLS-trust fix as run_image_signing_job.yml, for the
+                # same reason: the internal registry serves a cert issued
+                # by the cluster's own service-serving CA.
+                env:
+                  - name: SSL_CERT_FILE
+                    value: /etc/ssl/openshift-service-ca/service-ca.crt
+                volumeMounts:
+                  - name: openshift-service-ca
+                    mountPath: /etc/ssl/openshift-service-ca
+                    readOnly: true
+                  - name: refs
+                    mountPath: /work
+                    readOnly: true
+            volumes:
+              - name: openshift-service-ca
+                configMap:
+                  name: openshift-service-ca.crt
+              - name: refs
+                configMap:
+                  name: supply-chain-check-refs
+
+- name: "supply-chain-check | wait for the verify Job to reach a terminal state"
+  # Checks status.conditions (type Complete/Failed), not raw succeeded/
+  # failed pod counters - the same backoffLimit-retry race
+  # run_image_signing_job.yml already had to fix (a single failed pod
+  # attempt doesn't mean the Job is done).
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-build
+    name: supply-chain-verify-images
+  register: _supply_chain_verify_job
+  until: >-
+    (_supply_chain_verify_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_supply_chain_verify_job.resources[0].status.conditions | default([])
+      | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
+  retries: 20
+  delay: 10
+
+- name: "supply-chain-check | fetch the verify Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-build
+    label_selectors:
+      - "job-name=supply-chain-verify-images"
+  register: _supply_chain_verify_pod
+
+- name: "supply-chain-check | print the verify Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-build
+    name: "{{ _supply_chain_verify_pod.resources[0].metadata.name }}"
+    container: verify
+  register: _supply_chain_verify_log
+  when: (_supply_chain_verify_pod.resources | default([]) | length) > 0
+
+- name: "supply-chain-check | show the verify Job's output"
+  ansible.builtin.debug:
+    msg: "{{ _supply_chain_verify_log.log_lines | default(['no pod/log found']) }}"
+
+- name: "supply-chain-check | fail if the verify Job did not succeed"
+  ansible.builtin.fail:
+    msg: >-
+      supply-chain-verify-images Job did not succeed (succeeded=
+      {{ _supply_chain_verify_job.resources[0].status.succeeded | default(0) }}
+      failed={{ _supply_chain_verify_job.resources[0].status.failed | default(0) }}) -
+      see the output above.
+  when: (_supply_chain_verify_job.resources[0].status.succeeded | default(0)) == 0

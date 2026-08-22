@@ -37,6 +37,9 @@ repository's real state - see `platform/supply-chain/README.md`), but the
 workflow orchestration itself remains unverified.
 
 See `RELEASING.md` for how a real release (a `v*` tag, triggering
-`build-publish.yml`'s signed/SBOM'd/immutable-tagged publish path) is
-meant to work, and why `gitops/apps/*/application.yaml`'s
-`targetRevision: main` hasn't been rewritten to point at a tag yet.
+`build-publish.yml`'s SBOM'd/immutable-tagged publish path) is meant to
+work, and why `gitops/apps/*/application.yaml`'s `targetRevision: main`
+hasn't been rewritten to point at a tag yet. Signing itself no longer
+happens in this workflow at all - ADR-0420 moved it in-cluster (Vault
+Transit), since a GitHub-hosted runner has no route to sign against it;
+see `platform/supply-chain/README.md`.

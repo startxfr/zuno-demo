@@ -52,9 +52,9 @@ maintainer decision, not something to fabricate a tag for.
 1. Ensure `main` is at the commit you want to release.
 2. `git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`.
 3. `.github/workflows/build-publish.yml` triggers on the tag push:
-   builds, scans, SBOMs and signs every component image, publishing each
-   as both `quay.io/zuno/<component>:sha-<commit>` (always) and
-   `quay.io/zuno/<component>:v0.1.0` (only for a tag push).
+   builds, scans and SBOMs every component image (no longer signs - see
+   step 5), publishing each as both `quay.io/zuno/<component>:sha-<commit>`
+   (always) and `quay.io/zuno/<component>:v0.1.0` (only for a tag push).
 4. Bump each `gitops/charts/*/values.yaml`'s `image.tag` (and
    `.repository`, if also moving off the in-cluster registry) to
    `v0.1.0` in a follow-up commit/PR. Do this with
@@ -70,11 +70,18 @@ maintainer decision, not something to fabricate a tag for.
    `quay.io/...` is still a manual, reviewed edit per chart.
    `check_no_latest_tags.py` (wired into `.github/workflows/lint.yml`)
    starts passing once every chart's `tag: latest` is replaced this way.
-5. Run `platform/supply-chain/verify_signatures.py` to confirm each
-   pinned image verifies against the expected `build-publish.yml`
-   keyless GitHub OIDC identity before treating the release as trusted —
-   a meaningful check only once step 4 has replaced at least one
-   `latest` tag (see the script's own docstring).
+5. **Signing note (ADR-0420, 2026-08-22):** `build-publish.yml` no longer
+   signs anything — signing moved fully in-cluster (Vault Transit), since
+   a GitHub-hosted runner has no route to sign against it. Images
+   published to `quay.io/zuno/*` by this release flow are therefore
+   *not* signed. `platform/supply-chain/verify_signatures.py` only
+   verifies the in-cluster `image-registry...svc:5000/zuno-ai-build/*`
+   images every chart actually deploys today (`make d2 check
+   supply-chain`, or `python3 platform/supply-chain/verify_signatures.py`
+   from inside the cluster — it needs registry network access a release
+   PR's CI run doesn't have) — it has no bearing on this Quay path at
+   all. Signing the Quay-published path too is a distinct, not-yet-done
+   follow-up (see ADR-0420's Future work).
 6. Bump `gitops/apps/*/application.yaml`'s `targetRevision: main` to
    `targetRevision: v0.1.0` in the same PR — this is the point
    ADR-0115's "production-like Argo CD applications must deploy a

@@ -26,9 +26,20 @@ CI lint step.
 Run from the repository root, logged in to the target cluster (`oc login`):
 
     python3 platform/supply-chain/verify_signatures.py
+
+`--list-refs` prints the scanned/resolved refs as JSON instead of
+verifying them (no `cosign` needed) - ADR-0420/WP-070's `make d2 check
+supply-chain` gate uses this from the ansible controller (which has
+cluster API access but, unlike a pod, no route to the internal registry
+for the actual `cosign verify` pull) to hand a resolved ref list to an
+in-cluster Job that does the real verification:
+
+    python3 platform/supply-chain/verify_signatures.py --list-refs
 """
 from __future__ import annotations
 
+import argparse
+import json
 import pathlib
 import shutil
 import subprocess
@@ -64,15 +75,31 @@ class Finding:
 
 
 def _walk(node: Any, path: str, refs: List[ImageRef], file_label: str) -> None:
-    """Same shape-agnostic walk as check_no_latest_tags.py: any dict
-    carrying sibling `repository`/`tag` keys is a candidate image
-    reference, wherever it's nested (image.*, images.<x>.*, etc.)."""
+    """Same shape-agnostic walk as check_no_latest_tags.py, extended for a
+    second shape this repo actually uses: every per-agent chart (tekos,
+    comage, advantage, finage, arkos, naveo) shares one agent-bff/
+    agent-frontend build under `image: {registry, frontendRepository,
+    bffRepository, tag}` - separate `registry`/`*Repository` fields, not
+    one `repository` field - which the original `repository`/`tag`-only
+    match silently never saw at all (confirmed live: without this, the
+    scan finds 11 first-party images, not 13 - agent-bff/agent-frontend
+    invisible to every chart that deploys them)."""
     if isinstance(node, dict):
         repository = node.get("repository")
         tag = node.get("tag")
         if isinstance(repository, str) and isinstance(tag, str):
             if repository.startswith(FIRST_PARTY_REGISTRY_PREFIX) and tag not in IGNORED_TAG_VALUES:
                 refs.append(ImageRef(file_label, path, f"{repository}:{tag}"))
+
+        registry = node.get("registry")
+        if isinstance(registry, str) and isinstance(tag, str) and tag not in IGNORED_TAG_VALUES:
+            for repo_key in ("frontendRepository", "bffRepository"):
+                repo_suffix = node.get(repo_key)
+                if isinstance(repo_suffix, str):
+                    full_repository = f"{registry}/{repo_suffix}"
+                    if full_repository.startswith(FIRST_PARTY_REGISTRY_PREFIX):
+                        refs.append(ImageRef(file_label, f"{path}.{repo_key}", f"{full_repository}:{tag}"))
+
         for key, value in node.items():
             _walk(value, f"{path}.{key}" if path else str(key), refs, file_label)
     elif isinstance(node, list):
@@ -80,12 +107,44 @@ def _walk(node: Any, path: str, refs: List[ImageRef], file_label: str) -> None:
             _walk(item, f"{path}[{i}]", refs, file_label)
 
 
+def _has_build_config(name: str) -> bool:
+    """True iff zuno-ai-build has a BuildConfig named `name` - the actual
+    distinguishing signal between a genuinely first-party image (built by
+    an ansible/roles/*_build role) and a third-party image ansible/roles/
+    image_mirrors happens to mirror into the SAME registry/namespace
+    (e.g. vault, bitnami-kubectl - matched by FIRST_PARTY_REGISTRY_PREFIX
+    on hostname alone, but never built or signed by this pipeline). Not
+    every mirrored image collides with a first-party name, but any that do
+    would otherwise be reported as an unsigned "first-party" image
+    forever, a false positive this check must not raise."""
+    oc_bin = shutil.which("oc")
+    if oc_bin is None:
+        return False
+    result = subprocess.run(
+        [oc_bin, "get", "buildconfig", name, "-n", BUILD_NAMESPACE, "-o", "name"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    return result.returncode == 0
+
+
 def _collect_first_party_refs() -> List[ImageRef]:
+    """Deduplicates by `.image` (repository:tag) - agent-bff/agent-frontend
+    are each declared identically in every per-agent chart (tekos, comage,
+    advantage, finage, arkos, naveo all share the one build), so a naive
+    walk would report - and re-verify - the same underlying image once per
+    chart. The first chart alphabetically wins the `file`/`path` label."""
     refs: List[ImageRef] = []
     for values_path in sorted((REPO_ROOT / "gitops" / "charts").glob("*/values.yaml")):
         doc = yaml.safe_load(values_path.read_text()) or {}
         _walk(doc, "", refs, str(values_path.relative_to(REPO_ROOT)))
-    return refs
+
+    deduped: dict = {}
+    for ref in refs:
+        deduped.setdefault(ref.image, ref)
+
+    return [ref for ref in deduped.values() if _has_build_config(ref.image.rsplit("/", 1)[-1].rsplit(":", 1)[0])]
 
 
 def _cosign_path() -> Optional[str]:
@@ -114,6 +173,40 @@ def _resolve_live_digest(image: str) -> str:
         detail = (result.stderr or result.stdout or "no output").strip()
         raise RuntimeError(f"could not resolve ImageStreamTag {istag} in {BUILD_NAMESPACE}: {detail}")
     return digest
+
+
+def _resolve_ref_dict(ref: "ImageRef") -> dict:
+    """name/repository/digest triple for --list-refs JSON output - the
+    exact shape ansible/tasks/verify_image_signatures.yml hands to the
+    in-cluster verify Job. Raises RuntimeError (via _resolve_live_digest)
+    on failure; the caller decides how to report that."""
+    repository = ref.image.rsplit(":", 1)[0]
+    name = repository.rsplit("/", 1)[-1]
+    digest = _resolve_live_digest(ref.image)
+    return {"name": name, "repository": repository, "digest": digest}
+
+
+def list_refs() -> int:
+    """Prints `{"resolved": [...], "unresolved": [...]}`. A ref that can't
+    resolve to a live ImageStreamTag (no BuildConfig ever produced one -
+    e.g. rag-ingestion's images.compiler, a documented pre-existing gap
+    unrelated to signing, same one check_no_latest_tags.py's own docstring
+    already calls out) is reported separately, not treated as a script
+    failure - there is nothing to sign or verify for an image that was
+    never built. Always exits 0: this is a listing operation, not the
+    verification itself - the caller (ansible/tasks/
+    verify_image_signatures.yml) decides what to do with each list."""
+    refs = _collect_first_party_refs()
+    resolved = []
+    unresolved = []
+    for ref in refs:
+        try:
+            resolved.append(_resolve_ref_dict(ref))
+        except RuntimeError as exc:
+            unresolved.append({"image": ref.image, "error": str(exc)})
+
+    print(json.dumps({"resolved": resolved, "unresolved": unresolved}, indent=2))
+    return 0
 
 
 def _verify_one(cosign_bin: str, public_key: pathlib.Path, ref: "ImageRef") -> Optional[str]:
@@ -157,6 +250,17 @@ def _verify_one(cosign_bin: str, public_key: pathlib.Path, ref: "ImageRef") -> O
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--list-refs",
+        action="store_true",
+        help="print scanned/resolved refs as JSON instead of verifying them (no cosign needed)",
+    )
+    args = parser.parse_args()
+
+    if args.list_refs:
+        return list_refs()
+
     refs = _collect_first_party_refs()
 
     print(

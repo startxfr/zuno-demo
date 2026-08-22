@@ -32,8 +32,10 @@ DAY1_VERBS := check install build uninstall all reinstall
 # tier). "build" only knows how to build the 5 named image groups (mcp,
 # rag, rag-ingestion, agent, mlops - see
 # ansible/roles/{mcp,rag,rag_ingestion,agent,mlops}_build); "check"/
-# "install" operate on the 9 deployable components.
-DAY2_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp agents mlops
+# "install" operate on the 9 deployable components, plus "supply-chain"
+# (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
+# only a signature-verification gate (ansible/roles/supply_chain).
+DAY2_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp agents mlops supply-chain
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
 DAY2_VERBS := check install build uninstall all reinstall
 
