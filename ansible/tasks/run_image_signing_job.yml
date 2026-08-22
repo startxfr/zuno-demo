@@ -90,7 +90,12 @@
                 configMap:
                   name: openshift-service-ca.crt
 
-- name: "image-signing | wait for the signing Job to complete"
+- name: "image-signing | wait for the signing Job to reach a terminal state"
+  # Checks status.conditions (type Complete/Failed), not raw succeeded/
+  # failed pod counters - backoffLimit means a single failed pod attempt
+  # doesn't mean the Job is done (it retries), so waiting on
+  # "failed > 0" alone reports a false failure mid-retry, before the Job's
+  # eventual real success.
   kubernetes.core.k8s_info:
     api_version: batch/v1
     kind: Job
@@ -99,7 +104,8 @@
   register: _image_signing_job
   until: >-
     (_image_signing_job.resources[0].status.succeeded | default(0)) > 0 or
-    (_image_signing_job.resources[0].status.failed | default(0)) > 0
+    (_image_signing_job.resources[0].status.conditions | default([])
+      | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
   retries: 20
   delay: 10
 
