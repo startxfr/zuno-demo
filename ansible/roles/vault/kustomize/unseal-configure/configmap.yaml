@@ -165,3 +165,47 @@ data:
       ttl=1h
 
     echo "istio-issuer role configured."
+
+    # ADR-0420/WP-068: Transit secrets engine backing in-cluster supply-chain
+    # signing (replaces GitHub-OIDC/Fulcio/Rekor keyless cosign - see the
+    # ADR for the full rationale). A single non-exportable ECDSA key signs
+    # server-side via cosign's native hashivault:// KMS mode; verifiers only
+    # ever need the exported public key (platform/supply-chain/keys/
+    # zuno-platform-signer.pub), never Vault access - smaller blast radius
+    # than the PKI engine above, whose pki/issue would hand back a private
+    # key that would then need to live in a Secret.
+    enable_if_new "Transit secrets engine at transit/" vault secrets enable -path=transit transit
+
+    if ! vault read transit/keys/zuno-platform-signer >/dev/null 2>&1; then
+      vault write -f transit/keys/zuno-platform-signer type=ecdsa-p256 >/dev/null
+      echo "Transit key zuno-platform-signer: generated"
+    else
+      echo "Transit key zuno-platform-signer: already generated"
+    fi
+
+    # exportable=false/allow_plaintext_backup=false are Transit's own
+    # defaults, but set explicitly here so this key's non-exportability is a
+    # readable fact in this script, not an assumption about Vault's defaults.
+    vault write transit/keys/zuno-platform-signer/config \
+      exportable=false \
+      allow_plaintext_backup=false
+
+    printf 'path "transit/sign/zuno-platform-signer" {\n  capabilities = ["update"]\n}\npath "transit/keys/zuno-platform-signer" {\n  capabilities = ["read"]\n}\n' | vault policy write platform-signer -
+
+    # bound to the zuno-signer ServiceAccount in zuno-ai-build
+    # (ansible/roles/supply_chain_signer_build creates it) - the in-cluster
+    # signing Job/debug pod authenticates as this identity, never as a
+    # human or a GitHub Actions runner.
+    vault write auth/kubernetes/role/platform-signer \
+      bound_service_account_names=zuno-signer \
+      bound_service_account_namespaces=zuno-ai-build \
+      policies=platform-signer \
+      ttl=1h
+
+    echo "Transit engine and platform-signer role configured."
+
+    # In-cluster substitute for the Rekor transparency log this replaces:
+    # every transit/sign call is now an audited event instead of a public
+    # append-only log entry. Safe to re-run - "already enabled" is expected
+    # from the second run onward.
+    enable_if_new "File audit device (stdout)" vault audit enable file file_path=stdout

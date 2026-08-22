@@ -1,7 +1,8 @@
 ---
 # Day 1 build (`make day1 build`). Builds component images via OpenShift
 # BuildConfig/ImageStream; ai-gateway is included too since a fresh cluster
-# has no CI-published image otherwise.
+# has no CI-published image otherwise. supply-chain-signer (ADR-0420/WP-068)
+# is the same shape - no run component, image only.
 - name: "Day 1: build component images"
   hosts: localhost
   gather_facts: false
@@ -14,6 +15,7 @@
     day1_verb: build
     day1_build_components:
       - ai_gateway_build
+      - supply_chain_signer_build
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

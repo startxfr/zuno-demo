@@ -1,0 +1,23 @@
+---
+# Builds the supply-chain-signer image (ADR-0420/WP-068). Without this,
+# there is no in-cluster identity that can authenticate to Vault's
+# platform-signer role - the ServiceAccount here is exactly what
+# ansible/roles/vault's Transit block binds that role to.
+- name: "supply_chain_signer_build | create the zuno-signer ServiceAccount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: zuno-signer
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+
+- name: "supply_chain_signer_build | build supply-chain-signer"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: supply-chain-signer
+    build_dockerfile_path: components/supply-chain-signer/Dockerfile
+    build_context_dir: "."

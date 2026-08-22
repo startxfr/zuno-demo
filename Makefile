@@ -15,10 +15,11 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # Kueue, OpenShift AI, etc.) plus aiagent-operator, which runs last -
 # standard operator-before-CR ordering, since Day 2's "agents" component
 # creates the AIAgent CRs it reconciles. No build/run split beyond
-# ai-gateway (the only image built here - see
-# ansible/roles/ai_gateway_build).
+# ai-gateway (see ansible/roles/ai_gateway_build) and supply-chain-signer
+# (ADR-0420/WP-068, see ansible/roles/supply_chain_signer_build) - neither
+# has a matching run component, both are build-only images.
 DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak connectivity-link lws jobset kueue openshift-ai aiagent-operator
-DAY1_BUILD_COMPONENTS := ai-gateway
+DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer
 DAY1_VERBS := check install build uninstall all reinstall
 
 # Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
