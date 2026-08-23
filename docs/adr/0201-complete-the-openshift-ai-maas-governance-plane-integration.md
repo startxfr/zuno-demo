@@ -1,6 +1,45 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the authenticated end-to-end request 500s on a root-caused, RHOAI/KServe-owned Istio sidecar filter-chain mismatch on the Inference Extension endpoint-picker port - external to this repo, not a NetworkPolicy or Kuadrant issue; see 2026-08-23 notes, most recent first)
+- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the endpoint-picker TLS filter-chain mismatch is fixed and verified live - the authenticated request now clears it and reaches the gateway's Kuadrant `AuthPolicy` enforcement, where it 500s on WP-54/ADR-0511's already-documented, already-escalated Kuadrant wasm-shim defect - not resolvable from this repo, staying blocked on that same upstream fix; see 2026-08-23 notes, most recent first)
+
+## Implementation note (2026-08-23, part 4) — EPP fix verified live: the TLS reset is gone, the request now hits WP-54's already-known Kuadrant wasm-shim defect
+
+Applied part 3's proposed fix: `spec.router.scheduler.annotations:
+{traffic.sidecar.istio.io/excludeInboundPorts: "9002"}` on the `gpt-oss-20b`
+`LLMInferenceService` (`gitops/charts/models/templates/
+llminferenceservice-gptoss.yaml`, our own resource, no RHOAI ownerReference
+- commit `ae7ead4`). ArgoCD synced it; the new scheduler pod carries
+`traffic.sidecar.istio.io/excludeInboundPorts: "9002,15020"` (Istio merged
+our value with its own default 15020 health-check exclusion, confirmed via
+`oc get pod ... -o jsonpath='{.metadata.annotations}'`).
+
+Re-issued the same authenticated test request. **The TLS reset is gone -**
+the gateway's log for that request window shows no `ext_proc`/
+`Connection_reset_by_peer` line at all, at any log level. The request now
+reaches further into the filter chain and fails differently:
+
+```
+error envoy wasm ... wasm log kuadrant-wasm-shim kuadrant_wasm_shim:
+  gRPC status code is not OK
+```
+
+This is not a new mystery - it is **exactly** the defect WP-54/ADR-0511's
+2026-08-21 note already root-caused and escalated: Kuadrant's wasm-shim
+dispatches the `AuthPolicy` ext_authz `Check` call to Authorino and gets a
+non-OK gRPC status back near-instantly, independently proven (in that
+investigation) to be a fault in the `kuadrant-operator-wasm` binary itself,
+not Authorino, not our `AuthPolicy`/`RateLimitPolicy` config - see that
+ADR's note for the full raw-gRPC-vs-wasm-shim comparison that proved it.
+Both `maas-default-gateway` and `zuno-agent-gateway` (WP-54's own target)
+sit behind the same Kuadrant/Connectivity-Link installation, so this is the
+same upstream defect blocking two independent features, not two bugs.
+
+**Net effect:** the port-9002 TLS mismatch (part 3) was a real, now-fixed
+blocker. With it gone, ADR-0201's authenticated-request path is blocked on
+exactly one thing: WP-54's already-flagged Kuadrant wasm-shim defect,
+already recorded there as "not fixable from this repo - flagging for
+upstream Red Hat Connectivity Link." WP-27 now shares that same wait
+rather than carrying an unresolved mystery of its own.
 
 ## Implementation note (2026-08-23, part 3) — root cause found: a self-inflicted RHOAI/KServe TLS filter-chain mismatch on the endpoint-picker port, not Kuadrant, not NetworkPolicy
 

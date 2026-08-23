@@ -45,6 +45,14 @@ available in-cluster):
   wasm-shim is the confirmed fault boundary, and a raw-gRPC-vs-wasm-shim
   comparison (as above) is the fastest way to re-confirm it after any
   Connectivity Link version bump.
+- **2026-08-23 update:** confirmed this is the *same* fault, not a similar
+  one — ADR-0201/WP-27's independent investigation (a genuinely different
+  bug, a port-9002 TLS filter-chain mismatch on the Inference Extension
+  endpoint-picker) was fixed and, once out of the way, the authenticated
+  MaaS request hit this exact wasm-shim symptom (`kuadrant-wasm-shim: gRPC
+  status code is not OK`) behind `maas-default-gateway`, not just
+  `zuno-agent-gateway`. This defect now blocks two independent features'
+  live acceptance, both waiting on the same upstream Connectivity Link fix.
 
 ## Context
 
