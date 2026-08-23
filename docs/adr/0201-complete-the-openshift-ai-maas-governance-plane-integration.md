@@ -1,8 +1,103 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the actual authenticated end-to-end request is still blocked - a NetworkPolicy allow-list gap was confirmed and fixed 2026-08-23 without resolving the request, so a second, still-unidentified blocking layer exists; see 2026-08-23 note)
+- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the authenticated end-to-end request 500s on a root-caused, RHOAI/KServe-owned Istio sidecar filter-chain mismatch on the Inference Extension endpoint-picker port - external to this repo, not a NetworkPolicy or Kuadrant issue; see 2026-08-23 notes, most recent first)
 
-## Implementation note (2026-08-23) — NetworkPolicy fix landed and verified, but did not resolve the 500; a second blocking layer exists
+## Implementation note (2026-08-23, part 3) — root cause found: a self-inflicted RHOAI/KServe TLS filter-chain mismatch on the endpoint-picker port, not Kuadrant, not NetworkPolicy
+
+Chased the wasm-shim thread from part 2 using the *live, merged* Envoy
+config (`pilot-agent request GET config_dump`) instead of reasoning from
+chart source, on both the gateway and the destination pod. This overturned
+the working theory twice in one pass:
+
+**The IPP payload-processing pipeline (part 2's suspect) never attaches to
+the live filter chain at all.** The gateway's 443 listener's actual HTTP
+filter list has exactly one `envoy.filters.http.ext_proc` (base
+`cluster_name: "dummy"`) - no `.ipp-pre`/`.ipp` named filters exist live.
+RHOAI's `payload-processing` EnvoyFilter tries to `INSERT_BEFORE`/`AFTER` a
+subfilter named `extensions.istio.io/wasmplugin/openshift-ingress.kuadrant-
+maas-default-gateway`, but Kuadrant's own `kuadrant-maas-default-gateway`
+EnvoyFilter inserts its wasm filter under the plain name
+`envoy.filters.http.wasm` (`oc get wasmplugin -A` is empty cluster-wide -
+Kuadrant authors raw EnvoyFilters directly, not the WasmPlugin CRD). The
+anchor never matches, so RHOAI's insertion silently no-ops. **MaaS's own
+governance/auth enforcement is not wired into live model requests at all**
+- a bigger, separate gap from the 500, recorded here for whoever picks up
+the auth-enforcement half of ADR-0201's acceptance bullets 2-3.
+
+**The call that actually 500s targets a different service entirely.** The
+base `dummy`-cluster ext_proc filter gets a real per-route override on
+every model-serving path (`typed_per_filter_config` on
+`v1-completions-model-routing` etc.): `grpc_service.envoy_grpc.cluster_name:
+outbound|9002||gpt-oss-20b-epp-service.zuno-ai-run.svc.cluster.local` - the
+Gateway API Inference Extension's endpoint-picker (EPP), not
+`payload-processing:9004`.
+
+**Root-caused with byte-level precision** via `pilot-agent request POST
+/logging?level=debug` on the gateway pod (same technique as the 2026-08-21
+Kuadrant note) plus one live test request:
+
+```
+connecting to 10.130.2.55:9002
+connection in progress
+connected                                          <- TCP succeeds
+remote address:10.130.2.55:9002,TLS_error:|2147483752:
+  system library:OPENSSL_internal:Connection reset by peer:TLS_error_end
+```
+
+TCP connects cleanly - ruling out NetworkPolicy, DNS and routing entirely
+(confirmed separately: no NetworkPolicy in `zuno-ai-run` selects the EPP
+pod at all, so it's unrestricted by default). The reset happens specifically
+during the TLS handshake, ~0.6ms after connect.
+
+Pulled the EPP pod's own sidecar config
+(`pilot-agent request GET config_dump` on *that* pod, not the gateway) to
+see why. Its `virtualInbound` listener has exactly two filter chains for
+`destination_port: 9002`:
+
+```
+{"destination_port": 9002, "transport_protocol": "tls",
+ "application_protocols": ["istio", "istio-peer-exchange",
+                            "istio-http/1.0", "istio-http/1.1", "istio-h2"]}
+{"destination_port": 9002, "transport_protocol": "raw_buffer"}
+```
+
+One matches only Istio-mesh mTLS (ALPN restricted to Istio's own protocol
+tokens), the other matches only plaintext. There is no generic/passthrough
+TLS chain for a plain external TLS client. But the auto-generated
+`DestinationRule` for this exact service
+(`gpt-oss-20b-kserve-scheduler`, owned by KServe's `LLMInferenceService`
+controller, confirmed via `ownerReferences` - not ours) sets
+`trafficPolicy.tls: {mode: SIMPLE, insecureSkipVerify: true}` - a plain,
+non-mesh TLS connection with standard ALPN (h2/http1.1), matching *neither*
+inbound filter chain. Envoy's documented behavior when no filter chain
+matches is to close the connection - exactly the observed reset. EPP's own
+app logs confirm it's healthy and listening (`secure-serving: true`,
+`cert-path: /var/run/kserve/tls`, `"gRPC server listening", "port":9002`,
+no errors) and the pod carries `traffic.sidecar.istio.io/
+includeInboundPorts: "*"` with no exclusion for 9002 - so the sidecar
+does intercept this port, and its own filter-chain set doesn't accept the
+exact connection mode its sibling `DestinationRule` tells every caller to
+use.
+
+**This is a genuine, self-inflicted configuration mismatch between two
+RHOAI/KServe-auto-generated resources** (the `DestinationRule`'s TLS mode
+vs. the sidecar-injection template's port-inclusion default for the EPP
+port) - the same class of finding as the wasm-shim defect (WP-54/
+ADR-0511) and the earlier NetworkPolicy gap, but a different, more
+precisely diagnosed layer. Not resolvable by editing anything in this
+repo's own gitops tree (neither resource is ours). Options for a future
+pass, not attempted: (a) check whether `LLMInferenceService.spec` exposes
+a knob to exclude port 9002 from sidecar interception
+(`oc explain llminferenceservice.spec --recursive`) - if so, a values
+override might be applicable without touching KServe's own templates; (b)
+file as an upstream RHOAI/KServe defect; (c) get explicit approval to patch
+the auto-generated `DestinationRule`'s TLS mode directly, understanding it
+may not stick if KServe's controller reconciles it back (untested).
+
+Logging level was reset to `warning` after capturing the trace - this was
+a live, in-memory-only diagnostic change, nothing persisted.
+
+## Implementation note (2026-08-23, part 2) — NetworkPolicy fix landed and verified, but did not resolve the 500; a second blocking layer exists
 
 Landed WP-27's proposed fix for the 2026-08-21 note's NetworkPolicy finding,
 additively rather than patching the RHOAI-owned policy (which the
