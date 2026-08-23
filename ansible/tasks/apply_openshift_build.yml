@@ -127,22 +127,29 @@
         triggers:
           - type: ConfigChange
 
-- name: "openshift-build | force a fresh Build (day1 verb: build)"
+- name: "openshift-build | force a fresh Build (day1/day2 verb: build)"
   # kubernetes.core.k8s has no support for BuildConfig's /instantiate
   # subresource, so `oc start-build` is a deliberate exception to this
   # role's kubernetes.core.k8s-only convention. Only runs on an explicit
-  # `make d1 build <component>` (day1_build.yml sets day1_verb: build) -
-  # never on install.yml's own "ensure this image exists" dependency
-  # path, which stays re-verify-only so a routine install never triggers
-  # a surprise rebuild. Without this, the BuildConfig's ConfigChange
-  # trigger never fires on a content-only git change (source.git.ref is
-  # a fixed branch name, not a SHA, so re-applying an unchanged spec is
-  # a no-op diff) and `build` would silently re-verify whichever Build
-  # happened to exist last, same as install does today.
+  # `make d1 build <component>` / `make d2 build <component>` (day1_build.yml
+  # sets day1_verb: build, day2_build.yml sets day2_verb: build - this task
+  # is shared by both tiers since ADR-0060 moved several build components
+  # from Day 1 to Day 2) - never on install.yml's own "ensure this image
+  # exists" dependency path, which stays re-verify-only so a routine
+  # install never triggers a surprise rebuild. Without this, the
+  # BuildConfig's ConfigChange trigger never fires on a content-only git
+  # change (source.git.ref is a fixed branch name, not a SHA, so
+  # re-applying an unchanged spec is a no-op diff) and `build` would
+  # silently re-verify whichever Build happened to exist last, same as
+  # install does today. (Caught live 2026-08-23: day2_build.yml only ever
+  # set day2_verb, so this check - checking day1_verb alone - always
+  # skipped under `make day2 build`, silently reusing a stale image.)
   ansible.builtin.command:
     cmd: "oc start-build {{ build_image_name }} -n zuno-ai-build --wait"
   changed_when: true
-  when: (day1_verb | default('install')) == 'build'
+  when: >-
+    (day1_verb | default('install')) == 'build' or
+    (day2_verb | default('install')) == 'build'
 
 - name: "openshift-build | re-read the BuildConfig to get its current lastVersion"
   kubernetes.core.k8s_info:

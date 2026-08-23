@@ -1,6 +1,6 @@
 # ADR-0120: Implement a multi-provider Git-forge MCP server for GitHub and GitLab
 
-- **Status:** Partially implemented - see `components/mcp-servers/git-forge/`. Server, bindings, policy, chart and protocol tests merged; all repo-provable acceptance criteria pass (protocol tests, bindings/policy coverage, chart lint, conformance/hardening checks). Live GitHub/GitLab Cloud verification and PAT provisioning are an operator follow-up (WP-058), same split ADR-0117 used for Confluence.
+- **Status:** Implemented - see `components/mcp-servers/git-forge/`, deployed as `zuno-mcp-git-forge-d0`/`-d1` in `zuno-ai-run`. PAT provisioning done (`zuno/github/technical`, `zuno/gitlab/technical`); `read_repository_content`/`list_repositories`/`read_private_repository_content`/`list_private_repositories`/`delete_repository` live-verified against real GitHub.com/GitLab.com for both providers (WP-058, 2026-08-23) - `write_file`/`create_repository`/`fork_repository` remain verified via `tests/test_mcp_protocol.py` only, not live (deliberately, to avoid creating real external repos/commits).
 - **Target:** v0.1
 - **Date:** 2026-08-19
 - **Decision owners:** Zuno Demo architecture team

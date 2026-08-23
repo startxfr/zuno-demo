@@ -1,7 +1,7 @@
 # WP-058: Git-forge MCP server (GitHub + GitLab)
 
-- **State:** Operator pending (repo work merged 2026-08-19)
-- **ADRs:** ADR-0120 (To be implemented -> Partially implemented)
+- **State:** Done (repo work merged 2026-08-19; operator deploy + live verification 2026-08-23)
+- **ADRs:** ADR-0120 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-057 (merged)
 - **Blocks:** none
 - **Estimated files touched:** ~20
@@ -111,18 +111,44 @@ Decision).
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Operator: create a GitHub fine-grained PAT (Contents read/write,
-   Administration write for `create_repository`; **no** `delete_repo`
-   scope) and store it at `zuno/github/technical` in Vault (or via
-   `ansible/confidential.yml` + `make day0 install vault`).
-2. Operator: create a GitLab PAT (`api` scope) for a Developer/Maintainer
-   account (**not** Owner) and store it (with `url` if self-managed) at
-   `zuno/gitlab/technical`.
-3. Operator: deploy and run `make d1 build mcp` then `make d1 install mcp`;
-   verify the six capabilities execute against real GitHub/GitLab Cloud -
-   discharges the live-verification acceptance bullet.
-4. Operator: run one end-to-end chain per provider (public read, private
-   read, write, create, fork, delete-refusal) and record trace evidence.
+1. ~~Operator: create a GitHub fine-grained PAT...~~ Done - `zuno/github/technical`
+   seeded from `ansible/confidential.yml` via `make day0 install vault`
+   (2026-08-23).
+2. ~~Operator: create a GitLab PAT...~~ Done - `zuno/gitlab/technical` seeded
+   the same way (`url` left at the `https://gitlab.com` default).
+3. Deploy: **`make day2 build mcp` then `make day2 install mcp`** (mcp
+   moved Day1→Day2 under ADR-0060, 2026-08-22 - this step's commands were
+   stale). Run 2026-08-23; `zuno-mcp-git-forge-d0`/`-d1` reached
+   Synced/Healthy in `zuno-ai-run`.
+4. Live verification run 2026-08-23, scope **read + delete-refusal only**
+   (write/create/fork deliberately excluded - would have created real
+   repos/commits on GitHub.com/GitLab.com under the technical account;
+   those three stay verified by `tests/test_mcp_protocol.py` only, not
+   live). Exercised directly against the git-forge MCP endpoint
+   (`http://git-forge-mcp.zuno-ai-run.svc:8000/mcp`) with the real MCP
+   SDK client and the gateway workload token, from inside the pod:
+   - `read_repository_content`/`list_repositories` - both providers, live,
+     pass (`octocat/Hello-World`, `octocat`'s repos; `gitlab-org/gitlab`,
+     `gitlab-org`'s repos).
+   - `read_private_repository_content`/`list_private_repositories` -
+     GitLab, live, pass; GitHub correctly refuses (ADR-0121 guard).
+   - `delete_repository` - both providers, live, correctly refuses with
+     manual instructions, never constructs a client.
+
+   This run caught and fixed two real, live-only bugs (neither visible to
+   the existing mocked test suite or to any prior repo-only check):
+   - `components/mcp-servers/git-forge/server.py`'s `_github_client()`
+     passed a `float` timeout to PyGithub 2.9.1's `Github(...)`, which
+     asserts `isinstance(timeout, int)` - every GitHub call failed at
+     construction time. Fixed with an `int()` cast; added
+     `test_github_client_constructs_without_mocking` (exercises the real,
+     unmocked factory) so a regression fails the test suite next time.
+   - `ansible/tasks/apply_openshift_build.yml`'s force-fresh-build task
+     only checked `day1_verb`, never `day2_verb` - `make day2 build
+     <component>` (used by `mcp`, `rag`, `rag-ingestion`, `agent`, `mlops`
+     since ADR-0060) silently never forced a real rebuild, always
+     re-verifying whatever Build already existed. Fixed by checking both
+     verbs, matching the pattern the signing step below it already used.
 
 ## Status updates (then re-run check_docs.py)
 
@@ -130,9 +156,10 @@ Decision).
   `Partially implemented` in this change; `docs/adr/README.md` ADR-0120
   row → already `Partially implemented`; this file's State line → already
   `Operator pending`.
-- After operator steps: ADR-0120 → `Implemented - see \`components/mcp-servers/git-forge/\`.`;
-  index row → `Implemented`; tracker row → `Done`; this file's State line
-  → `Done`; `MEMORY.md` dated bullet.
+- After operator steps (done 2026-08-23): ADR-0120 →
+  `Implemented - see \`components/mcp-servers/git-forge/\`.` (noting
+  write/create/fork are protocol-test-verified only, not live); index row
+  → `Implemented`; tracker row → `Done`; this file's State line → `Done`.
 
 ## Out of scope / deferred
 
