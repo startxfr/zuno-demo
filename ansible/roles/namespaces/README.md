@@ -2,7 +2,7 @@
 
 Applies the namespace-scaffolding GitOps Applications (`gitops/apps/namespaces`
 → `gitops/charts/namespaces`): the
-`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-platform`/`zuno-ai-run`/`zuno-ai-build`
+`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-platform`/`zuno-ai-run`/`zuno-ai-build`/`zuno-mlops`
 platform namespaces (`-d0`), each with a `ResourceQuota` and a default-deny
 `NetworkPolicy` baseline (`-d1`). Agent workloads no longer get their own
 namespace - every active agent's FE/BFF deploys into the shared
@@ -30,6 +30,11 @@ special-cased `tasks_from`:
   checks one Application's (`zuno-namespaces-d0` / `zuno-namespaces-d1`)
   Synced+Healthy status and records a line in the shared `/tmp` state
   report (see `ansible/playbooks/day0_check.yml` / `day1_check.yml`).
+  `precheck.yml` additionally validates ADR-0333's required namespace
+  topology directly against the cluster (`kind: Namespace`, `status.phase:
+  Active`) for both the Zuno-managed namespaces this role creates and the
+  product-managed namespaces (`redhat-ods-*`, `openshift-ingress*`) it
+  doesn't - existence/health only, not workload placement.
 - `install.yml` / `install_d1.yml` - applies one GitOps Application each
   (idempotent; re-running gives an explicit on-demand re-sync after a
   `values.yaml` change).

@@ -1,6 +1,6 @@
 # ADR-0333: Separate product-managed AI infrastructure from Zuno build, run, and shared platform namespaces
 
-- **Status:** To be implemented
+- **Status:** Implemented
 - **Target:** v0
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team
@@ -130,18 +130,20 @@ More specifically:
                |                              |
                v                              v
 +-----------------------------+   +----------------------------+
-| zuno-ai-build               |   | zuno-ai-run                |
+| zuno-ai-build / zuno-mlops  |   | zuno-ai-run                |
 |                              |   |                            |
 | Workbenches                  |   | InferenceService           |
 | SparkApplication              |   | LLMInferenceService      |
 | Training jobs                  |   | vLLM / llm-d workloads |
 | Ray jobs                        |   | model-serving pods   |
 | Pipelines                        |   | inference GPU workloads |
-| LoRA / PEFT                       |   | runtime AI workloads |
+| LoRA / PEFT (zuno-mlops)           |   | runtime AI workloads |
 | RAG ingestion/indexing              |   |                    |
 | evaluations                          |   |                    |
 +-----------------------------+   +----------------------------+
 ```
+
+`zuno-mlops` is a second build-plane namespace, split from `zuno-ai-build` to avoid an Argo Workflow-controller Lease collision (see "`zuno-mlops` as a second build-plane namespace" above). The decision algorithm below treats any "Build-specific" outcome as resolving to a build-plane namespace (`zuno-ai-build` or `zuno-mlops`), not necessarily `zuno-ai-build` alone.
 
 ## Red Hat OpenShift AI namespaces
 
@@ -199,6 +201,8 @@ Examples include:
 
 The existence of `zuno-ai-platform` does not imply that every shared product component must be relocated there.
 
+As of this ADR, `zuno-ai-platform` is empty in the deployed cluster (RHOAI operands were removed per ADR-0331). Existing shared runtime services — `mcp-gateway`, `mcp-sales-db`, `ai-gateway`, `agent-runtime`, `tekos` — remain in `zuno-ai-run`. This is an accepted gap, not a violation: the "Resources preferred in zuno-ai-platform" section below uses SHOULD, not MUST, and relocating already-running shared services carries real risk (service DNS names, NetworkPolicies, mesh trust boundaries, ArgoCD application destinations). `zuno-ai-platform` remains reserved for genuinely new shared services going forward; relocating existing ones is a candidate for a future, separately-scoped work package.
+
 The namespace rule is therefore:
 
 ```text
@@ -246,6 +250,12 @@ spec:
 
 The Operator/controller responsible for managing Model Registry remains in its RHOAI-managed namespace.
 
+#### Deployed exception: `rhoai-model-registries`
+
+The live deployment keeps `DataScienceCluster.spec.components.modelregistry.registriesNamespace: rhoai-model-registries` (`gitops/charts/openshift-ai/values.yaml`), not `zuno-ai-platform`. This is a documented exception under this ADR's own rule that exceptions must be recorded in an existing or dedicated ADR.
+
+`rhoai-model-registries` is RHOAI's own true default registry namespace, distinct from `applicationsNamespace`. [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) already found that overriding RHOAI's default namespace configuration broke `trainer`, `ray`, `dashboard`, and `mlflowoperator` on RHOAI 3.5 EA2, and reverted OpenShift AI to its default namespaces. The same risk applies to relocating the Model Registry namespace. No migration to `zuno-ai-platform` is planned; `rhoai-model-registries` is the accepted, final placement.
+
 This illustrates the intended model:
 
 ```text
@@ -285,6 +295,12 @@ metadata:
 ```
 
 The Spark Operator itself remains in the namespace selected by OpenShift AI.
+
+#### `zuno-mlops` as a second build-plane namespace
+
+`zuno-mlops` (`gitops/charts/mlops/values.yaml`) hosts `mlops-dspa`, the LoRA/PEFT training pipeline ([ADR-0301](0301-introduce-lora-and-peft-model-customization.md), [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md)). It was split out of `zuno-ai-build` on 2026-08-21 because `rag-dspa` and `mlops-dspa` collided on a single unscoped Argo Workflow-controller Lease when sharing one namespace: whichever DataSciencePipelinesApplication lost leader election had its workflow runs silently never reconcile.
+
+`zuno-mlops` is an ADR-0333-blessed second BUILD-plane namespace, not a deviation from the three-namespace model. The namespace decision algorithm's "Build-specific?" branch resolves to a build-plane namespace (`zuno-ai-build` or `zuno-mlops`), with `zuno-mlops` reserved specifically for build workloads that need Argo Workflow-controller isolation from `zuno-ai-build`'s own controller. Folding `zuno-mlops` back into `zuno-ai-build` would resurrect the Lease collision and is not planned.
 
 ### AI runtime namespace
 
@@ -649,7 +665,8 @@ ADR-0333 is implemented when:
 - Gateway and Kuadrant resource placement follows the supported namespace requirements of the selected Gateway implementation;
 - no Operator-generated Deployment or Pod is duplicated into a Zuno namespace;
 - GitOps distinguishes Zuno-owned resources from Operator-generated resources;
-- Day 0 and Day 1 checks validate the namespace topology.
+- Day 0 and Day 1 checks validate the namespace topology;
+- Day 0 checks validate namespace existence for `redhat-ods-operator`, `redhat-ods-applications`, `openshift-ingress-operator`, `openshift-ingress`, `zuno-ai-platform`, `zuno-ai-build`, `zuno-ai-run`, `zuno-mlops`.
 
 ## Related ADRs
 
