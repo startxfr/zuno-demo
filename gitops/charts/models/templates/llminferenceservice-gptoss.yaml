@@ -68,5 +68,9 @@ spec:
     route: {}
     # scheduler: {} is not optional - the controller's own defaulting
     # always adds it to a gateway-enabled LLMInferenceService regardless
-    # of what this manifest sends.
-    scheduler: {}
+    # of what this manifest sends. annotations here land on the generated
+    # scheduler (EPP) pod - see values.yaml's schedulerAnnotations comment
+    # for why excludeInboundPorts is set (ADR-0201/WP-27).
+    scheduler:
+      annotations:
+        {{- toYaml .Values.gptOssModel.llmInferenceService.schedulerAnnotations | nindent 8 }}

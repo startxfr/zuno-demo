@@ -269,6 +269,21 @@ gptOssModel:
     # expects, same convention maas.yaml used for its own now-removed
     # qwen-specific credentials).
     serviceAccountName: gpt-oss-20b-s3
+    # ADR-0201/WP-27, 2026-08-23: the controller-generated scheduler (EPP)
+    # pod terminates its own TLS on port 9002 (KServe's cert-path flag),
+    # but its Istio sidecar's default inbound filter chains for that port
+    # only accept mesh-mTLS (Istio-flavored ALPN) or plaintext - neither
+    # matches the plain external TLS the auto-generated DestinationRule
+    # (mode: SIMPLE) sends, so every ext_proc call from maas-default-gateway
+    # resets mid-handshake (root-caused via live Envoy config dumps on both
+    # ends, see ADR-0201's dated note). Excluding the port from sidecar
+    # interception lets the plain TLS reach the app's own listener directly,
+    # matching Istio's documented pattern for workloads doing self-managed
+    # TLS on a specific port. Applied via spec.router.scheduler.annotations,
+    # a resource we own (no RHOAI ownerReference) - unlike the
+    # DestinationRule/sidecar defaults themselves.
+    schedulerAnnotations:
+      traffic.sidecar.istio.io/excludeInboundPorts: "9002"
   # cpu/memory sized like the old qwen-maas-backend's own mig-1g.24gb
   # workload (proven to fit alongside the other Card A co-resident
   # predictors on the g7e.4xlarge managed node), not the old workergpu
