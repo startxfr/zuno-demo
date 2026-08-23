@@ -65,6 +65,7 @@ call that needs them).
 """
 from __future__ import annotations
 
+import asyncio
 import hmac
 import os
 from contextlib import asynccontextmanager
@@ -474,10 +475,19 @@ async def list_repositories(provider: Provider, owner: str, owner_type: Literal[
     out, on either provider. For GitLab private/internal listings, use
     list_private_repositories instead (GitLab only)."""
     _require_provider(provider)
-    repos = (
-        _github_list_repos(owner, owner_type)
+    # asyncio.to_thread: _github_list_repos/_gitlab_list_repos are
+    # synchronous, blocking calls (PyGithub/python-gitlab both wrap
+    # `requests`) that page through the account's full repo list -
+    # potentially dozens of sequential HTTP round-trips for a large real
+    # org. Running that directly in this async def would block the whole
+    # single-worker event loop for the entire pagination, starving every
+    # other in-flight session (including health checks) - live-cluster-
+    # confirmed 2026-08-23: a large-org listing left the server returning
+    # 503 to a concurrent request for the rest of that window.
+    repos = await (
+        asyncio.to_thread(_github_list_repos, owner, owner_type)
         if provider == "github"
-        else _gitlab_list_repos(owner, owner_type, allow_private=False)
+        else asyncio.to_thread(_gitlab_list_repos, owner, owner_type, allow_private=False)
     )
     return {"owner": owner, "owner_type": owner_type, "repositories": repos, "count": len(repos)}
 
@@ -493,7 +503,9 @@ async def list_private_repositories(provider: Provider, owner: str, owner_type: 
             "list_private_repositories only supports provider='gitlab' "
             "- this server never grants private GitHub access (ADR-0121)"
         )
-    repos = _gitlab_list_repos(owner, owner_type, allow_private=True)
+    # See list_repositories's own comment for why this is offloaded to a
+    # thread rather than called directly.
+    repos = await asyncio.to_thread(_gitlab_list_repos, owner, owner_type, allow_private=True)
     return {"owner": owner, "owner_type": owner_type, "repositories": repos, "count": len(repos)}
 
 
