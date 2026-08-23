@@ -52,7 +52,7 @@ os.environ.setdefault("AGENT", "arkos")
 # importing evaluations/arkos/run_scenarios.py itself (whose own main()
 # entrypoint isn't what's needed here).
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, RUNTIME_URL, auth_headers  # noqa: E402
+from run_scenarios import AGENT, RUNTIME_URL, auth_headers, cleanup_created_runs, record_run_id  # noqa: E402
 
 PERSONA = "consultant-01"
 
@@ -112,6 +112,7 @@ def check_image_generation(case: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"img-{case}", "image_generation", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     images = body.get("images", [])
     ok = bool(images)
     return StressResult(
@@ -147,6 +148,14 @@ def main() -> int:
         "\nNOTE: this is an exploratory stress-test battery, not part of "
         "run_acceptance_gate.py / ADR-0053's mandatory gate."
     )
+
+    # Only reached for a standalone `python3 stress_test.py` invocation -
+    # see run_scenarios.py's own cleanup_created_runs()/main() comment for
+    # why the Job's real entrypoint (day2_stresstest.py) calls this once
+    # itself instead, after every layer has had a chance to contribute.
+    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        deleted, failed = cleanup_created_runs()
+        print(f"cleanup: {deleted} conversation(s) removed, {failed} failed")
 
     return 0 if total_passed == total else 1
 

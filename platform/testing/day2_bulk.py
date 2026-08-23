@@ -50,7 +50,14 @@ BULK_INTERACTIONS = int(os.getenv("BULK_INTERACTIONS", "0") or "0")
 BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
 PERSONA = os.getenv("STRESS_TEST_PERSONA", "consultant-01")
 
-SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+# .parent.resolve(), not .resolve().parent - same ConfigMap-symlink bug
+# and fix as platform/testing/day2_stresstest.py's own SCRIPT_DIR (see
+# that file's comment for the full explanation). Live-cluster-confirmed
+# 2026-08-23: this silently made _scenario_prompts() always return []
+# when run via the Job, which is why bulk_load's result was always the
+# "no message-bearing scenario content to replay" coverage fallback
+# rather than an actual replay of scenarios.yaml's prompts.
+SCRIPT_DIR = pathlib.Path(__file__).parent.resolve()
 
 
 def _scenario_prompts() -> List[str]:
@@ -86,6 +93,14 @@ def _auth_headers() -> Dict[str, str]:
     return run_scenarios.auth_headers(PERSONA)
 
 
+def _cleanup_created_runs() -> "tuple[int, int]":
+    # Imported lazily, same reasoning as _auth_headers() above - avoids a
+    # hard import-time dependency for callers that never invoke this.
+    import run_scenarios
+
+    return run_scenarios.cleanup_created_runs()
+
+
 def _percentile(sorted_values: List[float], pct: float) -> float:
     if not sorted_values:
         return 0.0
@@ -104,6 +119,8 @@ def run() -> List[Day2Result]:
             "no message-bearing scenario content to replay",
         )]
 
+    import run_scenarios
+
     headers = _auth_headers()
     latencies: List[float] = []
     errors = 0
@@ -117,7 +134,10 @@ def run() -> List[Day2Result]:
                 json={"session_id": f"day2-bulk-{AGENT}-{i}", "message": message},
                 timeout=30,
             )
-            ok = resp.status_code == 200 and bool(resp.json().get("reply"))
+            body = resp.json() if resp.status_code == 200 else {}
+            if resp.status_code == 200:
+                run_scenarios.record_run_id(PERSONA, body)
+            ok = resp.status_code == 200 and bool(body.get("reply"))
         except Exception:  # noqa: BLE001 - a call erroring counts as one failed interaction, not a crash
             ok = False
         latencies.append((time.monotonic() - start) * 1000)
@@ -137,6 +157,17 @@ def run() -> List[Day2Result]:
 def main() -> int:
     results = run()
     print(json.dumps([asdict(r) for r in results]))
+
+    # day2_bulk.py always runs as its own subprocess (see this file's own
+    # module docstring: "Run inside the same per-agent Job... [but] not a
+    # separate Job" refers to sharing the Job/container, not the process -
+    # the shell command invokes it as a second `python3` after
+    # day2_stresstest.py exits), so its own _CREATED_RUN_IDS is never
+    # shared with that other process - needs its own cleanup call.
+    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        deleted, failed = _cleanup_created_runs()
+        print(f"cleanup: {deleted} conversation(s) removed, {failed} failed", file=sys.stderr)
+
     return 0 if all(r.passed for r in results) else 1
 
 

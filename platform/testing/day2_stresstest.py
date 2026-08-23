@@ -162,6 +162,23 @@ def main() -> int:
     results += _safe_run("stress_test", _stress_test_results)
 
     print(json.dumps([asdict(r) for r in results]))
+
+    # This process (not day2_bulk.py, a separate subprocess with its own
+    # cleanup call - see that file's own main()) is where scenario,
+    # security and stress_test conversations all actually accumulate:
+    # run_scenarios/security_checks/stress_test are imported in-process
+    # above, each `from run_scenarios import ..., record_run_id`
+    # resolving to the SAME cached module object, so one call here covers
+    # every layer's created run_ids. Printed to stderr, not stdout - the
+    # Ansible task parses stdout lines matching `^\[.*\]$` as this
+    # process's one JSON-array result line, and a second matching line
+    # here would corrupt that.
+    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        import run_scenarios
+
+        deleted, failed = run_scenarios.cleanup_created_runs()
+        print(f"cleanup: {deleted} conversation(s) removed, {failed} failed", file=sys.stderr)
+
     return 0 if all(r.passed for r in results) else 1
 
 

@@ -82,7 +82,7 @@ os.environ.setdefault("AGENT", "comage")
 # evaluations/comage/run_scenarios.py inserts it onto sys.path the same
 # way; this file needs the same helpers so it does the same.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, RUNTIME_URL, auth_headers  # noqa: E402
+from run_scenarios import AGENT, RUNTIME_URL, auth_headers, cleanup_created_runs, record_run_id  # noqa: E402
 
 # The persona evaluations/comage/scenarios.yaml itself uses for live chat
 # scenarios (not consultant-01, which is Tekos/Arkos's).
@@ -128,6 +128,7 @@ def check_image_generation(case: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"img-{case}", "image_generation", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     images = body.get("images", [])
     ok = bool(images)
     return StressResult(
@@ -173,6 +174,7 @@ def check_sxa_visualization(case: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"sxa-{case}", "sxa_visualization_boundary", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     reply = body.get("reply", "")
     images = body.get("images", [])
     ok = bool(reply) and _no_fabricated_data_claim(reply)
@@ -212,6 +214,14 @@ def main() -> int:
         "\nNOTE: this is an exploratory stress-test battery, not part of "
         "run_acceptance_gate.py / ADR-0053's mandatory gate."
     )
+
+    # Only reached for a standalone `python3 stress_test.py` invocation -
+    # see run_scenarios.py's own cleanup_created_runs()/main() comment for
+    # why the Job's real entrypoint (day2_stresstest.py) calls this once
+    # itself instead, after every layer has had a chance to contribute.
+    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        deleted, failed = cleanup_created_runs()
+        print(f"cleanup: {deleted} conversation(s) removed, {failed} failed")
 
     return 0 if total_passed == total else 1
 

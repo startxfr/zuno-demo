@@ -27,7 +27,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import httpx
 import yaml
@@ -130,6 +130,61 @@ def get_token(persona: str) -> str:
 
 def auth_headers(persona: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {get_token(persona)}"}
+
+
+# --------------------------------------------------------------------------
+# Test-generated conversation cleanup. Every chat call below creates a
+# brand-new, permanently-persisted conversation (agent-runtime's
+# _resolve_run_id mints a fresh run_id whenever the caller doesn't already
+# have one to resume - there is no way to pre-tag a new conversation's
+# identity, and session_id is never written to any database column, only
+# carried into AgentState.session_id for tracing). Since these scripts
+# authenticate as real demo personas that are also used for live human
+# demos, an uncleaned run leaves synthetic conversations
+# ("Can you generate a mockup image...", etc.) sitting in that persona's
+# real conversation list.
+#
+# Rather than a heuristic sweep (by time window or persona, both of which
+# risk deleting a real demo's conversation happening concurrently), this
+# records the exact run_id every call creates and hard-deletes exactly
+# those at the end of the run via DELETE .../runs/{run_id}/hard-delete
+# (ADR-0515, already live - WP-066) - the same ownership check (owner_sub
+# must match the caller) that endpoint already enforces, so this can never
+# touch a conversation it didn't itself just create.
+# --------------------------------------------------------------------------
+
+_CREATED_RUN_IDS: List[Tuple[str, str]] = []  # (persona, run_id)
+
+
+def record_run_id(persona: str, body: Dict[str, Any]) -> None:
+    run_id = body.get("run_id")
+    if run_id:
+        _CREATED_RUN_IDS.append((persona, run_id))
+
+
+def cleanup_created_runs() -> Tuple[int, int]:
+    """Best-effort: a 404 (already gone) or any transport error is counted
+    as failed but never raised - cleanup must never fail an otherwise-
+    passing test run. Always targets RUNTIME_URL directly regardless of
+    whether the conversation was created via BFF_URL or RUNTIME_URL - the
+    backing conversations/checkpoint store is the same either way, and
+    hard-delete is agent-runtime's own endpoint."""
+    deleted = failed = 0
+    for persona, run_id in _CREATED_RUN_IDS:
+        try:
+            resp = httpx.delete(
+                f"{RUNTIME_URL}/v1/agents/{AGENT}/runs/{run_id}/hard-delete",
+                headers=auth_headers(persona),
+                timeout=15,
+            )
+            if resp.status_code in (200, 404):
+                deleted += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    _CREATED_RUN_IDS.clear()
+    return deleted, failed
 
 
 # ADR-0042: agent-frontend's `/` is a thin, always-200 HTML shell
@@ -300,6 +355,7 @@ def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
     if resp.status_code != 200:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(s["persona"], body)
     ok = bool(body.get("reply")) and isinstance(body.get("citations", []), list)
     detail = f"reply_len={len(body.get('reply', ''))} citations={len(body.get('citations', []))}"
 
@@ -326,6 +382,14 @@ def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
+    # Known, accepted gap in cleanup_created_runs()'s coverage: unlike
+    # chat_streaming_sse below, this deliberately breaks on the very first
+    # raw byte chunk to measure genuine first-byte latency - reading
+    # further (or switching to iter_lines()) to extract the "start"
+    # event's run_id would risk perturbing exactly the timing this
+    # scenario exists to measure. Leaves at most one uncleaned test
+    # conversation per run (this scenario, eval-9) rather than touch a
+    # latency-sensitive SLO check.
     start = time.monotonic()
     first_byte_at: Optional[float] = None
     try:
@@ -352,6 +416,10 @@ def chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
 
 def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
     saw_token, saw_done = False, False
+    # main.py's _stream_chat always yields event "start" (carrying run_id)
+    # first, before any "token"/"done" event - captured here purely for
+    # cleanup_created_runs(), never used for this scenario's own pass/fail.
+    expect_start_data = False
     try:
         with httpx.stream(
             "POST",
@@ -361,7 +429,15 @@ def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
             timeout=30,
         ) as resp:
             for line in resp.iter_lines():
-                if line.startswith("event: token"):
+                if expect_start_data and line.startswith("data:"):
+                    try:
+                        record_run_id(s["persona"], json.loads(line[len("data:"):].strip()))
+                    except Exception:
+                        pass
+                    expect_start_data = False
+                elif line.startswith("event: start"):
+                    expect_start_data = True
+                elif line.startswith("event: token"):
                     saw_token = True
                 elif line.startswith("event: done"):
                     saw_done = True
@@ -384,6 +460,7 @@ def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     if resp.status_code != 200:
         return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(s["persona"], body)
     # Citation.source is the raw result URL
     # (app/graph/nodes.py's respond_node: `item.get("url") or "live-read"`),
     # not a fixed marker string for the tool that produced it - Tekos's real
@@ -643,6 +720,19 @@ def main() -> int:
 
     threshold = 0.75
     print(f"\n{passed}/{total} passed ({rate:.0%}) - threshold {threshold:.0%} (ADR-0028)")
+
+    # Only reached for a standalone `python3 run_scenarios.py` invocation -
+    # when imported by platform/testing/day2_stresstest.py (the Job's real
+    # entrypoint), this main() never runs; that orchestrator calls
+    # cleanup_created_runs() itself once, after every layer (scenario,
+    # security, stress_test) has had a chance to add to the same shared
+    # _CREATED_RUN_IDS list.
+    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        deleted, failed = cleanup_created_runs()
+        print(f"cleanup: {deleted} conversation(s) removed, {failed} failed")
+    else:
+        print(f"cleanup: skipped (CLEANUP_TEST_DATA=0), {len(_CREATED_RUN_IDS)} conversation(s) left in place")
+
     if rate >= threshold:
         print("RESULT: PASS")
         return 0

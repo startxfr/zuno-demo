@@ -46,7 +46,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import yaml
 
-from run_scenarios import BFF_URL, RUNTIME_URL, auth_headers
+from run_scenarios import BFF_URL, RUNTIME_URL, auth_headers, cleanup_created_runs, record_run_id
 
 # Not part of run_scenarios.py's URL set (same reasoning as
 # security_checks.py's own copy of this constant: none of the 20 fixed
@@ -125,6 +125,7 @@ def check_technical_qa_domain(domain: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"qa-{domain}", "technical_qa", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     ok = bool(body.get("reply")) and len(body.get("citations", [])) > 0
     return StressResult(
         f"qa-{domain}", "technical_qa", message, ok,
@@ -167,6 +168,7 @@ def check_confluence_trigger(trigger: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"confluence-{trigger}", "confluence_live_read", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     # Citation.source is the raw result URL (app/graph/nodes.py's
     # respond_node: `item.get("url") or "live-read"`), not the literal
     # string "confluence" - this cluster's real instance is hosted at
@@ -207,7 +209,9 @@ def check_code_trigger(branch: str, message: str) -> StressResult:
     )
     if resp.status_code != 200:
         return StressResult(f"code-{branch}", "code_generation", message, False, f"status={resp.status_code}")
-    reply = resp.json().get("reply", "")
+    body = resp.json()
+    record_run_id(PERSONA, body)
+    reply = body.get("reply", "")
     ok = "```" in reply
     return StressResult(f"code-{branch}", "code_generation", message, ok, f"reply_len={len(reply)} has_fence={ok}")
 
@@ -256,6 +260,7 @@ def check_dat_boundary(case: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"dat-{case}", "dat_boundary", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     reply = body.get("reply", "")
     images = body.get("images", [])
     ok = bool(reply) and images == [] and _no_false_claim(reply)
@@ -278,6 +283,7 @@ def check_image_generation_boundary(case: str, message: str) -> StressResult:
     if resp.status_code != 200:
         return StressResult(f"img-{case}", "image_generation_boundary", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     reply = body.get("reply", "")
     images = body.get("images", [])
     ok = images == [] and _no_false_claim(reply)
@@ -321,6 +327,7 @@ def check_dual_trigger_live_read_priority() -> StressResult:
     if resp.status_code != 200:
         return StressResult("adv-dual-trigger", "adversarial", message, False, f"status={resp.status_code}")
     body = resp.json()
+    record_run_id(PERSONA, body)
     reply = body.get("reply", "")
     ok = "```" not in reply
     return StressResult(
@@ -337,7 +344,10 @@ def check_very_short_message() -> StressResult:
         json={"session_id": "stress-adv-short", "message": "?"},
         timeout=30,
     )
-    ok = resp.status_code != 500 and (resp.status_code != 200 or bool(resp.json().get("reply")))
+    body = resp.json() if resp.status_code == 200 else {}
+    if resp.status_code == 200:
+        record_run_id(PERSONA, body)
+    ok = resp.status_code != 500 and (resp.status_code != 200 or bool(body.get("reply")))
     return StressResult("adv-short-message", "adversarial", "1-character message", ok, f"status={resp.status_code}")
 
 
@@ -349,6 +359,8 @@ def check_very_long_message() -> StressResult:
         json={"session_id": "stress-adv-long", "message": long_message},
         timeout=45,
     )
+    if resp.status_code == 200:
+        record_run_id(PERSONA, resp.json())
     ok = resp.status_code != 500
     return StressResult("adv-long-message", "adversarial", f"{len(long_message)}-character message", ok, f"status={resp.status_code}")
 
@@ -376,6 +388,8 @@ def check_conversation_pivot_to_image_gen() -> StressResult:
     if turn1.status_code != 200:
         return StressResult("adv-pivot", "adversarial", "conversation pivot to image-gen", False, f"turn1 status={turn1.status_code}")
     run_id = turn1.json().get("run_id")
+    if run_id:
+        record_run_id(PERSONA, {"run_id": run_id})  # turn2 resumes this same run_id, no separate capture needed
     if not run_id:
         return StressResult("adv-pivot", "adversarial", "conversation pivot to image-gen", False, "turn1 returned no run_id")
     turn2 = httpx.post(
@@ -533,6 +547,14 @@ def main() -> int:
         "security_checks.py and gate_checks.py for the deterministic subset "
         "of these same boundary guarantees that IS mandatory."
     )
+
+    # Only reached for a standalone `python3 stress_test.py` invocation -
+    # see run_scenarios.py's own cleanup_created_runs()/main() comment for
+    # why the Job's real entrypoint (day2_stresstest.py) calls this once
+    # itself instead, after every layer has had a chance to contribute.
+    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        deleted, failed = cleanup_created_runs()
+        print(f"cleanup: {deleted} conversation(s) removed, {failed} failed")
 
     return 0 if total_passed == total else 1
 

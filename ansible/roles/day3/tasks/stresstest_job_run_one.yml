@@ -109,6 +109,14 @@
                     value: "https://{{ day2_stress_agent }}.{{ cluster_base_domain }}"
                   - name: BULK_INTERACTIONS
                     value: "{{ bulk_interactions | default(0) }}"
+                  # Makefile's CLEANUP=<0|1> (default 1) - read by
+                  # run_scenarios.py/stress_test.py/day2_bulk.py's own
+                  # main()/cleanup_created_runs() call, not branched on
+                  # here - unlike BULK_INTERACTIONS, cleanup always runs
+                  # as part of the same script, the env var just decides
+                  # whether it actually deletes anything.
+                  - name: CLEANUP_TEST_DATA
+                    value: "{{ cleanup_test_data | default(1) }}"
                   - name: DEMO_PERSONA_PASSWORD
                     valueFrom:
                       secretKeyRef:

@@ -332,9 +332,11 @@ if [[ -z "$$verb" ]]; then \
     '' \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
+    'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
     '' \
     'Example: make d3 test agents' \
-    'Example: make d3 stresstest BULK=25'; \
+    'Example: make d3 stresstest BULK=25' \
+    'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
@@ -353,7 +355,16 @@ case "$$verb" in \
         bulk=10; \
       fi; \
     fi; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" $(EXTRA_VARS) ;; \
+    cleanup="$${CLEANUP:-}"; \
+    if [[ -z "$$cleanup" ]]; then \
+      if [[ -t 0 ]]; then \
+        read -r -p "Remove test-generated conversations after the run? [Y/n]: " cleanup_answer; \
+        case "$$cleanup_answer" in [nN]*) cleanup=0 ;; *) cleanup=1 ;; esac; \
+      else \
+        cleanup=1; \
+      fi; \
+    fi; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" $(EXTRA_VARS) ;; \
 esac
 endef
 
