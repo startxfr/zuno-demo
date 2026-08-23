@@ -691,8 +691,21 @@ async def test_delete_repository_gitlab_always_refuses_and_never_touches_a_clien
     assert "Owner" in " ".join(payload["manual_instructions"])
 
 
+async def test_github_client_constructs_without_mocking(transport) -> None:
+    """Unlike every other test here, this deliberately does NOT mock
+    server._github_client - it calls the real factory (real Github(...)
+    constructor, no network call triggered by construction alone) to catch
+    argument-type bugs the mocked tests can never see. Caught a real bug
+    live: PyGithub 2.9.1's Github.__init__ asserts isinstance(timeout, int),
+    but HTTP_TIMEOUT_SECONDS is a float - every GitHub call failed at
+    construction time until this was cast with int()."""
+    client = server._github_client()
+    assert client is not None
+
+
 TESTS = [
     test_unauthenticated_call_rejected_before_any_protocol_handling,
+    test_github_client_constructs_without_mocking,
     test_tools_list_reports_exactly_the_eight_declared_tools,
     test_read_repository_content_github_file,
     test_read_repository_content_github_missing_path_is_a_tool_error,

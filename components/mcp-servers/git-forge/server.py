@@ -112,7 +112,10 @@ def _github_client() -> Github:
             "ExternalSecret against secret/zuno/github/technical - never "
             "hardcoded, ADR-0024)"
         )
-    return Github(auth=Auth.Token(GITHUB_TOKEN), timeout=HTTP_TIMEOUT_SECONDS)
+    # PyGithub 2.9.1's Github.__init__ asserts isinstance(timeout, int) - a
+    # bare float (e.g. the 20.0 HTTP_TIMEOUT_SECONDS defaults to) trips that
+    # assertion and every GitHub call fails before ever reaching the network.
+    return Github(auth=Auth.Token(GITHUB_TOKEN), timeout=int(HTTP_TIMEOUT_SECONDS))
 
 
 def _gitlab_client() -> gitlab.Gitlab:
