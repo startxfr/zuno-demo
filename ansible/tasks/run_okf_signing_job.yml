@@ -48,6 +48,15 @@
             initContainers:
               - name: fetch-agents
                 image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-runtime:latest"
+                # Always, not IfNotPresent - the mutable :latest tag needs it
+                # to avoid serving a stale cached image (same reasoning as
+                # gitops/charts/mcp-git-forge/values.yaml's own comment on
+                # this exact pattern) - live-cluster-confirmed 2026-08-23:
+                # without this, a node that already had an older
+                # agent-runtime:latest cached reused it instead of pulling
+                # the just-built image, so this Job signed stale bundle
+                # content and every later signature verification failed.
+                imagePullPolicy: Always
                 command: ["cp", "-a", "/app/agents", "/work/agents"]
                 volumeMounts:
                   - name: work
