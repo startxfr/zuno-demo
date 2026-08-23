@@ -110,6 +110,12 @@ platformNamespaces:
     # authenticate with instance` / `request canceled while waiting for
     # connection`, even though same-namespace traffic to the same
     # Service/port succeeds).
+    # zuno-mesh: Kiali's external_services.grafana health-check/link-out
+    # (gitops/charts/kiali/templates/kiali.yaml) calls the same :3000
+    # admin API from the Kiali pod - without this entry Kiali's Mesh page
+    # shows Grafana as permanently "Unreachable", same failure class as
+    # the entries above (blocked on this namespace's own ingress policy,
+    # invisible from zuno-mesh's side).
     allowedFromNamespaces:
       - zuno-ai-run
       - zuno-data
@@ -117,6 +123,7 @@ platformNamespaces:
       - zuno-ai-build
       - zuno-mlops
       - openshift-grafana-operator
+      - zuno-mesh
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
@@ -250,6 +257,12 @@ platformNamespaces:
       # invisible to NetworkPolicy checks scoped to that namespace alone)
       # and crash-loops on its startup probe.
       - rhoai-model-registries
+      # Pre-emptive: zuno-ai-platform is istio-injection: enabled (see its
+      # own entry above) but was missing from this allowlist too - same
+      # bug class as rhoai-model-registries just above. No live pod there
+      # yet to have hit it, but any workload deployed there would silently
+      # crash-loop on CA bootstrap the moment it's scheduled.
+      - zuno-ai-platform
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"

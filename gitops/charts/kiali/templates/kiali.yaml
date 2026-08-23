@@ -107,6 +107,19 @@ spec:
     istio:
       root_namespace: {{ .Values.meshNamespace }}
       istiod_url: http://istiod.{{ .Values.meshNamespace }}:15014
+    # Explicit rather than relying on Kiali's auto-discovery, which left
+    # the Mesh page's Grafana node permanently "Unreachable" - grafana's
+    # Service exposes its raw, unauthenticated port 3000 alongside the
+    # oauth-proxy-fronted 8443 used by the external Route (same internal
+    # port the Grafana Operator's own reconciler calls directly, per
+    # gitops/charts/grafana/values.yaml's allowedFromNamespaces comment).
+    # Also needs zuno-mesh added to zuno-monitoring's allowedFromNamespaces
+    # (gitops/charts/namespaces/values.yaml) - this URL alone isn't enough,
+    # the default-deny NetworkPolicy on zuno-monitoring's side blocks it.
+    grafana:
+      enabled: true
+      in_cluster_url: "http://grafana-service.zuno-monitoring.svc.cluster.local:3000"
+      external_url: "https://grafana-route-zuno-monitoring.{{ .Values.appsDomain }}"
     prometheus:
       # gitops/charts/mesh-monitoring's MonitoringStack - no OpenShift User
       # Workload Monitoring is enabled in this repo, so there's no
