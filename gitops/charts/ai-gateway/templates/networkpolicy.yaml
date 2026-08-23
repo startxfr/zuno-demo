@@ -1,5 +1,14 @@
-# Precise ingress allow-list, not a namespace-wide baseline: only Agent
-# Runtime and the acceptance-gate test Job may call this service.
+# Precise ingress allow-list, not a namespace-wide baseline: Agent
+# Runtime, the acceptance-gate test Job, and MCP Gateway (ADR-0415's
+# generate_image handler calls POST /v1/images/generations directly,
+# components/mcp-gateway/app/handlers/image_gen.py) may call this
+# service. mcp-gateway was missing here from ADR-0415's original
+# landing - live-cluster-confirmed 2026-08-23: every generate_image call
+# for every agent failed with a 503 ("upstream connect error... reset
+# reason: connection timeout" - a NetworkPolicy silently dropping the
+# SYN, not an application-level error either side ever logged), because
+# this policy never granted mcp-gateway ingress despite it being the
+# only caller of this specific route.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -23,6 +32,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: acceptance-gate
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mcp-gateway
       ports:
         - protocol: TCP
           port: 8080
