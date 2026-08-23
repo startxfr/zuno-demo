@@ -35,21 +35,13 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
 
-# ADR-0326/WP-33: the salesforce MCP server - same "deployed under this
-# same Day1 run component" reasoning as confluence above.
-- name: "mcp | apply the salesforce MCP server GitOps Application (d0, no-op)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  vars:
-    gitops_component_name: "mcp-salesforce"
-    gitops_app_phase: "d0"
-    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
-
-- name: "mcp | apply the salesforce MCP server GitOps Application (d1)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  vars:
-    gitops_component_name: "mcp-salesforce"
-    gitops_app_phase: "d1"
-    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+# ADR-0326/WP-33: the salesforce MCP server install is deferred (2026-08-23)
+# - its ExternalSecret can't resolve the "url" key at Vault path
+# salesforce/technical, so the Application never reaches Synced/Healthy. See
+# the "Out of scope / deferred" note in wp-33-comage-slice.md. Removed from
+# this GitOps Application to avoid re-installing a component that can't come
+# up; re-add the two apply_gitops_app.yml tasks (see git history) once the
+# Vault secret is fixed.
 
 # ADR-0120/WP-058: the git-forge MCP server - same "deployed under this
 # same Day1 run component" reasoning as confluence/salesforce above.

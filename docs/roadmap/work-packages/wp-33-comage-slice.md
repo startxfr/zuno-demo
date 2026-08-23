@@ -108,3 +108,12 @@ explicit `knowledge.sxa-legacy` access, delegated Google Workspace.
 
 - LoRA adapter for Comage (WP-34 — needs this bundle as training target).
 - Advantage/Finage (WP-35/36).
+- Salesforce MCP server install (2026-08-23): removed from the
+  `make day1/day2 install mcp` path and its `zuno-mcp-salesforce-d0`/`-d1`
+  ArgoCD Applications deleted from the live cluster — blocked on the Vault
+  ExternalSecret `salesforce-technical-credentials` (path
+  `salesforce/technical`) missing its `url` key, an existing operator-side
+  gap. Comage's "Known live-read gap" note in `agents/comage/README.md`
+  already documents the downstream chat-degradation behavior. Resume once
+  the Vault secret is fixed by re-adding the two `apply_gitops_app.yml`
+  tasks removed from `ansible/roles/mcp/tasks/install.yml`.
