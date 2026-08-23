@@ -12,12 +12,10 @@ zuno:
     - git.repository.private.list
     - git.file.write
     - git.repository.create
-    # ADR-0415: same offered illustration capability draft-architecture-
-    # testimonial.md's task declares - a workshop presentation benefits
-    # from an architecture diagram just as often as a DAT does.
-    - image.generation.create
-    # ADR-0516: same pairing as draft-architecture-testimonial.md - see
-    # that task's own comment.
+    # ADR-0516: same as draft-architecture-testimonial.md's task - see
+    # that task's own comment (`image.generation.create` was removed from
+    # both tasks by this policy update; photorealistic image generation
+    # is now Comage-only, scoped to marketing visuals).
     - diagram.generation.create
   allowed_knowledge:
     - knowledge.tech

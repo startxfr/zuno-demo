@@ -145,10 +145,48 @@ def tekos_declares_no_dat_or_image_generation_capability() -> CheckResult:
     )
 
 
+def arkos_declares_no_photorealistic_image_generation_capability() -> CheckResult:
+    """Policy update (post-ADR-0516): photorealistic image generation is
+    now Comage-exclusive, scoped to marketing visuals - Arkos's own former
+    `image.generation.create` grant (ADR-0415) was removed from both its
+    tasks, since its actual use cases are all diagram-shaped and covered
+    by `generate_diagram`. Pure config-consistency check, mirroring
+    tekos_declares_no_dat_or_image_generation_capability's own shape - the
+    live/behavioral counterpart lives in evaluations/arkos/
+    security_checks.py's arkos_chat_never_returns_photorealistic_images.
+
+    Deliberately does NOT check `diagram.generation.create` - Arkos
+    legitimately declares that one on both its tasks.
+    """
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    bundle = yaml.safe_load(
+        (repo_root / "agents/arkos/agent.okf.md").read_text().split("---", 2)[1]
+    )
+    tasks = bundle.get("zuno", {}).get("tasks", [])
+
+    image_gen_tasks = []
+    for task_name in tasks:
+        task_path = repo_root / "agents/arkos/tasks" / f"{task_name}.md"
+        if not task_path.exists():
+            continue
+        task_frontmatter = yaml.safe_load(task_path.read_text().split("---", 2)[1])
+        allowed_tools = task_frontmatter.get("zuno", {}).get("allowed_tools", [])
+        if "image.generation.create" in allowed_tools or "generate_image" in allowed_tools:
+            image_gen_tasks.append(task_name)
+
+    ok = not image_gen_tasks
+    return CheckResult(
+        "arkos_declares_no_photorealistic_image_generation_capability",
+        ok,
+        f"tasks_with_image_gen={image_gen_tasks}",
+    )
+
+
 CHECKS = [
     c2_permits_saas_fallback_when_not_local_only,
     tekos_write_code_prefers_mistral_codestral,
     tekos_declares_no_dat_or_image_generation_capability,
+    arkos_declares_no_photorealistic_image_generation_capability,
 ]
 
 

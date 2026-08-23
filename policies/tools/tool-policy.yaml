@@ -446,12 +446,17 @@ tools:
       - cdp
 
   # ADR-0415: stable-diffusion-xl image generation via OVHcloud AI
-  # Endpoints, for arkos/advantage/cognos/comage's preferred image model.
-  # min_classification C2, not each agent's own ambient ceiling - arkos
-  # and cognos are C3 for everything else; this tool is the one deliberate,
-  # narrow exception (see the ADR's Accepted risks), enforced at the call
-  # site (components/mcp-gateway/app/handlers/image_gen.py always declares
-  # C2 to ai-gateway, never the caller's real classification).
+  # Endpoints, for advantage/cognos/comage's preferred image model. Policy
+  # update: photorealistic generation is now Comage-exclusive among the
+  # live agents, scoped to genuine marketing-visual requests only (see
+  # agents/comage/prompts/check-deal-status.md) - Arkos's own former grant
+  # was removed, since its actual use cases are all diagram-shaped and
+  # covered by generate_diagram below. min_classification C2, not each
+  # agent's own ambient ceiling - cognos is C3 for everything else; this
+  # tool is the one deliberate, narrow exception (see the ADR's Accepted
+  # risks), enforced at the call site (components/mcp-gateway/app/
+  # handlers/image_gen.py always declares C2 to ai-gateway, never the
+  # caller's real classification).
   - tool: generate_image
     capability: image.generation.create
     mcp_server: image-gen
@@ -466,7 +471,12 @@ tools:
   # ADR-0516: Mermaid-to-SVG rendering via the in-cluster diagram-render
   # service, for structured/technical asks generate_image's diffusion
   # model can't do well (precise boxes/arrows/legible text - see the
-  # ADR's own comparison). min_classification C1, not C2 like
+  # ADR's own comparison). Policy update: unlike generate_image (now
+  # Comage-exclusive), this is the platform's default baseline visual
+  # capability - every current agent (arkos/comage/tekos) has it, and
+  # platform/templates/agent/scaffold_agent.py grants it to every future
+  # scaffolded agent automatically, no `--tool` flag needed.
+  # min_classification C1, not C2 like
   # generate_image above - unlike that tool, this one never leaves the
   # cluster (components/mcp-gateway/app/handlers/diagram_gen.py's own
   # docstring explains why C2's SaaS-boundary exception doesn't apply

@@ -256,6 +256,59 @@ def direct_call_to_salesforce_mcp_denied_without_gateway_token() -> CheckResult:
     )
 
 
+def comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests() -> CheckResult:
+    """Policy update (post-ADR-0516): Comage is the only agent still
+    declaring `image.generation.create` (SDXL/photorealistic), and even
+    here it's scoped to genuine marketing-visual requests only -
+    agents/comage/prompts/check-deal-status.md's system prompt is where
+    that scope is actually enforced (Comage has only the one live-routed
+    task, so there's no OKF task-declaration boundary to check the way
+    Arkos/Tekos have - see evaluations/tekos/gate_checks.py's
+    arkos_declares_no_photorealistic_image_generation_capability for that
+    pattern). This is a live/behavioral check only, no static
+    counterpart: a plain deal-status/chart ask must never return a
+    photorealistic (image/png) result, while an explicit marketing-visual
+    ask is allowed to.
+    """
+    chart_resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/comage/chat",
+        headers=auth_headers("sale-01"),
+        json={
+            "session_id": "sec-check-8",
+            "user_sub": "sale-01",
+            "message": "Show me a chart of this quarter's pipeline by stage.",
+        },
+        timeout=30,
+    )
+    chart_images = chart_resp.json().get("images", []) if chart_resp.status_code == 200 else []
+    chart_ok = chart_resp.status_code == 200 and all(
+        img.get("mime_type") != "image/png" for img in chart_images
+    )
+
+    marketing_resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/comage/chat",
+        headers=auth_headers("sale-01"),
+        json={
+            "session_id": "sec-check-9",
+            "user_sub": "sale-01",
+            "message": "Generate a promotional marketing image of a modern sales team celebrating a big win.",
+        },
+        timeout=30,
+    )
+    marketing_images = marketing_resp.json().get("images", []) if marketing_resp.status_code == 200 else []
+    marketing_ok = marketing_resp.status_code == 200 and any(
+        img.get("mime_type") == "image/png" for img in marketing_images
+    )
+
+    ok = chart_ok and marketing_ok
+    return CheckResult(
+        "comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests",
+        ok,
+        f"chart_status={chart_resp.status_code} chart_images={[img.get('mime_type') for img in chart_images]} "
+        f"marketing_status={marketing_resp.status_code} marketing_images={[img.get('mime_type') for img in marketing_images]}",
+    )
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -264,6 +317,7 @@ CHECKS = [
     entitlement_without_business_role_denied_salesforce,
     business_role_without_entitlement_denied_by_bff,
     direct_call_to_salesforce_mcp_denied_without_gateway_token,
+    comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests,
 ]
 
 

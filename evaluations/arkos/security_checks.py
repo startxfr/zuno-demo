@@ -291,6 +291,40 @@ def git_forge_never_grants_private_github_access() -> CheckResult:
     )
 
 
+def arkos_chat_never_returns_photorealistic_images() -> CheckResult:
+    """Policy update (post-ADR-0516): Arkos's tasks never list
+    `image.generation.create` (SDXL/photorealistic) any more, only
+    `diagram.generation.create` (Mermaid rendering) - see
+    evaluations/tekos/gate_checks.py's
+    arkos_declares_no_photorealistic_image_generation_capability for the
+    static counterpart. app/graph/arkos_nodes.py's draft_node never even
+    offers the generate_image tool schema to the model for Arkos any
+    more, so no entry in the chat response's images can structurally be a
+    generate_image/SDXL result. Mirrors
+    evaluations/tekos/security_checks.py's own
+    tekos_chat_never_returns_photorealistic_images exactly: asserts every
+    returned image's mime_type is image/svg+xml (a rendered diagram),
+    never image/png (what SDXL always returns).
+    """
+    resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/arkos/chat",
+        headers=auth_headers("consultant-01"),
+        json={
+            "session_id": "sec-check-9",
+            "user_sub": "consultant-01",
+            "message": "Draft a short architecture testimonial and include a diagram illustrating a Kubernetes Deployment rolling update.",
+        },
+        timeout=30,
+    )
+    images = resp.json().get("images", []) if resp.status_code == 200 else []
+    ok = resp.status_code == 200 and all(img.get("mime_type") == "image/svg+xml" for img in images)
+    return CheckResult(
+        "arkos_chat_never_returns_photorealistic_images",
+        ok,
+        f"status={resp.status_code} images={[img.get('mime_type') for img in images]}",
+    )
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -300,6 +334,7 @@ CHECKS = [
     business_role_without_entitlement_denied_by_bff,
     direct_call_to_sales_db_mcp_denied_without_gateway_token,
     git_forge_never_grants_private_github_access,
+    arkos_chat_never_returns_photorealistic_images,
 ]
 
 

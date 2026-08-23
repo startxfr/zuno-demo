@@ -52,6 +52,16 @@ Usage:
         --classification C1 --color "#5C6BC0" --icon compass \\
         --tile-description "New-hire onboarding Q&A, for consultants."
 
+`diagram.generation.create` (ADR-0516, Mermaid diagram rendering) is
+added to every scaffolded agent's primary task automatically - it's a
+platform-wide default baseline visual capability, not something `--tool`
+needs to spell out. Photorealistic image generation
+(`image.generation.create`) is NOT a default for the same reason it isn't
+default anywhere else in the platform: it's Comage-exclusive, scoped to
+marketing visuals - pass `--tool image.generation.create` explicitly only
+if a genuinely new agent has that same narrow use case, and update
+`policies/tools/tool-policy.yaml`'s own comment accordingly.
+
 Every `--knowledge`/`--tool` value must already be a real logical
 knowledge domain / tool capability this platform declares (ADR-0410:
 "existing knowledge domains and capabilities only, no new external
@@ -976,7 +986,14 @@ def write_all(spec: AgentSpec, sync_wave: int, repo_root: pathlib.Path = REPO_RO
     return written
 
 
+_DEFAULT_BASELINE_TOOLS = ["diagram.generation.create"]
+
+
 def build_spec_from_args(args: argparse.Namespace) -> AgentSpec:
+    tools = list(args.tool)
+    for default_tool in _DEFAULT_BASELINE_TOOLS:
+        if default_tool not in tools:
+            tools.append(default_tool)
     return AgentSpec(
         name=args.name,
         title=args.title,
@@ -984,7 +1001,7 @@ def build_spec_from_args(args: argparse.Namespace) -> AgentSpec:
         primary_task=args.primary_task,
         primary_task_title=args.primary_task_title,
         knowledge_domains=args.knowledge,
-        tools=args.tool,
+        tools=tools,
         live_read_tool=args.live_read_tool,
         entitlement_group=args.entitlement_group or f"agent_{args.name}",
         business_role=args.business_role,

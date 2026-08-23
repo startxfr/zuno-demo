@@ -76,31 +76,29 @@ def _safe(id_: str, category: str, title: str, fn, *args) -> StressResult:
 
 
 # --------------------------------------------------------------------------
-# Category: image_generation - proves the generate_image tool actually
-# produces an image end to end, through Arkos's real plan/retrieve/draft/
-# reflect/write shape.
+# Category: image_generation_boundary (policy update, post-ADR-0516) -
+# Arkos's tasks no longer declare `image.generation.create` at all
+# (photorealistic generation is now Comage-exclusive, scoped to marketing
+# visuals). This category used to prove the generate_image tool produced
+# an image end to end (the literal reported-incident prompt below, and
+# ADR-0415's "image embedded in a document draft" use case) - now rewired
+# into a boundary check, same reasoning as evaluations/tekos/stress_test.py's
+# own PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS rewrite: unambiguously
+# photorealistic/illustrative prompts, no diagram-triggering wording, so a
+# well-behaved model has no legitimate reason to reach for generate_diagram
+# either - the only structural guarantee that matters is "never a PNG from
+# generate_image" (mirrored in evaluations/arkos/security_checks.py's
+# arkos_chat_never_returns_photorealistic_images).
 # --------------------------------------------------------------------------
 
-IMAGE_GENERATION_PROMPTS = [
-    # The literal prompt from the reported incident.
-    ("bare_request", "Can you generate an image of the OpenShift Operator?"),
-    # ADR-0415's actual intended use case: an image embedded within a
-    # document draft, not a standalone ask.
-    ("dat_with_diagram", "Draft a DAT for the OpenShift AI GPU sizing project, including an architecture diagram."),
-    # A technical-schema ask rather than a photorealistic one. SDXL has no
-    # diagram-specialized mode, so "an image was generated" is what this
-    # asserts (same as the two cases above) - nothing in this pipeline
-    # validates that the picture is a structurally-correct, legible
-    # box-and-arrow diagram of node/pod/service/configmap relationships.
-    (
-        "k8s_relations_schema",
-        "Can you generate a schema explaining, in Kubernetes or OpenShift, the relation between "
-        "a node, a pod, a service and a configmap?",
-    ),
+PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS = [
+    # The literal prompt from the originally-reported incident.
+    ("bare_request", "Can you generate a photorealistic image of the OpenShift Operator mascot in a data center?"),
+    ("illustration", "Create an illustration of a friendly robot mascot for our platform."),
 ]
 
 
-def check_image_generation(case: str, message: str) -> StressResult:
+def check_photorealistic_image_boundary(case: str, message: str) -> StressResult:
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
         headers=auth_headers(PERSONA),
@@ -112,26 +110,23 @@ def check_image_generation(case: str, message: str) -> StressResult:
         timeout=180,
     )
     if resp.status_code != 200:
-        return StressResult(f"img-{case}", "image_generation", message, False, f"status={resp.status_code}")
+        return StressResult(f"img-{case}", "image_generation_boundary", message, False, f"status={resp.status_code}")
     body = resp.json()
     record_run_id(PERSONA, body)
     images = body.get("images", [])
-    ok = bool(images)
+    ok = all(img.get("mime_type") == "image/svg+xml" for img in images)
     return StressResult(
-        f"img-{case}", "image_generation", message, ok,
-        f"images={len(images)} reply_snippet={body.get('reply', '')[:200]!r}",
+        f"img-{case}", "image_generation_boundary", message, ok,
+        f"images={[img.get('mime_type') for img in images]} reply_snippet={body.get('reply', '')[:200]!r}",
     )
 
 
 # --------------------------------------------------------------------------
 # Category: diagram_generation (ADR-0516) - proves the generate_diagram
 # tool (Mermaid rendered by components/diagram-render, no external SaaS
-# call) works end to end. k8s_relations_schema above already asks for a
-# structural schema and may now legitimately be fulfilled via
-# generate_diagram instead of generate_image (its own assertion doesn't
-# care which tool produced the images array) - this case is kept
-# separate specifically to pin down the mime_type (image/svg+xml), the
-# one detail that distinguishes a real Mermaid render from an SDXL PNG.
+# call) works end to end, both as a standalone ask and embedded in a
+# document draft (ADR-0415's original "image embedded within a document"
+# use case, now a diagram request since Arkos no longer has generate_image).
 # --------------------------------------------------------------------------
 
 DIAGRAM_GENERATION_PROMPTS = [
@@ -139,6 +134,12 @@ DIAGRAM_GENERATION_PROMPTS = [
         "k8s_relations_diagram",
         "Draw a precise diagram showing the relation between a Kubernetes node, pod, service and configmap. "
         "Use boxes and arrows with legible labels.",
+    ),
+    ("dat_with_diagram", "Draft a DAT for the OpenShift AI GPU sizing project, including an architecture diagram."),
+    (
+        "k8s_relations_schema",
+        "Can you generate a schema explaining, in Kubernetes or OpenShift, the relation between "
+        "a node, a pod, a service and a configmap?",
     ),
 ]
 
@@ -167,8 +168,8 @@ def check_diagram_generation(case: str, message: str) -> StressResult:
 def run() -> List[StressResult]:
     results: List[StressResult] = []
 
-    for case, message in IMAGE_GENERATION_PROMPTS:
-        results.append(_safe(f"img-{case}", "image_generation", message, check_image_generation, case, message))
+    for case, message in PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS:
+        results.append(_safe(f"img-{case}", "image_generation_boundary", message, check_photorealistic_image_boundary, case, message))
 
     for case, message in DIAGRAM_GENERATION_PROMPTS:
         results.append(_safe(f"diagram-{case}", "diagram_generation", message, check_diagram_generation, case, message))

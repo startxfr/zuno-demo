@@ -6,14 +6,19 @@ zuno:
   allowed_tools:
     - salesforce.opportunity.read
     - web_search
-    # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints, offered to
-    # the reasoning model as a callable tool for deal-status questions
-    # that call for a visual (chart, mockup).
+    # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints. Comage is
+    # the only agent with this capability (policy update: photorealistic
+    # generation elsewhere was removed), and even here it's scoped to
+    # genuine marketing-visual requests only, never deal-status charts/
+    # mockups - see prompts/check-deal-status.md's system prompt, which is
+    # where that scope is actually enforced (this task has only the one
+    # live-routed primary task, so there's no separate task boundary to
+    # gate on).
     - image.generation.create
     # ADR-0516: Mermaid-to-SVG rendering, for deal-status visuals needing
-    # precise structure (e.g. a real chart from actual figures) rather
-    # than a diffusion-model approximation of one - see the ADR for why
-    # SDXL can't render legible numbers/labels reliably.
+    # precise structure (e.g. a real chart from actual figures) - this is
+    # the tool for ordinary deal-status charts/mockups now, not the one
+    # above.
     - diagram.generation.create
   live_read_tool: salesforce.opportunity.read
   allowed_knowledge:

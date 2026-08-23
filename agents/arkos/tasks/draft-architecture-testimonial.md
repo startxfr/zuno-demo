@@ -12,16 +12,14 @@ zuno:
     - git.repository.private.list
     - git.file.write
     - git.repository.create
-    # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints, offered to
-    # the drafting model as a callable tool - it decides whether a given
-    # DAT/workshop request needs an illustration.
-    - image.generation.create
-    # ADR-0516: Mermaid-to-SVG rendering, offered alongside the above for
-    # architecture/sequence/relationship diagrams needing precise
-    # structure or legible text - the diffusion model above can't do
-    # those reliably (see the ADR's own live-cluster finding). The
-    # drafting model chooses between the two based on what the request
-    # actually calls for.
+    # ADR-0516: Mermaid-to-SVG rendering, offered to the drafting model as
+    # a callable tool for architecture/sequence/relationship diagrams
+    # needing precise structure or legible text. `image.generation.create`
+    # (ADR-0415, stable-diffusion-xl) was offered here too until this
+    # policy update - photorealistic image generation is now Comage-only,
+    # scoped to marketing visuals; Arkos's own "does this need an
+    # illustration" cases are all diagram-shaped in practice, so
+    # generate_diagram alone covers them.
     - diagram.generation.create
   allowed_knowledge:
     - knowledge.tech
@@ -64,9 +62,9 @@ the same outcome a live Drive write failure would have produced, just
 without depending on an absent service to get there. Re-add both once a
 real `google-workspace` MCP server exists.
 
-ADR-0416: the reflect step prefers `ovhcloud-gpt-oss-120b` (same OVHcloud
-AI Endpoints account as the `image.generation.create` tool above) for its
-self-review pass over the draft - evaluated at a fixed C2 ceiling since
+ADR-0416: the reflect step prefers `ovhcloud-gpt-oss-120b` (OVHcloud AI
+Endpoints) for its self-review pass over the draft - evaluated at a fixed
+C2 ceiling since
 that call's payload is only the draft's own prose, never the raw
 retrieved/Confluence context draft_node was grounded in. Still honors any
 source-level `local_only_required` restriction that turn's retrieval may

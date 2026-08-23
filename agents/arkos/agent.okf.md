@@ -6,8 +6,7 @@ description: >-
   Architecture assistant for architects. Helps produce Design & Architecture
   Testimonials (DAT) and prepare Odyssey architecture workshops, drawing on
   the same technical RAG/Confluence knowledge base as Tekos plus Google
-  Drive/Docs, stable-diffusion-xl image generation, and Mermaid diagram
-  generation.
+  Drive/Docs and Mermaid diagram generation.
 provenance:
   maintainer: Zuno Demo architecture team
   repository: zuno-demo
@@ -114,7 +113,6 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `git.repository.private.list` | tool | `git.repository.private.list` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.private.list` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `git.file.write` | tool | `git.file.write` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.file.write` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `git.repository.create` | tool | `git.repository.create` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.create` |
-| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `image.generation.create` | tool | `image.generation.create` @ image-gen | C2 | consultant, adv, sales, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `generate_image` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `diagram.generation.create` | tool | `diagram.generation.create` @ diagram-gen | C1 | consultant, adv, sales, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `generate_diagram` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
 | `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
@@ -126,7 +124,6 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.private.list` | tool | `git.repository.private.list` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.private.list` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.file.write` | tool | `git.file.write` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.file.write` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `git.repository.create` | tool | `git.repository.create` @ git-forge | C2 | consultant, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `git.repository.create` |
-| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `image.generation.create` | tool | `image.generation.create` @ image-gen | C2 | consultant, adv, sales, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `generate_image` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `diagram.generation.create` | tool | `diagram.generation.create` @ diagram-gen | C1 | consultant, adv, sales, board, cdp | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `generate_diagram` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |
 | `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
