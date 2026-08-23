@@ -1,6 +1,50 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the actual authenticated end-to-end request is blocked on a platform-level gap in RHOAI's own MaaS payload-processing pipeline - now confirmed to be a NetworkPolicy allow-list, not solely mTLS, see 2026-08-21 note)
+- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the actual authenticated end-to-end request is still blocked - a NetworkPolicy allow-list gap was confirmed and fixed 2026-08-23 without resolving the request, so a second, still-unidentified blocking layer exists; see 2026-08-23 note)
+
+## Implementation note (2026-08-23) — NetworkPolicy fix landed and verified, but did not resolve the 500; a second blocking layer exists
+
+Landed WP-27's proposed fix for the 2026-08-21 note's NetworkPolicy finding,
+additively rather than patching the RHOAI-owned policy (which the
+2026-08-21 note already proved doesn't stick): `payload-pre-processing`'s
+NetworkPolicy is actually **our own** resource (ArgoCD-tracked, no
+`ModelsAsService` ownerReference - RHOAI's controller only auto-generates
+one for `payload-processing`), so it was extended directly to also allow
+`gateway-name: maas-default-gateway`; a brand-new, separately-owned
+NetworkPolicy (`payload-processing-maas-gateway-allow`) was added for
+`payload-processing` rather than editing the operator-owned one - unions
+with it instead of fighting its controller. Both confirmed live via
+`oc get networkpolicy -o yaml` after an ArgoCD hard-refresh/sync: exactly
+the rules intended.
+
+**The authenticated request still 500s, identical signature**: `envoy
+ext_proc` on `maas-default-gateway` still reports `Received gRPC error on
+stream: 14 ... TLS_error:...Connection_reset_by_peer`, and
+`payload-processing`/`payload-pre-processing`'s istio-proxy sidecars still
+log **zero** lines for the request window (checked a 10-minute window, not
+just the immediate one) - meaning the NetworkPolicy layer was never
+actually the (sole) blocker, contrary to the 2026-08-21 note's conclusion.
+Ruled out as alternates: no `AuthorizationPolicy` or `PeerAuthentication`
+exists anywhere in the cluster (`oc get peerauthentication -A` empty), so
+this isn't a mesh-wide STRICT-mTLS mismatch.
+
+**New lead, not yet chased**: a live `EnvoyFilter` named `payload-processing`
+in `openshift-ingress` (owned by RHOAI's `Config.maas.opendatahub.io/default`
+CR) inserts the `ipp-pre`/`ipp` ext_proc filters (the ones that call out to
+`payload-pre-processing`/`payload-processing` on port 9004) relative to a
+Kuadrant wasm-plugin subfilter,
+`extensions.istio.io/wasmplugin/openshift-ingress.kuadrant-maas-default-gateway`.
+This cluster has a separately-tracked, already-open Kuadrant wasm-shim
+defect (roadmap WP-54, 2026-08-21: "real Authorino bypass proves wasm-shim
+itself is broken, not our config"). If that wasm plugin isn't correctly
+present/positioned in the live filter chain, this `EnvoyFilter`'s
+`INSERT_BEFORE`/`INSERT_AFTER` anchor could silently fail to attach the
+ext_proc filters as configured - a plausible next root cause, not yet
+verified. Next step for a future pass: inspect the live Envoy config dump
+on `maas-default-gateway`'s pod (`istioctl proxy-config listener` /
+`config_dump`) to confirm whether the wasm-plugin subfilter and both
+ext_proc filters are actually present and correctly ordered in the running
+filter chain.
 
 ## Implementation note (2026-08-21) — the real blocker is a NetworkPolicy allow-list, and it isn't patchable
 
