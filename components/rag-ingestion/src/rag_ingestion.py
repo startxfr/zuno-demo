@@ -1101,7 +1101,21 @@ def _import_sxa_dump_native(conn, dump_text: str) -> None:
     silent no-op against already-populated tables, so the following
     INSERTs collide on primary keys instead of re-importing cleanly. This
     is what _load_sxa_dump's own idempotency claim already assumed the
-    dump would provide."""
+    dump would provide.
+
+    A duplicate-key IntegrityError on any single statement is logged and
+    skipped rather than aborting the whole import: confirmed live
+    2026-08-23, this legacy production export has genuine primary-key
+    collisions in a few peripheral permission/config tables (e.g.
+    user_droits' (login, droit) pair repeated - real production data debt
+    a strict constraint here was never enforced against upstream), even
+    against a freshly dropped-and-recreated table. Failing the entire
+    import over one bad statement would also lose every core business
+    table (commande/devis/entreprise/contact/affaire/...) that comes
+    after it in the dump, which matters far more than a handful of stale
+    permission rows."""
+    import pymysql
+
     with conn.cursor() as cur:
         for statement in _split_sql_statements(dump_text):
             if _CREATE_VIEW_RE.match(statement):
@@ -1109,7 +1123,14 @@ def _import_sxa_dump_native(conn, dump_text: str) -> None:
             create_table_match = _CREATE_TABLE_NAME_RE.match(statement)
             if create_table_match:
                 cur.execute(f"DROP TABLE IF EXISTS `{create_table_match.group('table')}`")
-            cur.execute(statement)
+            try:
+                cur.execute(statement)
+            except pymysql.err.IntegrityError as exc:
+                logger.warning(
+                    "load-sxa-dump: skipping a statement that violated a "
+                    "constraint (%s): %s...",
+                    exc, statement[:120],
+                )
     conn.commit()
 
 

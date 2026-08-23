@@ -377,6 +377,9 @@ class FakeMariaDBCursor:
 
     def execute(self, sql):
         self._conn.executed.append(sql)
+        if self._conn.fail_on_substring and self._conn.fail_on_substring in sql:
+            import pymysql
+            raise pymysql.err.IntegrityError(1062, "Duplicate entry 'x' for key 'PRIMARY'")
         stripped = sql.strip()
         if stripped.upper() == "SHOW TABLES":
             self._result = [{"Tables_in_sxa": t} for t in self._conn.tables]
@@ -391,12 +394,15 @@ class FakeMariaDBCursor:
 
 
 class FakeMariaDBConnection:
-    def __init__(self, tables, rows):
+    def __init__(self, tables, rows, fail_on_substring=None):
         self.tables = tables  # SHOW TABLES order
         self.rows = rows  # table -> list of dict rows
         self.executed: list = []
         self.committed = False
         self.closed = False
+        # When set, any executed statement containing this substring raises
+        # pymysql.err.IntegrityError instead of being recorded as applied.
+        self.fail_on_substring = fail_on_substring
 
     def cursor(self):
         return FakeMariaDBCursor(self)
@@ -529,6 +535,30 @@ def test_import_sxa_dump_native_drops_each_table_before_recreating_it():
     create_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("CREATE TABLE"))
     insert_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("INSERT"))
     assert drop_idx < create_idx < insert_idx
+
+
+def test_import_sxa_dump_native_skips_a_duplicate_key_statement_and_continues():
+    # Confirmed live 2026-08-23: this legacy production export has
+    # genuine primary-key collisions in a few peripheral tables (e.g.
+    # user_droits) even against a freshly dropped-and-recreated table -
+    # a real data-quality issue, not stale state. One bad statement must
+    # not abort the rest of the import (core business tables come after
+    # it in the dump).
+    dump = (
+        "CREATE TABLE `user_droits` (`login` varchar(20));\n"
+        "INSERT INTO `user_droits` VALUES ('dup');\n"
+        "CREATE TABLE `commande` (`id` int);\n"
+        "INSERT INTO `commande` VALUES (1);"
+    )
+    fake_conn = FakeMariaDBConnection(
+        tables=["user_droits", "commande"],
+        rows={"user_droits": [], "commande": [{"id": 1}]},
+        fail_on_substring="INSERT INTO `user_droits`",
+    )
+    rag_ingestion._import_sxa_dump_native(fake_conn, dump)
+    assert any("CREATE TABLE `commande`" in s for s in fake_conn.executed)
+    assert any("INSERT INTO `commande`" in s for s in fake_conn.executed)
+    assert fake_conn.committed
 
 
 def test_split_sql_statements_handles_semicolons_inside_quoted_values():
@@ -913,6 +943,7 @@ TESTS = [
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
     test_import_sxa_dump_native_skips_create_view_statements,
     test_import_sxa_dump_native_drops_each_table_before_recreating_it,
+    test_import_sxa_dump_native_skips_a_duplicate_key_statement_and_continues,
     test_split_sql_statements_handles_semicolons_inside_quoted_values,
     test_split_sql_statements_skips_comment_only_lines,
     test_parse_create_table_columns_skips_constraints_keeps_declared_order,
