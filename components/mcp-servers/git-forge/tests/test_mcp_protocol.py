@@ -107,13 +107,26 @@ class _FakeGithubRepo:
         return self._fork_result
 
 
+class _FakeGithubPushedAt:
+    """Minimal stand-in for the datetime PyGithub's Repository.pushed_at
+    returns - server.py only ever calls .isoformat() on it."""
+
+    def __init__(self, iso):
+        self._iso = iso
+
+    def isoformat(self):
+        return self._iso
+
+
 class _FakeGithubRepoSummary:
-    def __init__(self, name, full_name, private, description, html_url):
+    def __init__(self, name, full_name, private, description, html_url, stars=0, last_activity=None):
         self.name = name
         self.full_name = full_name
         self.private = private
         self.description = description
         self.html_url = html_url
+        self.stargazers_count = stars
+        self.pushed_at = _FakeGithubPushedAt(last_activity) if last_activity else None
 
 
 class _FakeGithubAccount:
@@ -122,8 +135,15 @@ class _FakeGithubAccount:
         self._created_repo = created_repo
         self.calls = []
 
-    def get_repos(self):
-        return self._repos
+    def get_repos(self, type=None, sort=None, direction=None):
+        self.calls.append(("get_repos", type, sort, direction))
+        # Applies the type filter server-side, the same way the real GitHub
+        # API would - a fake that ignored it would let a real bug (e.g.
+        # server.py dropping type="public") through undetected.
+        repos = self._repos
+        if type == "public":
+            repos = [r for r in repos if not r.private]
+        return repos
 
     def create_repo(self, name, **kwargs):
         self.calls.append(("create_repo", name, kwargs))
@@ -131,10 +151,12 @@ class _FakeGithubAccount:
 
 
 class _FakeGithubClient:
-    def __init__(self, repo=None, user=None, org=None):
+    def __init__(self, repo=None, user=None, org=None, search_repos=None):
         self._repo = repo
         self._user = user
         self._org = org
+        self._search_repos = search_repos or []
+        self.calls = []
 
     def get_repo(self, full_name):
         assert self._repo is not None, f"unexpected get_repo({full_name!r})"
@@ -147,6 +169,15 @@ class _FakeGithubClient:
     def get_organization(self, org):
         assert self._org is not None, f"unexpected get_organization({org!r})"
         return self._org
+
+    def search_repositories(self, query, sort=None, order=None, **qualifiers):
+        self.calls.append(("search_repositories", query, sort, order, qualifiers))
+        # Same server-side-filter reasoning as get_repos above, for the
+        # is:public query term.
+        repos = self._search_repos
+        if "is:public" in query:
+            repos = [r for r in repos if not r.private]
+        return repos
 
 
 class _FakeGitlabProjectFile:
@@ -228,11 +259,29 @@ class _FakeGitlabClient:
     def __init__(self, project=None, created_project=None, http_list_by_path=None):
         self.projects = _FakeGitlabProjectsManager(project, created_project)
         self._http_list_by_path = http_list_by_path or {}
+        self.calls = []
 
     def http_list(self, path, query_data=None, **kwargs):
+        query_data = query_data or {}
         for prefix, result in self._http_list_by_path.items():
-            if path.startswith(prefix):
-                return result
+            if not path.startswith(prefix):
+                continue
+            self.calls.append((path, dict(query_data)))
+            items = result
+            # Applies query_data server-side against the seeded fixture, the
+            # same way the real GitLab API would - a fake that just returned
+            # the seeded list regardless of query_data wouldn't catch a real
+            # bug like server.py silently dropping the visibility filter.
+            visibility = query_data.get("visibility")
+            if visibility:
+                items = [p for p in items if p.get("visibility") == visibility]
+            order_by = query_data.get("order_by")
+            if order_by:
+                items = sorted(items, key=lambda p: p[order_by], reverse=query_data.get("sort") == "desc")
+            per_page = query_data.get("per_page")
+            if per_page:
+                items = items[:per_page]
+            return items
         raise AssertionError(f"unexpected http_list({path!r}, {query_data!r})")
 
 
@@ -422,7 +471,11 @@ async def test_list_repositories_github_user(transport) -> None:
 
 async def test_list_repositories_gitlab_organization(transport) -> None:
     projects = [
-        {"name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public", "description": None, "web_url": "https://gitlab.com/acme/widgets"}
+        {
+            "name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public",
+            "description": None, "web_url": "https://gitlab.com/acme/widgets",
+            "star_count": 5, "last_activity_at": "2024-01-01T00:00:00Z",
+        }
     ]
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
     with _patch_gitlab(fake):
@@ -440,8 +493,8 @@ async def test_list_repositories_gitlab_organization(transport) -> None:
 
 async def test_list_repositories_filters_out_private_github(transport) -> None:
     repos = [
-        _FakeGithubRepoSummary("widgets", "acme/widgets", False, "public one", "https://github.com/acme/widgets"),
-        _FakeGithubRepoSummary("secret", "acme/secret", True, "private one", "https://github.com/acme/secret"),
+        _FakeGithubRepoSummary("widgets", "acme/widgets", False, "public one", "https://github.com/acme/widgets", stars=5),
+        _FakeGithubRepoSummary("secret", "acme/secret", True, "private one", "https://github.com/acme/secret", stars=999),
     ]
     fake = _FakeGithubClient(user=_FakeGithubAccount(repos=repos))
     with _patch_github(fake):
@@ -459,8 +512,16 @@ async def test_list_repositories_filters_out_private_github(transport) -> None:
 
 async def test_list_repositories_filters_out_private_gitlab(transport) -> None:
     projects = [
-        {"name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public", "description": None, "web_url": "https://gitlab.com/acme/widgets"},
-        {"name": "secret", "path_with_namespace": "acme/secret", "visibility": "private", "description": None, "web_url": "https://gitlab.com/acme/secret"},
+        {
+            "name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public",
+            "description": None, "web_url": "https://gitlab.com/acme/widgets",
+            "star_count": 5, "last_activity_at": "2024-01-01T00:00:00Z",
+        },
+        {
+            "name": "secret", "path_with_namespace": "acme/secret", "visibility": "private",
+            "description": None, "web_url": "https://gitlab.com/acme/secret",
+            "star_count": 999, "last_activity_at": "2024-06-01T00:00:00Z",
+        },
     ]
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
     with _patch_gitlab(fake):
@@ -478,8 +539,16 @@ async def test_list_repositories_filters_out_private_gitlab(transport) -> None:
 
 async def test_list_private_repositories_gitlab_includes_private(transport) -> None:
     projects = [
-        {"name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public", "description": None, "web_url": "https://gitlab.com/acme/widgets"},
-        {"name": "secret", "path_with_namespace": "acme/secret", "visibility": "private", "description": None, "web_url": "https://gitlab.com/acme/secret"},
+        {
+            "name": "widgets", "path_with_namespace": "acme/widgets", "visibility": "public",
+            "description": None, "web_url": "https://gitlab.com/acme/widgets",
+            "star_count": 5, "last_activity_at": "2024-01-01T00:00:00Z",
+        },
+        {
+            "name": "secret", "path_with_namespace": "acme/secret", "visibility": "private",
+            "description": None, "web_url": "https://gitlab.com/acme/secret",
+            "star_count": 999, "last_activity_at": "2024-06-01T00:00:00Z",
+        },
     ]
     fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": projects})
     with _patch_gitlab(fake):
@@ -492,6 +561,127 @@ async def test_list_private_repositories_gitlab_includes_private(transport) -> N
     assert not result.is_error, result.content
     payload = _result(result.structured_content)
     assert payload["count"] == 2, "must include both the public and the private project"
+
+
+async def test_list_repositories_github_returns_top10_starred_and_active_deduped(transport) -> None:
+    """ADR-0121 follow-up: with more than 10 candidates in EACH bucket, the
+    result must stay bounded to top-10-per-bucket (not the full list), and a
+    repo present in both buckets must be deduped into one entry with
+    matched_by recording both."""
+    shared = [
+        _FakeGithubRepoSummary(f"shared{i}", f"acme/shared{i}", False, "shared", f"https://github.com/acme/shared{i}")
+        for i in range(3)
+    ]
+    active_only = [
+        _FakeGithubRepoSummary(f"active{i}", f"acme/active{i}", False, "active-only", f"https://github.com/acme/active{i}")
+        for i in range(8)
+    ]
+    starred_only = [
+        _FakeGithubRepoSummary(f"starred{i}", f"acme/starred{i}", False, "starred-only", f"https://github.com/acme/starred{i}")
+        for i in range(8)
+    ]
+    # Already-sorted-desc order, as the real (server-side-sorted) API would
+    # return it - 11 items each (>10), so the [:10] slice must drop exactly
+    # the last one of each.
+    account = _FakeGithubAccount(repos=shared + active_only)
+    fake = _FakeGithubClient(user=account, search_repos=shared + starred_only)
+    with _patch_github(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_repositories", {"provider": "github", "owner": "acme", "owner_type": "user"}
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    full_names = {r["full_name"] for r in payload["repositories"]}
+    # 10 active (shared + active0..6, active7 dropped) + 10 starred (shared +
+    # starred0..6, starred7 dropped) - 3 shared duplicates = 17 unique.
+    assert payload["count"] == 17 == len(full_names)
+    assert "acme/active7" not in full_names, "the 11th most-active repo must be dropped by the top-10 cut"
+    assert "acme/starred7" not in full_names, "the 11th most-starred repo must be dropped by the top-10 cut"
+    by_name = {r["full_name"]: r for r in payload["repositories"]}
+    assert sorted(by_name["acme/shared0"]["matched_by"]) == ["most_active", "most_starred"]
+    assert by_name["acme/active0"]["matched_by"] == ["most_active"]
+    assert by_name["acme/starred0"]["matched_by"] == ["most_starred"]
+    # Server-side filtering, not a client-side post-filter - see
+    # server.py's list_repositories design notes.
+    assert ("get_repos", "public", "pushed", "desc") in account.calls
+    assert ("search_repositories", "is:public", "stars", "desc", {"user": "acme"}) in fake.calls
+
+
+def _gitlab_star_activity_fixture() -> list:
+    """11 public projects (star_count 110..10 descending by index, so
+    proj1 has the most stars; last_activity_at ascending by index, so
+    proj11 is the most recently active) plus 1 private project with the
+    single highest star_count of anything in the fixture - proves
+    visibility filtering happens server-side, before the top-10 cut, not
+    after (if it didn't, this private project would bump a real public one
+    out of the starred top-10)."""
+    projects = [
+        {
+            "name": "private-top-star", "path_with_namespace": "acme/private-top-star", "visibility": "private",
+            "description": None, "web_url": "https://gitlab.com/acme/private-top-star",
+            "star_count": 99999, "last_activity_at": "2024-01-15T00:00:00Z",
+        }
+    ]
+    for i in range(1, 12):
+        projects.append({
+            "name": f"proj{i}", "path_with_namespace": f"acme/proj{i}", "visibility": "public",
+            "description": None, "web_url": f"https://gitlab.com/acme/proj{i}",
+            "star_count": (12 - i) * 10,
+            "last_activity_at": f"2024-01-{i:02d}T00:00:00Z",
+        })
+    return projects
+
+
+async def test_list_repositories_gitlab_returns_top10_starred_and_active_deduped_and_excludes_private(transport) -> None:
+    fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": _gitlab_star_activity_fixture()})
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_repositories", {"provider": "gitlab", "owner": "acme", "owner_type": "organization"}
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    full_names = {r["full_name"] for r in payload["repositories"]}
+    assert "acme/private-top-star" not in full_names, (
+        "the highest-star project is private - must be excluded before the top-10 cut, "
+        "not merely outranked by it"
+    )
+    # star-desc top 10: proj1..proj10 (proj11 dropped, lowest star).
+    # activity-desc top 10: proj11..proj2 (proj1 dropped, least recent).
+    # overlap: proj2..proj10 (9 shared) -> 10 + 10 - 9 = 11 unique.
+    assert payload["count"] == 11 == len(full_names)
+    by_name = {r["full_name"]: r for r in payload["repositories"]}
+    assert by_name["acme/proj1"]["matched_by"] == ["most_starred"], "highest-star but least-active - starred only"
+    assert by_name["acme/proj11"]["matched_by"] == ["most_active"], "most-active but lowest-star - active only"
+    assert sorted(by_name["acme/proj5"]["matched_by"]) == ["most_active", "most_starred"]
+    assert any(call[1].get("visibility") == "public" for call in fake.calls), (
+        "must have passed visibility=public server-side"
+    )
+
+
+async def test_list_private_repositories_gitlab_includes_the_top_starred_private_project(transport) -> None:
+    """Same fixture as the excludes_private test above, called via
+    list_private_repositories instead - isolates the only real behavioral
+    difference between the two tools to the visibility query param."""
+    fake = _FakeGitlabClient(http_list_by_path={"/groups/acme/projects": _gitlab_star_activity_fixture()})
+    with _patch_gitlab(fake):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "list_private_repositories", {"provider": "gitlab", "owner": "acme", "owner_type": "organization"}
+                )
+    assert not result.is_error, result.content
+    payload = _result(result.structured_content)
+    by_name = {r["full_name"]: r for r in payload["repositories"]}
+    assert "acme/private-top-star" in by_name, "no visibility filter this time - the top-starred project must appear"
+    assert "most_starred" in by_name["acme/private-top-star"]["matched_by"]
+    assert all("visibility" not in call[1] for call in fake.calls), "must not have passed any visibility filter"
 
 
 async def test_list_private_repositories_refuses_github_provider(transport) -> None:
@@ -720,6 +910,9 @@ TESTS = [
     test_list_repositories_filters_out_private_github,
     test_list_repositories_filters_out_private_gitlab,
     test_list_private_repositories_gitlab_includes_private,
+    test_list_repositories_github_returns_top10_starred_and_active_deduped,
+    test_list_repositories_gitlab_returns_top10_starred_and_active_deduped_and_excludes_private,
+    test_list_private_repositories_gitlab_includes_the_top_starred_private_project,
     test_list_private_repositories_refuses_github_provider,
     test_write_file_github_creates_when_absent,
     test_write_file_github_updates_when_present,

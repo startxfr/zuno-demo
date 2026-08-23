@@ -207,23 +207,104 @@ def _gitlab_read_content(
 # --------------------------------------------------------------------------
 # git.repository.list - list_repositories / list_private_repositories
 # --------------------------------------------------------------------------
+#
+# ADR-0121 follow-up: a full org/group listing (e.g. the real "openshift"
+# GitHub org, 500+ repos) took ~30s of paginated API calls and produced a
+# result too large for the calling LLM's context window (52,990 tokens vs a
+# 32,768/8,192 limit) - live-cluster-confirmed 2026-08-23/24. Both providers
+# below now return only the top 10 most-starred and top 10 most-recently-
+# active repositories (deduped, so a repo in both buckets appears once),
+# fetched via server-side sort+limit so this is 1-2 bounded API calls per
+# provider instead of a full paginated fetch - a latency fix as much as a
+# context-budget one.
+
+
+def _merge_top10(
+    most_starred: List[Dict[str, Any]], most_active: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Dedupes on full_name - a repo present in both top-10 buckets appears
+    once, with matched_by recording which bucket(s) it came from. Ordering
+    (all most_starred entries first, then any most_active-only entries) falls
+    out of dict insertion order, no separate sort pass needed."""
+    merged: Dict[str, Dict[str, Any]] = {}
+    for r in most_starred:
+        entry = dict(r)
+        entry["matched_by"] = ["most_starred"]
+        merged[r["full_name"]] = entry
+    for r in most_active:
+        key = r["full_name"]
+        if key in merged:
+            merged[key]["matched_by"].append("most_active")
+        else:
+            entry = dict(r)
+            entry["matched_by"] = ["most_active"]
+            merged[key] = entry
+    return list(merged.values())
+
+
+def _github_repo_dict(r: Any) -> Dict[str, Any]:
+    return {
+        "name": r.name,
+        "full_name": r.full_name,
+        "private": r.private,
+        "description": r.description,
+        "url": r.html_url,
+        "stars": r.stargazers_count,
+        "last_activity": r.pushed_at.isoformat() if r.pushed_at else None,
+    }
+
 
 def _github_list_repos(owner: str, owner_type: str) -> List[Dict[str, Any]]:
     gh = _github_client()
     account = gh.get_organization(owner) if owner_type == "organization" else gh.get_user(owner)
     # ADR-0121: unconditional - GitHub listings from this server are always
     # public-only, on every tool (there is no private-scoped GitHub listing).
-    return [
-        {
-            "name": r.name,
-            "full_name": r.full_name,
-            "private": r.private,
-            "description": r.description,
-            "url": r.html_url,
-        }
-        for r in account.get_repos()
-        if not r.private
+    # type="public" filters server-side, BEFORE the top-10 slice below -
+    # filtering after the cut could wrongly shrink/skew the result if some
+    # of the true top-10-by-metric happen to be private. PaginatedList
+    # slicing is lazy (confirmed against PyGithub's own source): [:10] only
+    # fetches as many pages as needed, never the full list.
+    most_active = [
+        _github_repo_dict(r)
+        for r in account.get_repos(type="public", sort="pushed", direction="desc")[:10]
     ]
+    # REST get_repos has no stars sort (sort accepts only created/updated/
+    # pushed/full_name) - the Search API is the only server-side "top by
+    # stars" primitive PyGithub exposes. `is:public` goes in the query
+    # string (not **qualifiers - `is` is a Python keyword), giving the same
+    # server-side visibility filtering as type="public" above.
+    qualifier = "org" if owner_type == "organization" else "user"
+    most_starred = [
+        _github_repo_dict(r)
+        for r in gh.search_repositories(
+            query="is:public", sort="stars", order="desc", **{qualifier: owner}
+        )[:10]
+    ]
+    return _merge_top10(most_starred, most_active)
+
+
+def _gitlab_project_dict(p: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "name": p["name"],
+        "full_name": p["path_with_namespace"],
+        "private": p.get("visibility", "private") != "public",
+        "description": p.get("description"),
+        "url": p["web_url"],
+        "stars": p.get("star_count", 0),
+        "last_activity": p.get("last_activity_at"),
+    }
+
+
+def _gitlab_top10(gl: gitlab.Gitlab, path: str, *, visibility: Optional[str], order_by: str) -> List[Dict[str, Any]]:
+    query_data: Dict[str, Any] = {"order_by": order_by, "sort": "desc", "per_page": 10}
+    if visibility:
+        query_data["visibility"] = visibility
+    # get_all=False (not the full-fetch all=True this used to pass):
+    # GitlabList.next() never follows next_url when get_next=False, so this
+    # is exactly one bounded HTTP call for up to 10 items - confirmed
+    # against python-gitlab's own source. Passing it explicitly also
+    # suppresses an unrelated informational per-page-truncation warning.
+    return [_gitlab_project_dict(p) for p in gl.http_list(path, query_data=query_data, get_all=False)]
 
 
 def _gitlab_list_repos(owner: str, owner_type: str, *, allow_private: bool) -> List[Dict[str, Any]]:
@@ -233,26 +314,23 @@ def _gitlab_list_repos(owner: str, owner_type: str, *, allow_private: bool) -> L
     # low-level escape hatch wrapping the same REST endpoints the object
     # managers use internally.
     if owner_type == "organization":
-        projects = gl.http_list(f"/groups/{quote(owner, safe='')}/projects", all=True)
+        path = f"/groups/{quote(owner, safe='')}/projects"
     else:
         users = gl.http_list("/users", query_data={"username": owner})
         if not users:
             raise ValueError(f"no such GitLab user: {owner}")
-        projects = gl.http_list(f"/users/{users[0]['id']}/projects", all=True)
+        path = f"/users/{users[0]['id']}/projects"
 
-    results = [
-        {
-            "name": p["name"],
-            "full_name": p["path_with_namespace"],
-            "private": p.get("visibility", "private") != "public",
-            "description": p.get("description"),
-            "url": p["web_url"],
-        }
-        for p in projects
-    ]
-    if not allow_private:
-        results = [r for r in results if not r["private"]]
-    return results
+    # visibility=public filters server-side, before the top-10 cut - same
+    # "filter before slicing, not after" reasoning as GitHub above.
+    # allow_private omits the visibility param entirely (never
+    # visibility="private", which would wrongly EXCLUDE public/internal
+    # projects) so GitLab returns every visibility the technical token can
+    # see, matching list_private_repositories's existing semantics.
+    visibility = None if allow_private else "public"
+    most_starred = _gitlab_top10(gl, path, visibility=visibility, order_by="star_count")
+    most_active = _gitlab_top10(gl, path, visibility=visibility, order_by="last_activity_at")
+    return _merge_top10(most_starred, most_active)
 
 
 # --------------------------------------------------------------------------
@@ -470,10 +548,12 @@ async def read_private_repository_content(
 
 @mcp_server.tool()
 async def list_repositories(provider: Provider, owner: str, owner_type: Literal["user", "organization"]) -> Dict[str, Any]:
-    """List the PUBLIC repositories owned by a GitHub user/organization or a
-    GitLab user/group. Private/internal repositories are always filtered
-    out, on either provider. For GitLab private/internal listings, use
-    list_private_repositories instead (GitLab only)."""
+    """List up to 10 of the most-starred and up to 10 of the most-recently-
+    active PUBLIC repositories owned by a GitHub user/organization or a
+    GitLab user/group - not the full repository list. Private/internal
+    repositories are always filtered out, on either provider. For GitLab
+    private/internal listings, use list_private_repositories instead
+    (GitLab only)."""
     _require_provider(provider)
     # asyncio.to_thread: _github_list_repos/_gitlab_list_repos are
     # synchronous, blocking calls (PyGithub/python-gitlab both wrap
@@ -494,9 +574,11 @@ async def list_repositories(provider: Provider, owner: str, owner_type: Literal[
 
 @mcp_server.tool()
 async def list_private_repositories(provider: Provider, owner: str, owner_type: Literal["user", "organization"]) -> Dict[str, Any]:
-    """List EVERY repository (public, internal, AND private) owned by a
-    GitLab user/group - not a private-only filter. GitLab only - refuses
-    provider="github"; this server never grants private GitHub access."""
+    """List up to 10 of the most-starred and up to 10 of the most-recently-
+    active repositories (public, internal, AND private) owned by a GitLab
+    user/group - not the full repository list, and not a private-only
+    filter. GitLab only - refuses provider="github"; this server never
+    grants private GitHub access."""
     _require_provider(provider)
     if provider != "gitlab":
         raise ValueError(
