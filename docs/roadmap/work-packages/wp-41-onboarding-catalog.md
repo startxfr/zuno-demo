@@ -1,6 +1,12 @@
 # WP-41: Self-service onboarding and catalog expansion (promotes ADR-0307 + ADR-0410)
 
-- **State:** Part A merged (2026-08-15); Part B (sixth agent) next.
+- **State:** Cancelled (2026-08-23) — deprioritized; ADR-0307 and ADR-0410
+  deferred to v0.4 with status `Proposed`. The already-merged template
+  generator (`platform/templates/agent/`) and the Naveo agent bundle
+  (`agents/naveo/`, `gitops/charts/naveo/`, `gitops/apps/naveo/`) stay in
+  the repo as-is; the sixth-agent deployment gate (human review + operator
+  75% gate + flip to `active`) will not be pursued under this WP. Prior
+  state for the record, unchanged below: Part A merged (2026-08-15); Part B (sixth agent) next.
   **Part A** promoted ADR-0307 verbatim and delivered
   `platform/templates/agent/`: `scaffold_agent.py` (a hand-rolled
   parameterized generator, repo convention - one `render_*` function per

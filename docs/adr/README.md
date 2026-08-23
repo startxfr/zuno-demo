@@ -129,7 +129,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Partially implemented | Support dynamic LoRA adapter loading |
 | [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | v0.3 | Partially implemented | Optimize model selection using quality cost and latency |
 | [ADR-0305](0305-introduce-automated-model-benchmarking.md) | v0.3 | Partially implemented | Introduce automated model benchmarking |
-| [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.3 | Partially implemented | Support self-service agent onboarding |
+| [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.4 | Proposed | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Implemented | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v0.3 | Partially implemented | Introduce policy-driven autonomous optimization |
 | [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) | v0 | Implemented | Manage static Kubernetes resources as per-role kustomize directories |
@@ -182,7 +182,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0407](0400-v0.4-roadmap.md#adr-0407-add-specialized-task-oriented-frontend-views) | v0.4 | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0408](0400-v0.4-roadmap.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) | v0.4 | Proposed | Automate removal of inaccessible private RAG content |
 | [ADR-0409](0400-v0.4-roadmap.md#adr-0409-introduce-advanced-human-approval-workflows) | v0.4 | Proposed | Introduce advanced human approval workflows |
-| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.4 | Partially implemented | Expand the agent catalog beyond the initial five agents |
+| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.4 | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Implemented | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | v0.4 | Implemented | Consolidate Grafana dashboards into six platform views |

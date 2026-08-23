@@ -1,7 +1,7 @@
 # ADR-0307: Support self-service agent onboarding
 
-- **Status:** Partially implemented (template, validation workflow and sixth-agent definition merged; deployment gate pending)
-- **Target:** v0.3
+- **Status:** Proposed (deferred to v0.4 - WP-41 cancelled 2026-08-23; the merged template generator under `platform/templates/agent/` remains in the repo but self-service onboarding is not an active decision for v0.3)
+- **Target:** v0.4
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
 

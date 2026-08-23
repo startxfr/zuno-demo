@@ -1,6 +1,6 @@
 # ADR-0410: Expand the agent catalog beyond the initial five agents
 
-- **Status:** Partially implemented (template, validation workflow and sixth-agent definition merged; deployment gate pending)
+- **Status:** Proposed (deferred - WP-41 cancelled 2026-08-23; the merged Naveo agent bundle under `agents/naveo/` remains in the repo but the sixth-agent deployment gate is not being pursued)
 - **Target:** v0.4
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
