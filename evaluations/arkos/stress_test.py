@@ -85,6 +85,16 @@ IMAGE_GENERATION_PROMPTS = [
     # ADR-0415's actual intended use case: an image embedded within a
     # document draft, not a standalone ask.
     ("dat_with_diagram", "Draft a DAT for the OpenShift AI GPU sizing project, including an architecture diagram."),
+    # A technical-schema ask rather than a photorealistic one. SDXL has no
+    # diagram-specialized mode, so "an image was generated" is what this
+    # asserts (same as the two cases above) - nothing in this pipeline
+    # validates that the picture is a structurally-correct, legible
+    # box-and-arrow diagram of node/pod/service/configmap relationships.
+    (
+        "k8s_relations_schema",
+        "Can you generate a schema explaining, in Kubernetes or OpenShift, the relation between "
+        "a node, a pod, a service and a configmap?",
+    ),
 ]
 
 

@@ -43,6 +43,10 @@ configMapGenerator:
       - arkos-stress_test.py=../../../../../evaluations/arkos/stress_test.py
       - comage-scenarios.yaml=../../../../../evaluations/comage/scenarios.yaml
       - comage-security_checks.py=../../../../../evaluations/comage/security_checks.py
+      # ADR-0216/WP-065's SXA-visualization boundary probe - see that
+      # file's own module docstring for why this is a degradation check
+      # rather than a positive one (unlike arkos-stress_test.py above).
+      - comage-stress_test.py=../../../../../evaluations/comage/stress_test.py
       - advantage-scenarios.yaml=../../../../../evaluations/advantage/scenarios.yaml
       - advantage-security_checks.py=../../../../../evaluations/advantage/security_checks.py
       - finage-scenarios.yaml=../../../../../evaluations/finage/scenarios.yaml
