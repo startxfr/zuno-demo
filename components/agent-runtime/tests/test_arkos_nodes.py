@@ -421,6 +421,227 @@ async def test_draft_node_handles_a_downstream_error_nested_inside_the_mcp_envel
 
 
 # --------------------------------------------------------------------------
+# ADR-0516 + live-incident fix (2026-08-23, run_id
+# 3607e721-236b-4d02-ade5-d78dff32c610): generate_diagram's own bounded
+# retry-on-failure and result-grounding, on top of the ADR-0516 dispatch
+# already covered above. Shared helper under test:
+# nodes.py:_resolve_diagram_generation_call / _render_diagram /
+# _summarize_rendered_svg.
+# --------------------------------------------------------------------------
+
+
+def _fake_diagram_svg_base64(diagram_type: str, *labels: str) -> str:
+    import base64 as _base64
+
+    labels_markup = "".join(f"<text>{label}</text>" for label in labels)
+    svg = f'<svg aria-roledescription="{diagram_type}">{labels_markup}</svg>'
+    return _base64.b64encode(svg.encode()).decode()
+
+
+async def test_draft_node_retries_generate_diagram_after_a_render_failure_and_succeeds() -> None:
+    """diagram-render now genuinely reports invalid Mermaid syntax as an
+    error (server.js's findRenderIssue) instead of silently returning
+    Mermaid's own error/degenerate placeholder as a 200 success. On that
+    error, _resolve_diagram_generation_call makes one more model call,
+    still offering generate_diagram, so the model can retry with corrected
+    mermaid_source - this is the self-correcting path succeeding on the
+    retry."""
+    render_call_count = 0
+    followup_call_count = 0
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "generate_diagram",
+                        "args": {"mermaid_source": 'pie title X\n  label A 1 #FF0000'},
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        nonlocal render_call_count
+        render_call_count += 1
+        if render_call_count == 1:
+            return {"tool": "generate_diagram", "result": {"error": "Pie chart has no slices - check the syntax."}}
+        assert kwargs["arguments"]["mermaid_source"] == '"Client A" : 1200000'
+        return {
+            "tool": "generate_diagram",
+            "result": {
+                "data_base64": _fake_diagram_svg_base64("pie", "Client A", "1200000"),
+                "mime_type": "image/svg+xml",
+                "alt": "Top customer",
+            },
+        }
+
+    async def fake_followup_invoke(**kwargs):
+        nonlocal followup_call_count
+        followup_call_count += 1
+        if followup_call_count == 1:
+            assert kwargs.get("tools"), "retry round must still offer generate_diagram"
+            return (
+                _FakeModelResult(
+                    "",
+                    tool_calls=[
+                        {
+                            "name": "generate_diagram",
+                            "args": {"mermaid_source": '"Client A" : 1200000'},
+                            "id": "call_2",
+                        }
+                    ],
+                ),
+                ProviderCandidate(name="ai-gateway"),
+            )
+        assert kwargs.get("tools") is None, "final round must be a forced, tool-less synthesis call"
+        # The grounded tool summary from the successful retry must be what
+        # the model actually sees, not just status: ok.
+        tool_messages = [m for m in kwargs["messages"] if type(m).__name__ == "ToolMessage"]
+        assert '"diagram_type": "pie"' in tool_messages[-1].content
+        assert '"Client A"' in tool_messages[-1].content
+        return _FakeModelResult("Here's the pie chart of your top customer."), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "generate a pie chart of Client A's revenue",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert render_call_count == 2
+    assert followup_call_count == 2
+    assert result["document_draft"] == "Here's the pie chart of your top customer."
+    assert len(result["generated_images"]) == 1
+    assert result["generated_images"][0]["mime_type"] == "image/svg+xml"
+
+
+async def test_draft_node_generate_diagram_retry_also_fails_reports_honestly() -> None:
+    """Both the original attempt and the one retry attempt fail (e.g. the
+    model can't fix its own syntax) - the hard 2-attempt cap must stop
+    there rather than looping forever, generated_images must stay empty,
+    and the reply must reflect the real failure, not a fabricated
+    success."""
+    render_call_count = 0
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[{"name": "generate_diagram", "args": {"mermaid_source": "not mermaid at all"}, "id": "call_1"}],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        nonlocal render_call_count
+        render_call_count += 1
+        return {"tool": "generate_diagram", "result": {"error": "Mermaid could not parse this diagram."}}
+
+    followup_call_count = 0
+
+    async def fake_followup_invoke(**kwargs):
+        nonlocal followup_call_count
+        followup_call_count += 1
+        if followup_call_count == 1:
+            assert kwargs.get("tools"), "retry round must still offer generate_diagram"
+            return (
+                _FakeModelResult(
+                    "",
+                    tool_calls=[{"name": "generate_diagram", "args": {"mermaid_source": "still not mermaid"}, "id": "call_2"}],
+                ),
+                ProviderCandidate(name="ai-gateway"),
+            )
+        assert kwargs.get("tools") is None, "final round after the retry is exhausted must be forced synthesis"
+        return (
+            _FakeModelResult("I'm sorry, I couldn't generate that diagram."),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {"message": "generate a diagram", "bearer_token": "t", "request_id": "req-1"}
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert render_call_count == 2, "must stop after exactly one retry, not loop"
+    assert result.get("generated_images", []) == []
+    assert "couldn't generate" in result["document_draft"].lower()
+
+
+async def test_draft_node_generate_diagram_first_attempt_success_grounds_the_followup_call() -> None:
+    """Even when the first attempt succeeds outright (no retry needed), the
+    follow-up model call must receive a grounded summary of what was
+    actually rendered - not just status: ok - so its reply describes the
+    real diagram instead of guessing."""
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[{"name": "generate_diagram", "args": {"mermaid_source": "graph TD; A-->B;"}, "id": "call_1"}],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        return {
+            "tool": "generate_diagram",
+            "result": {
+                "data_base64": _fake_diagram_svg_base64("flowchart-v2", "A", "B"),
+                "mime_type": "image/svg+xml",
+                "alt": "A flowchart",
+            },
+        }
+
+    async def fake_followup_invoke(**kwargs):
+        assert kwargs.get("tools") is None
+        tool_messages = [m for m in kwargs["messages"] if type(m).__name__ == "ToolMessage"]
+        assert '"diagram_type": "flowchart-v2"' in tool_messages[-1].content
+        assert '"A"' in tool_messages[-1].content and '"B"' in tool_messages[-1].content
+        return _FakeModelResult("Here's the flowchart from A to B."), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {"message": "draw a flowchart from A to B", "bearer_token": "t", "request_id": "req-1"}
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert result["document_draft"] == "Here's the flowchart from A to B."
+    assert len(result["generated_images"]) == 1
+
+
+# --------------------------------------------------------------------------
 # ADR-0121/WP-059: draft_node's git-forge tool-call dispatch. Regression
 # coverage for the reported bug: git.* capabilities were declared in
 # allowed_tools/tool-bindings.yaml/tool-policy.yaml since WP-059 but no node
@@ -900,6 +1121,13 @@ TESTS = [
     test_reflect_node_bypasses_review_for_a_skip_reflect_draft,
     test_draft_node_dispatches_a_generate_image_tool_call,
     test_draft_node_then_reflect_node_survives_an_empty_image_caption,
+    # Pre-existing gap found while adding the tests below: this one was
+    # written during the 2026-08-23 envelope-unwrap fix but never actually
+    # registered here, so it never ran.
+    test_draft_node_handles_a_downstream_error_nested_inside_the_mcp_envelope,
+    test_draft_node_retries_generate_diagram_after_a_render_failure_and_succeeds,
+    test_draft_node_generate_diagram_retry_also_fails_reports_honestly,
+    test_draft_node_generate_diagram_first_attempt_success_grounds_the_followup_call,
     test_draft_node_dispatches_a_single_list_repositories_tool_call,
     test_draft_node_dispatches_parallel_list_and_private_list_calls,
     test_draft_node_resolves_a_second_sequential_git_round_then_forces_synthesis,

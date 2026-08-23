@@ -81,11 +81,48 @@ async function renderMermaidToSvg(mermaidSource) {
         // around elsewhere, e.g. every Python Job's HOME=/tmp fix).
         args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
       },
+      // Explicit instead of mermaid-cli's own unspecified defaults: a
+      // guaranteed white background (never dark-on-transparent-invisible,
+      // whatever theme mermaid-cli defaults to upstream) and a slightly
+      // larger base font size for legibility once the SVG is scaled down
+      // into a chat bubble.
+      parseMMDOptions: {
+        backgroundColor: "white",
+        mermaidConfig: { theme: "default", themeVariables: { fontSize: "16px" } },
+      },
     });
     return await fs.readFile(outputPath, "utf8");
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+// mermaid.js never throws on invalid diagram syntax - it catches its own
+// parse errors internally and draws a placeholder graphic instead, so
+// run() above resolves normally either way. Two failure shapes have been
+// observed live against this service (run_id
+// 3607e721-236b-4d02-ade5-d78dff32c610, a real Comage conversation):
+// mermaid's own red "Syntax error in text" box (aria-roledescription=
+// "error"), and a degenerate empty pie (aria-roledescription="pie" but
+// zero rendered slices - e.g. unquoted/malformed labels that don't
+// hard-error but produce nothing). Both used to come back as a normal
+// HTTP 200 - every caller up the chain (mcp-gateway's diagram_gen.py,
+// agent-runtime's _resolve_diagram_generation_call) only checks HTTP
+// status / an explicit "error" key, never SVG content, so a genuinely
+// failed render was reported as a success end to end, including back to
+// the LLM. Catching it here, before the 200 response, is the one place
+// that can see the actual rendered content.
+function findRenderIssue(svgText) {
+  if (/aria-roledescription="error"/.test(svgText)) {
+    return "Mermaid could not parse this diagram (syntax error in the mermaid_source).";
+  }
+  if (/aria-roledescription="pie"/.test(svgText) && !/<path[^>]*class="[^"]*pieCircle/.test(svgText)) {
+    return (
+      'Pie chart has no slices - check the "Label" : value syntax ' +
+      "(quoted label, colon, plain number; no inline per-slice colors)."
+    );
+  }
+  return null;
 }
 
 app.post("/render", async (req, res) => {
@@ -104,6 +141,11 @@ app.post("/render", async (req, res) => {
 
   try {
     const svg = await Promise.race([renderMermaidToSvg(mermaidSource), timeout]);
+    const issue = findRenderIssue(svg);
+    if (issue) {
+      console.error(`[${requestId}] render produced invalid output: ${issue}`);
+      return res.status(422).json({ error: issue, request_id: requestId });
+    }
     return res.json({
       data_base64: Buffer.from(svg, "utf8").toString("base64"),
       mime_type: "image/svg+xml",

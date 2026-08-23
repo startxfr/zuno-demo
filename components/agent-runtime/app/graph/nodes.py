@@ -17,6 +17,7 @@ app/graph/shapes/retrieve_reason_respond.py's `build()` calls the
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import re
@@ -216,9 +217,19 @@ _GENERATE_DIAGRAM_TOOL_SCHEMA = {
                 "mermaid_source": {
                     "type": "string",
                     "description": (
-                        "Valid Mermaid diagram source (e.g. 'graph TD; A-->B;' or "
-                        "'sequenceDiagram\\n  Alice->>Bob: Hi'). Write the complete "
-                        "diagram definition, not a description of one."
+                        "Valid Mermaid diagram source. Write the complete diagram "
+                        "definition, not a description of one. Use real Mermaid syntax "
+                        "only - do not invent your own keywords or fields. Three "
+                        "examples of correct syntax:\n"
+                        "- Flowchart: 'graph TD; A-->B;'\n"
+                        "- Sequence diagram: 'sequenceDiagram\\n  Alice->>Bob: Hi'\n"
+                        "- Pie chart: 'pie title Top Customers\\n  \"Client A\" : "
+                        "1200000\\n  \"Client B\" : 950000'. Each data line MUST be a "
+                        "quoted label, a colon, then a plain number - nothing else. "
+                        "Pie charts do NOT support a 'label' keyword and do NOT "
+                        "support inline per-slice colors of any kind; slice colors "
+                        "come from the rendering theme automatically, never from the "
+                        "data lines."
                     ),
                 },
                 "alt": {
@@ -260,13 +271,19 @@ _LIST_REPOSITORIES_TOOL_SCHEMA = {
     "function": {
         "name": "list_repositories",
         "description": (
-            "List the public repositories owned by a GitHub or GitLab user, "
-            "organization, or group. Requires the caller to name the owner "
-            "explicitly - there is no default org configured on this platform, so "
-            "ask the user which one to check rather than guessing. For GitLab, "
-            "list_private_repositories also returns internal/private repositories "
-            "(GitHub has no private equivalent - this server never grants private "
-            "GitHub access)."
+            "List up to 10 of the most-starred and up to 10 of the most-recently-"
+            "active PUBLIC repositories owned by a GitHub or GitLab user, "
+            "organization, or group - NOT the full repository list (large orgs can "
+            "have hundreds of repos, too much to return here). Each returned "
+            "repository includes stars, last_activity, and matched_by (which "
+            "list(s) it appeared in) so you can tell 'top starred' apart from "
+            "'most active'. If the caller needs a repo that isn't in either top-10 "
+            "set, say so rather than implying this is exhaustive. Requires the "
+            "caller to name the owner explicitly - there is no default org "
+            "configured on this platform, so ask the user which one to check "
+            "rather than guessing. For GitLab, list_private_repositories also "
+            "returns internal/private repositories (GitHub has no private "
+            "equivalent - this server never grants private GitHub access)."
         ),
         "parameters": {
             "type": "object",
@@ -326,11 +343,17 @@ _LIST_PRIVATE_REPOSITORIES_TOOL_SCHEMA = {
     "function": {
         "name": "list_private_repositories",
         "description": (
-            "List EVERY repository (public, internal, AND private) owned by a "
-            "GitLab user or group - not a private-only filter. GitLab only - "
-            "refuses provider=\"github\"; this server never grants private GitHub "
-            "access, use list_repositories for GitHub. Requires the caller to name "
-            "the owner explicitly - there is no default org configured."
+            "List up to 10 of the most-starred and up to 10 of the most-recently-"
+            "active repositories (public, internal, AND private) owned by a GitLab "
+            "user or group - NOT the full repository list, and not a private-only "
+            "filter. Each returned repository includes stars, last_activity, and "
+            "matched_by (which list(s) it appeared in) so you can tell 'top "
+            "starred' apart from 'most active'. If the caller needs a repo that "
+            "isn't in either top-10 set, say so rather than implying this is "
+            "exhaustive. GitLab only - refuses provider=\"github\"; this server "
+            "never grants private GitHub access, use list_repositories for GitHub. "
+            "Requires the caller to name the owner explicitly - there is no "
+            "default org configured."
         ),
         "parameters": {
             "type": "object",
@@ -988,23 +1011,48 @@ async def _resolve_image_generation_call(
     return {"reply": reply_text, "provider_used": final_provider.name, **generated_images_update}
 
 
-async def _resolve_diagram_generation_call(
-    state: AgentState,
-    agent: AgentDefinition,
-    task: TaskDefinition,
-    turn_messages: List[Any],
-    assistant_result: Any,
-    diagram_call: Dict[str, Any],
-    provider: Any,
-) -> Dict[str, Any]:
-    """ADR-0516: mirrors _resolve_image_generation_call above almost
-    exactly (same two-round tool-calling shape, same generated_images
-    sidecar field - a rendered diagram is indistinguishable in shape from
-    a generated image, just a different mime_type, so it reuses the exact
-    same state field and frontend rendering path) - the only real
-    difference is the tool being called and its argument shape
-    (mermaid_source, not prompt/negative_prompt)."""
-    args = diagram_call.get("args", {})
+_SVG_TEXT_ELEMENT_RE = re.compile(r"<(?:text|tspan)[^>]*>([^<]+)</(?:text|tspan)>")
+_SVG_ARIA_ROLEDESCRIPTION_RE = re.compile(r'aria-roledescription="([^"]+)"')
+
+
+def _summarize_rendered_svg(data_base64: str, max_labels: int = 20, max_label_length: int = 80) -> Dict[str, Any]:
+    """Extracts a compact, text-only summary of what a rendered Mermaid
+    SVG actually contains - diagram type and visible labels - so the
+    model's follow-up reply can be grounded in the real render instead of
+    guessing. Live-cluster-confirmed 2026-08-23 (run_id
+    3607e721-236b-4d02-ade5-d78dff32c610): without this, the model
+    fabricated colors/labels for a diagram it never received any content
+    from, even on calls that rendered successfully - the tool result used
+    to carry only `status: ok`. Deliberately not the full SVG markup fed
+    back verbatim - that's mostly path/style noise and would bloat every
+    follow-up call's context for no benefit."""
+    try:
+        svg_text = base64.b64decode(data_base64).decode("utf-8", errors="replace")
+    except (ValueError, UnicodeDecodeError):
+        return {"diagram_type": "unknown", "labels": []}
+    type_match = _SVG_ARIA_ROLEDESCRIPTION_RE.search(svg_text)
+    diagram_type = type_match.group(1) if type_match else "unknown"
+    labels: List[str] = []
+    seen = set()
+    for raw in _SVG_TEXT_ELEMENT_RE.findall(svg_text):
+        label = raw.strip()
+        if not label or label in seen:
+            continue
+        seen.add(label)
+        labels.append(label[:max_label_length])
+        if len(labels) >= max_labels:
+            break
+    return {"diagram_type": diagram_type, "labels": labels}
+
+
+async def _render_diagram(
+    state: AgentState, agent: AgentDefinition, task: TaskDefinition, args: Dict[str, Any]
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Runs one generate_diagram render attempt and builds the ToolMessage
+    summary + generated_images state update - shared by
+    _resolve_diagram_generation_call's first attempt and its one retry
+    attempt below, so both go through identical envelope-unwrap/error/
+    grounding handling."""
     try:
         tool_result = await invoke_tool(
             tool_name="generate_diagram",
@@ -1031,30 +1079,106 @@ async def _resolve_diagram_generation_call(
     result = tool_result.get("result", tool_result)
 
     if "error" in result:
-        tool_summary = {"status": "error", "detail": result["error"]}
-        generated_images_update: Dict[str, Any] = {}
-    else:
-        tool_summary = {"status": "ok", "mermaid_source": args.get("mermaid_source", "")}
-        generated_images_update = {
-            "generated_images": state.get("generated_images", [])
-            + [
-                {
-                    "data_base64": result["data_base64"],
-                    "mime_type": result.get("mime_type", "image/svg+xml"),
-                    "alt": result.get("alt", args.get("alt") or "Generated diagram"),
-                }
-            ]
-        }
+        return {"status": "error", "detail": result["error"]}, {}
 
-    follow_up_messages = [
+    tool_summary = {"status": "ok", **_summarize_rendered_svg(result["data_base64"])}
+    generated_images_update = {
+        "generated_images": state.get("generated_images", [])
+        + [
+            {
+                "data_base64": result["data_base64"],
+                "mime_type": result.get("mime_type", "image/svg+xml"),
+                "alt": result.get("alt", args.get("alt") or "Generated diagram"),
+            }
+        ]
+    }
+    return tool_summary, generated_images_update
+
+
+async def _resolve_diagram_generation_call(
+    state: AgentState,
+    agent: AgentDefinition,
+    task: TaskDefinition,
+    turn_messages: List[Any],
+    assistant_result: Any,
+    diagram_call: Dict[str, Any],
+    provider: Any,
+) -> Dict[str, Any]:
+    """ADR-0516 + live-incident fix (2026-08-23, run_id
+    3607e721-236b-4d02-ade5-d78dff32c610): mermaid.js never throws on
+    invalid syntax - it draws its own error/degenerate placeholder graphic
+    instead. components/diagram-render/server.js now detects that
+    (findRenderIssue) and returns a real error, which reaches here as a
+    genuine `"error" in result` for the first time. On that error, instead
+    of immediately reporting failure, this makes one more model call -
+    still offering generate_diagram - with the real error detail, so the
+    model can react and retry with corrected mermaid_source. Hard cap:
+    exactly one retry (two total render attempts), same bounded-round
+    pattern _resolve_git_forge_calls below uses for its own
+    sequential-call case - not a general agentic loop.
+
+    On any successful render (first attempt or the retry), the tool
+    summary now also carries a real, grounded description of what was
+    actually drawn (_render_diagram -> _summarize_rendered_svg), not just
+    `status: ok` - previously the model's follow-up reply had zero
+    information about the actual rendered content and fabricated
+    descriptions of it (confirmed live: "includes colors for each
+    segment... Pink... Yellow..." for a diagram it never saw)."""
+    args = diagram_call.get("args", {})
+    tool_summary, generated_images_update = await _render_diagram(state, agent, task, args)
+
+    messages: List[Any] = [
         *turn_messages,
         AIMessage(content=assistant_result.content or "", tool_calls=[diagram_call]),
         ToolMessage(content=json.dumps(tool_summary), tool_call_id=diagram_call.get("id", "")),
     ]
+
+    if tool_summary.get("status") == "error":
+        try:
+            retry_result, retry_provider = await _model_router.invoke_with_fallback(
+                classification=state.get("effective_classification", agent.preferred_classification),
+                messages=messages,
+                bearer_token=state["bearer_token"],
+                local_only=state.get("local_only_required", False),
+                request_id=state.get("request_id"),
+                run_id=state.get("run_id"),
+                agent_name=agent.name,
+                task_name=task.name,
+                project_id=state.get("project_id") if task.project_required else None,
+                tools=[_GENERATE_DIAGRAM_TOOL_SCHEMA],
+            )
+        except ModelRouterError as exc:
+            logger.error("retry model call after failed generate_diagram render failed: %s", exc)
+            return {
+                "reply": f"I couldn't generate that diagram: {tool_summary['detail']}",
+                "provider_used": provider.name,
+                "errors": state.get("errors", []) + [f"reason: {exc}"],
+                **generated_images_update,
+            }
+
+        retry_calls = getattr(retry_result, "tool_calls", None) or []
+        retry_diagram_call = next((tc for tc in retry_calls if tc.get("name") == "generate_diagram"), None)
+        if retry_diagram_call is None:
+            # The model gave up / replied in text instead of retrying -
+            # its own words are the final reply, same as
+            # _resolve_git_forge_calls's own "if not round_2_calls" branch
+            # below for the sequential-tool-calling-provider case.
+            reply_text = retry_result.content if hasattr(retry_result, "content") else str(retry_result)
+            return {"reply": reply_text, "provider_used": retry_provider.name, **generated_images_update}
+
+        retry_args = retry_diagram_call.get("args", {})
+        tool_summary, generated_images_update = await _render_diagram(state, agent, task, retry_args)
+        messages = [
+            *messages,
+            AIMessage(content=retry_result.content or "", tool_calls=[retry_diagram_call]),
+            ToolMessage(content=json.dumps(tool_summary), tool_call_id=retry_diagram_call.get("id", "")),
+        ]
+        provider = retry_provider
+
     try:
         final_result, final_provider = await _model_router.invoke_with_fallback(
             classification=state.get("effective_classification", agent.preferred_classification),
-            messages=follow_up_messages,
+            messages=messages,
             bearer_token=state["bearer_token"],
             local_only=state.get("local_only_required", False),
             request_id=state.get("request_id"),
@@ -1062,13 +1186,14 @@ async def _resolve_diagram_generation_call(
             agent_name=agent.name,
             task_name=task.name,
             project_id=state.get("project_id") if task.project_required else None,
+            # Forced synthesis - no more diagram tool-calling rounds after this.
         )
     except ModelRouterError as exc:
         logger.error("follow-up model call after generate_diagram failed: %s", exc)
         fallback_reply = (
             "I generated the diagram, but couldn't compose a follow-up reply right now."
-            if "error" not in result
-            else f"I couldn't generate that diagram: {result['error']}"
+            if tool_summary.get("status") == "ok"
+            else f"I couldn't generate that diagram: {tool_summary.get('detail')}"
         )
         return {
             "reply": fallback_reply,
