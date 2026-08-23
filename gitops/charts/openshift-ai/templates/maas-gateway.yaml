@@ -139,6 +139,17 @@ on "failed to get server groups: ... i/o timeout". This policy mirrors the
 operator-generated "payload-processing" NetworkPolicy for the missing label.
 VERIFIED live, 2026-08-17: RHOAI 3.5.0-ea.2. Revisit if a future RHOAI build
 generates this NetworkPolicy on its own.
+
+2026-08-23 (ADR-0201/WP-27): also allow port 9004 from maas-default-gateway
+itself, not just RHOAI's own data-science-gateway. The authenticated MaaS
+request was 500ing before any TLS handshake: maas-default-gateway's pods
+carry gateway.networking.k8s.io/gateway-name=maas-default-gateway (Istio
+derives this label from the Gateway object's own name, not overridable via
+spec.infrastructure.labels), so the data-science-gateway-only allow-list
+below silently dropped every request from our own gateway. This is our
+policy (ArgoCD-tracked, no ModelsAsService ownerReference) so it can be
+edited directly - unlike the operator-owned "payload-processing" policy
+below, where a live patch was confirmed not to stick.
 */ -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -164,6 +175,12 @@ spec:
           podSelector:
             matchLabels:
               gateway.networking.k8s.io/gateway-name: data-science-gateway
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: maas-default-gateway
       ports:
         - port: 9004
           protocol: TCP
@@ -178,5 +195,42 @@ spec:
         - port: 9005
           protocol: TCP
         - port: 9090
+          protocol: TCP
+---
+{{- /*
+2026-08-23 (ADR-0201/WP-27): "payload-processing" (unlike its
+"payload-pre-processing" sibling above) already has an operator-generated
+NetworkPolicy, owned by the ModelsAsService controller (ownerReference,
+controller: true) - VERIFIED live that a direct patch to it does not stick,
+the controller reconciles it back synchronously. Kubernetes unions ingress
+rules across every NetworkPolicy selecting a given pod, so this adds a
+second, independently-owned policy selecting the same pods rather than
+editing the operator's - nothing for that controller to revert. Same
+maas-default-gateway allow-list gap as payload-pre-processing's policy
+above; see that block's comment for the full root cause.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payload-processing-maas-gateway-allow
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  podSelector:
+    matchLabels:
+      app: payload-processing
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: maas-default-gateway
+      ports:
+        - port: 9004
           protocol: TCP
 {{- end }}
