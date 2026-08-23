@@ -1,9 +1,30 @@
 # ADR-0216: Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG
 
-- **Status:** Partially implemented (WP-065 Part A merged 2026-08-21: MariaDB database wiring, dedicated S3 bucket wiring, native mysqldump import stage, `sxa_anonymize.py` redaction module, `sales-db` engine-select mode, and fixture-driven tests throughout; real dump/bucket and live verification pending)
+- **Status:** Partially implemented (WP-065 Part A merged 2026-08-21; **amended 2026-08-23** — see Amendment below — reusing ADR-0217's corpus bucket, no anonymization transform; chart wiring for MariaDB-mode `sales-db` and live verification pending)
 - **Target:** v0.2
 - **Date:** 2026-08-21
 - **Decision owners:** Zuno Demo architecture team
+
+## Amendment (2026-08-23)
+
+Two operator decisions supersede clauses 2 and 4 below before Part B ever
+ran:
+
+1. **No separate raw dump exists.** Rather than wait on a dedicated
+   bucket/dump, WP-065 reuses ADR-0217/WP-067's already-anonymized
+   `zuno-demo-sxa-corpus` bucket (`sxa.schema.sql`/`sxa.data.sql`) as its
+   source. The MariaDB import and the `sales-db` MCP tools therefore serve
+   the same as-is content RAG does — not genuinely real/unredacted values,
+   as clause 3 originally intended. This is a deliberate scope reduction,
+   not a silent gap: there is currently no raw dump anywhere in this
+   environment.
+2. **The `sxa_anonymize.py` redaction step (clause 4) is removed
+   entirely**, not just relaxed. Both the MCP path and the RAG path now
+   index/serve SXA content exactly as it arrives from S3, whatever its
+   actual anonymization state — the same trust-the-source posture
+   ADR-0217 already used for its own corpus. `min_classification: C3` and
+   `allowed_groups: [sales, board]` remain the only real safeguard; there
+   is no longer a "vector index only gets anonymized text" claim to make.
 
 ## Context
 
@@ -61,14 +82,16 @@ things ADR-0016/ADR-0206 didn't have to consider:
    chart (ADR-0352): synthetic data stays cheap and fast for tests, real
    data lives where it's native.
 
-2. **The real SXA S3 dump lives in its own bucket, separate from the
-   shared corpus bucket** (`zuno-demo-rag-corpus`) that holds Confluence/
-   Redhat-docs/model content. This repo provisions no AWS infrastructure
-   (no Terraform, no AWS Ansible collections — every existing bucket,
-   including the corpus one, is operator-pre-created); the new bucket's
-   name/region and Vault-sourced access credentials are wired the same
-   way, left as explicit placeholders until the operator supplies real
-   values and creates the bucket.
+2. ~~The real SXA S3 dump lives in its own bucket, separate from the
+   shared corpus bucket~~ **Superseded by the 2026-08-23 amendment above:**
+   the dump lives in ADR-0217/WP-067's dedicated `zuno-demo-sxa-corpus`
+   bucket, reused rather than duplicated, since no separate raw dump
+   exists. (Original text, for history: the real SXA S3 dump lives in its
+   own bucket, separate from the shared corpus bucket
+   (`zuno-demo-rag-corpus`) that holds Confluence/Redhat-docs/model
+   content. This repo provisions no AWS infrastructure — every existing
+   bucket is operator-pre-created; the bucket's name/region and
+   Vault-sourced access credentials are wired the same way.)
 
 3. **`components/mcp-servers/sales-db/` gains an engine-select mode**
    (`SXA_DB_ENGINE=postgres|mariadb`, default `postgres`) rather than a
@@ -82,21 +105,14 @@ things ADR-0016/ADR-0206 didn't have to consider:
    and (per this ADR's security considerations below) the path real
    record values are allowed to flow through unredacted.
 
-4. **RAG consumption is real but anonymized-first.** The current
-   `load-sxa-dump` fetch stage (`components/rag-ingestion/src/
-   rag_ingestion.py`) is a placeholder that regex-splits the dump into
-   raw, truncated DDL/INSERT text and chunks *that* — never exercised
-   against real content because none existed. It is replaced with a
-   stage that extracts real per-record semantic text from the imported
-   MariaDB tables, passes it through a new, explicit, **schema-aware
-   deterministic redaction step** (`components/rag-ingestion/src/
-   sxa_anonymize.py` — a fixed map of known PII-bearing columns, e.g.
-   `customers.contact_name`/`email`/`phone`, to pseudonymized/redacted
-   values; not a heuristic NER scanner, since the schema is fully known
-   and this keeps the transform auditable), and only then chunks/embeds
-   the anonymized result into `knowledge.sxa-legacy`'s pgvector index.
-   Real values never enter vector space; the MCP path above is what
-   carries them, under its existing access control.
+4. ~~RAG consumption is real but anonymized-first~~ **Superseded by the
+   2026-08-23 amendment above: no redaction step.** The `load-sxa-dump`
+   fetch stage (`components/rag-ingestion/src/rag_ingestion.py`) extracts
+   real per-record text from the imported MariaDB tables and
+   chunks/embeds it into `knowledge.sxa-legacy`'s pgvector index exactly
+   as imported — no transform. `sxa_anonymize.py` (which would have done
+   schema-aware deterministic redaction) was deleted; there is no longer
+   a distinction between what the MCP path and the RAG path carry.
 
 5. **No new agent-side wiring.** `knowledge.sxa-legacy`'s existing policy
    (`allowed_groups: [sales, board]`, `min_classification: C3`) already
@@ -120,20 +136,17 @@ keep passing.
 
 ## Security considerations
 
-Real SXA record values reach agent context only through the
-access-controlled, parameterized MCP path (ADR-0017), gated by
-`allowed_groups`/`min_classification` per tool exactly as today. Anything
-that reaches the shared vector index is anonymized first — this is a
-stricter posture than ADR-0206 required (which only classified the whole
-domain C3), because embeddings are effectively permanent and harder to
-scope per-query than a live SQL grant. C3 classification continues to
-keep both paths local-model-only (ADR-0021/ADR-0035); this ADR does not
-relax that. The real dump file itself never enters git (ADR-0025) and
-lives only in the new S3 bucket and the MariaDB database it's imported
-into. `sxa_anonymize.py`'s column map must be reviewed against the real
-schema before the operator loads real data — an incomplete map is a
-silent PII leak into vector space, not a fail-closed error, so this
-review is a named operator gate, not an implicit assumption.
+**2026-08-23 amendment:** both the MCP path and the RAG path now carry
+SXA content exactly as it arrives from S3 — there is no longer an
+anonymization step distinguishing them, and no claim that the vector
+index only ever holds redacted text. `allowed_groups`/`min_classification`
+gating (ADR-0017's access-controlled, parameterized MCP path;
+`knowledge.sxa-legacy`'s policy for RAG) is the sole safeguard for both
+paths, same as ADR-0217 already accepted for its own corpus. C3
+classification continues to keep both paths local-model-only
+(ADR-0021/ADR-0035); this ADR does not relax that. The dump file itself
+never enters git (ADR-0025) and lives only in the (reused) S3 bucket and
+the MariaDB database it's imported into.
 
 ## Operational considerations
 
@@ -147,14 +160,15 @@ import before it's agent-facing.
 
 ## Acceptance criteria
 
-- A real mysqldump loads natively into the new MariaDB `sxa` database
-  with no schema-translation step.
+- The dump (schema.sql + data.sql from the reused ADR-0217 corpus bucket)
+  loads natively into the MariaDB `sxa` database with no schema-translation
+  step.
 - `sales-db` in `mariadb` mode answers `get_customer`/
-  `aggregate_revenue_by_year`/`lookup_record` with real values, gated by
-  the same `allowed_groups`/`min_classification` policy as today.
-- RAG-embedded `knowledge.sxa-legacy` chunks derived from real records
-  never contain unredacted values for the columns `sxa_anonymize.py`
-  declares as PII-bearing (spot-checked, not merely asserted).
+  `aggregate_revenue_by_year`/`lookup_record` with the imported content,
+  gated by the same `allowed_groups`/`min_classification` policy as today.
+- RAG-embedded `knowledge.sxa-legacy` chunks derived from the imported
+  records match the source content byte-for-byte — no transform applied
+  (spot-checked, not merely asserted).
 - Users without Sales/Direction legacy authorization still cannot reach
   either path (ADR-0206's existing acceptance bar, re-verified against
   real data).

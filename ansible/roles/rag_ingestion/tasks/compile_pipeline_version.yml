@@ -17,18 +17,19 @@
 # of leaving any of them permanently empty.
 #
 # COMPILE_TARGETS below is "tech" plus every WP-22/ADR-0217 domain that is
-# actually `enabled: true` today (sales/adv/sxa-legacy remain `enabled:
-# false` - nothing to compile for them yet) - extend this list as more
-# domains flip on. Confirmed live 2026-08-21: compiling a second domain
-# (sxa) exposed a real PipelineVersion-naming collision with tech's
-# ("Pipeline spec is immutable" - two domains' compiles both produced an
-# object literally named the chart's single pipeline.version value, and
+# actually `enabled: true` today (sales/adv remain `enabled: false` -
+# nothing to compile for them yet) - extend this list as more domains
+# flip on. Confirmed live 2026-08-21: compiling a second domain (sxa)
+# exposed a real PipelineVersion-naming collision with tech's ("Pipeline
+# spec is immutable" - two domains' compiles both produced an object
+# literally named the chart's single pipeline.version value, and
 # PipelineVersion names are unique per-namespace, not per-pipeline) -
 # fixed in files/pipeline.py.tpl by suffixing every non-tech domain's
-# compiled version name with its own domain name.
+# compiled version name with its own domain name. sxa-legacy added
+# 2026-08-23 once WP-065's amended Part B flipped it to enabled: true.
 - name: "rag_ingestion | set the list of pipeline compile targets"
   ansible.builtin.set_fact:
-    _rag_ingestion_compile_targets: ["tech", "sxa"]
+    _rag_ingestion_compile_targets: ["tech", "sxa", "sxa-legacy"]
 
 - name: "rag_ingestion | ensure the compiler venv (kfp SDK) exists"
   ansible.builtin.pip:

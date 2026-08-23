@@ -32,3 +32,22 @@ credentials:
   secretName: sales-db-postgresql-credentials
   secretStoreName: vault-backend
   refreshInterval: 1h
+
+# ADR-0216/WP-065: server.py's _connect() already dispatches to aiomysql
+# when SXA_DB_ENGINE=mariadb (same dict-row shape as psycopg, so no tool
+# body branches by engine) - this chart never wired that mode until now.
+# Flipped to mariadb 2026-08-23 once the sxa MariaDB database held real
+# imported content (gitops/charts/mariadb's sxaDatabase). username is
+# static (not Vault-stored), matching how ansible/roles/vault/tasks/
+# install.yml seeds only the password at sxa/mariadb-db.
+sxaDbEngine: mariadb
+mariadb:
+  host: mariadb.zuno-data.svc.cluster.local
+  port: "3306"
+  database: sxa
+  username: sxa
+  credentials:
+    vaultPath: sxa/mariadb-db
+    secretName: sales-db-mariadb-credentials
+    secretStoreName: vault-backend
+    refreshInterval: 1h

@@ -63,6 +63,23 @@ spec:
                   key: token
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+            - name: SXA_DB_ENGINE
+              value: {{ .Values.sxaDbEngine | default "postgres" | quote }}
+{{- if eq .Values.sxaDbEngine "mariadb" }}
+            - name: SXA_MARIADB_HOST
+              value: {{ .Values.mariadb.host | quote }}
+            - name: SXA_MARIADB_PORT
+              value: {{ .Values.mariadb.port | quote }}
+            - name: SXA_MARIADB_DATABASE
+              value: {{ .Values.mariadb.database | quote }}
+            - name: SXA_MARIADB_USER
+              value: {{ .Values.mariadb.username | quote }}
+            - name: SXA_MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mariadb.credentials.secretName }}
+                  key: password
+{{- end }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

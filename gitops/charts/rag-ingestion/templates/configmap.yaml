@@ -20,16 +20,18 @@ data:
   CONFLUENCE_SOURCES_JSON: {{ .Values.confluence | toJson | quote }}
   SALESFORCE_SOURCES_JSON: "[]"
   ARAMIS_SOURCES_JSON: "[]"
-  SXA_DUMP_S3_KEY: ""
+  SXA_DUMP_SCHEMA_S3_KEY: ""
+  SXA_DUMP_DATA_S3_KEY: ""
   SXA_SNAPSHOT_ID: ""
   # tech never sources from SXA - these exist only because
   # pipeline.py.tpl's CONFIG_KEYS requires the full key contract
-  # (SXA_DUMP_S3_KEY/SXA_SNAPSHOT_ID above included) in every domain's
-  # ConfigMap, tech's included. Confirmed live 2026-08-21: a stale
-  # PipelineVersion masked this gap here for a long time (compiled before
-  # these keys existed in CONFIG_KEYS); a fresh recompile without this
-  # block would hit the same CreateContainerConfigError the sxa domain's
-  # equivalent gap caused - see templates/domain-configmaps.yaml.
+  # (SXA_DUMP_SCHEMA_S3_KEY/SXA_DUMP_DATA_S3_KEY/SXA_SNAPSHOT_ID above
+  # included) in every domain's ConfigMap, tech's included. Confirmed live
+  # 2026-08-21: a stale PipelineVersion masked this gap here for a long
+  # time (compiled before these keys existed in CONFIG_KEYS); a fresh
+  # recompile without this block would hit the same
+  # CreateContainerConfigError the sxa domain's equivalent gap caused -
+  # see templates/domain-configmaps.yaml.
   SXA_S3_ENDPOINT: ""
   SXA_S3_BUCKET: ""
   SXA_S3_REGION: ""

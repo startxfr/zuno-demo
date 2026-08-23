@@ -2,18 +2,25 @@
 
 - **State:** Repo work merged (2026-08-21 - Part A complete: `knowledge.sxa`
   domain/policy/binding wiring, `fetch-sxa` source adapter (pure-Python
-  mysqldump parsing, no MariaDB/SQL engine), `sxa_anonymize.audit_pii_patterns()`,
-  weekly schedule, `rag-sxa` database wiring across postgresql/rag-ingestion/
-  rag-service charts, agent access grants for Comage/Advantage/Finage, a
-  declared-but-inert grant for Cognos, and fixture-driven tests - all passing.
-  Part B in progress (2026-08-21): dedicated bucket created and real export
-  uploaded, chart values filled in with the real bucket/keys, Vault-seeding
-  config ready - still open: run `make d0 install vault`, create the
-  `rag-sxa` database (`make d1 install postgresql`), flip
-  `domains.sxa.enabled: true` and sync `rag-ingestion`/`rag-service`, run
-  the pipeline, and live-verify.)
-- **ADRs:** ADR-0217 (To be implemented -> Partially implemented); related to
-  but does not modify ADR-0216/WP-065
+  mysqldump parsing, no MariaDB/SQL engine), weekly schedule, `rag-sxa`
+  database wiring across postgresql/rag-ingestion/rag-service charts,
+  agent access grants for Comage/Advantage/Finage, a declared-but-inert
+  grant for Cognos, and fixture-driven tests - all passing. Part B
+  live-verified 2026-08-23: Vault seeded (`rag-sxa-corpus-s3`,
+  `rag-postgres-sxa` ExternalSecrets synced), `rag-sxa` Postgres database
+  created, `domains.sxa.enabled: true` synced in both `rag-ingestion` and
+  `rag-service`, `compile_pipeline_version.yml`'s domain loop includes
+  `sxa` and a `PipelineVersion` (`v0-3-0-sxa`) exists, and an ingestion
+  workflow (`rag-corpus-ingestion-sxa-*`) is running against the live
+  cluster (a prior attempt errored 42h before this check; the current
+  run's outcome was still pending as of this check). **Amended
+  2026-08-23**: `audit_pii_patterns()` removed entirely (see ADR-0217's
+  Amendment section) - no PII scanning of any kind now, matching
+  ADR-0216/WP-065's own amendment. Still open: confirm the in-flight run
+  completes, live-verify retrieval by role, confirm the weekly schedule
+  reconciles, re-run for idempotency.
+- **ADRs:** ADR-0217 (To be implemented -> Partially implemented, amended
+  2026-08-23); related to but does not modify ADR-0216/WP-065
 - **Depends on:** none (independent of WP-065/WP-23's own open operator work)
 - **Blocks:** nothing - `knowledge.sxa-legacy` and its tests are untouched
 - **Estimated files touched:** ~20
@@ -97,16 +104,15 @@ alongside, without editing that matrix's existing sxa-legacy row).
    statements via a quote-aware, paren-depth-aware tokenizer -
    `_split_top_level`/`_split_row_tuples`/`_convert_sql_literal`), and
    `_fetch_sxa()` tying it together: fetch both files from the dedicated
-   bucket, parse, call `sxa_anonymize.audit_pii_patterns()` per row (never
-   `redact_row()` - this source is trusted pre-anonymized), render via the
-   existing `_render_record_text`, emit one raw record per row stamped
-   `domain: knowledge.sxa`. No SQL engine, ephemeral or persistent, is
-   involved anywhere in this path.
-6. **Audit function**: `components/rag-ingestion/src/sxa_anonymize.py`
-   gains `audit_pii_patterns(table, row) -> list[str]` - reuses the
-   existing `PII_COLUMNS` map and the email/phone regexes, logs a warning
-   per row/column hit, never alters a value. Additive; `redact_row()`/
-   `redact_value()` (WP-065's enforcing path) are unchanged.
+   bucket, parse, render via the existing `_render_record_text`, emit one
+   raw record per row stamped `domain: knowledge.sxa` - untouched,
+   trusted as-is (2026-08-23 amendment: no PII scan either). No SQL
+   engine, ephemeral or persistent, is involved anywhere in this path.
+6. ~~**Audit function**: `sxa_anonymize.py` gains
+   `audit_pii_patterns()`~~ **Superseded 2026-08-23**: removed entirely,
+   along with the rest of `sxa_anonymize.py` (WP-065's own amendment
+   dropped its enforcing path the same day, leaving the module with no
+   caller at all).
 7. **Chart wiring**: `gitops/charts/rag-ingestion/values.yaml`'s
    `domains.sxa` entry (`fetchStages: [fetch-sxa]`, its own
    `sxaCorpus.s3` block - a bucket dedicated to this source, distinct from
@@ -142,41 +148,26 @@ alongside, without editing that matrix's existing sxa-legacy row).
 ### Part B - operator steps (not executable by the model)
 
 1. ~~Create the dedicated SXA corpus S3 bucket~~ DONE 2026-08-21:
-   `zuno-demo-sxa-corpus` (eu-west-2). `sxa.schema.sql`/`sxa.data.sql` moved
-   there from the shared `zuno-demo-rag-corpus` bucket (size-verified,
-   originals deleted). A dedicated, bucket-scoped IAM user
-   (`zuno-sxa-corpus-s3`, policy limited to `GetObject`/`PutObject`/
-   `DeleteObject`/`ListBucket` on this one bucket) was created rather than
-   reusing broad admin credentials. `gitops/charts/rag-ingestion/values.yaml`'s
-   `domains.sxa.sxaCorpus` block now has the real bucket/region/keys filled
-   in (`schemaS3Key`/`dataS3Key` point at the two uploaded files).
-   `ansible/confidential.yml` (gitignored) and
-   `ansible/confidential.example.yml`/`ansible/roles/vault/tasks/
-   install.yml` (committed) have the matching `zuno_sxa_corpus_s3_*`
-   variables and `zuno/sxa-corpus/s3` Vault-seed task ready.
-   **Still open**: run `make d0 install vault` to actually seed the Vault
-   path live (config is ready, not yet applied to the cluster).
+   `zuno-demo-sxa-corpus` (eu-west-2), `sxa.schema.sql`/`sxa.data.sql`
+   uploaded, IAM user `zuno-sxa-corpus-s3` scoped to this bucket.
 2. ~~Upload the approved weekly export; set the real S3 keys~~ DONE
    2026-08-21, folded into step 1 above.
-3. Seed the new `rag-sxa` Postgres database's Vault-sourced credentials
-   (`rag-sxa/postgresql-app` - the self-generated entry added to
-   `ansible/roles/vault/tasks/install.yml`'s credential loop is ready, not
-   yet applied - same `make d0 install vault` run as step 1 covers both),
-   sync `gitops/charts/postgresql` (`make d1 install postgresql` - creates
-   the database + runs the one-time `CREATE EXTENSION vector`/`GRANT`),
-   then flip `domains.sxa.enabled: true` in both the `rag-ingestion` and
-   `rag-service` charts and sync both (`make d1 install rag-ingestion
-   rag-service`).
-4. Extend `ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml`'s
-   domain loop (currently `tech`-only, per its own comment: "extend this
-   loop to cover enabled domains when WP-22 flips one on") to also
-   compile+apply the `sxa` pipeline version, verified live against this
-   cluster's actual KFP/DataSciencePipelinesApplication setup rather than
-   guessed - deferred to here rather than Part A because it's
-   infrastructure-orchestration code this WP's author cannot validate
-   without a live cluster.
+3. ~~Seed Vault, create the `rag-sxa` Postgres database, flip
+   `domains.sxa.enabled: true` and sync~~ DONE, confirmed live
+   2026-08-23: `rag-sxa-corpus-s3`/`rag-postgres-sxa` ExternalSecrets
+   synced, `zuno-postgresql-pguser-ragsxa` Secret exists,
+   `domains.sxa.enabled: true` in both `rag-ingestion` and `rag-service`.
+4. ~~Extend `compile_pipeline_version.yml`'s domain loop to compile `sxa`~~
+   DONE, confirmed live 2026-08-23: `_rag_ingestion_compile_targets`
+   includes `sxa`, and a `PipelineVersion` (`v0-3-0-sxa`) exists in
+   `zuno-ai-build`.
 5. Run the ingestion pipeline once; confirm real rows land in
-   `document_embeddings` (row count, not just "the Job succeeded").
+   `document_embeddings` (row count, not just "the Job succeeded"). **In
+   progress as of 2026-08-23**: a workflow
+   (`rag-corpus-ingestion-sxa-65wsz-1-*`) was running at last check, ~2h
+   after start, following an earlier attempt that errored 42h before that
+   - confirm this run's outcome (and if it also failed, check why the
+   prior one errored before retrying blind).
 6. Confirm the weekly schedule ConfigMap was picked up by
    `ansible/roles/rag_ingestion/tasks/install.yml`'s recurring-run
    reconciliation (`oc get configmap -l zuno.io/rag-ingestion-schedule=true`,
@@ -193,8 +184,9 @@ alongside, without editing that matrix's existing sxa-legacy row).
 
 - `knowledge/sxa-legacy/domain.yaml`, `gitops/charts/rag-ingestion/values.yaml`'s
   `domains.sxa-legacy` block, `components/rag-ingestion/src/rag_ingestion.py`'s
-  `_load_sxa_dump`/`_import_sxa_dump_native`/`_mariadb_connect`,
-  `sxa_anonymize.redact_row`/`redact_value` - WP-065's own path, unaffected.
+  `_load_sxa_dump`/`_import_sxa_dump_native`/`_mariadb_connect` - WP-065's
+  own path, unaffected by this WP (though both WPs' 2026-08-23 amendments
+  landed the same day and both touch `rag_ingestion.py`).
 - `policies/knowledge/knowledge-policy.yaml`'s existing `knowledge.sxa-legacy`
   entry and `policies/tools/tool-policy.yaml`'s `sxa.*` capabilities -
   unchanged; this WP adds a new domain, never edits an existing one's
@@ -208,9 +200,8 @@ alongside, without editing that matrix's existing sxa-legacy row).
 
 - `helm lint`/`helm template` on `postgresql`, `rag-ingestion`, and
   `rag-service` charts.
-- Component test suite (own venv) for `rag_ingestion.py`/`sxa_anonymize.py` -
-  `tests/test_source_adapters.py`, `tests/test_sxa_anonymize.py`,
-  `tests/test_reconcile_acls.py`.
+- Component test suite (own venv) for `rag_ingestion.py` -
+  `tests/test_source_adapters.py`, `tests/test_reconcile_acls.py`.
 - `python3 platform/docs/check_docs.py` → `RESULT: PASS`.
 - `python3 platform/docs/check_knowledge_refs.py` → `RESULT: PASS`.
 - `python3 platform/okf/generate_authorization_matrix.py` regenerates

@@ -46,8 +46,6 @@ from bs4 import BeautifulSoup, NavigableString
 from botocore.exceptions import ClientError
 from pgvector.psycopg import register_vector
 
-import sxa_anonymize
-
 logger = logging.getLogger("rag_ingestion")
 
 STAGES = (
@@ -153,8 +151,13 @@ class IngestionConfig:
     # load-sxa-dump reads the operator-supplied, approved snapshot from its
     # own dedicated bucket (ADR-0025: no dump ever lives in git; ADR-0216:
     # a separate bucket from s3_bucket above, which holds unrelated corpus
-    # content).
-    sxa_dump_s3_key: Optional[str]
+    # content). Split schema/data key pair (2026-08-23 amendment): this
+    # domain now reuses ADR-0217's already-anonymized corpus bucket (no
+    # separate raw dump exists), which ships as a schema.sql/data.sql pair
+    # rather than one combined mysqldump - same shape as sxa_corpus_*
+    # below.
+    sxa_dump_schema_s3_key: Optional[str]
+    sxa_dump_data_s3_key: Optional[str]
     sxa_snapshot_id: Optional[str]
     sxa_s3_endpoint: str
     sxa_s3_bucket: str
@@ -175,8 +178,9 @@ class IngestionConfig:
     sxa_mariadb_database: str
 
     # ADR-0217 (WP-067): fetch-sxa's own dedicated bucket - a distinct
-    # source from sxa_dump_s3_key/sxa_mariadb_* above (knowledge.sxa-legacy).
-    # No MariaDB fields: this domain is RAG-only, no live query target.
+    # source from sxa_dump_schema_s3_key/sxa_dump_data_s3_key/sxa_mariadb_*
+    # above (knowledge.sxa-legacy). No MariaDB fields: this domain is
+    # RAG-only, no live query target.
     sxa_corpus_schema_s3_key: Optional[str]
     sxa_corpus_data_s3_key: Optional[str]
     sxa_corpus_snapshot_id: Optional[str]
@@ -275,7 +279,8 @@ def load_config() -> IngestionConfig:
         salesforce_token=os.environ.get("SALESFORCE_TOKEN"),
         aramis_base_url=os.environ.get("ARAMIS_BASE_URL"),
         aramis_token=os.environ.get("ARAMIS_TOKEN"),
-        sxa_dump_s3_key=os.environ.get("SXA_DUMP_S3_KEY"),
+        sxa_dump_schema_s3_key=os.environ.get("SXA_DUMP_SCHEMA_S3_KEY"),
+        sxa_dump_data_s3_key=os.environ.get("SXA_DUMP_DATA_S3_KEY"),
         sxa_snapshot_id=os.environ.get("SXA_SNAPSHOT_ID"),
         sxa_s3_endpoint=os.environ.get("SXA_S3_ENDPOINT", ""),
         sxa_s3_bucket=os.environ.get("SXA_S3_BUCKET", ""),
@@ -964,29 +969,15 @@ def _fetch_aramis(config: IngestionConfig, store: CorpusStore) -> int:
 # load-sxa-dump (knowledge.sxa-legacy)
 # --------------------------------------------------------------------------
 
-_SXA_TABLE_PATTERN = re.compile(
-    r"-- Table structure for table `(?P<table>[^`]+)`", re.IGNORECASE
-)
-_SXA_MAX_ROW_LINES = 40
-
-
-def _split_sxa_dump(dump_text: str) -> dict:
-    """Splits a mysqldump-style export into per-table sections (DDL +
-    INSERT block). Anything before the first table marker is ignored
-    (dump header)."""
-    sections: dict = {}
-    matches = list(_SXA_TABLE_PATTERN.finditer(dump_text))
-    for i, match in enumerate(matches):
-        start = match.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(dump_text)
-        sections[match.group("table")] = dump_text[start:end].strip()
-    return sections
-
 
 def _fetch_sxa_dump_bytes(config: IngestionConfig) -> Optional[bytes]:
     """Fetches the real dump from its own dedicated S3 bucket (ADR-0216) -
     a separate client from CorpusStore, which is bound to the shared
-    corpus bucket and unrelated content."""
+    corpus bucket and unrelated content. Split schema/data key pair
+    (2026-08-23 amendment): this domain reuses ADR-0217's corpus bucket,
+    which ships as schema.sql + data.sql rather than one combined
+    mysqldump - fetches both and concatenates (schema first, so its
+    CREATE TABLE statements run before data.sql's INSERTs)."""
     from botocore.config import Config as BotoClientConfig
 
     client_kwargs: dict = {
@@ -1003,14 +994,17 @@ def _fetch_sxa_dump_bytes(config: IngestionConfig) -> Optional[bytes]:
     if config.sxa_s3_endpoint:
         client_kwargs["endpoint_url"] = config.sxa_s3_endpoint
     client = boto3.client("s3", **client_kwargs)
-    try:
-        resp = client.get_object(Bucket=config.sxa_s3_bucket, Key=config.sxa_dump_s3_key)
-    except ClientError as exc:
-        code = exc.response.get("Error", {}).get("Code")
-        if code in ("NoSuchKey", "404"):
-            return None
-        raise
-    return resp["Body"].read()
+    parts = []
+    for key in (config.sxa_dump_schema_s3_key, config.sxa_dump_data_s3_key):
+        try:
+            resp = client.get_object(Bucket=config.sxa_s3_bucket, Key=key)
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code in ("NoSuchKey", "404"):
+                return None
+            raise
+        parts.append(resp["Body"].read())
+    return b"\n".join(parts)
 
 
 def _mariadb_connect(config: IngestionConfig):
@@ -1088,37 +1082,39 @@ def _import_sxa_dump_native(conn, dump_text: str) -> None:
 def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
     """ADR-0216 (WP-065): real per-record content, replacing the previous
     raw-DDL-chunk placeholder (never exercised against a real dump because
-    none ever existed). Fetches the real dump from its own dedicated S3
-    bucket, imports it NATIVELY into MariaDB (no schema translation), then
-    extracts real per-record text from every imported table, redacts PII
-    per sxa_anonymize's schema-aware column map (real values keep flowing
-    unredacted through the access-controlled sales-db MCP path - this
-    stage governs only what reaches the shared RAG vector index), and
-    emits one raw record per row. Idempotent per snapshot id: mysqldump
-    output's own `DROP TABLE IF EXISTS` makes re-running the same snapshot
-    re-import identical data, so records come out byte-identical
-    (detect-changes sees unchanged sha256s) and a new snapshot version
-    replaces content under the same identity with new snapshot metadata -
-    the same discipline ADR-0206 already required."""
-    if not config.sxa_dump_s3_key:
+    none ever existed). Fetches the dump (schema.sql + data.sql pair) from
+    its own dedicated S3 bucket, imports it NATIVELY into MariaDB (no
+    schema translation), then extracts real per-record text from every
+    imported table and emits one raw record per row - untouched, same as
+    what the access-controlled sales-db MCP path serves (2026-08-23
+    amendment: the operator-supplied content is trusted as-is, whatever
+    its actual anonymization state; no transform happens here). Idempotent
+    per snapshot id: re-running the same snapshot re-imports identical
+    data, so records come out byte-identical (detect-changes sees
+    unchanged sha256s) and a new snapshot version replaces content under
+    the same identity with new snapshot metadata - the same discipline
+    ADR-0206 already required."""
+    if not config.sxa_dump_schema_s3_key or not config.sxa_dump_data_s3_key:
         raise SystemExit(
-            "load-sxa-dump: SXA_DUMP_S3_KEY not set - upload the approved "
-            "snapshot to the dedicated SXA bucket and point this at it"
+            "load-sxa-dump: SXA_DUMP_SCHEMA_S3_KEY/SXA_DUMP_DATA_S3_KEY not set - "
+            "upload the approved snapshot to the dedicated SXA bucket and point "
+            "this at it"
         )
     raw_bytes = _fetch_sxa_dump_bytes(config)
     if raw_bytes is None:
         raise SystemExit(
-            f"load-sxa-dump: no object at s3://{config.sxa_s3_bucket}/{config.sxa_dump_s3_key}"
+            f"load-sxa-dump: no object at s3://{config.sxa_s3_bucket}/"
+            f"{{{config.sxa_dump_schema_s3_key},{config.sxa_dump_data_s3_key}}}"
         )
     dump_text = raw_bytes.decode("utf-8", errors="replace")
     checksum = hashlib.sha256(raw_bytes).hexdigest()
     snapshot_id = config.sxa_snapshot_id or f"sha256-{checksum[:16]}"
     imported_at = _utcnow_iso()
 
-    if not _SXA_TABLE_PATTERN.search(dump_text):
+    if not re.search(r"CREATE TABLE", dump_text, re.IGNORECASE):
         raise SystemExit(
-            "load-sxa-dump: no '-- Table structure for table' sections found - "
-            "not a mysqldump-style export, refusing to import an unvalidated shape"
+            "load-sxa-dump: no CREATE TABLE statement found - "
+            "not a SQL schema export, refusing to import an unvalidated shape"
         )
 
     conn = _mariadb_connect(config)
@@ -1133,8 +1129,7 @@ def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
                 cur.execute(f"SELECT * FROM `{table}`")
                 rows = cur.fetchall()
             for row in rows:
-                redacted = sxa_anonymize.redact_row(table, row)
-                text = _render_record_text(redacted)
+                text = _render_record_text(row)
                 if not text.strip():
                     continue
                 row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
@@ -1412,12 +1407,11 @@ def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
     schema.sql + data.sql directly in Python (no MariaDB, no SQL engine at
     all: mysqldump output is machine-generated and well-formed, the same
     assumption _split_sql_statements already relies on elsewhere in this
-    file), audits (never redacts - the operator asserts this export is
-    already anonymized) each row via sxa_anonymize.audit_pii_patterns, and
-    emits one raw record per row. Idempotent per snapshot id, same
-    discipline as load-sxa-dump: a re-run against byte-identical
-    schema/data produces byte-identical records (detect-changes sees
-    unchanged sha256s)."""
+    file) and emits one raw, untouched record per row - the operator's
+    content is trusted as-is (2026-08-23 amendment: no PII scanning
+    either). Idempotent per snapshot id, same discipline as
+    load-sxa-dump: a re-run against byte-identical schema/data produces
+    byte-identical records (detect-changes sees unchanged sha256s)."""
     if not config.sxa_corpus_schema_s3_key or not config.sxa_corpus_data_s3_key:
         raise SystemExit(
             "fetch-sxa: SXA_CORPUS_SCHEMA_S3_KEY/SXA_CORPUS_DATA_S3_KEY not set - "
@@ -1449,7 +1443,6 @@ def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
     columns_by_table = _parse_create_table_columns(schema_text)
     written = 0
     for table, row in _parse_insert_rows(data_text, columns_by_table):
-        sxa_anonymize.audit_pii_patterns(table, row)
         text = _render_record_text(row)
         if not text.strip():
             continue

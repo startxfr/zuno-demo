@@ -1,25 +1,26 @@
 # WP-065: Real SXA content via S3 → MariaDB, served through MCP and anonymized RAG (promotes ADR-0216)
 
-- **State:** Repo work merged (2026-08-21 - Part A complete: MariaDB
-  `Database`/`User`/`Grant` CRDs + self-generated Vault credential
-  (`gitops/charts/mariadb`), dedicated SXA S3 bucket wiring with
-  operator-placeholder name/region (`gitops/charts/rag-ingestion`), the
-  native mysqldump-into-MariaDB import stage replacing the old raw-DDL
-  chunker, `components/rag-ingestion/src/sxa_anonymize.py`'s deterministic
-  column-map redaction, `sales-db`'s `SXA_DB_ENGINE` mode switch, and
-  fixture-driven tests across all of it (`test_sxa_anonymize.py`,
-  updated `test_source_adapters.py`, updated `test_mcp_protocol.py` -
-  all passing). Part B (real bucket/dump, live import, live verification)
-  is still open.)
-- **ADRs:** ADR-0216 (To be implemented -> Partially implemented -> Implemented); supersedes ADR-0016's live-target clause
+- **State:** Repo work merged (2026-08-21 - Part A complete). **Amended
+  2026-08-23** (see ADR-0216's Amendment section): no separate raw dump
+  exists, so this WP reuses ADR-0217/WP-067's already-anonymized
+  `zuno-demo-sxa-corpus` bucket instead of a dedicated one, and the
+  `sxa_anonymize.py` redaction step is removed entirely (both MCP and RAG
+  now serve/index SXA content as-is). Amendment repo work merged
+  2026-08-23: two-key (`schema.sql`+`data.sql`) fetch in `load-sxa-dump`,
+  `sxa_anonymize.py` deleted, `sales-db` chart wired for
+  `SXA_DB_ENGINE=mariadb` (server.py already supported it; the chart never
+  turned it on), `rag-service`'s `sxa-legacy` domain flipped `enabled:
+  true`, `domains.sxa-legacy.enabled: true` in rag-ingestion. Live
+  steps (image rebuild, deploy, on-demand pipeline run, verification)
+  still open.
+- **ADRs:** ADR-0216 (To be implemented -> Partially implemented -> Implemented, amended 2026-08-23); supersedes ADR-0016's live-target clause
 - **Depends on:** WP-23 (repo work merged — policy/tooling/metadata-separation this WP extends)
 - **Blocks:** WP-23's remaining "real snapshot load" operator action, which now targets this WP instead
-- **Estimated files touched:** ~12
+- **Estimated files touched:** ~12 (Part A) + ~10 (2026-08-23 amendment)
 
 > Execute this brief as a standalone task from the repository root. Read
-> ADR-0216 in full before editing — it's the source of truth for every
-> decision below. Part A is pure repo work (chart/code/tests, no real
-> dump or bucket needed); Part B is operator-only.
+> ADR-0216 in full (including its 2026-08-23 Amendment section) before
+> editing — it's the source of truth for every decision below.
 
 ## Goal
 
@@ -61,72 +62,76 @@ local-only — unchanged, not relaxed).
 
 ### Part A — repo work, no real dump/bucket needed
 
+Historical record of the 2026-08-21 merge. Items 2, 4 and 5 were
+superseded by the 2026-08-23 amendment (reused bucket instead of a
+dedicated one; no anonymization module at all) — see ADR-0216's Amendment
+section and this file's State line above for what actually shipped.
+
 1. **MariaDB database wiring**: `gitops/charts/mariadb/templates/database-sxa.yaml`
    (new), mirroring `database-mlops.yaml` exactly — `Database`/`User`/
    `Grant` CRDs for a new `sxa` logical database on the existing shared
    instance. New Vault path + ExternalSecret for its credentials,
-   matching the existing `mlops`/`mlpipeline` pattern.
-2. **S3 bucket wiring**: a new block in `gitops/charts/rag-ingestion/values.yaml`
-   (or wherever the existing corpus-bucket block lives) for the dedicated
-   SXA dump bucket — name/region as explicit, clearly-commented
-   placeholders (`# OPERATOR-SUPPLIED — see ADR-0216`), new Vault path for
-   its access key/secret, separate from the existing `rag/s3` credential.
+   matching the existing `mlops`/`mlpipeline` pattern. (Unaffected by the
+   amendment — still current.)
+2. ~~**S3 bucket wiring**: a dedicated SXA dump bucket~~ **Superseded**:
+   no dedicated bucket was ever created; the amendment reuses WP-067's
+   `zuno-demo-sxa-corpus` bucket/credentials instead.
 3. **Native MariaDB import stage**: extend or replace `load-sxa-dump` in
-   `components/rag-ingestion/src/rag_ingestion.py` — fetch the dump from
-   the new bucket via `sxaDump.s3Key`/`snapshotId` (unchanged field
-   shape), load it directly into the new MariaDB `sxa` database (a raw
-   SQL-file execution against the mariadb driver, no per-table regex
-   splitting/truncation — that was only ever a workaround for not having
-   a real relational target). Idempotent per snapshot id.
-4. **Anonymization module**: `components/rag-ingestion/src/sxa_anonymize.py`
-   (new) — a fixed, reviewable map of PII-bearing columns (per
-   `data/sxa/schema/001_init.sql`: at minimum `customers.contact_name`/
-   `email`/`phone`, `contacts.*` equivalents) to a deterministic
-   pseudonymization/redaction function. No heuristic scanning — every
-   column not in the map passes through unchanged, every column in the
-   map is transformed, and an explicit test asserts the map covers every
-   PII-shaped column the schema defines (name/email/phone patterns) so a
-   newly added column can't silently leak.
-5. **Real-content extraction for RAG**: a new stage (or extension of the
-   normalize stage) that pulls real per-record text from the MariaDB `sxa`
-   database, runs it through `sxa_anonymize.py`, and feeds the result into
-   the existing `normalize → chunk → embed → index-pgvector` pipeline
-   unchanged — the anonymized text is the only thing that reaches the
-   embedding call.
+   `components/rag-ingestion/src/rag_ingestion.py` — fetch the dump,
+   load it directly into the new MariaDB `sxa` database (a raw SQL-file
+   execution against the mariadb driver, no per-table regex
+   splitting/truncation). Idempotent per snapshot id. (Amended
+   2026-08-23: fetches a `schema.sql`+`data.sql` key pair from the reused
+   bucket rather than one combined-mysqldump key.)
+4. ~~**Anonymization module**: `components/rag-ingestion/src/sxa_anonymize.py`~~
+   **Superseded**: removed entirely 2026-08-23. Content flows through
+   unmodified.
+5. ~~**Real-content extraction for RAG**: runs it through
+   `sxa_anonymize.py`~~ **Superseded**: the extraction stage still feeds
+   `normalize → chunk → embed → index-pgvector`, but with no redaction
+   step in front of it.
 6. **`sales-db` engine-select mode**: `components/mcp-servers/sales-db/server.py`
    gains `SXA_DB_ENGINE=postgres|mariadb` (default `postgres`, no
    behavior change until the operator sets it), switching only the
    connection/driver — every tool, its parameterized-query shape, and its
    `allowed_groups`/`min_classification` gate in `policies/tools/
-   tool-policy.yaml` stay exactly as they are.
-7. **Tests**: fixture-driven unit tests for `sxa_anonymize.py` (every
-   PII-shaped column redacted, everything else untouched), the MariaDB
-   import path (mocked driver, real SQL-file fixture), and `sales-db`'s
-   engine switch (both modes return the same shape against equivalent
-   fixture data) — follow each component's existing test conventions
-   (own venv per `mcp-gateway-test-venv`-style precedent).
+   tool-policy.yaml` stay exactly as they are. (Unaffected by the
+   amendment — still current. The chart wiring to actually turn this mode
+   on, `gitops/charts/mcp-sales-db/`, was added by the 2026-08-23
+   amendment; `server.py` itself always supported it.)
+7. **Tests**: fixture-driven unit tests for the MariaDB import path
+   (mocked driver, real SQL-file fixture) and `sales-db`'s engine switch
+   (both modes return the same shape against equivalent fixture data) —
+   follow each component's existing test conventions (own venv per
+   `mcp-gateway-test-venv`-style precedent). (Amended 2026-08-23:
+   `test_sxa_anonymize.py` deleted along with the module; redaction
+   assertions flipped to pass-through assertions.)
 
-### Part B — operator steps (not executable by the model)
+### Part B — live steps (2026-08-23 amended scope)
 
-1. Create the new S3 bucket; supply its name/region and provision Vault
-   credentials at the new path this WP's repo work references.
-2. Upload the real dump; set `sxaDump.s3Key`/`snapshotId` to the real
-   values.
-3. Seed the new MariaDB `sxa` database's Vault-sourced credentials
-   (mirrors the existing `zuno/mariadb/root` precondition).
-4. Run the import; confirm real rows exist in MariaDB (`SELECT count(*)`
-   per table, not just "the Job succeeded").
-5. Run the RAG ingestion pass; spot-check several embedded chunks against
-   their source rows to confirm PII columns are genuinely redacted, not
-   merely believed to be.
-6. Flip `sales-db` to `SXA_DB_ENGINE=mariadb`; re-run WP-23's original
-   live acceptance pass (real-snapshot load-and-verify, role-denial check
-   with the already-confirmed-real Keycloak users `sales-role-only-user-01`/
-   `board-role-only-user-01`/etc.) against the now-real data.
-7. Review `sxa_anonymize.py`'s column map against the real schema one more
-   time before this step is called done — per ADR-0216's Security
-   considerations, an incomplete map is a silent leak, not a fail-closed
-   error.
+The bucket, MariaDB `sxa` database credentials, and S3 credentials are
+already provisioned (reused from WP-067 — no new bucket, no new Vault
+seeding needed). What's left is deploying the amended code and running it:
+
+1. `make day2 build rag-ingestion` (image must be rebuilt — `_load_sxa_dump`
+   changed; push to `origin/main` first, BuildConfig clones from there).
+2. `make d1 install rag-ingestion` (re-render ConfigMap/values for the
+   now-`enabled: true` `sxa-legacy` domain) and `make d1 install
+   mcp-sales-db` (deploy the new `SXA_DB_ENGINE=mariadb` wiring — no image
+   rebuild needed, `server.py` already supported this mode).
+3. Run the `compile_pipeline_version` ansible task (now includes
+   `sxa-legacy` in its compile targets) to create its PipelineVersion CR.
+4. Trigger an on-demand `load-sxa-dump` run (ADR-0105: no schedule, manual
+   only).
+5. Confirm real rows landed in MariaDB (`SHOW TABLES`/`SELECT count(*)`
+   per table in `mariadb-0`, not just "the Job succeeded").
+6. Confirm `sales-db` MCP tools (`get_customer`, `aggregate_revenue_by_year`,
+   `lookup_record`) return content via a live call through `mcp-gateway`.
+7. Confirm `knowledge.sxa-legacy` chunks landed in `rag-sxa-legacy`
+   Postgres; re-run WP-23's original live acceptance pass (role-denial
+   check with the already-confirmed-real Keycloak users
+   `sales-role-only-user-01`/`board-role-only-user-01`/etc.) against the
+   now-live data.
 
 ## What NOT to touch
 
@@ -140,37 +145,35 @@ local-only — unchanged, not relaxed).
 
 ## Acceptance checks (run from repo root; all must pass)
 
-- `helm lint`/`helm template` on `mariadb` and `rag-ingestion` charts.
-- Component test suites (own venv per component) for `sxa_anonymize.py`,
-  the import stage, and `sales-db`'s engine switch — all fixture-driven,
-  no real dump needed.
+- `helm lint`/`helm template` on `mariadb`, `rag-ingestion`, `mcp-sales-db`,
+  and `rag-service` charts.
+- Component test suites (own venv per component) for `rag_ingestion.py`'s
+  `load-sxa-dump` adapter and `sales-db`'s engine switch — all
+  fixture-driven, no real dump needed.
 - `python3 platform/docs/check_docs.py` → `RESULT: PASS`.
 
 ## Operator / human follow-up
 
-See Part B above in full — every step there is operator-only.
+See Part B above — live cluster steps (build, deploy, trigger, verify).
 
 ## Status updates (then re-run check_docs.py)
 
-- After Part A merge: ADR-0216 → `Partially implemented (MariaDB
-  database wiring, S3 bucket wiring, native import stage, anonymization
-  module, sales-db engine switch, and tests merged; real dump/bucket and
-  live verification pending)`; index row to match; tracker → `Operator
-  pending`; this file's State.
-- After Part B: ADR-0216 → `Implemented - see gitops/charts/mariadb/,
-  components/rag-ingestion/src/sxa_anonymize.py,
-  components/mcp-servers/sales-db/server.py.`; index row `Implemented`;
-  tracker → `Done`; MEMORY.md dated bullet; WP-23's brief updated to
-  reflect its operator action was discharged here.
+- After Part B live steps complete: ADR-0216 → `Implemented - see
+  gitops/charts/mariadb/, gitops/charts/mcp-sales-db/,
+  components/rag-ingestion/src/rag_ingestion.py.`; index row
+  `Implemented`; tracker → `Done`; MEMORY.md dated bullet noting the
+  2026-08-23 amendment (reused bucket, no anonymization); WP-23's brief
+  updated to reflect its operator action was discharged here.
 
 ## Out of scope / deferred
 
 - A dedicated (non-shared) MariaDB instance for SXA — the user chose the
   shared-instance option; revisit only if isolation needs later outweigh
   the operational simplicity of one shared operand.
-- Anonymizing/masking values in the MCP path itself — the user chose to
-  keep it as the real-value, access-controlled path; a future ADR could
-  revisit this if entitlement scope ever broadens beyond Sales/Direction.
 - Any change to `knowledge.sxa-legacy`'s `allowed_groups`/
   `min_classification` policy values (a separate, field-level data-review
   decision ADR-0206 already deferred).
+- A genuinely separate raw dump / dedicated bucket for this domain — the
+  2026-08-23 amendment reuses WP-067's corpus instead; revisit only if a
+  real raw dump becomes available and the operator wants to restore
+  ADR-0216's original real-value/anonymized-RAG split.

@@ -25,7 +25,8 @@ data:
   CONFLUENCE_SOURCES_JSON: "[]"
   SALESFORCE_SOURCES_JSON: {{ ($domain.salesforce).sources | default list | toJson | quote }}
   ARAMIS_SOURCES_JSON: {{ ($domain.aramis).sources | default list | toJson | quote }}
-  SXA_DUMP_S3_KEY: {{ ($domain.sxaDump).s3Key | default "" | quote }}
+  SXA_DUMP_SCHEMA_S3_KEY: {{ ($domain.sxaDump).schemaS3Key | default "" | quote }}
+  SXA_DUMP_DATA_S3_KEY: {{ ($domain.sxaDump).dataS3Key | default "" | quote }}
   SXA_SNAPSHOT_ID: {{ ($domain.sxaDump).snapshotId | default "" | quote }}
   # ADR-0216/WP-065: the dedicated SXA dump bucket - separate from
   # S3_BUCKET/S3_ENDPOINT/S3_REGION below, which point at the shared

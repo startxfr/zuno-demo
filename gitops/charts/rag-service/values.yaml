@@ -109,8 +109,10 @@ knowledgeDomains:
     vaultPath: rag-sales/postgresql-app
     secretName: rag-service-db-ragsales
     seed: false
+  # Enabled 2026-08-23 (WP-065's amended Part B): the domain/policy have
+  # existed since ADR-0206, but retrieval was never turned on here.
   - domain: sxa-legacy
-    enabled: false
+    enabled: true
     database: rag-sxa-legacy
     schema: rag
     envPrefix: RAGSXALEGACY

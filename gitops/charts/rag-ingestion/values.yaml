@@ -1511,7 +1511,13 @@ domains:
     # freshness.operation_classes.semantic-read.max_staleness.
     staleAfter: 1d
   sxa-legacy:
-    enabled: false
+    # Enabled 2026-08-23 (amended Part B): no separate raw dump exists, so
+    # this domain reuses ADR-0217/WP-067's already-anonymized corpus
+    # bucket/content below instead of a dedicated raw-dump bucket - an
+    # explicit operator decision recorded in ADR-0216's amendment. The
+    # MariaDB import + sales-db MCP path therefore serves the same
+    # as-is content RAG does, not genuinely real/unredacted values.
+    enabled: true
     fetchStages: [load-sxa-dump]
     postgres:
       database: rag-sxa-legacy
@@ -1522,27 +1528,29 @@ domains:
         usernameProperty: username
         passwordProperty: password
     sxaDump:
-      # Operator-supplied: the approved snapshot's key in the SXA bucket
-      # below (ADR-0025: the dump itself never lives in git) and its
-      # version ID.
-      s3Key: ""
+      # Operator-supplied keys in the reused sxa-corpus bucket below
+      # (ADR-0025: the dump itself never lives in git) and an optional
+      # explicit snapshot id. Split schema/data pair, not one combined
+      # mysqldump - same shape as sxaCorpus below, since this is the same
+      # underlying export.
+      schemaS3Key: "sxa.schema.sql"
+      dataS3Key: "sxa.data.sql"
       snapshotId: ""
-      # ADR-0216/WP-065: a dedicated bucket, separate from s3.bucket above
-      # (which holds Confluence/Red Hat-docs/model corpus content) - real
-      # SXA business data gets its own bucket rather than sharing one with
-      # unrelated content. OPERATOR-SUPPLIED, like s3.bucket - this repo
-      # provisions no AWS infrastructure (no Terraform, no AWS Ansible
-      # collections); only the bucket name/region and Vault-sourced
-      # credentials are wired here, never bucket creation itself.
+      # 2026-08-23 amendment: reuses ADR-0217/WP-067's dedicated bucket
+      # (zuno-demo-sxa-corpus) instead of a separate dedicated raw-dump
+      # bucket - see ADR-0216's amendment. secretName stays distinct from
+      # sxaCorpus's own (rag-sxa-corpus-s3) to avoid two ExternalSecrets
+      # colliding on one name, but externalSecret.remoteKey points at the
+      # SAME already-seeded Vault path, so no new Vault seeding is needed.
       s3:
         type: aws
         endpoint: ""
-        bucket: ""              # OPERATOR-SUPPLIED - see ADR-0216
-        region: ""               # OPERATOR-SUPPLIED - see ADR-0216
+        bucket: "zuno-demo-sxa-corpus"
+        region: "eu-west-2"
         pathStyle: false
         secretName: rag-sxa-s3
         externalSecret:
-          remoteKey: "sxa/s3"
+          remoteKey: "sxa-corpus/s3"
           accessKeyProperty: accessKeyId
           secretKeyProperty: secretAccessKey
       # ADR-0216/WP-065: the MariaDB database the dump imports into

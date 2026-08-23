@@ -2,10 +2,23 @@
 
 - **Status:** Partially implemented (repo work merged 2026-08-21: `knowledge.sxa`
   domain/policy/binding wiring, `fetch-sxa` source adapter, weekly schedule,
-  agent access grants; real dedicated bucket and live verification pending)
+  agent access grants; dedicated bucket `zuno-demo-sxa-corpus` live and
+  populated, Part B infra provisioned; **amended 2026-08-23** — see below —
+  audit-only PII scan removed; live verification of the current pipeline run
+  pending)
 - **Target:** v0.2
 - **Date:** 2026-08-21
 - **Decision owners:** Zuno Demo architecture team
+
+## Amendment (2026-08-23)
+
+Clause 2's `audit_pii_patterns()` scan is removed entirely, not kept as a
+visibility net. The operator's instruction: for both this domain and
+ADR-0216/WP-065's, treat SXA content as OK to serve/index exactly as it
+arrives from S3, anonymized or not — no scanning, no logging of
+PII-shaped values, no transform. `sxa_anonymize.py` is deleted.
+`min_classification`/`allowed_groups` gating is unchanged and remains the
+only safeguard.
 
 ## Context
 
@@ -40,16 +53,14 @@ still-open effort.
    questions (this platform's own redaction vs. an upstream-supplied
    anonymized export).
 
-2. **No transform stage — audit only.** The upstream dump is treated as
-   already safe to index. `components/rag-ingestion/src/sxa_anonymize.py`
-   gains an additive `audit_pii_patterns()` function (distinct from the
-   existing `redact_row()`/`redact_value()` WP-065 uses) that scans
-   PII-shaped values against the same `PII_COLUMNS` map and logs a warning —
-   it never alters or blocks a value. This is insurance against the upstream
-   anonymization missing something, not an enforcement gate: unlike
-   ADR-0216's stricter posture (real record values, redaction is mandatory
-   before embedding), this decision is that the caller's assertion that the
-   dump is pre-anonymized is trusted.
+2. ~~No transform stage — audit only.~~ **Superseded by the 2026-08-23
+   amendment above: no transform AND no audit.** The upstream dump is
+   trusted as-is and indexed unmodified, with no PII-pattern scan of any
+   kind. (Original text, for history: `sxa_anonymize.py` was to gain an
+   additive `audit_pii_patterns()` function scanning PII-shaped values
+   against a `PII_COLUMNS` map and logging a warning without altering or
+   blocking anything — insurance against the upstream anonymization
+   missing something, not an enforcement gate.)
 
 3. **RAG-only — no MariaDB, no MCP tools.** The new `fetch-sxa` source
    adapter parses `sxa.schema.sql` (for column order per table) and
@@ -92,16 +103,16 @@ pre-commit to either.
 
 ## Security considerations
 
-Trusting an upstream anonymization claim is a real posture change from
-ADR-0216's (which trusts nothing and redacts deterministically before
-embedding) — this decision accepts that trade explicitly, for this source
-only, with the audit-only scan as a visibility net rather than a guarantee.
-`min_classification: C3` is kept on `knowledge.sxa` regardless (still
-commercial/financial-adjacent data — "already anonymized" does not lower its
-classification), keeping it local-model-only (ADR-0021/ADR-0035) exactly like
-`sxa-legacy`. No agent-facing tool can write to this domain's pgvector store
-or the S3 source bucket — ingestion-only-writable by construction, same
-posture as every other RAG domain.
+**2026-08-23 amendment:** trusting the upstream anonymization claim is no
+longer unique to this domain — ADR-0216's own amendment adopted the same
+posture for `knowledge.sxa-legacy`. Neither domain scans or redacts
+content; both rely solely on access control. `min_classification: C3` is
+kept on `knowledge.sxa` regardless (still commercial/financial-adjacent
+data — "already anonymized" does not lower its classification), keeping
+it local-model-only (ADR-0021/ADR-0035) exactly like `sxa-legacy`. No
+agent-facing tool can write to this domain's pgvector store or the S3
+source bucket — ingestion-only-writable by construction, same posture as
+every other RAG domain.
 
 ## Operational considerations
 

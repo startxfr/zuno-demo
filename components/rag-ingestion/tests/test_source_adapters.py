@@ -411,7 +411,8 @@ class FakeMariaDBConnection:
 def test_load_sxa_dump_natively_imports_and_writes_one_record_per_row():
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy",
-        SXA_DUMP_S3_KEY="dumps/sxa-2026-08.sql",
+        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
+        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
         SXA_SNAPSHOT_ID="2026-08",
         SXA_S3_BUCKET="sxa-bucket",
     )
@@ -442,15 +443,17 @@ def test_load_sxa_dump_natively_imports_and_writes_one_record_per_row():
     assert record["sxa"]["table"] == "customers"
     assert len(record["sxa"]["snapshot_checksum"]) == 64
     assert record["sxa"]["imported_at"]
-    # PII redacted before it ever reaches the record that gets embedded.
-    assert "Acme Corp" not in record["text"]
-    assert "0102030405" not in record["text"]
+    # 2026-08-23 amendment: no anonymization transform - content reaches
+    # the embedded record exactly as imported.
+    assert "Acme Corp" in record["text"]
+    assert "0102030405" in record["text"]
 
 
 def test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent():
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy",
-        SXA_DUMP_S3_KEY="dumps/sxa-2026-08.sql",
+        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
+        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
         SXA_S3_BUCKET="sxa-bucket",
     )
     store = FakeStore()
@@ -474,7 +477,8 @@ def test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent():
 def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy",
-        SXA_DUMP_S3_KEY="dumps/not-a-dump.sql",
+        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
+        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
         SXA_S3_BUCKET="sxa-bucket",
     )
     with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=b"SELECT 1; -- no table sections"):
@@ -488,7 +492,7 @@ def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
         _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config2, FakeStore())
         raise AssertionError("expected SystemExit for missing key")
     except SystemExit as exc:
-        assert "SXA_DUMP_S3_KEY" in str(exc)
+        assert "SXA_DUMP_SCHEMA_S3_KEY" in str(exc)
 
 
 def test_split_sql_statements_handles_semicolons_inside_quoted_values():
@@ -612,23 +616,6 @@ def test_fetch_sxa_refuses_non_schema_content_and_missing_keys():
             raise AssertionError("expected SystemExit for non-schema content")
         except SystemExit as exc:
             assert "refusing to parse" in str(exc)
-
-
-def test_audit_pii_patterns_flags_without_altering_the_value():
-    import sxa_anonymize
-
-    row = {"name": "Real Person", "revenue": 1000}
-    # "name" isn't in contacts' PII_COLUMNS map (first_name/last_name are)
-    # and carries no email/phone-shaped value, so nothing is flagged.
-    assert sxa_anonymize.audit_pii_patterns("contacts", row) == []
-    assert row == {"name": "Real Person", "revenue": 1000}  # never mutated
-
-    row2 = {"first_name": "Real Person", "notes": "contact me at real@example.com"}
-    hits2 = sxa_anonymize.audit_pii_patterns("contacts", row2)
-    assert "contacts.first_name" in hits2  # listed column
-    assert "contacts.notes" in hits2  # unlisted column, email-shaped value
-    assert row2["first_name"] == "Real Person"  # still unaltered
-    assert row2["notes"] == "contact me at real@example.com"
 
 
 # --- normalize carries domain/technology/extensions -------------------------
@@ -895,7 +882,6 @@ TESTS = [
     test_fetch_sxa_writes_one_record_per_row_without_any_sql_engine,
     test_fetch_sxa_reimport_of_same_export_is_idempotent,
     test_fetch_sxa_refuses_non_schema_content_and_missing_keys,
-    test_audit_pii_patterns_flags_without_altering_the_value,
     test_normalize_carries_domain_technology_and_extensions_into_metadata,
     test_normalize_defaults_missing_domain_to_the_run_domain,
     test_parse_duration_spec_supports_days_hours_minutes_and_none,

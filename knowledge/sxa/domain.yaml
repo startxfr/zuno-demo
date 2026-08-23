@@ -12,12 +12,12 @@ description: >-
   Legacy SXA commercial/sales content (affaire/devis/commande/facture),
   supplied as an already-anonymized relational SQL export refreshed weekly
   (ADR-0217). Distinct from `knowledge.sxa-legacy` (ADR-0216): that domain
-  redacts raw, unredacted content through this platform's own
-  sxa_anonymize.py before indexing and stays on-demand/immutable;
-  `knowledge.sxa` trusts an upstream anonymization claim (audited, not
-  enforced, by sxa_anonymize.py's audit_pii_patterns()) and refreshes on a
-  real weekly schedule. Both domains may coexist; neither supersedes the
-  other.
+  reuses this same source export for its own live-lookup path but stays
+  on-demand/immutable, while `knowledge.sxa` refreshes on a real weekly
+  schedule. Neither domain transforms or scans content (2026-08-23
+  amendment to both ADRs) - content is indexed/served exactly as it
+  arrives from the source, trusted as-is. Both domains may coexist;
+  neither supersedes the other.
 
 taxonomy:
   source_classes:
