@@ -22,7 +22,7 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
   vars:
     build_image_name: diagram-render
-    build_dockerfile_path: components/diagram-render/Dockerfile
+    build_dockerfile_path: Dockerfile
     build_context_dir: components/diagram-render
 
 # ADR-0119 (WP-057): discovered, not hand-listed one block per server -
