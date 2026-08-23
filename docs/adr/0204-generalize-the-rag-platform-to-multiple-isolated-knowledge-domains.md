@@ -1,6 +1,6 @@
 # ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
-- **Status:** Partially implemented (multi-domain retrieval core, bindings, per-domain databases and source adapters merged; WP-21's live provisioning confirmed 2026-08-17 - tech+sales domains live with distinct credentials, `make d1 check rag` reports installed after fixing a stale precheck.yml Job lookup; WP-22's live source-credential runs still pending)
+- **Status:** Partially implemented (multi-domain retrieval core, bindings, per-domain databases and source adapters merged; WP-21's live provisioning confirmed 2026-08-17 - tech+sales domains live with distinct credentials, `make d1 check rag` reports installed after fixing a stale precheck.yml Job lookup; the Salesforce/Aramis source-adapter mapping bullets below are superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note)
   <!-- 2026-08-15: WP-22 merged part 2 - the source-adapter interface
   (fetch-redhat/fetch-confluence refactored, fetch-salesforce/fetch-aramis/
   load-sxa-dump added), per-domain pipeline targeting and ADR-0105 cadences.
@@ -48,6 +48,18 @@ The same generic ingestion framework supports different source adapters:
 - Aramis -> `knowledge.adv`;
 - validated SQL dump -> `knowledge.sxa-legacy`.
 
+## Superseded (2026-08-23)
+
+[ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
+supersedes the `Salesforce -> knowledge.sales` and `Aramis -> knowledge.adv`
+bullets in the source-adapter list above: Aramis is dropped as an objective
+entirely (the service will not be provisioned), and Salesforce's batch
+ingestion cadence is deferred to an unscheduled backlog. The `knowledge.sales`
+domain/database binding itself (WP-21, live since 2026-08-17) is unaffected —
+only the automated ingestion adapter for it is deferred. The `web + Confluence
+-> knowledge.tech` and `validated SQL dump -> knowledge.sxa-legacy` adapters
+are unaffected. See ADR-0218 for the full decision.
+
 ## Consequences
 
 Zuno can add knowledge domains without duplicating the entire RAG stack, while preserving storage-level blast-radius reduction and future provider portability.
@@ -80,3 +92,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
 - [ADR-0202](0202-introduce-logical-knowledge-domains.md)
 - [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
+- [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — supersedes this ADR's Salesforce/Aramis adapter-mapping bullets

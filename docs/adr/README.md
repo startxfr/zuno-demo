@@ -118,6 +118,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Implemented | Carry conversation history into agent prompts with budgeted compaction |
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md) | v0.2 | Partially implemented | Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG |
 | [ADR-0217](0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Partially implemented | Ingest a weekly, already-anonymized SXA corpus as a new RAG domain |
+| [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | Unscheduled | Proposed | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
 
 ## version 0.3
 

@@ -1,6 +1,6 @@
 # ADR-0105: Automate source-specific knowledge ingestion
 
-- **Status:** Partially implemented (per-source adapters and cadence configuration merged; live scheduled runs pending on real Salesforce/Aramis credentials, see the 2026-08-17 note below)
+- **Status:** Partially implemented (tech/legacy cadence merged; Salesforce/Aramis clauses superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note below; live KFP schedule confirmation still blocked on rag-dspa readiness, see ADR-0330)
 - **Target:** v0.1
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -29,6 +29,15 @@ KFP recurring runs. Manual refresh remains
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Consequences, Security/Operational considerations,
 Acceptance criteria and Review evidence.
+
+## Superseded (2026-08-23)
+
+[ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
+drops Aramis as an ingestion objective entirely (the service will not be
+provisioned) and defers Salesforce's hours-scale batch-ingestion cadence to
+an unscheduled backlog, out of v0.1/v0.2. The tech (weekly) and legacy
+(on-demand) cadences this ADR decided are **not affected** and remain as
+originally decided. See ADR-0218 for the full decision.
 
 ## Live verification check (2026-08-17, roadmap WP-22)
 
@@ -62,3 +71,5 @@ leaving them generic:
   — the freshness policy that consumes each source's cadence objective.
 - [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
   — the Day 1 ingestion pipeline these cadences schedule.
+- [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
+  — supersedes this ADR's Salesforce/Aramis clauses.
