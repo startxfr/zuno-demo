@@ -55,6 +55,15 @@ class GraphRunRecorder:
         self.live_read_trigger_reason: Optional[str] = None
         self.outcome = "unknown"
 
+    def mark_error(self) -> None:
+        """For a caller (e.g. _stream_chat) that handles its own errors
+        internally - yielding a client-facing SSE error event rather than
+        raising - so the span still reports what actually happened instead
+        of defaulting to "ok" just because no exception crossed the `with`
+        boundary. Mirrors ApiRequestRecorder.mark_error()'s same rationale.
+        """
+        self.outcome = "error"
+
 
 @contextmanager
 def graph_run_span(
@@ -92,7 +101,8 @@ def graph_run_span(
         recorder = GraphRunRecorder()
         try:
             yield recorder
-            recorder.outcome = "ok"
+            if recorder.outcome == "unknown":
+                recorder.outcome = "ok"
         except Exception as exc:
             recorder.outcome = "error"
             span.record_exception(exc)

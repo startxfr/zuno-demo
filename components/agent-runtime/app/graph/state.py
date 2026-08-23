@@ -56,6 +56,16 @@ class AgentState(TypedDict, total=False):
     # the MaaS adapter) as X-Zuno-Request-Id for usage/trace correlation -
     # see app/main.py's _request_id and app/clients/model_router.py.
     request_id: str
+    # ADR-0517: forwarded to mcp-gateway/rag-service/ai-gateway as
+    # X-Zuno-Run-Id so their tool_invoke/rag_search/model_call spans can be
+    # correlated back to this run - see app/main.py's agent_chat and
+    # app/clients/{mcp_client,rag_client,model_router}.py. Distinct from
+    # request_id above (one HTTP call vs. the whole conversation turn).
+    # Without a declared field here, LangGraph drops the key entirely
+    # (it only carries declared schema fields between/into nodes), so this
+    # entry is not optional decoration - omitting it silently breaks every
+    # state.get("run_id") call downstream.
+    run_id: str
     # ADR-0209/WP-28: scopes this turn to a project's durable memory
     # (knowledge.project) - forwarded on every RAG call this turn makes
     # (app/clients/rag_client.py) and to the extraction endpoint at

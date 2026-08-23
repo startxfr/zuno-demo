@@ -940,7 +940,7 @@ async def agent_chat(
         return StreamingResponse(
             _stream_chat(
                 graph, initial_state, config, request_id, run_id,
-                agent=agent_def.name,
+                agent=agent_def.name, graph_shape=agent_def.graph_shape,
                 conversations_pool=conversations_pool, write_lock_holder=write_lock_holder,
             ),
             media_type="text/event-stream",
@@ -1006,6 +1006,7 @@ async def _stream_chat(
     run_id: str,
     *,
     agent: Optional[str] = None,
+    graph_shape: Optional[str] = None,
     conversations_pool: Optional[Any] = None,
     write_lock_holder: Optional[str] = None,
 ) -> AsyncIterator[str]:
@@ -1030,7 +1031,11 @@ async def _stream_chat(
     errors are handled internally here (an SSE "error" event, not a raised
     exception), so the two `except` branches below call
     api_recorder.mark_error() explicitly rather than relying on the span
-    catching a propagating exception.
+    catching a propagating exception. The retry loop itself is additionally
+    wrapped in graph_run_span (agent_graph_run) - the streaming-path
+    equivalent of the non-streaming path's own graph_run_span in
+    agent_chat, previously only emitted for non-streaming calls even
+    though streaming is the common case.
     """
     with api_request_span(run_id, agent=agent, request_id=request_id) as api_recorder:
         try:
@@ -1047,76 +1052,82 @@ async def _stream_chat(
             # coherently) - sent_any tracks that boundary.
             sent_any = False
             attempts_remaining = 2
-            while attempts_remaining:
-                attempts_remaining -= 1
-                try:
-                    async for event in graph.astream_events(initial_state, config=config, version="v2"):
-                        kind = event.get("event")
-                        name = event.get("name")
-                        if kind == "on_chat_model_stream":
-                            # ADR-0215: the history-compaction node's own internal
-                            # summarization call is a real nested chat-model
-                            # invocation inside this same graph run, so it emits
-                            # on_chat_model_stream events too - tagged
-                            # "zuno-internal" (app/clients/model_router.py) so it
-                            # never reaches the user as a chat token.
-                            if "zuno-internal" in (event.get("tags") or []):
-                                continue
-                            chunk = event["data"].get("chunk")
-                            token = getattr(chunk, "content", "") if chunk is not None else ""
-                            if token:
-                                sent_any = True
-                                yield _sse("token", {"delta": token})
-                        elif kind == "on_chain_start" and name in _TOOL_NODES:
-                            yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
-                        elif kind == "on_chain_end" and name in _TOOL_NODES:
-                            yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
-                        elif kind == "on_chain_end" and name == "respond":
-                            output = event["data"].get("output") or {}
-                            citations = output.get("citations", [])
-                            # ADR-0205/WP-24: same field the non-streaming response
-                            # carries - the streaming path must not silently omit it.
-                            source_mode = output.get("source_mode", "indexed")
-                        elif kind == "on_chain_end" and name in ("reason", "draft"):
-                            # ADR-0415: generate_image results are returned by
-                            # whichever node actually calls the model
-                            # (retrieve_reason_respond's "reason", plan_draft_write's
-                            # "draft") - unlike citations/source_mode above, there is
-                            # no later node in either shape that re-assembles this,
-                            # so it's captured here directly.
-                            output = event["data"].get("output") or {}
-                            if output.get("generated_images"):
-                                images = output["generated_images"]
-                except psycopg.OperationalError as exc:
-                    if sent_any or attempts_remaining == 0:
+            with graph_run_span(
+                initial_state.get("session_id", ""), agent=agent, graph_shape=graph_shape, run_id=run_id
+            ) as graph_recorder:
+                while attempts_remaining:
+                    attempts_remaining -= 1
+                    try:
+                        async for event in graph.astream_events(initial_state, config=config, version="v2"):
+                            kind = event.get("event")
+                            name = event.get("name")
+                            if kind == "on_chat_model_stream":
+                                # ADR-0215: the history-compaction node's own internal
+                                # summarization call is a real nested chat-model
+                                # invocation inside this same graph run, so it emits
+                                # on_chat_model_stream events too - tagged
+                                # "zuno-internal" (app/clients/model_router.py) so it
+                                # never reaches the user as a chat token.
+                                if "zuno-internal" in (event.get("tags") or []):
+                                    continue
+                                chunk = event["data"].get("chunk")
+                                token = getattr(chunk, "content", "") if chunk is not None else ""
+                                if token:
+                                    sent_any = True
+                                    yield _sse("token", {"delta": token})
+                            elif kind == "on_chain_start" and name in _TOOL_NODES:
+                                yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
+                            elif kind == "on_chain_end" and name in _TOOL_NODES:
+                                yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
+                            elif kind == "on_chain_end" and name == "respond":
+                                output = event["data"].get("output") or {}
+                                citations = output.get("citations", [])
+                                # ADR-0205/WP-24: same field the non-streaming response
+                                # carries - the streaming path must not silently omit it.
+                                source_mode = output.get("source_mode", "indexed")
+                            elif kind == "on_chain_end" and name in ("reason", "draft"):
+                                # ADR-0415: generate_image results are returned by
+                                # whichever node actually calls the model
+                                # (retrieve_reason_respond's "reason", plan_draft_write's
+                                # "draft") - unlike citations/source_mode above, there is
+                                # no later node in either shape that re-assembles this,
+                                # so it's captured here directly.
+                                output = event["data"].get("output") or {}
+                                if output.get("generated_images"):
+                                    images = output["generated_images"]
+                    except psycopg.OperationalError as exc:
+                        if sent_any or attempts_remaining == 0:
+                            logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
+                            api_recorder.mark_error()
+                            graph_recorder.mark_error()
+                            yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
+                            return
+                        logger.warning(
+                            "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
+                            request_id, exc,
+                        )
+                        continue
+                    except Exception as exc:
+                        # Live-cluster-confirmed 2026-08-23: an unexpected exception
+                        # here (e.g. a KeyError from a malformed tool response) used
+                        # to reach the client verbatim via str(exc) - a raw Python
+                        # repr with no context, displayed in the chat bubble as if
+                        # it were a real reply. The full exception still goes to the
+                        # server log immediately above; only the client-facing
+                        # message is generic now. Deliberate exceptions from a graph
+                        # node's own graceful-degradation path (e.g.
+                        # _resolve_image_generation_call's "error" in result branch)
+                        # never reach this handler at all - those return a normal
+                        # AIMessage-driven reply through the second model call, not
+                        # a raised exception.
                         logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
                         api_recorder.mark_error()
+                        graph_recorder.mark_error()
                         yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
                         return
-                    logger.warning(
-                        "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
-                        request_id, exc,
-                    )
-                    continue
-                except Exception as exc:
-                    # Live-cluster-confirmed 2026-08-23: an unexpected exception
-                    # here (e.g. a KeyError from a malformed tool response) used
-                    # to reach the client verbatim via str(exc) - a raw Python
-                    # repr with no context, displayed in the chat bubble as if
-                    # it were a real reply. The full exception still goes to the
-                    # server log immediately above; only the client-facing
-                    # message is generic now. Deliberate exceptions from a graph
-                    # node's own graceful-degradation path (e.g.
-                    # _resolve_image_generation_call's "error" in result branch)
-                    # never reach this handler at all - those return a normal
-                    # AIMessage-driven reply through the second model call, not
-                    # a raised exception.
-                    logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
-                    api_recorder.mark_error()
-                    yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
-                    return
-                else:
-                    break
+                    else:
+                        break
+                graph_recorder.source_mode = source_mode
 
             yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
         finally:

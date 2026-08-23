@@ -70,6 +70,7 @@ spec:
           "title": "All spans for run_id=$run_id",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "description": "Every span any service tagged with this run_id, time-sorted. Spans are independent traces (no cross-service parent/child linking, ADR-0517) - this is a correlated list, not a single connected waterfall.",
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
           "targets": [
@@ -81,6 +82,7 @@ spec:
           "title": "BFF request",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"bff_request\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -91,6 +93,7 @@ spec:
           "title": "API request (agent-runtime)",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"api_request\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -101,6 +104,7 @@ spec:
           "title": "Agent graph run",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "description": "Time inside the LangGraph run itself - overlaps api_request by design (see agent-runtime's telemetry.py).",
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
           "targets": [
@@ -112,6 +116,7 @@ spec:
           "title": "MCP tool calls",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"tool_invoke\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -122,6 +127,7 @@ spec:
           "title": "RAG searches",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -132,6 +138,7 @@ spec:
           "title": "Model calls (all - provider/model/adapter/cost/tokens/latency)",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "description": "Fields of interest: zuno.provider, zuno.model, zuno.adapter, zuno.model_kind (local/saas), zuno.estimated_cost_usd, zuno.prompt_tokens, zuno.completion_tokens, zuno.latency_ms.",
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
           "targets": [
@@ -143,6 +150,7 @@ spec:
           "title": "Model calls - local (self-hosted)",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 44},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"local\"}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -153,6 +161,7 @@ spec:
           "title": "Model calls - distant (SaaS)",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 44},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"saas\"}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -163,6 +172,7 @@ spec:
           "title": "Errors this run (span status=error)",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 52},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\" && status=error}", "limit": 20, "tableType": "traces", "refId": "A"}
@@ -173,6 +183,7 @@ spec:
           "title": "MCP policy denials this run",
           "type": "table",
           "datasource": {"type": "tempo", "uid": "tempo"},
+          "fieldConfig": {"overrides": [{"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Explore", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22query%22%3A%22%24%7B__value.raw%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}]}]}]},
           "description": "A denied tool call is expected control flow (ADR-0011), not an OTel span error - it only shows up here, via zuno.outcome, not in the status=error panel to the left.",
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 52},
           "targets": [
