@@ -1,5 +1,7 @@
 # WP-04: Supply-chain completion (three stages)
 
+> ADR-0115 retargeted to v0.7 (GitHub-Actions-based release automation) on 2026-08-24 — see `docs/roadmap/versions.md`.
+
 - **State:** Closed — deferred (2026-08-22): GitHub Actions publish pipeline
   disabled (`build-publish.yml` switched to `workflow_dispatch` only);
   confirmed no chart depends on quay.io for deployment; confirmed every

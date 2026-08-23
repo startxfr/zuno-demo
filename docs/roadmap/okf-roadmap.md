@@ -23,7 +23,9 @@ copy would drift unvalidated).
   implementation and superseded by ADR-0515. `agents/` stays in this
   repository throughout. ADR-0511 (quota policy enforced via Kuadrant)
   and ADR-0512 (project-bound tasks with Salesforce-verified context)
-  retargeted out of this milestone to platform v0.3 on 2026-08-24 — see
+  retargeted out of this milestone on 2026-08-24, first briefly to
+  platform v0.3, then the same day to the new platform v0.5 milestone
+  ("make the MaaS governance plane live and used by agents") — see
   change log; WP-54/WP-55 stay tracked in this file's own Tracker below,
   only their ADRs' version `Target` moved.
 - **OKF v0.2 — extraction** (ADR-0506 – 0508): the `zuno-okf` repository is
@@ -135,13 +137,20 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
 
 ## Change log
 
-- 2026-08-24 — ADR-0511/ADR-0512 retargeted from OKF v0.1 to platform v0.3
+- 2026-08-24 (afternoon) — ADR-0511/ADR-0512 moved a second time today,
+  from the morning's platform v0.3 into the new platform v0.5 milestone
+  ("make the MaaS governance plane live and used by agents"), created
+  alongside v0.6 and v0.7 — see `docs/adr/README.md`'s afternoon
+  Retargeting note and `versions.md`.
+- 2026-08-24 (morning) — ADR-0511/ADR-0512 retargeted from OKF v0.1 to
+  platform v0.3
   (see [v0.1-v0.3-implementation-roadmap.md](v0.1-v0.3-implementation-roadmap.md)'s
   own change log and `docs/adr/README.md`'s Retargeting note): WP-54 is
   stalled on the same upstream Kuadrant wasm-shim defect blocking WP-27/
   ADR-0201, and WP-55/ADR-0512 has a hard `Depends on: WP-54`, so it moves
   with it. This milestone's ADR-0501–0512 numbering band is unaffected —
   only the two ADRs' version `Target` moved out of the OKF v0.1 count.
+  (Superseded same day — see the afternoon entry above.)
 - 2026-08-18 — roadmap created alongside ADR-0501; tracker rows land with
   their WP briefs.
 - 2026-08-19 — WP-56 (ADR-0513: real schema for `rag/`/`tools/`/`policies/`)

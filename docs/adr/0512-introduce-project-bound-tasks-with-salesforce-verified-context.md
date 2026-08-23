@@ -1,7 +1,7 @@
 # ADR-0512: Introduce project-bound tasks with Salesforce-verified context
 
 - **Status:** Partially implemented (schema, prompts, runtime binding and scoping merged; live Salesforce verification pending)
-- **Target:** v0.3 (retargeted from OKF v0.1 on 2026-08-24 — WP-55 has a hard `Depends on: WP-54`, which is retargeted to v0.3 alongside ADR-0511; moves with it rather than sitting blocked inside the OKF v0.1 milestone)
+- **Target:** v0.5 (retargeted to v0.5 on 2026-08-24, superseding this same-day morning's move to v0.3 — WP-55 has a hard `Depends on: WP-54`, so it follows ADR-0511 into the dedicated "make MaaS live and used by agents" milestone rather than the generic v0.3 catch-all. Originally OKF v0.1.)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 

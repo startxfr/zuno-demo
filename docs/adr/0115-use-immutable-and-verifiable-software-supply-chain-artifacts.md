@@ -1,7 +1,7 @@
 # ADR-0115: Use immutable and verifiable software supply chain artifacts
 
 - **Status:** Deferred
-- **Target:** v0.1
+- **Target:** v0.7 (retargeted from v0.1 on 2026-08-24 — WP-04's own text: "the ADR itself states gaps 2,3,4,6 all reduce to gap 7: one real, credentialed GitHub Actions + Quay release"; grouped under a new v0.7 milestone dedicated to GitHub-Actions-based release automation)
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team
 - **Renumbered:** formerly ADR-0051, retargeted v0 -> v0.1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)

@@ -12,7 +12,9 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Banding note (2026-08-18):** the 05xx band is reserved for the OKF stream (ADR-0501, its own version line OKF v0.1 – OKF v0.3, tracked in the [OKF roadmap](../roadmap/okf-roadmap.md)); a future platform v0.5 stream takes the next free band.
 
-**Retargeting note (2026-08-24):** ADR-0201 (v0.2 -> v0.3) and ADR-0511/ADR-0512 (OKF v0.1 -> v0.3) all retargeted together - the upstream Kuadrant wasm-shim defect blocking WP-27/WP-54 has no repo-side fix, and ADR-0512/WP-55 has a hard `Depends on: WP-54`, so it moves with ADR-0511 rather than sitting blocked inside their original milestones. Numbering (02xx/05xx band) is unchanged; only the `Target` column moves.
+**Retargeting note (2026-08-24, morning):** ADR-0201 (v0.2 -> v0.3) and ADR-0511/ADR-0512 (OKF v0.1 -> v0.3) all retargeted together - the upstream Kuadrant wasm-shim defect blocking WP-27/WP-54 has no repo-side fix, and ADR-0512/WP-55 has a hard `Depends on: WP-54`, so it moves with ADR-0511 rather than sitting blocked inside their original milestones. Numbering (02xx/05xx band) is unchanged; only the `Target` column moves.
+
+**Retargeting note (2026-08-24, afternoon):** three new platform version bands added - v0.5 (make the MaaS governance plane live and used by agents), v0.6 (prove platform automation via a from-scratch redeploy on a new cluster), v0.7 (GitHub-Actions-based release automation). ADR-0201/ADR-0511/ADR-0512 move again, this time from the morning's generic v0.3 catch-all into the dedicated v0.5 MaaS milestone (same root blocker, better-scoped home). ADR-0115 (v0.1 -> v0.7) joins WP-04's GitHub Actions release-pipeline scope. ADR-0517 is a new small ADR authored for v0.6 (demo333 cluster redeploy). No new ADR numbering band was reserved - v0.5/v0.7 reuse existing ADR numbers, and ADR-0517 simply takes the next free sequential number after ADR-0516.
 
 ## version 0
 
@@ -93,7 +95,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | v0.1 | Implemented | Implement production-grade backup and recovery |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Superseded by ADR-0118 | Use Zuno as a policy router in front of OpenShift AI MaaS |
-| [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.1 | Deferred | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v0.1 | Implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | v0.1 | Implemented | Implement Confluence as the first real external MCP integration |
 | [ADR-0118](0118-keep-the-ai-gateway-as-policy-router-and-defer-maas-delegation.md) | v0.1 | Implemented | Keep the AI Gateway as policy router and defer MaaS delegation to the governance plane |
@@ -125,7 +126,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.3 | Partially implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v0.3 | Partially implemented | Introduce LoRA and PEFT model customization |
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v0.3 | Partially implemented | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Partially implemented | Support dynamic LoRA adapter loading |
@@ -170,8 +170,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0354](0354-add-ansible-automation-platform-as-a-day-0-component.md) | v0.3 | Proposed | Add Ansible Automation Platform as a new Day 0 component |
-| [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | v0.3 | Partially implemented | Define OKF quota policy enforced via Kuadrant |
-| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.3 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
 
 ## version 0.4
 
@@ -197,6 +195,32 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Proposed | Execute Day 0 and Day 1 operations as AAP Job Templates |
 | [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Proposed | Split model preference into preferred/fallback, with prompt-slot overrides |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Implemented | Sign supply-chain artifacts in-cluster with Vault Transit |
+
+## version 0.5
+
+Goal: make the OpenShift AI MaaS governance plane live and route agent model calls through it end-to-end.
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.5 | Partially implemented | Complete the OpenShift AI MaaS governance plane integration |
+| [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | v0.5 | Partially implemented | Define OKF quota policy enforced via Kuadrant |
+| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.5 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
+
+## version 0.6
+
+Goal: prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster.
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | v0.6 | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
+
+## version 0.7
+
+Goal: automate the release/supply-chain pipeline using GitHub Actions (build, sign, publish, promote).
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.7 | Deferred | Use immutable and verifiable software supply chain artifacts |
 
 ## OKF stream
 

@@ -1,5 +1,7 @@
 # WP-55: Project-bound tasks (promotes ADR-0512)
 
+> ADR-0512 retargeted to v0.5 (make the MaaS governance plane live and used by agents) on 2026-08-24 — see `docs/roadmap/versions.md`.
+
 - **State:** Repo work merged (2026-08-21: schema mark, Finage task frontmatter + new prompt files, `agents/finage/tests/tasks/test_task_declarations.py`, `components/agent-runtime/app/project_binding.py` [new], `conversations.py`/`registry.py`/`main.py`/`model_router.py`/`graph/nodes.py` wiring, chat-contract doc updates, 20 new tests — all green. A real, load-bearing gap found live and reported rather than fixed per this brief's own "what NOT to touch": `salesforce.opportunity.read`'s `allowed_groups: [sales, board]` in `policies/tools/tool-policy.yaml` does not include Finage's real `finance` business-role group, so no real Finage user can bind a project until a separate, reviewed policy-grant change lands — see ADR-0512's 2026-08-21 implementation note for the full detail. Operator follow-up below remains blocked on the standing WP-22/WP-33 Salesforce sandbox credential gap.)
 - **ADRs:** ADR-0512
 - **Depends on:** WP-54 (quota substrate; the binding validity window

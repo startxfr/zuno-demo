@@ -1,5 +1,7 @@
 # WP-54: Quota policy and Kuadrant translation (promotes ADR-0511)
 
+> ADR-0511 retargeted to v0.5 (make the MaaS governance plane live and used by agents) on 2026-08-24 — see `docs/roadmap/versions.md`.
+
 - **State:** Operator pending (Parts A+B merged 2026-08-18; demo
   Gateway/HTTPRoute/AuthPolicy attached and `quotaEnforcement.enabled`
   flipped `true` the same day, discovering and fixing six further live

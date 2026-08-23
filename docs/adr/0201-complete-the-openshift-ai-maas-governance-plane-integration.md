@@ -354,7 +354,7 @@ this is a genuine operator/user decision (accept a second GPU node, or
 get an OpenShift AI 3.5 documentation confirmation that `ExternalModel`
 intentionally supports internal cluster-local endpoints), not a
 credential or code gap.
-- **Target:** v0.3 (retargeted from v0.2 on 2026-08-24 — blocked on the upstream Kuadrant wasm-shim defect (see WP-54/ADR-0511's own note) with no repo-side path to resolution; v0.2's remaining ADRs no longer wait on it)
+- **Target:** v0.5 (retargeted to v0.5 on 2026-08-24, superseding this same-day morning's move to v0.3 — the user created a dedicated "make MaaS live and used by agents" milestone, a better-scoped home than the generic v0.3 catch-all; the underlying reason is unchanged, still blocked on the upstream Kuadrant wasm-shim defect (see WP-54/ADR-0511's own note) with no repo-side path to resolution. Originally v0.2.)
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 
