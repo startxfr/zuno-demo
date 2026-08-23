@@ -56,7 +56,7 @@ DAY3_VERBS := test stresstest
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -95,6 +95,10 @@ help:
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
+	  '  make completion   Print a bash completion function for day0|d0/day1|d1/day2|d2/day3|d3' \
+	  '                    (verb-then-component aware). Wire it up once, in ~/.bashrc:' \
+	  '                    eval "$$(cd $(CURDIR) && make completion)"' \
+	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
 	  'Day 1 components (check/install): $(DAY1_RUN_COMPONENTS)' \
 	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)' \
@@ -111,6 +115,57 @@ new-mcp-server:
 	  exit 2; \
 	fi
 	python3 platform/scaffolding/new_mcp_server.py "$(NAME)" $(if $(DESCRIPTION),--description "$(DESCRIPTION)")
+
+# Bash completion for `make day0|d0/day1|d1/day2|d2/day3|d3 <verb> [component]`.
+# _complete-verbs/_complete-components are the single source of truth for
+# what to offer at each position - they just echo the same
+# DAY*_VERBS/DAY*_RUN_COMPONENTS/DAY*_BUILD_COMPONENTS variables the real
+# recipes validate against above, so the completion list can never drift
+# from what a command would actually accept. `completion` emits a bash
+# function that shells out to them live (one `make` call per Tab press),
+# rather than baking a static word list into the emitted script.
+_complete-verbs:
+	@case "$(DAY)" in \
+	  0) echo "$(DAY0_VERBS)" ;; \
+	  1) echo "$(DAY1_VERBS)" ;; \
+	  2) echo "$(DAY2_VERBS)" ;; \
+	  3) echo "$(DAY3_VERBS)" ;; \
+	esac
+
+_complete-components:
+	@case "$(DAY)" in \
+	  0) echo "$(DAY0_COMPONENTS) all" ;; \
+	  1) case "$(VERB)" in \
+	       build) echo "$(DAY1_BUILD_COMPONENTS) all" ;; \
+	       *) echo "$(DAY1_RUN_COMPONENTS) all" ;; \
+	     esac ;; \
+	  2) case "$(VERB)" in \
+	       build) echo "$(DAY2_BUILD_COMPONENTS) all" ;; \
+	       *) echo "$(DAY2_RUN_COMPONENTS) all" ;; \
+	     esac ;; \
+	  3) echo "$(DAY3_COMPONENTS) all" ;; \
+	esac
+
+completion:
+	@printf '%s\n' \
+	  '_zuno_demo_make_complete() {' \
+	  '  local cur day verb' \
+	  '  cur=$$2' \
+	  '  case "$${COMP_WORDS[1]}" in' \
+	  '    day0|d0) day=0 ;;' \
+	  '    day1|d1) day=1 ;;' \
+	  '    day2|d2) day=2 ;;' \
+	  '    day3|d3) day=3 ;;' \
+	  '    *) return 0 ;;' \
+	  '  esac' \
+	  '  if [[ $$COMP_CWORD -eq 2 ]]; then' \
+	  '    COMPREPLY=( $$(compgen -W "$$(command make -s -C "$(CURDIR)" _complete-verbs DAY=$$day 2>/dev/null)" -- "$$cur") )' \
+	  '  elif [[ $$COMP_CWORD -eq 3 ]]; then' \
+	  '    verb=$${COMP_WORDS[2]}' \
+	  '    COMPREPLY=( $$(compgen -W "$$(command make -s -C "$(CURDIR)" _complete-components DAY=$$day VERB=$$verb 2>/dev/null)" -- "$$cur") )' \
+	  '  fi' \
+	  '}' \
+	  'complete -F _zuno_demo_make_complete make'
 
 credentials-check:
 	@kubeconfig="$${KUBECONFIG:-$$HOME/.kube/config}"; \
