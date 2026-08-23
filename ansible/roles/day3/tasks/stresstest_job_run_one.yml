@@ -14,6 +14,24 @@
     namespace: zuno-ai-run
     wait: true
 
+# A ConfigMap volume's `items:` entries have no per-key "optional" field in
+# the Kubernetes API (KeyToPath only has key/path/mode) - only the whole
+# ConfigMap can be marked optional. A previous version of this task listed
+# "{{ day2_stress_agent }}-stress_test.py" unconditionally with a bogus
+# per-item `optional: true` that the API server silently drops; kubelet
+# then hard-fails MountVolume.SetUp for any agent lacking that key (only
+# Arkos/Comage/Tekos have a real evaluations/<agent>/stress_test.py) -
+# live-cluster-confirmed 2026-08-23 via
+# zuno-day2-stresstest-advantage-*'s "configmap references non-existent
+# config key: advantage-stress_test.py". Fixed by deciding, from the same
+# local checkout stresstest_job.yml's own find-based discovery already
+# reads from, whether to include the item at all - same
+# discovered-never-hardcoded posture as that file's own header comment.
+- name: "day2-stresstest | check whether {{ day2_stress_agent }} has its own stress_test.py"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/evaluations/{{ day2_stress_agent }}/stress_test.py"
+  register: _day2_stress_agent_stress_test_file
+
 - name: "day2-stresstest | run the stresstest Job for {{ day2_stress_agent }}"
   kubernetes.core.k8s:
     state: present
@@ -136,18 +154,24 @@
               - name: gate-agent
                 configMap:
                   name: day2-stresstest-scripts
-                  items:
-                    - key: "{{ day2_stress_agent }}-scenarios.yaml"
-                      path: scenarios.yaml
-                    - key: "{{ day2_stress_agent }}-security_checks.py"
-                      path: security_checks.py
-                    # Only Arkos has its own stress_test.py today
-                    # (ADR-0415's image-generation coverage) - optional so
-                    # every other agent's Job pod still starts cleanly
-                    # without this key existing in the ConfigMap.
-                    - key: "{{ day2_stress_agent }}-stress_test.py"
-                      path: stress_test.py
-                      optional: true
+                  # stress_test.py's item is only included when this
+                  # agent actually has one (see the stat task above) -
+                  # ConfigMap volume items have no per-key optional flag,
+                  # so an always-listed key that's sometimes absent from
+                  # the ConfigMap hard-fails the mount instead of being
+                  # skipped.
+                  items: >-
+                    {{
+                      [
+                        {'key': day2_stress_agent ~ '-scenarios.yaml', 'path': 'scenarios.yaml'},
+                        {'key': day2_stress_agent ~ '-security_checks.py', 'path': 'security_checks.py'},
+                      ]
+                      + (
+                          [{'key': day2_stress_agent ~ '-stress_test.py', 'path': 'stress_test.py'}]
+                          if _day2_stress_agent_stress_test_file.stat.exists
+                          else []
+                        )
+                    }}
               - name: gate-policies
                 configMap:
                   name: day2-stresstest-scripts
