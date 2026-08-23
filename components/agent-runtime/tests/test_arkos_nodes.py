@@ -196,6 +196,33 @@ async def test_reflect_node_is_a_noop_without_a_draft() -> None:
     assert result == {"document_draft": None}
 
 
+async def test_reflect_node_bypasses_review_for_a_skip_reflect_draft() -> None:
+    """ADR-0121/WP-059 regression test: a git-forge tool-grounded factual
+    answer (draft_node's skip_reflect=True) must pass through unchanged,
+    never fed into the "review your own document draft" persona - live-
+    cluster-confirmed 2026-08-23: a local model given a short factual
+    answer like "openshift has 850 public repos" under that persona
+    responded with a confused meta-question ("Could you please provide the
+    draft...") instead of passing the answer through."""
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("this should never be called"), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_invoke
+        result = await arkos_nodes.reflect_node(
+            {"document_draft": "The openshift org has 850 public repositories.", "skip_reflect": True}
+        )
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert not captured, "reflect_node must not call the model when skip_reflect is set"
+    assert result == {"document_draft": "The openshift org has 850 public repositories."}
+
+
 # --------------------------------------------------------------------------
 # ADR-0415: draft_node's generate_image tool-call dispatch. Previously
 # untested anywhere in the repo - the shared helper these tests exercise
@@ -464,6 +491,7 @@ async def test_draft_node_dispatches_a_single_list_repositories_tool_call() -> N
     # image_generation_enabled) - _escalate(C3, C2) stays C3, it never
     # downgrades.
     assert result["effective_classification"] == "C3"
+    assert result["skip_reflect"] is True
 
 
 async def test_draft_node_dispatches_parallel_list_and_private_list_calls() -> None:
@@ -521,6 +549,7 @@ async def test_draft_node_dispatches_parallel_list_and_private_list_calls() -> N
 
     assert set(invoked_tool_names) == {"git.repository.list", "git.repository.private.list"}
     assert result["document_draft"] == "zuno has 3 public and 7 total repos."
+    assert result["skip_reflect"] is True
 
 
 async def test_draft_node_resolves_a_second_sequential_git_round_then_forces_synthesis() -> None:
@@ -592,6 +621,7 @@ async def test_draft_node_resolves_a_second_sequential_git_round_then_forces_syn
 
     assert round_2_call_count == 2
     assert result["document_draft"] == "zuno has 3 public and 7 total repos."
+    assert result["skip_reflect"] is True
 
 
 def test_arkos_declares_the_confluence_capabilities_from_its_task() -> None:
@@ -867,6 +897,7 @@ TESTS = [
     test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_classification,
     test_reflect_node_still_honors_local_only_required,
     test_reflect_node_is_a_noop_without_a_draft,
+    test_reflect_node_bypasses_review_for_a_skip_reflect_draft,
     test_draft_node_dispatches_a_generate_image_tool_call,
     test_draft_node_then_reflect_node_survives_an_empty_image_caption,
     test_draft_node_dispatches_a_single_list_repositories_tool_call,

@@ -120,6 +120,12 @@ class AgentState(TypedDict, total=False):
     # `document_draft` rather than `draft` for the same node-name-collision
     # reason as `doc_plan` above (the shape's own node is named "draft").
     document_draft: Optional[str]
+    # ADR-0121/WP-059: True when document_draft is a git-forge tool-grounded
+    # factual answer rather than an actual document body - lets
+    # reflect_node bypass its "review your own document draft" persona,
+    # which doesn't apply to a short factual reply (see arkos_nodes.py's
+    # draft_node/reflect_node).
+    skip_reflect: bool
     # The Drive document URL write_node persisted the draft to, when the
     # write succeeded - None if the write failed or wasn't attempted.
     drive_doc_url: Optional[str]

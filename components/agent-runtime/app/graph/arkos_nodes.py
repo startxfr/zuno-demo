@@ -554,6 +554,13 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
         return {
             "document_draft": resolved.get("reply"),
             "provider_used": resolved.get("provider_used"),
+            # A git-forge answer is a short, tool-grounded factual reply
+            # (e.g. a repo count), not a DAT/workshop document body -
+            # reflect_node's "review your own document draft" persona
+            # doesn't apply to it and previously confused the model into
+            # asking for "the draft" instead of passing this answer
+            # through, live-cluster-confirmed 2026-08-23.
+            "skip_reflect": True,
             **({"errors": resolved["errors"]} if "errors" in resolved else {}),
             **(
                 {"effective_classification": resolved["effective_classification"]}
@@ -599,6 +606,12 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     """
     draft = state.get("document_draft")
     if not draft:
+        return {"document_draft": draft}
+    # ADR-0121/WP-059: draft_node sets this when document_draft is a
+    # git-forge tool-grounded factual answer, not an actual document body -
+    # see draft_node's own comment on the git_calls branch for the
+    # live-cluster-confirmed confusion this bypass fixes.
+    if state.get("skip_reflect"):
         return {"document_draft": draft}
 
     task = _active_task(state)

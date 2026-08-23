@@ -12,7 +12,11 @@ from typing import Any, Dict, Optional
 import httpx
 
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc:8080")
-MCP_TIMEOUT_SECONDS = float(os.getenv("MCP_TIMEOUT_SECONDS", "20"))
+# 20s was too short for a real capability against a real large dataset -
+# live-cluster-confirmed 2026-08-23: git.repository.list against the real
+# "openshift" GitHub org (500+ repos, server-side paginated) timed out here
+# even though git-forge-mcp would have eventually succeeded.
+MCP_TIMEOUT_SECONDS = float(os.getenv("MCP_TIMEOUT_SECONDS", "40"))
 
 
 class McpClientError(Exception):
