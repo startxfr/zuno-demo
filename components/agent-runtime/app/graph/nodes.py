@@ -660,8 +660,22 @@ async def _resolve_image_generation_call(
         logger.warning("generate_image tool call failed: %s", exc)
         tool_result = {"error": str(exc)}
 
-    if "error" in tool_result:
-        tool_summary = {"status": "error", "detail": tool_result["error"]}
+    # MCP Gateway's /v1/tools/{tool}/invoke always wraps a successful call's
+    # payload in an envelope ({"tool":..., "result": {...}}, see
+    # components/mcp-gateway/app/main.py's own return statement) - unwrap it
+    # once here. When invoke_tool raised above instead (tool_result is
+    # already the flat {"error": ...} this function built itself, no
+    # "result" key), .get("result", tool_result) correctly falls back to
+    # tool_result unchanged. Live-cluster-confirmed 2026-08-23: without this
+    # unwrap, a genuinely successful generate_image call crashed with
+    # KeyError('data_base64') - this code path had never run to completion
+    # against a real response before (every prior attempt failed earlier,
+    # at the network layer), so the envelope/flat-shape mismatch was never
+    # exercised until then.
+    result = tool_result.get("result", tool_result)
+
+    if "error" in result:
+        tool_summary = {"status": "error", "detail": result["error"]}
         generated_images_update: Dict[str, Any] = {}
     else:
         tool_summary = {"status": "ok", "prompt": args.get("prompt", "")}
@@ -669,9 +683,9 @@ async def _resolve_image_generation_call(
             "generated_images": state.get("generated_images", [])
             + [
                 {
-                    "data_base64": tool_result["data_base64"],
-                    "mime_type": tool_result.get("mime_type", "image/png"),
-                    "alt": tool_result.get("alt", args.get("prompt", "")),
+                    "data_base64": result["data_base64"],
+                    "mime_type": result.get("mime_type", "image/png"),
+                    "alt": result.get("alt", args.get("prompt", "")),
                 }
             ]
         }

@@ -228,7 +228,17 @@ async def test_draft_node_dispatches_a_generate_image_tool_call() -> None:
 
     async def fake_invoke_tool(**kwargs):
         captured_tool_call.update(kwargs)
-        return {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"}
+        # Real shape returned by agent-runtime's invoke_tool (mcp_client.py
+        # returns resp.json() unmodified) - MCP Gateway's own /invoke route
+        # always wraps a tool's payload in this envelope
+        # (components/mcp-gateway/app/main.py). A flat dict here would
+        # silently hide the KeyError('data_base64') regression this
+        # unwrapping fixed - live-cluster-confirmed 2026-08-23.
+        return {
+            "tool": "generate_image",
+            "capability": "image.generation.create",
+            "result": {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"},
+        }
 
     async def fake_followup_invoke(**kwargs):
         return _FakeModelResult("Here's the OpenShift Operator icon."), ProviderCandidate(name="ai-gateway")
@@ -285,7 +295,13 @@ async def test_draft_node_then_reflect_node_survives_an_empty_image_caption() ->
         )
 
     async def fake_invoke_tool(**kwargs):
-        return {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"}
+        # Real envelope shape - see the other fake_invoke_tool above for
+        # why a flat dict here would hide the real bug.
+        return {
+            "tool": "generate_image",
+            "capability": "image.generation.create",
+            "result": {"data_base64": "abc123", "mime_type": "image/png", "alt": "an OpenShift Operator icon"},
+        }
 
     async def fake_followup_invoke(**kwargs):
         return _FakeModelResult(""), ProviderCandidate(name="ai-gateway")
@@ -312,6 +328,69 @@ async def test_draft_node_then_reflect_node_survives_an_empty_image_caption() ->
 
     reflect_result = await arkos_nodes.reflect_node({**state, "document_draft": draft_result["document_draft"]})
     assert reflect_result == {"document_draft": ""}
+
+
+async def test_draft_node_handles_a_downstream_error_nested_inside_the_mcp_envelope() -> None:
+    """MCP Gateway returns HTTP 200 with the tool's own reported failure
+    nested under "result" (e.g. image_gen.py's {"error": "..."} when
+    OVHcloud itself errors) - this is a distinct case from invoke_tool
+    raising McpClientError (an HTTP-level failure, e.g. a 503), which
+    nodes.py's own except block already turns into a flat {"error": ...}
+    with no "result" key. Before the 2026-08-23 envelope-unwrap fix, this
+    nested-error shape was invisible to the old `"error" in tool_result`
+    check (top-level tool_result never had an "error" key here) and would
+    have been wrongly treated as success, crashing on a missing
+    "data_base64" exactly like the KeyError regression this whole file's
+    other generate_image tests exist to catch."""
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "generate_image",
+                        "args": {"prompt": "an OpenShift Operator icon"},
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        return {
+            "tool": "generate_image",
+            "capability": "image.generation.create",
+            "result": {"error": "image generation failed: Server error '503 Service Unavailable' for url '...'"},
+        }
+
+    async def fake_followup_invoke(**kwargs):
+        return (
+            _FakeModelResult("Sorry, I couldn't generate that image right now."),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "can you generate an image of the openshift operator",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert result["document_draft"] == "Sorry, I couldn't generate that image right now."
+    assert result.get("generated_images", []) == []
 
 
 def test_arkos_declares_the_confluence_capabilities_from_its_task() -> None:

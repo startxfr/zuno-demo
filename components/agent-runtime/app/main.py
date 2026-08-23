@@ -979,6 +979,14 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
 # tool-calling node would add a second entry here.
 _TOOL_NODES = {"tool_call": "search_confluence"}
 
+# Shown to the client for an unexpected exception in _stream_chat's own
+# except blocks - never str(exc) directly (see the comment at each yield
+# site for the incident this followed). request_id is already what
+# logger.error prints just above each yield, so it's the natural
+# correlator to hand back to the user for support/bug reports without
+# exposing internals.
+_CLIENT_FACING_STREAM_ERROR = "Something went wrong on our side. Please try again. (ref: {request_id})"
+
 
 async def _stream_chat(
     graph,
@@ -1063,7 +1071,7 @@ async def _stream_chat(
             except psycopg.OperationalError as exc:
                 if sent_any or attempts_remaining == 0:
                     logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
-                    yield _sse("error", {"message": str(exc)})
+                    yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
                     return
                 logger.warning(
                     "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
@@ -1071,8 +1079,20 @@ async def _stream_chat(
                 )
                 continue
             except Exception as exc:
+                # Live-cluster-confirmed 2026-08-23: an unexpected exception
+                # here (e.g. a KeyError from a malformed tool response) used
+                # to reach the client verbatim via str(exc) - a raw Python
+                # repr with no context, displayed in the chat bubble as if
+                # it were a real reply. The full exception still goes to the
+                # server log immediately above; only the client-facing
+                # message is generic now. Deliberate exceptions from a graph
+                # node's own graceful-degradation path (e.g.
+                # _resolve_image_generation_call's "error" in result branch)
+                # never reach this handler at all - those return a normal
+                # AIMessage-driven reply through the second model call, not
+                # a raised exception.
                 logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
-                yield _sse("error", {"message": str(exc)})
+                yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
                 return
             else:
                 break
