@@ -6,11 +6,19 @@
 # reasoning applied elsewhere). ASSUMPTION: the Tempo operator warns that
 # TempoMonolithic without multi-tenancy "provide[s] no authentication or
 # authorization on the ingest or query paths, and [is] not supported on
-# OpenShift" - acceptable here since ingest/query stay cluster-internal
-# (no Route is created for the OTLP/query ports, only for Jaeger UI's own
-# read path via gitops/charts/kiali's Kiali, which talks to Tempo
-# in-cluster). Revisit with a TempoStack if this ever needs to be
-# multi-tenant or externally reachable.
+# OpenShift" - acceptable here since ingest/query stay cluster-internal (no
+# Route is created for the OTLP/query ports). Revisit with a TempoStack if
+# this ever needs to be multi-tenant.
+#
+# ADR-0517: Jaeger UI's own read path IS now externally reachable (see
+# spec.jaegerui.route/authentication below) - unlike the ingest/query ports
+# above, the operator puts its own oauth-proxy in front of it, so this
+# doesn't reopen the "no auth" gap the ASSUMPTION above is about. Kiali
+# still separately talks to Tempo in-cluster for its own mesh-scoped
+# tracing tab; this Route is for the per-run resource dashboard's trace
+# links (gitops/charts/grafana/templates/dashboard-run-trace.yaml), which
+# need a generic "open trace X" page Kiali's app-scoped tracing view can't
+# provide.
 apiVersion: tempo.grafana.com/v1alpha1
 kind: TempoMonolithic
 metadata:
@@ -34,5 +42,12 @@ spec:
   jaegerui:
     enabled: true
     route:
-      enabled: false
+      enabled: true
+      host: "tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}"
+    authentication:
+      enabled: true
+      # sar defaults to {"namespace": "<this CR's namespace>", "resource":
+      # "pods", "verb": "get"} - zuno-monitoring, the same authorization
+      # boundary gitops/charts/grafana/templates/grafana.yaml's own
+      # oauth-proxy already uses. No override needed.
 {{- end }}

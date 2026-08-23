@@ -55,3 +55,8 @@ operator:
 
 tempo:
   enabled: false
+
+# ADR-0517: builds spec.jaegerui.route.host in templates/tempomonolithic.yaml -
+# same hardcoded-per-chart convention gitops/charts/kiali/values.yaml already
+# uses for its own Route host, rather than a shared/global value.
+appsDomain: apps.demo222.startx.fr

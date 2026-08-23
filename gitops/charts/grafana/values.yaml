@@ -67,6 +67,12 @@ grafana:
 
 monitoringNamespace: zuno-monitoring
 
+# ADR-0517: builds the Jaeger UI trace-link URLs in
+# templates/dashboard-run-trace.yaml - same hardcoded-per-chart convention
+# gitops/charts/kiali/values.yaml and gitops/charts/tempo/values.yaml
+# already use for their own Route hosts, rather than a shared/global value.
+appsDomain: apps.demo222.startx.fr
+
 # Backs spec.persistentVolumeClaim in templates/grafana.yaml - without this,
 # Grafana's SQLite state (datasources, dashboards, admin user) lives in the
 # operator's default emptyDir and is wiped on every pod restart, forcing
