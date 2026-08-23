@@ -2121,19 +2121,28 @@ def _list_confluence_space_pages(base_url: str, space: str, auth) -> list:
     regardless of how many sources reference it.
     """
     pages: list = []
-    start = 0
-    limit = 25
-    while True:
-        params = {
-            "cql": f'space="{space}" and type=page',
-            "start": start,
-            "limit": limit,
-            "expand": "ancestors,metadata.labels",
-        }
+    # `start=`/`limit=` offset paging does not reliably terminate against
+    # this endpoint - live-cluster-confirmed 2026-08-23: a real run against
+    # this exact space paginated past start=294425 before Confluence itself
+    # 504'd, 58 minutes in, having never seen a short page. This is the
+    # same "content/search" endpoint stage_fetch_confluence's own loop
+    # already moved off offset paging for (see that function's own comment
+    # on `_links.next` cursor-based pagination) - this function was added
+    # later for WP-25 and reintroduced the old approach instead of reusing
+    # the fix. `_links.next`'s presence/absence is this endpoint's actual
+    # documented end-of-results signal, unlike inferring it from a short
+    # page.
+    next_url = f"{base_url}/wiki/rest/api/content/search"
+    next_params = {
+        "cql": f'space="{space}" and type=page',
+        "limit": 25,
+        "expand": "ancestors,metadata.labels",
+    }
+    while next_url:
         try:
             resp = requests.get(
-                f"{base_url}/wiki/rest/api/content/search",
-                params=params,
+                next_url,
+                params=next_params,
                 auth=auth,
                 timeout=HTTP_TIMEOUT_SECONDS,
             )
@@ -2165,9 +2174,12 @@ def _list_confluence_space_pages(base_url: str, space: str, auth) -> list:
             # batches of `limit`) costs nothing for a small space and
             # gives real mid-flight visibility for a large one.
             logger.info("reconcile-acls: listed %d page(s) so far in space '%s'", len(pages), space)
-        if len(results) < limit:
-            break
-        start += limit
+        next_link = payload.get("_links", {}).get("next")
+        if next_link:
+            next_url = f"{base_url}/wiki{next_link}"
+            next_params = None  # the cursor URL already carries the full query string
+        else:
+            next_url = None
     return pages
 
 

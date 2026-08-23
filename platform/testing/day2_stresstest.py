@@ -154,12 +154,65 @@ def _stress_test_results() -> List[Day2Result]:
     ]
 
 
+def _rag_ingestion_results() -> List[Day2Result]:
+    """WP-25/ADR-0110: a fast, bounded, read-only proof that
+    reconcile-acls's live Confluence listing path is reachable and
+    returns real content. Deliberately NOT a full space walk the way
+    reconcile-acls itself does - live-cluster-confirmed 2026-08-23: a real
+    listing of the "SXSI" space (the one every knowledge.tech Confluence
+    source points at) can run for the better part of an hour, unsuitable
+    for a recurring stresstest job with a normal timeout. A single
+    small-limit, unpaginated CQL request is enough to prove auth +
+    connectivity + real content without that cost. Tekos-only - it's the
+    one agent whose knowledge.tech domain has Confluence sources
+    configured at all.
+    """
+    if AGENT != "tekos":
+        return [
+            Day2Result(
+                AGENT, "rag_ingestion", "n/a", "coverage", True,
+                "reconcile-acls live check is Tekos-only (knowledge.tech domain)",
+            )
+        ]
+
+    base_url = os.environ.get("CONFLUENCE_URL")
+    username = os.environ.get("CONFLUENCE_USERNAME")
+    token = os.environ.get("CONFLUENCE_TOKEN")
+    if not (base_url and username and token):
+        return [
+            Day2Result(
+                AGENT, "rag_ingestion", "confluence-live-listing", "coverage", True,
+                "no CONFLUENCE_URL/CONFLUENCE_USERNAME/CONFLUENCE_TOKEN mounted in this Job",
+            )
+        ]
+
+    import httpx
+
+    try:
+        resp = httpx.get(
+            f"{base_url}/wiki/rest/api/content/search",
+            params={"cql": 'space="SXSI" and type=page', "limit": 5},
+            auth=(username, token),
+            timeout=15,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        passed = len(results) > 0
+        detail = f"{len(results)} real page(s) returned" if passed else "listing succeeded but returned zero pages"
+    except Exception as exc:  # noqa: BLE001 - reported as a failed row, not a crash
+        passed = False
+        detail = f"live listing failed: {exc}"
+
+    return [Day2Result(AGENT, "rag_ingestion", "confluence-live-listing", "connectivity", passed, detail)]
+
+
 def main() -> int:
     results: List[Day2Result] = []
     results += _safe_run("scenario", _scenario_results)
     results += _safe_run("security", _security_results)
     results += _safe_run("gate", _gate_check_results)
     results += _safe_run("stress_test", _stress_test_results)
+    results += _safe_run("rag_ingestion", _rag_ingestion_results)
 
     print(json.dumps([asdict(r) for r in results]))
 

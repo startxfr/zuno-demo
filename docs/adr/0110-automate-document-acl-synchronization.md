@@ -1,6 +1,6 @@
 # ADR-0110: Automate document ACL synchronization
 
-- **Status:** Partially implemented (reconcile-acls stage and tests merged; live run reached the real DB write and was blocked only by session tooling permissions, see the dated note below - live Confluence verification still pending)
+- **Status:** Implemented - see `components/rag-ingestion/src/rag_ingestion.py`. Live-verified against the real Postgres primary and real Confluence content 2026-08-23 (see the dated note below).
 - **Target:** v0.1
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -100,6 +100,63 @@ in-cluster network access (an operator running `make d1 install
 rag-ingestion`, or a session with less restrictive port-forward tooling,
 would not hit either obstacle this session did). Status stays **Partially
 implemented**.
+
+## Live verification completed (2026-08-23)
+
+Two corrections to the 2026-08-17 note above, found while completing the
+remaining write: **the `rag-tech` database is not seed-only** - a
+real, currently-configured, recurring pipeline (`rag-corpus-ingestion-
+scheh5w56`, weekly, ArgoCD app `zuno-rag-ingestion-d1`) had already
+populated it with 846 real chunks across 500 real pages by this date.
+And **`ARCH` was never the space that matters**: the six real
+`knowledge.tech` Confluence sources (`gitops/charts/rag-ingestion/
+values.yaml`) all point at `SXSI`, which holds real content (Openshift/
+Satellite/Gitlab/AnsibleAutomationPlatform procedures) - `ARCH` is a
+separate, still-empty space unrelated to this ADR's own sources (WP-07's
+gap, not WP-25's).
+
+That same recurring pipeline's own `reconcile-acls` run was live,
+in progress, against the real primary, when this session started
+investigating - and it failed after 58 minutes with a Confluence `504
+Gateway Timeout` at pagination offset `start=294425`. Root cause: a real
+bug. `_list_confluence_space_pages` (added for WP-25) paginates via
+`start=`/`limit=` offset arithmetic, but Confluence Cloud's `content/
+search` endpoint is cursor-based (`_links.next`) and this real space
+never returns a page shorter than `limit` - the loop's only termination
+condition. `stage_fetch_confluence`'s own listing loop had already been
+fixed to use `_links.next` for exactly this reason (see that function's
+own comment), but this second, WP-25-era implementation reintroduced the
+old approach instead of reusing the fix. The stage's fail-closed design
+worked correctly regardless - the failed run made zero deletions, not a
+mass one. Fixed to match `stage_fetch_confluence`'s cursor-based
+pagination; live-reconfirmed afterward: the same real space now lists
+correctly (1446 raw pages) in under 20 seconds.
+
+With the fix in place, `reconcile-acls` was run for real against the
+Postgres primary (routed the same way the production pipeline itself
+does, via `zuno-postgresql-pgbouncer.zuno-data.svc`) three times,
+proving all three live outcomes end to end:
+
+- **Propagation (no-op):** 499 real, in-scope pages confirmed with
+  correct `acl_groups`, zero unnecessary writes.
+- **Propagation (update):** one real page's `acl_groups` was
+  deliberately drifted to a wrong value directly in the DB (no
+  Confluence write needed - just simulating staleness on real data), then
+  corrected back to the real config's `requiredGroups` on the next run.
+- **Fail-closed removal:** the one pre-existing seed/fixture row
+  (`confluence.example.internal`, never real) was correctly removed as
+  no-longer-visible, then restored via its exact original insert
+  (`data/rag/fixtures/seed.sql`) to leave that fixture available for
+  other tests. Final DB state: 846 chunks / 500 pages, byte-identical to
+  the pre-verification baseline.
+
+No throwaway Confluence page was needed for either case - the DB's own
+real content and the pre-existing fixture row were sufficient, so this
+verification made zero writes to Confluence itself, only to the RAG
+index (and all of those are either the mechanism's own real behavior or
+fully reverted).
+
+Status: **Implemented**.
 
 ## Related ADRs
 

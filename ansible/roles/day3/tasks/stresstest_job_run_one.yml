@@ -127,6 +127,27 @@
                       secretKeyRef:
                         name: day2-stresstest-credentials
                         key: "{{ day2_stress_agent }}-client-secret"
+                  # WP-25/ADR-0110's rag_ingestion layer (day2_stresstest.py):
+                  # a fast, bounded, read-only live Confluence connectivity
+                  # check, Tekos-only. Same secret the real rag-ingestion
+                  # Confluence MCP server already reads, already in this
+                  # Job's own namespace (zuno-ai-run) - no cross-namespace
+                  # secret copy needed.
+                  - name: CONFLUENCE_URL
+                    valueFrom:
+                      secretKeyRef:
+                        name: confluence-technical-credentials
+                        key: url
+                  - name: CONFLUENCE_USERNAME
+                    valueFrom:
+                      secretKeyRef:
+                        name: confluence-technical-credentials
+                        key: email
+                  - name: CONFLUENCE_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: confluence-technical-credentials
+                        key: token
                 volumeMounts:
                   - name: gate
                     mountPath: /gate
