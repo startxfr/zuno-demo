@@ -516,6 +516,21 @@ def test_import_sxa_dump_native_skips_create_view_statements():
     assert fake_conn.committed
 
 
+def test_import_sxa_dump_native_drops_each_table_before_recreating_it():
+    # Confirmed live 2026-08-23: this dump uses "CREATE TABLE IF NOT
+    # EXISTS" throughout, never "DROP TABLE IF EXISTS" - a re-run (new
+    # snapshot, or a retry after a mid-import failure) would otherwise
+    # leave CREATE TABLE as a no-op against an already-populated table,
+    # so its INSERTs collide with leftover rows on the primary key.
+    dump = "CREATE TABLE IF NOT EXISTS `commande` (`id` int);\nINSERT INTO `commande` VALUES (1);"
+    fake_conn = FakeMariaDBConnection(tables=["commande"], rows={"commande": [{"id": 1}]})
+    rag_ingestion._import_sxa_dump_native(fake_conn, dump)
+    drop_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("DROP TABLE IF EXISTS `COMMANDE`"))
+    create_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("CREATE TABLE"))
+    insert_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("INSERT"))
+    assert drop_idx < create_idx < insert_idx
+
+
 def test_split_sql_statements_handles_semicolons_inside_quoted_values():
     dump = "INSERT INTO `t` VALUES (1,'a;b'),(2,\"c;d\");\nCREATE TABLE `u` (`id` int);"
     statements = rag_ingestion._split_sql_statements(dump)
@@ -897,6 +912,7 @@ TESTS = [
     test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
     test_import_sxa_dump_native_skips_create_view_statements,
+    test_import_sxa_dump_native_drops_each_table_before_recreating_it,
     test_split_sql_statements_handles_semicolons_inside_quoted_values,
     test_split_sql_statements_skips_comment_only_lines,
     test_parse_create_table_columns_skips_constraints_keeps_declared_order,

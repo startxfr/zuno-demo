@@ -1072,6 +1072,10 @@ _CREATE_VIEW_RE = re.compile(
     r"^CREATE\s+(?:ALGORITHM=\S+\s+)?(?:DEFINER=\S+\s+)?(?:SQL\s+SECURITY\s+\S+\s+)?VIEW\b",
     re.IGNORECASE,
 )
+_CREATE_TABLE_NAME_RE = re.compile(
+    r"^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(?P<table>\w+)`?",
+    re.IGNORECASE,
+)
 
 
 def _import_sxa_dump_native(conn, dump_text: str) -> None:
@@ -1086,11 +1090,25 @@ def _import_sxa_dump_native(conn, dump_text: str) -> None:
     denied". _load_sxa_dump only ever reads base tables via SHOW
     TABLES/SELECT *, so the views (and their harmless
     CREATE-TABLE-IF-NOT-EXISTS stand-in placeholders, which still import
-    fine as empty, always-skipped tables) are simply not needed."""
+    fine as empty, always-skipped tables) are simply not needed.
+
+    Every CREATE TABLE statement gets an explicit `DROP TABLE IF EXISTS`
+    right before it, regardless of whether the dump itself has one:
+    confirmed live 2026-08-23, this phpMyAdmin export uses `CREATE TABLE
+    IF NOT EXISTS` throughout (no `DROP TABLE IF EXISTS` anywhere) - a
+    re-run (new snapshot, or a retry after a mid-import failure like the
+    view-statement one above) would otherwise leave CREATE TABLE as a
+    silent no-op against already-populated tables, so the following
+    INSERTs collide on primary keys instead of re-importing cleanly. This
+    is what _load_sxa_dump's own idempotency claim already assumed the
+    dump would provide."""
     with conn.cursor() as cur:
         for statement in _split_sql_statements(dump_text):
             if _CREATE_VIEW_RE.match(statement):
                 continue
+            create_table_match = _CREATE_TABLE_NAME_RE.match(statement)
+            if create_table_match:
+                cur.execute(f"DROP TABLE IF EXISTS `{create_table_match.group('table')}`")
             cur.execute(statement)
     conn.commit()
 
