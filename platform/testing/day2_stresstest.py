@@ -58,7 +58,20 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from day2_report import Day2Result  # noqa: E402
 
 AGENT = os.getenv("AGENT", "tekos")
-SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+# .parent.resolve(), NOT .resolve().parent: the Job mounts this file at
+# /gate/day2_stresstest.py as a ConfigMap symlink
+# (/gate/day2_stresstest.py -> ..data/day2_stresstest.py -> the
+# ConfigMap's own internal timestamped directory). .resolve() on __file__
+# itself follows that chain all the way through, landing SCRIPT_DIR
+# inside the ConfigMap's private directory - which has no idea that
+# /gate/<agent>/ is a SEPARATE volume mounted alongside it, not nested
+# inside it. Live-cluster-confirmed 2026-08-23: this silently made
+# _load_security_checks()/_load_stress_test() report "not found" for
+# every agent, always, whenever run via the Job (never when run
+# standalone against a real repo checkout, which is why this went
+# unnoticed). Resolving only the parent (a real mountpoint directory,
+# never itself a symlink) keeps SCRIPT_DIR at the mount point instead.
+SCRIPT_DIR = pathlib.Path(__file__).parent.resolve()
 
 
 def _load_security_checks():

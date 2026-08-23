@@ -59,7 +59,21 @@ AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.
 # experimentation with a different persona without editing this file.
 PERSONA = os.getenv("STRESS_TEST_PERSONA", "consultant-01")
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+# parents[2] on the RAW (unresolved) __file__, not .resolve().parents[2]:
+# in a real repo checkout this file sits at evaluations/tekos/stress_test.py
+# (two levels below repo root, no symlinks, so .resolve() was always a
+# no-op there). But the Day3 Job mounts it at /gate/tekos/stress_test.py -
+# a ConfigMap symlink - and .resolve() there chases that symlink chain
+# into the ConfigMap's own internal directory, adding an extra invisible
+# nesting level .parents[2] doesn't account for; the two config files this
+# reads (platform/ai-gateway/provider-routing.yaml,
+# policies/model-routing/model-routing-policy.yaml) are mounted at the
+# Job's true root (/platform/..., /policies/...), matching
+# gate_checks.py's own root-relative convention - reachable via
+# parents[2] on this file's raw, unresolved path.
+# Live-cluster-confirmed 2026-08-23 alongside the day2_stresstest.py
+# SCRIPT_DIR fix this depends on (platform/testing/day2_stresstest.py).
+REPO_ROOT = pathlib.Path(__file__).parents[2]
 
 
 @dataclass
