@@ -495,6 +495,27 @@ def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
         assert "SXA_DUMP_SCHEMA_S3_KEY" in str(exc)
 
 
+def test_import_sxa_dump_native_skips_create_view_statements():
+    # Confirmed live 2026-08-23: this phpMyAdmin-style dump's views are
+    # hardcoded to their original source database name ("PROD_sxa"),
+    # which this MariaDB user has no grant on ("CREATE VIEW command
+    # denied") - _import_sxa_dump_native must skip them rather than fail
+    # the whole import, since _load_sxa_dump only ever reads base tables.
+    dump = (
+        "CREATE TABLE `commande` (`id` int);\n"
+        "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER "
+        "VIEW `PROD_sxa`.`EXTRACT_SALES_202x` AS select `PROD_sxa`.`commande`.`id` "
+        "AS `id` from `PROD_sxa`.`commande`;\n"
+        "INSERT INTO `commande` VALUES (1);"
+    )
+    fake_conn = FakeMariaDBConnection(tables=["commande"], rows={"commande": [{"id": 1}]})
+    rag_ingestion._import_sxa_dump_native(fake_conn, dump)
+    assert not any("VIEW" in s.upper() for s in fake_conn.executed)
+    assert any("CREATE TABLE `commande`" in s for s in fake_conn.executed)
+    assert any("INSERT INTO `commande`" in s for s in fake_conn.executed)
+    assert fake_conn.committed
+
+
 def test_split_sql_statements_handles_semicolons_inside_quoted_values():
     dump = "INSERT INTO `t` VALUES (1,'a;b'),(2,\"c;d\");\nCREATE TABLE `u` (`id` int);"
     statements = rag_ingestion._split_sql_statements(dump)
@@ -875,6 +896,7 @@ TESTS = [
     test_load_sxa_dump_natively_imports_and_writes_one_record_per_row,
     test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
+    test_import_sxa_dump_native_skips_create_view_statements,
     test_split_sql_statements_handles_semicolons_inside_quoted_values,
     test_split_sql_statements_skips_comment_only_lines,
     test_parse_create_table_columns_skips_constraints_keeps_declared_order,

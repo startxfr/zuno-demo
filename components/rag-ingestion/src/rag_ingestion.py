@@ -1068,13 +1068,29 @@ def _split_sql_statements(dump_text: str) -> list:
     return [s.strip() for s in statements if s.strip()]
 
 
+_CREATE_VIEW_RE = re.compile(
+    r"^CREATE\s+(?:ALGORITHM=\S+\s+)?(?:DEFINER=\S+\s+)?(?:SQL\s+SECURITY\s+\S+\s+)?VIEW\b",
+    re.IGNORECASE,
+)
+
+
 def _import_sxa_dump_native(conn, dump_text: str) -> None:
     """Executes the real mysqldump SQL directly against MariaDB - no
     schema re-derivation (ADR-0216: the dump's own format is already
     MySQL-native, unlike ADR-0016's superseded Postgres-translation
-    path)."""
+    path). CREATE VIEW statements are skipped: confirmed live 2026-08-23,
+    this phpMyAdmin-style export's views are hardcoded to their original
+    source database name (`` `PROD_sxa`.`view_name` ``, embedded in every
+    column reference too), which our own `sxa` database's user has no
+    grant on and which doesn't exist here at all - "CREATE VIEW command
+    denied". _load_sxa_dump only ever reads base tables via SHOW
+    TABLES/SELECT *, so the views (and their harmless
+    CREATE-TABLE-IF-NOT-EXISTS stand-in placeholders, which still import
+    fine as empty, always-skipped tables) are simply not needed."""
     with conn.cursor() as cur:
         for statement in _split_sql_statements(dump_text):
+            if _CREATE_VIEW_RE.match(statement):
+                continue
             cur.execute(statement)
     conn.commit()
 
