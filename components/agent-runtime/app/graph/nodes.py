@@ -237,6 +237,165 @@ def _diagram_generation_declared(task: TaskDefinition) -> bool:
     migration-alias tolerance."""
     return "diagram.generation.create" in task.allowed_tools or "generate_diagram" in task.allowed_tools
 
+
+# ADR-0121/WP-059: git-forge read/list capabilities have been declared in
+# tool-bindings.yaml, tool-policy.yaml and every entitled task's
+# allowed_tools since WP-059 (commit c2e8fe9) - but no node ever offered
+# them to the model as a callable tool until now, so the LLM could never
+# actually reach git-forge (live-cluster-confirmed 2026-08-23: zero git.*
+# invocations across a real 3-hour production window, despite a user
+# directly asking Arkos a GitHub question). Four schemas, one per declared
+# capability, same schema+_x_declared trio pattern as
+# _GENERATE_IMAGE_TOOL_SCHEMA above. write_file/create_repository are
+# deliberately out of scope here - the reported gap is the read/list side;
+# a write capability deserves its own scoped follow-up.
+#
+# Each schema's function name is git-forge's own MCP tool name
+# (components/mcp-servers/git-forge/server.py), which is NOT always the
+# platform capability ID invoke_tool must be called with (unlike
+# generate_image/generate_diagram, where the two happen to match) - see
+# _GIT_FORGE_CAPABILITY_BY_TOOL_NAME below for that mapping.
+_LIST_REPOSITORIES_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "list_repositories",
+        "description": (
+            "List the public repositories owned by a GitHub or GitLab user, "
+            "organization, or group. Requires the caller to name the owner "
+            "explicitly - there is no default org configured on this platform, so "
+            "ask the user which one to check rather than guessing. For GitLab, "
+            "list_private_repositories also returns internal/private repositories "
+            "(GitHub has no private equivalent - this server never grants private "
+            "GitHub access)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "provider": {"type": "string", "enum": ["github", "gitlab"]},
+                "owner": {"type": "string", "description": "The GitHub/GitLab user, organization, or group name."},
+                "owner_type": {"type": "string", "enum": ["user", "organization"]},
+            },
+            "required": ["provider", "owner", "owner_type"],
+        },
+    },
+}
+
+
+def _git_repository_list_declared(task: TaskDefinition) -> bool:
+    return "git.repository.list" in task.allowed_tools
+
+
+_READ_REPOSITORY_CONTENT_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "read_repository_content",
+        "description": (
+            "Read a file's content, or list a directory, in a PUBLIC GitHub or "
+            "GitLab repository. Refuses if the repository is private on either "
+            "provider - use read_private_repository_content for a GitLab private/"
+            "internal repository instead (GitHub has no private equivalent). Leave "
+            "path empty to list the repository root."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "provider": {"type": "string", "enum": ["github", "gitlab"]},
+                "owner": {"type": "string", "description": "The GitHub/GitLab user, organization, or group name."},
+                "repo": {"type": "string", "description": "The repository name."},
+                "path": {
+                    "type": "string",
+                    "description": "Optional: file or directory path. Empty reads the repository root.",
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "Optional: branch, tag, or commit SHA. Defaults to the repository's default branch.",
+                },
+            },
+            "required": ["provider", "owner", "repo"],
+        },
+    },
+}
+
+
+def _git_repository_read_declared(task: TaskDefinition) -> bool:
+    return "git.repository.read" in task.allowed_tools
+
+
+_LIST_PRIVATE_REPOSITORIES_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "list_private_repositories",
+        "description": (
+            "List EVERY repository (public, internal, AND private) owned by a "
+            "GitLab user or group - not a private-only filter. GitLab only - "
+            "refuses provider=\"github\"; this server never grants private GitHub "
+            "access, use list_repositories for GitHub. Requires the caller to name "
+            "the owner explicitly - there is no default org configured."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "provider": {"type": "string", "enum": ["gitlab"]},
+                "owner": {"type": "string", "description": "The GitLab user or group name."},
+                "owner_type": {"type": "string", "enum": ["user", "organization"]},
+            },
+            "required": ["provider", "owner", "owner_type"],
+        },
+    },
+}
+
+
+def _git_repository_private_list_declared(task: TaskDefinition) -> bool:
+    return "git.repository.private.list" in task.allowed_tools
+
+
+_READ_PRIVATE_REPOSITORY_CONTENT_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "read_private_repository_content",
+        "description": (
+            "Read a file's content, or list a directory, in a GitLab repository "
+            "regardless of visibility (public, internal, or private). GitLab only "
+            "- refuses provider=\"github\"; this server never grants private GitHub "
+            "access, use read_repository_content for a public GitHub repo. Leave "
+            "path empty to list the repository root."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "provider": {"type": "string", "enum": ["gitlab"]},
+                "owner": {"type": "string", "description": "The GitLab user or group name."},
+                "repo": {"type": "string", "description": "The repository name."},
+                "path": {
+                    "type": "string",
+                    "description": "Optional: file or directory path. Empty reads the repository root.",
+                },
+                "ref": {
+                    "type": "string",
+                    "description": "Optional: branch, tag, or commit SHA. Defaults to the repository's default branch.",
+                },
+            },
+            "required": ["provider", "owner", "repo"],
+        },
+    },
+}
+
+
+def _git_repository_private_read_declared(task: TaskDefinition) -> bool:
+    return "git.repository.private.read" in task.allowed_tools
+
+
+# tool-bindings.yaml's provider_tool field is what actually renames e.g.
+# "git.repository.list" to "list_repositories" server-side (mcp-gateway/app/
+# downstream.py) - invoke_tool is always called with the capability ID on
+# the left, never the provider tool name on the right.
+_GIT_FORGE_CAPABILITY_BY_TOOL_NAME = {
+    "list_repositories": "git.repository.list",
+    "read_repository_content": "git.repository.read",
+    "list_private_repositories": "git.repository.private.list",
+    "read_private_repository_content": "git.repository.private.read",
+}
+
 # ADR-0046: "Similarity alone can return an incorrect OpenShift version
 # even when the user names a version" - these deterministic pre-ranking
 # filters (rag-service's app/search.py:_filter_clause) only trigger when
@@ -628,14 +787,30 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     # _GENERATE_DIAGRAM_TOOL_SCHEMA's own comment for why this is a
     # separate tool rather than a generate_image variant.
     diagram_generation_enabled = _diagram_generation_declared(task)
-    visual_tool_schemas = [
+    # ADR-0121/WP-059: same declarative gate, four git-forge capabilities -
+    # kept as its own list (not folded straight into tool_schemas below) so
+    # _resolve_git_forge_calls can re-offer exactly this same
+    # already-authorized subset on its own follow-up model call, rather
+    # than a wider or narrower set.
+    git_tool_schemas = [
+        schema
+        for schema, enabled in (
+            (_LIST_REPOSITORIES_TOOL_SCHEMA, _git_repository_list_declared(task)),
+            (_READ_REPOSITORY_CONTENT_TOOL_SCHEMA, _git_repository_read_declared(task)),
+            (_LIST_PRIVATE_REPOSITORIES_TOOL_SCHEMA, _git_repository_private_list_declared(task)),
+            (_READ_PRIVATE_REPOSITORY_CONTENT_TOOL_SCHEMA, _git_repository_private_read_declared(task)),
+        )
+        if enabled
+    ]
+    tool_schemas = [
         schema
         for schema, enabled in (
             (_GENERATE_IMAGE_TOOL_SCHEMA, image_generation_enabled),
             (_GENERATE_DIAGRAM_TOOL_SCHEMA, diagram_generation_enabled),
         )
         if enabled
-    ] or None
+    ] + git_tool_schemas
+    tool_schemas = tool_schemas or None
 
     async def reason_node(state: AgentState) -> Dict[str, Any]:
         context = _build_context_block(state)
@@ -669,7 +844,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 # draw project quota - gated on the task's own mark, never
                 # on state["project_id"] being merely truthy.
                 project_id=state.get("project_id") if task.project_required else None,
-                tools=visual_tool_schemas,
+                tools=tool_schemas,
             )
         except ModelRouterError as exc:
             logger.error("all model providers failed: %s", exc)
@@ -692,6 +867,11 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
         if diagram_call:
             return await _resolve_diagram_generation_call(
                 state, agent, task, turn_messages, result, diagram_call, provider,
+            )
+        git_calls = [tc for tc in tool_calls if tc.get("name") in _GIT_FORGE_CAPABILITY_BY_TOOL_NAME]
+        if git_calls:
+            return await _resolve_git_forge_calls(
+                state, agent, task, turn_messages, result, git_calls, provider, git_tool_schemas,
             )
         reply_text = result.content if hasattr(result, "content") else str(result)
         return {"reply": reply_text, "provider_used": provider.name}
@@ -891,6 +1071,147 @@ async def _resolve_diagram_generation_call(
 
     reply_text = final_result.content if hasattr(final_result, "content") else str(final_result)
     return {"reply": reply_text, "provider_used": final_provider.name, **generated_images_update}
+
+
+async def _invoke_git_forge_call(
+    state: AgentState,
+    agent: AgentDefinition,
+    task: TaskDefinition,
+    call: Dict[str, Any],
+    data_classification: str,
+) -> Dict[str, Any]:
+    """Invokes one git-forge tool call and returns a JSON-serializable
+    summary suitable for feeding straight back to the model as a
+    ToolMessage - mirrors _resolve_image_generation_call's tool_summary
+    envelope-unwrap, minus that function's base64-payload special case (a
+    repository listing/file read has no binary sidecar to keep out of the
+    text history)."""
+    capability = _GIT_FORGE_CAPABILITY_BY_TOOL_NAME[call["name"]]
+    try:
+        tool_result = await invoke_tool(
+            tool_name=capability,
+            arguments=call.get("args", {}),
+            bearer_token=state["bearer_token"],
+            agent_name=agent.name,
+            task_name=task.name,
+            data_classification=data_classification,
+        )
+    except McpClientError as exc:
+        logger.warning("%s tool call failed: %s", call["name"], exc)
+        return {"status": "error", "detail": str(exc)}
+
+    result = tool_result.get("result", tool_result)
+    if "error" in result:
+        return {"status": "error", "detail": result["error"]}
+    return {"status": "ok", **result}
+
+
+async def _resolve_git_forge_calls(
+    state: AgentState,
+    agent: AgentDefinition,
+    task: TaskDefinition,
+    turn_messages: List[Any],
+    assistant_result: Any,
+    git_calls: List[Dict[str, Any]],
+    provider: Any,
+    git_tool_schemas: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """ADR-0121/WP-059's missing runtime half - see _GIT_FORGE_CAPABILITY_
+    BY_TOOL_NAME's own comment for the full history of the gap this closes.
+
+    Resolves every git-forge call the model returned in this completion (a
+    provider with parallel tool-calling may return list_repositories AND
+    list_private_repositories together), then makes one more model call
+    still offering the same, already-authorized git_tool_schemas subset -
+    covering a provider WITHOUT parallel tool-calling (e.g. local vLLM),
+    which returns such calls sequentially across completions instead of
+    together. If that second round also returns git calls, resolves those
+    too and forces a third, tools=None call for the final answer. Hard
+    2-round cap - not a general agentic loop, just enough to not silently
+    drop the sequential-call case a single-shot resolver (like
+    _resolve_image_generation_call) would.
+
+    ADR-0034/0035: escalates to _LIVE_READ_CLASSIFICATION before every git
+    call, same as tool_call_node does for its own live-read tool - git.*'s
+    own min_classification (tool-policy.yaml) requires at least C2, so a
+    stale lower declaration would simply be denied. The escalation is
+    reflected back into effective_classification on every return path below
+    so later turns/state see it too.
+    """
+    escalated = _escalate(state.get("effective_classification", agent.preferred_classification), _LIVE_READ_CLASSIFICATION)
+
+    async def _tool_messages_for(calls: List[Dict[str, Any]]) -> List[ToolMessage]:
+        return [
+            ToolMessage(
+                content=json.dumps(await _invoke_git_forge_call(state, agent, task, call, escalated)),
+                tool_call_id=call.get("id", ""),
+            )
+            for call in calls
+        ]
+
+    messages = [
+        *turn_messages,
+        AIMessage(content=assistant_result.content or "", tool_calls=git_calls),
+        *await _tool_messages_for(git_calls),
+    ]
+    try:
+        round_2_result, round_2_provider = await _model_router.invoke_with_fallback(
+            classification=escalated,
+            messages=messages,
+            bearer_token=state["bearer_token"],
+            local_only=state.get("local_only_required", False),
+            request_id=state.get("request_id"),
+            agent_name=agent.name,
+            task_name=task.name,
+            project_id=state.get("project_id") if task.project_required else None,
+            tools=git_tool_schemas or None,
+        )
+    except ModelRouterError as exc:
+        logger.error("follow-up model call after git-forge tool call failed: %s", exc)
+        return {
+            "reply": "I looked that up but couldn't compose a follow-up reply right now.",
+            "provider_used": provider.name,
+            "effective_classification": escalated,
+            "errors": state.get("errors", []) + [f"reason: {exc}"],
+        }
+
+    round_2_calls = [
+        tc
+        for tc in (getattr(round_2_result, "tool_calls", None) or [])
+        if tc.get("name") in _GIT_FORGE_CAPABILITY_BY_TOOL_NAME
+    ]
+    if not round_2_calls:
+        reply_text = round_2_result.content if hasattr(round_2_result, "content") else str(round_2_result)
+        return {"reply": reply_text, "provider_used": round_2_provider.name, "effective_classification": escalated}
+
+    messages = [
+        *messages,
+        AIMessage(content=round_2_result.content or "", tool_calls=round_2_calls),
+        *await _tool_messages_for(round_2_calls),
+    ]
+    try:
+        final_result, final_provider = await _model_router.invoke_with_fallback(
+            classification=escalated,
+            messages=messages,
+            bearer_token=state["bearer_token"],
+            local_only=state.get("local_only_required", False),
+            request_id=state.get("request_id"),
+            agent_name=agent.name,
+            task_name=task.name,
+            project_id=state.get("project_id") if task.project_required else None,
+            # Forced synthesis - no more git tool-calling rounds after this.
+        )
+    except ModelRouterError as exc:
+        logger.error("final model call after second git-forge tool round failed: %s", exc)
+        return {
+            "reply": "I looked that up but couldn't compose a final reply right now.",
+            "provider_used": round_2_provider.name,
+            "effective_classification": escalated,
+            "errors": state.get("errors", []) + [f"reason: {exc}"],
+        }
+
+    reply_text = final_result.content if hasattr(final_result, "content") else str(final_result)
+    return {"reply": reply_text, "provider_used": final_provider.name, "effective_classification": escalated}
 
 
 def _compute_source_mode(state: AgentState) -> str:

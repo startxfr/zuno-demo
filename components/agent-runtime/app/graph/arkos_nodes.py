@@ -27,12 +27,22 @@ from app.graph.history import build_history_messages
 from app.graph.nodes import (
     _GENERATE_DIAGRAM_TOOL_SCHEMA,
     _GENERATE_IMAGE_TOOL_SCHEMA,
+    _GIT_FORGE_CAPABILITY_BY_TOOL_NAME,
+    _LIST_PRIVATE_REPOSITORIES_TOOL_SCHEMA,
+    _LIST_REPOSITORIES_TOOL_SCHEMA,
     _LIVE_READ_CLASSIFICATION,
+    _READ_PRIVATE_REPOSITORY_CONTENT_TOOL_SCHEMA,
+    _READ_REPOSITORY_CONTENT_TOOL_SCHEMA,
     _code_request_trigger_reason,
     _diagram_generation_declared,
     _escalate,
+    _git_repository_list_declared,
+    _git_repository_private_list_declared,
+    _git_repository_private_read_declared,
+    _git_repository_read_declared,
     _image_generation_declared,
     _resolve_diagram_generation_call,
+    _resolve_git_forge_calls,
     _resolve_image_generation_call,
 )
 from app.graph.state import AgentState
@@ -463,14 +473,29 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
     image_generation_enabled = _image_generation_declared(task)
     # ADR-0516: same declarative gate, second visual tool.
     diagram_generation_enabled = _diagram_generation_declared(task)
-    visual_tool_schemas = [
+    # ADR-0121/WP-059: same declarative gate, four git-forge capabilities -
+    # see app/graph/nodes.py:_make_reason_node's identical construction for
+    # why this is kept as its own list rather than folded straight into
+    # tool_schemas below.
+    git_tool_schemas = [
+        schema
+        for schema, enabled in (
+            (_LIST_REPOSITORIES_TOOL_SCHEMA, _git_repository_list_declared(task)),
+            (_READ_REPOSITORY_CONTENT_TOOL_SCHEMA, _git_repository_read_declared(task)),
+            (_LIST_PRIVATE_REPOSITORIES_TOOL_SCHEMA, _git_repository_private_list_declared(task)),
+            (_READ_PRIVATE_REPOSITORY_CONTENT_TOOL_SCHEMA, _git_repository_private_read_declared(task)),
+        )
+        if enabled
+    ]
+    tool_schemas = [
         schema
         for schema, enabled in (
             (_GENERATE_IMAGE_TOOL_SCHEMA, image_generation_enabled),
             (_GENERATE_DIAGRAM_TOOL_SCHEMA, diagram_generation_enabled),
         )
         if enabled
-    ] or None
+    ] + git_tool_schemas
+    tool_schemas = tool_schemas or None
     turn_messages: List[Any] = [system, *history_messages, human]
     try:
         result, provider = await _model_router.invoke_with_fallback(
@@ -481,7 +506,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             request_id=state.get("request_id"),
             agent_name=_ARKOS.name,
             task_name=task.name,
-            tools=visual_tool_schemas,
+            tools=tool_schemas,
         )
     except ModelRouterError as exc:
         logger.error("all model providers failed: %s", exc)
@@ -511,6 +536,25 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             "provider_used": resolved.get("provider_used"),
             **({"errors": resolved["errors"]} if "errors" in resolved else {}),
             **({"generated_images": resolved["generated_images"]} if "generated_images" in resolved else {}),
+        }
+
+    git_calls = [tc for tc in tool_calls if tc.get("name") in _GIT_FORGE_CAPABILITY_BY_TOOL_NAME]
+    if git_calls:
+        # ADR-0121/WP-059: same document_draft remap as the visual tools
+        # above - see _resolve_git_forge_calls's own docstring (app/graph/
+        # nodes.py) for the 2-round resolution shape.
+        resolved = await _resolve_git_forge_calls(
+            state, _ARKOS, task, turn_messages, result, git_calls, provider, git_tool_schemas,
+        )
+        return {
+            "document_draft": resolved.get("reply"),
+            "provider_used": resolved.get("provider_used"),
+            **({"errors": resolved["errors"]} if "errors" in resolved else {}),
+            **(
+                {"effective_classification": resolved["effective_classification"]}
+                if "effective_classification" in resolved
+                else {}
+            ),
         }
 
     draft_text = result.content if hasattr(result, "content") else str(result)

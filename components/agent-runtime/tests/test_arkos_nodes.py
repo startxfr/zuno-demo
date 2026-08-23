@@ -393,6 +393,207 @@ async def test_draft_node_handles_a_downstream_error_nested_inside_the_mcp_envel
     assert result.get("generated_images", []) == []
 
 
+# --------------------------------------------------------------------------
+# ADR-0121/WP-059: draft_node's git-forge tool-call dispatch. Regression
+# coverage for the reported bug: git.* capabilities were declared in
+# allowed_tools/tool-bindings.yaml/tool-policy.yaml since WP-059 but no node
+# ever offered them to the model, so Arkos could never actually reach
+# git-forge - live-cluster-confirmed 2026-08-23 (run_id
+# 4848bb50-ea0c-495c-bff2-3219a38a5b89: zero git.* invocations ever across a
+# real 3-hour production window). Shared helper under test:
+# nodes.py:_resolve_git_forge_calls.
+# --------------------------------------------------------------------------
+
+
+async def test_draft_node_dispatches_a_single_list_repositories_tool_call() -> None:
+    """The simple case: the model calls list_repositories once, gets a real
+    result back, and the follow-up (tool-less) call's reply becomes the
+    document_draft - same two-round shape as generate_image."""
+    captured_tool_call = {}
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "list_repositories",
+                        "args": {"provider": "github", "owner": "openshift", "owner_type": "organization"},
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        captured_tool_call.update(kwargs)
+        return {
+            "tool": "list_repositories",
+            "capability": "git.repository.list",
+            "result": {"owner": "openshift", "owner_type": "organization", "repositories": [{"name": "a"}, {"name": "b"}], "count": 2},
+        }
+
+    async def fake_followup_invoke(**kwargs):
+        return _FakeModelResult("The openshift org has 2 public repositories."), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "how many public repos does the openshift github org have?",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    # invoke_tool must be called with the platform capability ID, never the
+    # provider tool name (tool-bindings.yaml's provider_tool field does that
+    # translation server-side, not this node).
+    assert captured_tool_call.get("tool_name") == "git.repository.list"
+    assert result["document_draft"] == "The openshift org has 2 public repositories."
+    # Arkos's own ambient classification is C3 (ADR-0415's comment on
+    # image_generation_enabled) - _escalate(C3, C2) stays C3, it never
+    # downgrades.
+    assert result["effective_classification"] == "C3"
+
+
+async def test_draft_node_dispatches_parallel_list_and_private_list_calls() -> None:
+    """A provider with parallel tool-calling may return both
+    list_repositories and list_private_repositories in the same completion
+    (the reported "how many repos are public and private" case) - both must
+    be resolved before the follow-up call, not just the first."""
+    invoked_tool_names = []
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "list_repositories",
+                        "args": {"provider": "gitlab", "owner": "zuno", "owner_type": "group"},
+                        "id": "call_1",
+                    },
+                    {
+                        "name": "list_private_repositories",
+                        "args": {"provider": "gitlab", "owner": "zuno", "owner_type": "group"},
+                        "id": "call_2",
+                    },
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        invoked_tool_names.append(kwargs.get("tool_name"))
+        count = 3 if kwargs.get("tool_name") == "git.repository.list" else 7
+        return {"result": {"owner": "zuno", "repositories": [], "count": count}}
+
+    async def fake_followup_invoke(**kwargs):
+        return _FakeModelResult("zuno has 3 public and 7 total repos."), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "how many git repo are public and private for the zuno gitlab group?",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert set(invoked_tool_names) == {"git.repository.list", "git.repository.private.list"}
+    assert result["document_draft"] == "zuno has 3 public and 7 total repos."
+
+
+async def test_draft_node_resolves_a_second_sequential_git_round_then_forces_synthesis() -> None:
+    """A provider WITHOUT parallel tool-calling (e.g. local vLLM) may return
+    the two calls sequentially across completions instead of together: round
+    1 returns list_repositories, the round-2 follow-up (still offered
+    tools=) returns list_private_repositories instead of a final answer, and
+    only round 3 (tools=None, forced) produces the final reply. A
+    single-shot resolver would have silently dropped the second call - this
+    is exactly the gap the 2-round cap exists to cover."""
+    round_2_call_count = 0
+
+    async def fake_draft_invoke(**kwargs):
+        return (
+            _FakeModelResult(
+                "",
+                tool_calls=[
+                    {
+                        "name": "list_repositories",
+                        "args": {"provider": "gitlab", "owner": "zuno", "owner_type": "group"},
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            ProviderCandidate(name="ai-gateway"),
+        )
+
+    async def fake_invoke_tool(**kwargs):
+        return {"result": {"owner": "zuno", "repositories": [], "count": 3}}
+
+    async def fake_followup_invoke(**kwargs):
+        nonlocal round_2_call_count
+        round_2_call_count += 1
+        if round_2_call_count == 1:
+            assert kwargs.get("tools"), "round 2 must still offer the git tools"
+            return (
+                _FakeModelResult(
+                    "",
+                    tool_calls=[
+                        {
+                            "name": "list_private_repositories",
+                            "args": {"provider": "gitlab", "owner": "zuno", "owner_type": "group"},
+                            "id": "call_2",
+                        }
+                    ],
+                ),
+                ProviderCandidate(name="ai-gateway"),
+            )
+        assert kwargs.get("tools") is None, "round 3 must be a forced, tool-less synthesis call"
+        return _FakeModelResult("zuno has 3 public and 7 total repos."), ProviderCandidate(name="ai-gateway")
+
+    saved_draft_invoke = arkos_nodes._model_router.invoke_with_fallback
+    saved_invoke_tool = nodes.invoke_tool
+    saved_followup_invoke = nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_draft_invoke
+        nodes.invoke_tool = fake_invoke_tool
+        nodes._model_router.invoke_with_fallback = fake_followup_invoke
+        state = {
+            "message": "how many git repo are public and private for the zuno gitlab group?",
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        result = await arkos_nodes.draft_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_draft_invoke
+        nodes.invoke_tool = saved_invoke_tool
+        nodes._model_router.invoke_with_fallback = saved_followup_invoke
+
+    assert round_2_call_count == 2
+    assert result["document_draft"] == "zuno has 3 public and 7 total repos."
+
+
 def test_arkos_declares_the_confluence_capabilities_from_its_task() -> None:
     """Sanity check against the real checked-in bundle - confirms the
     module-level singletons resolved the actual draft-architecture-
@@ -668,6 +869,9 @@ TESTS = [
     test_reflect_node_is_a_noop_without_a_draft,
     test_draft_node_dispatches_a_generate_image_tool_call,
     test_draft_node_then_reflect_node_survives_an_empty_image_caption,
+    test_draft_node_dispatches_a_single_list_repositories_tool_call,
+    test_draft_node_dispatches_parallel_list_and_private_list_calls,
+    test_draft_node_resolves_a_second_sequential_git_round_then_forces_synthesis,
     test_arkos_declares_the_confluence_capabilities_from_its_task,
     test_reflect_slot_resolves_from_the_real_bundle,
     test_arkos_declares_the_workshop_presentation_task,

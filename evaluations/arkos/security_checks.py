@@ -263,6 +263,34 @@ def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
     )
 
 
+def git_forge_never_grants_private_github_access() -> CheckResult:
+    """ADR-0121: this server never grants private GitHub access, GitHub-side
+    private/internal listing simply doesn't exist as a capability - only
+    GitLab has a private variant. consultant-01 IS authorized to call
+    git.repository.private.list (it's in draft-architecture-testimonial's
+    allowed_tools, ADR-0121's table), so this call passes every policy-layer
+    check and reaches the real git-forge server, which raises ValueError for
+    provider="github" (components/mcp-servers/git-forge/server.py). MCP
+    Gateway surfaces a downstream tool's raised error as 502 (downstream.py:
+    `if result.is_error: raise DownstreamError(502, ...)`), not 403 - this
+    check is defense-in-depth confirming the server's own refusal actually
+    fires end to end, independent of the policy layer that would otherwise
+    be the only thing standing between a caller and private GitHub data.
+    """
+    resp = _invoke_tool(
+        "consultant-01",
+        "git.repository.private.list",
+        {"provider": "github", "owner": "openshift", "owner_type": "organization"},
+        classification="C2",
+    )
+    ok = resp.status_code == 502
+    return CheckResult(
+        "git_forge_never_grants_private_github_access",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -271,6 +299,7 @@ CHECKS = [
     entitlement_without_business_role_denied_confluence,
     business_role_without_entitlement_denied_by_bff,
     direct_call_to_sales_db_mcp_denied_without_gateway_token,
+    git_forge_never_grants_private_github_access,
 ]
 
 
