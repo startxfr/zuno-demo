@@ -1,0 +1,6 @@
+apiVersion: v2
+name: diagram-render
+description: In-cluster Mermaid-to-SVG rendering (ADR-0516) - backs mcp-gateway's generate_diagram handler.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

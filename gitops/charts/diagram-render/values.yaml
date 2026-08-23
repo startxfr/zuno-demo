@@ -1,0 +1,34 @@
+# Must match mcp-gateway's binding registry entry (endpoint.default:
+# http://diagram-render.zuno-ai-run.svc:8080) in
+# platform/bindings/tools/tool-bindings.yaml.
+namespace: zuno-ai-run
+
+# Built by the "mcp" build component (ansible/roles/mcp_build) into
+# zuno-ai-build's ImageStream, pulled cross-namespace into zuno-ai-run via
+# the system:image-puller RoleBinding - same path as every mcp-* image.
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/diagram-render
+  # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
+  tag: latest
+  # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
+  pullPolicy: Always
+
+replicas: 1
+
+# Headless Chromium is the real resource cost here, not Node itself -
+# sized well above a typical Python MCP server's own request/limit
+# (e.g. mcp-confluence's 100m/128Mi) for that reason. Bump further if
+# rendering under load shows throttling/OOM in practice.
+resources:
+  requests:
+    cpu: 250m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+# ADR-0037 defense-in-depth second layer - same shared secret
+# app/downstream.py already reads for every other MCP-backing service.
+gatewayToken:
+  secretName: mcp-gateway-workload-token
+  secretKey: token

@@ -149,10 +149,13 @@ _GENERATE_IMAGE_TOOL_SCHEMA = {
     "function": {
         "name": "generate_image",
         "description": (
-            "Generate an image with stable-diffusion-xl when the user's request or "
-            "the surrounding conversation calls for a picture, diagram, illustration "
-            "or mockup. Only pass the visual description itself as the prompt - never "
-            "paste retrieved document content, citations or conversation history into it."
+            "Generate a photorealistic or illustrative image with stable-diffusion-xl "
+            "when the user's request calls for a picture, illustration or mockup - NOT "
+            "for diagrams, charts, schemas or sequence/workflow diagrams needing precise "
+            "structure or legible text (use generate_diagram for those instead; SDXL "
+            "cannot render exact boxes, arrows or text reliably). Only pass the visual "
+            "description itself as the prompt - never paste retrieved document content, "
+            "citations or conversation history into it."
         ),
         "parameters": {
             "type": "object",
@@ -183,6 +186,56 @@ def _image_generation_declared(task: TaskDefinition) -> bool:
     policies/tools/tool-policy.yaml and platform/bindings/tools/
     tool-bindings.yaml both already answer to either name)."""
     return "image.generation.create" in task.allowed_tools or "generate_image" in task.allowed_tools
+
+
+# ADR-0516: a second, purpose-built visual tool alongside generate_image
+# above - SDXL (a general photorealistic diffusion model) is fundamentally
+# weak at precise, structured technical output (legible embedded text,
+# exact box/arrow relationships), live-cluster-confirmed 2026-08-23 on a
+# real Kubernetes-resource-relationship request. The model writes Mermaid
+# syntax directly as the tool-call argument (already demonstrably
+# comfortable doing so unprompted, per that same session's own testing);
+# a deterministic renderer (components/diagram-render, no external SaaS
+# call - see that service's own module docstring) then draws it exactly,
+# rather than a diffusion model approximating it in pixels.
+_GENERATE_DIAGRAM_TOOL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "generate_diagram",
+        "description": (
+            "Render a precise technical diagram - architecture diagrams, sequence "
+            "diagrams, flowcharts, entity/resource relationship diagrams - by writing "
+            "valid Mermaid syntax directly as the argument. Use this instead of "
+            "generate_image whenever legible text, exact structure, or box/arrow "
+            "relationships matter; use generate_image instead for photorealistic or "
+            "illustrative pictures with no precise structure."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "mermaid_source": {
+                    "type": "string",
+                    "description": (
+                        "Valid Mermaid diagram source (e.g. 'graph TD; A-->B;' or "
+                        "'sequenceDiagram\\n  Alice->>Bob: Hi'). Write the complete "
+                        "diagram definition, not a description of one."
+                    ),
+                },
+                "alt": {
+                    "type": "string",
+                    "description": "Optional: a short, human-readable caption for the diagram.",
+                },
+            },
+            "required": ["mermaid_source"],
+        },
+    },
+}
+
+
+def _diagram_generation_declared(task: TaskDefinition) -> bool:
+    """Mirrors _image_generation_declared above - same ADR-0116
+    migration-alias tolerance."""
+    return "diagram.generation.create" in task.allowed_tools or "generate_diagram" in task.allowed_tools
 
 # ADR-0046: "Similarity alone can return an incorrect OpenShift version
 # even when the user names a version" - these deterministic pre-ranking
@@ -571,6 +624,18 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     # live_read_tool already uses - only offered to the LLM when this
     # task's own OKF bundle lists it.
     image_generation_enabled = _image_generation_declared(task)
+    # ADR-0516: same declarative gate, second visual tool - see
+    # _GENERATE_DIAGRAM_TOOL_SCHEMA's own comment for why this is a
+    # separate tool rather than a generate_image variant.
+    diagram_generation_enabled = _diagram_generation_declared(task)
+    visual_tool_schemas = [
+        schema
+        for schema, enabled in (
+            (_GENERATE_IMAGE_TOOL_SCHEMA, image_generation_enabled),
+            (_GENERATE_DIAGRAM_TOOL_SCHEMA, diagram_generation_enabled),
+        )
+        if enabled
+    ] or None
 
     async def reason_node(state: AgentState) -> Dict[str, Any]:
         context = _build_context_block(state)
@@ -604,7 +669,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 # draw project quota - gated on the task's own mark, never
                 # on state["project_id"] being merely truthy.
                 project_id=state.get("project_id") if task.project_required else None,
-                tools=[_GENERATE_IMAGE_TOOL_SCHEMA] if image_generation_enabled else None,
+                tools=visual_tool_schemas,
             )
         except ModelRouterError as exc:
             logger.error("all model providers failed: %s", exc)
@@ -619,13 +684,17 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
 
         tool_calls = getattr(result, "tool_calls", None) or []
         image_call = next((tc for tc in tool_calls if tc.get("name") == "generate_image"), None)
-        if not image_call:
-            reply_text = result.content if hasattr(result, "content") else str(result)
-            return {"reply": reply_text, "provider_used": provider.name}
-
-        return await _resolve_image_generation_call(
-            state, agent, task, turn_messages, result, image_call, provider,
-        )
+        diagram_call = next((tc for tc in tool_calls if tc.get("name") == "generate_diagram"), None)
+        if image_call:
+            return await _resolve_image_generation_call(
+                state, agent, task, turn_messages, result, image_call, provider,
+            )
+        if diagram_call:
+            return await _resolve_diagram_generation_call(
+                state, agent, task, turn_messages, result, diagram_call, provider,
+            )
+        reply_text = result.content if hasattr(result, "content") else str(result)
+        return {"reply": reply_text, "provider_used": provider.name}
 
     return reason_node
 
@@ -711,10 +780,107 @@ async def _resolve_image_generation_call(
         )
     except ModelRouterError as exc:
         logger.error("follow-up model call after generate_image failed: %s", exc)
+        # Same envelope-unwrap fix as above (result, not tool_result) -
+        # this branch had the identical latent bug, just harder to hit
+        # (needs the follow-up call to ALSO fail): checking the wrapped
+        # envelope's top-level "error" key here was almost always False
+        # even when generation genuinely failed, misreporting "I
+        # generated the image" for a call that never produced one.
         fallback_reply = (
             "I generated the image, but couldn't compose a follow-up reply right now."
-            if "error" not in tool_result
-            else f"I couldn't generate that image: {tool_result['error']}"
+            if "error" not in result
+            else f"I couldn't generate that image: {result['error']}"
+        )
+        return {
+            "reply": fallback_reply,
+            "provider_used": provider.name,
+            "errors": state.get("errors", []) + [f"reason: {exc}"],
+            **generated_images_update,
+        }
+
+    reply_text = final_result.content if hasattr(final_result, "content") else str(final_result)
+    return {"reply": reply_text, "provider_used": final_provider.name, **generated_images_update}
+
+
+async def _resolve_diagram_generation_call(
+    state: AgentState,
+    agent: AgentDefinition,
+    task: TaskDefinition,
+    turn_messages: List[Any],
+    assistant_result: Any,
+    diagram_call: Dict[str, Any],
+    provider: Any,
+) -> Dict[str, Any]:
+    """ADR-0516: mirrors _resolve_image_generation_call above almost
+    exactly (same two-round tool-calling shape, same generated_images
+    sidecar field - a rendered diagram is indistinguishable in shape from
+    a generated image, just a different mime_type, so it reuses the exact
+    same state field and frontend rendering path) - the only real
+    difference is the tool being called and its argument shape
+    (mermaid_source, not prompt/negative_prompt)."""
+    args = diagram_call.get("args", {})
+    try:
+        tool_result = await invoke_tool(
+            tool_name="generate_diagram",
+            arguments={"mermaid_source": args.get("mermaid_source", ""), "alt": args.get("alt")},
+            bearer_token=state["bearer_token"],
+            agent_name=agent.name,
+            task_name=task.name,
+            # No fixed classification ceiling override needed here, unlike
+            # _IMAGE_GENERATION_CLASSIFICATION - diagram-render never
+            # leaves the cluster, so there is no SaaS boundary to gate
+            # (see policies/tools/tool-policy.yaml's generate_diagram
+            # entry, min_classification: C1). The caller's own effective
+            # classification is used as-is.
+            data_classification=state.get("effective_classification", agent.preferred_classification),
+        )
+    except McpClientError as exc:
+        logger.warning("generate_diagram tool call failed: %s", exc)
+        tool_result = {"error": str(exc)}
+
+    # Same envelope-unwrap as _resolve_image_generation_call above -
+    # applied correctly from the start here, not retrofitted after a live
+    # incident (see that function's own comment for the full story).
+    result = tool_result.get("result", tool_result)
+
+    if "error" in result:
+        tool_summary = {"status": "error", "detail": result["error"]}
+        generated_images_update: Dict[str, Any] = {}
+    else:
+        tool_summary = {"status": "ok", "mermaid_source": args.get("mermaid_source", "")}
+        generated_images_update = {
+            "generated_images": state.get("generated_images", [])
+            + [
+                {
+                    "data_base64": result["data_base64"],
+                    "mime_type": result.get("mime_type", "image/svg+xml"),
+                    "alt": result.get("alt", args.get("alt") or "Generated diagram"),
+                }
+            ]
+        }
+
+    follow_up_messages = [
+        *turn_messages,
+        AIMessage(content=assistant_result.content or "", tool_calls=[diagram_call]),
+        ToolMessage(content=json.dumps(tool_summary), tool_call_id=diagram_call.get("id", "")),
+    ]
+    try:
+        final_result, final_provider = await _model_router.invoke_with_fallback(
+            classification=state.get("effective_classification", agent.preferred_classification),
+            messages=follow_up_messages,
+            bearer_token=state["bearer_token"],
+            local_only=state.get("local_only_required", False),
+            request_id=state.get("request_id"),
+            agent_name=agent.name,
+            task_name=task.name,
+            project_id=state.get("project_id") if task.project_required else None,
+        )
+    except ModelRouterError as exc:
+        logger.error("follow-up model call after generate_diagram failed: %s", exc)
+        fallback_reply = (
+            "I generated the diagram, but couldn't compose a follow-up reply right now."
+            if "error" not in result
+            else f"I couldn't generate that diagram: {result['error']}"
         )
         return {
             "reply": fallback_reply,

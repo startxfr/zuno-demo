@@ -1,0 +1,38 @@
+---
+# ADR-0516: in-cluster Mermaid-to-SVG rendering, backing mcp-gateway's
+# generate_diagram handler - never an external SaaS call, unlike
+# gitops/apps/llm (ai-gateway, which backs generate_image).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-diagram-render-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-137"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/diagram-render
+    helm:
+      releaseName: zuno-diagram-render-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  ignoreDifferences:
+    # ADR-0059: image.openshift.io/triggers patches this field
+    # directly from the ImageStream whenever a fresh Build completes, so
+    # ArgoCD must not treat that patch as drift from the Git-declared
+    # :latest tag and revert it (selfHeal below would otherwise fight the
+    # image-trigger controller).
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -274,16 +274,23 @@ def mcp_gateway_denies_generate_image_for_tekos_agent_declaration() -> CheckResu
     )
 
 
-def tekos_chat_never_returns_image_artifacts() -> CheckResult:
-    """ADR-0415: `ChatResponse.images` must stay empty for every Tekos
-    turn, including one that explicitly asks for a generated image - since
-    Tekos's task never lists `image.generation.create`,
-    app/graph/nodes.py's reason_node never even offers the generate_image
-    tool schema to the model, so this is a structural guarantee, not a
-    probabilistic one. Deliberately checks only the `images` field, not
-    reply prose content - a mandatory check must never fail on benign LLM
-    phrasing variance; the fuzzier false-capability-claim heuristic lives
-    in stress_test.py instead.
+def tekos_chat_never_returns_photorealistic_images() -> CheckResult:
+    """ADR-0415/ADR-0516: Tekos's task never lists
+    `image.generation.create` (SDXL/photorealistic), only
+    `diagram.generation.create` (ADR-0516's Mermaid rendering) as of the
+    latter's deliberate carve-out - app/graph/nodes.py's reason_node never
+    even offers the generate_image tool schema to the model for Tekos, so
+    NO entry in `ChatResponse.images` can structurally be a
+    generate_image/SDXL result. This used to assert `images == []`
+    unconditionally (renamed from tekos_chat_never_returns_image_
+    artifacts) - that broke the moment Tekos legitimately started
+    returning diagram images, so the check now asserts the structural
+    fact that actually matters: every image entry's mime_type is
+    image/svg+xml (a rendered diagram), never image/png (what SDXL always
+    returns - see components/mcp-gateway/app/handlers/image_gen.py's own
+    hardcoded "mime_type": "image/png"). The prompt below deliberately
+    asks for a diagram (not a photorealistic image) specifically to prove
+    the positive path doesn't accidentally produce a PNG.
     """
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/tekos/chat",
@@ -295,11 +302,12 @@ def tekos_chat_never_returns_image_artifacts() -> CheckResult:
         },
         timeout=30,
     )
-    ok = resp.status_code == 200 and resp.json().get("images", None) == []
+    images = resp.json().get("images", []) if resp.status_code == 200 else []
+    ok = resp.status_code == 200 and all(img.get("mime_type") == "image/svg+xml" for img in images)
     return CheckResult(
-        "tekos_chat_never_returns_image_artifacts",
+        "tekos_chat_never_returns_photorealistic_images",
         ok,
-        f"status={resp.status_code} images={resp.json().get('images') if resp.status_code == 200 else None}",
+        f"status={resp.status_code} images={[img.get('mime_type') for img in images]}",
     )
 
 
@@ -312,7 +320,7 @@ CHECKS = [
     business_role_without_entitlement_denied_by_bff,
     direct_call_to_sales_db_mcp_denied_without_gateway_token,
     mcp_gateway_denies_generate_image_for_tekos_agent_declaration,
-    tekos_chat_never_returns_image_artifacts,
+    tekos_chat_never_returns_photorealistic_images,
 ]
 
 

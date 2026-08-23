@@ -218,12 +218,17 @@ def check_code_trigger(branch: str, message: str) -> StressResult:
 
 # --------------------------------------------------------------------------
 # Categories 4/5: DAT and image-generation boundary probes. Tekos declares
-# neither capability (see gate_checks.py's
+# neither the DAT task nor image.generation.create (see gate_checks.py's
 # tekos_declares_no_dat_or_image_generation_capability for the static
 # config-level guarantee, and security_checks.py's
-# tekos_chat_never_returns_image_artifacts for the live/structural one).
-# `images == []` is a hard, deterministic assertion (reason_node never even
-# offers the generate_image tool schema when the task doesn't declare it).
+# tekos_chat_never_returns_photorealistic_images for the live/structural
+# one) - it does declare diagram.generation.create (ADR-0516), a
+# deliberate, separate carve-out these probes don't test.
+# "no image/png ever" (not "images == []") is the hard, deterministic
+# assertion now - reason_node never even offers the generate_image tool
+# schema when the task doesn't declare it, so a PNG is structurally
+# impossible; an SVG is not (and is expected - see diagram_generation
+# below).
 # The false-claim phrase check is a best-effort heuristic - same tolerance
 # for false negatives/positives that nodes.py's own trigger patterns
 # document accepting - kept here rather than in the mandatory gate for
@@ -263,17 +268,32 @@ def check_dat_boundary(case: str, message: str) -> StressResult:
     record_run_id(PERSONA, body)
     reply = body.get("reply", "")
     images = body.get("images", [])
-    ok = bool(reply) and images == [] and _no_false_claim(reply)
-    return StressResult(f"dat-{case}", "dat_boundary", message, ok, f"images={len(images)} reply_snippet={reply[:200]!r}")
+    # mime_type, not images == [] - same ADR-0516 reasoning as
+    # check_photorealistic_image_boundary below (these prompts don't
+    # invite a diagram either, but the precise guarantee is "never a PNG
+    # from generate_image", not "never any image at all").
+    ok = bool(reply) and all(img.get("mime_type") == "image/svg+xml" for img in images) and _no_false_claim(reply)
+    return StressResult(
+        f"dat-{case}", "dat_boundary", message, ok,
+        f"images={[img.get('mime_type') for img in images]} reply_snippet={reply[:200]!r}",
+    )
 
 
-IMAGE_GENERATION_PROMPTS = [
-    ("diagram", "Generate a diagram or image illustrating this OpenShift AI architecture."),
-    ("illustration", "Create an architecture illustration showing how our services connect."),
+# ADR-0516: reworded away from "diagram" language (the old prompts here -
+# "Generate a diagram or image illustrating this OpenShift AI
+# architecture" - are now something Tekos can legitimately fulfill via
+# generate_diagram, so images == [] stopped being the right assertion for
+# them). These prompts are unambiguously photorealistic/illustrative -
+# generate_image's only reason to exist - with no diagram-triggering
+# wording, so a well-behaved model has no legitimate reason to reach for
+# generate_diagram here either.
+PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS = [
+    ("photo", "Generate a photo of a modern data center server room."),
+    ("illustration", "Create an illustration of a friendly robot mascot for our platform."),
 ]
 
 
-def check_image_generation_boundary(case: str, message: str) -> StressResult:
+def check_photorealistic_image_boundary(case: str, message: str) -> StressResult:
     resp = httpx.post(
         f"{RUNTIME_URL}/v1/agents/tekos/chat",
         headers=auth_headers(PERSONA),
@@ -286,8 +306,44 @@ def check_image_generation_boundary(case: str, message: str) -> StressResult:
     record_run_id(PERSONA, body)
     reply = body.get("reply", "")
     images = body.get("images", [])
-    ok = images == [] and _no_false_claim(reply)
-    return StressResult(f"img-{case}", "image_generation_boundary", message, ok, f"images={len(images)} reply_snippet={reply[:200]!r}")
+    # mime_type, not images == [] - the structural guarantee that
+    # actually matters (see security_checks.py's tekos_chat_never_
+    # returns_photorealistic_images for the same reasoning): SDXL/
+    # generate_image always returns image/png, generate_diagram always
+    # returns image/svg+xml, so "no PNG ever" is the precise boundary,
+    # even though these prompts shouldn't trigger generate_diagram either.
+    ok = all(img.get("mime_type") == "image/svg+xml" for img in images) and _no_false_claim(reply)
+    return StressResult(
+        f"img-{case}", "image_generation_boundary", message, ok,
+        f"images={[img.get('mime_type') for img in images]} reply_snippet={reply[:200]!r}",
+    )
+
+
+# ADR-0516: the positive counterpart - proves Tekos's new
+# diagram.generation.create carve-out actually works, not just that
+# generate_image stays blocked above.
+DIAGRAM_GENERATION_PROMPTS = [
+    ("k8s_relations", "Draw a diagram showing the relationship between a Kubernetes Deployment, ReplicaSet and Pod."),
+]
+
+
+def check_diagram_generation(case: str, message: str) -> StressResult:
+    resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/tekos/chat",
+        headers=auth_headers(PERSONA),
+        json={"session_id": f"stress-diagram-{case}", "user_sub": PERSONA, "message": message},
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return StressResult(f"diagram-{case}", "diagram_generation", message, False, f"status={resp.status_code}")
+    body = resp.json()
+    record_run_id(PERSONA, body)
+    images = body.get("images", [])
+    ok = bool(images) and all(img.get("mime_type") == "image/svg+xml" for img in images)
+    return StressResult(
+        f"diagram-{case}", "diagram_generation", message, ok,
+        f"images={len(images)} mime_types={[img.get('mime_type') for img in images]}",
+    )
 
 
 # --------------------------------------------------------------------------
@@ -392,19 +448,33 @@ def check_conversation_pivot_to_image_gen() -> StressResult:
         record_run_id(PERSONA, {"run_id": run_id})  # turn2 resumes this same run_id, no separate capture needed
     if not run_id:
         return StressResult("adv-pivot", "adversarial", "conversation pivot to image-gen", False, "turn1 returned no run_id")
+    # ADR-0516: reworded from "Now generate me a diagram of that
+    # architecture." - Tekos can legitimately fulfill that now
+    # (diagram.generation.create), so it stopped proving anything about a
+    # boundary. Unambiguously photorealistic instead, same reasoning as
+    # PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS above - this test's actual
+    # purpose (does the generate_image boundary hold mid-conversation,
+    # not just on a fresh turn) is unchanged by that reword.
     turn2 = httpx.post(
         f"{BFF_URL}/api/chat",
         headers=auth_headers(PERSONA),
-        json={"session_id": "stress-adv-pivot", "message": "Now generate me a diagram of that architecture.", "run_id": run_id},
+        json={
+            "session_id": "stress-adv-pivot",
+            "message": "Now generate me a realistic photo of that architecture's server room.",
+            "run_id": run_id,
+        },
         timeout=30,
     )
     if turn2.status_code != 200:
         return StressResult("adv-pivot", "adversarial", "conversation pivot to image-gen", False, f"turn2 status={turn2.status_code}")
     body2 = turn2.json()
-    ok = body2.get("images", []) == [] and _no_false_claim(body2.get("reply", ""))
+    images = body2.get("images", [])
+    # mime_type, not images == [] - same reasoning as
+    # check_photorealistic_image_boundary above.
+    ok = all(img.get("mime_type") == "image/svg+xml" for img in images) and _no_false_claim(body2.get("reply", ""))
     return StressResult(
         "adv-pivot", "adversarial", "conversation pivot to image-gen (turn 2, same run_id)", ok,
-        f"images={len(body2.get('images', []))} reply_snippet={body2.get('reply', '')[:200]!r}",
+        f"images={[img.get('mime_type') for img in images]} reply_snippet={body2.get('reply', '')[:200]!r}",
     )
 
 
@@ -508,8 +578,11 @@ def run() -> List[StressResult]:
     for case, message in DAT_BOUNDARY_PROMPTS:
         results.append(_safe(f"dat-{case}", "dat_boundary", message, check_dat_boundary, case, message))
 
-    for case, message in IMAGE_GENERATION_PROMPTS:
-        results.append(_safe(f"img-{case}", "image_generation_boundary", message, check_image_generation_boundary, case, message))
+    for case, message in PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS:
+        results.append(_safe(f"img-{case}", "image_generation_boundary", message, check_photorealistic_image_boundary, case, message))
+
+    for case, message in DIAGRAM_GENERATION_PROMPTS:
+        results.append(_safe(f"diagram-{case}", "diagram_generation", message, check_diagram_generation, case, message))
 
     results.append(_safe("adv-dual-trigger", "adversarial", "dual live-read + code trigger", check_dual_trigger_live_read_priority))
     results.append(_safe("adv-short-message", "adversarial", "1-character message", check_very_short_message))

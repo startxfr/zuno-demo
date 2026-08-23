@@ -110,8 +110,15 @@ def tekos_declares_no_dat_or_image_generation_capability() -> CheckResult:
     components/agent-runtime/app/graph/nodes.py's own alias-tolerant check
     for whether a task is entitled to the generate_image tool. A pure
     config-consistency check, no live cluster needed - the live/behavioral
-    counterpart (`images` always empty on a real chat turn) lives in
-    security_checks.py's tekos_chat_never_returns_image_artifacts.
+    counterpart (no photorealistic image ever appears on a real chat turn)
+    lives in security_checks.py's
+    tekos_chat_never_returns_photorealistic_images.
+
+    ADR-0516: deliberately does NOT check `diagram.generation.create` -
+    Tekos's answer-technical-question task legitimately declares that one
+    (a carve-out, not a boundary violation; see that task's own frontmatter
+    comment). This function's assertion is unchanged by that addition since
+    it only ever looked for `image.generation.create`/`generate_image`.
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     bundle = yaml.safe_load(

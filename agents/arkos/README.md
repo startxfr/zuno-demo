@@ -1,7 +1,10 @@
 # Arkos Agent
 
 - **Purpose:** Architecture assistant
-- **Primary integrations:** Technical RAG, Confluence, Google Drive/Docs, Lucidchart
+- **Primary integrations:** Technical RAG, Confluence, Google Drive/Docs,
+  stable-diffusion-xl image generation (ADR-0415), Mermaid diagram
+  generation (ADR-0516 - supersedes the originally-planned Lucidchart
+  integration, never built beyond a placeholder README)
 - **Initial tasks:** Draft architecture testimonial (DAT); prepare Odyssey
   workshop presentations; structure a customer demo; write code
 

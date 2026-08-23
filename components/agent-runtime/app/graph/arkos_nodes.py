@@ -25,11 +25,14 @@ from app.clients.model_router import ModelRouter, ModelRouterError
 from app.clients.rag_client import RagClientError, search
 from app.graph.history import build_history_messages
 from app.graph.nodes import (
+    _GENERATE_DIAGRAM_TOOL_SCHEMA,
     _GENERATE_IMAGE_TOOL_SCHEMA,
     _LIVE_READ_CLASSIFICATION,
     _code_request_trigger_reason,
+    _diagram_generation_declared,
     _escalate,
     _image_generation_declared,
+    _resolve_diagram_generation_call,
     _resolve_image_generation_call,
 )
 from app.graph.state import AgentState
@@ -458,6 +461,16 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
     local_only = state.get("local_only_required", False) or _ARKOS.local_only
     # ADR-0415: same declarative gate as app/graph/nodes.py:reason_node.
     image_generation_enabled = _image_generation_declared(task)
+    # ADR-0516: same declarative gate, second visual tool.
+    diagram_generation_enabled = _diagram_generation_declared(task)
+    visual_tool_schemas = [
+        schema
+        for schema, enabled in (
+            (_GENERATE_IMAGE_TOOL_SCHEMA, image_generation_enabled),
+            (_GENERATE_DIAGRAM_TOOL_SCHEMA, diagram_generation_enabled),
+        )
+        if enabled
+    ] or None
     turn_messages: List[Any] = [system, *history_messages, human]
     try:
         result, provider = await _model_router.invoke_with_fallback(
@@ -468,7 +481,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             request_id=state.get("request_id"),
             agent_name=_ARKOS.name,
             task_name=task.name,
-            tools=[_GENERATE_IMAGE_TOOL_SCHEMA] if image_generation_enabled else None,
+            tools=visual_tool_schemas,
         )
     except ModelRouterError as exc:
         logger.error("all model providers failed: %s", exc)
@@ -484,14 +497,15 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
 
     tool_calls = getattr(result, "tool_calls", None) or []
     image_call = next((tc for tc in tool_calls if tc.get("name") == "generate_image"), None)
-    if image_call:
-        # ADR-0415: arkos's draft is the document body itself
+    diagram_call = next((tc for tc in tool_calls if tc.get("name") == "generate_diagram"), None)
+    if image_call or diagram_call:
+        # ADR-0415/ADR-0516: arkos's draft is the document body itself
         # (document_draft, not reply) - the shared helper's own reply/
         # provider_used/generated_images result is remapped onto that
-        # field here rather than reused verbatim.
-        resolved = await _resolve_image_generation_call(
-            state, _ARKOS, task, turn_messages, result, image_call, provider,
-        )
+        # field here rather than reused verbatim, for either visual tool.
+        resolver = _resolve_image_generation_call if image_call else _resolve_diagram_generation_call
+        call = image_call or diagram_call
+        resolved = await resolver(state, _ARKOS, task, turn_messages, result, call, provider)
         return {
             "document_draft": resolved.get("reply"),
             "provider_used": resolved.get("provider_used"),

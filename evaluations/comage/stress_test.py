@@ -138,6 +138,44 @@ def check_image_generation(case: str, message: str) -> StressResult:
 
 
 # --------------------------------------------------------------------------
+# Category: diagram_generation (ADR-0516) - proves generate_diagram works
+# end to end for Comage. Deliberately NOT the SXA pie-chart prompt below -
+# that one has no real backing data by design (see
+# sxa_visualization_boundary's own docstring) and stays a hedging/
+# fabrication probe; a real Mermaid pie chart with fabricated numbers
+# would actually look MORE convincingly real than SDXL's garbled fake one
+# did, which is exactly why that check's assertion is about reply TEXT
+# content (_no_fabricated_data_claim), never about whether an image was
+# produced or how good it looks - unaffected by this new tool either way.
+# This case asks for something Comage can legitimately diagram from
+# general knowledge, no real data required.
+# --------------------------------------------------------------------------
+
+DIAGRAM_GENERATION_PROMPTS = [
+    ("sales_process_flow", "Draw a simple flowchart of a typical B2B sales process from lead to closed deal."),
+]
+
+
+def check_diagram_generation(case: str, message: str) -> StressResult:
+    resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
+        headers=auth_headers(PERSONA),
+        json={"session_id": f"stress-diagram-{case}", "user_sub": PERSONA, "message": message},
+        timeout=60,
+    )
+    if resp.status_code != 200:
+        return StressResult(f"diagram-{case}", "diagram_generation", message, False, f"status={resp.status_code}")
+    body = resp.json()
+    record_run_id(PERSONA, body)
+    images = body.get("images", [])
+    ok = bool(images) and all(img.get("mime_type") == "image/svg+xml" for img in images)
+    return StressResult(
+        f"diagram-{case}", "diagram_generation", message, ok,
+        f"images={len(images)} mime_types={[img.get('mime_type') for img in images]}",
+    )
+
+
+# --------------------------------------------------------------------------
 # Category: sxa_visualization_boundary - proves Comage hedges/declines
 # rather than fabricating specific SXA figures it has no live route,
 # tool, or data to actually back up.
@@ -191,6 +229,9 @@ def run() -> List[StressResult]:
 
     for case, message in IMAGE_GENERATION_PROMPTS:
         results.append(_safe(f"img-{case}", "image_generation", message, check_image_generation, case, message))
+
+    for case, message in DIAGRAM_GENERATION_PROMPTS:
+        results.append(_safe(f"diagram-{case}", "diagram_generation", message, check_diagram_generation, case, message))
 
     for case, message in SXA_VISUALIZATION_PROMPTS:
         results.append(_safe(f"sxa-{case}", "sxa_visualization_boundary", message, check_sxa_visualization, case, message))

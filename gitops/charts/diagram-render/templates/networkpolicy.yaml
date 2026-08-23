@@ -1,0 +1,33 @@
+# diagram-render must accept traffic ONLY from mcp-gateway, not other
+# same-namespace pods (e.g. agent-runtime) - same reasoning as
+# gitops/charts/mcp-confluence's own NetworkPolicy. The app also validates
+# the X-Zuno-Gateway-Token shared secret as defense in depth (server.js).
+#
+# Live-cluster-confirmed 2026-08-23: this exact class of gap (a
+# NetworkPolicy never granting mcp-gateway ingress to a service it needs
+# to call) silently broke generate_image for a full session before being
+# caught - see gitops/charts/ai-gateway/templates/networkpolicy.yaml's
+# own comment on that incident. Written correctly from the start here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: diagram-render
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: diagram-render
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mcp-gateway
+      ports:
+        - protocol: TCP
+          port: 8080

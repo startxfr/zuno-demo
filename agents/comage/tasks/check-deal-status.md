@@ -10,6 +10,11 @@ zuno:
     # the reasoning model as a callable tool for deal-status questions
     # that call for a visual (chart, mockup).
     - image.generation.create
+    # ADR-0516: Mermaid-to-SVG rendering, for deal-status visuals needing
+    # precise structure (e.g. a real chart from actual figures) rather
+    # than a diffusion-model approximation of one - see the ADR for why
+    # SDXL can't render legible numbers/labels reliably.
+    - diagram.generation.create
   live_read_tool: salesforce.opportunity.read
   allowed_knowledge:
     - knowledge.sales

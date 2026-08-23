@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diagram-render
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: diagram-render
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    image.openshift.io/triggers: |-
+      {{ include "diagram-render.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "diagram-render") }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: diagram-render
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: diagram-render
+    spec:
+      serviceAccountName: diagram-render
+      priorityClassName: zuno-workload-default
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: diagram-render
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: MCP_GATEWAY_WORKLOAD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gatewayToken.secretName }}
+                  key: {{ .Values.gatewayToken.secretKey }}
+          volumeMounts:
+            # Chromium's own cache/user-data-dir lands under HOME=/tmp
+            # (Dockerfile), and mermaid-cli writes its per-request
+            # input/output files under os.tmpdir() (server.js) - both
+            # need this writable regardless of readOnlyRootFilesystem
+            # above, same pattern every restricted-SCC workload in this
+            # repo already uses (e.g. gitops/charts/mcp-confluence).
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

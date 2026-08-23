@@ -8,6 +8,16 @@ zuno:
     - web_search
     - git.repository.read
     - git.repository.list
+    # ADR-0516: a deliberate, narrow carve-out - Tekos gets diagram
+    # generation (Mermaid-to-SVG, never leaves the cluster) for technical
+    # questions that call for an architecture/sequence/relationship
+    # diagram, but still never declares image.generation.create
+    # (photorealistic/illustrative SDXL content stays Arkos/Comage's
+    # job - see evaluations/tekos/security_checks.py's
+    # tekos_chat_never_returns_photorealistic_images and gate_checks.py's
+    # tekos_declares_no_dat_or_image_generation_capability, both updated
+    # alongside this to assert exactly that boundary).
+    - diagram.generation.create
   live_read_tool: search_confluence
   allowed_knowledge:
     - knowledge.tech

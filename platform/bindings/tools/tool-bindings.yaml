@@ -376,3 +376,17 @@ bindings:
     handler: image_gen
     provider_tool: generate_image
     auth_mode: service-identity
+
+  # ADR-0516: calls the real, in-cluster diagram-render service
+  # (app/handlers/diagram_gen.py) - unlike image_gen above, never an
+  # external SaaS call, so auth_mode is service-identity in name only
+  # (there is no credential of any kind here - see the handler's own
+  # docstring for why no identity needs forwarding to a stateless
+  # renderer with no per-caller decision to make).
+  - capability: diagram.generation.create
+    aliases: [generate_diagram]
+    backend: diagram-gen
+    transport: in-process
+    handler: diagram_gen
+    provider_tool: generate_diagram
+    auth_mode: service-identity

@@ -16,6 +16,13 @@ zuno:
     # the drafting model as a callable tool - it decides whether a given
     # DAT/workshop request needs an illustration.
     - image.generation.create
+    # ADR-0516: Mermaid-to-SVG rendering, offered alongside the above for
+    # architecture/sequence/relationship diagrams needing precise
+    # structure or legible text - the diffusion model above can't do
+    # those reliably (see the ADR's own live-cluster finding). The
+    # drafting model chooses between the two based on what the request
+    # actually calls for.
+    - diagram.generation.create
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project
@@ -70,9 +77,13 @@ v0 scope, honestly: this proves the plan -> retrieve -> draft -> write
 mechanism end to end in one turn. The full v1 DAT workflow described in
 `docs/agents/arkos.md`/MEMORY.md section 8 - collect -> outline ->
 explicit user review -> generation -> review -> final Google Doc, with
-resumable intermediate state and optional Lucidchart diagrams - is staged
-work: the explicit-review checkpoints between stages are a later
-iteration, not built by this task. Live Jira is deferred until its MCP
+resumable intermediate state - is staged work: the explicit-review
+checkpoints between stages are a later iteration, not built by this task.
+"Optional Lucidchart diagrams" from that same original plan is superseded
+by ADR-0516's `generate_diagram` (self-hosted Mermaid rendering) - built,
+not staged; a real Lucidchart integration (`components/mcp-servers/
+lucidchart`, still just a placeholder README) was never built and this
+task no longer depends on it. Live Jira is deferred until its MCP
 server exists (WP-02's template, not yet scheduled for Jira); Confluence
 read/search are live today (`components/mcp-servers/confluence`, ADR-0117).
 

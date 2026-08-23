@@ -1,0 +1,15 @@
+{
+  "name": "diagram-render",
+  "version": "1.0.0",
+  "private": true,
+  "description": "In-cluster Mermaid-to-SVG rendering service for the generate_diagram MCP tool (ADR-0516). Never reaches outside the cluster - see server.js's own module comment.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.4.2",
+    "express": "^4.21.2"
+  }
+}

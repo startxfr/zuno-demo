@@ -23,7 +23,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
 from app.bindings import Binding
-from app.handlers import drive, email_report, gmail, image_gen, web_search
+from app.handlers import diagram_gen, drive, email_report, gmail, image_gen, web_search
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
@@ -61,6 +61,9 @@ IN_PROCESS_HANDLERS = {
     # ADR-0415: not a demo-mode stub like the rest of this dict - calls
     # the real, already-deployed components/ai-gateway in-cluster.
     "image_gen": image_gen.handle,
+    # ADR-0516: same posture - calls the real, in-cluster diagram-render
+    # service (never an external SaaS call, unlike image_gen above).
+    "diagram_gen": diagram_gen.handle,
 }
 
 

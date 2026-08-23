@@ -117,6 +117,16 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim
+          # ADR-0516: backs mcp-gateway's generate_diagram handler, same
+          # relationship ai-gateway has to image_gen.py above - a
+          # standalone entry (not context: ".") since, unlike every
+          # Python entry in this matrix, it bakes in nothing outside its
+          # own component directory.
+          - name: diagram-render
+            dockerfile: components/diagram-render/Dockerfile
+            context: components/diagram-render
+            build_args: |
+              BASE_IMAGE=docker.io/library/node:20-alpine
           - name: rag-service
             dockerfile: components/rag-service/Dockerfile
             context: .

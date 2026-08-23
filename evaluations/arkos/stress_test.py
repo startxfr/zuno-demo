@@ -6,9 +6,11 @@
 
 Mirrors `evaluations/tekos/stress_test.py`'s structure (`StressResult`,
 `_safe`, `run()`/`main()`) but is a POSITIVE check instead of that file's
-negative boundary probes: Tekos never declares `generate_image`, so its
-own `IMAGE_GENERATION_PROMPTS`/`check_image_generation_boundary` assert the
-opposite of what this file asserts. This is the first live coverage of the
+negative boundary probes: Tekos never declares `generate_image` (still
+true after ADR-0516 - it only gained `generate_diagram`), so its own
+`PHOTOREALISTIC_IMAGE_BOUNDARY_PROMPTS`/`check_photorealistic_image_boundary`
+assert the opposite of what this file asserts. This is the first live
+coverage of the
 `generate_image` dispatch path for any agent - previously untested anywhere
 (components/agent-runtime/tests/test_arkos_nodes.py now covers the node
 logic itself with mocks; this covers the real end-to-end call).
@@ -122,12 +124,54 @@ def check_image_generation(case: str, message: str) -> StressResult:
 
 
 # --------------------------------------------------------------------------
+# Category: diagram_generation (ADR-0516) - proves the generate_diagram
+# tool (Mermaid rendered by components/diagram-render, no external SaaS
+# call) works end to end. k8s_relations_schema above already asks for a
+# structural schema and may now legitimately be fulfilled via
+# generate_diagram instead of generate_image (its own assertion doesn't
+# care which tool produced the images array) - this case is kept
+# separate specifically to pin down the mime_type (image/svg+xml), the
+# one detail that distinguishes a real Mermaid render from an SDXL PNG.
+# --------------------------------------------------------------------------
+
+DIAGRAM_GENERATION_PROMPTS = [
+    (
+        "k8s_relations_diagram",
+        "Draw a precise diagram showing the relation between a Kubernetes node, pod, service and configmap. "
+        "Use boxes and arrows with legible labels.",
+    ),
+]
+
+
+def check_diagram_generation(case: str, message: str) -> StressResult:
+    resp = httpx.post(
+        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
+        headers=auth_headers(PERSONA),
+        json={"session_id": f"stress-diagram-{case}", "user_sub": PERSONA, "message": message},
+        timeout=180,
+    )
+    if resp.status_code != 200:
+        return StressResult(f"diagram-{case}", "diagram_generation", message, False, f"status={resp.status_code}")
+    body = resp.json()
+    record_run_id(PERSONA, body)
+    images = body.get("images", [])
+    ok = bool(images) and all(img.get("mime_type") == "image/svg+xml" for img in images)
+    return StressResult(
+        f"diagram-{case}", "diagram_generation", message, ok,
+        f"images={len(images)} mime_types={[img.get('mime_type') for img in images]}",
+    )
+
+
+# --------------------------------------------------------------------------
 
 def run() -> List[StressResult]:
     results: List[StressResult] = []
 
     for case, message in IMAGE_GENERATION_PROMPTS:
         results.append(_safe(f"img-{case}", "image_generation", message, check_image_generation, case, message))
+
+    for case, message in DIAGRAM_GENERATION_PROMPTS:
+        results.append(_safe(f"diagram-{case}", "diagram_generation", message, check_diagram_generation, case, message))
 
     return results
 

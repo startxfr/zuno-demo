@@ -16,6 +16,9 @@ zuno:
     # testimonial.md's task declares - a workshop presentation benefits
     # from an architecture diagram just as often as a DAT does.
     - image.generation.create
+    # ADR-0516: same pairing as draft-architecture-testimonial.md - see
+    # that task's own comment.
+    - diagram.generation.create
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project

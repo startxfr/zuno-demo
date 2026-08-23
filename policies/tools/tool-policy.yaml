@@ -462,3 +462,29 @@ tools:
       - sales
       - board
       - cdp
+
+  # ADR-0516: Mermaid-to-SVG rendering via the in-cluster diagram-render
+  # service, for structured/technical asks generate_image's diffusion
+  # model can't do well (precise boxes/arrows/legible text - see the
+  # ADR's own comparison). min_classification C1, not C2 like
+  # generate_image above - unlike that tool, this one never leaves the
+  # cluster (components/mcp-gateway/app/handlers/diagram_gen.py's own
+  # docstring explains why C2's SaaS-boundary exception doesn't apply
+  # here), so the least-restrictive classification is the correct
+  # default, not a copy-pasted ceiling. Same allowed_groups as
+  # generate_image - Tekos's own consultant-01 persona is already in
+  # the `consultant` group below, so no group addition was needed for
+  # ADR-0516's Tekos carve-out; the OKF task declaration (agents/tekos/
+  # tasks/answer-technical-question.md) is what actually grants Tekos
+  # this tool - it still never declares generate_image/
+  # image.generation.create.
+  - tool: generate_diagram
+    capability: diagram.generation.create
+    mcp_server: diagram-gen
+    min_classification: C1
+    allowed_groups:
+      - consultant
+      - adv
+      - sales
+      - board
+      - cdp

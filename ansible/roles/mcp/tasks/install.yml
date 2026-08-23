@@ -58,3 +58,23 @@
     gitops_component_name: "mcp-git-forge"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
+# ADR-0516: diagram-render, the Mermaid-to-SVG service backing
+# mcp-gateway's generate_diagram handler - not a real MCP server
+# (components/mcp-servers/*), but deployed under this same "mcp" Day1 run
+# component for the same reason confluence/git-forge are: it exists
+# solely to serve one mcp-gateway tool, same name-mismatch
+# self-sufficiency pattern as those two.
+- name: "mcp | apply the diagram-render GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "diagram-render"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "mcp | apply the diagram-render GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "diagram-render"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
