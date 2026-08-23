@@ -87,12 +87,20 @@ def record_freshness_lag(domain: str, lag_seconds: float) -> None:
 
 
 @contextmanager
-def search_span(query: str, top_k: int) -> Iterator["SearchRecorder"]:
+def search_span(
+    query: str, top_k: int, run_id: Optional[str] = None
+) -> Iterator["SearchRecorder"]:
+    """ADR-0517: run_id (the calling chat turn's id, forwarded by
+    agent-runtime's rag_client as X-Zuno-Run-Id) is a span attribute only,
+    never added to the zuno.rag_searches counter - unbounded cardinality.
+    """
     tracer = _tracer or trace.get_tracer("rag-service")
     start = time.monotonic()
     with tracer.start_as_current_span("rag_search") as span:
         span.set_attribute("zuno.query_length", len(query))
         span.set_attribute("zuno.top_k", top_k)
+        if run_id:
+            span.set_attribute("zuno.run_id", run_id)
         recorder = SearchRecorder()
         try:
             yield recorder

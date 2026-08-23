@@ -213,6 +213,10 @@ async def chat_completions(
     # span still carries a stable id even for a caller that never sends
     # one (never blank, always joinable to something).
     x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
+    # ADR-0517: the calling chat turn's id (distinct from request_id, one
+    # HTTP call) - agent-runtime's model_router forwards this so the
+    # model_call span can be found by the per-run resource dashboard.
+    x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
     # ADR-0511 (WP-54): quota class per the executing task's
     # zuno.quota_class (absent = standard), and the ADR-0512 verified
     # project binding - both only ever set platform-side (agent-runtime);
@@ -224,6 +228,7 @@ async def chat_completions(
     classification = x_zuno_data_classification.upper()
     local_only = x_zuno_local_only.strip().lower() == "true"
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
+    run_id = x_zuno_run_id.strip() or None
     quota_class = x_zuno_quota_class.strip() or "standard"
     project_id = x_zuno_project_id.strip() or None
     # ADR-0511: token-budget check BEFORE dispatch, on top of (never
@@ -272,7 +277,7 @@ async def chat_completions(
         return StreamingResponse(
             _stream_completion(
                 candidates, classification, messages, request_id, adapter_decl,
-                identity=identity, tools=payload.tools, agent=x_zuno_agent,
+                identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -294,6 +299,7 @@ async def chat_completions(
         project_id=project_id,
         tools=payload.tools,
         agent=x_zuno_agent,
+        run_id=run_id,
     )
 
 
@@ -389,6 +395,7 @@ async def _invoke_with_fallback(
     project_id: Optional[str] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
     agent: str = "",
+    run_id: Optional[str] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -443,6 +450,7 @@ async def _invoke_with_fallback(
             with model_call_span(
                 candidate.name, effective_model_name, classification, request_id,
                 adapter=adapter_name, caller_sub=caller_sub, groups=groups, agent=agent,
+                run_id=run_id, model_kind=candidate.kind,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 if tools:
@@ -531,6 +539,7 @@ async def _stream_completion(
     identity: Optional[CallerIdentity] = None,
     tools: Optional[List[Dict[str, Any]]] = None,
     agent: str = "",
+    run_id: Optional[str] = None,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -559,6 +568,7 @@ async def _stream_completion(
                 caller_sub=identity.sub if identity else None,
                 groups=identity.groups if identity else None,
                 agent=agent,
+                run_id=run_id, model_kind=candidate.kind,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 if tools:

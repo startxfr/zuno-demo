@@ -35,6 +35,7 @@ async def invoke_tool(
     agent_name: str,
     task_name: str,
     data_classification: str = "C1",
+    run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """agent_name/task_name (ADR-0036) declare which OKF-defined agent/task
     is making this call, so the gateway can enforce the agent_declaration
@@ -47,6 +48,11 @@ async def invoke_tool(
         "X-Zuno-Agent": agent_name,
         "X-Zuno-Task": task_name,
     }
+    if run_id:
+        # ADR-0517: lets mcp-gateway tag its tool_invoke span with the
+        # calling chat turn's run_id, so a run's resource-consumption
+        # dashboard can find every tool call it made.
+        headers["X-Zuno-Run-Id"] = run_id
     try:
         async with httpx.AsyncClient(timeout=MCP_TIMEOUT_SECONDS) as client:
             resp = await client.post(

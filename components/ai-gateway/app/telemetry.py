@@ -167,6 +167,8 @@ def model_call_span(
     caller_sub: Optional[str] = None,
     groups: Optional[List[str]] = None,
     agent: Optional[str] = None,
+    run_id: Optional[str] = None,
+    model_kind: Optional[str] = None,
 ) -> Iterator["ModelCallRecorder"]:
     """Wraps one model invocation: records a span plus the zuno.model_calls
     / zuno.model_call_duration_ms metrics (ADR-0029) unconditionally, for
@@ -214,6 +216,14 @@ def model_call_span(
     `zuno_model_cost_usd_total` had no reliable per-agent dimension (the
     `group` label sometimes held an `agent_<name>` placeholder for
     service-account callers, but that's a different, unrelated fallback).
+
+    ADR-0517: `run_id` (distinct from request_id - the whole conversation
+    turn, not just this one HTTP call) and `model_kind` (candidate.kind,
+    "local"/"saas" - app/routing.py) are span attributes only, never added
+    to the Prometheus counters above (run_id is unbounded cardinality;
+    model_kind is redundant with the existing provider/model labels for
+    aggregate dashboards, but is what lets the per-run resource dashboard
+    group local-vs-distant without hardcoding provider names).
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
@@ -231,6 +241,10 @@ def model_call_span(
             span.set_attribute("zuno.groups", groups)
         if agent:
             span.set_attribute("zuno.agent", agent)
+        if run_id:
+            span.set_attribute("zuno.run_id", run_id)
+        if model_kind:
+            span.set_attribute("zuno.model_kind", model_kind)
         recorder = ModelCallRecorder(provider=provider)
         try:
             yield recorder

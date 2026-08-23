@@ -28,6 +28,7 @@ async def search(
     technology: Optional[str] = None,
     project_id: Optional[str] = None,
     caller_sub: Optional[str] = None,
+    run_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """ADR-0046: product/version are deterministic pre-ranking filters
     (set by app/graph/nodes.py:_extract_product_version when the user's
@@ -68,9 +69,16 @@ async def search(
     if caller_sub:
         body["caller_sub"] = caller_sub
 
+    headers: Dict[str, str] = {}
+    if run_id:
+        # ADR-0517: lets rag-service tag its rag_search span with the
+        # calling chat turn's run_id, so a run's resource-consumption
+        # dashboard can find every search it made.
+        headers["X-Zuno-Run-Id"] = run_id
+
     try:
         async with httpx.AsyncClient(timeout=RAG_TIMEOUT_SECONDS) as client:
-            resp = await client.post(f"{RAG_SERVICE_URL}/v1/search", json=body)
+            resp = await client.post(f"{RAG_SERVICE_URL}/v1/search", json=body, headers=headers)
         resp.raise_for_status()
     except httpx.HTTPError as exc:
         raise RagClientError(str(exc)) from exc

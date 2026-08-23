@@ -37,7 +37,7 @@ from app.schemas import (
     ReorderConversationsRequest,
     TransferOwnershipRequest,
 )
-from app.telemetry import graph_run_span, init_telemetry
+from app.telemetry import api_request_span, graph_run_span, init_telemetry
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("agent_runtime")
@@ -886,6 +886,12 @@ async def agent_chat(
     initial_state = _initial_state(payload, identity, request_id)
     conversations_pool = request.app.state.conversations_pool
     run_id = await _resolve_run_id(graph, payload, identity, conversations_pool)
+    # ADR-0517: threaded through graph node calls (app/graph/nodes.py,
+    # arkos_nodes.py) so their MCP/RAG/model-router clients can forward it
+    # as X-Zuno-Run-Id, distinct from the request_id above (one HTTP call
+    # vs. the whole conversation turn) - needed for the per-run resource
+    # dashboard.
+    initial_state["run_id"] = run_id
     await _seed_history_backfill(graph, run_id, payload.run_id is not None, initial_state, agent_def)
     # ADR-0512/WP-55: fail-closed before any graph action for a
     # project_required primary task - raises HTTPException itself on any
@@ -934,6 +940,7 @@ async def agent_chat(
         return StreamingResponse(
             _stream_chat(
                 graph, initial_state, config, request_id, run_id,
+                agent=agent_def.name,
                 conversations_pool=conversations_pool, write_lock_holder=write_lock_holder,
             ),
             media_type="text/event-stream",
@@ -945,12 +952,15 @@ async def agent_chat(
         )
 
     try:
-        with graph_run_span(payload.session_id, agent=agent_def.name, graph_shape=agent_def.graph_shape) as recorder:
-            final_state = await _ainvoke_with_retry(
-                graph, initial_state, config, session_id=payload.session_id, request_id=request_id,
-            )
-            recorder.source_mode = final_state.get("source_mode", "none")
-            recorder.live_read_trigger_reason = final_state.get("live_read_trigger_reason")
+        with api_request_span(run_id, agent=agent_def.name, request_id=request_id):
+            with graph_run_span(
+                payload.session_id, agent=agent_def.name, graph_shape=agent_def.graph_shape, run_id=run_id
+            ) as recorder:
+                final_state = await _ainvoke_with_retry(
+                    graph, initial_state, config, session_id=payload.session_id, request_id=request_id,
+                )
+                recorder.source_mode = final_state.get("source_mode", "none")
+                recorder.live_read_trigger_reason = final_state.get("live_read_trigger_reason")
     except Exception as exc:
         logger.error("graph execution failed for session=%s request_id=%s: %s", payload.session_id, request_id, exc)
         raise HTTPException(status_code=500, detail=f"agent workflow failed: {exc}") from exc
@@ -995,6 +1005,7 @@ async def _stream_chat(
     request_id: str,
     run_id: str,
     *,
+    agent: Optional[str] = None,
     conversations_pool: Optional[Any] = None,
     write_lock_holder: Optional[str] = None,
 ) -> AsyncIterator[str]:
@@ -1013,91 +1024,103 @@ async def _stream_chat(
     it mid-iteration, which is exactly the "on-disconnect handler" the
     ADR's Decision text asks for. The lease's own TTL is the fallback if
     even this never runs (a hard crash).
-    """
-    try:
-        yield _sse("start", {"request_id": request_id, "run_id": run_id})
 
-        citations: Any = []
-        images: Any = []
-        source_mode = "indexed"
-        # One bounded retry, same rationale as _ainvoke_with_retry, but only
-        # safe to take before any token has reached the client (ADR-0029-style
-        # precedent: components/ai-gateway/app/main.py's _stream_completion
-        # never silently retries a candidate that already streamed partial
-        # content, since the client has content a fresh run wouldn't continue
-        # coherently) - sent_any tracks that boundary.
-        sent_any = False
-        attempts_remaining = 2
-        while attempts_remaining:
-            attempts_remaining -= 1
-            try:
-                async for event in graph.astream_events(initial_state, config=config, version="v2"):
-                    kind = event.get("event")
-                    name = event.get("name")
-                    if kind == "on_chat_model_stream":
-                        # ADR-0215: the history-compaction node's own internal
-                        # summarization call is a real nested chat-model
-                        # invocation inside this same graph run, so it emits
-                        # on_chat_model_stream events too - tagged
-                        # "zuno-internal" (app/clients/model_router.py) so it
-                        # never reaches the user as a chat token.
-                        if "zuno-internal" in (event.get("tags") or []):
-                            continue
-                        chunk = event["data"].get("chunk")
-                        token = getattr(chunk, "content", "") if chunk is not None else ""
-                        if token:
-                            sent_any = True
-                            yield _sse("token", {"delta": token})
-                    elif kind == "on_chain_start" and name in _TOOL_NODES:
-                        yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
-                    elif kind == "on_chain_end" and name in _TOOL_NODES:
-                        yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
-                    elif kind == "on_chain_end" and name == "respond":
-                        output = event["data"].get("output") or {}
-                        citations = output.get("citations", [])
-                        # ADR-0205/WP-24: same field the non-streaming response
-                        # carries - the streaming path must not silently omit it.
-                        source_mode = output.get("source_mode", "indexed")
-                    elif kind == "on_chain_end" and name in ("reason", "draft"):
-                        # ADR-0415: generate_image results are returned by
-                        # whichever node actually calls the model
-                        # (retrieve_reason_respond's "reason", plan_draft_write's
-                        # "draft") - unlike citations/source_mode above, there is
-                        # no later node in either shape that re-assembles this,
-                        # so it's captured here directly.
-                        output = event["data"].get("output") or {}
-                        if output.get("generated_images"):
-                            images = output["generated_images"]
-            except psycopg.OperationalError as exc:
-                if sent_any or attempts_remaining == 0:
+    ADR-0517: wraps this whole generator's execution in api_request_span,
+    the streaming-path equivalent of the sync path's span in agent_chat -
+    errors are handled internally here (an SSE "error" event, not a raised
+    exception), so the two `except` branches below call
+    api_recorder.mark_error() explicitly rather than relying on the span
+    catching a propagating exception.
+    """
+    with api_request_span(run_id, agent=agent, request_id=request_id) as api_recorder:
+        try:
+            yield _sse("start", {"request_id": request_id, "run_id": run_id})
+
+            citations: Any = []
+            images: Any = []
+            source_mode = "indexed"
+            # One bounded retry, same rationale as _ainvoke_with_retry, but only
+            # safe to take before any token has reached the client (ADR-0029-style
+            # precedent: components/ai-gateway/app/main.py's _stream_completion
+            # never silently retries a candidate that already streamed partial
+            # content, since the client has content a fresh run wouldn't continue
+            # coherently) - sent_any tracks that boundary.
+            sent_any = False
+            attempts_remaining = 2
+            while attempts_remaining:
+                attempts_remaining -= 1
+                try:
+                    async for event in graph.astream_events(initial_state, config=config, version="v2"):
+                        kind = event.get("event")
+                        name = event.get("name")
+                        if kind == "on_chat_model_stream":
+                            # ADR-0215: the history-compaction node's own internal
+                            # summarization call is a real nested chat-model
+                            # invocation inside this same graph run, so it emits
+                            # on_chat_model_stream events too - tagged
+                            # "zuno-internal" (app/clients/model_router.py) so it
+                            # never reaches the user as a chat token.
+                            if "zuno-internal" in (event.get("tags") or []):
+                                continue
+                            chunk = event["data"].get("chunk")
+                            token = getattr(chunk, "content", "") if chunk is not None else ""
+                            if token:
+                                sent_any = True
+                                yield _sse("token", {"delta": token})
+                        elif kind == "on_chain_start" and name in _TOOL_NODES:
+                            yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
+                        elif kind == "on_chain_end" and name in _TOOL_NODES:
+                            yield _sse("tool", {"name": _TOOL_NODES[name], "status": "finished"})
+                        elif kind == "on_chain_end" and name == "respond":
+                            output = event["data"].get("output") or {}
+                            citations = output.get("citations", [])
+                            # ADR-0205/WP-24: same field the non-streaming response
+                            # carries - the streaming path must not silently omit it.
+                            source_mode = output.get("source_mode", "indexed")
+                        elif kind == "on_chain_end" and name in ("reason", "draft"):
+                            # ADR-0415: generate_image results are returned by
+                            # whichever node actually calls the model
+                            # (retrieve_reason_respond's "reason", plan_draft_write's
+                            # "draft") - unlike citations/source_mode above, there is
+                            # no later node in either shape that re-assembles this,
+                            # so it's captured here directly.
+                            output = event["data"].get("output") or {}
+                            if output.get("generated_images"):
+                                images = output["generated_images"]
+                except psycopg.OperationalError as exc:
+                    if sent_any or attempts_remaining == 0:
+                        logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
+                        api_recorder.mark_error()
+                        yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
+                        return
+                    logger.warning(
+                        "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
+                        request_id, exc,
+                    )
+                    continue
+                except Exception as exc:
+                    # Live-cluster-confirmed 2026-08-23: an unexpected exception
+                    # here (e.g. a KeyError from a malformed tool response) used
+                    # to reach the client verbatim via str(exc) - a raw Python
+                    # repr with no context, displayed in the chat bubble as if
+                    # it were a real reply. The full exception still goes to the
+                    # server log immediately above; only the client-facing
+                    # message is generic now. Deliberate exceptions from a graph
+                    # node's own graceful-degradation path (e.g.
+                    # _resolve_image_generation_call's "error" in result branch)
+                    # never reach this handler at all - those return a normal
+                    # AIMessage-driven reply through the second model call, not
+                    # a raised exception.
                     logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
+                    api_recorder.mark_error()
                     yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
                     return
-                logger.warning(
-                    "checkpoint DB connection failed before any token sent, retrying once: request_id=%s: %s",
-                    request_id, exc,
-                )
-                continue
-            except Exception as exc:
-                # Live-cluster-confirmed 2026-08-23: an unexpected exception
-                # here (e.g. a KeyError from a malformed tool response) used
-                # to reach the client verbatim via str(exc) - a raw Python
-                # repr with no context, displayed in the chat bubble as if
-                # it were a real reply. The full exception still goes to the
-                # server log immediately above; only the client-facing
-                # message is generic now. Deliberate exceptions from a graph
-                # node's own graceful-degradation path (e.g.
-                # _resolve_image_generation_call's "error" in result branch)
-                # never reach this handler at all - those return a normal
-                # AIMessage-driven reply through the second model call, not
-                # a raised exception.
-                logger.error("SSE stream failed request_id=%s: %s", request_id, exc)
-                yield _sse("error", {"message": _CLIENT_FACING_STREAM_ERROR.format(request_id=request_id)})
-                return
-            else:
-                break
+                else:
+                    break
 
-        yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
-    finally:
-        if conversations_pool is not None and write_lock_holder is not None:
-            await conversations.release_write_lock(conversations_pool, run_id=run_id, holder_sub=write_lock_holder)
+            yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
+        finally:
+            if conversations_pool is not None and write_lock_holder is not None:
+                await conversations.release_write_lock(
+                    conversations_pool, run_id=run_id, holder_sub=write_lock_holder
+                )

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 from app import db, ogx_provider, project_memory
@@ -71,7 +71,13 @@ async def readyz():
 
 
 @app.post("/v1/search", response_model=SearchResponse)
-async def search(payload: SearchRequest) -> SearchResponse:
+async def search(
+    payload: SearchRequest,
+    # ADR-0517: optional - only agent-runtime's rag_client sends this today
+    # (the calling chat turn's run_id), tagged on the search span so the
+    # per-run resource dashboard can find this call.
+    x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
+) -> SearchResponse:
     # ADR-0322: RAG_PROVIDER=ogx is the only way this branch is ever taken
     # (see app/ogx_provider.py's module docstring) - the pgvector+full-text
     # provider below is untouched and remains the default. A database pool
@@ -88,7 +94,7 @@ async def search(payload: SearchRequest) -> SearchResponse:
         await db.retry_failed_domains()
     if not use_ogx and not db.any_ready():
         raise HTTPException(status_code=503, detail="no domain database connected")
-    with search_span(payload.query, payload.top_k) as call:
+    with search_span(payload.query, payload.top_k, run_id=x_zuno_run_id or None) as call:
         call.provider = "ogx" if use_ogx else "pgvector"
         try:
             if use_ogx:

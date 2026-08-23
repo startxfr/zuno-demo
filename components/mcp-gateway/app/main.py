@@ -154,12 +154,13 @@ async def invoke_tool(
     x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
     x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
     x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
+    x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
 ) -> Dict[str, Any]:
     request_id = str(uuid.uuid4())
     started = time.monotonic()
     classification = x_zuno_data_classification.upper()
 
-    with tool_invoke_span(tool_name, classification) as call:
+    with tool_invoke_span(tool_name, classification, run_id=x_zuno_run_id or None) as call:
         # ADR-0116: the binding registry is the single source of known tool
         # names (canonical capability IDs + migration aliases) - an unknown
         # name fails closed here, before any policy or backend work.

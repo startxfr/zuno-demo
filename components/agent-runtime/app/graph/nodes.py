@@ -506,6 +506,7 @@ def _make_retrieve_node(agent: AgentDefinition, task: TaskDefinition):
                 technology=product,
                 project_id=project_id,
                 caller_sub=state.get("user_sub"),
+                run_id=state.get("run_id"),
             )
         except RagClientError as exc:
             logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)
@@ -629,6 +630,7 @@ def _make_tool_call_node(agent: AgentDefinition, task: TaskDefinition):
                 data_classification=escalated,
                 agent_name=agent.name,
                 task_name=task.name,
+                run_id=state.get("run_id"),
             )
         except McpClientError as exc:
             logger.warning("MCP Gateway tool call failed, continuing without live tool context: %s", exc)
@@ -726,6 +728,7 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
                 bearer_token=state["bearer_token"],
                 local_only=local_only,
                 request_id=state.get("request_id"),
+                run_id=state.get("run_id"),
                 agent_name=agent.name,
                 task_name=code_task.name,
                 # ADR-0511/ADR-0512 (WP-55): only a verified binding may
@@ -838,6 +841,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 bearer_token=state["bearer_token"],
                 local_only=local_only,
                 request_id=state.get("request_id"),
+                run_id=state.get("run_id"),
                 agent_name=agent.name,
                 task_name=task.name,
                 # ADR-0511/ADR-0512 (WP-55): only a verified binding may
@@ -904,6 +908,7 @@ async def _resolve_image_generation_call(
             agent_name=agent.name,
             task_name=task.name,
             data_classification=_IMAGE_GENERATION_CLASSIFICATION,
+            run_id=state.get("run_id"),
         )
     except McpClientError as exc:
         logger.warning("generate_image tool call failed: %s", exc)
@@ -951,6 +956,7 @@ async def _resolve_image_generation_call(
             bearer_token=state["bearer_token"],
             local_only=state.get("local_only_required", False),
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
             # ADR-0511/ADR-0512 (WP-55): only a verified binding may draw
@@ -1013,6 +1019,7 @@ async def _resolve_diagram_generation_call(
             # entry, min_classification: C1). The caller's own effective
             # classification is used as-is.
             data_classification=state.get("effective_classification", agent.preferred_classification),
+            run_id=state.get("run_id"),
         )
     except McpClientError as exc:
         logger.warning("generate_diagram tool call failed: %s", exc)
@@ -1051,6 +1058,7 @@ async def _resolve_diagram_generation_call(
             bearer_token=state["bearer_token"],
             local_only=state.get("local_only_required", False),
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
             project_id=state.get("project_id") if task.project_required else None,
@@ -1095,6 +1103,7 @@ async def _invoke_git_forge_call(
             agent_name=agent.name,
             task_name=task.name,
             data_classification=data_classification,
+            run_id=state.get("run_id"),
         )
     except McpClientError as exc:
         logger.warning("%s tool call failed: %s", call["name"], exc)
@@ -1161,6 +1170,7 @@ async def _resolve_git_forge_calls(
             bearer_token=state["bearer_token"],
             local_only=state.get("local_only_required", False),
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
             project_id=state.get("project_id") if task.project_required else None,
@@ -1196,6 +1206,7 @@ async def _resolve_git_forge_calls(
             bearer_token=state["bearer_token"],
             local_only=state.get("local_only_required", False),
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
             project_id=state.get("project_id") if task.project_required else None,

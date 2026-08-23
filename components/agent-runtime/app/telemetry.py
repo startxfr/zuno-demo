@@ -58,7 +58,10 @@ class GraphRunRecorder:
 
 @contextmanager
 def graph_run_span(
-    session_id: str, agent: Optional[str] = None, graph_shape: Optional[str] = None
+    session_id: str,
+    agent: Optional[str] = None,
+    graph_shape: Optional[str] = None,
+    run_id: Optional[str] = None,
 ) -> Iterator[GraphRunRecorder]:
     """WP-24 (ADR-0205): wraps one LangGraph run, recording the same
     no-silent-substitution signals the response body carries -
@@ -71,6 +74,10 @@ def graph_run_span(
     this run - the Operational considerations requirement that "tracing
     must record which graph shape served a given request, alongside the
     existing agent/task identifiers."
+
+    ADR-0517: run_id (distinct from session_id, the caller-supplied value
+    above) is the LangGraph thread id - tagging it here is what lets the
+    per-run resource dashboard find this span via TraceQL.
     """
     tracer = _tracer or trace.get_tracer("agent-runtime")
     start = time.monotonic()
@@ -80,6 +87,8 @@ def graph_run_span(
             span.set_attribute("zuno.agent", agent)
         if graph_shape:
             span.set_attribute("zuno.graph_shape", graph_shape)
+        if run_id:
+            span.set_attribute("zuno.run_id", run_id)
         recorder = GraphRunRecorder()
         try:
             yield recorder
@@ -94,3 +103,51 @@ def graph_run_span(
             span.set_attribute("zuno.source_mode", recorder.source_mode)
             if recorder.live_read_trigger_reason:
                 span.set_attribute("zuno.live_read_trigger_reason", recorder.live_read_trigger_reason)
+
+
+class ApiRequestRecorder:
+    def __init__(self) -> None:
+        self.outcome = "unknown"
+
+    def mark_error(self) -> None:
+        """For a caller (e.g. _stream_chat) that handles its own errors
+        internally - yielding a client-facing SSE error event rather than
+        raising - so the span still reports what actually happened instead
+        of defaulting to "ok" just because no exception crossed the `with`
+        boundary.
+        """
+        self.outcome = "error"
+
+
+@contextmanager
+def api_request_span(
+    run_id: str, agent: Optional[str] = None, request_id: Optional[str] = None
+) -> Iterator[ApiRequestRecorder]:
+    """ADR-0517: wraps the whole agent_chat handler body (from run_id
+    resolution through the response), enclosing agent_graph_run on the
+    non-streaming path and _stream_chat's execution on the streaming path.
+    Distinguishes "time spent in agent-runtime's own request handling
+    (auth, history load/compaction, response assembly)" from
+    "time spent inside the LangGraph run itself" on the per-run resource
+    dashboard - the two spans overlap in time by design.
+    """
+    tracer = _tracer or trace.get_tracer("agent-runtime")
+    start = time.monotonic()
+    with tracer.start_as_current_span("api_request") as span:
+        span.set_attribute("zuno.run_id", run_id)
+        if agent:
+            span.set_attribute("zuno.agent", agent)
+        if request_id:
+            span.set_attribute("zuno.request_id", request_id)
+        recorder = ApiRequestRecorder()
+        try:
+            yield recorder
+            if recorder.outcome == "unknown":
+                recorder.outcome = "ok"
+        except Exception as exc:
+            recorder.outcome = "error"
+            span.record_exception(exc)
+            raise
+        finally:
+            span.set_attribute("zuno.latency_ms", (time.monotonic() - start) * 1000.0)
+            span.set_attribute("zuno.outcome", recorder.outcome)

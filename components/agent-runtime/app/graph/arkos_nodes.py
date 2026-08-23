@@ -273,6 +273,7 @@ async def code_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=_ARKOS.name,
             task_name=_WRITE_CODE_TASK.name,
         )
@@ -313,6 +314,7 @@ async def demo_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=_ARKOS.name,
             task_name=_STRUCTURE_DEMO_TASK.name,
         )
@@ -386,6 +388,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
                 domains=authorized_domains,
                 project_id=project_id,
                 caller_sub=state.get("user_sub"),
+                run_id=state.get("run_id"),
             )
         except RagClientError as exc:
             logger.warning("rag-service search failed, continuing without retrieved context: %s", exc)
@@ -408,6 +411,7 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
             data_classification=escalated,
             agent_name=_ARKOS.name,
             task_name=task.name,
+            run_id=state.get("run_id"),
         )
     except McpClientError as exc:
         logger.warning("Confluence search failed, continuing without it: %s", exc)
@@ -504,6 +508,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=_ARKOS.name,
             task_name=task.name,
             tools=tool_schemas,
@@ -611,6 +616,7 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
             bearer_token=state["bearer_token"],
             local_only=local_only,
             request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
             agent_name=_ARKOS.name,
             task_name=task.name,
             tags=["zuno-internal"],
@@ -679,6 +685,7 @@ async def write_node(state: AgentState) -> Dict[str, Any]:
             data_classification=escalated,
             agent_name=_ARKOS.name,
             task_name=task.name,
+            run_id=state.get("run_id"),
         )
     except McpClientError as exc:
         logger.warning("Drive write failed, returning the draft inline instead: %s", exc)

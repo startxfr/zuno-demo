@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -99,6 +100,12 @@ func main() {
 type requestIdentity struct {
 	sub    string
 	groups []string
+	// runID (ADR-0517): the chat turn's run_id, once chatHandler/proxySSE
+	// learns it - empty for non-chat endpoints or a chat call that never
+	// resolved one (rejected/failed before a run_id was known). Read back
+	// by metricsMiddleware after the handler returns, to tag the
+	// bff_request span for the per-run resource dashboard.
+	runID string
 }
 
 type ctxKeyIdentity struct{}
@@ -114,10 +121,25 @@ type ctxKeyIdentity struct{}
 func metricsMiddleware(agent string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		identity := &requestIdentity{}
-		r = r.WithContext(context.WithValue(r.Context(), ctxKeyIdentity{}, identity))
+		ctx := context.WithValue(r.Context(), ctxKeyIdentity{}, identity)
+		r = r.WithContext(ctx)
+
+		// ADR-0517: opened before the handler runs and closed after it
+		// returns, so it covers the whole request regardless of which
+		// exit path the handler took - identity.runID is populated (when
+		// known at all) by chatHandler or proxySSE during ServeHTTP, and
+		// read back here since both already run to completion
+		// synchronously within this call.
+		span := telemetry.StartBFFRequestSpan(ctx, agent)
+		start := time.Now()
+
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		telemetry.RecordRequest(r.Context(), agent, strconv.Itoa(rec.status), identity.sub, identity.groups)
+
+		code := strconv.Itoa(rec.status)
+		telemetry.RecordRequest(r.Context(), agent, code, identity.sub, identity.groups)
+		telemetry.RecordDuration(r.Context(), agent, code, float64(time.Since(start).Milliseconds()))
+		telemetry.EndBFFRequestSpan(span, code, identity.runID, start)
 	})
 }
 
@@ -343,7 +365,11 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
 		}
-		if identity, ok := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity); ok {
+		// ADR-0517: kept in this outer scope (rather than the if-block's
+		// own shadowed variable) so the run_id/streaming branches below
+		// can also set identity.runID once they learn it.
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		if identity != nil {
 			identity.sub = claims.Subject
 			identity.groups = claims.Groups
 		}
@@ -384,6 +410,13 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			ProjectID: req.ProjectID, // ADR-0209: forwarded as-is, this BFF does not validate project membership
 			RunID:     req.RunID,     // ADR-0212: forwarded as-is, the Agent Runtime enforces ownership
 		}
+		// ADR-0517: a resumed conversation already knows its run_id
+		// upfront - a brand-new one doesn't until agent-runtime's first
+		// SSE "start" event (streaming) or its JSON response (non-
+		// streaming), handled at each of those points below.
+		if identity != nil && req.RunID != "" {
+			identity.runID = req.RunID
+		}
 
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 			// A full streamed reply can legitimately take longer than a
@@ -406,7 +439,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
-				proxySSE(w, resp)
+				proxySSE(w, resp, identity)
 				return
 			}
 			// The Agent Runtime rejected the request before streaming
@@ -425,6 +458,12 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		defer cancel()
 
 		resp, err := runtimeClient.Chat(ctx, token, runtimeReq)
+		if identity != nil && resp != nil {
+			// ADR-0517: always populated by the time a non-streaming call
+			// returns successfully, whether this was a brand-new or
+			// resumed conversation.
+			identity.runID = resp.RunID
+		}
 		if err != nil {
 			log.Printf("agent-bff: agent runtime call failed: %v", err)
 			w.Header().Set("Content-Type", "application/json")
@@ -455,13 +494,30 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 	}
 }
 
+// runIDFromSSE extracts run_id from agent-runtime's very first SSE event
+// ("start", always emitted before any token - see
+// components/agent-runtime/app/main.go's `_stream_chat`). Deliberately a
+// simple substring scan rather than parsing SSE framing/JSON properly:
+// this is a best-effort peek (ADR-0517), not a protocol implementation -
+// see proxySSE's own comment on why a miss here is never fatal.
+var runIDFromSSE = regexp.MustCompile(`"run_id"\s*:\s*"([^"]+)"`)
+
 // proxySSE relays an already-200-OK SSE response body to w chunk by chunk,
 // flushing after every read so token deltas reach the caller as they
 // arrive rather than being buffered - see
 // components/agent-frontend/internal/chat/chat.go's identically-named
 // function for the next hop down and the same client-cancellation
 // reasoning.
-func proxySSE(w http.ResponseWriter, resp *http.Response) {
+//
+// ADR-0517: also peeks the first few reads for run_id, when identity
+// doesn't already have one (a brand-new, not resumed, conversation) - so
+// metricsMiddleware's bff_request span still gets tagged with run_id even
+// on this path, where chatHandler itself never sees the value (it's inside
+// the streamed body, not the initial response headers). Best-effort: if
+// the "start" event never shows up intact within the first few reads (a
+// fragmented write, or a future protocol change), the span is simply left
+// untagged rather than blocking/buffering the stream indefinitely.
+func proxySSE(w http.ResponseWriter, resp *http.Response, identity *requestIdentity) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
@@ -469,9 +525,28 @@ func proxySSE(w http.ResponseWriter, resp *http.Response) {
 
 	flusher, canFlush := w.(http.Flusher)
 	buf := make([]byte, 4096)
+
+	needRunID := identity != nil && identity.runID == ""
+	var pending []byte
+	attemptsLeft := 4
+
 	for {
 		n, readErr := resp.Body.Read(buf)
 		if n > 0 {
+			if needRunID {
+				pending = append(pending, buf[:n]...)
+				if m := runIDFromSSE.FindSubmatch(pending); m != nil {
+					identity.runID = string(m[1])
+					needRunID = false
+					pending = nil
+				} else {
+					attemptsLeft--
+					if attemptsLeft <= 0 || len(pending) > 8192 {
+						needRunID = false // give up looking, stop buffering
+						pending = nil
+					}
+				}
+			}
 			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
 				return
 			}

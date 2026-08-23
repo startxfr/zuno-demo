@@ -1,0 +1,184 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0517: per-run drill-down - pick an agent, paste a run_id, see every
+# MCP tool call / RAG search / model call / BFF hop / API-layer hop that
+# run made, with cost/tokens/latency/outcome. Tempo-only by design (plus
+# one Prometheus sanity stat) - Prometheus can't filter by run_id
+# (unbounded cardinality), so every drill-down panel is a TraceQL table
+# query against zuno.run_id, the span attribute every service now stamps
+# (agent-runtime's api_request/agent_graph_run, mcp-gateway's tool_invoke,
+# rag-service's rag_search, ai-gateway's model_call, agent-bff's
+# bff_request).
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: run-trace
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-run-trace
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-run-trace",
+      "title": "Run Trace (per-run drill-down)",
+      "description": "ADR-0517: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes.",
+      "tags": ["zuno", "agents", "mcp", "rag", "tracing", "adr-0517"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "templating": {"list": [
+        {
+          "current": {"text": "", "value": ""},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(zuno_bff_requests_total, agent)",
+          "hide": 0, "includeAll": false, "multi": false,
+          "name": "agent", "options": [],
+          "query": "label_values(zuno_bff_requests_total, agent)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        },
+        {
+          "current": {"text": "", "value": ""},
+          "hide": 0, "name": "run_id", "options": [], "query": "",
+          "type": "textbox",
+          "description": "Paste a run_id (from the chat UI or database) - not a lookup, this dashboard does not list run_ids for you."
+        }
+      ]},
+      "panels": [
+        {
+          "id": 1,
+          "title": "Traffic sanity for $agent (is this dashboard/pipeline alive?)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "If every panel below is empty, check here first: no traffic at all for $agent means Tempo/the collector may be down or retention expired, not necessarily a wrong run_id.",
+          "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "All spans for run_id=$run_id",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "description": "Every span any service tagged with this run_id, time-sorted. Spans are independent traces (no cross-service parent/child linking, ADR-0517) - this is a correlated list, not a single connected waterfall.",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\"}", "limit": 50, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "BFF request",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"bff_request\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "API request (agent-runtime)",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"api_request\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Agent graph run",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "description": "Time inside the LangGraph run itself - overlaps api_request by design (see agent-runtime's telemetry.py).",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"agent_graph_run\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 6,
+          "title": "MCP tool calls",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"tool_invoke\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 7,
+          "title": "RAG searches",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Model calls (all - provider/model/adapter/cost/tokens/latency)",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "description": "Fields of interest: zuno.provider, zuno.model, zuno.adapter, zuno.model_kind (local/saas), zuno.estimated_cost_usd, zuno.prompt_tokens, zuno.completion_tokens, zuno.latency_ms.",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Model calls - local (self-hosted)",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 44},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"local\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Model calls - distant (SaaS)",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 44},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"saas\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Errors this run (span status=error)",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 52},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\" && status=error}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        },
+        {
+          "id": 12,
+          "title": "MCP policy denials this run",
+          "type": "table",
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "description": "A denied tool call is expected control flow (ADR-0011), not an OTel span error - it only shows up here, via zuno.outcome, not in the status=error panel to the left.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 52},
+          "targets": [
+            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\" && span.zuno.outcome=\"denied\"}", "limit": 20, "tableType": "traces", "refId": "A"}
+          ]
+        }
+      ]
+    }
+{{- end }}
