@@ -12,7 +12,6 @@ configMapGenerator:
       - requirements.txt=../../../../../evaluations/tekos/requirements.txt
       - run_scenarios.py=../../../../../evaluations/tekos/run_scenarios.py
       - gate_checks.py=../../../../../evaluations/tekos/gate_checks.py
-      - stress_test.py=../../../../../evaluations/tekos/stress_test.py
       - day2_report.py=../../../../../platform/testing/day2_report.py
       - day2_stresstest.py=../../../../../platform/testing/day2_stresstest.py
       - day2_bulk.py=../../../../../platform/testing/day2_bulk.py
@@ -32,14 +31,23 @@ configMapGenerator:
       # "security_checks.py".
       - tekos-scenarios.yaml=../../../../../evaluations/tekos/scenarios.yaml
       - tekos-security_checks.py=../../../../../evaluations/tekos/security_checks.py
+      # Live-cluster-confirmed 2026-08-23: this key was previously only
+      # sourced as the plain, unprefixed "stress_test.py" (in the
+      # canonical-shared-files block above), but _load_stress_test()
+      # (platform/testing/day2_stresstest.py) always looks for
+      # /gate/<agent>/stress_test.py regardless of agent - so for
+      # AGENT=tekos it was always looking in the wrong place. The
+      # now-fixed conditional gate-agent volume item (see
+      # stresstest_job_run_one.yml) needs the per-agent-prefixed key,
+      # same convention as arkos/comage below, to actually find it.
+      - tekos-stress_test.py=../../../../../evaluations/tekos/stress_test.py
       - arkos-scenarios.yaml=../../../../../evaluations/arkos/scenarios.yaml
       - arkos-security_checks.py=../../../../../evaluations/arkos/security_checks.py
-      # ADR-0415 image-generation coverage - Arkos is the only agent with
-      # its own stress_test.py today (day2_stresstest.py's
+      # ADR-0415 image-generation coverage (day2_stresstest.py's
       # _load_stress_test() loads it dynamically per agent, same pattern
-      # as *-security_checks.py above; every other agent simply has no
-      # matching key, which is fine - see stresstest_job_run_one.yml's
-      # `optional: true` on this projection).
+      # as *-security_checks.py above). Not every agent has one - see
+      # stresstest_job_run_one.yml's own stat-based conditional on this
+      # projection.
       - arkos-stress_test.py=../../../../../evaluations/arkos/stress_test.py
       - comage-scenarios.yaml=../../../../../evaluations/comage/scenarios.yaml
       - comage-security_checks.py=../../../../../evaluations/comage/security_checks.py
