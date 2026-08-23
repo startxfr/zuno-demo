@@ -12,6 +12,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Banding note (2026-08-18):** the 05xx band is reserved for the OKF stream (ADR-0501, its own version line OKF v0.1 – OKF v0.3, tracked in the [OKF roadmap](../roadmap/okf-roadmap.md)); a future platform v0.5 stream takes the next free band.
 
+**Retargeting note (2026-08-24):** ADR-0201 (v0.2 -> v0.3) and ADR-0511/ADR-0512 (OKF v0.1 -> v0.3) all retargeted together - the upstream Kuadrant wasm-shim defect blocking WP-27/WP-54 has no repo-side fix, and ADR-0512/WP-55 has a hard `Depends on: WP-54`, so it moves with ADR-0511 rather than sitting blocked inside their original milestones. Numbering (02xx/05xx band) is unchanged; only the `Target` column moves.
+
 ## version 0
 
 | ADR | Target | Status | Decision |
@@ -103,7 +105,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.2 | Partially implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v0.2 | Implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v0.2 | Implemented | Enforce knowledge authorization as policy intersection |
 | [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Partially implemented | Generalize the RAG platform to multiple isolated knowledge domains |
@@ -124,6 +125,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
+| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.3 | Partially implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v0.3 | Partially implemented | Introduce LoRA and PEFT model customization |
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v0.3 | Partially implemented | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Partially implemented | Support dynamic LoRA adapter loading |
@@ -168,6 +170,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0354](0354-add-ansible-automation-platform-as-a-day-0-component.md) | v0.3 | Proposed | Add Ansible Automation Platform as a new Day 0 component |
+| [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | v0.3 | Partially implemented | Define OKF quota policy enforced via Kuadrant |
+| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.3 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
 
 ## version 0.4
 
@@ -208,8 +212,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | OKF v0.2 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
 | [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | OKF v0.3 | Proposed | Deliver OKF content as mounted versioned artifacts |
 | [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | OKF v0.3 | Proposed | Make the AIAgent operator watch the zuno-okf repository |
-| [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | OKF v0.1 | Partially implemented | Define OKF quota policy enforced via Kuadrant |
-| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | OKF v0.1 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
 | [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | OKF v0.1 | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | OKF v0.1 | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
 | [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Implemented | Open per-conversation tabs with one browser tab per agent |

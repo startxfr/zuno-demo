@@ -354,7 +354,7 @@ this is a genuine operator/user decision (accept a second GPU node, or
 get an OpenShift AI 3.5 documentation confirmation that `ExternalModel`
 intentionally supports internal cluster-local endpoints), not a
 credential or code gap.
-- **Target:** v0.2
+- **Target:** v0.3 (retargeted from v0.2 on 2026-08-24 — blocked on the upstream Kuadrant wasm-shim defect (see WP-54/ADR-0511's own note) with no repo-side path to resolution; v0.2's remaining ADRs no longer wait on it)
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 

@@ -13,16 +13,19 @@ copy would drift unvalidated).
 
 ## Milestones
 
-- **OKF v0.1 — content excellence, in-repo** (ADR-0502 – 0504, 0511 – 0513,
+- **OKF v0.1 — content excellence, in-repo** (ADR-0502 – 0504, 0513,
   0515): the two-stage agent maturity model, the generated per-agent
   authorization matrix ("who can use what, for what, under which policy —
   and how much"), real `deployment/` content, the `tests/` target
   structure, per-conversation frontend tabs with one browser tab per
-  agent, quota policy enforced via Kuadrant, project-bound tasks with
-  Salesforce-verified context, and a real schema for
-  `rag/`/`tools/`/`policies/` content. ADR-0505, the original per-task tab
-  decision, was abandoned before implementation and superseded by
-  ADR-0515. `agents/` stays in this repository throughout.
+  agent, and a real schema for `rag/`/`tools/`/`policies/` content.
+  ADR-0505, the original per-task tab decision, was abandoned before
+  implementation and superseded by ADR-0515. `agents/` stays in this
+  repository throughout. ADR-0511 (quota policy enforced via Kuadrant)
+  and ADR-0512 (project-bound tasks with Salesforce-verified context)
+  retargeted out of this milestone to platform v0.3 on 2026-08-24 — see
+  change log; WP-54/WP-55 stay tracked in this file's own Tracker below,
+  only their ADRs' version `Target` moved.
 - **OKF v0.2 — extraction** (ADR-0506 – 0508): the `zuno-okf` repository is
   bootstrapped (history-preserving), this repository consumes it through a
   single pinned reference (baked-image build model unchanged), then the
@@ -132,6 +135,13 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
 
 ## Change log
 
+- 2026-08-24 — ADR-0511/ADR-0512 retargeted from OKF v0.1 to platform v0.3
+  (see [v0.1-v0.3-implementation-roadmap.md](v0.1-v0.3-implementation-roadmap.md)'s
+  own change log and `docs/adr/README.md`'s Retargeting note): WP-54 is
+  stalled on the same upstream Kuadrant wasm-shim defect blocking WP-27/
+  ADR-0201, and WP-55/ADR-0512 has a hard `Depends on: WP-54`, so it moves
+  with it. This milestone's ADR-0501–0512 numbering band is unaffected —
+  only the two ADRs' version `Target` moved out of the OKF v0.1 count.
 - 2026-08-18 — roadmap created alongside ADR-0501; tracker rows land with
   their WP briefs.
 - 2026-08-19 — WP-56 (ADR-0513: real schema for `rag/`/`tools/`/`policies/`)

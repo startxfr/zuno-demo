@@ -1,7 +1,7 @@
 # ADR-0512: Introduce project-bound tasks with Salesforce-verified context
 
 - **Status:** Partially implemented (schema, prompts, runtime binding and scoping merged; live Salesforce verification pending)
-- **Target:** OKF v0.1
+- **Target:** v0.3 (retargeted from OKF v0.1 on 2026-08-24 — WP-55 has a hard `Depends on: WP-54`, which is retargeted to v0.3 alongside ADR-0511; moves with it rather than sitting blocked inside the OKF v0.1 milestone)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 

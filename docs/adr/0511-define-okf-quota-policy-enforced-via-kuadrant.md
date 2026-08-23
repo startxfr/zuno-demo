@@ -1,7 +1,7 @@
 # ADR-0511: Define OKF quota policy enforced via Kuadrant
 
 - **Status:** Partially implemented (WP-54: policy/generator/AI Gateway budget enforcement merged 2026-08-18; the demo Gateway/HTTPRoute/AuthPolicy attached and `quotaEnforcement` enabled the same day, surfacing and fixing six real live Kuadrant/RHCL bugs (CEL predicate syntax, RateLimitPolicy `Overridden` status, demo Gateway ClusterIP+Route ingress, ArgoCD `-d0`/`-d1` ownership conflict, Authorino TLS issuer trust, Limitador CEL quote-escaping crash — see this chart's README for detail); the actual 429-exceedance demo is still blocked on a newly found platform defect, see 2026-08-21 note)
-- **Target:** OKF v0.1
+- **Target:** v0.3 (retargeted from OKF v0.1 on 2026-08-24 — same upstream Kuadrant wasm-shim defect as ADR-0201/WP-27, no repo-side path to resolution; moved out of the OKF v0.1 milestone alongside ADR-0512, its one hard dependent)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 
