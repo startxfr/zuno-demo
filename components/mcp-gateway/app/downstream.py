@@ -27,7 +27,13 @@ from app.handlers import diagram_gen, drive, email_report, gmail, image_gen, web
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
-DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "20"))
+# Matches app/clients/mcp_client.py's MCP_TIMEOUT_SECONDS on the
+# agent-runtime side (also bumped from 20s) - live-cluster-confirmed
+# 2026-08-23: git.repository.list against the real "openshift" GitHub org
+# (500+ repos, server-side paginated) still timed out here even after that
+# other hop was widened, since this is a second, independent timeout on
+# the gateway's own call to the downstream MCP server.
+DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "40"))
 
 # ADR-0037: a shared secret (vault-generated,
 # ansible/roles/vault/tasks/configure.yml,
