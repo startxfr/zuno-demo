@@ -277,6 +277,12 @@
                   # task's /agents/tekos/tasks/<task>.md.
                   - name: gate-tekos-bundle
                     mountPath: /agents/tekos
+                  # Same / resolution: arkos_declares_no_photorealistic_
+                  # image_generation_capability reads /agents/arkos/
+                  # agent.okf.md and every declared task's /agents/arkos/
+                  # tasks/<task>.md.
+                  - name: gate-arkos-bundle
+                    mountPath: /agents/arkos
                   - name: gate-ca
                     mountPath: /gate-ca
             volumes:
@@ -327,6 +333,20 @@
                     - key: tekos-task-check-my-drive-docs.md
                       path: tasks/check-my-drive-docs.md
                     - key: tekos-task-write-code.md
+                      path: tasks/write-code.md
+              - name: gate-arkos-bundle
+                configMap:
+                  name: acceptance-gate-scripts
+                  items:
+                    - key: arkos-agent-okf.md
+                      path: agent.okf.md
+                    - key: arkos-task-draft-architecture-testimonial.md
+                      path: tasks/draft-architecture-testimonial.md
+                    - key: arkos-task-workshop-presentation.md
+                      path: tasks/workshop-presentation.md
+                    - key: arkos-task-structure-demo.md
+                      path: tasks/structure-demo.md
+                    - key: arkos-task-write-code.md
                       path: tasks/write-code.md
               - name: gate-ca
                 configMap:

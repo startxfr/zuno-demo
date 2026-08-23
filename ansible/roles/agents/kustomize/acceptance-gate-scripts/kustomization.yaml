@@ -29,6 +29,15 @@ configMapGenerator:
       - tekos-task-find-relevant-docs.md=../../../../../agents/tekos/tasks/find-relevant-docs.md
       - tekos-task-check-my-drive-docs.md=../../../../../agents/tekos/tasks/check-my-drive-docs.md
       - tekos-task-write-code.md=../../../../../agents/tekos/tasks/write-code.md
+      # gate_checks.py's arkos_declares_no_photorealistic_image_generation_
+      # capability reads /agents/arkos/agent.okf.md and every declared
+      # task's /agents/arkos/tasks/<task>.md - same / resolution as the
+      # tekos-* entries above, same reason they need to be projected here.
+      - arkos-agent-okf.md=../../../../../agents/arkos/agent.okf.md
+      - arkos-task-draft-architecture-testimonial.md=../../../../../agents/arkos/tasks/draft-architecture-testimonial.md
+      - arkos-task-workshop-presentation.md=../../../../../agents/arkos/tasks/workshop-presentation.md
+      - arkos-task-structure-demo.md=../../../../../agents/arkos/tasks/structure-demo.md
+      - arkos-task-write-code.md=../../../../../agents/arkos/tasks/write-code.md
 generatorOptions:
   disableNameSuffixHash: true
   labels:
