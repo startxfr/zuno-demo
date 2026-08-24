@@ -55,10 +55,7 @@ spec:
     # which runs sidecar-less and connects to -primary directly);
     # 8432 = pgBackRest's own TLS server; 8008 = Patroni's API, today still
     # Envoy-tunneled but listed so a future exclusion widening can't
-    # resurrect this same trap. Same-namespace scope (bare podSelector)
-    # matches the platform baseline's "same-namespace traffic is always
-    # allowed" stance (gitops/charts/namespaces' default-deny policy);
-    # cross-namespace consumers reach PgBouncer, not these pods.
+    # resurrect this same trap.
     - from:
         - podSelector: {}
       ports:
@@ -68,4 +65,29 @@ spec:
           port: 8432
         - protocol: TCP
           port: 8008
+    # Cross-namespace direct-to-primary consumers, port 5432 only (never
+    # 8432/8008 - pgBackRest/Patroni stay same-namespace-internal). This
+    # rule is what the comment above used to (wrongly) claim didn't exist -
+    # "cross-namespace consumers reach PgBouncer, not these pods" was true
+    # for every consumer except Keycloak, which deliberately bypasses
+    # PgBouncer's transaction-mode pooling for prepared-statement support
+    # (ADR-0315, gitops/charts/keycloak/values.yaml's postgresqlHost
+    # comment) - the same reasoning ADR-0354/WP-072 reused for AAP's four
+    # sub-components. Found live 2026-08-24/25: this policy's same-
+    # namespace-only 5432 rule, once the Istio tunnel stopped silently
+    # bypassing it, broke Keycloak's own primary connection first
+    # (zuno-0 CrashLoopBackOff, 80+ restarts) before AAP Gateway's DB
+    # migration hit the identical timeout. Named explicitly rather than
+    # opened to "any namespace" - only the namespaces that actually run a
+    # direct-to-primary consumer.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-auth
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-aap
+      ports:
+        - protocol: TCP
+          port: 5432
 {{- end }}
