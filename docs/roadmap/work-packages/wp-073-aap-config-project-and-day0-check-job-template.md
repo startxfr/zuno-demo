@@ -1,25 +1,31 @@
 # WP-073: Register the zuno-demo Project and day0_check Job Template in AAP
 
-- **State:** Not started. Blocked on WP-072's live CRD inventory (its
-  step 10) - the mechanism this WP implements (Path A vs Path B below) is
-  not chosen until that inventory is in hand.
+- **State:** Not started - unblocked. WP-072's live CRD inventory
+  (2026-08-24, `demo222`) confirmed **Path A**: the AAP operator's own
+  bundle already ships Kubernetes CRDs for `AnsibleProject`,
+  `JobTemplate`, `AnsibleCredential`, `AnsibleInventory`, `AnsibleJob`,
+  `AnsibleSchedule`, `AnsibleWorkflow`, `WorkflowTemplate` (group
+  `tower.ansible.com/v1alpha1`) - no second Subscription, no
+  `infra.aap_configuration` collection, no Ansible-executed action code
+  needed. Path B's steps below are now historical (kept as a documented
+  fallback only). This WP still needs `aap` (WP-072) actually installed
+  and Ready on the target cluster before it can run.
 - **ADRs:** ADR-0354 (clause 4 and clause 6's AAP-side authenticator
   question)
-- **Depends on:** WP-072 (`aap` component live, Ready, and its CRD
-  inventory recorded).
+- **Depends on:** WP-072 (`aap` component live and Ready - repo work
+  merged 2026-08-24, live install still pending).
 - **Unblocks:** WP-074/ADR-0355 (`mcp-aap` needs a working Job Template
   and a scoped launch token to wrap).
-- **Estimated files touched:** Path A ~8 (role: 3, chart: ~3, apps: 2);
-  Path B ~6 (role: 3, `ansible/requirements.yml`: 1, docs: ~2) - final
-  count depends on which path WP-072's inventory selects.
+- **Estimated files touched:** ~8 (role: 3, chart: ~3, apps: 2) - Path A,
+  confirmed.
 
 > Execute this brief as a standalone task from the repository root. Read
 > ADR-0354 clause 4 and clause 6 in full before starting, and read
-> WP-072's recorded CRD inventory findings first - **do not start
-> implementation until that inventory exists and has been reviewed.** If
-> the inventory shows a mechanism this brief did not anticipate, stop and
-> report before writing code, per the standing instruction to be warned
-> before any new Ansible-executed action code is authored.
+> `ansible/roles/aap/README.md`'s CRD-inventory findings first (Path A is
+> confirmed - see this file's State field). If a live cluster's actual
+> operator bundle turns out not to ship the CRDs WP-072 found, stop and
+> report before falling back to Path B, per the standing instruction to
+> be warned before any new Ansible-executed action code is authored.
 
 ## Goal
 
@@ -56,26 +62,30 @@ assert-or-seed idempotency shape Path B must reuse if selected).
   `AnsibleProject`-shaped type found.
 - `python3 platform/docs/check_docs.py` exits 0.
 
-## Decision checkpoint: Path A vs Path B
+## Decision checkpoint: Path A vs Path B - RESOLVED, Path A
 
-Read WP-072's recorded inventory and pick exactly one path. Do not
-implement both.
+WP-072's live CRD inventory (2026-08-24) confirmed the CRDs Path A needs
+are already shipped by the **same** `ansible-automation-platform-operator`
+bundle WP-072 subscribes - not a separate resource operator, and no
+second Subscription is needed. Implement Path A only. Path B is kept
+below only as a documented fallback in case a live cluster's operator
+bundle ever turns out to differ (re-run WP-072's `oc api-resources`/
+`oc explain` commands to confirm before assuming Path B applies).
 
-### Path A - CRDs exist (preferred)
+### Path A - CRDs exist (confirmed, 2026-08-24)
 
-If the inventory shows a **separate AAP resource operator** (distinct OLM
-package from the platform operator WP-072 installed) publishing
-Kubernetes CRDs for Project/JobTemplate-shaped objects:
+The same OLM package WP-072 installs already ships Kubernetes CRDs for
+Project/JobTemplate-shaped objects - no separate resource operator, no
+second Subscription:
 
-1. That resource operator becomes a second Subscription. Decide whether
-   it belongs in `aap`'s own `-d0` Application (same chart, an additional
-   toggle) or a dedicated `-d0` half of `aap-config` itself - prefer
-   keeping it inside `aap-config`'s own `-d0`/`-d1` pair so `aap` (WP-072)
-   stays exactly as already shipped and does not need a follow-up change.
+1. `aap-config`'s `-d0` Application is a no-op (the CRDs already exist
+   once `aap`'s own `-d0`/`-d1` from WP-072 are live - no second
+   Subscription, unlike the original Path A draft assumed before the CRD
+   inventory confirmed this).
 2. `ansible/roles/aap_config/tasks/install.yml`: apply `zuno-aap-config-d0`
-   (resource-operator subscription) then `zuno-aap-config-d1` (the
-   Project + JobTemplate CRs) via `apply_gitops_app.yml`, same
-   wait-Synced+Healthy-between pattern as every other component.
+   (no-op) then `zuno-aap-config-d1` (the Project + JobTemplate CRs) via
+   `apply_gitops_app.yml`, same wait-Synced+Healthy-between pattern as
+   every other component.
 3. `gitops/charts/aap-config/`: `templates/project.yaml` (repo URL,
    branch, SCM auto-sync toggle), `templates/jobtemplate-day0-check.yaml`
    (playbook path, credential ref, inventory ref, survey for

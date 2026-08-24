@@ -1,6 +1,56 @@
 # WP-072: Install Ansible Automation Platform as a Day 1 component
 
-- **State:** Not started.
+- **State:** Repo work merged (2026-08-24) - role, chart, apps, four
+  dedicated Crunchy databases, Vault seeds, Keycloak OIDC client
+  registration, Makefile/playbook wiring all committed. **CRD inventory
+  complete** (step 10, done live against `demo222` before any code was
+  written): subscribed the operator (`ansible-automation-platform-
+  operator`, default channel `stable-2.7`, catalog `redhat-operators`,
+  `InstallModes` `OwnNamespace`/`SingleNamespace`/`MultiNamespace` only),
+  ran `oc explain` against the real CRDs, then deliberately deleted the
+  Subscription/OperatorGroup/namespace again before creating any
+  `AnsibleAutomationPlatform` CR - no Gateway/Controller/Hub/EDA pod was
+  ever started. Findings (see `ansible/roles/aap/README.md` for the full
+  writeup):
+  - **The unified CR does NOT take one shared external-database secret**
+    (this ADR-0354 clause 5's original open question) - Gateway
+    (`spec.database.database_secret`) and EDA
+    (`spec.eda.database.database_secret`) use one field name; Controller
+    (`spec.controller.postgres_configuration_secret`) and Hub
+    (`spec.hub.postgres_configuration_secret`) use another. Resolved by
+    repeating the ADR-0315 dedicated-database pattern four times rather
+    than switching mechanisms, per the WP's own pre-authorized fallback.
+  - `automationhub.spec.file_storage_access_mode` accepts `ReadWriteOnce`
+    (not RWX-only) - Hub is configured `storage_type: file` +
+    `ReadWriteOnce`, matching this repository's `gp3-csi`-everywhere
+    convention with no new storage class or S3 dependency.
+  - Confirmed live replica-count field names for non-HA sizing:
+    `spec.api.replicas` (Gateway); `spec.controller.replicas`/
+    `web_replicas`/`task_replicas`; `spec.hub.{api,web,worker}.replicas`;
+    `spec.eda.{api,default_worker,activation_worker,ui}.replicas`
+    (`default_worker`/`activation_worker` default to 2, trimmed to 1).
+  - A CR-level `spec.bundle_cacert_secret` field exists (Gateway's own
+    outbound-HTTPS CA trust bundle) - left unset in this WP, deferred to
+    WP-073 alongside the OIDC authenticator wiring it would actually
+    serve.
+  - **Not verified**: the exact key set each `postgres_configuration_secret`/
+    `database_secret` Secret requires (no `alm-examples` were published on
+    this channel to confirm against; the chart follows the documented
+    upstream awx-operator convention, unverified end to end), and whether
+    EDA's `automation_server_url` (required on the standalone `EDA` CRD)
+    is auto-wired by the unified CR or needs setting explicitly - both
+    open until the first real `make d1 install aap`.
+  - **Path A confirmed for WP-073**: the same operator bundle already
+    installs Kubernetes CRDs for `AnsibleProject`, `JobTemplate`,
+    `AnsibleCredential`, `AnsibleInventory`, `AnsibleJob`, `AnsibleSchedule`,
+    `AnsibleWorkflow`, `WorkflowTemplate` (group `tower.ansible.com/
+    v1alpha1`) - no second Subscription and no `infra.aap_configuration`
+    collection are needed. WP-073 can proceed directly with Path A.
+
+  Live install (`make d1 install aap`) and the acceptance checks below are
+  still pending - deliberately not run in the same session as the repo
+  work, since a full Gateway+Controller+Hub+EDA install is a heavy,
+  separately-approved action on a shared cluster.
 - **ADRs:** ADR-0354 (Add Ansible Automation Platform as a new Day 1
   component)
 - **Depends on:** `postgresql`, `vault`, `external_secrets`, `keycloak`,

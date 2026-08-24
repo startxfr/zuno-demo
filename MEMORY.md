@@ -679,6 +679,18 @@ not here.
 
 ### Dated entries (roadmap work packages, v0.2) — current status per ADR
 
+- **ADR-0354 (WP-072)**: Ansible Automation Platform `aap` component -
+  role/chart/apps, four dedicated Crunchy databases (Gateway/Controller/
+  Hub/EDA each own their own database secret, confirmed live via a
+  2026-08-24 CRD inventory against `demo222` - the unified CR does NOT
+  take one shared external-database secret, correcting the ADR's
+  original open question), Vault seeds, Keycloak OIDC client
+  registration. Repo-complete; `make d1 install aap` not yet run on a
+  live cluster - see `ansible/roles/aap/README.md` for what remains
+  unverified end to end. Companion `aap-config` component (WP-073) not
+  started, but unblocked: the same CRD inventory confirmed Path A
+  (Project/JobTemplate CRDs already shipped by the platform operator's
+  own bundle, no second Subscription needed).
 - **ADR-0202 / ADR-0203 (WP-20)**: four logical knowledge-domain
   identifiers (`knowledge.tech/sales/sxa-legacy/adv`) declared in
   `knowledge/<domain>/domain.yaml`, validated by
