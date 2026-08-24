@@ -16,6 +16,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-24, afternoon):** three new platform version bands added - v0.5 (make the MaaS governance plane live and used by agents), v0.6 (prove platform automation via a from-scratch redeploy on a new cluster), v0.7 (GitHub-Actions-based release automation). ADR-0201/ADR-0511/ADR-0512 move again, this time from the morning's generic v0.3 catch-all into the dedicated v0.5 MaaS milestone (same root blocker, better-scoped home). ADR-0115 (v0.1 -> v0.7) joins WP-04's GitHub Actions release-pipeline scope. ADR-0517 is a new small ADR authored for v0.6 (demo333 cluster redeploy). No new ADR numbering band was reserved - v0.5/v0.7 reuse existing ADR numbers, and ADR-0517 simply takes the next free sequential number after ADR-0516.
 
+**Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
+
 ## version 0
 
 | ADR | Target | Status | Decision |
@@ -121,6 +123,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md) | v0.2 | Partially implemented | Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG |
 | [ADR-0217](0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Partially implemented | Ingest a weekly, already-anonymized SXA corpus as a new RAG domain |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | Unscheduled | Proposed | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
+| [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | v0.2 | Proposed | Add Ansible Automation Platform as a new Day 1 component |
 
 ## version 0.3
 
@@ -169,7 +172,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | To be implemented (manifests merged 2026-08-17; live rollout pending) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
-| [ADR-0354](0354-add-ansible-automation-platform-as-a-day-0-component.md) | v0.3 | Proposed | Add Ansible Automation Platform as a new Day 0 component |
+| [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | v0.3 | Proposed | Expose AAP audits to agents through an mcp-aap server |
 
 ## version 0.4
 
