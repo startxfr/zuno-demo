@@ -35,6 +35,33 @@
         namespace: zuno-data
         wait: true
 
+    # A throwaway Secret built directly from ansible/confidential.yml, NOT
+    # the ArgoCD/ExternalSecret-managed zuno-postgresql-backup-s3 - this
+    # check must run *before* zuno-postgresql-d1 is (re)applied (that's the
+    # whole point: it decides whether that apply carries the restore
+    # trigger), so it can never depend on a Secret only d1 creates. Hit
+    # live 2026-08-24: after a real `make day1 uninstall postgresql`, d1 (and
+    # everything it owns, including that Secret) is gone, and mounting it
+    # here failed with FailedMount ... secret not found. no_log because the
+    # raw key/secret pass through this module call either way.
+    - name: "postgresql | create a throwaway S3-creds Secret for the check Job"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: zuno-postgresql-check-s3-backup-creds
+            namespace: zuno-data
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          stringData:
+            s3.conf: |
+              [global]
+              repo2-s3-key={{ zuno_postgresql_backup_s3_access_key }}
+              repo2-s3-key-secret={{ zuno_postgresql_backup_s3_secret_key }}
+      no_log: true
+
     - name: "postgresql | run the S3 backup-check Job"
       kubernetes.core.k8s:
         state: present
@@ -82,11 +109,13 @@
                 volumes:
                   - name: s3-creds
                     secret:
-                      # Single key (s3.conf): repo2-s3-key/repo2-s3-key-secret,
-                      # rendered by the ExternalSecret template - the exact
-                      # same file PGO's own pgbackrest containers mount via
-                      # spec.backups.pgbackrest.configuration.
-                      secretName: zuno-postgresql-backup-s3
+                      # Single key (s3.conf): repo2-s3-key/repo2-s3-key-secret
+                      # - the throwaway Secret created above, same shape as
+                      # the ExternalSecret-rendered one PGO's own pgbackrest
+                      # containers mount via spec.backups.pgbackrest.configuration,
+                      # but independently created so this check never depends
+                      # on zuno-postgresql-d1 having been applied yet.
+                      secretName: zuno-postgresql-check-s3-backup-creds
 
     - name: "postgresql | wait for the S3 backup-check Job to reach a terminal state"
       kubernetes.core.k8s_info:
@@ -99,7 +128,13 @@
         (_postgresql_s3_check_job.resources[0].status.succeeded | default(0)) > 0 or
         (_postgresql_s3_check_job.resources[0].status.conditions | default([])
           | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
-      retries: 12
+      # retries*delay must comfortably exceed the Job's own
+      # activeDeadlineSeconds (180s) - otherwise Ansible times out first and
+      # reports a generic failure without ever seeing the Job's true
+      # terminal state (hit live 2026-08-24: the real cause, a FailedMount,
+      # only showed up via a direct `oc get events` read, not in this
+      # task's own failure output).
+      retries: 20
       delay: 10
 
     - name: "postgresql | fetch the S3 backup-check Job's pod"
@@ -164,5 +199,14 @@
         api_version: batch/v1
         kind: Job
         name: zuno-postgresql-check-s3-backup
+        namespace: zuno-data
+        wait: false
+
+    - name: "postgresql | delete the throwaway S3-creds Secret (cleanup)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Secret
+        name: zuno-postgresql-check-s3-backup-creds
         namespace: zuno-data
         wait: false
