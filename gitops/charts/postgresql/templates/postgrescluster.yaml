@@ -55,6 +55,23 @@ spec:
 
   instances:
     - name: instance1
+      # Postgres (5432) and pgBackRest's own TLS server (8432, from the
+      # PGO-generated ~postgres-operator_server.conf's tls-server block,
+      # live-verified on a running instance pod 2026-08-24) both already do
+      # their own TLS end-to-end (PGO-managed certs). Envoy intercepting
+      # those connections corrupts the handshake - live symptoms: replica
+      # pg_basebackup bootstrap fails with "server closed the connection
+      # unexpectedly", and PGO's backup Jobs fail with "unable to check
+      # pg1/2/3: [ServiceError] TLS error [5:0]" then "unable to find
+      # primary cluster", leaving readyReplicas stuck at 1/3 forever. Same
+      # server-side-TLS-vs-istio-sniffing class as MariaDB's documented
+      # case in this repo. Exclude just these two ports from interception,
+      # both directions - the pods stay fully in the mesh (sidecar
+      # injected, every other port still proxied, e.g. exporter's 9187).
+      metadata:
+        annotations:
+          traffic.sidecar.istio.io/excludeInboundPorts: "5432,8432"
+          traffic.sidecar.istio.io/excludeOutboundPorts: "5432,8432"
       replicas: {{ .Values.cluster.instances }}
       priorityClassName: zuno-platform-critical
       # Do not add an explicit topologySpreadConstraints block here
@@ -115,6 +132,16 @@ spec:
   # configured (values.yaml's backups.s3.enabled).
   backups:
     pgbackrest:
+      # Same 5432/8432 exclusion as spec.instances above (see that comment
+      # for the live evidence) - this metadata block is the only lever PGO
+      # exposes for the repo-host StatefulSet's and its ad hoc backup Job
+      # pods' annotations (repoHost/jobs sub-objects have no metadata field
+      # of their own, confirmed via `oc explain`). The backup Job pods were
+      # the ones directly logging the TLS [5:0] error against pg1/pg2/pg3.
+      metadata:
+        annotations:
+          traffic.sidecar.istio.io/excludeInboundPorts: "5432,8432"
+          traffic.sidecar.istio.io/excludeOutboundPorts: "5432,8432"
       global:
         repo1-retention-full: "4"
         repo1-retention-full-type: count
