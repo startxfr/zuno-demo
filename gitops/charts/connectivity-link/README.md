@@ -34,6 +34,24 @@ co-edited by hand or by this chart). A BFF-side direct Limitador
 consult was rejected: it would move declared policy into per-agent Go
 code and bypass the compilation flow the platform already trusts.
 
+**Day1/Day2 Application split (2026-08-25):** the HTTPRoute/AuthPolicy
+(`templates/quota-demo-route.yaml`) and the RateLimitPolicy
+(`templates/quota-ratelimitpolicies.yaml`) reference or target a backend
+that only exists on Day2 (`tekos-frontend`, created by
+`ansible/roles/agents`), so they render from a dedicated Day2 Application,
+`zuno-connectivity-link-quota-d1` (applied by
+`ansible/roles/agents/tasks/install.yml`, after `zuno-api-d1`/Tekos exists),
+gated by `quotaEnforcement.route.enabled`. The Gateway/ConfigMap/Route
+below have no such dependency and stay on the Day1
+`zuno-connectivity-link-d1` Application, gated by
+`quotaEnforcement.gateway.enabled`. Originally all of it rendered from
+Day1 alone; that left the HTTPRoute permanently `BackendNotFound`/Degraded
+until Day2 ran, which made `zuno-connectivity-link-d1`'s own
+Synced+Healthy wait in `ansible/roles/connectivity_link/tasks/install.yml`
+liable to time out and fail `make day1 install` on a fresh cluster.
+Rollback for either half is the same pattern: flip its `.enabled` switch
+back to `false` and sync, ArgoCD's `selfHeal` removes just that half.
+
 **Why a Gateway is required at all:** confirmed directly against the
 installed CRD (`oc get crd ratelimitpolicies.kuadrant.io -o json` →
 `x-kubernetes-validations`), not assumed — `targetRef.group` must be
@@ -161,8 +179,12 @@ that `ADD`s the same TLS-wrapped cluster at `priority: -1`. Verified live
 2026-08-24: `401`, not `500`, Authorino's own log shows the request
 arriving through `zuno-agent-gateway` too.
 
-**Rollback:** set `quotaEnforcement.enabled: false` and push — ArgoCD's
-`selfHeal` removes all of it. Nothing outside this chart references any
+**Rollback:** set `quotaEnforcement.gateway.enabled: false` (removes the
+Day1 Gateway/ConfigMap/Route/EnvoyFilter, applied via
+`zuno-connectivity-link-d1`) and/or `quotaEnforcement.route.enabled: false`
+(removes the Day2 HTTPRoute/AuthPolicy/RateLimitPolicy, applied via
+`zuno-connectivity-link-quota-d1`) and push — ArgoCD's `selfHeal` removes
+whichever half you flip off. Nothing outside this chart references any
 object rendered here.
 
 **Verification:** a demo persona's requests to

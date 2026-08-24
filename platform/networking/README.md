@@ -9,10 +9,15 @@ installs the Red Hat Connectivity Link operator - a Kuadrant-based Gateway
 API policy layer (rate limiting, auth, DNS/TLS policies for
 Gateway-fronted traffic) - plus a `Kuadrant` operand CR (ADR-0317). The
 chart now also stands up a real Gateway API `Gateway` (`zuno-agent-gateway`,
-`gitops/charts/connectivity-link/templates/quota-demo-gateway.yaml`), one
-`HTTPRoute` (`tekos-quota-demo`), and its `AuthPolicy`/`RateLimitPolicy` for
-the quota-enforcement demo path (d1 only, gated behind
-`quotaEnforcement.enabled`/`kuadrant.enabled`). `openshift-ai`'s own
+`gitops/charts/connectivity-link/templates/quota-demo-gateway.yaml`), applied
+by Day1's `zuno-connectivity-link-d1` (gated behind
+`quotaEnforcement.gateway.enabled`/`kuadrant.enabled`), plus one `HTTPRoute`
+(`tekos-quota-demo`, `templates/quota-demo-route.yaml`) and its
+`AuthPolicy`/`RateLimitPolicy` for the quota-enforcement demo path - these
+reference the Day2-only `tekos-frontend` backend, so they're applied
+instead by Day2's `zuno-connectivity-link-quota-d1`
+(`ansible/roles/agents`), gated behind `quotaEnforcement.route.enabled`.
+`openshift-ai`'s own
 `maas-default-gateway` (`gitops/charts/openshift-ai/templates/maas-gateway.yaml`)
 is a separate Gateway outside this chart's scope. This project's own MCP
 Gateway (`components/mcp-gateway`) and AI Inference Gateway

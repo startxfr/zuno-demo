@@ -26,18 +26,36 @@
 # policies/quotas/quota-policy.yaml via
 # platform/okf/generate_quota_enforcement.py - never edit that file by
 # hand) PLUS the demo Gateway/HTTPRoute/AuthPolicy in
-# templates/quota-demo-gateway.yaml that gives them something to target
-# (Kuadrant's CRDs hard-reject any targetRef that isn't Gateway API - plain
-# OpenShift Routes, which is how every agent's real traffic is served
-# today, cannot be targeted at all). Scoped to Tekos on a dedicated demo
-# hostname; the real tekos-frontend Route is untouched. See this chart's
-# README, WP-54 section, for the live demo evidence and rollback
-# (enabled: false removes all of it via ArgoCD selfHeal). Token budgets
-# are NOT here: they
-# are enforced by AI Gateway (components/ai-gateway/app/quota_budgets.yaml,
-# generated from the same policy file).
+# templates/quota-demo-gateway.yaml + templates/quota-demo-route.yaml that
+# give them something to target (Kuadrant's CRDs hard-reject any targetRef
+# that isn't Gateway API - plain OpenShift Routes, which is how every
+# agent's real traffic is served today, cannot be targeted at all). Scoped
+# to Tekos on a dedicated demo hostname; the real tekos-frontend Route is
+# untouched. See this chart's README, WP-54 section, for the live demo
+# evidence and rollback (enabled: false removes all of it via ArgoCD
+# selfHeal). Token budgets are NOT here: they are enforced by AI Gateway
+# (components/ai-gateway/app/quota_budgets.yaml, generated from the same
+# policy file).
+#
+# Split into gateway/route sub-switches so the two halves can be applied
+# by different ArgoCD Applications on different Days: gateway (ConfigMap +
+# Gateway + Route) has no dependency on any Day2 workload and stays on
+# zuno-connectivity-link-d1 (Day1); route (HTTPRoute + AuthPolicy) plus the
+# sibling RateLimitPolicy target/reference the tekos-frontend backend
+# Service, which is only created by Day2's `agents` role - rendering them
+# from Day1 made the HTTPRoute permanently BackendNotFound/Degraded until
+# Day2 ran, which in turn made zuno-connectivity-link-d1's Synced+Healthy
+# wait in ansible/roles/connectivity_link/tasks/install.yml liable to time
+# out and hard-fail `make day1 install` on every fresh cluster. route
+# defaults false so only the Day2 zuno-connectivity-link-quota-d1
+# Application (ansible/roles/agents/tasks/install.yml, applied after
+# zuno-api-d1/tekos-frontend exists) renders it.
 quotaEnforcement:
   enabled: true
+  gateway:
+    enabled: true
+  route:
+    enabled: false
   routeName: tekos-quota-demo
   routeNamespace: zuno-ai-run
   demoHostname: tekos-quota-demo.apps.demo222.startx.fr

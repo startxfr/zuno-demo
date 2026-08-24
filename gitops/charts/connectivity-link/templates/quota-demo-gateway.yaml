@@ -23,18 +23,27 @@
 # for it - the ELB was a different address entirely). This ConfigMap fixes
 # it by matching the live pattern instead of the Gateway API default.
 #
-# Rollback: set quotaEnforcement.enabled back to false and sync - ArgoCD's
-# selfHeal removes every object below (and the RateLimitPolicy in the
-# sibling template); nothing here is referenced by any other chart.
+# Rollback: set quotaEnforcement.gateway.enabled back to false and sync -
+# ArgoCD's selfHeal removes every object below; nothing here is referenced
+# by any other chart.
 #
-# Guarded on kuadrant.enabled too, not just quotaEnforcement.enabled: this
-# chart is rendered by BOTH the -d0 and -d1 ArgoCD Applications, and
-# quotaEnforcement.enabled is a plain chart default with no per-Application
-# override - without this extra guard -d0 rendered these objects too, in
-# the same explicit namespaces as -d1, and the two Applications fought over
-# ownership of the same live resources (ArgoCD SharedResourceWarning, sync
-# never settling). Only -d1 sets kuadrant.enabled: true.
-{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
+# This file renders ONLY the shared ingress infra (ConfigMap/Gateway/Route)
+# - no dependency on any Day2 workload, so it stays on the Day1
+# zuno-connectivity-link-d1 Application. The HTTPRoute/AuthPolicy that
+# target the Day2-only tekos-frontend backend live in the sibling template
+# quota-demo-route.yaml, rendered instead by the Day2
+# zuno-connectivity-link-quota-d1 Application (see values.yaml's
+# quotaEnforcement comment for the full split rationale).
+#
+# Guarded on kuadrant.enabled too, not just quotaEnforcement.gateway.enabled:
+# this chart is rendered by BOTH the -d0 and -d1 ArgoCD Applications, and
+# quotaEnforcement.gateway.enabled is a plain chart default with no
+# per-Application override - without this extra guard -d0 rendered these
+# objects too, in the same explicit namespaces as -d1, and the two
+# Applications fought over ownership of the same live resources (ArgoCD
+# SharedResourceWarning, sync never settling). Only -d1 sets
+# kuadrant.enabled: true.
+{{- if and .Values.quotaEnforcement.gateway.enabled .Values.kuadrant.enabled }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -103,49 +112,4 @@ spec:
     name: zuno-agent-gateway-istio
     weight: 100
   wildcardPolicy: None
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ .Values.quotaEnforcement.routeName }}
-  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
-  labels:
-    app.kubernetes.io/part-of: zuno-quota-enforcement
-spec:
-  parentRefs:
-    - name: zuno-agent-gateway
-      namespace: openshift-ingress
-  hostnames:
-    - {{ .Values.quotaEnforcement.demoHostname }}
-  rules:
-    - backendRefs:
-        - name: {{ .Values.quotaEnforcement.demoBackendService }}
-          port: {{ .Values.quotaEnforcement.demoBackendPort }}
----
-apiVersion: kuadrant.io/v1
-kind: AuthPolicy
-metadata:
-  name: {{ .Values.quotaEnforcement.routeName }}-jwt
-  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
-  labels:
-    app.kubernetes.io/part-of: zuno-quota-enforcement
-spec:
-  targetRef:
-    group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: {{ .Values.quotaEnforcement.routeName }}
-  rules:
-    authentication:
-      keycloak-jwt:
-        jwt:
-          # jwksUrl (direct fetch), not issuerUrl (OIDC discovery): Authorino
-          # runs in-cluster and does not trust the CA signing the externally-
-          # issued Keycloak route cert, so OIDC discovery against the
-          # external issuer 500s with "certificate signed by unknown
-          # authority" - the same class of problem ADR-0347/ADR-0411 solve
-          # for other in-cluster consumers. The internal JWKS Service
-          # endpoint is plain HTTP, sidestepping TLS trust entirely - the
-          # same split-brain issuer/JWKS default every other Keycloak
-          # consumer chart in this repo already uses.
-          jwksUrl: {{ .Values.quotaEnforcement.keycloakJwksUrl }}
 {{- end }}

@@ -1,0 +1,79 @@
+# ADR-0511/WP-54: the HTTPRoute + AuthPolicy that bind Tekos's demo hostname
+# to the tekos-frontend backend and gate it behind Keycloak JWT auth. Split
+# out of the sibling template quota-demo-gateway.yaml (which owns the
+# shared, backend-independent Gateway/ConfigMap/Route ingress infra) because
+# these two resources - and the RateLimitPolicy in quota-ratelimitpolicies.yaml
+# that also targets this HTTPRoute - reference the tekos-frontend Service,
+# which only exists once Day2's `agents` role runs. Rendering them from the
+# Day1 zuno-connectivity-link-d1 Application left the HTTPRoute permanently
+# BackendNotFound/Degraded until Day2 completed, which made that
+# Application's Synced+Healthy wait in
+# ansible/roles/connectivity_link/tasks/install.yml liable to time out and
+# fail `make day1 install` outright on a fresh cluster.
+#
+# Rendered instead by the Day2 zuno-connectivity-link-quota-d1 Application
+# (ansible/roles/agents/tasks/install.yml), applied only after zuno-api-d1
+# (Tekos) has created tekos-frontend.
+#
+# Rollback: set quotaEnforcement.route.enabled back to false and sync -
+# ArgoCD's selfHeal removes both objects below (and the RateLimitPolicy in
+# the sibling generated template); nothing here is referenced by any other
+# chart.
+#
+# NOT also guarded on kuadrant.enabled (unlike the sibling
+# quota-demo-gateway.yaml): this template is rendered by its own dedicated
+# Application (zuno-connectivity-link-quota-d1) with no d0/d1 split of its
+# own, so there's no premature-operator-install phase to guard against here
+# - and gating on kuadrant.enabled too would force that Application to also
+# set kuadrant.enabled: true, which would re-render the Kuadrant operand CR
+# and ServiceMonitors (templates/kuadrant.yaml,
+# templates/servicemonitor-*.yaml, guarded by kuadrant.enabled alone),
+# fighting zuno-connectivity-link-d1 for ownership of those - the same
+# SharedResourceWarning class of bug this split is meant to avoid.
+{{- if .Values.quotaEnforcement.route.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Values.quotaEnforcement.routeName }}
+  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  parentRefs:
+    - name: zuno-agent-gateway
+      namespace: openshift-ingress
+  hostnames:
+    - {{ .Values.quotaEnforcement.demoHostname }}
+  rules:
+    - backendRefs:
+        - name: {{ .Values.quotaEnforcement.demoBackendService }}
+          port: {{ .Values.quotaEnforcement.demoBackendPort }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: {{ .Values.quotaEnforcement.routeName }}-jwt
+  namespace: {{ .Values.quotaEnforcement.routeNamespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .Values.quotaEnforcement.routeName }}
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          # jwksUrl (direct fetch), not issuerUrl (OIDC discovery): Authorino
+          # runs in-cluster and does not trust the CA signing the externally-
+          # issued Keycloak route cert, so OIDC discovery against the
+          # external issuer 500s with "certificate signed by unknown
+          # authority" - the same class of problem ADR-0347/ADR-0411 solve
+          # for other in-cluster consumers. The internal JWKS Service
+          # endpoint is plain HTTP, sidestepping TLS trust entirely - the
+          # same split-brain issuer/JWKS default every other Keycloak
+          # consumer chart in this repo already uses.
+          jwksUrl: {{ .Values.quotaEnforcement.keycloakJwksUrl }}
+{{- end }}

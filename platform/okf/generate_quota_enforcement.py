@@ -12,9 +12,11 @@ clause 3); enforcement config is generated, never hand-authored:
      chart because that chart owns the Kuadrant plane (the operator
      compiles policy CRs into the Limitador operand - the same flow the
      MaaS token limits already use in-cluster); guarded by
-     `.Values.quotaEnforcement.enabled` (default false) until the
-     operator attaches the agent chat path to a gateway HTTPRoute
-     (see the chart README's WP-54 section for the placement decision).
+     `.Values.quotaEnforcement.route.enabled` (default false), rendered
+     only by the Day2 `zuno-connectivity-link-quota-d1` Application once
+     the HTTPRoute it targets exists (its backend, tekos-frontend, is a
+     Day2 resource - see the chart README's WP-54 section for the
+     placement decision and the Day1/Day2 split rationale).
      Field shapes verified against the live CRDs via `oc explain`
      (rates: limit+window; counters: expression; when: predicate).
 
@@ -99,16 +101,20 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
     # its own `when` class-selector predicate, which is what actually
     # differentiates standard vs intensive at request time.
     lines: List[str] = [
-        # kuadrant.enabled, not just quotaEnforcement.enabled: this chart is
-        # rendered by BOTH the -d0 and -d1 ArgoCD Applications (operator
-        # install vs operand config); quotaEnforcement.enabled is a plain
-        # chart default with no per-Application override, so without this
-        # extra guard -d0 rendered these objects too, in the same explicit
-        # namespaces as -d1 - the two Applications then fought over
-        # ownership of the same live resources (ArgoCD SharedResourceWarning,
-        # confirmed live 2026-08-18, sync never settled). Only -d1 sets
-        # kuadrant.enabled: true.
-        "{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}",
+        # quotaEnforcement.route.enabled ALONE, not also kuadrant.enabled:
+        # this file is rendered by its own dedicated Day2 Application
+        # (zuno-connectivity-link-quota-d1, see
+        # gitops/apps/connectivity-link-quota/application-d1.yaml) with no
+        # d0/d1 split of its own, so there's no premature-operator-install
+        # phase to guard against - and adding a kuadrant.enabled requirement
+        # would force that Application to also set kuadrant.enabled: true,
+        # which would re-render the Kuadrant operand CR and ServiceMonitors
+        # (guarded by kuadrant.enabled alone) and fight
+        # zuno-connectivity-link-d1 for ownership of those (ArgoCD
+        # SharedResourceWarning, the same class of bug confirmed live
+        # 2026-08-18 that the -d0/-d1 kuadrant.enabled guard elsewhere in
+        # this chart already exists to prevent).
+        "{{- if .Values.quotaEnforcement.route.enabled }}",
         f"# GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:",
         f"# policies/quotas/quota-policy.yaml. Regenerate with:",
         f"#   {REGEN_CMD}",
@@ -117,9 +123,9 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
         f"# components/ai-gateway/app/quota_budgets.yaml). Kuadrant allows only",
         f"# one policy per targetRef at this level, so per-class limits share",
         f"# one CR - each limit entry's own `when` predicate selects the class.",
-        f"# Rendered only when .Values.quotaEnforcement.enabled is true AND the",
-        f"# operator has supplied the agent chat HTTPRoute this policy targets",
-        f"# (see this chart's README, WP-54 section).",
+        f"# Rendered only when .Values.quotaEnforcement.route.enabled is true",
+        f"# AND the operator has supplied the agent chat HTTPRoute this policy",
+        f"# targets (see this chart's README, WP-54 section).",
         "---",
         "apiVersion: kuadrant.io/v1",
         "kind: RateLimitPolicy",

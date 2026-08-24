@@ -30,9 +30,15 @@
 # wp-071-authorino-service-ca-trust-alignment.md for the full evidence.
 #
 # Guarded the same as templates/quota-demo-gateway.yaml (which creates the
-# zuno-agent-gateway this targets) - rollback is the same
-# quotaEnforcement.enabled: false switch.
-{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
+# zuno-agent-gateway this targets, and stays on the Day1
+# zuno-connectivity-link-d1 Application) - not quotaEnforcement.route.enabled,
+# which now also goes true on the separate Day2
+# zuno-connectivity-link-quota-d1 Application; this EnvoyFilter targets the
+# Gateway itself, not the backend-dependent HTTPRoute, so rendering it from
+# both would cause the exact SharedResourceWarning class of bug the
+# gateway/route values split exists to avoid. Rollback is the same
+# quotaEnforcement.gateway.enabled: false switch.
+{{- if and .Values.quotaEnforcement.gateway.enabled .Values.kuadrant.enabled }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:

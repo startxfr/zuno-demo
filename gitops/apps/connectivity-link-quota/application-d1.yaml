@@ -1,0 +1,44 @@
+---
+# Day2 counterpart to gitops/apps/connectivity-link/application-d1.yaml -
+# renders the SAME connectivity-link chart, but only the
+# tekos-quota-demo HTTPRoute + AuthPolicy (templates/quota-demo-route.yaml)
+# plus the RateLimitPolicy that targets it
+# (templates/quota-ratelimitpolicies.yaml), gated by
+# quotaEnforcement.route.enabled ALONE (not kuadrant.enabled - see those
+# templates' own comments: setting kuadrant.enabled true here too would
+# re-render the Kuadrant operand CR/ServiceMonitors, which are guarded by
+# kuadrant.enabled alone, and fight zuno-connectivity-link-d1 for ownership
+# of those). These reference the tekos-frontend backend Service, which is
+# a Day2 resource (ansible/roles/agents), so this Application is applied
+# by that same role (ansible/roles/agents/tasks/install.yml) after
+# zuno-api-d1/tekos-frontend exists - not by ansible/roles/connectivity_link
+# (Day1), which only renders the backend-independent Gateway/ConfigMap/Route
+# via zuno-connectivity-link-d1. See that chart's values.yaml
+# quotaEnforcement comment and README WP-54 section for the full split
+# rationale.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-connectivity-link-quota-d1
+  namespace: openshift-gitops
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/connectivity-link
+    helm:
+      releaseName: zuno-connectivity-link-quota-d1
+      values: |
+        quotaEnforcement:
+          route:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

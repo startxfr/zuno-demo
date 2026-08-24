@@ -1,4 +1,4 @@
-{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
+{{- if .Values.quotaEnforcement.route.enabled }}
 # GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:
 # policies/quotas/quota-policy.yaml. Regenerate with:
 #   python3 platform/okf/generate_quota_enforcement.py
@@ -7,9 +7,9 @@
 # components/ai-gateway/app/quota_budgets.yaml). Kuadrant allows only
 # one policy per targetRef at this level, so per-class limits share
 # one CR - each limit entry's own `when` predicate selects the class.
-# Rendered only when .Values.quotaEnforcement.enabled is true AND the
-# operator has supplied the agent chat HTTPRoute this policy targets
-# (see this chart's README, WP-54 section).
+# Rendered only when .Values.quotaEnforcement.route.enabled is true
+# AND the operator has supplied the agent chat HTTPRoute this policy
+# targets (see this chart's README, WP-54 section).
 ---
 apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
