@@ -116,19 +116,36 @@ project:
 
 kuadrant:
   enabled: false
-  # Enables the spec.authorino.listener.tls override in templates/kuadrant.yaml
-  # (backed by the Certificate in templates/certificate.yaml) so Authorino's
-  # own listener is TLS-enabled - required for DataScienceCluster's
-  # MaaSPrerequisitesAvailable condition. Off by default here, same
-  # "all default false, flipped at the Application layer" convention as
-  # operator/project/kuadrant above; set true via
-  # gitops/apps/connectivity-link/application-d1.yaml.
+  # Enables the spec.listener.tls override in templates/authorino.yaml so
+  # Authorino's own listener is TLS-enabled - required for
+  # DataScienceCluster's MaaSPrerequisitesAvailable condition (this
+  # comment previously, incorrectly, pointed at templates/kuadrant.yaml -
+  # that file's own comment has always explained why it CAN'T carry this
+  # override; templates/authorino.yaml is and always was the actual patch
+  # target). Off by default here, same "all default false, flipped at the
+  # Application layer" convention as operator/project/kuadrant above; set
+  # true via gitops/apps/connectivity-link/application-d1.yaml.
+  #
+  # certSecretName (WP-071) names an OpenShift Service-CA-issued Secret,
+  # NOT a cert-manager Certificate - there is no templates/certificate.yaml
+  # any more. The live diagnostic behind WP-071 established that RHCL's
+  # generated `kuadrant-auth-service` Envoy cluster (the one Kuadrant's
+  # wasm-shim actually dials for every AuthPolicy ext_authz Check) trusts
+  # OpenShift's service-ca.crt, not any cert-manager root - so no
+  # Certificate issued by any ClusterIssuer (including the previous
+  # vault-issuer-istio) can satisfy the real caller. Fixed by annotating
+  # the operator-owned Authorino Service with
+  # service.beta.openshift.io/serving-cert-secret-name: <this value>
+  # (ansible/roles/connectivity_link/tasks/install.yml) - this CRD has no
+  # field to request that annotation through the CR. This value MUST match
+  # the literal secret name hardcoded in that Ansible task; nothing keeps
+  # them in sync automatically, same manual-sync convention as
+  # operandNamespace below. dnsNames is gone: the Service CA Operator
+  # derives the Service's DNS names from the Service object itself, no
+  # override needed.
   authorinoTls:
     enabled: false
-    certSecretName: authorino-server-tls
-    dnsNames:
-      - authorino-authorino-authorization.kuadrant-system.svc
-      - authorino-authorino-authorization.kuadrant-system.svc.cluster.local
+    certSecretName: authorino-server-cert
 
 # Referenced by templates/kuadrant.yaml - kept in sync with
 # project.project.name above (must match, since that's what actually

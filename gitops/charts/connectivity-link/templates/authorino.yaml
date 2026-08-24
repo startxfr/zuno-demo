@@ -9,9 +9,19 @@
 # directly. Only spec.listener.tls is set here (not a full spec
 # re-declaration) so this only ever asserts that one sub-field, leaving the
 # rest of the object - clusterWide, oidcServer, tracing, etc., all populated
-# by the Kuadrant operator - alone. Sync-wave 30: after the Kuadrant CR
-# (20, which triggers the operator to create this object) and the
-# Certificate below (10, so the secret exists first).
+# by the Kuadrant operator - alone.
+#
+# certSecretName (WP-071) is NOT backed by a Certificate in this chart -
+# there is no templates/certificate.yaml any more. It names a Secret
+# populated by the OpenShift Service CA Operator, requested by annotating
+# the operator-owned Authorino Service directly
+# (ansible/roles/connectivity_link/tasks/install.yml, since this CRD has
+# no field to request that annotation through the CR either - same "no
+# passthrough field" gap). That means this CR can be applied (sync-wave
+# 30, after the Kuadrant CR at 20) before the Secret exists: Authorino's
+# pod will sit in ContainerCreating until the Ansible annotate task runs
+# and the Service CA Operator issues the Secret. Expected, not a
+# regression - see the Day-1 precheck for this role and WP-071.
 apiVersion: operator.authorino.kuadrant.io/v1beta1
 kind: Authorino
 metadata:

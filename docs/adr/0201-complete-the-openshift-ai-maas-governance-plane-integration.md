@@ -1,8 +1,20 @@
 # ADR-0201: Complete the OpenShift AI MaaS governance plane integration
 
-- **Status:** Partially implemented (local model published and consumable through MaaS, governance pairing proven live; the endpoint-picker TLS filter-chain mismatch is fixed and verified live - the authenticated request now clears it and reaches the gateway's Kuadrant `AuthPolicy` enforcement, where it 500s on WP-54/ADR-0511's already-documented, already-escalated Kuadrant wasm-shim defect - not resolvable from this repo, staying blocked on that same upstream fix; see 2026-08-23 notes, most recent first)
+- **Status:** Partially implemented - Authorino Service CA trust fix merged and live-verified 2026-08-24 (WP-071); the ext_authz transport path through `maas-default-gateway` now works end to end (`401`, not `500`, zero `CERTIFICATE_VERIFY_FAILED`, Authorino's own log shows the request arriving). The previously-flagged RHOAI payload-processing `EnvoyFilter` subfilter-anchor mismatch (part 3's other finding: MaaS's own auth-enforcement wiring never attaches to the live filter chain) remains separately open and unaffected by this fix - see part 3 below.
+
+## Implementation note (2026-08-24, part 5) — root cause corrected: an Authorino/Envoy TLS trust mismatch, not a wasm-shim binary defect (WP-071)
+
+Part 4's conclusion - "the same upstream Kuadrant wasm-shim defect ADR-0511 root-caused, not resolvable from this repo" - is **superseded and incorrect**. A live Envoy `config_dump`/`clusters` diagnostic against the `kuadrant-auth-service` cluster (the exact cluster the wasm-shim dials for every AuthPolicy ext_authz `Check`, on both `maas-default-gateway` and `zuno-agent-gateway`) showed: the cluster exists, resolves, is EDS-healthy, carries `http2_protocol_options: {}` and a TLS transport socket - and its `trusted_ca` is `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, OpenShift's own Service CA. Authorino's listener certificate was issued by `vault-issuer-istio` (a cert-manager `ClusterIssuer`; `gitops/charts/connectivity-link/templates/certificate.yaml`, now deleted). Envoy therefore failed TLS verification of the Authorino listener with `CERTIFICATE_VERIFY_FAILED` before any gRPC `Authorization/Check` request reached Authorino - the wasm-shim dispatch itself succeeds and was never at fault. `gRPC status code is not OK` (part 4's symptom) was the wasm-shim's own surfacing of that transport-layer TLS failure, not a serialization/protobuf defect in `kuadrant-operator-wasm`.
+
+A second, distinct bug was found behind the same misdiagnosis: Kuadrant's own generated `EnvoyFilter` never adds TLS to the `kuadrant-auth-service` cluster, for any gateway - confirmed byte-identical on both. `maas-default-gateway` only got a working TLS connection because RHOAI's `odh-model-controller` separately owns a second `EnvoyFilter` (`maas-default-gateway-authn-ssl`, not in this repo) that independently `ADD`s a TLS-wrapped version of the same cluster at `priority: -1`. This is why the TLS-trust fix alone was sufficient for MaaS but not for WP-54/`zuno-agent-gateway`, which has no such controller - see ADR-0511's 2026-08-24 note for that half of the fix.
+
+**Fix (WP-071):** Authorino's listener now serves an OpenShift service-serving certificate for `authorino-authorino-authorization.kuadrant-system.svc`, requested via a `service.beta.openshift.io/serving-cert-secret-name: authorino-server-cert` annotation patched onto the operator-owned Service (`ansible/roles/connectivity_link/tasks/install.yml`, since neither the `Authorino` nor `Kuadrant` CRD exposes a field to request this through the CR). Verified live 2026-08-24 on `maas-default-gateway`: repeated `401` responses, zero `CERTIFICATE_VERIFY_FAILED`, `cx_connect_fail` delta `0`, Authorino's own log shows the request arriving and being denied for the (deliberately invalid) test token.
+
+The separately-diagnosed port-9002 EPP TLS filter-chain fix (part 3/4) remains correctly fixed and unaffected by this correction. The RHOAI payload-processing filter-anchor gap (parts 1-2, below) remains a distinct, still-open issue, out of WP-071's scope - MaaS's own governance/auth-enforcement wiring is proven *transport-capable* now, not yet proven *attached* to live model requests.
 
 ## Implementation note (2026-08-23, part 4) — EPP fix verified live: the TLS reset is gone, the request now hits WP-54's already-known Kuadrant wasm-shim defect
+
+> **Superseded by part 5 above (2026-08-24):** the "Kuadrant wasm-shim defect" this note describes was a misdiagnosis - see part 5 for the corrected root cause (an Authorino/Envoy TLS trust mismatch) and the fix (WP-071). Left intact below as an accurate record of what was observed and reasoned at the time.
 
 Applied part 3's proposed fix: `spec.router.scheduler.annotations:
 {traffic.sidecar.istio.io/excludeInboundPorts: "9002"}` on the `gpt-oss-20b`
@@ -354,7 +366,7 @@ this is a genuine operator/user decision (accept a second GPU node, or
 get an OpenShift AI 3.5 documentation confirmation that `ExternalModel`
 intentionally supports internal cluster-local endpoints), not a
 credential or code gap.
-- **Target:** v0.5 (retargeted to v0.5 on 2026-08-24, superseding this same-day morning's move to v0.3 — the user created a dedicated "make MaaS live and used by agents" milestone, a better-scoped home than the generic v0.3 catch-all; the underlying reason is unchanged, still blocked on the upstream Kuadrant wasm-shim defect (see WP-54/ADR-0511's own note) with no repo-side path to resolution. Originally v0.2.)
+- **Target:** v0.5 (retargeted to v0.5 on 2026-08-24, superseding this same-day morning's move to v0.3 — the user created a dedicated "make MaaS live and used by agents" milestone, a better-scoped home than the generic v0.3 catch-all; at the time of this move, believed blocked on an upstream Kuadrant wasm-shim defect with no repo-side path to resolution — corrected later the same day by WP-071, see part 5 below. Originally v0.2. Grouping stays valid regardless of the corrected root cause.)
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
 

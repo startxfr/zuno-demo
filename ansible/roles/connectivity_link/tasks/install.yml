@@ -84,3 +84,82 @@
           enabled: true
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15
+
+# WP-071: Authorino's gRPC listener TLS certificate must chain to
+# OpenShift's Service CA, not any cert-manager ClusterIssuer - RHCL's
+# generated Envoy `kuadrant-auth-service` cluster only trusts
+# service-ca.crt (see docs/roadmap/work-packages/
+# wp-071-authorino-service-ca-trust-alignment.md for the live diagnostic
+# evidence). Neither the Authorino nor Kuadrant CRD exposes a field to
+# request this annotation through the operand CR (confirmed: `oc explain
+# authorino.spec`/`kuadrant.spec` have no service/serviceTemplate stanza),
+# so - same shape as ansible/roles/mariadb/tasks/install.yml's
+# appProtocol patch on the operator-owned mariadb Service - this patches
+# the annotation on after the authorino-operator creates the Service.
+# The secret name here MUST match gitops/charts/connectivity-link/
+# values.yaml's kuadrant.authorinoTls.certSecretName (kept in sync
+# manually, same convention as that chart's operandNamespace comment).
+# Idempotent; re-run after any authorino-operator upgrade that recreates
+# the Service.
+- name: "connectivity_link | wait for the authorino-authorino-authorization Service (WP-071)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    namespace: kuadrant-system
+    name: authorino-authorino-authorization
+  register: _connectivity_link_authorino_svc
+  until: (_connectivity_link_authorino_svc.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+# Two branches, not one k8s_json_patch call: `op: add` on
+# /metadata/annotations/<key> requires the parent annotations map to
+# already exist as an object - Kubernetes omits empty maps entirely, so if
+# the authorino-operator ever creates this Service with zero annotations,
+# a single "add the leaf key" patch fails with a path-not-found error.
+# The first branch initializes the whole (single-key) map when absent; the
+# second safely adds/overwrites just this one key, preserving any other
+# annotations, when the map already exists. (Live-tested 2026-08-24: this
+# Service currently has zero annotations, so the first branch is the one
+# that actually runs today - both are kept for correctness across
+# operator upgrades.)
+- name: "connectivity_link | annotate Authorino Service for OpenShift Service CA (create annotations map)"
+  kubernetes.core.k8s_json_patch:
+    api_version: v1
+    kind: Service
+    namespace: kuadrant-system
+    name: authorino-authorino-authorization
+    patch:
+      - op: add
+        path: /metadata/annotations
+        value:
+          service.beta.openshift.io/serving-cert-secret-name: authorino-server-cert
+  when: (_connectivity_link_authorino_svc.resources[0].metadata.annotations | default({}) | length) == 0
+
+- name: "connectivity_link | annotate Authorino Service for OpenShift Service CA (existing annotations map)"
+  kubernetes.core.k8s_json_patch:
+    api_version: v1
+    kind: Service
+    namespace: kuadrant-system
+    name: authorino-authorino-authorization
+    patch:
+      - op: add
+        path: /metadata/annotations/service.beta.openshift.io~1serving-cert-secret-name
+        value: authorino-server-cert
+  when: (_connectivity_link_authorino_svc.resources[0].metadata.annotations | default({}) | length) > 0
+
+# Diagnostic wait, not a hard install gate: if the Service CA Operator is
+# slow or the annotation didn't stick, the Day-1 precheck below surfaces
+# it as a genuine regression on the next `make day1 check
+# connectivity-link` run rather than failing install here.
+- name: "connectivity_link | wait for the Service-CA-generated authorino-server-cert Secret (WP-071)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: kuadrant-system
+    name: authorino-server-cert
+  register: _connectivity_link_authorino_cert_secret
+  until: (_connectivity_link_authorino_cert_secret.resources | default([]) | length) > 0
+  retries: 12
+  delay: 5
+  failed_when: false

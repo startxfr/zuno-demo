@@ -117,6 +117,50 @@ solely to satisfy a DataScienceCluster readiness precondition
 (`authorino.yaml`'s own comment); this JWT AuthPolicy was very
 plausibly the first time anything actually exercised it end-to-end.
 
+**Correction (2026-08-24, WP-071): the vault-issuer-istio fix above was
+itself incomplete as a trust design, and the wasm-shim symptom it later
+led to was misdiagnosed as an unfixable upstream defect.** A live Envoy
+`config_dump` on `kuadrant-auth-service` — the specific cluster Kuadrant's
+wasm-shim dials for every AuthPolicy ext_authz `Check` call, not a generic
+mesh sidecar-to-sidecar call — shows its `trusted_ca` is
+`/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, OpenShift's
+own Service CA, not any cert-manager-issued root, mesh or otherwise.
+`kuadrant-system` was never onboarded into the Istio mesh (no
+`istio-injection` label, no `DestinationRule`/`PeerAuthentication`
+targeting it), so no consumer — mesh or otherwise — was ever validating
+Authorino's cert against the mesh's SPIFFE root; the 2026-08-18 fix
+"worked" only in the sense that it happened not to make things worse for
+this listener. The actual fix: annotate the operator-owned
+`authorino-authorino-authorization` Service with
+`service.beta.openshift.io/serving-cert-secret-name: authorino-server-cert`
+(`ansible/roles/connectivity_link/tasks/install.yml`, since neither the
+`Authorino` nor `Kuadrant` CRD exposes a field to request this through the
+CR — same "no passthrough field" gap `values.yaml`'s `authorinoTls`
+comment documents). `templates/certificate.yaml` (the cert-manager
+`Certificate`) is deleted; there is no Certificate in this chart any more.
+Verified live 2026-08-24 on `maas-default-gateway`: `401`, not `500`,
+zero `CERTIFICATE_VERIFY_FAILED`, Authorino's own log shows the request
+arriving. See
+`docs/roadmap/work-packages/wp-071-authorino-service-ca-trust-alignment.md`
+for the full root-cause evidence.
+
+**A second, distinct bug behind this same misdiagnosis (WP-071, found
+2026-08-24): Kuadrant's own generated `EnvoyFilter` never adds TLS to the
+`kuadrant-auth-service` cluster, for any gateway.** `maas-default-gateway`
+only got a TLS-wrapped cluster because RHOAI's `odh-model-controller`
+independently owns a *second*, non-Kuadrant `EnvoyFilter`
+(`maas-default-gateway-authn-ssl`, not in this repo) that `ADD`s its own
+TLS-wrapped version of the same cluster name at `priority: -1`, winning
+over Kuadrant's plain one. `zuno-agent-gateway` has no RHOAI controller
+watching it, so its ext_authz cluster stayed plaintext regardless of which
+CA signed Authorino's cert — a protocol mismatch against a TLS-only
+listener, not a trust mismatch (`rq_error`, not `cx_connect_fail`).
+`templates/quota-demo-gateway-authn-ssl.yaml` fixes this by mirroring
+RHOAI's exact pattern: a small `EnvoyFilter` scoped to `zuno-agent-gateway`
+that `ADD`s the same TLS-wrapped cluster at `priority: -1`. Verified live
+2026-08-24: `401`, not `500`, Authorino's own log shows the request
+arriving through `zuno-agent-gateway` too.
+
 **Rollback:** set `quotaEnforcement.enabled: false` and push — ArgoCD's
 `selfHeal` removes all of it. Nothing outside this chart references any
 object rendered here.
@@ -126,7 +170,10 @@ object rendered here.
 with an explicit `429` after the `standard` class's per-user limit (60
 req/5m); `oc get limitador -n kuadrant-system -o yaml` should show the
 compiled `zuno-quota-*` descriptors alongside the pre-existing MaaS
-ones. (Evidence recorded in `docs/roadmap/work-packages/wp-54-quota-policy-and-kuadrant-translation.md`'s State log once run.)
+ones. The ext_authz transport path itself (WP-071) is live-verified as of
+2026-08-24 — the remaining step is running this exact quota-exceedance
+pass with a real token, no longer blocked by any TLS or wasm-shim defect.
+(Evidence recorded in `docs/roadmap/work-packages/wp-54-quota-policy-and-kuadrant-translation.md`'s State log once run.)
 
 Identity/key semantics (also in the generated file's header): user =
 `auth.identity.sub`; group = the caller's sorted group set joined with

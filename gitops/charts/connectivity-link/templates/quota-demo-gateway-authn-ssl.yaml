@@ -1,0 +1,80 @@
+# WP-071: Kuadrant's own generated EnvoyFilter (kuadrant-<gateway>, wave
+# rendered by the RHCL/Kuadrant operator, never hand-edited by us) never
+# adds a TLS transport_socket to the kuadrant-auth-service cluster it
+# creates for ext_authz - confirmed live and byte-identical on both
+# maas-default-gateway and zuno-agent-gateway. maas-default-gateway only
+# gets a working TLS connection to Authorino because RHOAI's
+# odh-model-controller separately owns a SECOND EnvoyFilter
+# (maas-default-gateway-authn-ssl, not in this repo, not ours to touch)
+# that ADDs its own TLS-wrapped version of the same cluster name at
+# priority: -1, winning over Kuadrant's plain one. zuno-agent-gateway has
+# no RHOAI controller watching it, so nothing plays that role here -
+# without this file its ext_authz cluster stays plaintext against a
+# TLS-only Authorino listener (rq_error, not cx_connect_fail - a protocol
+# mismatch, not a trust mismatch).
+#
+# This mirrors RHOAI's own pattern exactly (same ADD operation, same
+# cluster shape, same trusted_ca, same priority: -1) rather than
+# hand-editing Kuadrant's generated EnvoyFilter - a NEW filter is not "the
+# RHCL/Kuadrant-generated EnvoyFilter" the WP-071 brief says never to
+# hand-edit. trusted_ca must match
+# gitops/charts/connectivity-link/values.yaml's kuadrant.authorinoTls
+# comment: Authorino's listener now serves an OpenShift Service-CA
+# certificate, and this is the exact CA file every in-cluster pod mounts
+# at this path by default - no cert-manager Certificate or Secret
+# reference needed here, unlike the Gateway's own listener cert.
+#
+# Live-verified 2026-08-24: 401 (not 500) through zuno-agent-gateway, zero
+# CERTIFICATE_VERIFY_FAILED, Authorino's own log shows the request
+# arriving. See docs/roadmap/work-packages/
+# wp-071-authorino-service-ca-trust-alignment.md for the full evidence.
+#
+# Guarded the same as templates/quota-demo-gateway.yaml (which creates the
+# zuno-agent-gateway this targets) - rollback is the same
+# quotaEnforcement.enabled: false switch.
+{{- if and .Values.quotaEnforcement.enabled .Values.kuadrant.enabled }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: zuno-agent-gateway-authn-ssl
+  namespace: openshift-ingress
+  labels:
+    zuno.io/managed-by: argocd
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  priority: -1
+  configPatches:
+    - applyTo: CLUSTER
+      match:
+        cluster:
+          service: authorino-authorino-authorization.kuadrant-system.svc.cluster.local
+      patch:
+        operation: ADD
+        value:
+          name: kuadrant-auth-service
+          type: STRICT_DNS
+          connect_timeout: 1s
+          lb_policy: ROUND_ROBIN
+          http2_protocol_options: {}
+          load_assignment:
+            cluster_name: kuadrant-auth-service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: authorino-authorino-authorization.kuadrant-system.svc.cluster.local
+                          port_value: 50051
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              common_tls_context:
+                validation_context:
+                  trusted_ca:
+                    filename: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: zuno-agent-gateway
+{{- end }}

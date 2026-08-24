@@ -1,25 +1,45 @@
 # WP-071: Align Authorino TLS trust with Kuadrant gateway service CA
 
-- **State:** To be implemented (2026-08-24) - root cause confirmed live. The
-  Kuadrant-generated `kuadrant-auth-service` Envoy cluster exists, resolves the
-  Authorino endpoint, marks it HEALTHY, and is configured for HTTP/2 over TLS,
-  but every connection fails before any gRPC request reaches Authorino. Envoy
-  logs show `CERTIFICATE_VERIFY_FAILED` / `unable to get local issuer
-  certificate`; cluster counters show `cx_connect_fail +1`, `rq_error +1`,
-  `rq_total 0`. The live Envoy cluster trusts
+- **State:** Done (2026-08-24) - root cause confirmed and fixed live on both
+  consumer gateways. The original diagnosis held for `maas-default-gateway`:
+  the Kuadrant-generated `kuadrant-auth-service` Envoy cluster trusted
   `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, while the
-  Zuno-managed Authorino listener currently serves a certificate issued by
-  `vault-issuer-istio`. The resulting trust mismatch is surfaced by
-  `kuadrant-wasm-shim` as gRPC status 14 and HTTP 500. This WP replaces the
-  incompatible Authorino certificate source with an OpenShift service-serving
-  certificate and adds regression checks.
+  Zuno-managed Authorino listener served a certificate issued by
+  `vault-issuer-istio`. Fixed by annotating the operator-owned
+  `authorino-authorino-authorization` Service with
+  `service.beta.openshift.io/serving-cert-secret-name: authorino-server-cert`
+  and repointing Authorino's `listener.tls.certSecretRef` at the resulting
+  Service-CA-issued Secret. **A second, distinct bug was found live on
+  `zuno-agent-gateway` (WP-54's gateway) while validating this fix:**
+  Kuadrant's own generated `EnvoyFilter` never adds TLS to the
+  `kuadrant-auth-service` cluster it creates, for any gateway - confirmed
+  byte-identical on both. `maas-default-gateway` only worked because RHOAI's
+  `odh-model-controller` separately owns a second `EnvoyFilter`
+  (`maas-default-gateway-authn-ssl`, not in this repo) that independently
+  `ADD`s a TLS-wrapped version of the same cluster at `priority: -1`.
+  `zuno-agent-gateway` has no such controller, so a new, hand-authored
+  `EnvoyFilter` (`templates/quota-demo-gateway-authn-ssl.yaml`) mirrors that
+  exact pattern. Both fixes live-tested repeatedly and confirmed on the
+  cluster before being committed: `401`, not `500`, zero
+  `CERTIFICATE_VERIFY_FAILED`, `cx_connect_fail` delta `0`, Authorino's own
+  log shows the request arriving, on both `maas-default-gateway` and
+  `zuno-agent-gateway`. See ADR-0201/ADR-0511's 2026-08-24 implementation
+  notes for the full evidence trail, including two dead ends ruled out live:
+  `Kuadrant.spec.mtls` (requires `kuadrant-system` to be mesh-onboarded with
+  sidecar injection, which it isn't - tested and rolled back cleanly) and an
+  ArgoCD-self-heal false negative (a live-only CR edit got reverted
+  mid-test, briefly making the fix look broken).
 - **ADRs:** ADR-0201, ADR-0511
 - **Depends on:** WP-27 (MaaS governance integration), WP-54 (Kuadrant quota
   enforcement), Red Hat Connectivity Link / Kuadrant operand installed and
   Authorino TLS listener enabled.
 - **Unblocks:** completion of WP-27 and WP-54 authenticated/governed request
   paths.
-- **Estimated files touched:** ~7
+- **Estimated files touched:** ~7 (actual: 14 — the brief's own "Update
+  roadmap state" step and "Status updates" section touch both WP-27's and
+  WP-54's tracker rows *and* brief files, plus both ADRs, more than the
+  headline estimate; a second, distinct `EnvoyFilter` fix for
+  `zuno-agent-gateway`, found live while validating this WP, added two more)
 
 > Execute this brief as a standalone task from the repository root. Read
 > ADR-0201 and ADR-0511 before editing. Preserve operator-owned resources and

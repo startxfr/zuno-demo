@@ -1,0 +1,143 @@
+---
+# Shared by precheck.yml's WP-071 blocks - included once per consumer
+# gateway (maas-default-gateway, zuno-agent-gateway), parameterized by
+# wp071_gateway_pod (the Gateway's istio-proxy pod name) and
+# wp071_route_lookup_name (the openshift-ingress Route fronting it).
+# Mirrors WP-071's own Acceptance Checks C/D/E exactly, automated: same
+# `openssl verify` command against the live service-ca.crt and Authorino's
+# cert, same before/after `/clusters?format=json` delta on
+# cx_connect_fail, same "401/403 proves transport, 500 does not"
+# tolerance. No community.crypto collection needed (not in
+# ansible/requirements.yml) - shells out to the local openssl CLI, same as
+# the brief's own check.
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: fetch the live service-ca.crt from this gateway's istio-proxy"
+  kubernetes.core.k8s_exec:
+    namespace: openshift-ingress
+    pod: "{{ wp071_gateway_pod }}"
+    container: istio-proxy
+    command: cat /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+  register: _wp071_service_ca_cat
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: write both certs to a throwaway temp dir"
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: wp071-{{ wp071_gateway_pod }}
+  register: _wp071_tmpdir
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: write the gateway's service-ca.crt and Authorino's cert"
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ _wp071_tmpdir.path }}/{{ item.name }}"
+    mode: "0600"
+  loop:
+    - { name: service-ca.crt, content: "{{ _wp071_service_ca_cat.stdout }}" }
+    - { name: authorino.crt, content: "{{ _wp071_cert_secret.resources[0].data['tls.crt'] | b64decode }}" }
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: verify Authorino's cert against this gateway's exact trusted CA"
+  ansible.builtin.command:
+    cmd: "openssl verify -CAfile {{ _wp071_tmpdir.path }}/service-ca.crt {{ _wp071_tmpdir.path }}/authorino.crt"
+  register: _wp071_openssl_verify
+  changed_when: false
+  failed_when: false
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: clean up the temp dir"
+  ansible.builtin.file:
+    path: "{{ _wp071_tmpdir.path }}"
+    state: absent
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: assert the cert chain verifies"
+  ansible.builtin.assert:
+    that: "'OK' in _wp071_openssl_verify.stdout"
+    fail_msg: >-
+      Authorino's certificate does NOT verify against the exact CA this
+      gateway's Envoy trusts (WP-071 regression):
+      {{ _wp071_openssl_verify.stdout }} {{ _wp071_openssl_verify.stderr }}
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: snapshot kuadrant-auth-service cluster stats (before)"
+  kubernetes.core.k8s_exec:
+    namespace: openshift-ingress
+    pod: "{{ wp071_gateway_pod }}"
+    container: istio-proxy
+    command: pilot-agent request GET /clusters?format=json
+  register: _wp071_clusters_before
+  changed_when: false
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: parse the before snapshot"
+  ansible.builtin.set_fact:
+    _wp071_before_stats: >-
+      {{
+        (_wp071_clusters_before.stdout | from_json).cluster_statuses
+        | selectattr('name', 'equalto', 'kuadrant-auth-service') | list
+      }}
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: assert kuadrant-auth-service is present in live Envoy config"
+  ansible.builtin.assert:
+    that: (_wp071_before_stats | length) > 0
+    fail_msg: >-
+      kuadrant-auth-service cluster missing from {{ wp071_gateway_pod }}'s
+      live Envoy config - either the premise behind WP-071 changed, or
+      Kuadrant hasn't reconciled this AuthPolicy yet.
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: look up the {{ wp071_route_lookup_name }} Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: openshift-ingress
+    name: "{{ wp071_route_lookup_name }}"
+  register: _wp071_route
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: issue one intentionally-unauthenticated protected request"
+  ansible.builtin.uri:
+    url: "https://{{ _wp071_route.resources[0].spec.host }}/"
+    headers:
+      Authorization: "Bearer wp071-precheck-invalid-token"
+    validate_certs: false
+    status_code: [200, 401, 403, 429, 500]
+  register: _wp071_probe
+  failed_when: false
+  when: (_wp071_route.resources | default([]) | length) > 0
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: snapshot kuadrant-auth-service cluster stats (after)"
+  kubernetes.core.k8s_exec:
+    namespace: openshift-ingress
+    pod: "{{ wp071_gateway_pod }}"
+    container: istio-proxy
+    command: pilot-agent request GET /clusters?format=json
+  register: _wp071_clusters_after
+  changed_when: false
+  when: (_wp071_route.resources | default([]) | length) > 0
+
+- name: "connectivity_link | WP-071 [{{ wp071_gateway_pod }}]: assert no new cx_connect_fail and the probe wasn't a TLS-failure 500"
+  vars:
+    wp071_after_stats: >-
+      {{
+        (_wp071_clusters_after.stdout | from_json).cluster_statuses
+        | selectattr('name', 'equalto', 'kuadrant-auth-service') | list | first
+      }}
+    wp071_stat: >-
+      {{
+        wp071_after_stats.host_statuses[0].stats
+        | selectattr('name', 'equalto', 'cx_connect_fail') | map(attribute='value') | list
+        | first | default(0)
+      }}
+    wp071_stat_before: >-
+      {{
+        _wp071_before_stats[0].host_statuses[0].stats
+        | selectattr('name', 'equalto', 'cx_connect_fail') | map(attribute='value') | list
+        | first | default(0)
+      }}
+  ansible.builtin.assert:
+    that:
+      - (_wp071_probe.status | default(0) | int) != 500
+      - (wp071_stat | int) == (wp071_stat_before | int)
+    fail_msg: >-
+      Protected request through {{ wp071_gateway_pod }} returned
+      {{ _wp071_probe.status | default('no response') }} and/or
+      cx_connect_fail increased ({{ wp071_stat_before }} ->
+      {{ wp071_stat }}) - Authorino TLS trust regression (WP-071). A
+      401/403/429 is fine here; a 500 with CERTIFICATE_VERIFY_FAILED-shaped
+      Envoy logs is not.
+  when: (_wp071_route.resources | default([]) | length) > 0

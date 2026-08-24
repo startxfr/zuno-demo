@@ -14,6 +14,20 @@
   and cleanly DENYs an expired one; the same fresh token through the real
   gateway still 500s. Not fixable from this repo — flagging for upstream
   Red Hat Connectivity Link, staying `Operator pending`.)
+  **2026-08-24: retracted — see WP-071.** The wasm-shim binary was never
+  the fault. Live diagnosis found Envoy's `kuadrant-auth-service` cluster
+  trusts OpenShift's `service-ca.crt`, while Authorino's cert was issued
+  by `vault-issuer-istio` — a locally-fixable TLS trust mismatch, not an
+  upstream defect. A second gap was specific to this gateway: Kuadrant's
+  own generated `EnvoyFilter` never adds TLS to the ext_authz cluster for
+  any gateway; `maas-default-gateway` only worked via a separate
+  RHOAI-owned filter this gateway never had. WP-071 fixed both (Authorino
+  Service CA cert + a new mirroring `EnvoyFilter`) and verified live:
+  repeated `401` responses through `zuno-agent-gateway`, zero
+  `CERTIFICATE_VERIFY_FAILED`, `cx_connect_fail` delta `0`, Authorino's own
+  log shows the request arriving. The request-limit half of this demo is
+  no longer blocked — only the final 429-exceedance acceptance run (real
+  token, repeated requests) remains, a normal remaining task.
   **Placement decision (Part B step 5):** Kuadrant-native —
   the generated per-class `RateLimitPolicy`s live in the
   connectivity-link chart (it owns the Kuadrant plane), values-gated
@@ -118,10 +132,11 @@ generator's output.
 Apply/sync the generated chart; demo: one user exceeds a request limit
 (explicit quota error), token-budget exhaustion visible in metrics;
 confirm counters keyed correctly per dimension in Limitador.
-**Blocked as of 2026-08-21** on a Kuadrant wasm-shim defect external to
-this repo (ADR-0511's 2026-08-21 note) — the request-limit half of this
-demo cannot complete until Red Hat ships a fix or a workaround is found;
-re-attempt after any Connectivity Link operator upgrade.
+**Unblocked 2026-08-24 (WP-071)** — the 2026-08-21 wasm-shim diagnosis is
+retracted; the real cause (an Authorino/Envoy TLS trust mismatch plus a
+gateway-specific missing-TLS gap) is fixed and live-verified. Remaining:
+run the actual 429-exceedance pass with a real token — a normal
+acceptance step, not blocked by any external defect.
 
 ## Status updates (then re-run check_docs.py)
 

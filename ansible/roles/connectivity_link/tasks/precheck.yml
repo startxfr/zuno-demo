@@ -33,3 +33,101 @@
 
 - name: "connectivity_link | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# --- WP-071 regression checks: Authorino TLS trust with the RHCL-
+# generated Envoy kuadrant-auth-service cluster, on both consumer
+# gateways (maas-default-gateway/WP-27, zuno-agent-gateway/WP-54). Unlike
+# the state-detection block above (never fails), these are meant to fail
+# `make day1 check connectivity-link` if the fix regresses - each block
+# skips gracefully (no assert) when its prerequisite resource isn't
+# found, so this stays safe on environments without Kuadrant/MaaS/quota
+# enabled. Does not require a valid user token to prove the ext_authz
+# transport path: a 401/403 produced by Authorino is sufficient; a 500
+# from a TLS failure is not (WP-071 brief, step 5).
+- name: "connectivity_link | WP-071: look up the Authorino CR"
+  kubernetes.core.k8s_info:
+    api_version: operator.authorino.kuadrant.io/v1beta1
+    kind: Authorino
+    name: authorino
+    namespace: kuadrant-system
+  register: _wp071_authorino_cr
+  when: (_connectivity_link_kuadrant_lookup.resources | default([]) | length) > 0
+
+- name: "connectivity_link | WP-071: assert Authorino TLS listener uses the Service CA secret"
+  ansible.builtin.assert:
+    that:
+      - _wp071_authorino_cr.resources[0].spec.listener.tls.enabled | bool
+      - _wp071_authorino_cr.resources[0].spec.listener.tls.certSecretRef.name == 'authorino-server-cert'
+    fail_msg: >-
+      Authorino's spec.listener.tls is not pointed at the Service-CA
+      secret (WP-071 regression) - got
+      {{ _wp071_authorino_cr.resources[0].spec.listener.tls | default('unset') }}.
+      ArgoCD self-heal reverts a live-only patch of this CR within
+      minutes - the fix must live in gitops/charts/connectivity-link's
+      values.yaml/authorino.yaml, not be reapplied by hand.
+  when: (_wp071_authorino_cr.resources | default([]) | length) > 0
+
+- name: "connectivity_link | WP-071: look up the authorino-server-cert Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: kuadrant-system
+    name: authorino-server-cert
+  register: _wp071_cert_secret
+  when: (_connectivity_link_kuadrant_lookup.resources | default([]) | length) > 0
+
+- name: "connectivity_link | WP-071: assert the Service-CA Secret exists with tls.crt/tls.key"
+  ansible.builtin.assert:
+    that:
+      - (_wp071_cert_secret.resources | default([]) | length) > 0
+      - "'tls.crt' in _wp071_cert_secret.resources[0].data"
+      - "'tls.key' in _wp071_cert_secret.resources[0].data"
+    fail_msg: >-
+      authorino-server-cert Secret is missing or incomplete in
+      kuadrant-system - the Service annotation
+      (ansible/roles/connectivity_link/tasks/install.yml) may not have
+      been applied, or the Service CA Operator hasn't reconciled it yet
+      (WP-071).
+  when: (_connectivity_link_kuadrant_lookup.resources | default([]) | length) > 0
+
+# One block per consumer gateway: locate its pod, verify the Authorino
+# cert chains to the exact CA that gateway's Envoy trusts (same
+# `openssl verify` command as WP-071's Acceptance Check C, run from the
+# control host against temp files), then issue one deliberately-
+# unauthenticated request and confirm it's answered (not a 500) with no
+# new connect failures on the kuadrant-auth-service cluster. Each block
+# is guarded on its own Gateway pod existing, so this is safe to run
+# whether or not MaaS/quota-enforcement are enabled on a given cluster.
+- name: "connectivity_link | WP-071: locate the maas-default-gateway pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: openshift-ingress
+    label_selectors:
+      - "gateway.networking.k8s.io/gateway-name=maas-default-gateway"
+  register: _wp071_maas_gw_pod
+  when: (_wp071_cert_secret.resources | default([]) | length) > 0
+  ignore_errors: true
+
+- name: "connectivity_link | WP-071: verify TLS trust and ext_authz transport through maas-default-gateway"
+  when: (_wp071_maas_gw_pod.resources | default([]) | length) > 0
+  vars:
+    wp071_gateway_pod: "{{ _wp071_maas_gw_pod.resources[0].metadata.name }}"
+    wp071_route_lookup_name: maas-gateway-route
+  ansible.builtin.include_tasks: verify_ext_authz_tls.yml
+
+- name: "connectivity_link | WP-071: locate the zuno-agent-gateway pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: openshift-ingress
+    label_selectors:
+      - "gateway.networking.k8s.io/gateway-name=zuno-agent-gateway"
+  register: _wp071_zuno_gw_pod
+  when: (_wp071_cert_secret.resources | default([]) | length) > 0
+  ignore_errors: true
+
+- name: "connectivity_link | WP-071: verify TLS trust and ext_authz transport through zuno-agent-gateway"
+  when: (_wp071_zuno_gw_pod.resources | default([]) | length) > 0
+  vars:
+    wp071_gateway_pod: "{{ _wp071_zuno_gw_pod.resources[0].metadata.name }}"
+    wp071_route_lookup_name: zuno-agent-gateway
+  ansible.builtin.include_tasks: verify_ext_authz_tls.yml
