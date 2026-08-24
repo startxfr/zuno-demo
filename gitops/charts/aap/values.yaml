@@ -101,6 +101,10 @@ sizing:
     apiReplicas: 1
     webReplicas: 1
     workerReplicas: 1
+    # Not discovered by WP-072's original CRD inventory (only api/web/worker
+    # were checked) - content defaults to 2 replicas if left unset. Trimmed
+    # to 1 for consistency with every other non-HA sizing knob here.
+    contentReplicas: 1
   eda:
     apiReplicas: 1
     uiReplicas: 1

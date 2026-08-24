@@ -38,8 +38,26 @@ spec:
       replicas: {{ .Values.sizing.hub.apiReplicas }}
     web:
       replicas: {{ .Values.sizing.hub.webReplicas }}
+    # content/worker both mount the same ReadWriteOnce file_storage PVC
+    # (EBS-backed, this cluster has no RWX storage class - see values.yaml
+    # hub.fileStorageAccessMode). RWO only allows attachment on one node
+    # at a time, so worker's pod must be forced onto whichever node
+    # content's pod(s) already landed on, or it hangs on
+    # FailedAttachVolume/Multi-Attach - confirmed live 2026-08-24/25
+    # (WP-072). podAffinity (not nodeAffinity): content's own scheduling
+    # is unconstrained, so worker follows it rather than both racing for a
+    # fixed node.
+    content:
+      replicas: {{ .Values.sizing.hub.contentReplicas }}
     worker:
       replicas: {{ .Values.sizing.hub.workerReplicas }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: content-server
+              topologyKey: kubernetes.io/hostname
   eda:
     # EDA's own standalone CRD (eda.ansible.com/v1alpha1) marks
     # automation_server_url as required (confirmed live) - the URL EDA
