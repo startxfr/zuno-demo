@@ -1,0 +1,42 @@
+{{- if .Values.postgresCluster.enabled }}
+{{- /*
+Third piece of the "Postgres in the mesh" fix (with postgrescluster.yaml's
+5432/8432 Envoy exclusions and networkpolicy-metrics.yaml's same-namespace
+allows): the instance pods no longer terminate Istio mTLS on 5432, but every
+fully-meshed CLIENT's sidecar still auto-mTLS-upgrades outbound connections
+to any in-mesh destination - so Istio mTLS bytes land directly on Postgres,
+whose own SSL negotiation then reads garbage. Live symptom 2026-08-24:
+Keycloak (spec.db.host = zuno-postgresql-primary..., a direct connection,
+not PgBouncer) crash-looped 79 times with the JDBC driver dying inside
+ConnectionFactoryImpl.enableSSL. These DestinationRules tell client
+sidecars to pass the application's own bytes through on 5432 (Postgres
+native SSL end-to-end); scoped per-port so Patroni's 8008 etc. stay
+normally meshed. 8432 needs no rule - its only clients (backup Jobs,
+repo-host, instances) already carry outbound exclusions and never transit
+a client Envoy. PgBouncer's own host is deliberately absent: its 5432 is
+still Envoy-intercepted, so client->PgBouncer mesh mTLS works and should
+stay. DRs here export mesh-wide by default, covering clients in other
+namespaces (zuno-auth's Keycloak etc.).
+*/}}
+{{- range $svc := list "primary" "replicas" "ha" "pods" }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: {{ $.Values.cluster.name }}-{{ $svc }}-plain-5432
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-31"
+spec:
+  host: {{ $.Values.cluster.name }}-{{ $svc }}.{{ $.Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    portLevelSettings:
+      - port:
+          number: 5432
+        tls:
+          mode: DISABLE
+---
+{{- end }}
+{{- end }}
