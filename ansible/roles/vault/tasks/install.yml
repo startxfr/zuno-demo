@@ -409,6 +409,43 @@
         username: ragproject
         password: "{{ zuno_admin_rag_project_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      aap/admin:
+        # AAP's own bootstrap admin password (ADR-0354/WP-072), consumed by
+        # the AnsibleAutomationPlatform CR's spec.admin_password_secret.
+        username: admin
+        password: "{{ zuno_admin_aap_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      aap/postgresql-app:
+        # Dedicated database/role for AAP Gateway's own database
+        # (ADR-0354/WP-072, ADR-0315 pattern) - see aap-controller/
+        # aap-hub/aap-eda below for the other three sub-components. Same
+        # naming constraint as postgresql/app above.
+        username: aapgateway
+        password: "{{ zuno_admin_aap_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      aap-controller/postgresql-app:
+        # Dedicated database/role for AAP Controller's own database - the
+        # unified AnsibleAutomationPlatform CR does NOT take one shared
+        # external-database secret for the whole platform (confirmed live,
+        # see ansible/roles/aap/README.md). Same naming constraint as
+        # postgresql/app above.
+        username: aapcontroller
+        password: "{{ zuno_admin_aap_controller_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      aap-hub/postgresql-app:
+        # Dedicated database/role for AAP Hub's own database - see
+        # aap-controller/postgresql-app above. Same naming constraint as
+        # postgresql/app above.
+        username: aaphub
+        password: "{{ zuno_admin_aap_hub_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      aap-eda/postgresql-app:
+        # Dedicated database/role for AAP EDA's own database - see
+        # aap-controller/postgresql-app above. Same naming constraint as
+        # postgresql/app above.
+        username: aapeda
+        password: "{{ zuno_admin_aap_eda_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
 - name: "vault | generate and seed the tekos-frontend confidential OIDC client secret (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
@@ -493,6 +530,19 @@
     vault_seed_path: keycloak/openshift-client
     vault_seed_fields:
       client_secret: "{{ zuno_admin_openshift_client_token |
+        default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+
+# ADR-0354/WP-072: the "aap" client backing AAP Gateway's OIDC
+# authentication - same single-secret shape as openshift/tekos-frontend
+# above. The AAP-side authenticator wiring itself is deferred to WP-073;
+# this seed only makes the Keycloak-side client secret resolvable.
+- name: "vault | generate and seed the aap OIDC client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: keycloak/aap-client
+    vault_seed_fields:
+      client_secret: "{{ zuno_admin_aap_client_token |
         default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
 # Grafana's oauth-proxy sidecar (gitops/charts/grafana): AES-key-sized

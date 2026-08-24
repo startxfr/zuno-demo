@@ -29,6 +29,9 @@ platformNamespaces:
     # Keycloak: JWKS/token-endpoint callers.
     allowedFromNamespaces:
       - zuno-ai-run
+      # ADR-0354: AAP Gateway's OIDC authenticator and any in-cluster
+      # JWKS/token-endpoint calls to Keycloak (WP-072/WP-073).
+      - zuno-aap
     # Sidecar-injected + mTLS-enforced (service-mesh component, phase 3).
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
@@ -78,6 +81,9 @@ platformNamespaces:
       - zuno-ai-run
       - zuno-vault
       - zuno-auth
+      # ADR-0354: AAP Controller/Hub/EDA/Gateway each reach their own
+      # dedicated database/role on this cluster (WP-072).
+      - zuno-aap
       - redhat-ods-applications
       - zuno-ai-build
       - zuno-mlops
@@ -269,6 +275,21 @@ platformNamespaces:
     # istiod's sidecar-injector + validating webhooks are called synchronously
     # by the API server, same pattern as ESO's secretstore-validate webhook.
     allowApiServerWebhooks: true
+  - name: zuno-aap
+    displayName: Zuno Ansible Automation Platform
+    description: >-
+      Ansible Automation Platform (Gateway, Controller, Hub, EDA) - the
+      platform's automation-execution surface (ADR-0354).
+    # v0.2: nothing calls into zuno-aap yet (aap-config, WP-073, reaches
+    # it via the Controller API over its Route, not in-cluster). v0.3's
+    # mcp-aap server (ADR-0355) adds zuno-ai-run here once it starts
+    # calling the Controller/Gateway API in-cluster.
+    allowedFromNamespaces: []
+    # Deliberately NOT istio-injection: enabled - AAP's own workloads stay
+    # outside the mesh, same posture as other heavy operator-backed
+    # namespaces (zuno-vault, redhat-ods-*).
+    extraLabels:
+      zuno.io/managed: "true"
 
   # ADR-0331: RHOAI's own default namespaces, given the same governance
   # (labels/NetworkPolicy/quota) zuno-ai-platform used to get, now that

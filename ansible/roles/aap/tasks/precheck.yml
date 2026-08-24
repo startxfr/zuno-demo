@@ -1,0 +1,42 @@
+---
+# State detection (never fails). Checks both d0 (operator) and d1
+# (AnsibleAutomationPlatform CR), same "AND in the extra k8s_info lookups"
+# shape as ansible/roles/kueue/tasks/precheck.yml.
+- name: "aap | check the aap Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-aap-d0"
+
+- name: "aap | save the d0 check result"
+  ansible.builtin.set_fact:
+    _aap_d0_installed: "{{ _state_check_result }}"
+
+- name: "aap | check the aap Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-aap-d1"
+
+- name: "aap | look up the AnsibleAutomationPlatform CR"
+  kubernetes.core.k8s_info:
+    api_version: aap.ansible.com/v1alpha1
+    kind: AnsibleAutomationPlatform
+    namespace: zuno-aap
+    name: aap
+  register: _aap_cr_lookup
+  # Never let a transiently-unready API (CRD just registered, webhook not
+  # up yet) turn this diagnostic check into a hard playbook failure - same
+  # contract as this file's header.
+  ignore_errors: true
+
+- name: "aap | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _aap_d0_installed
+        and _state_check_result
+        and not (_aap_cr_lookup.failed | default(false))
+        and (_aap_cr_lookup.resources | default([]) | length) > 0
+      }}
+
+- name: "aap | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

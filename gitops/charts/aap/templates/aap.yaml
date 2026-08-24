@@ -1,0 +1,63 @@
+{{- if .Values.aap.enabled }}
+# The unified AnsibleAutomationPlatform CR (aap.ansible.com/v1alpha1)
+# provisions Gateway, Controller, Hub and EDA together (ADR-0354 clause 3).
+# Field names below are confirmed live via `oc explain` against the real
+# CRD (WP-072's CRD inventory, 2026-08-24, cluster demo222) - see
+# ansible/roles/aap/README.md for the full discovery notes and what
+# remains unverified end to end.
+apiVersion: aap.ansible.com/v1alpha1
+kind: AnsibleAutomationPlatform
+metadata:
+  name: {{ .Values.crName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  hostname: "aap.{{ .Values.clusterBaseDomain }}"
+  admin_password_secret: {{ .Values.adminSecretName }}
+  # Gateway's own dedicated database (spec.database.database_secret) - not
+  # postgres_configuration_secret, unlike Controller/Hub below. See
+  # README.md's "Per-component external database" table.
+  database:
+    database_secret: {{ .Values.postgresql.gateway.secretName }}
+  api:
+    replicas: {{ .Values.sizing.gateway.replicas }}
+  controller:
+    replicas: {{ .Values.sizing.controller.replicas }}
+    web_replicas: {{ .Values.sizing.controller.webReplicas }}
+    task_replicas: {{ .Values.sizing.controller.taskReplicas }}
+    postgres_configuration_secret: {{ .Values.postgresql.controller.secretName }}
+  hub:
+    postgres_configuration_secret: {{ .Values.postgresql.hub.secretName }}
+    storage_type: {{ .Values.hub.storageType }}
+    file_storage_access_mode: {{ .Values.hub.fileStorageAccessMode }}
+    file_storage_size: {{ .Values.hub.fileStorageSize }}
+    api:
+      replicas: {{ .Values.sizing.hub.apiReplicas }}
+    web:
+      replicas: {{ .Values.sizing.hub.webReplicas }}
+    worker:
+      replicas: {{ .Values.sizing.hub.workerReplicas }}
+  eda:
+    # EDA's own standalone CRD (eda.ansible.com/v1alpha1) marks
+    # automation_server_url as required (confirmed live) - the URL EDA
+    # uses to reach Controller's API. Left unset here: the unified
+    # AnsibleAutomationPlatform CR is documented to cross-wire its own
+    # sub-components' URLs automatically, unlike a standalone EDA CR
+    # applied on its own. NOT verified end to end (WP-072's CRD inventory
+    # deliberately stopped short of creating this CR) - if EDA fails to
+    # reconcile citing a missing automation_server_url, set it explicitly
+    # here to the Gateway's own hostname above.
+    database:
+      database_secret: {{ .Values.postgresql.eda.secretName }}
+    api:
+      replicas: {{ .Values.sizing.eda.apiReplicas }}
+    ui:
+      replicas: {{ .Values.sizing.eda.uiReplicas }}
+    default_worker:
+      replicas: {{ .Values.sizing.eda.defaultWorkerReplicas }}
+    activation_worker:
+      replicas: {{ .Values.sizing.eda.activationWorkerReplicas }}
+{{- end }}

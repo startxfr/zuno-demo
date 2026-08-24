@@ -1,0 +1,19 @@
+---
+# Reverse of install.yml: delete d1 (AnsibleAutomationPlatform CR) first,
+# then remove_operator.yml (needs the Subscription to still exist) before
+# d0's delete - same contract as ansible/roles/kueue/tasks/uninstall.yml.
+- name: "aap | delete the aap GitOps Application (d1: AnsibleAutomationPlatform CR)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-aap-d1"
+
+- name: "aap | remove the operator (its owned CRDs then the CSV then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ aap_package_name | default('ansible-automation-platform-operator') }}"
+    operator_namespace: zuno-aap
+
+- name: "aap | delete the aap GitOps Application (d0: the Subscription itself)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-aap-d0"

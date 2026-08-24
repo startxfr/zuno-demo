@@ -1,0 +1,118 @@
+# operator.enabled renders the AAP operator Subscription/OperatorGroup;
+# aap.enabled renders the AnsibleAutomationPlatform CR and its consumer-side
+# ExternalSecrets. Both default false so templates render nothing by default.
+aap:
+  enabled: false
+
+# Namespace for the operator Subscription/OperatorGroup and the
+# AnsibleAutomationPlatform CR. No Namespace template here - zuno-aap is
+# created by gitops/charts/namespaces (ADR-0354).
+namespace: zuno-aap
+
+# Name of the AnsibleAutomationPlatform CR.
+crName: aap
+
+# OpenShift apps wildcard domain, substituted by
+# ansible/tasks/apply_gitops_app.yml the same way gitops/charts/keycloak's
+# clusterBaseDomain is - override for the real cluster before go-live; the
+# checked-in default only works for the example domain.
+clusterBaseDomain: apps.mycluster.example.com
+
+# aap-operator's CSV only supports OwnNamespace/SingleNamespace/
+# MultiNamespace install modes, not AllNamespaces (confirmed live,
+# ansible/roles/aap/README.md), so it's subscribed directly into zuno-aap
+# rather than the shared openshift-operators namespace other operators use -
+# same reasoning as gitops/charts/keycloak.
+#
+# subscription.operator.channel/source.name are left empty by default,
+# discovered by ansible and set via gitops_app_extra_helm_values on the -d0
+# apply. templates/checks.yaml fails the render if either is still empty.
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: aap
+    app: aap
+  subscription:
+    enabled: true
+    name: ansible-automation-platform-operator
+    namespace: zuno-aap
+    operator:
+      channel: ""
+      name: ansible-automation-platform-operator
+      installPlanApproval: Automatic
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: aap-operator-group
+    namespace: zuno-aap
+
+# Kubernetes Secret names populated by ExternalSecrets resolving against the
+# vault-backend ClusterSecretStore. Never hardcode values here.
+adminSecretName: aap-admin
+
+# Dedicated Postgres databases (ADR-0315 pattern, repeated once per
+# sub-component - the unified CR does NOT take one shared external-database
+# secret; confirmed live via `oc explain`, see
+# ansible/roles/aap/README.md's "Per-component external database" section).
+# Each block names the consumer-side Secret this chart creates (consumed
+# directly by the matching CR field) and the Vault path
+# gitops/charts/postgresql seeds the same credential from independently
+# (secretKeyRef can't cross namespaces - same "own ExternalSecret" pattern
+# as gitops/charts/keycloak).
+postgresql:
+  host: zuno-postgresql-primary.zuno-data.svc.cluster.local
+  port: 5432
+  sslmode: prefer
+  gateway:
+    database: aap
+    secretName: aap-gateway-postgres-config
+    vaultPath: aap/postgresql-app
+  controller:
+    database: aap-controller
+    secretName: aap-controller-postgres-config
+    vaultPath: aap-controller/postgresql-app
+  hub:
+    database: aap-hub
+    secretName: aap-hub-postgres-config
+    vaultPath: aap-hub/postgresql-app
+  eda:
+    database: aap-eda
+    secretName: aap-eda-postgres-config
+    vaultPath: aap-eda/postgresql-app
+
+# Non-HA sizing (ADR-0354 clause 3) - every sub-component's replica count
+# trimmed to its minimum. Field names confirmed live via `oc explain`
+# against the real CRDs (WP-072's CRD inventory, 2026-08-24); resource
+# requests/limits are left at the operator's own defaults - no measured
+# usage exists yet to hand-tune them (see README.md).
+sizing:
+  gateway:
+    replicas: 1
+  controller:
+    replicas: 1
+    webReplicas: 1
+    taskReplicas: 1
+  hub:
+    apiReplicas: 1
+    webReplicas: 1
+    workerReplicas: 1
+  eda:
+    apiReplicas: 1
+    uiReplicas: 1
+    # EDA's worker replicas default to 2 on a fresh install; trimmed to 1
+    # for non-HA demo sizing.
+    defaultWorkerReplicas: 1
+    activationWorkerReplicas: 1
+
+# Hub content storage - ReadWriteOnce confirmed live as a valid
+# file_storage_access_mode (not RWX-only), matching this repository's
+# gp3-csi-everywhere convention (no RWX storage class, no in-cluster S3).
+hub:
+  storageType: file
+  fileStorageAccessMode: ReadWriteOnce
+  fileStorageSize: 10Gi

@@ -17,8 +17,12 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # creates the AIAgent CRs it reconciles. No build/run split beyond
 # ai-gateway (see ansible/roles/ai_gateway_build) and supply-chain-signer
 # (ADR-0420/WP-068, see ansible/roles/supply_chain_signer_build) - neither
-# has a matching run component, both are build-only images.
-DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth connectivity-link lws jobset kueue openshift-ai aiagent-operator
+# has a matching run component, both are build-only images. "aap"
+# (ADR-0354/WP-072) sits right after "openshift-oauth": Ansible Automation
+# Platform needs its own dedicated PostgreSQL database (postgresql,
+# earlier here) and Keycloak/openshift-oauth's Ingress+CA-trust bootstrap,
+# same prerequisites openshift-oauth itself needed to move out of Day 0 for.
+DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap connectivity-link lws jobset kueue openshift-ai aiagent-operator
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer
 DAY1_VERBS := check install build uninstall all reinstall
 

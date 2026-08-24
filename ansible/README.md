@@ -26,8 +26,12 @@ ingestion), and Day 3 (agent test/stresstest operations):
    alias) walk `DAY1_RUN_COMPONENTS` - the AI-platform-operator stack
    (`redis`, `observability`, `service-mesh`, `mesh-monitoring`, `kiali`,
    `grafana`, `postgresql`, `mariadb`, `tempo`, `keycloak`,
-   `connectivity-link`, `lws`, `jobset`, `kueue`, `openshift-ai`,
-   `aiagent-operator`) - `uninstall` walks the same list in reverse.
+   `openshift-oauth`, `aap`, `connectivity-link`, `lws`, `jobset`, `kueue`,
+   `openshift-ai`, `aiagent-operator`) - `uninstall` walks the same list in
+   reverse. `aap` (ADR-0354) installs Ansible Automation Platform
+   (Gateway/Controller/Hub/EDA), non-HA, right after `openshift-oauth` -
+   its own dedicated PostgreSQL databases and Keycloak OIDC client both
+   need `postgresql`/`keycloak` already live.
    `aiagent-operator` runs last (operator-before-CR: Day 2's `agents`
    creates the CRs it reconciles). `make day1 build` only builds
    `ai-gateway`.

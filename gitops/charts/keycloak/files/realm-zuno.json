@@ -1517,6 +1517,47 @@
             }],
             "secret": "${vault.openshift_client_secret}",
             "clientAuthenticatorType": "client-secret"
+        },
+        {
+            "clientId": "aap",
+            "name": "Ansible Automation Platform Gateway OIDC client (ADR-0354)",
+            "description": "Confidential client backing AAP Gateway's OIDC authenticator - AAP-side wiring itself is deferred to WP-073, this client only makes the Keycloak-side registration ready ahead of it",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": false,
+            "rootUrl": "https://aap.apps.mycluster.example.com",
+            "redirectUris": [
+                "https://aap.apps.mycluster.example.com/*"
+            ],
+            "webOrigins": [
+                "https://aap.apps.mycluster.example.com"
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "protocolMappers": [{
+                "name": "groups",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-group-membership-mapper",
+                "consentRequired": false,
+                "config": {
+                    "full.path": "false",
+                    "id.token.claim": "true",
+                    "access.token.claim": "true",
+                    "userinfo.token.claim": "true",
+                    "claim.name": "groups"
+                }
+            }],
+            "secret": "${vault.aap_client_secret}",
+            "clientAuthenticatorType": "client-secret"
         }
     ],
     "identityProviders": [{

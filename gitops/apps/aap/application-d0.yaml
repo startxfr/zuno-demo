@@ -1,0 +1,38 @@
+---
+# AAP operator install; the AnsibleAutomationPlatform CR operand is a
+# separate Application (application-d1.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-aap-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-156"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/aap
+    helm:
+      releaseName: zuno-aap-d0
+      values: |
+        namespace: zuno-aap
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-aap
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

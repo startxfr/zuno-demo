@@ -1,0 +1,113 @@
+---
+# ADR-0354: installs Ansible Automation Platform (Gateway, Controller, Hub,
+# EDA) as a Day 1 component, immediately after openshift_oauth (keycloak's
+# dedicated postgres database, Vault/External Secrets, and Keycloak/
+# openshift_oauth itself must all already be Synced+Healthy). zuno-aap is
+# a Day 0 namespace (gitops/charts/namespaces), not created by this role.
+#
+# Package name/default channel confirmed live against this cluster's
+# redhat-operators catalog on 2026-08-24: "ansible-automation-platform-
+# operator", defaultChannel "stable-2.7", InstallModes OwnNamespace/
+# SingleNamespace/MultiNamespace only (no AllNamespaces) - same reasoning
+# as keycloak's rhbk-operator, subscribed into its own namespace with its
+# own OperatorGroup rather than the shared openshift-operators namespace.
+# Still discover catalog/channel from the PackageManifest rather than
+# hardcoding them, same pattern as every other operator-backed role.
+- name: "aap | look up the {{ aap_package_name | default('ansible-automation-platform-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ aap_package_name | default('ansible-automation-platform-operator') }}"
+  register: _aap_pkg_info
+
+- name: "aap | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named
+      '{{ aap_package_name | default('ansible-automation-platform-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i ansible` for the correct package name
+      on this cluster; re-run with `-e aap_package_name=<name>` or update
+      this role's default - the catalog on this cluster changed from what
+      ADR-0354/WP-072 last confirmed.
+  when: (_aap_pkg_info.resources | default([]) | length) == 0
+
+- name: "aap | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _aap_catalog_source: "{{ _aap_pkg_info.resources[0].status.catalogSource }}"
+    _aap_channel: >-
+      {{
+        'stable'
+        if (_aap_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_aap_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "aap | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ aap_package_name | default('ansible-automation-platform-operator') }}'
+      (catalog '{{ _aap_catalog_source }}') has no "stable" channel and no
+      defaultChannel to fall back to. Published channels:
+      {{ _aap_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _aap_channel | length == 0
+
+- name: "aap | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package
+      '{{ aap_package_name | default('ansible-automation-platform-operator') }}',
+      catalog '{{ _aap_catalog_source }}', channel '{{ _aap_channel }}'.
+
+- name: "aap | apply the aap GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "aap"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-aap-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+        subscription:
+          operator:
+            channel: "{{ _aap_channel }}"
+            source:
+              name: "{{ _aap_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# Gateway+Controller+Hub+EDA starting together, even non-HA, is comparable
+# to openshift_ai's DataScienceCluster - generous retries, longer delay.
+- name: "aap | apply the aap GitOps Application (d1: AnsibleAutomationPlatform CR)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "aap"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-aap-d1"
+    gitops_app_extra_helm_values:
+      # clusterBaseDomain must be re-supplied here even though
+      # application-d1.yaml already sets it: apply_gitops_app.yml's
+      # gitops_app_extra_helm_values REPLACES spec.source.helm.values
+      # wholesale rather than merging (same gotcha keycloak's install.yml
+      # documents), so omitting it would silently fall back to the
+      # placeholder example domain.
+      aap:
+        enabled: true
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+    gitops_app_wait_retries: 90
+    gitops_app_wait_delay: 20
+
+# NOT wired in this WP: the AnsibleAutomationPlatform CR has its own
+# top-level `bundle_cacert_secret` field (confirmed live via `oc explain
+# ansibleautomationplatform.spec` on 2026-08-24, WP-072's CRD inventory) -
+# a Secret naming the CA bundle the Gateway trusts for its own outbound
+# HTTPS calls, which is what a Keycloak OIDC authenticator (WP-073) would
+# need if the Keycloak Route's certificate is Vault-PKI-signed rather than
+# publicly trusted. Unlike `ansible/tasks/sync_keycloak_serving_ca.yml`
+# (which produces a ConfigMap, consumed by pods that mount it directly),
+# this CR field wants a Secret, and its expected key name is not confirmed
+# from the CRD schema alone (no alm-examples were published on this
+# channel). Deferred to WP-073 alongside the OIDC authenticator wiring
+# itself, since the CR field is only load-bearing once an authenticator
+# actually depends on it - reconciling the CR today needs no Keycloak
+# trust at all.

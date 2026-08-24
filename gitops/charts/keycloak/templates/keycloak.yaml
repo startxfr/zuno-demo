@@ -164,6 +164,15 @@ spec:
                     items:
                       - key: client_secret
                         path: zuno_openshift__client__secret
+                - secret:
+                    # ADR-0354/WP-072: AAP Gateway's OIDC client, same
+                    # confidential-client shape as openshift/tekos-frontend
+                    # above.
+                    name: aap-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_aap__client__secret
         containers:
           - name: keycloak
             securityContext:

@@ -21,6 +21,7 @@
       - tempo
       - keycloak
       - openshift_oauth
+      - aap
       - connectivity_link
       - lws
       - jobset

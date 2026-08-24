@@ -1,0 +1,13 @@
+apiVersion: v2
+name: aap
+description: >-
+  Deploys the Ansible Automation Platform operator Subscription and the
+  AnsibleAutomationPlatform CR (Gateway, Controller, Hub, EDA), non-HA
+  (ADR-0354).
+type: application
+version: 0.1.0
+appVersion: "n/a"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"

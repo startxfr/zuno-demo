@@ -1,0 +1,37 @@
+---
+# The AnsibleAutomationPlatform CR (Gateway, Controller, Hub, EDA) and its
+# consumer-side ExternalSecrets (not the operator itself, see
+# application-d0.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-aap-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-155"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/aap
+    helm:
+      releaseName: zuno-aap-d1
+      values: |
+        namespace: zuno-aap
+        aap:
+          enabled: true
+        crName: aap
+        # Placeholder auto-substituted with the real cluster domain by
+        # ansible/tasks/apply_gitops_app.yml.
+        clusterBaseDomain: apps.mycluster.example.com
+        adminSecretName: aap-admin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-aap
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
