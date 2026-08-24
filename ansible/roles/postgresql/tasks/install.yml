@@ -131,30 +131,10 @@
 # image/build needed (unverified: confirm versions once connected via
 # `SELECT extname, extversion FROM pg_extension;`).
 #
-# Soft-read of ansible/confidential.yml (not a hard fail like vault's) for
-# optional S3 backup creds.
-- name: "postgresql | check for ansible/confidential.yml"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  register: _postgresql_confidential_file
-
-- name: "postgresql | load ansible/confidential.yml if present"
-  ansible.builtin.include_vars:
-    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
-  when: _postgresql_confidential_file.stat.exists
-
 # Only add the S3 pgBackRest repo when real credentials exist - never
-# rendered half-configured.
-- name: "postgresql | determine whether S3 backup credentials are configured"
-  ansible.builtin.set_fact:
-    _postgresql_backup_s3_enabled: >-
-      {{
-        (zuno_postgresql_backup_s3_bucket | default('xxxxxx') != 'xxxxxx')
-        and (zuno_postgresql_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx')
-        and (zuno_postgresql_backup_s3_region | default('xxxxxx') != 'xxxxxx')
-        and (zuno_postgresql_backup_s3_access_key | default('xxxxxx') != 'xxxxxx')
-        and (zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx')
-      }}
+# rendered half-configured. Shared with restore.yml/check_s3_backup.yml.
+- name: "postgresql | resolve S3 backup credentials"
+  ansible.builtin.include_tasks: resolve_backup_s3_creds.yml
 
 - name: "postgresql | note that the S3 backup repo is not configured"
   ansible.builtin.debug:
@@ -166,8 +146,46 @@
       `make d0 install postgresql` to add the off-cluster S3 repo (repo2).
   when: not (_postgresql_backup_s3_enabled | bool)
 
+# Auto-detect a reinstall over previously-backed-up data: the S3 bucket
+# itself is the source of truth (in-cluster pgBackRest info Job, not just
+# "the local PVC is missing" - a fresh environment legitimately has no
+# repo2 data yet either). Safety gate: only ever considered when the
+# PostgresCluster does NOT already exist live - a normal re-run of
+# `make d1 install postgresql` against an already-healthy cluster must
+# never trigger a restore.
+- name: "postgresql | look up whether a PostgresCluster already exists"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _postgresql_existing_cluster_lookup
+
+- name: "postgresql | check the S3 backup repo for existing data"
+  ansible.builtin.include_tasks: check_s3_backup.yml
+  when:
+    - _postgresql_backup_s3_enabled | bool
+    - (_postgresql_existing_cluster_lookup.resources | default([]) | length) == 0
+
+- name: "postgresql | restore from the existing S3 backup instead of bootstrapping empty"
+  ansible.builtin.include_tasks: restore.yml
+  when:
+    - _postgresql_s3_has_backup | default(false) | bool
+    - (_postgresql_existing_cluster_lookup.resources | default([]) | length) == 0
+
+- name: "postgresql | record whether auto-restore just ran"
+  ansible.builtin.set_fact:
+    _postgresql_auto_restored: >-
+      {{
+        (_postgresql_s3_has_backup | default(false) | bool)
+        and ((_postgresql_existing_cluster_lookup.resources | default([]) | length) == 0)
+      }}
+
 # postgresCluster.enabled lives in the same chart, applied via the
 # separate zuno-postgresql-d1 Application after -d0 is Synced+Healthy.
+# Skipped when restore.yml (above) already applied d1 with the restore
+# trigger and cleared it again - re-applying here would be redundant, not
+# wrong, but there's no reason to.
 - name: "postgresql | apply the PostgreSQL GitOps Application (d1: PostgresCluster)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -184,6 +202,7 @@
           endpoint: "{{ zuno_postgresql_backup_s3_endpoint | default('') }}"
           region: "{{ zuno_postgresql_backup_s3_region | default('') }}"
     gitops_app_wait_retries: 60
+  when: not (_postgresql_auto_restored | default(false))
 
 # PGO 5.8.8 never sets a "Progressing" condition, so the documented
 # `wait --for=condition=Progressing=False` approach never matches here;

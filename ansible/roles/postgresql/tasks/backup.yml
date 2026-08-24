@@ -1,0 +1,75 @@
+---
+# `make d3 backup postgresql` - triggers an on-demand pgBackRest backup via
+# PGO's documented annotation mechanism (PGO runs a fresh backup Job
+# whenever postgres-operator.crunchydata.com/pgbackrest-backup's value
+# changes; any unique value works, a timestamp doubles as a log trail).
+# Unlike precheck.yml's read of the same status shape (diagnostic only,
+# never fails), this is an explicit on-demand action and fails loudly if
+# it doesn't complete.
+- name: "postgresql | look up the PostgresCluster"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _postgresql_backup_cluster_lookup
+
+- name: "postgresql | fail if the PostgresCluster doesn't exist"
+  ansible.builtin.fail:
+    msg: "zuno-postgresql PostgresCluster not found in zuno-data - nothing to back up. Run 'make d1 install postgresql' first."
+  when: (_postgresql_backup_cluster_lookup.resources | default([]) | length) == 0
+
+# Baseline: the most recent *successful* scheduled/on-demand backup before
+# triggering, so completion below can be detected as "something newer than
+# this appeared" rather than mistaking an old backup for the one just
+# triggered.
+- name: "postgresql | record the most recent backup before triggering"
+  ansible.builtin.set_fact:
+    _postgresql_backup_before: >-
+      {{
+        (
+          (_postgresql_backup_cluster_lookup.resources[0].status.pgbackrest.scheduledBackups | default([]))
+          | selectattr('succeeded', 'defined') | selectattr('succeeded', 'greaterthan', 0)
+          | map(attribute='completionTime') | sort | last | default('')
+        )
+      }}
+
+- name: "postgresql | trigger an on-demand backup"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+    definition:
+      metadata:
+        annotations:
+          postgres-operator.crunchydata.com/pgbackrest-backup: "{{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
+
+- name: "postgresql | wait for a newer successful backup to appear"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _postgresql_backup_poll
+  until: >-
+    (
+      (_postgresql_backup_poll.resources[0].status.pgbackrest.scheduledBackups | default([]))
+      | selectattr('succeeded', 'defined') | selectattr('succeeded', 'greaterthan', 0)
+      | map(attribute='completionTime') | sort | last | default('')
+    ) > _postgresql_backup_before
+  retries: 60
+  delay: 10
+
+- name: "postgresql | report backup completion"
+  ansible.builtin.debug:
+    msg: >-
+      On-demand backup completed:
+      {{
+        (
+          (_postgresql_backup_poll.resources[0].status.pgbackrest.scheduledBackups | default([]))
+          | selectattr('succeeded', 'defined') | selectattr('succeeded', 'greaterthan', 0)
+          | sort(attribute='completionTime') | last
+        )
+      }}

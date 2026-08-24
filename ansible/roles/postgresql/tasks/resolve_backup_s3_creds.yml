@@ -1,0 +1,30 @@
+---
+# Shared by install.yml, restore.yml and check_s3_backup.yml - extracted
+# from install.yml so all three read the exact same S3 credentials/enabled
+# determination instead of three copies drifting apart. Soft-read of
+# ansible/confidential.yml (not a hard fail like vault's): S3 backup is
+# opt-in, a cluster with no S3 creds configured simply has no repo2.
+- name: "postgresql | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _postgresql_confidential_file
+  when: _postgresql_backup_s3_enabled is not defined
+
+- name: "postgresql | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when:
+    - _postgresql_backup_s3_enabled is not defined
+    - _postgresql_confidential_file.stat.exists
+
+- name: "postgresql | determine whether S3 backup credentials are configured"
+  ansible.builtin.set_fact:
+    _postgresql_backup_s3_enabled: >-
+      {{
+        (zuno_postgresql_backup_s3_bucket | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_region | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_access_key | default('xxxxxx') != 'xxxxxx')
+        and (zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx')
+      }}
+  when: _postgresql_backup_s3_enabled is not defined

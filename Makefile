@@ -39,24 +39,33 @@ DAY2_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp ag
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
 DAY2_VERBS := check install build uninstall all reinstall
 
-# ADR-0057/ADR-0058: Day 3 (agent test / stresstest operations), the
-# fourth stage after Day 0 (cluster prerequisites), Day 1 (AI-platform-
-# operator stack), and Day 2 (AI infrastructure + content ingestion).
-# "test" only ever proves availability (agent frontends' /healthz, shared
-# platform services' /healthz+/readyz); "stresstest" runs every existing
-# test layer per agent (contract/scenarios/security/gate/stress_test)
-# plus an optional bulk-interaction load pass. Component granularity
-# matches Day 2's "agents" (every agent bundle, collectively) plus a new
-# "platform" component for the shared services - which agents/services
-# actually exist is resolved dynamically from agents/*/agent.okf.md at
-# Ansible run time, never a list here.
-DAY3_COMPONENTS := agents platform
-DAY3_VERBS := test stresstest
+# ADR-0057/ADR-0058: Day 3 was originally agent test/stresstest operations
+# only; widened 2026-08-24 into the general "operational tasks" tier -
+# anything that acts on an already-installed component rather than
+# installing/uninstalling it (test, stresstest, backup, restore, check).
+# Each verb has its own component list, same split Day 1 already uses for
+# "build" vs "check/install/uninstall" (DAY1_BUILD_COMPONENTS vs
+# DAY1_RUN_COMPONENTS) - not every Day 3 verb applies to every Day 3
+# component. "test"/"stresstest" only ever prove availability (agent
+# frontends' /healthz, shared platform services' /healthz+/readyz) or run
+# the full per-agent test layer; component granularity matches Day 2's
+# "agents" (every agent bundle, collectively) plus "platform" for the
+# shared services - which agents/services actually exist is resolved
+# dynamically from agents/*/agent.okf.md at Ansible run time, never a list
+# here. "backup"/"restore" are per-component pgBackRest-style operations
+# (see ansible/roles/postgresql/tasks/{backup,restore}.yml); "check" spans
+# every Day 3 component regardless of verb group, delegating to the same
+# availability test for agents/platform and to each component's own
+# precheck.yml otherwise (ansible/playbooks/day3_check.yml).
+DAY3_TEST_COMPONENTS := agents platform
+DAY3_BACKUP_COMPONENTS := postgresql
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS))
+DAY3_VERBS := test stresstest backup restore check
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -104,7 +113,8 @@ help:
 	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)' \
 	  'Day 2 components (check/install): $(DAY2_RUN_COMPONENTS)' \
 	  'Day 2 components (build):         $(DAY2_BUILD_COMPONENTS)' \
-	  'Day 3 components: $(DAY3_COMPONENTS)' \
+	  'Day 3 components (test/stresstest/check): $(DAY3_TEST_COMPONENTS)' \
+	  'Day 3 components (backup/restore):        $(DAY3_BACKUP_COMPONENTS)' \
 	  'Day 3 report format: text (default) | json | csv - set via REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"'
 
 # ADR-0119: scaffold a new MCP server from the confluence-shaped template
@@ -143,7 +153,10 @@ _complete-components:
 	       build) echo "$(DAY2_BUILD_COMPONENTS) all" ;; \
 	       *) echo "$(DAY2_RUN_COMPONENTS) all" ;; \
 	     esac ;; \
-	  3) echo "$(DAY3_COMPONENTS) all" ;; \
+	  3) case "$(VERB)" in \
+	       backup|restore) echo "$(DAY3_BACKUP_COMPONENTS) all" ;; \
+	       *) echo "$(DAY3_COMPONENTS) all" ;; \
+	     esac ;; \
 	esac
 
 completion:
@@ -375,15 +388,21 @@ define DAY3_RECIPE
 component="$${TARGET_COMPONENT:-$(DAY_COMPONENT)}"; \
 if [[ -z "$$verb" ]]; then \
   printf '%s\n' \
-    'Zuno Demo - Day 3 (agent test / stresstest operations)' \
+    'Zuno Demo - Day 3 (operational tasks)' \
     '' \
     'Usage: make day3|d3 <verb> [component]' \
     '' \
     '  test         Check availability only (agent frontends'"'"' /healthz, shared platform services'"'"' /healthz+/readyz)' \
     '  stresstest   Run every existing test layer per agent, plus an optional bulk-interaction load pass (ADR-0058)' \
+    '  backup       Trigger an on-demand backup' \
+    '  restore      Restore from the most recent backup (fails if none exists)' \
+    '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
     '' \
-    'Components (optional, default: all):' \
-    '  $(DAY3_COMPONENTS)' \
+    'Components (test/stresstest/check; optional, default: all):' \
+    '  $(DAY3_TEST_COMPONENTS)' \
+    '' \
+    'Components (backup/restore; optional, default: all):' \
+    '  $(DAY3_BACKUP_COMPONENTS)' \
     '' \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
@@ -391,16 +410,20 @@ if [[ -z "$$verb" ]]; then \
     '' \
     'Example: make d3 test agents' \
     'Example: make d3 stresstest BULK=25' \
-    'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection'; \
+    'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection' \
+    'Example: make d3 backup postgresql' \
+    'Example: make d3 restore postgresql'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY3_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day3 verb: '$$verb' (expected one of: $(DAY3_VERBS))" >&2; exit 2;; esac; \
-case " $(DAY3_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 component: '$$component' (expected one of: $(DAY3_COMPONENTS) or all)" >&2; exit 2;; esac; \
 report_format="$${REPORT_FORMAT:-text}"; \
 case "$$verb" in \
-  test) $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+  test) \
+    case " $(DAY3_TEST_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 test component: '$$component' (expected one of: $(DAY3_TEST_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
   stresstest) \
+    case " $(DAY3_TEST_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 stresstest component: '$$component' (expected one of: $(DAY3_TEST_COMPONENTS) or all)" >&2; exit 2;; esac; \
     bulk="$${BULK:-}"; \
     if [[ -z "$$bulk" ]]; then \
       if [[ -t 0 ]]; then \
@@ -420,6 +443,15 @@ case "$$verb" in \
       fi; \
     fi; \
     $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" $(EXTRA_VARS) ;; \
+  backup) \
+    case " $(DAY3_BACKUP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 backup component: '$$component' (expected one of: $(DAY3_BACKUP_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_backup.yml -e "target_component=$$component" $(EXTRA_VARS) ;; \
+  restore) \
+    case " $(DAY3_BACKUP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 restore component: '$$component' (expected one of: $(DAY3_BACKUP_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_restore.yml -e "target_component=$$component" $(EXTRA_VARS) ;; \
+  check) \
+    case " $(DAY3_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 check component: '$$component' (expected one of: $(DAY3_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_check.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
 esac
 endef
 
@@ -434,5 +466,5 @@ d3: $(if $(DAY_VERB),credentials-check)
 # directly, so e.g. `make d0 check postgresql` needs "check" and
 # "postgresql" to resolve to *something* as Make goals without erroring
 # as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS)):
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS)):
 	@:

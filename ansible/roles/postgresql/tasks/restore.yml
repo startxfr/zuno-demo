@@ -1,0 +1,117 @@
+---
+# `make d3 restore postgresql` (also included directly by install.yml's
+# auto-restore detection - guarded below so it doesn't redundantly re-run
+# the S3 check a second time in that case).
+#
+# Restore mechanism: docs/adr/0112-implement-production-grade-backup-and-recovery.md
+# / docs/platform/backup-recovery.md document a live-executed drill (2026-08-18)
+# using spec.dataSource.postgresCluster - PGO restores by creating a *new*
+# PostgresCluster that pre-populates its data directory from an existing
+# repo, never destructively in place. clusterName/clusterNamespace default
+# to the cluster being created when omitted, so restoring "into yourself"
+# (recreating zuno-postgresql after a deletion, this role's actual use
+# case) only needs repoName - see
+# gitops/charts/postgresql/templates/postgrescluster.yaml's dataSource
+# block. Only repo2 (S3) is ever used here: repo1 is a local PVC, gone
+# along with everything else if the cluster itself had to be recreated.
+- name: "postgresql | check the S3 backup repo for existing data"
+  ansible.builtin.include_tasks: check_s3_backup.yml
+  when: _postgresql_s3_has_backup is not defined
+
+- name: "postgresql | fail if the S3 backup repo could not be queried"
+  ansible.builtin.fail:
+    msg: >-
+      Could not query the S3 pgBackRest repo (repo2) to restore from - see
+      the check Job's output above. This is different from "no backup
+      exists": fix the underlying credentials/connectivity problem and
+      re-run `make d3 restore postgresql` rather than assuming there is
+      nothing to restore.
+  when: not (_postgresql_s3_check_succeeded | default(false) | bool)
+
+- name: "postgresql | fail if the S3 backup repo has no existing backup"
+  ansible.builtin.fail:
+    msg: >-
+      S3 repo2 (bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }})
+      was reachable but has no completed backup - nothing to restore.
+  when:
+    - _postgresql_s3_check_succeeded | default(false) | bool
+    - not (_postgresql_s3_has_backup | default(false) | bool)
+
+# Full replacement of spec.source.helm.values (apply_gitops_app.yml
+# replaces, not merges) - must repeat the same backups.s3.* values
+# install.yml's own d1 apply uses, or this call would silently disable the
+# S3 repo. gitops_app_refresh: true because zuno-postgresql-d1's automated
+# sync is disabled live (unlike most other Applications) - a values-only
+# re-apply would otherwise just sit OutOfSync until someone syncs it by
+# hand, defeating the point of an automated restore.
+- name: "postgresql | apply the PostgreSQL GitOps Application (d1: restore from repo2)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "postgresql"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_refresh: true
+    gitops_app_extra_helm_values:
+      postgresCluster:
+        enabled: true
+        restoreFromRepo: repo2
+      backups:
+        s3:
+          enabled: true
+          bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
+          endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
+          region: "{{ zuno_postgresql_backup_s3_region }}"
+    gitops_app_wait_retries: 60
+
+# Same readiness signal install.yml's normal path waits on (PGO never sets
+# a "Progressing" condition on this version, see that file's comment) -
+# reused here rather than guessing at status.pgbackrest.restore's exact
+# schema: PGO blocks instance startup on the restore Job completing, so by
+# the time every instance is ready, a failed restore could never have let
+# us get here in the first place.
+- name: "postgresql | wait for the restored zuno-postgresql PostgresCluster to finish rolling out"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _postgresql_restored_cluster
+  until: >-
+    (_postgresql_restored_cluster.resources | default([]) | length) > 0 and
+    (_postgresql_restored_cluster.resources[0].status.instances | default([]) | length) > 0 and
+    (_postgresql_restored_cluster.resources[0].status.instances | map(attribute='readyReplicas', default=0) | sum) ==
+    (_postgresql_restored_cluster.resources[0].status.instances | map(attribute='replicas', default=0) | sum) and
+    (_postgresql_restored_cluster.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'ProxyAvailable') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 90
+  delay: 10
+
+- name: "postgresql | report restore completion"
+  ansible.builtin.debug:
+    msg: >-
+      zuno-postgresql restored from S3 repo2 and finished rolling out
+      ({{ _postgresql_restored_cluster.resources[0].status.instances | map(attribute='replicas', default=0) | sum }}
+      instance(s)). status.pgbackrest.restore:
+      {{ _postgresql_restored_cluster.resources[0].status.pgbackrest.restore | default('(not reported)') }}
+
+# Clear the trigger again now that the restore has landed - dataSource
+# only matters at initial creation, but leaving restoreFromRepo armed
+# could surprise a future *intentional* fresh-cluster recreation.
+- name: "postgresql | clear the restore trigger"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "postgresql"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_refresh: true
+    gitops_app_extra_helm_values:
+      postgresCluster:
+        enabled: true
+      backups:
+        s3:
+          enabled: true
+          bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
+          endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
+          region: "{{ zuno_postgresql_backup_s3_region }}"
+    gitops_app_wait_retries: 30

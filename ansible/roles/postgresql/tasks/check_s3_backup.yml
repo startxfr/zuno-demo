@@ -1,0 +1,168 @@
+---
+# Shared by install.yml (auto-restore detection) and restore.yml (pre-flight
+# check). Uses the S3 bucket itself as the source of truth - runs a
+# throwaway in-cluster Job with Crunchy's own standalone pgbackrest image
+# (RELATED_IMAGE_PGBACKREST off the installed CSV, confirmed live
+# 2026-08-24: registry.connect.redhat.com/crunchydata/crunchy-pgbackrest)
+# against repo2 only. Deliberately never fails on its own (same philosophy
+# as precheck.yml) - sets two facts instead so callers can tell "genuinely
+# no backup" (_postgresql_s3_has_backup: false, _postgresql_s3_check_succeeded:
+# true) apart from "couldn't tell" (_postgresql_s3_check_succeeded: false,
+# e.g. bad credentials/connectivity) and react differently.
+#
+# `pgbackrest info` is queried with no --stanza filter, listing whatever
+# stanza(s) exist in the repo - this sidesteps needing to know PGO's own
+# stanza-naming convention up front; any stanza with >=1 backup entry
+# counts as "has backup".
+- name: "postgresql | resolve S3 backup credentials"
+  ansible.builtin.include_tasks: resolve_backup_s3_creds.yml
+
+- name: "postgresql | default S3 backup check facts when S3 isn't configured"
+  ansible.builtin.set_fact:
+    _postgresql_s3_has_backup: false
+    _postgresql_s3_check_succeeded: false
+  when: not (_postgresql_backup_s3_enabled | bool)
+
+- name: "postgresql | check the S3 pgBackRest repo for existing data"
+  when: _postgresql_backup_s3_enabled | bool
+  block:
+    - name: "postgresql | delete any previous S3-backup-check Job (idempotent-by-recreation)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: zuno-postgresql-check-s3-backup
+        namespace: zuno-data
+        wait: true
+
+    - name: "postgresql | run the S3 backup-check Job"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: zuno-postgresql-check-s3-backup
+            namespace: zuno-data
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          spec:
+            backoffLimit: 2
+            activeDeadlineSeconds: 180
+            template:
+              metadata:
+                annotations:
+                  sidecar.istio.io/inject: "false"
+              spec:
+                restartPolicy: Never
+                priorityClassName: zuno-platform-weak
+                containers:
+                  - name: pgbackrest-info
+                    image: "registry.connect.redhat.com/crunchydata/crunchy-pgbackrest@sha256:cfbd7926c9c2f33a42464328596c018b036c14d331add1170cd7f29c30f8ffde"
+                    command:
+                      - pgbackrest
+                    args:
+                      - info
+                      - --repo=2
+                      - --output=json
+                      - --config-include-path=/etc/pgbackrest/conf.d
+                    env:
+                      - name: PGBACKREST_REPO2_TYPE
+                        value: s3
+                      - name: PGBACKREST_REPO2_S3_BUCKET
+                        value: "{{ zuno_postgresql_backup_s3_bucket }}"
+                      - name: PGBACKREST_REPO2_S3_ENDPOINT
+                        value: "{{ zuno_postgresql_backup_s3_endpoint }}"
+                      - name: PGBACKREST_REPO2_S3_REGION
+                        value: "{{ zuno_postgresql_backup_s3_region }}"
+                    volumeMounts:
+                      - name: s3-creds
+                        mountPath: /etc/pgbackrest/conf.d
+                        readOnly: true
+                volumes:
+                  - name: s3-creds
+                    secret:
+                      # Single key (s3.conf): repo2-s3-key/repo2-s3-key-secret,
+                      # rendered by the ExternalSecret template - the exact
+                      # same file PGO's own pgbackrest containers mount via
+                      # spec.backups.pgbackrest.configuration.
+                      secretName: zuno-postgresql-backup-s3
+
+    - name: "postgresql | wait for the S3 backup-check Job to reach a terminal state"
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-data
+        name: zuno-postgresql-check-s3-backup
+      register: _postgresql_s3_check_job
+      until: >-
+        (_postgresql_s3_check_job.resources[0].status.succeeded | default(0)) > 0 or
+        (_postgresql_s3_check_job.resources[0].status.conditions | default([])
+          | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
+      retries: 12
+      delay: 10
+
+    - name: "postgresql | fetch the S3 backup-check Job's pod"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: zuno-data
+        label_selectors:
+          - "job-name=zuno-postgresql-check-s3-backup"
+      register: _postgresql_s3_check_pod
+
+    - name: "postgresql | select the most recent pod"
+      ansible.builtin.set_fact:
+        _postgresql_s3_check_pod_name: >-
+          {{ (_postgresql_s3_check_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
+      when: (_postgresql_s3_check_pod.resources | default([]) | length) > 0
+
+    - name: "postgresql | read the S3 backup-check Job's output"
+      kubernetes.core.k8s_log:
+        namespace: zuno-data
+        name: "{{ _postgresql_s3_check_pod_name }}"
+        container: pgbackrest-info
+      register: _postgresql_s3_check_log
+      when: (_postgresql_s3_check_pod.resources | default([]) | length) > 0
+
+    - name: "postgresql | record whether the check Job itself succeeded"
+      ansible.builtin.set_fact:
+        _postgresql_s3_check_succeeded: "{{ (_postgresql_s3_check_job.resources[0].status.succeeded | default(0)) > 0 }}"
+
+    - name: "postgresql | parse pgbackrest info output"
+      ansible.builtin.set_fact:
+        _postgresql_s3_stanzas: "{{ (_postgresql_s3_check_log.log | default('[]')) | from_json }}"
+      when: _postgresql_s3_check_succeeded | bool
+
+    - name: "postgresql | determine whether any stanza has a completed backup"
+      ansible.builtin.set_fact:
+        _postgresql_s3_has_backup: >-
+          {{
+            _postgresql_s3_check_succeeded | bool
+            and (_postgresql_s3_stanzas | default([])
+                 | map(attribute='backup', default=[]) | map('length') | select('greaterthan', 0) | list | length) > 0
+          }}
+
+    - name: "postgresql | report the S3 backup check result"
+      ansible.builtin.debug:
+        msg: >-
+          {% if not (_postgresql_s3_check_succeeded | bool) -%}
+          Could not query the S3 pgBackRest repo (repo2) - see the Job output
+          above (credentials/connectivity?). Treating as "no backup found" is
+          NOT safe here; callers should distinguish
+          _postgresql_s3_check_succeeded from _postgresql_s3_has_backup.
+          {%- elif _postgresql_s3_has_backup | bool -%}
+          S3 repo2 has at least one existing backup - this looks like a
+          reinstall over previously-backed-up data.
+          {%- else -%}
+          S3 repo2 is reachable but has no existing backup - this looks like
+          a genuinely fresh environment.
+          {%- endif %}
+
+    - name: "postgresql | delete the S3-backup-check Job (cleanup - throwaway probe, not GitOps-tracked)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: zuno-postgresql-check-s3-backup
+        namespace: zuno-data
+        wait: false

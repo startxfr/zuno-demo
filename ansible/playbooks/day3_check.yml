@@ -1,0 +1,89 @@
+---
+# `make day3|d3 check [component]` - the "global check" spanning every Day
+# 3 component regardless of which verb-group it belongs to. Two different
+# component shapes exist under Day 3 (see Makefile's comment above
+# DAY3_TEST_COMPONENTS/DAY3_BACKUP_COMPONENTS), so "check" composes their
+# existing mechanisms rather than inventing a third: agents/platform reuse
+# the same availability test day3_test.yml already runs (that IS their
+# check - see ansible/roles/day3/tasks/test.yml's own docstring); every
+# other Day 3 component (currently just postgresql) uses its own
+# tasks/precheck.yml, same convention every other day-tier's "check" verb
+# already follows (e.g. day1_check.yml). Both groups always run to
+# completion (report-everything-then-decide-once, same as
+# ansible/roles/day3/tasks/test.yml's own agents+platform split) - one
+# failing group never prevents the other from running.
+- name: "Day 3: global check"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    day3_precheck_components:
+      - postgresql
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Run the agents/platform availability test
+      when: target_component | default('all') in ['agents', 'platform', 'all']
+      block:
+        - name: "day3-check | run the availability test"
+          ansible.builtin.include_role:
+            name: day3
+            tasks_from: test
+          vars:
+            # The enclosing block's `when` already restricts target_component
+            # to agents/platform/all here - nothing further to resolve.
+            target_component: "{{ target_component | default('all') }}"
+      rescue:
+        - name: "day3-check | record the availability test as failed"
+          ansible.builtin.set_fact:
+            _day3_check_test_failed: true
+        - name: "day3-check | re-surface the failure"
+          ansible.builtin.debug:
+            msg: "Agents/platform availability test failed - see the output above."
+
+    - name: Resolve requested Day 3 precheck component name(s)
+      ansible.builtin.set_fact:
+        selected_precheck_components: >-
+          {{ day3_precheck_components if target_component | default('all') in ['all', 'postgresql']
+             else [] }}
+
+    - name: Generate the state-report file
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
+      when: (selected_precheck_components | length) > 0
+
+    - name: Run Day 3 component prechecks
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: precheck
+      loop: "{{ selected_precheck_components }}"
+      loop_control:
+        label: "{{ item }}"
+      ignore_errors: true
+      register: _day3_check_precheck_results
+      when: (selected_precheck_components | length) > 0
+
+    - name: Display the state report
+      ansible.builtin.debug:
+        msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"
+      when: (selected_precheck_components | length) > 0
+
+    - name: Fail if any Day 3 check failed
+      ansible.builtin.fail:
+        msg: >-
+          One or more Day 3 checks failed:
+          {{ 'agents/platform availability test failed. ' if (_day3_check_test_failed | default(false)) else '' }}
+          {{ 'Precheck failed for: ' ~ (
+               (_day3_check_precheck_results.results | default([]))
+               | selectattr('failed', 'defined') | selectattr('failed')
+               | map(attribute='item') | list
+             ) if (_day3_check_precheck_results is defined
+                   and (_day3_check_precheck_results.results | default([])
+                        | selectattr('failed', 'defined') | selectattr('failed') | list | length) > 0)
+             else '' }}
+          See the task output above for detail.
+      when: >-
+        (_day3_check_test_failed | default(false))
+        or (_day3_check_precheck_results is defined
+            and (_day3_check_precheck_results.results | default([])
+                 | selectattr('failed', 'defined') | selectattr('failed') | list | length) > 0)

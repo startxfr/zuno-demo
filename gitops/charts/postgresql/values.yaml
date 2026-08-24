@@ -4,6 +4,15 @@
 # template`/`helm lint` render nothing.
 postgresCluster:
   enabled: false
+  # One-shot recovery trigger (ansible/roles/postgresql/tasks/restore.yml):
+  # a pgBackRest repo name (e.g. "repo2") to bootstrap this PostgresCluster
+  # from via spec.dataSource.postgresCluster, instead of an empty cluster.
+  # Empty string (default) = normal fresh bootstrap. Set only as a live
+  # Helm-value override for the duration of a restore - restore.yml clears
+  # it again once the restored cluster is Ready, since dataSource only
+  # matters at initial creation and leaving it armed could surprise a
+  # future *intentional* fresh-cluster recreation.
+  restoreFromRepo: ""
 
 # subscription.name/operator.channel/operator.source.name are all
 # discovered at run time by ansible/roles/postgresql/tasks/install.yml and
@@ -245,3 +254,31 @@ conversationsDatabase:
   name: agent-conversations
   owner: agentconversations
   vaultPath: agent-runtime/conversations-postgresql-app
+
+# Ansible Automation Platform (ADR-0354, WP-072) - four dedicated
+# databases/roles, one per sub-component, same "bring your own password"
+# mechanism and isolation rationale as keycloakDatabase above. Unlike
+# every other consumer in this file, AAP's unified CR does NOT take one
+# shared external-database secret: Gateway, Controller, Hub and EDA each
+# own their own database configuration (confirmed live via `oc explain`,
+# see ansible/roles/aap/README.md's "Per-component external database"
+# table) - hence four blocks instead of one.
+aapDatabase:
+  name: aap
+  owner: aapgateway
+  vaultPath: aap/postgresql-app
+
+aapControllerDatabase:
+  name: aap-controller
+  owner: aapcontroller
+  vaultPath: aap-controller/postgresql-app
+
+aapHubDatabase:
+  name: aap-hub
+  owner: aaphub
+  vaultPath: aap-hub/postgresql-app
+
+aapEdaDatabase:
+  name: aap-eda
+  owner: aapeda
+  vaultPath: aap-eda/postgresql-app

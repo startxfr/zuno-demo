@@ -19,6 +19,20 @@ metadata:
 spec:
   postgresVersion: {{ .Values.postgresVersion }}
 
+{{- if .Values.postgresCluster.restoreFromRepo }}
+  # One-shot recovery: pre-populate this (newly-created) cluster's data
+  # directory from an existing pgBackRest repo instead of bootstrapping
+  # empty. clusterName/clusterNamespace default to this cluster's own name/
+  # namespace when omitted (confirmed via `oc explain
+  # postgrescluster.spec.dataSource.postgresCluster`), so restoring "into
+  # yourself" (recreating the same cluster after a deletion) only needs
+  # repoName. See ansible/roles/postgresql/tasks/restore.yml, the only
+  # intended setter of postgresCluster.restoreFromRepo.
+  dataSource:
+    postgresCluster:
+      repoName: {{ .Values.postgresCluster.restoreFromRepo | quote }}
+{{- end }}
+
   # Tells PGO to apply OpenShift-SCC-friendly pod/container security
   # context conventions to the instances it manages.
   openshift: true
@@ -200,6 +214,18 @@ spec:
     - name: {{ .Values.conversationsDatabase.owner }}
       databases:
         - {{ .Values.conversationsDatabase.name }}
+    - name: {{ .Values.aapDatabase.owner }}
+      databases:
+        - {{ .Values.aapDatabase.name }}
+    - name: {{ .Values.aapControllerDatabase.owner }}
+      databases:
+        - {{ .Values.aapControllerDatabase.name }}
+    - name: {{ .Values.aapHubDatabase.owner }}
+      databases:
+        - {{ .Values.aapHubDatabase.name }}
+    - name: {{ .Values.aapEdaDatabase.owner }}
+      databases:
+        - {{ .Values.aapEdaDatabase.name }}
 
   # Runs once at bootstrap against "postgres", not the app database - see
   # templates/configmap-init-sql.yaml's `\connect` comment for why.

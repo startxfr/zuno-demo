@@ -1,0 +1,27 @@
+---
+# `make day3|d3 backup [component]`. Only components with a
+# tasks/backup.yml support this - see Makefile's DAY3_BACKUP_COMPONENTS.
+- name: "Day 3: on-demand backup"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    day3_backup_components:
+      - postgresql
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve requested Day 3 backup component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day3_backup_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Run Day 3 backup
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: backup
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"
