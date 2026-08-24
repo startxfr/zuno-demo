@@ -47,16 +47,20 @@ jobTemplate:
   name: zuno-day0-check
   playbook: ansible/playbooks/day0_check.yml
 
-# Secret holding the Controller API access token every CR's
+# Secret holding the Gateway API access token every CR's
 # connection_secret references. Minted once by ansible/roles/aap_config
-# (POST /api/controller/v2/tokens/, shown-once) and persisted to Vault
+# (POST /api/gateway/v1/tokens/, shown-once - on AAP 2.5+ tokens are
+# gateway resources; the controller-side tokens endpoint no longer
+# exists, confirmed live 2026-08-25) and persisted to Vault
 # zuno/aap/controller-token; the ExternalSecret here re-materializes it,
-# adding the in-cluster Controller service as `host`.
+# adding the in-cluster Gateway service as `host`.
 connectionSecret:
   name: aap-controller-token
   vaultPath: aap/controller-token
-  # The resource operator appends /api/v2/... itself, so this must be the
-  # Controller's own root URL, NOT the gateway route (where Controller
-  # lives under the /api/controller/ prefix). Same-namespace in-cluster
-  # service, plain HTTP (confirmed live: Service aap-controller-service:80).
-  host: http://aap-controller-service.zuno-aap.svc
+  # The gateway's own in-cluster service (Service `aap`:80, the same one
+  # the external Route fronts - serves the /api/ discovery doc the
+  # gateway-aware ansible.controller collection in the resource
+  # operator's runner image reads, then talks to /api/controller/v2/...
+  # with the Bearer token). NOT aap-controller-service: controller-direct
+  # access has no token auth anymore on 2.5+.
+  host: http://aap.zuno-aap.svc

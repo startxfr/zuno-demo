@@ -67,9 +67,15 @@
   retries: 60
   delay: 10
 
+# Organizations are GATEWAY-level resources in AAP 2.5+ (the platform
+# resource server owns them and syncs them down into Controller/Hub/EDA) -
+# a direct POST on /api/controller/v2/organizations/ is rejected with
+# "Failed to sync resource to resource server" (HTTP 400, confirmed live
+# 2026-08-25). Create on the gateway API; the sync makes it visible to
+# the Controller-side lookups the resource operator does.
 - name: "aap-config | check whether the {{ aap_config_organization | default('zuno') }} organization exists"
   ansible.builtin.uri:
-    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/?name={{ aap_config_organization | default('zuno') }}"
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/organizations/?name={{ aap_config_organization | default('zuno') }}"
     method: GET
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
@@ -81,7 +87,7 @@
 
 - name: "aap-config | create the {{ aap_config_organization | default('zuno') }} organization"
   ansible.builtin.uri:
-    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/"
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/organizations/"
     method: POST
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
@@ -95,14 +101,36 @@
   when: (_aap_config_org_lookup.json.count | default(0) | int) == 0
   no_log: true
 
-# --- Controller API token, persisted to Vault (shown-once) ------------------
-# The tower.ansible.com CRs authenticate to Controller through a
-# connection_secret holding an access token. Tokens are shown once at
-# creation, so Vault (zuno/aap/controller-token) is the durable source and
-# the aap-config chart's ExternalSecret re-materializes it. Mint-then-seed
-# only when the Vault path doesn't exist yet - the same check-first
-# contract as ansible/tasks/vault_seed_if_missing.yml (a fresh token per
-# run would litter Controller with orphans and desync the Secret).
+- name: "aap-config | wait for the organization to sync down to Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/?name={{ aap_config_organization | default('zuno') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_org_synced
+  until: (_aap_config_org_synced.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 5
+  no_log: true
+
+# --- Gateway API token, persisted to Vault (shown-once) ---------------------
+# The tower.ansible.com CRs authenticate through a connection_secret
+# holding an access token. On AAP 2.5+ tokens are GATEWAY resources
+# (confirmed live 2026-08-25: /api/controller/v2/tokens/ is 404 both via
+# the gateway and against the controller service directly - controller
+# token management is gone, centralized in the gateway), and a gateway
+# token authenticates fine against the /api/controller/... paths through
+# the gateway (ping/projects/organizations all 200 with Bearer, only the
+# /me/ endpoint has a lazy-user-sync quirk this flow never touches).
+# Tokens are shown once at creation, so Vault (zuno/aap/controller-token)
+# is the durable source and the aap-config chart's ExternalSecret
+# re-materializes it. Mint-then-seed only when the Vault path doesn't
+# exist yet - the same check-first contract as
+# ansible/tasks/vault_seed_if_missing.yml (a fresh token per run would
+# litter the gateway with orphans and desync the Secret).
 
 - name: "aap-config | locate the Vault server pod"
   kubernetes.core.k8s_info:
@@ -147,9 +175,9 @@
   failed_when: false
   no_log: true
 
-- name: "aap-config | mint a Controller API access token (first run only - shown once)"
+- name: "aap-config | mint a Gateway API access token (first run only - shown once)"
   ansible.builtin.uri:
-    url: "{{ _aap_config_gateway_url }}/api/controller/v2/tokens/"
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/tokens/"
     method: POST
     url_username: admin
     url_password: "{{ _aap_config_admin_password }}"
@@ -158,13 +186,12 @@
     body_format: json
     body:
       description: "zuno-aap-config resource-operator connection (WP-073)"
-      scope: write
     status_code: 201
   register: _aap_config_token_minted
   when: _aap_config_token_existing.rc != 0
   no_log: true
 
-- name: "aap-config | persist the Controller token to Vault (first run only)"
+- name: "aap-config | persist the Gateway token to Vault (first run only)"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
     pod: "{{ _vault_pod.resources[0].metadata.name }}"
