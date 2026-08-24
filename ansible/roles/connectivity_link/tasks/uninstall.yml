@@ -15,6 +15,45 @@
     # cluster), so the Subscription lives in openshift-operators.
     operator_namespace: openshift-operators
 
+# rhcl-operator's CSV declares Authorino/DNS/Limitador as dependencies, so
+# OLM auto-installs all three alongside it on first subscribe - but never
+# removes them again on its own. Their Subscription names are OLM's
+# auto-generated <package>-<channel>-<catalogsource>-<catalognamespace>
+# form (confirmed live: e.g. authorino-operator-stable-redhat-operators-
+# openshift-marketplace), unlike rhcl-operator's own Subscription whose
+# name our chart fixes directly - so resolve them by their stable
+# spec.name (the package name) rather than hardcoding metadata.name, same
+# discover-don't-hardcode principle install.yml already applies to
+# catalog/channel. Run after rhcl-operator's own removal above so its
+# controller is already stopped and isn't reconciling against the CRDs
+# being deleted here.
+- name: "connectivity_link | discover the Subscription names OLM auto-installed for RHCL's dependencies (Authorino/DNS/Limitador)"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: openshift-operators
+  register: _connectivity_link_openshift_operators_subs
+
+- name: "connectivity_link | resolve the dependency operators' actual Subscription names"
+  ansible.builtin.set_fact:
+    _connectivity_link_dependency_subscriptions: >-
+      {{
+        _connectivity_link_openshift_operators_subs.resources
+        | selectattr('spec.name', 'in', ['authorino-operator', 'dns-operator', 'limitador-operator'])
+        | map(attribute='metadata.name')
+        | list
+      }}
+
+- name: "connectivity_link | remove RHCL's OLM-dependency operators (Authorino/DNS/Limitador - installed automatically alongside rhcl-operator, never removed on its own)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ _connectivity_link_dependency_operator_subscription }}"
+    operator_namespace: openshift-operators
+  loop: "{{ _connectivity_link_dependency_subscriptions }}"
+  loop_control:
+    loop_var: _connectivity_link_dependency_operator_subscription
+    label: "{{ _connectivity_link_dependency_operator_subscription }}"
+
 - name: "connectivity_link | delete the connectivity-link GitOps Application (d0: the Subscription itself)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
