@@ -30,13 +30,12 @@
 # file or logged.
 #
 # SQL is mounted from the {{ .Values.cluster.name }}-monitoring-role ConfigMap
-# (configmap-monitoring-role.yaml) and run via `-f`, not inlined via `-c`:
-# two real bugs were found here live on 2026-08-24 that only manifest with
-# `-c`/args-array delivery - (1) Kubernetes' own $(VAR) arg-substitution
-# collapses any literal `$$` elsewhere in the same args array, breaking
-# Postgres dollar-quoted DO blocks; (2) this psql client only performs
-# `:'var'` colon-interpolation for SQL read as a script (`-f`/stdin), never
-# for `-c`. Same ConfigMap+`-f` pattern as gitops/charts/sql-schema's Job.
+# (configmap-monitoring-role.yaml) and run via `-f`, not inlined via `-c` -
+# `-c` never performs `:'var'` colon-interpolation at all, live-verified
+# 2026-08-24. See that ConfigMap's own comment for why the SQL also avoids a
+# DO/PL-pgSQL block (dollar-quoting separately disables colon-interpolation,
+# regardless of `-c` vs `-f`). Same ConfigMap+`-f` pattern as
+# gitops/charts/sql-schema's Job.
 apiVersion: batch/v1
 kind: Job
 metadata:

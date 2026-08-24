@@ -1,11 +1,6 @@
-DO $mrole$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ccp_monitoring') THEN
-    CREATE ROLE ccp_monitoring LOGIN PASSWORD :'pass';
-  ELSE
-    ALTER ROLE ccp_monitoring PASSWORD :'pass';
-  END IF;
-END
-$mrole$;
+SELECT format('CREATE ROLE ccp_monitoring LOGIN PASSWORD %L', :'pass')
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ccp_monitoring') \gexec
+
+ALTER ROLE ccp_monitoring PASSWORD :'pass';
 GRANT pg_monitor TO ccp_monitoring;
 GRANT CONNECT ON DATABASE postgres TO ccp_monitoring;

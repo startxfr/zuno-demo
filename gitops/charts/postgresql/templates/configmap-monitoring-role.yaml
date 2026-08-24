@@ -1,11 +1,15 @@
 {{- if .Values.monitoring.enabled }}
-# Mounted by job-monitoring-role.yaml's Sync-hook Job at /sql. Moved out of
-# that Job's inline `-c` args (same reasoning as gitops/charts/sql-schema and
-# gitops/charts/rag-service's ConfigMap+`-f` pattern): psql's `:'var'`
-# colon-interpolation only applies to SQL read as a script (`-f`/stdin), not
-# to SQL passed via `-c` - and separately, Kubernetes' own $(VAR_NAME)
-# command-arg substitution collapses any literal `$$` in the same args
-# array, which broke this SQL's dollar-quoted DO block when it lived inline.
+# Mounted by job-monitoring-role.yaml's Sync-hook Job at /sql (ConfigMap+`-f`
+# pattern, same as gitops/charts/sql-schema and gitops/charts/rag-service).
+# The SQL avoids a DO/PL-pgSQL block on purpose: psql's `:'var'` colon-
+# interpolation is skipped entirely inside dollar-quoted strings (`$$...$$`
+# or `$tag$...$tag$`), by design, live-verified 2026-08-24 - a `DO $$ ... :
+# 'pass' ... $$;` body never gets the password substituted, however the SQL
+# is delivered. The `format(...)`+`\gexec` pattern below keeps every `:'pass'`
+# reference in plain top-level SQL, outside any dollar-quoting, where
+# interpolation does work (also live-verified, but only via `-f`/script mode
+# - `-c` never interpolates `:'var'` at all, which is the separate reason
+# this Job uses `-f` instead of inlining the SQL into `-c` args).
 # Sync-wave "-1" (before the Job's wave "0") so it's guaranteed to exist
 # before the hook Job that mounts it runs.
 apiVersion: v1
