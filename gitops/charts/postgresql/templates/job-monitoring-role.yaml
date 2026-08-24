@@ -36,6 +36,18 @@
 # DO/PL-pgSQL block (dollar-quoting separately disables colon-interpolation,
 # regardless of `-c` vs `-f`). Same ConfigMap+`-f` pattern as
 # gitops/charts/sql-schema's Job.
+#
+# Pod template opts out of Istio sidecar injection (sidecar.istio.io/inject:
+# "false" below): live-verified 2026-08-24 that with injection on, `psql`
+# regularly starts and makes its one connection before Envoy's native-
+# sidecar init container is actually ready to proxy traffic (Kubernetes only
+# orders on the sidecar having *started*, not passed its readiness probe),
+# producing an intermittent "server closed the connection unexpectedly" -
+# the Postgres server itself never crashes. This one-shot admin Job has no
+# need for mesh mTLS/telemetry, and mesh-wide mTLS is PERMISSIVE (no
+# PeerAuthentication anywhere), so a plain same-namespace connection works
+# fine without the sidecar - removing it removes the race entirely instead
+# of just narrowing the window.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -56,6 +68,9 @@ spec:
   # same reasoning as gitops/charts/{sql-schema,rag-service}'s Jobs.
   activeDeadlineSeconds: 300
   template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       restartPolicy: Never
       priorityClassName: zuno-platform-weak
