@@ -1,4 +1,4 @@
-{{- if .Values.monitoring.enabled }}
+{{- if and .Values.monitoring.enabled .Values.postgresCluster.enabled }}
 # Automates a fix that was previously manual (see this chart's
 # postgrescluster.yaml "postgres" user comment, and the git history of
 # gitops/charts/grafana/templates/dashboard-infra-data.yaml): Crunchy PGO

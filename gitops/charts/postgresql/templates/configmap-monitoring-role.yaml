@@ -1,4 +1,4 @@
-{{- if .Values.monitoring.enabled }}
+{{- if and .Values.monitoring.enabled .Values.postgresCluster.enabled }}
 # Mounted by job-monitoring-role.yaml's Sync-hook Job at /sql (ConfigMap+`-f`
 # pattern, same as gitops/charts/sql-schema and gitops/charts/rag-service).
 # The SQL avoids a DO/PL-pgSQL block on purpose: psql's `:'var'` colon-
