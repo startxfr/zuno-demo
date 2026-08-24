@@ -39,4 +39,33 @@ spec:
       ports:
         - protocol: TCP
           port: 9187
+    # Same-namespace ingress on the database-internal ports. Because this
+    # policy selects the instance pods at all, everything not listed here is
+    # denied to them - which silently held only as long as every Postgres
+    # connection rode the Istio sidecar tunnel (which slips past the L4
+    # dport match). Once postgrescluster.yaml's
+    # traffic.sidecar.istio.io/excludeInboundPorts made 5432/8432 direct
+    # pod-to-pod (2026-08-24, see that template's comment), this policy
+    # started dropping them: replica pg_basebackup bootstrap against the
+    # primary timed out (readyReplicas stuck 1/3) and pgBackRest backup
+    # Jobs timed out on every instance's 8432 - proven live by paired
+    # /dev/tcp probes from a replica: 8008 (still Envoy-tunneled) OPEN,
+    # 5432 (direct) TIMEOUT, with the primary healthy throughout.
+    # 5432 = Postgres (replication/pgBouncer/the monitoring-role fixup Job,
+    # which runs sidecar-less and connects to -primary directly);
+    # 8432 = pgBackRest's own TLS server; 8008 = Patroni's API, today still
+    # Envoy-tunneled but listed so a future exclusion widening can't
+    # resurrect this same trap. Same-namespace scope (bare podSelector)
+    # matches the platform baseline's "same-namespace traffic is always
+    # allowed" stance (gitops/charts/namespaces' default-deny policy);
+    # cross-namespace consumers reach PgBouncer, not these pods.
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8432
+        - protocol: TCP
+          port: 8008
 {{- end }}
