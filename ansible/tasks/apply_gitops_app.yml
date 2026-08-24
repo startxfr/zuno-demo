@@ -41,9 +41,20 @@
     definition: "{{ _gitops_app_definition }}"
 
 # Reconcile passes gitops_app_refresh: true to force ArgoCD to re-evaluate a
-# stuck app - re-applying an unchanged manifest alone doesn't trigger a
-# refresh. Default false so install behavior is unchanged.
-- name: "gitops | request a hard refresh of {{ gitops_app_name }}"
+# stuck app or apply a fresh diff immediately - re-applying an unchanged
+# manifest alone doesn't trigger a sync. Previously patched the
+# argocd.argoproj.io/refresh: hard annotation, then immediately polled
+# status.sync/status.health below - that raced ArgoCD's own diff
+# computation: the poll could read a stale cached Synced+Healthy status
+# before the refresh finished, reporting success while the app was still
+# actually OutOfSync (hit live 2026-08-24, WP-071 deploy - a chart change
+# requiring pruning needed a manual `oc patch .../operation` follow-up to
+# actually apply). Patching spec.operation.sync directly instead - the
+# same mechanism `argocd app sync` uses - gives an unambiguous completion
+# signal (status.operationState.phase) to wait on before the Synced/Healthy
+# check below, instead of racing a cache refresh. Default false so install
+# behavior for non-refresh callers is unchanged.
+- name: "gitops | trigger a sync operation for {{ gitops_app_name }}"
   kubernetes.core.k8s:
     state: patched
     api_version: argoproj.io/v1alpha1
@@ -51,9 +62,22 @@
     namespace: openshift-gitops
     name: "{{ gitops_app_name }}"
     definition:
-      metadata:
-        annotations:
-          argocd.argoproj.io/refresh: "hard"
+      operation:
+        sync: {}
+  when: gitops_app_refresh | default(false) | bool
+
+- name: "gitops | wait for the {{ gitops_app_name }} sync operation to finish"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ gitops_app_name }}"
+  register: _gitops_app_operation
+  until: >-
+    (_gitops_app_operation.resources | length > 0) and
+    (_gitops_app_operation.resources[0].status.operationState.phase | default('') == 'Succeeded')
+  retries: "{{ gitops_app_wait_retries | default(30) }}"
+  delay: "{{ gitops_app_wait_delay | default(10) }}"
   when: gitops_app_refresh | default(false) | bool
 
 - name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy, diagnosing blocked resources on timeout"
