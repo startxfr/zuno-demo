@@ -1,5 +1,8 @@
 ---
 # Day 0 install (`make day0 install`). Same component order as day0_check.yml.
+# openshift_oauth moved to Day 1 (after keycloak) - it depends on Keycloak's
+# Ingress/TLS Secret, which don't exist until Day 1's keycloak component
+# has run. See ansible/playbooks/day1_install.yml.
 - name: "Day 0: install prerequisites"
   hosts: localhost
   gather_facts: false
@@ -15,7 +18,6 @@
       - cert_manager
       - external_secrets
       - smtp
-      - openshift_oauth
       # machines before nfd/nvidia_gpu: the permanent GPU node should exist
       # (or be provisioning) before nvidia_gpu's ClusterPolicy-ready wait.
       - machines

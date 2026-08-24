@@ -158,7 +158,7 @@
     # Day 0 (gitops/charts/namespaces), long before this component existed -
     # postgresql's pods (created at the 'postgresql' step, before this one)
     # came up without a sidecar and won't get one until restarted. Every
-    # component after this one in day0_components (keycloak) and every Day 1
+    # component after this one in day1_components (keycloak) and every Day 1
     # AI/agent workload auto-injects on first create, so needs no such step.
 - name: "service_mesh | discover the PostgreSQL instance StatefulSets in zuno-data"
   kubernetes.core.k8s_info:

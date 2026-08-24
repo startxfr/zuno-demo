@@ -1,7 +1,7 @@
 ---
 # ADR-0320. Depends on keycloak (the "openshift" client and its Vault-
 # seeded secret must exist first) - ordered after keycloak in
-# ansible/playbooks/day0_install.yml. No operator/PackageManifest
+# ansible/playbooks/day1_install.yml. No operator/PackageManifest
 # discovery needed - OAuth is a built-in cluster API, not OLM-installed.
 - name: "openshift_oauth | apply the openshift-oauth GitOps Application (d0: ExternalSecret into openshift-config)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -77,7 +77,7 @@
     msg: >-
       Ingress {{ zuno_keycloak_cr_name | default('zuno') }} (zuno-auth) not
       found - keycloak is not installed or not reconciled; check
-      `make d0 check keycloak` before re-running.
+      `make day1 check keycloak` before re-running.
   when: (_openshift_oauth_keycloak_ingress.resources | default([]) | length) == 0
 
 - name: "openshift_oauth | look up the Secret the Keycloak Ingress actually references"
@@ -97,7 +97,9 @@
       state: "NotFound"
       cause: "cert-manager has not yet issued the certificate the keycloak Ingress currently references"
       solution: "Verify the relevant ClusterIssuer is Ready and the Certificate is Ready, then re-run"
-      auto_fix: "make d0 reconcile keycloak"
+      # No day1_reconcile.yml exists in this repo - install.yml is
+      # idempotent, so re-running it is the equivalent remediation.
+      auto_fix: "make day1 install keycloak"
   when: (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
 
 - name: "openshift_oauth | fail loudly if the Keycloak serving TLS secret isn't available to copy"
@@ -105,7 +107,7 @@
     msg: >-
       Secret {{ _openshift_oauth_keycloak_ingress.resources[0].spec.tls[0].secretName }}
       (zuno-auth) not found - cert-manager must have issued it first;
-      check `make d0 check keycloak` before re-running.
+      check `make day1 check keycloak` before re-running.
   when: (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
 
 # ACME-issued Secrets (Let's Encrypt via cert-manager) carry only

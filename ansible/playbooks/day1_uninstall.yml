@@ -3,7 +3,9 @@
 # order. `namespaces`, `llm`, `models`, and content-ingestion moved to
 # Day 2 - see day2_uninstall.yml. `aiagent_operator` runs first here
 # (last in install) - reverse of operator-before-CR: nothing left in
-# Day 1 depends on it once uninstall starts.
+# Day 1 depends on it once uninstall starts. `openshift_oauth` (moved
+# here from Day 0) runs right before `keycloak`, mirroring its install
+# position right after it.
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false
@@ -16,6 +18,7 @@
       - jobset
       - lws
       - connectivity_link
+      - openshift_oauth
       - keycloak
       - tempo
       - mariadb

@@ -8,7 +8,7 @@ EXTRA_VARS ?=
 # ADR-0056/ADR-0060: Day 0 (cluster prerequisites) / Day 1 (AI-platform-
 # operator stack) / Day 2 (AI infrastructure + content ingestion) / Day 3
 # (agent test/stresstest operations) sequencing.
-DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets openshift-oauth smtp machines nfd nvidia-gpu custom-metrics-autoscaler
+DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets smtp machines nfd nvidia-gpu custom-metrics-autoscaler
 DAY0_VERBS := check install uninstall reconcile all reinstall
 
 # Day 1 is the AI-platform-operator stack only (mesh, Keycloak, databases,
@@ -18,7 +18,7 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # ai-gateway (see ansible/roles/ai_gateway_build) and supply-chain-signer
 # (ADR-0420/WP-068, see ansible/roles/supply_chain_signer_build) - neither
 # has a matching run component, both are build-only images.
-DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak connectivity-link lws jobset kueue openshift-ai aiagent-operator
+DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth connectivity-link lws jobset kueue openshift-ai aiagent-operator
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer
 DAY1_VERBS := check install build uninstall all reinstall
 

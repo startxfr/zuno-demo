@@ -1,6 +1,7 @@
 ---
 # Day 0 uninstall (`make day0 uninstall`). Reverses install order so
 # dependents are removed before what they depend on.
+# openshift_oauth moved to Day 1 (after keycloak) - see day1_uninstall.yml.
 - name: "Day 0: uninstall prerequisites"
   hosts: localhost
   gather_facts: false
@@ -14,7 +15,6 @@
       # nodes away before the GPU operator uninstall would strand its
       # node-scoped operands mid-delete.
       - machines
-      - openshift_oauth
       - smtp
       - external_secrets
       - cert_manager

@@ -4,7 +4,7 @@ Applies the `gitops/apps/openshift-oauth` ArgoCD Application pair, whose
 chart (`gitops/charts/openshift-oauth`) renders the cluster `OAuth`/`cluster`
 singleton (`config.openshift.io/v1`), a `Proxy`/`cluster` trust patch, plus
 the `ExternalSecret` that syncs its Vault-seeded OIDC client secret into
-`openshift-config`. A Day 0 component, ordered after `keycloak` (the
+`openshift-config`. A Day 1 component, ordered right after `keycloak` (the
 "openshift" client and its secret, plus its cert-manager-issued TLS cert,
 must exist first): `-d0` applies the `ExternalSecret`; the role then
 copies two CA ConfigMaps into `openshift-config` (see below); `-d1`
@@ -47,10 +47,11 @@ from cluster-specific data (Helm can't render them):
   `spec.trustedCA` - `Proxy`/`cluster` carries other operator-managed
   fields this chart must never touch).
 
-Both copies run unconditionally on every install/reconcile, so a rotated
-Keycloak cert or regenerated Vault root is healed by `make d0 reconcile
-openshift-oauth`; `uninstall.yml` deletes both and `precheck.yml` requires
-both for the component to count as installed.
+Both copies run unconditionally on every install, so a rotated Keycloak
+cert or regenerated Vault root is healed by re-running `make day1 install
+openshift-oauth` (no `day1_reconcile.yml` exists in this repo -
+`install.yml` is idempotent); `uninstall.yml` deletes both and
+`precheck.yml` requires both for the component to count as installed.
 
 ## Referenced startx Secrets (never created here)
 

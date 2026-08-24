@@ -3,7 +3,10 @@
 # only (mesh, Keycloak, databases, Kueue, OpenShift AI, etc.) plus
 # aiagent_operator. `openshift_ai`/`kueue` back `models`' KServe/RHOAI
 # serving path and `keycloak` provides auth broadly across this tier, so
-# both precede `aiagent_operator`. `aiagent_operator` runs last -
+# both precede `aiagent_operator`. `openshift_oauth` runs right after
+# `keycloak` (moved here from Day 0 - it needs Keycloak's Ingress/TLS
+# Secret to exist first, which Day 0 can never provide). `aiagent_operator`
+# runs last -
 # standard operator-before-CR ordering: it must be running before Day 2's
 # `agents` component creates any `AIAgent` CRs. `namespaces`, `llm`,
 # `models`, and content-ingestion (sql_schema/rag/rag_ingestion/mcp/
@@ -29,6 +32,7 @@
       - mariadb
       - tempo
       - keycloak
+      - openshift_oauth
       - connectivity_link
       - lws
       - jobset

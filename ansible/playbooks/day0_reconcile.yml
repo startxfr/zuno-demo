@@ -6,6 +6,8 @@
 # install re-run, which re-applies the component's Application manifest - the
 # baseline remediation, since Applications are Ansible-applied, not
 # git-synced (ADR-0311/ADR-0343) - and re-runs the diagnosing waits.
+# openshift_oauth moved to Day 1 (after keycloak) - no day1_reconcile.yml
+# exists in this repo, so it has no reconcile-list counterpart.
 - name: "Day 0: reconcile blocked prerequisites"
   hosts: localhost
   gather_facts: false
@@ -21,7 +23,6 @@
       - cert_manager
       - external_secrets
       - smtp
-      - openshift_oauth
       - nfd
       - nvidia_gpu
       - custom_metrics_autoscaler

@@ -1,6 +1,11 @@
 ---
 # Day 0 state check (`make day0 check`). Component order matters: e.g.
 # vault must precede cert_manager/external_secrets, argocd before namespaces.
+# openshift_oauth moved to Day 1 (after keycloak) - see day1_check.yml.
+# (This list previously repeated almost every component twice, likely a
+# stray copy-paste - deduplicated to a single pass matching
+# day0_install.yml's order; no coverage was lost, the first pass already
+# checked everything.)
 - name: "Day 0: check install state"
   hosts: localhost
   gather_facts: false
@@ -16,20 +21,7 @@
       - cert_manager
       - external_secrets
       - smtp
-      - openshift_oauth
       - machines
-      - nfd
-      - nvidia_gpu
-      - custom_metrics_autoscaler
-      - argocd
-      - admin_context
-      - namespaces
-      - openshift_rbac_groups
-      - vault
-      - cert_manager
-      - external_secrets
-      - openshift_oauth
-      - smtp
       - nfd
       - nvidia_gpu
       - custom_metrics_autoscaler
