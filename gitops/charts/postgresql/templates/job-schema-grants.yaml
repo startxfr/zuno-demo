@@ -1,0 +1,69 @@
+{{- if .Values.postgresCluster.enabled }}
+# Grants CREATE on the public schema to every dedicated-database owner
+# role - see configmap-schema-grants.yaml for the full root-cause writeup
+# (PGO leaves every dedicated database owned by "postgres", and
+# PostgreSQL 15+ no longer implies schema-level CREATE from the
+# database-level grant PGO's spec.users[].databases does give).
+#
+# Same ArgoCD Sync-hook shape as job-monitoring-role.yaml (see that Job's
+# own comment for why Sync, not PreSync, and why the pod opts out of Istio
+# injection) - connects as the postgres superuser using the PGO-native
+# {{ .Values.cluster.name }}-pguser-postgres secret, already
+# health-gated by the PostgresCluster reconcile at wave -30.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.cluster.name }}-schema-grants
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  # Same reasoning as job-monitoring-role.yaml: a handful of GRANT
+  # statements takes seconds; without a deadline a pod stuck in
+  # CreateContainerConfigError hangs the whole sync operation forever.
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      restartPolicy: Never
+      priorityClassName: zuno-platform-weak
+      containers:
+        - name: psql
+          image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/postgres:16-bookworm
+          command:
+            - psql
+          env:
+            - name: PGHOST
+              value: {{ .Values.cluster.name }}-primary.{{ .Release.Namespace }}.svc
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cluster.name }}-pguser-postgres
+                  key: password
+          args:
+            - -v
+            - ON_ERROR_STOP=1
+            - -f
+            - /sql/schema-grants.sql
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      volumes:
+        - name: sql
+          configMap:
+            name: {{ .Values.cluster.name }}-schema-grants
+{{- end }}

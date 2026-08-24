@@ -1,0 +1,63 @@
+{{- if .Values.postgresCluster.enabled }}
+# Mounted by job-schema-grants.yaml's Sync-hook Job at /sql. Found live
+# 2026-08-24/25: PGO creates every dedicated database (spec.users[].
+# databases) owned by "postgres", not by the named app role - the role
+# only gets CTc (Connect/Temp/Create) at the DATABASE level via
+# spec.users[].databases (`\l`'s "Access privileges" column). Since
+# PostgreSQL 15, CREATE on the `public` SCHEMA is a separate grant, held
+# only by the pseudo-role `pg_database_owner` (which resolves to whichever
+# role actually owns the database - here, always "postgres", never the
+# app role) - `\dn+ public` on a freshly-created dedicated database shows
+# `pg_database_owner=UC/pg_database_owner`, nothing for the app role. Every
+# consumer that runs its own schema migrations against a dedicated
+# database (Keycloak, AAP's four sub-components, and any future one) hits
+# "permission denied for schema public" on first migrate/CREATE TABLE
+# without this - confirmed live: Keycloak's zuno-0 pod was CrashLoopBackOff
+# for this exact reason before this fix, discovered while verifying
+# ADR-0354/WP-072's aap install.
+#
+# One GRANT per dedicated database, generated from this chart's own
+# *Database values rather than hand-listed, so a future dedicated database
+# added the same way (a new templates/externalsecret-<x>.yaml + a
+# `<x>Database` values.yaml block) is covered automatically without a
+# second edit here. cluster.owner (zunoapp/zuno, the shared app database)
+# is deliberately NOT in this list - PGO makes a database's own
+# spec.users[] entry its owner when it's the *only* database that user is
+# ever granted (confirmed by `\l`'s Owner column showing "postgres" even
+# there, same as every dedicated database - so it needs the same GRANT.
+# Included via cluster.owner/cluster.database below, not skipped).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.cluster.name }}-schema-grants
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  schema-grants.sql: |
+    {{- $databases := list
+      (dict "name" .Values.cluster.database "owner" .Values.cluster.owner)
+      (dict "name" .Values.keycloakDatabase.name "owner" .Values.keycloakDatabase.owner)
+      (dict "name" .Values.ragTechDatabase.name "owner" .Values.ragTechDatabase.owner)
+      (dict "name" .Values.maasDatabase.name "owner" .Values.maasDatabase.owner)
+      (dict "name" .Values.checkpointDatabase.name "owner" .Values.checkpointDatabase.owner)
+      (dict "name" .Values.ogxDatabase.name "owner" .Values.ogxDatabase.owner)
+      (dict "name" .Values.ragSalesDatabase.name "owner" .Values.ragSalesDatabase.owner)
+      (dict "name" .Values.ragSxaLegacyDatabase.name "owner" .Values.ragSxaLegacyDatabase.owner)
+      (dict "name" .Values.ragAdvDatabase.name "owner" .Values.ragAdvDatabase.owner)
+      (dict "name" .Values.ragSxaDatabase.name "owner" .Values.ragSxaDatabase.owner)
+      (dict "name" .Values.ragProjectDatabase.name "owner" .Values.ragProjectDatabase.owner)
+      (dict "name" .Values.conversationsDatabase.name "owner" .Values.conversationsDatabase.owner)
+      (dict "name" .Values.aapDatabase.name "owner" .Values.aapDatabase.owner)
+      (dict "name" .Values.aapControllerDatabase.name "owner" .Values.aapControllerDatabase.owner)
+      (dict "name" .Values.aapHubDatabase.name "owner" .Values.aapHubDatabase.owner)
+      (dict "name" .Values.aapEdaDatabase.name "owner" .Values.aapEdaDatabase.owner)
+    -}}
+    {{- range $databases }}
+    \c "{{ .name }}"
+    GRANT CREATE, USAGE ON SCHEMA public TO "{{ .owner }}";
+    {{- end }}
+{{- end }}
