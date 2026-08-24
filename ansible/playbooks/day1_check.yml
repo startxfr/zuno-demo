@@ -22,6 +22,7 @@
       - keycloak
       - openshift_oauth
       - aap
+      - aap_config
       - connectivity_link
       - lws
       - jobset

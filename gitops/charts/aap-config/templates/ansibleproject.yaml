@@ -1,0 +1,26 @@
+{{- if .Values.aapConfig.enabled }}
+# The AAP Project registering this repository (ADR-0354 clause 4). Field
+# names confirmed live via `oc explain ansibleproject.spec` (WP-072's CRD
+# inventory): connection_secret/name/organization/scm_type are required.
+# The organization must already exist - created via the Controller API by
+# ansible/roles/aap_config/tasks/install.yml (organizations have no CRD).
+apiVersion: tower.ansible.com/v1alpha1
+kind: AnsibleProject
+metadata:
+  name: {{ .Values.project.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  connection_secret: {{ .Values.connectionSecret.name }}
+  name: {{ .Values.project.name }}
+  organization: {{ .Values.organization }}
+  scm_type: git
+  repo: {{ .Values.project.repo }}
+  branch: {{ .Values.project.branch }}
+  description: >-
+    The zuno-demo platform repository - source of the day0/day1/day2/day3
+    playbooks (registered by gitops/charts/aap-config, WP-073).
+{{- end }}

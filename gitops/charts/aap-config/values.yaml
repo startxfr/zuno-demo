@@ -1,0 +1,62 @@
+# aapConfig.enabled renders everything (this chart has no operator half -
+# the tower.ansible.com CRDs are shipped by gitops/charts/aap's own
+# operator Subscription, so application-d0.yaml is a no-op). Defaults
+# false so `helm template` with no overrides renders nothing.
+aapConfig:
+  enabled: false
+
+# Namespace the CRs and their supporting objects live in - the AAP
+# resource operator (part of the aap operator bundle) only watches its
+# own namespace (OwnNamespace install mode).
+namespace: zuno-aap
+
+# AAP organization every object below belongs to. NOT created by this
+# chart - organizations have no CRD; ansible/roles/aap_config/tasks/
+# install.yml creates it via the Controller API (idempotent GET-then-POST)
+# before applying this chart's Application.
+organization: zuno
+
+# The Project registering this repository (same repoURL/branch every
+# ArgoCD Application in this repo already uses).
+project:
+  name: zuno-demo
+  repo: https://github.com/startxfr/zuno-demo.git
+  branch: main
+
+# Inventory the Job Template runs against. The CRD has no host-management
+# field - the localhost host (ansible_connection=local) is added by
+# ansible/roles/aap_config/tasks/install.yml via the Controller API.
+inventory:
+  name: zuno
+
+# Least-privilege machine credential (ADR-0354 Security considerations,
+# narrowed further per WP-073): a dedicated ServiceAccount bound to
+# cluster-reader, its token consumed through AnsibleCredential's native
+# kubernetes_api/kubernetes_bearer_token_secret fields. day0_check is
+# read-mostly by construction; if a precheck ever needs more, widen with
+# a targeted extra Role - never swap in an admin kubeconfig.
+credential:
+  name: zuno-cluster-reader
+  # The CRD's `type` field takes the Controller credential-type NAME.
+  type: OpenShift or Kubernetes API Bearer Token
+  kubernetesApi: https://kubernetes.default.svc
+serviceAccount:
+  name: aap-day0-check
+
+jobTemplate:
+  name: zuno-day0-check
+  playbook: ansible/playbooks/day0_check.yml
+
+# Secret holding the Controller API access token every CR's
+# connection_secret references. Minted once by ansible/roles/aap_config
+# (POST /api/controller/v2/tokens/, shown-once) and persisted to Vault
+# zuno/aap/controller-token; the ExternalSecret here re-materializes it,
+# adding the in-cluster Controller service as `host`.
+connectionSecret:
+  name: aap-controller-token
+  vaultPath: aap/controller-token
+  # The resource operator appends /api/v2/... itself, so this must be the
+  # Controller's own root URL, NOT the gateway route (where Controller
+  # lives under the /api/controller/ prefix). Same-namespace in-cluster
+  # service, plain HTTP (confirmed live: Service aap-controller-service:80).
+  host: http://aap-controller-service.zuno-aap.svc

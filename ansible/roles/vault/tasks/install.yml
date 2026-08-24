@@ -756,6 +756,24 @@
     and zuno_smtp_password | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# ADR-0354/WP-073: the Red Hat account used by `make d1 install aap` to
+# attach AAP's subscription (ansible/roles/aap reads the aap-rhn-credentials
+# Secret an ExternalSecret materializes from this path - the standard
+# ADR-0024 chain, replacing that role's original direct confidential.yml
+# read).
+- name: "vault | seed the AAP Red Hat account credentials from ansible/confidential.yml (ADR-0354)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/rhn
+      username={{ zuno_aap_rhn_username | quote }} password={{ zuno_aap_rhn_password | quote }}"
+  when: >-
+    zuno_aap_rhn_username | default('xxxxxx') != 'xxxxxx'
+    and zuno_aap_rhn_password | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 # url/email are required alongside token: Atlassian Cloud's REST API uses
 # email+API-token Basic Auth, not a bearer token alone.
 - name: "vault | seed the Confluence technical credentials from ansible/confidential.yml"
@@ -1019,6 +1037,7 @@
     - jira/technical
     - salesforce/technical
     - aws/route53-dns01
+    - aap/rhn
   loop_control:
     loop_var: secret_path
     label: "{{ secret_path }}"

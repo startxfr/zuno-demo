@@ -198,6 +198,11 @@ zuno_aramis_enabled: false
 # connectivity-link/lws/jobset/kueue/openshift-ai/aiagent-operator in
 # Day 1, so this deliberately blocks the rest of the sequence until the
 # subscription is resolved.
+# The username/password values are consumed via the standard ADR-0024
+# chain (seeded to Vault zuno/aap/rhn by `make d0 install vault`, then
+# read from the aap-rhn-credentials Secret by the aap role) - after
+# changing them here, re-run `make d0 install vault` before
+# `make d1 install aap`. Only the zuno_aap_enabled flag is read directly.
 zuno_aap_enabled: false
 zuno_aap_rhn_username: "xxxxxx"
 zuno_aap_rhn_password: "xxxxxx"

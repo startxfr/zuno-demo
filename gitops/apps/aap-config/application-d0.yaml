@@ -1,0 +1,34 @@
+---
+# No-op: aap-config has no operator half of its own - the
+# tower.ansible.com CRDs its -d1 CRs need are shipped by gitops/charts/aap's
+# operator Subscription (confirmed live, WP-072's CRD inventory - no
+# separate resource-operator Subscription exists or is needed). Kept so the
+# component matches the repo's uniform -d0/-d1 Application-pair shape.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-aap-config-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-154"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/aap-config
+    helm:
+      releaseName: zuno-aap-config-d0
+      values: |
+        aapConfig:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-aap
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

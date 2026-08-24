@@ -1,0 +1,34 @@
+---
+# The zuno-demo Project, zuno-day0-check Job Template, their inventory and
+# least-privilege cluster credential - AAP resource-operator CRs plus their
+# supporting ServiceAccount/token/ExternalSecret (ADR-0354 clause 4,
+# WP-073). The zuno organization and the Controller API token these CRs
+# depend on are created by ansible/roles/aap_config/tasks/install.yml
+# BEFORE this Application is applied (organizations/tokens have no CRD).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-aap-config-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-153"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/aap-config
+    helm:
+      releaseName: zuno-aap-config-d1
+      values: |
+        aapConfig:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-aap
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

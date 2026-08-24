@@ -1,0 +1,11 @@
+apiVersion: v2
+name: aap-config
+description: >-
+  Registers this repository in the running AAP instance: the zuno-demo
+  Project, the zuno-day0-check Job Template, their inventory and
+  least-privilege cluster credential - rendered as AAP resource-operator
+  CRs (tower.ansible.com/v1alpha1, shipped by the same operator bundle
+  gitops/charts/aap subscribes). ADR-0354 clause 4, Path A (WP-073).
+type: application
+version: 0.1.0
+appVersion: "n/a"

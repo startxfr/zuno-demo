@@ -1,0 +1,22 @@
+{{- if .Values.aapConfig.enabled }}
+# Inventory the zuno-day0-check Job Template runs against. The CRD has no
+# host-management field (confirmed live, WP-073) - the localhost host
+# (ansible_connection=local, so the playbook's kubernetes.core modules
+# talk straight to the API server with the injected credential) is added
+# by ansible/roles/aap_config/tasks/install.yml via the Controller API.
+apiVersion: tower.ansible.com/v1alpha1
+kind: AnsibleInventory
+metadata:
+  name: {{ .Values.inventory.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  connection_secret: {{ .Values.connectionSecret.name }}
+  name: {{ .Values.inventory.name }}
+  organization: {{ .Values.organization }}
+  description: >-
+    localhost-only inventory for cluster-facing playbooks (WP-073).
+{{- end }}

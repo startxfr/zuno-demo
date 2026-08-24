@@ -1,15 +1,33 @@
 # WP-073: Register the zuno-demo Project and day0_check Job Template in AAP
 
-- **State:** Not started - unblocked. WP-072's live CRD inventory
-  (2026-08-24, `demo222`) confirmed **Path A**: the AAP operator's own
-  bundle already ships Kubernetes CRDs for `AnsibleProject`,
-  `JobTemplate`, `AnsibleCredential`, `AnsibleInventory`, `AnsibleJob`,
-  `AnsibleSchedule`, `AnsibleWorkflow`, `WorkflowTemplate` (group
-  `tower.ansible.com/v1alpha1`) - no second Subscription, no
-  `infra.aap_configuration` collection, no Ansible-executed action code
-  needed. Path B's steps below are now historical (kept as a documented
-  fallback only). This WP still needs `aap` (WP-072) actually installed
-  and Ready on the target cluster before it can run.
+- **State:** Repo work merged (2026-08-25), live verification pending.
+  Implemented via **Path A** as confirmed by WP-072's CRD inventory, with
+  four user-approved scope additions beyond the original brief:
+  (1) the RHN subscription credentials moved into the standard ADR-0024
+  Vault chain (`zuno/aap/rhn` seed + `aap-rhn-credentials` ExternalSecret,
+  replacing the aap role's direct confidential.yml read);
+  (2) a dedicated AAP organization `zuno` (API-created - orgs have no CRD,
+  and `AnsibleProject.spec.organization` is required);
+  (3) **Keycloak SSO wired now** (closing ADR-0354 clause 6): the 2.7
+  gateway ships a native `keycloak` authenticator plugin (confirmed live),
+  created via the gateway API against WP-072's `aap` realm client, with
+  `ocp-paas-ops`→superuser and allow-authenticated maps;
+  (4) least-privilege machine credential: `aap-day0-check` ServiceAccount
+  + cluster-reader, consumed through `AnsibleCredential`'s native
+  `kubernetes_api`/`kubernetes_bearer_token_secret` fields.
+  Additional live-confirmed facts folded in: the `JobTemplate` CRD has NO
+  credentials/extra_vars field (credential attached via Controller API);
+  the `AnsibleInventory` CRD has no host field (localhost added via API);
+  the Controller connection token is minted once (shown-once) and
+  persisted to Vault `zuno/aap/controller-token`; `route_host` (not
+  `hostname`) is what actually moves the AAP Route - fixed in
+  `gitops/charts/aap` so the Route lands on `aap.<domain>`, matching the
+  Keycloak client's redirect URIs; `ansible/tasks/load_k8s_auth_env.yml`
+  now detects AAP's injected `K8S_AUTH_HOST` so the same playbooks run
+  unmodified from a shell and from a Job Template.
+
+  Original decision-checkpoint framing below is kept for history; Path B
+  never applied.
 - **ADRs:** ADR-0354 (clause 4 and clause 6's AAP-side authenticator
   question)
 - **Depends on:** WP-072 (`aap` component live and Ready - repo work

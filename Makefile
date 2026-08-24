@@ -22,7 +22,9 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # Platform needs its own dedicated PostgreSQL database (postgresql,
 # earlier here) and Keycloak/openshift-oauth's Ingress+CA-trust bootstrap,
 # same prerequisites openshift-oauth itself needed to move out of Day 0 for.
-DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap connectivity-link lws jobset kueue openshift-ai aiagent-operator
+# "aap-config" (WP-073) follows immediately: it registers this repository
+# (Project/Job Template/SSO) inside the AAP instance "aap" just installed.
+DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap aap-config connectivity-link lws jobset kueue openshift-ai aiagent-operator
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer
 DAY1_VERBS := check install build uninstall all reinstall
 

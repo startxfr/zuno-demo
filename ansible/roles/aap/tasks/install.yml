@@ -148,17 +148,44 @@
 - name: "aap | activate the Red Hat subscription"
   when: zuno_aap_enabled | default(false) | bool
   block:
+# ADR-0024 chain (WP-073 improvement): the RHN credentials come from the
+    # aap-rhn-credentials Secret (ExternalSecret over Vault zuno/aap/rhn,
+    # seeded by ansible/roles/vault from confidential.yml) - this role no
+    # longer reads confidential.yml's RHN values directly; only the
+    # zuno_aap_enabled flag still comes from there.
+    - name: "aap | read the RHN credentials from the aap-rhn-credentials Secret"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: zuno-aap
+        name: aap-rhn-credentials
+      register: _aap_rhn_secret
+      no_log: true
+
+    - name: "aap | resolve the RHN credentials"
+      ansible.builtin.set_fact:
+        _aap_rhn_username: >-
+          {{ (_aap_rhn_secret.resources[0].data.username | default('') | b64decode)
+             if (_aap_rhn_secret.resources | default([]) | length) > 0 else '' }}
+        _aap_rhn_password: >-
+          {{ (_aap_rhn_secret.resources[0].data.password | default('') | b64decode)
+             if (_aap_rhn_secret.resources | default([]) | length) > 0 else '' }}
+      no_log: true
+
     - name: "aap | fail if the RHN credentials are missing or placeholders"
       ansible.builtin.fail:
         msg: >-
-          zuno_aap_enabled is true but zuno_aap_rhn_username/
-          zuno_aap_rhn_password are missing or still "xxxxxx" in
-          ansible/confidential.yml - fill in a real access.redhat.com
-          login (see ansible/confidential.example.yml) or set
+          zuno_aap_enabled is true but the aap-rhn-credentials Secret in
+          zuno-aap has no real username/password - Vault zuno/aap/rhn is
+          still the operator-supplied placeholder. Fill in
+          zuno_aap_rhn_username/zuno_aap_rhn_password in
+          ansible/confidential.yml (a real access.redhat.com login, see
+          ansible/confidential.example.yml), run `make d0 install vault`
+          to seed it, then re-run this install - or set
           zuno_aap_enabled: false.
       when: >-
-        (zuno_aap_rhn_username | default('xxxxxx')) in ['', 'xxxxxx'] or
-        (zuno_aap_rhn_password | default('xxxxxx')) in ['', 'xxxxxx']
+        _aap_rhn_username in ['', 'xxxxxx'] or
+        _aap_rhn_password in ['', 'xxxxxx']
 
     - name: "aap | look up the Gateway Route"
       kubernetes.core.k8s_info:
@@ -233,8 +260,8 @@
         validate_certs: false
         body_format: json
         body:
-          subscriptions_username: "{{ zuno_aap_rhn_username }}"
-          subscriptions_password: "{{ zuno_aap_rhn_password }}"
+          subscriptions_username: "{{ _aap_rhn_username }}"
+          subscriptions_password: "{{ _aap_rhn_password }}"
         status_code: 200
       register: _aap_subscribe
       no_log: true

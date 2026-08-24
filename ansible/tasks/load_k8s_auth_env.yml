@@ -2,6 +2,23 @@
 # Resolves the operator's kubeconfig (`oc login` beforehand) and exposes it
 # as K8S_AUTH_KUBECONFIG via each playbook's environment:, so no role
 # duplicates this logic.
+
+# ADR-0354/WP-073: when a playbook runs as an AAP Job Template instead of
+# an operator's shell, there is no kubeconfig - the Job Template's
+# "OpenShift or Kubernetes API Bearer Token" credential injects
+# K8S_AUTH_HOST/K8S_AUTH_API_KEY (& co) directly into the job's process
+# environment, which kubernetes.core modules read natively. Detecting that
+# and setting an empty k8s_auth_environment short-circuits the kubeconfig
+# resolution below (its guard is `k8s_auth_environment is not defined`),
+# so the same playbooks run unmodified from both entry points. Never set
+# locally: an operator shell has no K8S_AUTH_HOST.
+- name: "k8s-auth | detect an injected K8S_AUTH_* environment (AAP Job Template execution)"
+  ansible.builtin.set_fact:
+    k8s_auth_environment: {}
+  when:
+    - k8s_auth_environment is not defined
+    - (lookup('env', 'K8S_AUTH_HOST') | default('', true)) | length > 0
+
 - name: "k8s-auth | resolve the operator's kubeconfig path"
   ansible.builtin.set_fact:
     k8s_auth_kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') | default(lookup('env', 'HOME') + '/.kube/config', true) }}"

@@ -1,0 +1,482 @@
+---
+# ADR-0354 clause 4 (WP-073, Path A): registers this repository in the
+# running AAP instance - the zuno organization, a Controller API token,
+# then the zuno-demo Project / zuno inventory / zuno-cluster-reader
+# credential / zuno-day0-check Job Template as resource-operator CRs
+# (tower.ansible.com/v1alpha1, shipped by gitops/charts/aap's own operator
+# bundle - no second Subscription), and finally the Keycloak SSO
+# authenticator on the Gateway (ADR-0354 clause 6, closed here).
+#
+# Three things have no CRD and are driven via the Gateway/Controller API
+# instead (same ansible.builtin.uri Basic-auth pattern the aap role's
+# subscription step already proved live): the organization, the inventory's
+# localhost host, and the Job Template's credential attachment (the
+# JobTemplate CRD has no credentials field - confirmed live against the
+# CRD schema, WP-073). All are idempotent GET-then-POST.
+
+- name: "aap-config | apply the aap-config GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "aap-config"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-aap-config-d0"
+
+# --- Gateway/Controller API bootstrap (org + token) -------------------------
+
+- name: "aap-config | look up the Gateway Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: zuno-aap
+    name: aap
+  register: _aap_config_route
+
+- name: "aap-config | fail if the Gateway Route doesn't exist"
+  ansible.builtin.fail:
+    msg: >-
+      Route 'aap' not found in zuno-aap - run `make d1 install aap` first
+      (aap-config configures a running AAP instance, it never installs
+      one).
+  when: (_aap_config_route.resources | default([]) | length) == 0
+
+- name: "aap-config | read the admin password from the aap-admin Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-aap
+    name: aap-admin
+  register: _aap_config_admin_secret
+  no_log: true
+
+- name: "aap-config | resolve Gateway URL and admin credentials"
+  ansible.builtin.set_fact:
+    _aap_config_gateway_url: "https://{{ _aap_config_route.resources[0].spec.host }}"
+    _aap_config_admin_password: "{{ _aap_config_admin_secret.resources[0].data.password | b64decode }}"
+  no_log: true
+
+# Same reasoning as the aap role's subscription step: ArgoCD health on the
+# aap Applications does not imply the Gateway API answers.
+- name: "aap-config | wait for the Gateway API to answer"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/"
+    method: GET
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_api_ping
+  until: _aap_config_api_ping.status | default(0) == 200
+  retries: 60
+  delay: 10
+
+- name: "aap-config | check whether the {{ aap_config_organization | default('zuno') }} organization exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/?name={{ aap_config_organization | default('zuno') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_org_lookup
+  no_log: true
+
+- name: "aap-config | create the {{ aap_config_organization | default('zuno') }} organization"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: "{{ aap_config_organization | default('zuno') }}"
+      description: "Zuno demo platform organization (WP-073)"
+    status_code: 201
+  when: (_aap_config_org_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+# --- Controller API token, persisted to Vault (shown-once) ------------------
+# The tower.ansible.com CRs authenticate to Controller through a
+# connection_secret holding an access token. Tokens are shown once at
+# creation, so Vault (zuno/aap/controller-token) is the durable source and
+# the aap-config chart's ExternalSecret re-materializes it. Mint-then-seed
+# only when the Vault path doesn't exist yet - the same check-first
+# contract as ansible/tasks/vault_seed_if_missing.yml (a fresh token per
+# run would litter Controller with orphans and desync the Secret).
+
+- name: "aap-config | locate the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+
+- name: "aap-config | read the Vault bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _aap_config_vault_creds
+  no_log: true
+
+- name: "aap-config | fail if Vault isn't bootstrapped"
+  ansible.builtin.fail:
+    msg: >-
+      vault-bootstrap-credentials not found in zuno-vault - run
+      `make d0 install vault` first.
+  when: >-
+    (_vault_pod.resources | default([]) | length) == 0 or
+    (_aap_config_vault_creds.resources | default([]) | length) == 0
+
+- name: "aap-config | set the Vault connection fact"
+  ansible.builtin.set_fact:
+    _vault_root_token: "{{ _aap_config_vault_creds.resources[0].data.root_token | b64decode }}"
+  no_log: true
+
+- name: "aap-config | check whether zuno/aap/controller-token already exists in Vault"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/aap/controller-token"
+  register: _aap_config_token_existing
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "aap-config | mint a Controller API access token (first run only - shown once)"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/tokens/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      description: "zuno-aap-config resource-operator connection (WP-073)"
+      scope: write
+    status_code: 201
+  register: _aap_config_token_minted
+  when: _aap_config_token_existing.rc != 0
+  no_log: true
+
+- name: "aap-config | persist the Controller token to Vault (first run only)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/controller-token
+      token={{ _aap_config_token_minted.json.token | quote }}"
+  when: _aap_config_token_existing.rc != 0
+  no_log: true
+
+# --- The CRs themselves -----------------------------------------------------
+
+- name: "aap-config | apply the aap-config GitOps Application (d1: Project/Inventory/Credential/JobTemplate CRs)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "aap-config"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-aap-config-d1"
+    gitops_app_extra_helm_values:
+      aapConfig:
+        enabled: true
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10
+
+# ArgoCD reports the CRs Synced/Healthy the moment they're applied (no
+# custom health checks exist for tower.ansible.com kinds) - the resource
+# operator reconciles them into real Controller objects asynchronously.
+# Poll the Controller API for the terminal objects before the follow-up
+# steps that need their IDs.
+- name: "aap-config | wait for the Project to exist in Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/projects/?name={{ aap_config_project_name | default('zuno-demo') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_project_lookup
+  until: (_aap_config_project_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+- name: "aap-config | wait for the Job Template to exist in Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/?name={{ aap_config_job_template_name | default('zuno-day0-check') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_jt_lookup
+  until: (_aap_config_jt_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+# --- localhost host (no CRD field for inventory hosts) ----------------------
+
+- name: "aap-config | look up the inventory"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/inventories/?name={{ aap_config_inventory_name | default('zuno') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_inventory_lookup
+  until: (_aap_config_inventory_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+- name: "aap-config | check whether the localhost host exists in the inventory"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/inventories/{{ _aap_config_inventory_lookup.json.results[0].id }}/hosts/?name=localhost"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_host_lookup
+  no_log: true
+
+- name: "aap-config | add the localhost host to the inventory"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/inventories/{{ _aap_config_inventory_lookup.json.results[0].id }}/hosts/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: localhost
+      variables: '{"ansible_connection": "local"}'
+    status_code: 201
+  when: (_aap_config_host_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+# --- credential attach (no CRD field on JobTemplate) ------------------------
+
+- name: "aap-config | look up the cluster credential"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/credentials/?name={{ aap_config_credential_name | default('zuno-cluster-reader') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_credential_lookup
+  until: (_aap_config_credential_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+- name: "aap-config | check which credentials the Job Template already has"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/{{ _aap_config_jt_lookup.json.results[0].id }}/credentials/"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_jt_credentials
+  no_log: true
+
+- name: "aap-config | attach the cluster credential to the Job Template"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/{{ _aap_config_jt_lookup.json.results[0].id }}/credentials/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      id: "{{ _aap_config_credential_lookup.json.results[0].id }}"
+    status_code: 204
+  when: >-
+    (_aap_config_jt_credentials.json.results | default([])
+     | selectattr('id', 'equalto', _aap_config_credential_lookup.json.results[0].id)
+     | list | length) == 0
+  no_log: true
+
+# --- Keycloak SSO on the Gateway (ADR-0354 clause 6, closed here) -----------
+# The 2.7 gateway ships a native keycloak authenticator plugin (confirmed
+# live via /api/gateway/v1/authenticator_plugins/). Required configuration
+# keys per its configuration_schema: KEY (client id), SECRET, PUBLIC_KEY
+# (the realm's RSA public key - fetched live from the realm's public
+# endpoint so a realm key rotation only needs a re-install, never a code
+# change); the URL defaults carry the legacy /auth/ prefix RHBK dropped,
+# so both are set explicitly. GROUPS_CLAIM=groups matches every client's
+# oidc-group-membership-mapper in realm-zuno.json. Existing authenticator
+# = skip entirely (no PATCH churn); the local-database admin login stays
+# as fallback.
+
+- name: "aap-config | read the aap Keycloak client secret (zuno-auth)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-auth
+    name: aap-client-secret
+  register: _aap_config_kc_client_secret
+  no_log: true
+
+- name: "aap-config | skip SSO wiring if the Keycloak client secret isn't materialized"
+  ansible.builtin.debug:
+    msg: >-
+      Secret aap-client-secret not found in zuno-auth - Keycloak's chart
+      hasn't materialized the aap client secret (run `make d1 install
+      keycloak`). Skipping the SSO authenticator wiring; admin login
+      stays local-only until a re-run.
+  when: (_aap_config_kc_client_secret.resources | default([]) | length) == 0
+
+- name: "aap-config | wire the Keycloak SSO authenticator"
+  when: (_aap_config_kc_client_secret.resources | default([]) | length) > 0
+  block:
+    - name: "aap-config | fetch the zuno realm's public key"
+      ansible.builtin.uri:
+        url: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
+        method: GET
+        validate_certs: false
+        status_code: 200
+      register: _aap_config_realm_info
+
+    - name: "aap-config | check whether the Keycloak authenticator exists"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticators/?name=Keycloak%20zuno"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _aap_config_authenticator_lookup
+      no_log: true
+
+    - name: "aap-config | create the Keycloak authenticator"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticators/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "Keycloak zuno"
+          type: "ansible_base.authentication.authenticator_plugins.keycloak"
+          enabled: true
+          create_objects: true
+          remove_users: false
+          configuration:
+            KEY: aap
+            SECRET: "{{ _aap_config_kc_client_secret.resources[0].data.client_secret | b64decode }}"
+            PUBLIC_KEY: "{{ _aap_config_realm_info.json.public_key }}"
+            AUTHORIZATION_URL: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/auth"
+            ACCESS_TOKEN_URL: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/token"
+            GROUPS_CLAIM: groups
+        status_code: 201
+      register: _aap_config_authenticator_created
+      when: (_aap_config_authenticator_lookup.json.count | default(0) | int) == 0
+      no_log: true
+
+    - name: "aap-config | resolve the authenticator id"
+      ansible.builtin.set_fact:
+        _aap_config_authenticator_id: >-
+          {{ _aap_config_authenticator_created.json.id
+             if (_aap_config_authenticator_created is not skipped)
+             else _aap_config_authenticator_lookup.json.results[0].id }}
+
+    - name: "aap-config | list the authenticator's maps"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticators/{{ _aap_config_authenticator_id }}/authenticator_maps/"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _aap_config_maps
+      no_log: true
+
+    # Order 1, revoke: superuser tracks ocp-paas-ops membership both ways
+    # (granted on login when present, removed when not) - platform
+    # operations is the realm group that maps to "administers AAP".
+    - name: "aap-config | map ocp-paas-ops to superuser"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: superuser-ocp-paas-ops
+          authenticator: "{{ _aap_config_authenticator_id | int }}"
+          map_type: is_superuser
+          revoke: true
+          order: 1
+          triggers:
+            groups:
+              has_or:
+                - ocp-paas-ops
+        status_code: 201
+      when: >-
+        (_aap_config_maps.json.results | default([])
+         | selectattr('name', 'equalto', 'superuser-ocp-paas-ops')
+         | list | length) == 0
+      no_log: true
+
+    # Order 10: every authenticated realm user may log in (viewer-level
+    # until Controller RBAC grants more) - launch-RBAC hardening beyond
+    # this is ADR-0418's scope, not WP-073's.
+    - name: "aap-config | map all authenticated users to allow"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: allow-authenticated
+          authenticator: "{{ _aap_config_authenticator_id | int }}"
+          map_type: allow
+          revoke: false
+          order: 10
+          triggers:
+            always: {}
+        status_code: 201
+      when: >-
+        (_aap_config_maps.json.results | default([])
+         | selectattr('name', 'equalto', 'allow-authenticated')
+         | list | length) == 0
+      no_log: true
+
+- name: "aap-config | summary"
+  ansible.builtin.debug:
+    msg: >-
+      aap-config complete: organization
+      '{{ aap_config_organization | default('zuno') }}', Project
+      '{{ aap_config_project_name | default('zuno-demo') }}', Job Template
+      '{{ aap_config_job_template_name | default('zuno-day0-check') }}'
+      (credential attached), Keycloak SSO
+      {{ 'wired' if (_aap_config_kc_client_secret.resources | default([]) | length) > 0 else 'SKIPPED (client secret not materialized)' }}.

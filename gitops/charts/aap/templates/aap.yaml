@@ -16,6 +16,14 @@ metadata:
     argocd.argoproj.io/sync-wave: "-15"
 spec:
   hostname: "aap.{{ .Values.clusterBaseDomain }}"
+  # hostname alone does NOT move the operator-created Route (confirmed
+  # live 2026-08-25: the CR carried hostname aap.<domain> while the Route
+  # stayed at the default aap-zuno-aap.<domain>, and the hostname answered
+  # 503) - route_host is the field that actually sets the Route's host.
+  # Kept equal to hostname so the Gateway's own origin and the Keycloak
+  # client's redirect URIs (gitops/charts/keycloak/files/realm-zuno.json's
+  # "aap" client, rooted at https://aap.<domain>) all agree.
+  route_host: "aap.{{ .Values.clusterBaseDomain }}"
   admin_password_secret: {{ .Values.adminSecretName }}
   # Gateway's own dedicated database (spec.database.database_secret) - not
   # postgres_configuration_secret, unlike Controller/Hub below. See

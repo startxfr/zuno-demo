@@ -8,7 +8,9 @@
 # Secret to exist first, which Day 0 can never provide). `aap` (ADR-0354/
 # WP-072) runs right after `openshift_oauth` - AAP needs its own dedicated
 # PostgreSQL database (postgresql, earlier here) and the same Keycloak/
-# CA-trust bootstrap openshift_oauth itself needed. `aiagent_operator`
+# CA-trust bootstrap openshift_oauth itself needed. `aap_config` (WP-073)
+# follows immediately - it registers this repository (Project/Job
+# Template/SSO) inside the instance `aap` just installed. `aiagent_operator`
 # runs last -
 # standard operator-before-CR ordering: it must be running before Day 2's
 # `agents` component creates any `AIAgent` CRs. `namespaces`, `llm`,
@@ -37,6 +39,7 @@
       - keycloak
       - openshift_oauth
       - aap
+      - aap_config
       - connectivity_link
       - lws
       - jobset
