@@ -1,15 +1,45 @@
 ---
-# Reverse of install.yml.
+# Reverse of install.yml. OAuth/cluster and Proxy/cluster are required
+# config.openshift.io singletons - the API server refuses DELETE on them
+# unconditionally (confirmed live, even for cluster-admin), so the d1
+# Application's own cascade-prune of these two resources can never
+# succeed and would otherwise leave it stuck Terminating forever with a
+# DeletionError. templates/oauth.yaml and templates/cluster-trusted-ca.yaml
+# both carry argocd.argoproj.io/sync-options: Prune=false so ArgoCD never
+# attempts it; the two tasks below do the actual cleanup by resetting the
+# fields this chart owns directly, before the Application is deleted.
+- name: "openshift_oauth | reset OAuth/cluster's spec (identityProviders/templates/tokenConfig)"
+  kubernetes.core.k8s:
+    state: patched
+    merge_type: merge
+    api_version: config.openshift.io/v1
+    kind: OAuth
+    name: cluster
+    definition:
+      spec:
+        identityProviders: null
+        templates: null
+        tokenConfig: null
+
+# Safe: kube-system's kubeadmin secret is a login path independent of
+# spec.identityProviders, so clearing it here doesn't lock anyone out.
+- name: "openshift_oauth | reset Proxy/cluster's trustedCA (this chart's only owned field)"
+  kubernetes.core.k8s:
+    state: patched
+    merge_type: merge
+    api_version: config.openshift.io/v1
+    kind: Proxy
+    name: cluster
+    definition:
+      spec:
+        trustedCA:
+          name: ""
+
 - name: "openshift_oauth | delete the openshift-oauth GitOps Application (d1: cluster OAuth singleton)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-openshift-oauth-d1"
 
-# ADR-0347: the two CA ConfigMaps install.yml creates in openshift-config.
-# Deleting user-ca-bundle un-claims proxy/cluster.spec.trustedCA's target,
-# but doesn't unset the field itself - low risk either way, since an empty
-# Proxy spec is the operator's own normal default state (unlike OAuth/
-# cluster, whose empty-spec default breaks all non-kubeadmin login).
 - name: "openshift_oauth | delete the copied Keycloak/router CA ConfigMap from openshift-config"
   kubernetes.core.k8s:
     state: absent

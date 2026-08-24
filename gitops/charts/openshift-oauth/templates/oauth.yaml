@@ -14,6 +14,15 @@ metadata:
   name: cluster
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    # OAuth/cluster is a required config.openshift.io singleton - the API
+    # server refuses DELETE on it unconditionally (confirmed live, even for
+    # cluster-admin), so letting ArgoCD prune it on Application removal can
+    # never succeed and leaves the Application stuck Terminating forever.
+    # ansible/roles/openshift_oauth/tasks/uninstall.yml resets spec fields
+    # explicitly instead - this annotation just stops ArgoCD from ever
+    # attempting the impossible delete.
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   identityProviders:
     - name: {{ .Values.oauth.clientId }}

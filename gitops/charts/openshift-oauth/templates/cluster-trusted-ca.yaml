@@ -14,6 +14,12 @@ metadata:
   name: cluster
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    # Proxy/cluster is a required config.openshift.io singleton - same
+    # unconditional DELETE refusal as OAuth/cluster above, same fix:
+    # never let ArgoCD prune it. ansible/roles/openshift_oauth/tasks/
+    # uninstall.yml resets spec.trustedCA.name explicitly instead.
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   trustedCA:
     name: {{ .Values.clusterTrustedCA.configMapName }}
