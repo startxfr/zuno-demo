@@ -13,3 +13,7 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-machines-d0"
+    # Cascading this Application's delete terminates a real EC2 GPU instance
+    # (g7e.4xlarge) via the Machine API operator's finalizer - the module's
+    # 120s default (see delete_gitops_app.yml) isn't enough to wait that out.
+    gitops_app_delete_wait_timeout: 600

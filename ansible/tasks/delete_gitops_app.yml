@@ -29,3 +29,4 @@
     name: "{{ gitops_app_name }}"
     namespace: openshift-gitops
     wait: true
+    wait_timeout: "{{ gitops_app_delete_wait_timeout | default(120) }}"
