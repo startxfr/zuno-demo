@@ -28,6 +28,15 @@
 # substitution (not a shell, so no quoting/injection surface beyond what
 # psql's own :'var' interpolation already handles) - never written to a
 # file or logged.
+#
+# SQL is mounted from the {{ .Values.cluster.name }}-monitoring-role ConfigMap
+# (configmap-monitoring-role.yaml) and run via `-f`, not inlined via `-c`:
+# two real bugs were found here live on 2026-08-24 that only manifest with
+# `-c`/args-array delivery - (1) Kubernetes' own $(VAR) arg-substitution
+# collapses any literal `$$` elsewhere in the same args array, breaking
+# Postgres dollar-quoted DO blocks; (2) this psql client only performs
+# `:'var'` colon-interpolation for SQL read as a script (`-f`/stdin), never
+# for `-c`. Same ConfigMap+`-f` pattern as gitops/charts/sql-schema's Job.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -80,17 +89,13 @@ spec:
             - ON_ERROR_STOP=1
             - -v
             - "pass=$(CCP_MONITORING_PASSWORD)"
-            - -c
-            - >
-              DO $mrole$
-              BEGIN
-                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ccp_monitoring') THEN
-                  CREATE ROLE ccp_monitoring LOGIN PASSWORD :'pass';
-                ELSE
-                  ALTER ROLE ccp_monitoring PASSWORD :'pass';
-                END IF;
-              END
-              $mrole$;
-              GRANT pg_monitor TO ccp_monitoring;
-              GRANT CONNECT ON DATABASE postgres TO ccp_monitoring;
+            - -f
+            - /sql/monitoring-role.sql
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      volumes:
+        - name: sql
+          configMap:
+            name: {{ .Values.cluster.name }}-monitoring-role
 {{- end }}

@@ -1,0 +1,24 @@
+{{- if .Values.monitoring.enabled }}
+# Mounted by job-monitoring-role.yaml's Sync-hook Job at /sql. Moved out of
+# that Job's inline `-c` args (same reasoning as gitops/charts/sql-schema and
+# gitops/charts/rag-service's ConfigMap+`-f` pattern): psql's `:'var'`
+# colon-interpolation only applies to SQL read as a script (`-f`/stdin), not
+# to SQL passed via `-c` - and separately, Kubernetes' own $(VAR_NAME)
+# command-arg substitution collapses any literal `$$` in the same args
+# array, which broke this SQL's dollar-quoted DO block when it lived inline.
+# Sync-wave "-1" (before the Job's wave "0") so it's guaranteed to exist
+# before the hook Job that mounts it runs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.cluster.name }}-monitoring-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  monitoring-role.sql: |
+{{ .Files.Get "files/sql/monitoring-role.sql" | indent 4 }}
+{{- end }}
