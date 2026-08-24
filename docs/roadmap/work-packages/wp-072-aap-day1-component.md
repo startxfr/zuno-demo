@@ -47,10 +47,34 @@
     v1alpha1`) - no second Subscription and no `infra.aap_configuration`
     collection are needed. WP-073 can proceed directly with Path A.
 
-  Live install (`make d1 install aap`) and the acceptance checks below are
-  still pending - deliberately not run in the same session as the repo
-  work, since a full Gateway+Controller+Hub+EDA install is a heavy,
-  separately-approved action on a shared cluster.
+  **Live install verified (2026-08-24/25)**: `make d1 install aap` run for
+  real on `demo222`; Gateway, Controller, Hub and EDA all Running healthy,
+  `make day1 check aap` reports installed. Three real platform bugs were
+  found and fixed along the way (none specific to `aap` - two were already
+  silently breaking Keycloak): a NetworkPolicy regression blocking
+  cross-namespace direct-to-primary Postgres (commit `fd45ff8`), the
+  PGO/pg15+ public-schema CREATE grant gap (commit `c76c668` - note its
+  Sync-hook Job inherits this chart's known hook-not-firing ArgoCD issue,
+  so the grants were also applied manually per the existing runbook), and
+  Hub's RWO-volume Multi-Attach on a no-RWX cluster (commit `99b0f40`,
+  podAffinity pinning worker to content's node - applied to the
+  `AutomationHub` sub-CR directly, since the unified CR does not forward
+  `hub.worker.affinity`; a re-reconcile of the parent CR may revert it,
+  re-check after any operator upgrade). Remaining cosmetic issue:
+  `aap-automationmetricsservice-web` restarts intermittently on its
+  `/health/` probe (secondary telemetry component, not blocking).
+
+  **Addendum (2026-08-25) - Red Hat subscription activation**: on user
+  request, `tasks/install.yml` gained a final step attaching the
+  operator's own Red Hat account entitlement (`zuno_aap_enabled`/
+  `zuno_aap_rhn_username`/`zuno_aap_rhn_password` in
+  `ansible/confidential.yml`), hard-failing the install when enabled but
+  broken. Endpoint/semantics confirmed live: single `POST
+  /api/controller/v2/config/` with `subscriptions_username`/`password`
+  attaches directly on 2.7 (no Tower-style pool_id two-step); a fresh
+  install already carries an ambient auto-attached Developer
+  subscription, so idempotency keys on `subscription_id` (which account),
+  not on compliance alone. See `ansible/roles/aap/README.md`.
 - **ADRs:** ADR-0354 (Add Ansible Automation Platform as a new Day 1
   component)
 - **Depends on:** `postgresql`, `vault`, `external_secrets`, `keycloak`,

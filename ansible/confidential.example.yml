@@ -186,6 +186,22 @@ zuno_aramis_base_url: "xxxxxx"     # e.g. https://aramis.example.com/api
 zuno_aramis_token: "xxxxxx"
 zuno_aramis_enabled: false
 
+# --- AAP Red Hat subscription activation (ADR-0354/WP-072 follow-up) -------
+# Set true to auto-activate AAP's Red Hat subscription at the end of
+# `make d1 install aap` (the Gateway/Controller "Subscription" screen
+# equivalent) using a Red Hat account (access.redhat.com login, NOT an
+# activation key/manifest). On AAP 2.7 a single authenticated POST to
+# /api/controller/v2/config/ with these credentials validates the account
+# and attaches its matching entitlement directly (confirmed live
+# 2026-08-25). Hard-fails `make d1 install aap` if enabled but the
+# credentials are wrong/missing or the API is unreachable - aap precedes
+# connectivity-link/lws/jobset/kueue/openshift-ai/aiagent-operator in
+# Day 1, so this deliberately blocks the rest of the sequence until the
+# subscription is resolved.
+zuno_aap_enabled: false
+zuno_aap_rhn_username: "xxxxxx"
+zuno_aap_rhn_password: "xxxxxx"
+
 # --- OpenShift AI MaaS gateway API key (ADR-0201/WP-27) ------------------
 # Minted by MaaS itself once a MaaSSubscription/key-request flow runs on
 # the live cluster (Vault path maas/gateway-api-key; consumed by

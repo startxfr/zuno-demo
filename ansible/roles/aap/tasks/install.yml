@@ -111,3 +111,154 @@
 # itself, since the CR field is only load-bearing once an authenticator
 # actually depends on it - reconciling the CR today needs no Keycloak
 # trust at all.
+
+# --- Red Hat subscription activation (zuno_aap_enabled) ---------------------
+# Attaches the operator's own Red Hat account subscription to the freshly
+# started platform, replacing whatever ambient entitlement the cluster
+# auto-attached (a fresh install came up with a "Developer Subscription
+# for Individuals" already compliant, observed live 2026-08-25 - the
+# decision is that the *configured* account must always be the one
+# attached, not whichever fallback happened to apply). Endpoint and
+# semantics confirmed live against this cluster's Gateway (2026-08-25):
+# on AAP 2.7 a single authenticated POST to /api/controller/v2/config/
+# with subscriptions_username/subscriptions_password validates the account
+# against Red Hat and attaches its matching entitlement in one call
+# (HTTP 200, returns the applied license_info) - not the older Tower
+# two-step list-pools-then-attach-pool_id flow.
+#
+# Deliberately hard-fails the whole install when enabled but broken (bad
+# credentials, unreachable API): aap precedes connectivity_link/lws/
+# jobset/kueue/openshift_ai/aiagent_operator in day1_components, so a
+# subscription problem blocks the rest of Day 1 until resolved - the
+# user's explicit choice over a warn-and-continue.
+
+# Same optional-read pattern as ansible/roles/keycloak/tasks/install.yml:
+# the role stays runnable without confidential.yml - a missing file just
+# leaves zuno_aap_enabled undefined, defaulting to false below.
+- name: "aap | check for ansible/confidential.yml (optional, only for the Red Hat subscription step)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _aap_confidential_file
+
+- name: "aap | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _aap_confidential_file.stat.exists
+
+- name: "aap | activate the Red Hat subscription"
+  when: zuno_aap_enabled | default(false) | bool
+  block:
+    - name: "aap | fail if the RHN credentials are missing or placeholders"
+      ansible.builtin.fail:
+        msg: >-
+          zuno_aap_enabled is true but zuno_aap_rhn_username/
+          zuno_aap_rhn_password are missing or still "xxxxxx" in
+          ansible/confidential.yml - fill in a real access.redhat.com
+          login (see ansible/confidential.example.yml) or set
+          zuno_aap_enabled: false.
+      when: >-
+        (zuno_aap_rhn_username | default('xxxxxx')) in ['', 'xxxxxx'] or
+        (zuno_aap_rhn_password | default('xxxxxx')) in ['', 'xxxxxx']
+
+    - name: "aap | look up the Gateway Route"
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: zuno-aap
+        name: aap
+      register: _aap_route
+
+    - name: "aap | fail if the Gateway Route doesn't exist"
+      ansible.builtin.fail:
+        msg: >-
+          Route 'aap' not found in zuno-aap - the
+          AnsibleAutomationPlatform CR should have created it during the
+          -d1 apply above. Check `oc get route -n zuno-aap` and the
+          aap-gateway-operator logs.
+      when: (_aap_route.resources | default([]) | length) == 0
+
+    - name: "aap | read the admin password from the aap-admin Secret"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: zuno-aap
+        name: aap-admin
+      register: _aap_admin_secret
+      no_log: true
+
+    - name: "aap | resolve Gateway URL and admin credentials"
+      ansible.builtin.set_fact:
+        _aap_gateway_url: "https://{{ _aap_route.resources[0].spec.host }}"
+        _aap_admin_password: "{{ _aap_admin_secret.resources[0].data.password | b64decode }}"
+      no_log: true
+
+    # ArgoCD Synced/Healthy on zuno-aap-d1 does NOT imply the Gateway API
+    # answers yet (no custom Lua health check exists for the
+    # AnsibleAutomationPlatform CRD - observed live: the Application was
+    # Healthy while the gateway pod was still failing its DB migration),
+    # so poll the real API before calling it. validate_certs false: the
+    # Route's edge certificate may be the router default rather than a
+    # publicly-trusted chain, and this is an admin call from the install
+    # shell, not a browser flow.
+    - name: "aap | wait for the Gateway API to answer"
+      ansible.builtin.uri:
+        url: "{{ _aap_gateway_url }}/api/"
+        method: GET
+        validate_certs: false
+        status_code: 200
+      register: _aap_api_ping
+      until: _aap_api_ping.status | default(0) == 200
+      retries: 60
+      delay: 10
+
+    - name: "aap | read the current subscription state"
+      ansible.builtin.uri:
+        url: "{{ _aap_gateway_url }}/api/controller/v2/config/"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _aap_config_before
+      no_log: true
+
+    - name: "aap | attach the configured Red Hat account's subscription"
+      ansible.builtin.uri:
+        url: "{{ _aap_gateway_url }}/api/controller/v2/config/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          subscriptions_username: "{{ zuno_aap_rhn_username }}"
+          subscriptions_password: "{{ zuno_aap_rhn_password }}"
+        status_code: 200
+      register: _aap_subscribe
+      no_log: true
+      changed_when: >-
+        (_aap_config_before.json.license_info.subscription_id | default(''))
+        != (_aap_subscribe.json.subscription_id | default(''))
+
+    - name: "aap | fail if the attached subscription is not valid/compliant"
+      ansible.builtin.fail:
+        msg: >-
+          The Red Hat account accepted the credentials but the resulting
+          subscription is not valid/compliant (valid_key={{
+          _aap_subscribe.json.valid_key | default('absent') }},
+          compliant={{ _aap_subscribe.json.compliant | default('absent')
+          }}). Check the account's Ansible Automation Platform
+          entitlements on access.redhat.com.
+      when: >-
+        not (_aap_subscribe.json.valid_key | default(false) | bool) or
+        not (_aap_subscribe.json.compliant | default(false) | bool)
+
+    - name: "aap | subscription summary"
+      ansible.builtin.debug:
+        msg: >-
+          Subscription active: '{{ _aap_subscribe.json.subscription_name }}'
+          (account {{ _aap_subscribe.json.account_number }}, sku
+          {{ _aap_subscribe.json.sku }}, {{ _aap_subscribe.json.instance_count
+          }} managed hosts, compliant={{ _aap_subscribe.json.compliant }}).

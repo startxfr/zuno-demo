@@ -88,6 +88,45 @@ charts in this repository that hand-tune CPU/memory from measured usage,
 no live measurement exists yet for AAP; trim `values.yaml`'s
 `resourceRequirements` blocks once real usage is observed.
 
+## Red Hat subscription activation (`zuno_aap_enabled`)
+
+When `ansible/confidential.yml` sets `zuno_aap_enabled: true` (plus
+`zuno_aap_rhn_username`/`zuno_aap_rhn_password`, see
+`ansible/confidential.example.yml`), `tasks/install.yml` ends by
+attaching that Red Hat account's AAP entitlement to the freshly started
+platform - the Gateway/Controller "Subscription" screen equivalent, fully
+automated.
+
+Confirmed live against this cluster's Gateway (2026-08-25):
+
+- The endpoint is `/api/controller/v2/config/` (the AWX/Tower-inherited
+  path, proxied under the 2.5+ unified gateway's `/api/controller/`
+  prefix; `GET /api/` lists all five sub-APIs).
+- On AAP 2.7 a **single** authenticated `POST` with
+  `subscriptions_username`/`subscriptions_password` validates the account
+  against Red Hat and attaches its matching entitlement in one call
+  (HTTP 200, returns the applied `license_info`) - not the older Tower
+  two-step list-pools-then-attach-`pool_id` flow.
+- A fresh install comes up with an ambient "Developer Subscription for
+  Individuals" already attached and compliant (inherited from the
+  cluster's own Red Hat account/pull secret, without any action from
+  this role). The task's idempotency is therefore keyed on *which*
+  subscription is attached (`subscription_id` before vs after), not on
+  "some valid subscription exists" - the configured account always wins.
+
+Failure behavior is deliberately **blocking**: bad RHN credentials,
+placeholder values with the flag enabled, or an unreachable Gateway API
+fail the whole `make d1 install aap` - `aap` precedes
+`connectivity-link`/`lws`/`jobset`/`kueue`/`openshift-ai`/
+`aiagent-operator` in Day 1, so a subscription problem stops the sequence
+until resolved (explicit user decision over warn-and-continue). Admin
+authentication reuses the `aap-admin` Kubernetes Secret directly (the
+same one the CR's `admin_password_secret` consumes); the ArgoCD
+Synced/Healthy gate on `zuno-aap-d1` is NOT trusted as "Gateway API up"
+(no custom health check exists for the CRD - observed Healthy while the
+gateway pod was still crash-looping), so the task polls `GET /api/`
+first.
+
 ## Deferred to WP-073, not this role
 
 - **`spec.bundle_cacert_secret`** (confirmed live: a Secret naming the
