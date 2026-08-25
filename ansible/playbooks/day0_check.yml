@@ -11,6 +11,16 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # ADR-0354/WP-073: zuno_repo_root normally comes from
+    # ansible/inventories/demo/group_vars/all/auto.yml, auto-loaded
+    # because `make d0/d1 ...` always passes `-i ansible/inventories/
+    # demo/hosts.yml`. Launched as an AAP Job Template, the inventory is
+    # Controller-managed (zuno-day0-check's own AnsibleInventory CR), with
+    # no associated group_vars directory - so this play computes the same
+    # playbook-relative value itself (identical formula, higher play-vars
+    # precedence just makes this the effective value either way) rather
+    # than depending on inventory-source auto-discovery.
+    zuno_repo_root: "{{ playbook_dir }}/../.."
     day0_components:
       - argocd
       - admin_context
