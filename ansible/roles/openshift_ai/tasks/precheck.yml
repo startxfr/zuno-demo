@@ -53,6 +53,53 @@
          else 'DataScienceCluster does not exist yet' }},
       OGXReady={{ _openshift_ai_ogx_ready }}
 
+# --- maas-api Postgres reachability (ADR-0201) -----------------------------
+# maas-api CrashLoopBackOffs at startup when it cannot reach its own database,
+# and the failure is silent afterwards: the pod eventually starts, so a later
+# `oc get pods` shows it Running with only a restart count as evidence.
+# Observed 2026-08-25 - 10 restarts, each dying on:
+#   failed to initialize token store: failed to connect to PostgreSQL:
+#   ... tls error: read tcp ...: read: connection reset by peer
+#   ... FATAL: no pg_hba.conf entry for host "10.128.0.x", user "maas",
+#       database "maas", no encryption (SQLSTATE 28000)
+# It attempts TLS, the mesh resets the connection, it retries in plaintext,
+# and pg_hba rejects that - the same mesh-vs-Postgres-TLS shape already
+# documented for ports 5432/8432 elsewhere in this repo. Read-only and
+# never-failing, per precheck's reporting contract: this records a finding,
+# it does not gate _state_is_installed.
+- name: "openshift_ai | precheck: look up the maas-api Deployment for its restart evidence"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: redhat-ods-applications
+    label_selectors:
+      - app.kubernetes.io/name=maas-api
+  register: _openshift_ai_maas_api_pods
+
+- name: "openshift_ai | precheck: count maas-api container restarts"
+  ansible.builtin.set_fact:
+    _openshift_ai_maas_api_restarts: >-
+      {{ (_openshift_ai_maas_api_pods.resources | default([]))
+         | map(attribute='status.containerStatuses', default=[])
+         | flatten
+         | selectattr('name', 'equalto', 'maas-api')
+         | map(attribute='restartCount') | sum }}
+
+- name: "openshift_ai | precheck: record the maas-api database startup race"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Deployment/maas-api (redhat-ods-applications)"
+      state: "{{ _openshift_ai_maas_api_restarts }} container restart(s)"
+      cause: "ADR-0201 - maas-api races its own PostgreSQL at startup: it dials with TLS, the mesh resets the connection, it falls back to plaintext and pg_hba rejects that (SQLSTATE 28000, 'no pg_hba.conf entry ... user maas, database maas, no encryption'). It recovers on a later retry, so the only lasting evidence is the restart count"
+      solution: "Confirm the maas role and maas database exist on zuno-postgresql and that the mesh is not intercepting the connection before maas-api starts; check `oc logs deploy/maas-api -n redhat-ods-applications --previous` for the pg_hba line"
+      auto_fix: "make d1 reconcile openshift-ai"
+  when:
+    - (_openshift_ai_maas_api_pods.resources | default([]) | length) > 0
+    - (_openshift_ai_maas_api_restarts | int) > 0
+    - blocked_findings is defined
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

@@ -42,6 +42,17 @@
           {{ day1_components if target_component | default('all') == 'all'
              else [target_component | replace('-', '_')] }}
 
+    # Day 1 roles record blocked-resource findings exactly as Day 0 roles do
+    # (openshift_ai and openshift_oauth both do), but this playbook never
+    # initialized the accumulator, so every one of those findings was
+    # silently discarded on `make d1 check` - the guard they carry is
+    # `when: blocked_findings is defined`, which was simply false here. That
+    # mattered more once ADR-0201's reconcile moved to Day 1: openshift_ai's
+    # findings had no Day 0 playbook left to surface them either.
+    - name: Initialize blocked-resource tracking
+      ansible.builtin.set_fact:
+        blocked_findings: []
+
     - name: Generate the state-report file
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
 
@@ -58,6 +69,14 @@
     - name: Display the state report
       ansible.builtin.debug:
         msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"
+
+    # blocked_report_fail: false - `make d1 check` reports and keeps its
+    # never-failing-on-findings contract, same as day0_check.yml. A genuinely
+    # failed precheck is still caught by the task below.
+    - name: Summarize blocked resources (reports, never fails the check)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/report_blocked_findings.yml"
+      vars:
+        blocked_report_fail: false
 
     - name: Fail if any Day 1 state check failed
       ansible.builtin.fail:
