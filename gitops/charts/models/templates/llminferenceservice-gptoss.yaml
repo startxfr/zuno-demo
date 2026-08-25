@@ -55,6 +55,23 @@ spec:
           # the resolved vLLM image before relying on it.
           - --enable-auto-tool-choice
           - --tool-call-parser=openai
+          {{- if .Values.maas.enabled }}
+          # ADR-0201 (WP-27), 2026-08-25: MaaS clients name this model by the
+          # policy plane's identity (<namespace>/<MaaSModelRef name>) in the
+          # request body - proven live to traverse auth/subscription/TRLP and
+          # reach vLLM, which then 404'd on the unknown name. KServe's
+          # generated launcher passes `--served-model-name "<model.name>"
+          # "publishers/<ns>/models/<name>"` BEFORE these chart args ($@), and
+          # vLLM's argparse takes the LAST occurrence of the flag - so this
+          # list must REPEAT both KServe names and append the MaaS alias, or
+          # it would replace them and break ai-gateway's direct calls and the
+          # header-form route. Verify after rollout: the workload's
+          # /v1/models must list all three.
+          - --served-model-name
+          - {{ .Values.gptOssModel.servedModelName | quote }}
+          - "publishers/{{ .Values.namespace }}/models/{{ .Values.gptOssModel.inferenceServiceName }}"
+          - "{{ .Values.namespace }}/{{ .Values.maas.publishedName }}"
+          {{- end }}
         resources:
           {{- toYaml .Values.gptOssModel.resources | nindent 10 }}
   router:
