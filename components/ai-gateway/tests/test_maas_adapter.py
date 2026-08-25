@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -35,6 +36,7 @@ def _reset_adapter_env(**overrides: str) -> None:
         "MAAS_GATEWAY_ENDPOINT",
         "MAAS_GATEWAY_API_KEY_ENV",
         "MAAS_EXTERNAL_EGRESS_ENABLED",
+        "MAAS_SA_TOKEN_PATH",
     ):
         os.environ.pop(key, None)
     os.environ.update(overrides)
@@ -46,6 +48,7 @@ def _reset_adapter_env(**overrides: str) -> None:
     maas_adapter.MAAS_EXTERNAL_EGRESS_ENABLED = (
         os.getenv("MAAS_EXTERNAL_EGRESS_ENABLED", "false").strip().lower() == "true"
     )
+    maas_adapter.MAAS_SA_TOKEN_PATH = os.getenv("MAAS_SA_TOKEN_PATH", "")
 
 
 def test_adapter_disabled_by_default() -> None:
@@ -94,6 +97,32 @@ def test_maas_adapter_without_endpoint_fails_loudly() -> None:
         raise AssertionError("expected MaasAdapterError")
     except maas_adapter.MaasAdapterError as exc:
         assert "MAAS_GATEWAY_ENDPOINT" in str(exc)
+
+
+def test_bearer_token_falls_back_to_api_key_when_no_sa_token_path() -> None:
+    """ADR-0521 (WP-076) step 3: an environment that never sets
+    MAAS_SA_TOKEN_PATH (e.g. one still relying on the API-key path)
+    behaves exactly as before this change."""
+    _reset_adapter_env(MAAS_GATEWAY_API_KEY="sk-oai-abc123")
+    assert maas_adapter._maas_bearer_token() == "sk-oai-abc123"
+
+
+def test_bearer_token_falls_back_when_sa_token_path_does_not_exist() -> None:
+    _reset_adapter_env(MAAS_SA_TOKEN_PATH="/nonexistent/token", MAAS_GATEWAY_API_KEY="sk-oai-abc123")
+    assert maas_adapter._maas_bearer_token() == "sk-oai-abc123"
+
+
+def test_bearer_token_prefers_sa_token_when_present() -> None:
+    """The live projection path (gitops/charts/ai-gateway's deployment.yaml)
+    - a real file, read fresh, not the env-var-cached API key."""
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as fh:
+        fh.write("eyJhbGciOi.fake.jwt\n")
+        token_path = fh.name
+    try:
+        _reset_adapter_env(MAAS_SA_TOKEN_PATH=token_path, MAAS_GATEWAY_API_KEY="sk-oai-abc123")
+        assert maas_adapter._maas_bearer_token() == "eyJhbGciOi.fake.jwt"
+    finally:
+        os.unlink(token_path)
 
 
 def test_maas_adapter_never_widens_c3_local_only_eligibility() -> None:
@@ -157,6 +186,9 @@ TESTS = [
     test_chat_model_for_uses_direct_client_when_adapter_disabled,
     test_chat_model_for_uses_maas_client_when_opted_in_and_enabled,
     test_maas_adapter_without_endpoint_fails_loudly,
+    test_bearer_token_falls_back_to_api_key_when_no_sa_token_path,
+    test_bearer_token_falls_back_when_sa_token_path_does_not_exist,
+    test_bearer_token_prefers_sa_token_when_present,
     test_maas_adapter_never_widens_c3_local_only_eligibility,
     test_external_egress_stays_blocked_even_when_adapter_and_provider_both_opt_in,
     test_external_egress_opt_in_only_affects_non_local_candidates,

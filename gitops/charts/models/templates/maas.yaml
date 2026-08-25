@@ -100,8 +100,17 @@ metadata:
     zuno.io/managed-by: argocd
 spec:
   owner:
+    {{- if .user }}
+    # ADR-0521 (WP-076) step 3: a service identity (e.g. ai-gateway's own
+    # ServiceAccount via Kuadrant's kubernetesTokenReview), not a persona
+    # group - schema-valid without a matching groups entry (`oc explain
+    # maassubscription.spec.owner --recursive`).
+    users:
+      - {{ .user | quote }}
+    {{- else }}
     groups:
       - name: {{ .group }}
+    {{- end }}
   priority: {{ .priority }}
   modelRefs:
     - name: {{ $model.publishedName }}
@@ -123,9 +132,24 @@ spec:
     - name: {{ .publishedName }}
       namespace: {{ $.Values.namespace }}
   subjects:
+    {{- $authGroups := list }}
+    {{- $authUsers := list }}
+    {{- range .subscriptions }}
+    {{- if .user }}
+    {{- $authUsers = append $authUsers .user }}
+    {{- else }}
+    {{- $authGroups = append $authGroups .group }}
+    {{- end }}
+    {{- end }}
+    {{- if $authGroups }}
     groups:
-      {{- range .subscriptions }}
-      - name: {{ .group }}
+      {{- range $authGroups }}
+      - name: {{ . }}
       {{- end }}
+    {{- end }}
+    {{- if $authUsers }}
+    users:
+      {{- toYaml $authUsers | nindent 6 }}
+    {{- end }}
 {{- end }}
 {{- end }}

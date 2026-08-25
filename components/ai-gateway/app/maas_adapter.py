@@ -39,7 +39,24 @@ MAAS_GATEWAY_ENDPOINT = os.getenv("MAAS_GATEWAY_ENDPOINT", "")
 # Names the environment variable the MaaS API key is read from (populated
 # by an ExternalSecret, same convention as every provider's *_API_KEY_ENV
 # in provider-routing.yaml - never a literal value here, ADR-0024).
+# ADR-0521 (WP-076) step 3: kept as the documented fallback - MaaS's own
+# API-key issuance flow was never discovered live (only
+# /internal/v1/api-keys/validate has been observed working), so this stays
+# wired for the day it is, but is no longer the primary path (see
+# MAAS_SA_TOKEN_PATH below).
 MAAS_GATEWAY_API_KEY_ENV = os.getenv("MAAS_GATEWAY_API_KEY_ENV", "MAAS_GATEWAY_API_KEY")
+# ADR-0521 (WP-076) step 3: this pod's own audience-scoped ServiceAccount
+# token (gitops/charts/ai-gateway's deployment.yaml - a purpose-built
+# projected volume, not the pod's default SA mount, which stays off per
+# ADR-0052's hardening). Authenticates as
+# system:serviceaccount:zuno-ai-run:ai-gateway via maas-gateway-auth's
+# kubernetesTokenReview rule (live-confirmed audience:
+# https://kubernetes.default.svc, `oc get authpolicy maas-gateway-auth -n
+# openshift-ingress`) - no external issuance flow needed for ai-gateway's
+# own local-model traffic. gitops/charts/models's maas.yaml grants this
+# identity a MaaSSubscription/MaaSAuthPolicy entry per model
+# (owner.users/subjects.users, not a persona group).
+MAAS_SA_TOKEN_PATH = os.getenv("MAAS_SA_TOKEN_PATH", "")
 
 # ADR-0201 (WP-27): a THIRD gate, on top of the two above, specific to
 # candidates that leave the cluster (candidate.kind != "local") - external-
@@ -56,6 +73,24 @@ class MaasAdapterError(RuntimeError):
 
 def enabled() -> bool:
     return MAAS_ADAPTER_ENABLED
+
+
+def _maas_bearer_token() -> str:
+    """Prefers the pod's own projected ServiceAccount token
+    (MAAS_SA_TOKEN_PATH) over the external API-key env var - read fresh
+    from disk on every call, never cached at import time, since kubelet
+    rotates a projected token in place before it expires (this file's
+    module-level constants are read once at import, which would silently
+    serve an expired token if this read the same way). Falls back to the
+    API-key path when no token file is configured, so an environment that
+    still relies on MAAS_GATEWAY_API_KEY keeps working unchanged.
+    """
+    if MAAS_SA_TOKEN_PATH and os.path.exists(MAAS_SA_TOKEN_PATH):
+        with open(MAAS_SA_TOKEN_PATH, "r", encoding="utf-8") as fh:
+            token = fh.read().strip()
+        if token:
+            return token
+    return os.getenv(MAAS_GATEWAY_API_KEY_ENV, "not-required")
 
 
 def should_use_maas(cfg: Dict[str, Any], candidate_kind: str = "local") -> bool:
@@ -105,7 +140,7 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
 
     return ChatOpenAI(
         base_url=MAAS_GATEWAY_ENDPOINT,
-        api_key=os.getenv(MAAS_GATEWAY_API_KEY_ENV, "not-required"),
+        api_key=_maas_bearer_token(),
         model=cfg.get("maas_model_ref", cfg.get("model")),
         temperature=cfg.get("temperature", 0.2),
         timeout=cfg.get("timeout_seconds", 60),

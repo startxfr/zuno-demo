@@ -539,6 +539,29 @@ maas:
             - limit: 5000
               window: 1h
           priority: 1
+        # ADR-0521 (WP-076) step 3: ai-gateway's own identity, not a
+        # persona. `user:` (MaaSSubscription.spec.owner.users /
+        # MaaSAuthPolicy.spec.subjects.users - both schema-valid without a
+        # matching `groups` entry, confirmed via `oc explain
+        # maassubscription.spec.owner --recursive`) rather than `group:`,
+        # scoped to this ONE ServiceAccount rather than
+        # system:serviceaccounts:zuno-ai-run (every SA in the namespace) -
+        # the tighter grant a Kubernetes TokenReview identity supports.
+        # Rate limit is deliberately generous (10x agent_tekos's own
+        # "high" tier): this identity will carry ai-gateway's ENTIRE
+        # aggregate local-model traffic once WP-076 step 4 enables MaaS as
+        # the default transport, not one persona's share of it - Zuno's
+        # own per-request policy layer (ADR-0021 classification, ADR-0511
+        # quota.py) is still the primary control; this is a coarse
+        # platform-level circuit breaker, not the mechanism doing real
+        # quota enforcement. Priority 100 (above every persona tier) since
+        # it represents infrastructure, not a contended end-user share.
+        - name: gpt-oss-20b-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
 
       # Proves a group/model combination WITHOUT entitlement is denied
       # (ADR-0201 acceptance bullet 3): only the groups above are subjects
@@ -569,6 +592,15 @@ maas:
             - limit: 5000
               window: 1h
           priority: 1
+        # ADR-0521 (WP-076) step 3: same ai-gateway-own-identity entry as
+        # gptOssModel's own - see that one's comment for the full
+        # user-vs-group scoping/rate-limit rationale.
+        - name: qwen36-27b-instruct-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
       authPolicy:
         name: qwen36-27b-instruct-entitlement
 

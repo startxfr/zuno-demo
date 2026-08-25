@@ -141,6 +141,13 @@ spec:
                   name: {{ .Values.maasAdapter.secretName }}
                   key: api_key
                   optional: true
+            # ADR-0521 (WP-076) step 3: preferred over MAAS_GATEWAY_API_KEY
+            # above - see app/maas_adapter.py's own comment. Points at the
+            # audience-scoped projected token below, not the pod's default
+            # SA token (automountServiceAccountToken: false, a deliberate
+            # hardening choice this doesn't reverse).
+            - name: MAAS_SA_TOKEN_PATH
+              value: /var/run/secrets/maas/token
             # ADR-0104: semantic cache, default off - see
             # components/ai-gateway/app/semantic_cache.py and
             # platform/ai-gateway/provider-routing.yaml's `cache_enabled`
@@ -179,6 +186,9 @@ spec:
             - name: openshift-service-ca
               mountPath: /etc/ssl/openshift-service-ca
               readOnly: true
+            - name: maas-sa-token
+              mountPath: /var/run/secrets/maas
+              readOnly: true
             - name: tmp
               mountPath: /tmp
           livenessProbe:
@@ -202,5 +212,21 @@ spec:
         - name: openshift-service-ca
           configMap:
             name: openshift-service-ca.crt
+        # ADR-0521 (WP-076) step 3: a purpose-scoped token, not the pod's
+        # default SA mount (deliberately off, see
+        # automountServiceAccountToken: false above) - only this one
+        # audience, only where this one client needs it, kubelet-rotated
+        # in place before expiry (app/maas_adapter.py reads it fresh per
+        # call rather than caching, so rotation is transparent). Audience
+        # matches maas-gateway-auth's kubernetesTokenReview.audiences
+        # exactly (`oc get authpolicy maas-gateway-auth -n
+        # openshift-ingress` - live-confirmed 2026-08-26).
+        - name: maas-sa-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: https://kubernetes.default.svc
+                  expirationSeconds: 3600
         - name: tmp
           emptyDir: {}
