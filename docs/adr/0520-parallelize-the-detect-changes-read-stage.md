@@ -96,3 +96,16 @@ correctly regardless of thread scheduling). Full suite green (47/47).
 Live re-ingestion timing comparison (`sxa` domain, before/after) is a
 separate, explicit operator action - not run automatically by this
 ADR/WP, same convention as ADR-0519.
+
+**Live result (2026-08-25):** after building and deploying this change,
+the in-flight `sxa` run (started before the deploy, still on the old
+image) was cancelled and a fresh run triggered against the same domain
+(314,428 raw objects under `raw-sxa/`). `detect-changes` completed in
+**13m25s** (20:05:51-20:19:16 UTC), down from **3h48m17s** on the same
+domain's prior run (14:59:00-18:47:17 UTC) - a ~17x speedup, consistent
+with the new concurrency default of 16. The full pipeline run
+(`fetch-sxa` through `index-pgvector`) reached `SUCCEEDED` end-to-end in
+16m51s; downstream stages after `detect-changes` finished in seconds
+because the changeset was empty (the cancelled prior run had already
+written an up-to-date manifest before being terminated mid-`normalize`),
+not because of any change made by this ADR.

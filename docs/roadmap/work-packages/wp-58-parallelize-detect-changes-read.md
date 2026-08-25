@@ -6,10 +6,12 @@
   and `CorpusStore`'s shared S3 client got an explicit
   `max_pool_connections=32` so that concurrency isn't silently capped by
   botocore's default of 10. Full unit suite green (47/47, 2 new tests -
-  `detect-changes` had zero prior coverage). Live timing comparison
-  deferred to a separate, explicit operator-triggered re-ingestion run
-  (not part of this WP's automated verification), same convention as
-  WP-57.
+  `detect-changes` had zero prior coverage). **Live-verified 2026-08-25**:
+  built, deployed, and re-run against the `sxa` domain (314,428 raw
+  objects) - `detect-changes` dropped from **3h48m17s** (pre-WP-58 run,
+  same domain) to **13m25s**, a ~17x speedup consistent with the
+  concurrency knob's default of 16. Full run (`fetch-sxa` through
+  `index-pgvector`) completed end-to-end (SUCCEEDED) in 16m51s.
 - **ADRs:** ADR-0520
 - **Depends on:** WP-57/ADR-0519 (this WP's bottleneck was only exposed
   once `fetch-sxa` became fast enough to stop masking it)
