@@ -1,0 +1,116 @@
+# ADR-0201 (WP-27): a Gateway that deliberately carries no external traffic.
+#
+# WHY A GATEWAY THAT ROUTES NOTHING EXISTS
+# KServe's LLMInferenceService always publishes an HTTPRoute for its router,
+# and it must name a Gateway that exists - omitting router.gateway.refs does
+# not disable route publication, it falls back to a cluster-default
+# openshift-ingress/openshift-ai-inference which is absent here, taking the
+# whole LLMInferenceService to Ready=False (tested live 2026-08-25 and
+# reverted; see the history in values.yaml's routerGateway comment).
+#
+# So KServe needs *somewhere* to publish. It must not be
+# maas-default-gateway: while KServe owns a route there, the MaaSModelRef
+# adopts that route instead of publishing its own, and everything downstream
+# inherits KServe's identity form (publishers/zuno-ai-run/models/gpt-oss-20b)
+# while maas-api, the MaaSAuthPolicy's OPA map and the generated
+# TokenRateLimitPolicy all key on the MaaS form
+# (zuno-ai-run/gpt-oss-20b-maas). The two never meet: one routes and fails
+# auth, the other passes auth and 404s.
+#
+# This Gateway is the parking spot that breaks that tie. KServe publishes
+# here, maas-default-gateway is left free, and the MaaS controller - which
+# does hold create/update RBAC on httproutes
+# (clusterrole/maas-controller-role) - publishes its own route carrying its
+# own identity and receiving its own controller-generated
+# TokenRateLimitPolicy.
+#
+# Nothing is expected to call this Gateway. Agent traffic reaches the model
+# through ai-gateway, which dials the workload Service directly
+# (gpt-oss-20b-kserve-workload-svc:8000 - platform/ai-gateway/
+# provider-routing.yaml's local-gpt-oss endpoint), never through any gateway;
+# governed external traffic goes through maas-default-gateway. If this ever
+# starts serving real requests, something has been misrouted.
+#
+# No OpenShift Route is published for it, deliberately - it has no external
+# surface. Mirrors gitops/charts/openshift-ai/templates/maas-gateway.yaml's
+# proven shape (infrastructure.parametersRef sizing + a service-serving
+# certificate) rather than inventing a second pattern.
+{{- if and .Values.maas.enabled .Values.gptOssModel.llmInferenceService.routerGateway.manage }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.gptOssModel.llmInferenceService.routerGateway.name }}-config
+  namespace: {{ .Values.gptOssModel.llmInferenceService.routerGateway.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-maas-governance
+  annotations:
+    # Before the Gateway that references it, which is before the
+    # LLMInferenceService (sync-wave 0) whose router attaches to it.
+    argocd.argoproj.io/sync-wave: "-6"
+data:
+  service: |
+    metadata:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: "{{ .Values.gptOssModel.llmInferenceService.routerGateway.name }}-tls"
+    spec:
+      type: ClusterIP
+  deployment: |
+    spec:
+      template:
+        spec:
+          containers:
+            - name: istio-proxy
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gptOssModel.llmInferenceService.routerGateway.name }}
+  namespace: {{ .Values.gptOssModel.llmInferenceService.routerGateway.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-maas-governance
+    app.kubernetes.io/component: gateway
+    # Same opt-out RHOAI's own managed gateways carry, so the ODH platform
+    # layer does not try to adopt or rewrite this one.
+    opendatahub.io/managed: "false"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+    opendatahub.io/managed: "false"
+spec:
+  gatewayClassName: istio
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: {{ .Values.gptOssModel.llmInferenceService.routerGateway.name }}-config
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      # Only the model's own namespace - nothing else has any business
+      # attaching a route here.
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - {{ .Values.namespace }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            # Issued by OpenShift's service-CA from the annotation in the
+            # ConfigMap above - nothing to rotate, nothing to expire.
+            name: {{ .Values.gptOssModel.llmInferenceService.routerGateway.name }}-tls
+{{- end }}

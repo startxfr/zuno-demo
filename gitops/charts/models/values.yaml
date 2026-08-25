@@ -283,50 +283,52 @@ gptOssModel:
   # reasoning tasks far more room than the qwen chat model's 8192.
   maxModelLen: 32768
   llmInferenceService:
-    # ADR-0201/WP-27, 2026-08-25: whether KServe's own router attaches to
-    # maas-default-gateway.
+    # ADR-0201/WP-27: which Gateway KServe's own router publishes its
+    # HTTPRoute on. This is load-bearing and the history is expensive, so it
+    # is recorded here in full.
     #
-    # Attaching it (the old behaviour, true) makes KServe publish the
-    # HTTPRoute on that gateway, and the MaaSModelRef then *adopts* that
-    # route rather than publishing one of its own - confirmed by
-    # MaaSModelRef.status.httpRouteName pointing at gpt-oss-20b-kserve-route.
-    # Everything downstream then speaks KServe's identity form,
-    # publishers/zuno-ai-run/models/gpt-oss-20b, while maas-api, the
-    # MaaSAuthPolicy's OPA map and the generated TokenRateLimitPolicy all key
-    # on the MaaS form, zuno-ai-run/gpt-oss-20b-maas. The two never meet:
-    # sending the MaaS form 404s (no route matches it) and sending the
-    # publisher form 403s ("no matching subscription found for user").
-    # Proven by calling maas-api's own /internal/v1/subscriptions/select with
-    # each candidate string - only the MaaS form returns a subscription.
+    # THE PROBLEM. maas-api, the MaaSAuthPolicy's OPA map and the generated
+    # TokenRateLimitPolicy all key the model on zuno-ai-run/gpt-oss-20b-maas
+    # (<modelRef namespace>/<modelRef name>). The data path speaks KServe's
+    # publishers/zuno-ai-run/models/gpt-oss-20b. Sending the MaaS form 404s,
+    # sending the publisher form 403s "no matching subscription found for
+    # user" - mutually exclusive. Proven by calling maas-api's own
+    # /internal/v1/subscriptions/select with each candidate: only the MaaS
+    # form returns a subscription, so the entitlement plane was never broken.
     #
-    # Adding a second HTTPRoute keyed on the MaaS form does not work either
-    # and was reverted (see the revert of 689f8a5): the controller generates a
-    # subscription's TokenRateLimitPolicy only for the route the MaaSModelRef
-    # adopted, so any hand-authored route on this gateway is governed solely
-    # by the gateway-level deny-all default (limit 0/1m) and 429s on every
-    # request.
+    # THE CAUSE. Pointing this at maas-default-gateway makes KServe own the
+    # HTTPRoute there, so the MaaSModelRef ADOPTS that route rather than
+    # publishing its own (status.httpRouteName confirms it) and inherits
+    # KServe's identity form.
     #
-    # So the gateway ref is dropped, letting MaaS publish its own route with
-    # its own identity and its own controller-generated TRLP. Safe because
-    # nothing else routes through this gateway: ai-gateway reaches the model
-    # directly at gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000
-    # (platform/ai-gateway/provider-routing.yaml's local-gpt-oss endpoint),
-    # never via maas-default-gateway. Flip back to true to restore the
-    # previous topology.
-    # 2026-08-25: TESTED FALSE ON THE LIVE CLUSTER AND REVERTED TO TRUE.
-    # Omitting router.gateway.refs does not make KServe publish nothing - it
-    # falls back to a cluster-default gateway openshift-ingress/
-    # openshift-ai-inference, which does not exist here, so the
-    # LLMInferenceService went RouterReady=False / Ready=False
-    # ("Managed HTTPRoute references non-existent Gateway") and the
-    # MaaSModelRef followed it to Unhealthy/BackendNotReady. Serving itself
-    # stayed up (MainWorkloadReady/InferencePoolReady true, and ai-gateway
-    # talks to the workload Service directly), but the model was no longer
-    # Ready, which is strictly worse than the identity mismatch it was meant
-    # to fix. Left true; see the note above for the mismatch this does NOT
-    # solve. Any future attempt must point the ref at a DIFFERENT, existing
-    # gateway rather than removing it.
-    attachRouterToMaasGateway: true
+    # TWO FIXES TRIED AND REVERTED - do not retry either:
+    #   1. A second HTTPRoute keyed on the MaaS identity. It routed and auth
+    #      passed, but 429'd on everything: the controller generates a
+    #      subscription's TRLP only for the ADOPTED route, and
+    #      MaaSModelRef.spec has no field to redirect it, so a hand-authored
+    #      route is governed solely by the gateway-level deny-all
+    #      (gateway-default-deny, limit 0/1m).
+    #   2. Removing the ref entirely. KServe does not yield publication - it
+    #      falls back to a cluster-default openshift-ingress/
+    #      openshift-ai-inference which does not exist here, taking the
+    #      LLMInferenceService to Ready=False and the MaaSModelRef to
+    #      Unhealthy. Serving stayed up (ai-gateway dials the workload
+    #      Service directly) but the model was no longer Ready.
+    #
+    # THE FIX. Give KServe a Gateway of its own that carries no real traffic
+    # (templates/model-gateway.yaml), leaving maas-default-gateway free so
+    # the MaaS controller - which does hold create/update RBAC on httproutes
+    # - publishes its own route with its own identity and its own generated
+    # TRLP.
+    #
+    # ROLLBACK: set name back to maas-default-gateway and manage: false.
+    routerGateway:
+      name: zuno-model-gateway
+      namespace: openshift-ingress
+      # Whether this chart renders the Gateway itself. false when pointing
+      # at a gateway another chart owns (e.g. maas-default-gateway, which
+      # gitops/charts/openshift-ai owns).
+      manage: true
     # Same RHOAI 3.5 EA2 vLLM/CUDA preset the qwen MaaS backend used
     # (`oc get llminferenceserviceconfig -n redhat-ods-applications`) -
     # generic serving image, not qwen-specific.
