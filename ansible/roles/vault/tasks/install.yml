@@ -309,9 +309,9 @@
 - name: "vault | extract that version's public key + creation time"
   ansible.builtin.set_fact:
     _vault_transit_pubkey: >-
-      {{ _vault_transit_key_json.data.keys[_vault_transit_key_json.data.latest_version | string].public_key }}
+      {{ _vault_transit_key_json.data['keys'][_vault_transit_key_json.data.latest_version | string].public_key }}
     _vault_transit_key_created: >-
-      {{ _vault_transit_key_json.data.keys[_vault_transit_key_json.data.latest_version | string].creation_time }}
+      {{ _vault_transit_key_json.data['keys'][_vault_transit_key_json.data.latest_version | string].creation_time }}
 
 - name: "vault | write the current Transit public key to the committed trust anchor"
   ansible.builtin.copy:
@@ -319,14 +319,25 @@
     content: "{{ _vault_transit_pubkey }}"
   register: _vault_pubkey_file
 
-- name: "vault | commit the trust anchor if the live key changed (pathspec-limited add+commit - never touches any other pending change in the working tree, local commit only, no push)"
+- name: "vault | check whether the trust anchor actually differs from the last commit (a disk-vs-HEAD drift with no real content change - e.g. a stray uncommitted edit that this task's copy above just reverted - is not something to commit)"
+  ansible.builtin.command:
+    cmd: git diff --quiet -- agents/zuno-platform-signer.pub
+    chdir: "{{ zuno_repo_root }}"
+  register: _vault_pubkey_git_diff
+  changed_when: false
+  failed_when: false
+  when: _vault_pubkey_file.changed
+
+- name: "vault | commit the trust anchor if it actually differs from HEAD (pathspec-limited add+commit - never touches any other pending change in the working tree, local commit only, no push)"
   ansible.builtin.shell:
     cmd: >-
       set -o pipefail;
       git add -- agents/zuno-platform-signer.pub &&
       git commit -m "vault: sync zuno-platform-signer.pub with live Transit key (version {{ _vault_transit_key_json.data.latest_version }}, created {{ _vault_transit_key_created }})" -- agents/zuno-platform-signer.pub
     chdir: "{{ zuno_repo_root }}"
-  when: _vault_pubkey_file.changed
+  when:
+    - _vault_pubkey_file.changed
+    - (_vault_pubkey_git_diff.rc | default(0)) != 0
 
 - name: "vault | generate and seed self-generatable application secrets (idempotent - first run only, see vault_seed_if_missing.yml)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
