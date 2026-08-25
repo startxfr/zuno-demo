@@ -453,6 +453,33 @@ Observability must correlate at least:
 
 The deployment must include acceptance tests for authorized access, denied access, quota/rate-limit behavior and an unavailable-model/fallback path.
 
+## Implementation note (2026-08-25) — the entitlement gap is one identity string, and two fixes were tried and backed out
+
+**The gap.** `GET /v1/models` returned an empty list for every identity, and a completion returned 403 `no matching subscription found for user` even for `consultant-01`, who is in the `agent_tekos` OpenShift group that owns the `gpt-oss-20b-tekos` subscription. The cause is not groups, not maas-api health, not Postgres, and not the inert `zuno-ai-run/default-tenant`: it is that two different strings name the same model and never meet.
+
+Established by calling maas-api's own selector directly, varying only `requestedModel`:
+
+| `requestedModel` | `/internal/v1/subscriptions/select` |
+|---|---|
+| `publishers/zuno-ai-run/models/gpt-oss-20b` | `not_found` |
+| `gpt-oss-20b` | `not_found` |
+| `gpt-oss-20b-maas` | `not_found` |
+| **`zuno-ai-run/gpt-oss-20b-maas`** | subscription `gpt-oss-20b-tekos`, `ready: true`, priority 10 |
+
+So the entitlement plane has been correct all along — groups, subscriptions and priority selection all work. The accepted identity is `<modelRef namespace>/<modelRef name>`, and it is independently expected by two further components: the `MaaSAuthPolicy`'s OPA map is keyed on it, and the generated `TokenRateLimitPolicy`'s predicates read `selected_subscription_key == "...@zuno-ai-run/gpt-oss-20b-maas"`. Three parts of the policy plane agree; only the data path speaks KServe's publisher form. Sending the MaaS form 404s (no route matches it), sending the publisher form 403s — mutually exclusive.
+
+This also **retracts** the earlier hypothesis that aligning `maas.publishedName` with the backend name would fix it. The accepted form is namespaced, so `gpt-oss-20b` would have failed identically.
+
+**Why it happens.** `router.gateway.refs` on the LLMInferenceService attaches KServe's router to `maas-default-gateway`, so KServe publishes the HTTPRoute there and the `MaaSModelRef` *adopts* it rather than publishing its own (`status.httpRouteName: gpt-oss-20b-kserve-route`). Everything downstream then inherits KServe's identity form. The same adoption explains the empty `/v1/models`: `status.endpoint` is the bare gateway root with no model path, so maas-api's access probe requests `<endpoint>/v1/models`, the gateway matches `maas-api-route` (PathPrefix `/v1/models`) and routes it straight back to maas-api, which returns its own empty list. Authorino logs the probe with the maas-api pod as source IP.
+
+**Attempt 1 — a second HTTPRoute keyed on the MaaS identity. Reverted.** It got further than anything before: routing matched and auth passed for the first time. But it returned 429 on every request, because the MaaS controller generates a subscription's `TokenRateLimitPolicy` only for the *adopted* route, and `MaaSModelRef.spec` has no field to redirect it. Any hand-authored route on this gateway is therefore governed solely by the gateway-level `gateway-default-deny` (limit `0`/1m) — live-confirmed via that route's own `TokenRateLimitPolicyAffected` condition. Leaving it would also have been a diagnostic regression, turning a clear 404 into a misleading "quota exceeded".
+
+**Attempt 2 — drop `router.gateway.refs` so MaaS publishes its own route. Reverted.** Omitting the ref does not hand publication to MaaS; KServe falls back to a cluster-default gateway `openshift-ingress/openshift-ai-inference` which does not exist here, so the LLMInferenceService went `RouterReady=False` / `Ready=False` ("Managed HTTPRoute references non-existent Gateway") and the MaaSModelRef followed to `Unhealthy`/`BackendNotReady`. KServe also kept its existing route on `maas-default-gateway` throughout, so MaaS never got the chance. Serving stayed up (`MainWorkloadReady`/`InferencePoolReady` true; ai-gateway reaches the workload Service directly and was unaffected), but a not-Ready LLMInferenceService is strictly worse than the mismatch. Reverted via `gptOssModel.llmInferenceService.attachRouterToMaasGateway`, which is retained with the tested outcome recorded.
+
+**What the next attempt has to do.** Point `router.gateway.refs` at a *different, existing* gateway rather than removing it, so KServe publishes elsewhere and the MaaSModelRef publishes its own route — carrying the MaaS identity and receiving its own controller-generated TRLP — on `maas-default-gateway` via the Tenant's `gatewayRef`. That needs a second Gateway provisioned for model traffic, which is a topology decision beyond this pass.
+
+**Corrections to this ADR's own earlier text.** The status line's claim that MaaS auth enforcement is "not yet proven attached to live model requests" is out of date: the gateway's Kuadrant wasm config carries 16 actionSets, 8 of them keyed on plain path prefixes needing no injected header, each wired to `auth-service` plus both ratelimit services, and an unauthenticated path-prefixed completion returns 401. Enforcement is attached; what fails is subscription *selection*, for the identity reason above. Separately, the `ipp-pre` re-anchoring (see the 2026-08-25 anchor note) is confirmed working end to end: with no explicit header at all, the request body's `model` field is copied into `X-Gateway-Model-Name` and the route cache is cleared, so the body is authoritative for routing.
+
 ## Acceptance criteria
 
 - At least one local Zuno model is published and consumable through MaaS.
