@@ -1,6 +1,6 @@
 # WP-072: Install Ansible Automation Platform as a Day 1 component
 
-- **State:** Repo work merged (2026-08-24) - role, chart, apps, four
+- **State:** Done (live-verified 2026-08-25) - role, chart, apps, four
   dedicated Crunchy databases, Vault seeds, Keycloak OIDC client
   registration, Makefile/playbook wiring all committed. **CRD inventory
   complete** (step 10, done live against `demo222` before any code was

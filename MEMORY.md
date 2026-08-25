@@ -679,18 +679,19 @@ not here.
 
 ### Dated entries (roadmap work packages, v0.2) — current status per ADR
 
-- **ADR-0354 (WP-072)**: Ansible Automation Platform `aap` component -
-  role/chart/apps, four dedicated Crunchy databases (Gateway/Controller/
-  Hub/EDA each own their own database secret, confirmed live via a
-  2026-08-24 CRD inventory against `demo222` - the unified CR does NOT
-  take one shared external-database secret, correcting the ADR's
-  original open question), Vault seeds, Keycloak OIDC client
-  registration. Repo-complete; `make d1 install aap` not yet run on a
-  live cluster - see `ansible/roles/aap/README.md` for what remains
-  unverified end to end. Companion `aap-config` component (WP-073) not
-  started, but unblocked: the same CRD inventory confirmed Path A
-  (Project/JobTemplate CRDs already shipped by the platform operator's
-  own bundle, no second Subscription needed).
+- **ADR-0354 (WP-072/WP-073)**: Ansible Automation Platform. WP-072
+  (`aap`) and WP-073 (`aap-config`) are both `Done`, live-verified on
+  `demo222` (2026-08-25): Gateway/Controller/Hub/EDA Running, RHN
+  subscription auto-attached, organization `zuno` plus its Project/
+  Inventory/Credential/Job Template CRs reconciled, Keycloak SSO
+  authenticator wired (API-confirmed, browser login flow still
+  unverified). Four dedicated Crunchy databases confirmed live (the
+  unified CR does NOT take one shared external-database secret,
+  correcting the ADR's original open question). See
+  `ansible/roles/aap/README.md` and `ansible/roles/aap_config/README.md`
+  for the full findings, including the one accepted limitation (vault's
+  precheck can't run through the least-privilege machine credential,
+  `pods/exec` deliberately not granted).
 - **ADR-0202 / ADR-0203 (WP-20)**: four logical knowledge-domain
   identifiers (`knowledge.tech/sales/sxa-legacy/adv`) declared in
   `knowledge/<domain>/domain.yaml`, validated by

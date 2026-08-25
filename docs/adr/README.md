@@ -123,7 +123,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md) | v0.2 | Partially implemented | Import real SXA content via S3 into MariaDB, served through MCP and anonymized RAG |
 | [ADR-0217](0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Partially implemented | Ingest a weekly, already-anonymized SXA corpus as a new RAG domain |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | Unscheduled | Proposed | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
-| [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | v0.2 | Proposed | Add Ansible Automation Platform as a new Day 1 component |
+| [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | v0.2 | Implemented | Add Ansible Automation Platform as a new Day 1 component |
 
 ## version 0.3
 

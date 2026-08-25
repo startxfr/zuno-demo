@@ -1,6 +1,6 @@
 # WP-073: Register the zuno-demo Project and day0_check Job Template in AAP
 
-- **State:** Repo work merged (2026-08-25), live verification pending.
+- **State:** Done (live-verified 2026-08-25).
   Implemented via **Path A** as confirmed by WP-072's CRD inventory, with
   four user-approved scope additions beyond the original brief:
   (1) the RHN subscription credentials moved into the standard ADR-0024
@@ -28,6 +28,51 @@
 
   Original decision-checkpoint framing below is kept for history; Path B
   never applied.
+
+  **Live install verified (2026-08-25)**: `make d1 install aap-config` run
+  for real on `demo222` - organization `zuno` created and synced down to
+  Controller, Gateway token minted and persisted to Vault
+  `zuno/aap/controller-token`, Project `zuno-demo`/Inventory `zuno`/
+  Credential `zuno-cluster-reader`/Job Template `zuno-day0-check` all
+  reconciled, Keycloak authenticator `Keycloak zuno` created
+  (`enabled: True`, confirmed via the Gateway API). The Project's SCM sync
+  and a manual `zuno-day0-check` launch both completed `successful`, and a
+  second full install run was idempotent (`changed=0`, no duplicate
+  org/token/authenticator). Five real bugs were found and fixed along the
+  way (none pre-existing except the last): AAP 2.5+ moved organizations
+  and API tokens to gateway-level endpoints, breaking the original
+  Controller-API calls (commit `56c48fe`); the connection Secret's `host`
+  had to be the gateway's own in-cluster Service
+  (`http://aap.zuno-aap.svc`), not `aap-controller-service` (401 with a
+  gateway-minted token, same commit); `zuno_repo_root` was undefined on
+  the first real Job Template run because AAP's Controller-managed
+  inventory has no `group_vars/` for auto-discovery, fixed by having
+  `day0_check.yml` compute it itself (commit `eef095f`); `cluster-reader`
+  excludes Secrets entirely, requiring a narrowly-scoped Role/RoleBinding
+  in `zuno-vault` alone for vault's precheck (commit `c664273`); and a
+  genuine pre-existing bug, unrelated to AAP, found only because this was
+  the first time `day0_check.yml` ran through a non-admin credential:
+  `openshift_rbac_groups`'s precheck referenced a stale
+  `ClusterRoleBinding` name (`zuno-admin-cluster-admin`) the ADR-0349
+  persona restructure had renamed to `zuno-ocp-paas-ops-cluster-admin`,
+  producing a false "NOT installed" on `make d0 check
+  openshift-rbac-groups` on every cluster, not just this one - fixed
+  (commit `c3417a9`).
+
+  **One accepted, documented limitation**: `zuno-day0-check`'s report
+  always shows `vault` as "NOT installed" - `cluster-reader` has no
+  `pods/exec` (unlike Secrets, not merely excluded, entirely absent from
+  the built-in role) and vault's precheck needs it for `vault status`.
+  The operator explicitly declined to widen the credential for this
+  (RBAC can't scope `pods/exec` to just that one command); `make d0 check
+  vault` from an operator shell remains the source of truth. See
+  `ansible/roles/aap_config/README.md`'s "Known limitation" section.
+
+  **Not yet done**: an actual interactive browser login through the
+  Gateway's "Log in with Keycloak" button with a real `zuno` realm
+  persona - only the authenticator object's existence and API-level
+  config (`enabled: True`, correct plugin type) were confirmed live. The
+  local admin login is unaffected and remains the fallback either way.
 - **ADRs:** ADR-0354 (clause 4 and clause 6's AAP-side authenticator
   question)
 - **Depends on:** WP-072 (`aap` component live and Ready - repo work

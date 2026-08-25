@@ -1,6 +1,6 @@
 # ADR-0354: Add Ansible Automation Platform as a new Day 1 component
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.2
 - **Date:** 2026-08-20
 - **Amended:** 2026-08-24 (Day 0 → Day 1 placement, scope split into `aap`/
@@ -342,10 +342,21 @@ therefore be safely idempotent under a plain repeated `install`.
 
 ## Implementation state
 
-**To be implemented.** This ADR records an agreed architectural decision.
-No chart, role, playbook or Makefile change is claimed by this ADR itself -
-implementation lands via WP-072 (`aap`) and WP-073 (`aap-config`) under
-`docs/roadmap/work-packages/`.
+**Implemented and live-verified (2026-08-25, `demo222`).** WP-072 (`aap`)
+and WP-073 (`aap-config`) are both `Done` under
+`docs/roadmap/work-packages/`: Gateway/Controller/Hub/EDA Running, the
+Red Hat subscription auto-attached, the `zuno` organization plus its
+Project/Inventory/Credential/Job Template all reconciled, and clause 6's
+AAP-side Keycloak authenticator created and confirmed active via the
+Gateway API (`enabled: True`). One item is not yet confirmed: an actual
+interactive "Log in with Keycloak" browser flow through the Gateway route
+- only the authenticator object's existence and config were checked at
+the API level. The local admin login remains the fallback regardless.
+One limitation was accepted by design rather than fixed: the least-
+privilege Job Template credential (`cluster-reader`, no `pods/exec`)
+can't run vault's `vault status` precheck, so `zuno-day0-check` always
+reports `vault` as "NOT installed" - `make d0 check vault` from an
+operator shell stays authoritative for that component.
 
 ## Related ADRs
 
