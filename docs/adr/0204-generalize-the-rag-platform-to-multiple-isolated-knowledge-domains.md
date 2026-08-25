@@ -1,11 +1,6 @@
 # ADR-0204: Generalize the RAG platform to multiple isolated knowledge domains
 
 - **Status:** Partially implemented (multi-domain retrieval core, bindings, per-domain databases and source adapters merged; WP-21's live provisioning confirmed 2026-08-17 - tech+sales domains live with distinct credentials, `make d1 check rag` reports installed after fixing a stale precheck.yml Job lookup; the Salesforce/Aramis source-adapter mapping bullets below are superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note)
-  <!-- 2026-08-15: WP-22 merged part 2 - the source-adapter interface
-  (fetch-redhat/fetch-confluence refactored, fetch-salesforce/fetch-aramis/
-  load-sxa-dump added), per-domain pipeline targeting and ADR-0105 cadences.
-  Only the operator provisioning/live-run follow-up (WP-21+WP-22 briefs)
-  separates this from Implemented. -->
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
