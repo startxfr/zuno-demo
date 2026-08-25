@@ -49,6 +49,11 @@ AGENT = os.getenv("AGENT", "tekos")
 BULK_INTERACTIONS = int(os.getenv("BULK_INTERACTIONS", "0") or "0")
 BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
 PERSONA = os.getenv("STRESS_TEST_PERSONA", "consultant-01")
+# Matches the local-provider timeout in platform/ai-gateway/provider-routing.yaml
+# (60s). The old hardcoded 30s here made every /api/chat call that took
+# longer than that under normal single-replica load count as a hard
+# "error" indistinguishable from a real backend failure.
+BULK_TIMEOUT_SECONDS = float(os.getenv("BULK_TIMEOUT_SECONDS", "60"))
 
 # .parent.resolve(), not .resolve().parent - same ConfigMap-symlink bug
 # and fix as platform/testing/day2_stresstest.py's own SCRIPT_DIR (see
@@ -108,6 +113,29 @@ def _percentile(sorted_values: List[float], pct: float) -> float:
     return sorted_values[index]
 
 
+def _post_chat(headers: Dict[str, str], message: str, i: int) -> "tuple[bool, bool, float]":
+    """One /api/chat call. Returns (ok, timed_out, elapsed_ms)."""
+    import run_scenarios
+
+    start = time.monotonic()
+    try:
+        resp = httpx.post(
+            f"{BFF_URL}/api/chat",
+            headers=headers,
+            json={"session_id": f"day2-bulk-{AGENT}-{i}", "message": message},
+            timeout=BULK_TIMEOUT_SECONDS,
+        )
+        body = resp.json() if resp.status_code == 200 else {}
+        if resp.status_code == 200:
+            run_scenarios.record_run_id(PERSONA, body)
+        ok = resp.status_code == 200 and bool(body.get("reply"))
+        return ok, False, (time.monotonic() - start) * 1000
+    except httpx.TimeoutException:
+        return False, True, (time.monotonic() - start) * 1000
+    except Exception:  # noqa: BLE001 - a call erroring counts as one failed interaction, not a crash
+        return False, False, (time.monotonic() - start) * 1000
+
+
 def run() -> List[Day2Result]:
     if BULK_INTERACTIONS <= 0:
         return []
@@ -119,35 +147,30 @@ def run() -> List[Day2Result]:
             "no message-bearing scenario content to replay",
         )]
 
-    import run_scenarios
-
     headers = _auth_headers()
     latencies: List[float] = []
     errors = 0
+    timeouts = 0
     for i in range(BULK_INTERACTIONS):
         message = corpus[i % len(corpus)]
-        start = time.monotonic()
-        try:
-            resp = httpx.post(
-                f"{BFF_URL}/api/chat",
-                headers=headers,
-                json={"session_id": f"day2-bulk-{AGENT}-{i}", "message": message},
-                timeout=30,
-            )
-            body = resp.json() if resp.status_code == 200 else {}
-            if resp.status_code == 200:
-                run_scenarios.record_run_id(PERSONA, body)
-            ok = resp.status_code == 200 and bool(body.get("reply"))
-        except Exception:  # noqa: BLE001 - a call erroring counts as one failed interaction, not a crash
-            ok = False
-        latencies.append((time.monotonic() - start) * 1000)
+        ok, timed_out, elapsed_ms = _post_chat(headers, message, i)
+        if not ok and timed_out:
+            # One retry on a bare timeout absorbs a single slow response
+            # instead of counting normal single-replica backend latency
+            # as a hard failure.
+            ok, timed_out, retry_ms = _post_chat(headers, message, i)
+            elapsed_ms += retry_ms
+        latencies.append(elapsed_ms)
         if not ok:
             errors += 1
+            if timed_out:
+                timeouts += 1
 
     latencies.sort()
     error_rate = errors / BULK_INTERACTIONS
     detail = (
-        f"count={BULK_INTERACTIONS} errors={errors} error_rate={error_rate:.1%} "
+        f"count={BULK_INTERACTIONS} errors={errors} (timeouts={timeouts}) "
+        f"error_rate={error_rate:.1%} "
         f"p50={_percentile(latencies, 0.50):.0f}ms p95={_percentile(latencies, 0.95):.0f}ms "
         f"max={max(latencies):.0f}ms"
     )
