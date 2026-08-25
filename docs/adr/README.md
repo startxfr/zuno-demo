@@ -243,6 +243,7 @@ Goal: automate the release/supply-chain pipeline using GitHub Actions (build, si
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | OKF v0.1 | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
 | [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Implemented | Open per-conversation tabs with one browser tab per agent |
 | [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Proposed | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
+| [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Proposed | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
 
 ## Standard clauses
 

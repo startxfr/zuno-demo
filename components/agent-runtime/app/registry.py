@@ -39,12 +39,13 @@ OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 # ADR-0215: fleet-wide defaults for a bundle that declares no zuno.memory.
 # history block at all (every field there is optional - see
 # platform/okf/schema/zuno-okf-v0.2.schema.json). HISTORY_TOKEN_BUDGET's
-# default (1800) is sized against qwen2.5-7b-instruct's
-# --max-model-len=8192 (gitops/charts/models/templates/servingruntime.
-# yaml), leaving headroom for the system prompt (~500) and RAG context
-# (~2500) - an agent routed to a larger-context model (e.g. Arkos's C3
-# local-only path to gpt-oss-20b's 32768) declares a larger budget
-# explicitly in its own bundle instead of raising this shared default.
+# default (1800) predates ADR-0518: it was sized against the old chat
+# model's --max-model-len=8192, with headroom for the system prompt
+# (~500) and RAG context (~2500). Both local models now serve 32768
+# (gitops/charts/models/templates/servingruntime.yaml), so this default
+# is deliberately conservative rather than binding - an agent wanting a
+# larger window declares it explicitly in its own bundle instead of this
+# shared default silently inflating every agent's per-turn token spend.
 HISTORY_TOKEN_BUDGET_DEFAULT = int(os.getenv("HISTORY_TOKEN_BUDGET", "1800"))
 HISTORY_MAX_TURNS_DEFAULT = 6
 # Operational kill switch (ADR-0215): forces every agent's history off

@@ -45,7 +45,7 @@ def test_declared_adapter_overrides_local_model_name() -> None:
     _reset_maas_env()
     candidate = ProviderCandidate(name="local", kind="local")
     with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
-        providers.chat_model_for(candidate, {"model": "qwen2.5-7b-instruct", "serves_adapters": True}, adapter="comage-lora")
+        providers.chat_model_for(candidate, {"model": "qwen3.6-27b-instruct", "serves_adapters": True}, adapter="comage-lora")
     (_, kwargs) = chat_openai.call_args
     assert kwargs["model"] == "comage-lora"
 
@@ -54,9 +54,9 @@ def test_no_adapter_uses_base_model_name() -> None:
     _reset_maas_env()
     candidate = ProviderCandidate(name="local", kind="local")
     with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
-        providers.chat_model_for(candidate, {"model": "qwen2.5-7b-instruct"}, adapter=None)
+        providers.chat_model_for(candidate, {"model": "qwen3.6-27b-instruct"}, adapter=None)
     (_, kwargs) = chat_openai.call_args
-    assert kwargs["model"] == "qwen2.5-7b-instruct"
+    assert kwargs["model"] == "qwen3.6-27b-instruct"
 
 
 def test_adapter_never_applied_to_a_saas_candidate() -> None:
@@ -83,7 +83,7 @@ def test_adapter_never_applied_when_routed_via_maas() -> None:
     maas_adapter.MAAS_GATEWAY_API_KEY_ENV = "MAAS_GATEWAY_API_KEY"
     candidate = ProviderCandidate(name="local", kind="local")
     with mock.patch("app.maas_adapter.chat_model_via_maas") as via_maas:
-        providers.chat_model_for(candidate, {"via_maas": True, "model": "qwen2.5-7b-instruct"}, adapter="comage-lora")
+        providers.chat_model_for(candidate, {"via_maas": True, "model": "qwen3.6-27b-instruct"}, adapter="comage-lora")
     assert via_maas.called
     _reset_maas_env()
 

@@ -55,7 +55,7 @@ Zuno-specific response field:
   ```json
   {
     "id": "chatcmpl-...", "object": "chat.completion", "created": 1735689600,
-    "model": "qwen2.5-7b-instruct",
+    "model": "qwen3.6-27b-instruct",
     "choices": [{"index": 0, "message": {"role": "assistant", "content": "..."}, "finish_reason": "stop"}],
     "usage": {"prompt_tokens": 128, "completion_tokens": 64, "total_tokens": 192},
     "zuno_provider": "local"
@@ -147,7 +147,7 @@ metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`
 |---|---|---|
 | `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.mycluster.example.com/realms/zuno` | JWT issuer / JWKS base |
 | `PROVIDER_ROUTING_PATH` | `/app/config/provider-routing.yaml` | routing config (ConfigMap-mounted, not baked into the image) |
-| `LOCAL_MODEL_ENDPOINT` | `http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
+| `LOCAL_MODEL_ENDPOINT` | `http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `zuno/providers/<name>` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces/metrics |
 | `SEMANTIC_CACHE_ENABLED` | `false` | global cache switch (chart value `semanticCache.enabled`) |

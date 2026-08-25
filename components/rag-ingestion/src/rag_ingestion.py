@@ -322,7 +322,7 @@ def load_config() -> IngestionConfig:
         pg_password=os.environ.get("PGPASSWORD"),
         embedding_endpoint=_env("EMBEDDING_ENDPOINT", required=True),
         embedding_model=_env("EMBEDDING_MODEL", required=True),
-        embedding_dimensions=_env_int("EMBEDDING_DIMENSIONS", 384),
+        embedding_dimensions=_env_int("EMBEDDING_DIMENSIONS", 1024),
         embedding_batch_size=_env_int("EMBEDDING_BATCH_SIZE", 16),
         embedding_api_token=os.environ.get("EMBEDDING_API_TOKEN"),
         confluence_token=os.environ.get("CONFLUENCE_TOKEN"),

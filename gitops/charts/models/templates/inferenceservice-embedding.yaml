@@ -1,6 +1,7 @@
-# Model weights are pulled from Hugging Face at pod start (hf://), no
-# offline/mirrored cache; same cold-start caveat as
-# templates/inferenceservice.yaml, though this model is far smaller.
+# ADR-0518: weights are read from modelsS3 at pod start (the same
+# staged-in-S3 convention every other predictor already follows) - the
+# previous hf:// pull-at-pod-start was the last HF-at-runtime dependency
+# in the serving path, and in-cluster HF downloads hang unreliably here.
 apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
@@ -23,10 +24,16 @@ spec:
     # chat model mig-2g.48gb) and packing all inference onto the one
     # permanent GPU node is exactly the intended layout - the old
     # constraint would forbid it outright.
+    # Carries the serving.kserve.io/s3-* annotated Secret KServe's
+    # storage-initializer auto-detects for the s3:// storageUri below
+    # (templates/s3-serving-credentials-embedding.yaml).
+    serviceAccountName: {{ .Values.embeddingModel.inferenceServiceName }}-s3
     model:
       modelFormat:
         name: vLLM
       runtime: {{ .Values.embeddingModel.servingRuntimeName }}
-      storageUri: "hf://{{ .Values.embeddingModel.modelId }}"
+      # <prefix>/<servedModelName>/ is the bucket's layout convention,
+      # same as the chat predictor.
+      storageUri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.embeddingModel.servedModelName }}/"
       resources:
         {{- toYaml .Values.embeddingModel.resources | nindent 8 }}

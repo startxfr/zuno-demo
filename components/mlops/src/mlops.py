@@ -273,6 +273,52 @@ class ArtifactStore:
                 uploaded.append(key)
         return uploaded
 
+    def download_prefix(self, bucket: str, prefix: str, local_dir: Path) -> int:
+        """Downloads every object under s3://bucket/prefix/ into
+        local_dir, preserving relative paths - train-lora's base-model
+        fetch (ADR-0518). Takes an explicit bucket (the base model lives
+        under the models/ prefix, addressed by a full s3:// URI in
+        MLOPS_BASE_MODEL) but reuses this store's client/credentials.
+        download_file streams to disk via boto3's managed transfer -
+        never get_bytes: safetensors shards run ~5GB each and buffering
+        one in memory would eat half the train pod's memory request."""
+        prefix = prefix.rstrip("/") + "/"
+        paginator = self._client.get_paginator("list_objects_v2")
+        count = 0
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                rel = obj["Key"][len(prefix):]
+                if not rel:
+                    continue
+                target = local_dir / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                self._client.download_file(bucket, obj["Key"], str(target))
+                count += 1
+        return count
+
+
+def _resolve_base_model(config: MlopsConfig, store: ArtifactStore, workdir: Path) -> str:
+    """Returns a from_pretrained-loadable reference for config.base_model:
+    an s3://<bucket>/<prefix> URI (ADR-0518 - the staged-in-S3 base, same
+    convention every served model follows) is downloaded under workdir
+    and the local directory path returned; anything else (an HF repo id,
+    a pre-mounted local path) passes through untouched."""
+    if not config.base_model.startswith("s3://"):
+        return config.base_model
+    bucket, _, prefix = config.base_model[len("s3://"):].partition("/")
+    if not bucket or not prefix:
+        raise SystemExit(f"malformed s3:// base model URI: {config.base_model}")
+    local_dir = workdir / "base-model"
+    local_dir.mkdir(parents=True, exist_ok=True)
+    count = store.download_prefix(bucket, prefix, local_dir)
+    if count == 0 or not (local_dir / "config.json").exists():
+        raise SystemExit(
+            f"base model download from {config.base_model} yielded no usable "
+            f"checkpoint ({count} objects, config.json "
+            f"{'present' if (local_dir / 'config.json').exists() else 'missing'})"
+        )
+    return str(local_dir)
+
 
 def _run_prefix(base_prefix: str, config: MlopsConfig) -> str:
     return f"{base_prefix}/{config.agent}/{config.run_id}"
@@ -383,7 +429,12 @@ def _load_dataset_manifest(config: MlopsConfig, store: ArtifactStore) -> Dict[st
     return manifest
 
 
-def _run_lora_training(config: MlopsConfig, examples: List[Dict[str, Any]], output_dir: Path) -> Dict[str, Any]:
+def _run_lora_training(
+    config: MlopsConfig,
+    examples: List[Dict[str, Any]],
+    output_dir: Path,
+    base_model_ref: Optional[str] = None,
+) -> Dict[str, Any]:
     """Real PEFT/LoRA fine-tuning of config.base_model on `examples`
     (causal-LM text corpus), saved to output_dir via save_pretrained().
     torch/transformers/peft/datasets are imported lazily, here and only
@@ -400,10 +451,19 @@ def _run_lora_training(config: MlopsConfig, examples: List[Dict[str, Any]], outp
     from peft import LoraConfig, TaskType, get_peft_model
     from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 
-    tokenizer = AutoTokenizer.from_pretrained(config.base_model)
+    base_ref = base_model_ref or config.base_model
+    tokenizer = AutoTokenizer.from_pretrained(base_ref)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(config.base_model)
+    # bf16 on the GPU path (ADR-0518): transformers' default fp32 load
+    # would need ~36GB of host RAM for the Qwen3.5-9B base - over the
+    # train pod's memory limit - where bf16 (the checkpoint's native
+    # dtype) halves that. cpu_safe keeps the default: fp32 is the safe
+    # dtype for CPU-only Trainer runs.
+    model = AutoModelForCausalLM.from_pretrained(
+        base_ref,
+        **({} if config.cpu_safe else {"torch_dtype": torch.bfloat16}),
+    )
 
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -451,7 +511,10 @@ def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         output_dir = Path(tmp)
-        train_stats = _run_lora_training(config, examples, output_dir)
+        # Resolved inside the TemporaryDirectory so an s3://-staged base
+        # model's ~18GB working copy is reclaimed with the run.
+        base_model_ref = _resolve_base_model(config, store, output_dir)
+        train_stats = _run_lora_training(config, examples, output_dir, base_model_ref=base_model_ref)
         adapter_prefix = f"{_run_prefix(config.model_prefix, config)}/adapter"
         uploaded = store.put_dir(adapter_prefix, output_dir / "adapter")
 

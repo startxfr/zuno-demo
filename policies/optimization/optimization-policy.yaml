@@ -48,7 +48,7 @@ scopes:
   cache_enabled:
     enabled: true
     models:
-      - qwen2.5-7b-instruct
+      - qwen3.6-27b-instruct
 
   # Scope 2: routing choice between PRE-APPROVED EQUIVALENT model/adapter
   # candidates only. Each entry lists candidates a human has already

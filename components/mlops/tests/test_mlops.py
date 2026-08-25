@@ -38,12 +38,25 @@ import mlops  # noqa: E402
 
 class _FakeStore:
     """In-memory stand-in for ArtifactStore - every stage function only
-    ever calls put_json/get_json/put_text/get_bytes/put_dir/list_keys, so
-    a plain dict-backed fake covers every call site without touching
-    boto3 at all."""
+    ever calls put_json/get_json/put_text/get_bytes/put_dir/list_keys/
+    download_prefix, so a plain dict-backed fake covers every call site
+    without touching boto3 at all."""
 
     def __init__(self):
         self.objects: dict = {}
+
+    def download_prefix(self, bucket, prefix, local_dir):
+        # Mirrors ArtifactStore.download_prefix; the fake is flat (no
+        # per-bucket namespacing), bucket is accepted and ignored.
+        prefix = prefix.rstrip("/") + "/"
+        count = 0
+        for key, data in self.objects.items():
+            if key.startswith(prefix):
+                target = pathlib.Path(local_dir) / key[len(prefix):]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+                count += 1
+        return count
 
     def put_json(self, key, obj):
         self.objects[key] = json.dumps(obj).encode("utf-8")
@@ -220,7 +233,9 @@ def test_stage_train_lora_uploads_adapter_and_writes_train_manifest() -> None:
     )
     store.put_text("mlops/datasets/comage/run-001/examples.jsonl", json.dumps({"text": "hello", "source": "doc-1"}))
 
-    def _fake_train(cfg, examples, output_dir):
+    def _fake_train(cfg, examples, output_dir, base_model_ref=None):
+        # A non-s3 base model passes through _resolve_base_model untouched.
+        assert base_model_ref == cfg.base_model
         (output_dir / "adapter").mkdir(parents=True, exist_ok=True)
         (output_dir / "adapter" / "adapter_config.json").write_text("{}")
         (output_dir / "adapter" / "adapter_model.bin").write_bytes(b"fake-weights")
@@ -237,6 +252,38 @@ def test_stage_train_lora_uploads_adapter_and_writes_train_manifest() -> None:
         "mlops/models/comage/run-001/adapter/adapter_model.bin",
     ]
     assert store.get_bytes("mlops/models/comage/run-001/adapter/adapter_model.bin") == b"fake-weights"
+
+
+def test_resolve_base_model_passthrough_for_hf_repo_id() -> None:
+    config = _config(base_model="ibm-granite/granite-3.1-2b-instruct")
+    with tempfile.TemporaryDirectory() as tmp:
+        ref = mlops._resolve_base_model(config, _FakeStore(), pathlib.Path(tmp))
+    assert ref == "ibm-granite/granite-3.1-2b-instruct"
+
+
+def test_resolve_base_model_downloads_s3_uri() -> None:
+    config = _config(base_model="s3://some-bucket/models/qwen3.5-9b")
+    store = _FakeStore()
+    store.objects["models/qwen3.5-9b/config.json"] = b"{}"
+    store.objects["models/qwen3.5-9b/model.safetensors"] = b"fake-weights"
+    with tempfile.TemporaryDirectory() as tmp:
+        ref = mlops._resolve_base_model(config, store, pathlib.Path(tmp))
+        local = pathlib.Path(ref)
+        assert local == pathlib.Path(tmp) / "base-model"
+        assert (local / "config.json").read_bytes() == b"{}"
+        assert (local / "model.safetensors").read_bytes() == b"fake-weights"
+
+
+def test_resolve_base_model_fails_on_empty_or_configless_prefix() -> None:
+    config = _config(base_model="s3://some-bucket/models/missing")
+    store = _FakeStore()
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            mlops._resolve_base_model(config, store, pathlib.Path(tmp))
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("expected SystemExit on an empty base-model prefix")
 
 
 # --- evaluate --------------------------------------------------------

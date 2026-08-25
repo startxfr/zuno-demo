@@ -101,8 +101,8 @@ def test_evaluate_honors_a_stricter_per_agent_threshold() -> None:
 
 def test_candidate_label_is_threaded_through_unchanged() -> None:
     with mock.patch.object(quality_gate, "run_acceptance_gate", return_value=_summary(0.75)):
-        result = quality_gate.evaluate("tekos", candidate="qwen2.5-7b-instruct-v2")
-    assert result["candidate"] == "qwen2.5-7b-instruct-v2"
+        result = quality_gate.evaluate("tekos", candidate="qwen3.6-27b-instruct-v2")
+    assert result["candidate"] == "qwen3.6-27b-instruct-v2"
 
 
 def test_main_exits_2_for_an_unknown_agent() -> None:

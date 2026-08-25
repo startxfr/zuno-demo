@@ -70,9 +70,9 @@ def test_chat_model_for_uses_direct_client_when_adapter_disabled() -> None:
     _reset_adapter_env()
     candidate = ProviderCandidate(name="local", kind="local")
     with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
-        providers.chat_model_for(candidate, {"via_maas": True, "model": "qwen2.5-7b-instruct"})
+        providers.chat_model_for(candidate, {"via_maas": True, "model": "qwen3.6-27b-instruct"})
     (_, kwargs) = chat_openai.call_args
-    assert "qwen25-7b-instruct-predictor" in kwargs["base_url"] or kwargs["model"] == "qwen2.5-7b-instruct"
+    assert "qwen36-27b-instruct-predictor" in kwargs["base_url"] or kwargs["model"] == "qwen3.6-27b-instruct"
 
 
 def test_chat_model_for_uses_maas_client_when_opted_in_and_enabled() -> None:
@@ -80,17 +80,17 @@ def test_chat_model_for_uses_maas_client_when_opted_in_and_enabled() -> None:
     candidate = ProviderCandidate(name="local", kind="local")
     with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
         providers.chat_model_for(
-            candidate, {"via_maas": True, "model": "qwen2.5-7b-instruct", "maas_model_ref": "maas/qwen2.5-7b"}
+            candidate, {"via_maas": True, "model": "qwen3.6-27b-instruct", "maas_model_ref": "maas/qwen3.6-27b"}
         )
     (_, kwargs) = chat_openai.call_args
     assert kwargs["base_url"] == "http://maas.example/v1"
-    assert kwargs["model"] == "maas/qwen2.5-7b"
+    assert kwargs["model"] == "maas/qwen3.6-27b"
 
 
 def test_maas_adapter_without_endpoint_fails_loudly() -> None:
     _reset_adapter_env(MAAS_ADAPTER_ENABLED="true")
     try:
-        maas_adapter.chat_model_via_maas({"model": "qwen2.5-7b-instruct"})
+        maas_adapter.chat_model_via_maas({"model": "qwen3.6-27b-instruct"})
         raise AssertionError("expected MaasAdapterError")
     except maas_adapter.MaasAdapterError as exc:
         assert "MAAS_GATEWAY_ENDPOINT" in str(exc)

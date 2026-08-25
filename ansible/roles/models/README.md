@@ -1,7 +1,7 @@
 # models
 
 Applies `gitops/apps/models` (`gitops/charts/models`): a KServe
-`ServingRuntime` (vLLM) + `InferenceService` serving Qwen2.5-7B-Instruct on
+`ServingRuntime` (vLLM) + `InferenceService` serving Qwen3.6-27B (FP8) on
 the single 24GB L4 (ADR-0019). A Day 1 component (ADR-0056). Depends on
 `openshift_ai` (`DataScienceCluster` Ready) and `nvidia_gpu` (GPU
 Operator) having run first.

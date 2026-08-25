@@ -30,5 +30,7 @@ data:
 {{ .Files.Get "files/sql/004_rag_chunking.sql" | indent 4 }}
   005_project_memory.sql: |
 {{ .Files.Get "files/sql/005_project_memory.sql" | indent 4 }}
+  006_embedding_1024.sql: |
+{{ .Files.Get "files/sql/006_embedding_1024.sql" | indent 4 }}
   seed.sql: |
 {{ .Files.Get "files/sql/seed.sql" | indent 4 }}

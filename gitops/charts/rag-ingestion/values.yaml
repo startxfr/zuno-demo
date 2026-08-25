@@ -1354,14 +1354,20 @@ postgres:
 embedding:
   endpoint: "http://embeddings-predictor.zuno-ai-run.svc:8080/v1"
   # The SERVED model id (gitops/charts/models embeddingModel.servedModelName),
-  # NOT the HF repo id "BAAI/bge-small-en-v1.5" - vLLM answers 404
-  # NotFoundError ("The model `BAAI/bge-small-en-v1.5` does not exist")
-  # for the HF id, which zeroes out every embedding (embed: embedded 0
-  # chunks) and fails validate with "no rows indexed". Same
+  # NOT the HF repo id "Qwen/Qwen3-Embedding-0.6B" - vLLM answers 404
+  # NotFoundError for the HF id, which zeroes out every embedding
+  # (embed: embedded 0 chunks) and fails validate with "no rows
+  # indexed" (observed live back on the bge model). Same
   # modelId-vs-servedModelName split the models chart documents for the
   # chat model (its own 404, values.yaml servedModelName comment).
-  model: "bge-small-en-v1.5"
-  dimensions: 384
+  # ADR-0518: 1024-dim Qwen3-Embedding-0.6B replaces 384-dim
+  # bge-small-en-v1.5; dimensions here, the models chart's
+  # embeddingModel.dimensions and rag-service's pgvector column
+  # (files/sql/006_embedding_1024.sql) MUST move together, and any
+  # change forces a full re-ingestion - old vectors are unreadable in
+  # the new space.
+  model: "qwen3-embedding-0.6b"
+  dimensions: 1024
   batchSize: 64
   auth:
     enabled: false
@@ -1372,12 +1378,14 @@ embedding:
 
 chunking:
   strategy: structural
-  # Budget must fit embedding.model's max sequence length (bge-small-en-v1.5:
-  # 512), and the chunker counts cl100k tokens which run ~1.4-1.7x FEWER
-  # than bge's WordPiece on technical prose - 700 here meant 1000+ real
-  # tokens and vLLM 400-failed nearly every batch (17/13324 chunks
-  # embedded). 320 cl100k =~ 450-540 WordPiece; the embed stage's
-  # truncate_prompt_tokens handles the tail that still crosses 512.
+  # 320 was originally forced by bge-small-en-v1.5's 512-token max
+  # sequence length (that model 400-failed batches above it - see git
+  # history for the full cl100k-vs-WordPiece arithmetic). ADR-0518's
+  # Qwen3-Embedding-0.6B accepts 32k tokens, so the ceiling is gone -
+  # 320 is KEPT deliberately as a retrieval-granularity choice (small
+  # focused chunks retrieve better than page-sized ones for this
+  # corpus's Q&A-style queries); raising it is now a quality decision,
+  # not a compatibility one, and would force a full re-ingestion.
   maxTokens: 320
   overlapTokens: 64
   preserveCodeBlocks: true

@@ -99,14 +99,14 @@ def chat_model_for(
                 "endpoint",
                 os.getenv(
                     "LOCAL_MODEL_ENDPOINT",
-                    "http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1",
+                    "http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1",
                 ),
             ),
             api_key=os.getenv("LOCAL_MODEL_API_KEY", "not-required"),
             # ADR-0303 (WP-39): a declared adapter overrides the base
             # model name outright - vLLM multi-LoRA selects the adapter
             # module by this exact field.
-            model=adapter or cfg.get("model", os.getenv("LOCAL_MODEL_NAME", "qwen2.5-7b-instruct")),
+            model=adapter or cfg.get("model", os.getenv("LOCAL_MODEL_NAME", "qwen3.6-27b-instruct")),
             temperature=cfg.get("temperature", 0.2),
             timeout=cfg.get("timeout_seconds", 60),
             http_async_client=http_async_client,

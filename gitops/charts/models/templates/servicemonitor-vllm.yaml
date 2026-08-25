@@ -15,7 +15,7 @@
 # actually backs the dashboards and Thanos querier Grafana reads from.
 #
 # One ServiceMonitor for the two classic-predictor Services this chart
-# still owns (qwen25-7b-instruct-predictor, embeddings-predictor) via
+# still owns (qwen36-27b-instruct-predictor, embeddings-predictor) via
 # matchExpressions on the label KServe stamps on every predictor Service,
 # rather than near-identical CRs per model - both expose port 80 (name
 # "http") -> targetPort 8080, the same port templates/servingruntime*.yaml's

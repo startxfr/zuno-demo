@@ -130,7 +130,7 @@
                   "maximum": 50
                 },
                 "token_budget": {
-                  "description": "Approximate token budget (character/4 heuristic, see app/graph/history.py) for the running summary plus verbatim history combined. Must leave headroom for this agent's system prompt, RAG context and generation - sized against the local model's actual context window (e.g. qwen2.5-7b-instruct's --max-model-len=8192).",
+                  "description": "Approximate token budget (character/4 heuristic, see app/graph/history.py) for the running summary plus verbatim history combined. Must leave headroom for this agent's system prompt, RAG context and generation - sized against the local model's actual context window (e.g. qwen3.6-27b-instruct's --max-model-len=32768).",
                   "type": "integer",
                   "minimum": 100,
                   "maximum": 32000

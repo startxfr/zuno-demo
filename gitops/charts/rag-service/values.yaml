@@ -154,7 +154,7 @@ knowledgeDomains:
 
 # OpenAI-compatible embeddings endpoint - see README "Embedding backend".
 embeddingServiceUrl: http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings
-embeddingModelName: bge-small-en-v1.5
+embeddingModelName: qwen3-embedding-0.6b
 
 # ADR-0322 v0.1 integration scope: opt in to the OGX-backed RAG provider
 # prototype (app/ogx_provider.py) instead of the default pgvector+full-text

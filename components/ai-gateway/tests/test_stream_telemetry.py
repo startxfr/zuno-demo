@@ -29,7 +29,7 @@ from app import telemetry  # noqa: E402
 from app import main as app_main  # noqa: E402
 from app.routing import ProviderCandidate  # noqa: E402
 
-_QWEN_URL = "http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1"
+_QWEN_URL = "http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1"
 
 
 # --- stream_usage=True at construction ---------------------------------
@@ -37,7 +37,7 @@ _QWEN_URL = "http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1"
 
 def test_local_candidate_enables_stream_usage() -> None:
     candidate = ProviderCandidate(name="local", kind="local")
-    cfg = {"model": "qwen2.5-7b-instruct", "endpoint": _QWEN_URL}
+    cfg = {"model": "qwen3.6-27b-instruct", "endpoint": _QWEN_URL}
     with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
         providers.chat_model_for(candidate, cfg)
     (_, kwargs) = chat_openai.call_args

@@ -27,11 +27,11 @@ zuno:
     - write-code
   memory:
     # ADR-0215: Arkos is C3/local-only (see model.preferred_classification
-    # below), so its history-carrying model calls route to gpt-oss-20b
-    # rather than qwen2.5-7b-instruct - a much larger context window
-    # (32768 vs 8192, see gitops/charts/models/values.yaml), so its
-    # history budget can be generous rather than riding the tighter
-    # qwen-sized default (app/registry.py's HISTORY_TOKEN_BUDGET, 1800).
+    # below), so its history-carrying model calls route to gpt-oss-20b's
+    # 32768 context window (since ADR-0518 the chat model matches it -
+    # both serve 32768, see gitops/charts/models/values.yaml), so its
+    # history budget can be generous rather than riding the conservative
+    # fleet default (app/registry.py's HISTORY_TOKEN_BUDGET, 1800).
     history:
       enabled: true
       max_turns: 6

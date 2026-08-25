@@ -90,7 +90,7 @@ chart's `ExternalSecret` re-materializes that credential in
 
 `embedding.endpoint`/`embedding.model`/`embedding.dimensions` point at
 `gitops/charts/models`' additive `embeddingModel` (KServe InferenceService
-`embeddings`, `BAAI/bge-small-en-v1.5`, 384-dim) - the same backing
+`embeddings`, `Qwen/Qwen3-Embedding-0.6B`, 1024-dim) - the same backing
 service `gitops/charts/rag-service` expects by default
 (`embeddings-predictor.zuno-ai-run.svc`).
 

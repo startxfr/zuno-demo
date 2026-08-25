@@ -124,7 +124,16 @@ agents:
   comage:
     enabled: true
     knowledgeDomains: [knowledge.sales, knowledge.project]
-    baseModel: ibm-granite/granite-3.1-2b-instruct
+    # ADR-0518: Qwen3.5-9B staged in S3 (same literal-bucket convention
+    # gitops/charts/models' modelsS3 uses), replacing the HF repo id
+    # ibm-granite/granite-3.1-2b-instruct that mlops.py pulled from
+    # huggingface.co at run time - in-cluster HF downloads hang
+    # unreliably here (the same reason every served model is staged in
+    # S3). An s3:// value is downloaded by mlops.py's train stage before
+    # from_pretrained; a plain HF repo id still works as before. Must
+    # point at the same rag/s3-readable bucket this chart's s3: block
+    # authenticates against.
+    baseModel: s3://zuno-demo-rag-corpus/models/qwen3.5-9b
     loraR: 8
     loraAlpha: 16
     loraDropout: 0.05
@@ -159,11 +168,16 @@ training:
   # Explicit because zuno-ai-build (the DSPA namespace) has no LimitRange:
   # without these the train pod would run wholly unbounded. cpuLimit 7 of
   # the burst g7e.2xlarge's ~7.5 allocatable vCPU.
+  # ADR-0518: memory raised 12/24Gi -> 24/48Gi for the Qwen3.5-9B base
+  # (~18GB of bf16 weights transit host RAM in from_pretrained before
+  # the Trainer moves them to the GPU; the old sizing fit the 2B
+  # granite). The burst node's 64GiB absorbs 48Gi with room for system
+  # daemons - it runs nothing else by design (taint).
   resources:
     cpuRequest: "2"
-    memoryRequest: 12Gi
+    memoryRequest: 24Gi
     cpuLimit: "7"
-    memoryLimit: 24Gi
+    memoryLimit: 48Gi
 
 networkPolicy:
   enabled: true

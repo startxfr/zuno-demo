@@ -79,7 +79,7 @@ _NODE_USD_PER_HOUR = {
 # from this table - not a live bug today (that policy's `objectives:` is
 # empty), but a trap for whoever adds the first local-preferring ceiling.
 _COST_PER_SECOND_LOCAL = {
-    "local": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,  # ~$0.000556/s (qwen2.5-7b-instruct, half the shared card)
+    "local": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,  # ~$0.000556/s (qwen3.6-27b-instruct, half the shared card)
     "local-gpt-oss": _NODE_USD_PER_HOUR["g7e.2xlarge"] / 3600.0,   # ~$0.000933/s (gpt-oss-20b, whole card)
 }
 

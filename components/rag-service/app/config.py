@@ -38,7 +38,7 @@ EMBEDDING_SERVICE_URL = os.getenv(
     "EMBEDDING_SERVICE_URL",
     "http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings",
 )
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "bge-small-en-v1.5")
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "qwen3-embedding-0.6b")
 EMBEDDING_TIMEOUT_SECONDS = float(os.getenv("EMBEDDING_TIMEOUT_SECONDS", "10"))
 
 DEFAULT_TOP_K = int(os.getenv("RAG_DEFAULT_TOP_K", "5"))

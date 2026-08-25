@@ -21,10 +21,15 @@ metrics:
   enabled: true
 
 servingRuntimeName: vllm-runtime
-inferenceServiceName: qwen25-7b-instruct
+inferenceServiceName: qwen36-27b-instruct
 
 # The HF repository id the download Job pulls (hf://<modelId>).
-modelId: Qwen/Qwen2.5-7B-Instruct
+# ADR-0518: Qwen3.6-27B in the official FP8 checkpoint (~28GB weights) -
+# BF16 (~54GB) would not fit the 2g.48gb MIG slice. The arch is
+# Qwen3_5ForConditionalGeneration (hybrid Gated-DeltaNet linear
+# attention, NOT plain Qwen3 dense) - verified supported by the live
+# rhaii-early-access vLLM image (0.21.0+rhaiv.10) before this migration.
+modelId: Qwen/Qwen3.6-27B-FP8
 # The OpenAI-compatible API id vLLM serves (--served-model-name) - the
 # platform-wide canonical model id every consumer routes by
 # (platform/ai-gateway/provider-routing.yaml, ai-gateway's
@@ -32,7 +37,7 @@ modelId: Qwen/Qwen2.5-7B-Instruct
 # Serving under the HF id instead made every local chat completion 404
 # ("The model `qwen2.5-7b-instruct` does not exist") - the two ids are
 # different concerns.
-servedModelName: qwen2.5-7b-instruct
+servedModelName: qwen3.6-27b-instruct
 
 image:
   # Fallback for `helm template`/standalone testing only; ansible always
@@ -50,6 +55,12 @@ image:
 # MaaS backend. Requires ClusterPolicy mig.strategy=mixed (ansible/roles/
 # nvidia_gpu) and the all-balanced partition on the node
 # (gitops/charts/machines).
+# ADR-0518: memory limit raised 32Gi -> 48Gi for Qwen3.6-27B-FP8: the
+# weights alone are ~28GB and the safetensors load path stages them
+# through host RAM, so a 32Gi ceiling leaves almost no margin over the
+# raw payload. Preventive sizing, not an observed OOM; the g7e.4xlarge
+# node (128GiB) has ample headroom over the three co-resident
+# predictors' combined limits.
 resources:
   requests:
     cpu: "4"
@@ -57,7 +68,7 @@ resources:
     nvidia.com/mig-2g.48gb: "1"
   limits:
     cpu: "8"
-    memory: 32Gi
+    memory: 48Gi
     nvidia.com/mig-2g.48gb: "1"
 
 minReplicas: 1
@@ -159,11 +170,15 @@ modelStorage:
 # Same bucket/credential (Vault "rag/s3") as rag-ingestion's corpus
 # (gitops/charts/rag-ingestion/values.yaml's s3: block) - the models/
 # prefix keeps weights and corpus objects apart. Layout is
-# <prefix>/<servedModelName>/: models/qwen2.5-7b-instruct/ (uploaded
+# <prefix>/<servedModelName>/: models/qwen3.6-27b-instruct/ and
+# models/qwen3-embedding-0.6b/ (ADR-0518, streamed HF->S3
 # out-of-cluster - in-cluster hf:// downloads hang unreliably here, see
-# maas.yaml), models/gpt-oss-20b/ (served by gptOssModel below since
-# ADR-0412), and models/gpt-oss-120b/ (NOT servable on this cluster's
-# GPUs - transit storage for the operator's own workstation only).
+# maas.yaml), models/qwen3.5-9b/ (mlops LoRA training base, ADR-0518 -
+# not served by this chart), models/gpt-oss-20b/ (served by gptOssModel
+# below since ADR-0412), models/gpt-oss-120b/ (NOT servable on this
+# cluster's GPUs - transit storage for the operator's own workstation
+# only), and models/qwen2.5-7b-instruct/ (retired by ADR-0518, kept as
+# instant rollback weights).
 modelsS3:
   bucket: zuno-demo-rag-corpus
   prefix: models
@@ -182,7 +197,7 @@ modelsS3:
 # rag-service's query-side embedding calls. inferenceServiceName is
 # "embeddings", not "embeddings-predictor": KServe RawDeployment appends
 # "-predictor" to the InferenceService name to build its Service name
-# (see qwen25-7b-instruct -> qwen25-7b-instruct-predictor below), and
+# (see qwen36-27b-instruct -> qwen36-27b-instruct-predictor below), and
 # gitops/charts/rag-service/values.yaml's embeddingServiceUrl /
 # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL default
 # already hardcode http://embeddings-predictor.zuno-ai-run.svc:8080 -
@@ -194,37 +209,46 @@ modelsS3:
 # flat values shape for no benefit at this scale.
 embeddingModel:
   servingRuntimeName: vllm-embedding-runtime
+  # Kept as "embeddings" across the ADR-0518 model swap on purpose: the
+  # generated Service name embeddings-predictor.zuno-ai-run.svc is
+  # hardcoded by rag-service/rag-ingestion consumers - a neutral name
+  # means swapping the model never renames the endpoint.
   inferenceServiceName: embeddings
   # Same modelId (HF download) / servedModelName (API id) split as the
   # chat model above - rag-service's EMBEDDING_MODEL_NAME expects the
   # short canonical id.
-  servedModelName: bge-small-en-v1.5
-  # BAAI/bge-small-en-v1.5, 384-dim: matches rag-service's existing
-  # embeddingModelName default (gitops/charts/rag-service/values.yaml) -
-  # same reasoning as the endpoint name above. Served via vLLM's pooling
+  servedModelName: qwen3-embedding-0.6b
+  # ADR-0518: Qwen/Qwen3-Embedding-0.6B, 1024-dim, replaces
+  # BAAI/bge-small-en-v1.5 (384-dim, English-only) - the live corpus is
+  # French Confluence content, so an MTEB-multilingual-topping model is
+  # a correctness fix, not a nicety. Any dimension change here MUST land
+  # together with the matching pgvector column migration
+  # (gitops/charts/rag-service/files/sql) and a full re-ingestion: old
+  # vectors are unreadable in the new space. Served via vLLM's pooling
   # runner (--runner=pooling --convert=embed), not chat.
-  modelId: BAAI/bge-small-en-v1.5
-  dimensions: 384
+  modelId: Qwen/Qwen3-Embedding-0.6B
+  dimensions: 1024
   # GPU request: the discovered/pinned image.vllm is a CUDA-only vLLM
   # build (ADR-0048 prefers the "cuda"-named template), which crashes
   # with "Failed to infer device type" when scheduled without a GPU -
-  # verified on-cluster. bge-small-en-v1.5 is a ~130MB encoder model, so
-  # this shares the chat model's GPU node rather than needing its own.
-  # memory: the old 1Gi/2Gi sizing was set back when this ran CPU-only;
-  # with a GPU it runs vLLM's full torch.compile + CUDA-graph-capture
-  # pipeline like the chat model, whose fixed overhead OOMKilled the
-  # container at a 2Gi limit (verified on-cluster, exit 137) despite the
-  # model itself being tiny.
-  # ADR-0351: a 1g.24gb MIG slice - same 24GB a whole L4 gave this tiny
-  # encoder model before, now co-resident on the shared permanent GPU node.
+  # verified on-cluster. Qwen3-Embedding-0.6B (~1.2GB BF16) is still far
+  # below the slice, so this shares the chat model's GPU node rather
+  # than needing its own.
+  # memory: vLLM's torch.compile + CUDA-graph-capture fixed overhead
+  # OOMKilled the container at a 2Gi limit back on the (10x smaller)
+  # bge model (verified on-cluster, exit 137); ADR-0518 adds ~1.2GB of
+  # weights staged through host RAM on top, hence 3Gi/6Gi.
+  # ADR-0351: a 1g.24gb MIG slice - same 24GB a whole L4 gave the
+  # embedding model before, now co-resident on the shared permanent GPU
+  # node.
   resources:
     requests:
       cpu: "500m"
-      memory: 2Gi
+      memory: 3Gi
       nvidia.com/mig-1g.24gb: "1"
     limits:
       cpu: "1"
-      memory: 4Gi
+      memory: 6Gi
       nvidia.com/mig-1g.24gb: "1"
   minReplicas: 1
   maxReplicas: 1
@@ -376,19 +400,19 @@ lmEval:
     # gp3-csi.
     size: 1Gi
   jobs:
-    - name: qwen25-7b-instruct-mmlu
+    - name: qwen36-27b-instruct-mmlu
       model: local-completions
       modelArgs:
         - name: base_url
-          value: http://qwen25-7b-instruct-predictor.zuno-ai-run.svc:8080/v1/completions
+          value: http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1/completions
         - name: model
-          value: qwen2.5-7b-instruct
+          value: qwen3.6-27b-instruct
         # lm-eval-harness's TemplateAPI defaults to
         # AutoTokenizer.from_pretrained(model) when `tokenizer` is unset -
         # `model` here is the in-cluster served-model name, not a valid HF
         # repo id, so that lookup 404s against huggingface.co
-        # ("qwen2.5-7b-instruct is not the path to a directory..."). A
-        # local directory path (not the Qwen/Qwen2.5-7B-Instruct repo id)
+        # ("... is not the path to a directory..."). A
+        # local directory path (not the Qwen/Qwen3.6-27B-FP8 repo id)
         # so AutoTokenizer.from_pretrained loads straight off disk with no
         # HF Hub resolution at all - HF_HUB_OFFLINE=1 is irrelevant either
         # way. job-lmeval-cache-prefetch.yaml's tokenizer-prefetch init
@@ -398,7 +422,7 @@ lmEval:
         # `range .modelArgs` lookup, so it's the single source of truth -
         # change it here only.
         - name: tokenizer
-          value: /cache/tokenizers/qwen2.5-7b-instruct
+          value: /cache/tokenizers/qwen3.6-27b-instruct
       # The full `mmlu` group task (57 subjects) expands to 56,168
       # loglikelihood requests - too much sustained load for this demo
       # cluster's shared single-GPU-plus-MIG capacity (qwen + gpt-oss-20b +
@@ -417,8 +441,8 @@ lmEval:
       # (hails/mmlu_no_train, one
       # HF `load_dataset(path, config)` call per of its 57 subject
       # configs - NOT the "all" aggregate config, which has a real,
-      # separate bug returning 0 examples per split) AND the
-      # Qwen/Qwen2.5-7B-Instruct tokenizer are both pre-cached by the
+      # separate bug returning 0 examples per split) AND the chat
+      # model's tokenizer are both pre-cached by the
       # operator into this PVC's HF_HOME before the job runs.
       # tokenizer_backend=none was tried and reverted: mmlu is a
       # loglikelihood task and TemplateAPI asserts a real tokenizer is

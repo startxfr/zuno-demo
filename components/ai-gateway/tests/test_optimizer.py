@@ -39,7 +39,7 @@ def _policy(**overrides) -> OptimizationPolicy:
         cache_ttl_min=300,
         cache_ttl_max=86400,
         cache_enabled_scope=True,
-        cache_enabled_models=["qwen2.5-7b-instruct"],
+        cache_enabled_models=["qwen3.6-27b-instruct"],
         routing_enabled=True,
         pre_approved_equivalents=[
             {"agent": "comage", "task": "check-deal-status", "candidates": ["comage-lora-v1", "comage-lora-v2"]},
@@ -128,14 +128,14 @@ def test_cache_enabled_toggle_applied_for_an_allow_listed_model() -> None:
     should_use_cache(), with the global switch forced on."""
     _reset_cache_override()
     controller = TuningController(_policy())
-    cfg = {"model": "qwen2.5-7b-instruct", "cache_enabled": True}
+    cfg = {"model": "qwen3.6-27b-instruct", "cache_enabled": True}
     orig_global = semantic_cache.SEMANTIC_CACHE_ENABLED
     semantic_cache.SEMANTIC_CACHE_ENABLED = True
     try:
         assert semantic_cache.should_use_cache(cfg) is True
-        entry = controller.apply_cache_enabled("qwen2.5-7b-instruct", False, evidence={"reason": "low hit rate"})
+        entry = controller.apply_cache_enabled("qwen3.6-27b-instruct", False, evidence={"reason": "low hit rate"})
         assert semantic_cache.should_use_cache(cfg) is False
-        assert entry.parameter == "cache_enabled:qwen2.5-7b-instruct"
+        assert entry.parameter == "cache_enabled:qwen3.6-27b-instruct"
     finally:
         semantic_cache.SEMANTIC_CACHE_ENABLED = orig_global
         _reset_cache_override()
@@ -147,11 +147,11 @@ def test_cache_enabled_toggle_never_overrides_the_global_deployment_switch() -> 
     still leave the cache off."""
     _reset_cache_override()
     controller = TuningController(_policy())
-    cfg = {"model": "qwen2.5-7b-instruct", "cache_enabled": False}
+    cfg = {"model": "qwen3.6-27b-instruct", "cache_enabled": False}
     orig_global = semantic_cache.SEMANTIC_CACHE_ENABLED
     semantic_cache.SEMANTIC_CACHE_ENABLED = False
     try:
-        controller.apply_cache_enabled("qwen2.5-7b-instruct", True, evidence={})
+        controller.apply_cache_enabled("qwen3.6-27b-instruct", True, evidence={})
         assert semantic_cache.should_use_cache(cfg) is False, "global off must always win"
     finally:
         semantic_cache.SEMANTIC_CACHE_ENABLED = orig_global
@@ -170,14 +170,14 @@ def test_cache_enabled_refused_for_a_model_not_in_the_allow_list() -> None:
 def test_cache_enabled_toggle_reverts_on_rollback_and_kill() -> None:
     _reset_cache_override()
     controller = TuningController(_policy())
-    controller.apply_cache_enabled("qwen2.5-7b-instruct", False, evidence={})
-    assert semantic_cache._runtime_cache_enabled_overrides == {"qwen2.5-7b-instruct": False}
+    controller.apply_cache_enabled("qwen3.6-27b-instruct", False, evidence={})
+    assert semantic_cache._runtime_cache_enabled_overrides == {"qwen3.6-27b-instruct": False}
     rolled_back = controller.report_outcome(error_rate=0.9)
     assert len(rolled_back) == 1
     assert semantic_cache._runtime_cache_enabled_overrides == {}
 
     controller2 = TuningController(_policy())
-    controller2.apply_cache_enabled("qwen2.5-7b-instruct", False, evidence={})
+    controller2.apply_cache_enabled("qwen3.6-27b-instruct", False, evidence={})
     reverted = controller2.kill()
     assert len(reverted) == 1
     assert semantic_cache._runtime_cache_enabled_overrides == {}

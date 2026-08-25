@@ -365,7 +365,7 @@ not here.
   `policies/data-classification/classification.yaml`.
 - **Data**: from-scratch PostgreSQL-native SXA schema (`data/sxa/schema/`,
   §10), synthetic fixtures, sales-db MCP server.
-- **AI/model layer**: local Qwen2.5-7B-Instruct serving; AI Inference
+- **AI/model layer**: local Qwen3.6-27B (FP8) serving; AI Inference
   Gateway (`components/ai-gateway`, ADR-0009) owns provider
   routing/fallback/classification-eligibility (§6) behind an
   OpenAI-compatible API; MCP Gateway; RAG service; Tekos LangGraph
@@ -743,9 +743,9 @@ not here.
   `AgentState` channels (`history`, `summary`, `history_classification`)
   carried across turns via the existing checkpoint mechanism; a shared
   `record_history` terminal node compacts older turns into a running
-  summary once a token budget is exceeded (default 1800 tokens, sized for
-  qwen2.5-7b's 8192 context; Arkos overrides to 6000 since its
-  C3/local-only path uses gpt-oss-20b's 32768 context). Compaction stays
+  summary once a token budget is exceeded (default 1800 tokens - a
+  conservative floor predating ADR-0518's 32768-context chat model;
+  Arkos overrides to 6000 on its C3/local-only path). Compaction stays
   local-only for C2/C3 conversations (mirrors the existing
   `app/memory.py` rule) and is tagged `zuno-internal`, filtered out of
   the user-visible SSE stream. New `app/graph/history.py` +

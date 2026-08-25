@@ -56,8 +56,8 @@ burst-taint toleration for the NVIDIA daemonsets) comes from
    with the same `all-balanced` slices).
 2. The embeddings and MaaS pods reschedule on their own. The qwen chat
    predictor's model PVC is zone-bound to eu-west-2a (gp3-csi is single-AZ):
-   delete the `qwen25-7b-instruct-model-download` Job and the
-   `qwen25-7b-instruct-model` PVC, then sync `zuno-models-d1` - the Job
+   delete the `qwen36-27b-instruct-model-download` Job and the
+   `qwen36-27b-instruct-model` PVC, then sync `zuno-models-d1` - the Job
    reruns on the new node and the PVC rebinds in eu-west-2c (~15GB
    re-download).
 3. Fail back by reversing: scale `zuno-gpu-a` back to 1 once zone a
