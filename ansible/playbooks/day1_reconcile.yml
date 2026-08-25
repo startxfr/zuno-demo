@@ -1,0 +1,90 @@
+---
+# Day 1 reconcile (`make day1|d1 reconcile [component]`): diagnose blocked
+# resources and apply known remediations automatically. Same component order
+# as day1_install.yml.
+#
+# Why this playbook exists (ADR-0201 follow-up). `reconcile` was a Day 0 verb
+# only, but the single role that has a tasks/reconcile.yml - openshift_ai - is
+# a Day 1 component, and so is openshift_oauth. `make d0 reconcile
+# openshift-ai` was therefore rejected by the Makefile every time, while nine
+# blocked-findings across that role printed it as the authoritative remedy.
+# The remediation was written, tested and documented, and had no reachable
+# entry point; that is why ADR-0201's payload-processing sidecar injection was
+# still unapplied ten hours after an install that had diagnosed it correctly.
+#
+# Roles with a tasks/reconcile.yml run their targeted remediations; every other
+# role falls back to its idempotent install re-run, which re-applies the
+# component's Application manifest - the baseline remediation, since
+# Applications are Ansible-applied, not git-synced (ADR-0311/ADR-0343) - and
+# re-runs the diagnosing waits. That fallback is ADR-0344's documented Day 0
+# behaviour, reused verbatim here via the shared ansible/tasks/run_component.yml.
+- name: "Day 1: reconcile blocked components"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d1
+    # install, NOT reconcile. ansible/tasks/apply_openshift_build.yml reads
+    # day1_verb to decide whether it may trigger an image build, and the
+    # install contract is re-verify-only (see day1_install.yml's own comment).
+    # A reconcile must not silently rebuild images either, so it borrows the
+    # same value rather than introducing a third behaviour.
+    day1_verb: install
+    day1_components:
+      - redis
+      - observability
+      - service_mesh
+      - mesh_monitoring
+      - kiali
+      - grafana
+      - postgresql
+      - mariadb
+      - tempo
+      - keycloak
+      - openshift_oauth
+      - aap
+      - aap_config
+      - connectivity_link
+      - lws
+      - jobset
+      - kueue
+      - openshift_ai
+      - aiagent_operator
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve requested Day 1 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day1_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Initialize blocked-resource tracking
+      ansible.builtin.set_fact:
+        blocked_findings: []
+        _run_component_any_failed: false
+
+    - name: Reconcile Day 1 components
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_component.yml"
+      vars:
+        run_component_day: d1
+        run_component_role: "{{ item }}"
+        run_component_tasks_from: reconcile
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Summarize blocked resources (fails when anything is still blocked)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/report_blocked_findings.yml"
+
+    - name: Fail on component errors that produced no findings
+      ansible.builtin.fail:
+        msg: >-
+          At least one component failed without a recorded blocked-resource
+          finding - scroll up to its failed task for the cause.
+      when:
+        - _run_component_any_failed | bool
+        - (blocked_findings | default([])) | length == 0
