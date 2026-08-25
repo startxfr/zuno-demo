@@ -322,13 +322,30 @@ gptOssModel:
     # TRLP.
     #
     # ROLLBACK: set name back to maas-default-gateway and manage: false.
+    # 2026-08-25: TESTED zuno-model-gateway ON THE LIVE CLUSTER AND REVERTED.
+    # MaaS does not publish its own route under any circumstances - it
+    # REQUIRES the backend's route to be on its own gateway, and says so
+    # explicitly when it is not:
+    #   Failed to reconcile HTTPRoute: HTTPRoute
+    #   zuno-ai-run/gpt-oss-20b-kserve-route does not reference gateway
+    #   (expected: openshift-ingress/maas-default-gateway, found:
+    #   openshift-ingress/zuno-model-gateway). The LLMInferenceService must
+    #   be configured to use openshift-ingress/maas-default-gateway
+    # MaaSModelRef went phase=Failed / ReconcileFailed. (The LLMInferenceService
+    # itself stayed Ready=True, so the controller's create/update RBAC on
+    # httproutes is used to patch the ADOPTED route, not to publish one.)
+    #
+    # That closes the question: adoption is mandatory, so the served identity
+    # is always KServe's publishers/... form and nothing in this repository
+    # can make it the zuno-ai-run/gpt-oss-20b-maas form the MaaS policy plane
+    # keys on. The mismatch is an RHOAI-side constraint, not our
+    # configuration. See ADR-0201's 2026-08-25 notes for all three attempts.
     routerGateway:
-      name: zuno-model-gateway
+      name: maas-default-gateway
       namespace: openshift-ingress
-      # Whether this chart renders the Gateway itself. false when pointing
-      # at a gateway another chart owns (e.g. maas-default-gateway, which
-      # gitops/charts/openshift-ai owns).
-      manage: true
+      # Whether this chart renders the Gateway itself. false here:
+      # maas-default-gateway is owned by gitops/charts/openshift-ai.
+      manage: false
     # Same RHOAI 3.5 EA2 vLLM/CUDA preset the qwen MaaS backend used
     # (`oc get llminferenceserviceconfig -n redhat-ods-applications`) -
     # generic serving image, not qwen-specific.
