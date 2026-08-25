@@ -15,6 +15,22 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
 
+# The sales-db MCP server Deployment (d1) - moved here from
+# ansible/roles/sql_schema/tasks/install.yml (which still applies its d0
+# schema Application): the server reads the mcp-gateway-workload-token
+# Secret the gateway Application above just created, so applying it any
+# earlier health-gates a component on a Secret that doesn't exist yet - a
+# fresh-install deadlock (day2 install died on it, live 2026-08-25;
+# previously masked because the Retain-policy Secret survived
+# reinstalls). Its image is ensured by sql_schema's mcp_build include and
+# by the d1 chart's own dependency path.
+- name: "mcp | apply the sales-db MCP server GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp-sales-db"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
 # ADR-0117: the confluence MCP server - also no Day0 prerequisite (no
 # schema/operator), same shape as the gateway itself above. Deployed under
 # this same "mcp" Day1 run component since gitops/apps/mcp-confluence's
