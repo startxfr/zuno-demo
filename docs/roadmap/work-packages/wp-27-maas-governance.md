@@ -2,31 +2,39 @@
 
 > ADR-0201 retargeted to v0.5 (make the MaaS governance plane live and used by agents) on 2026-08-24 — see `docs/roadmap/versions.md`.
 
-- **State:** Operator pending — **blocked upstream, not on repo work** (2026-08-25: the
-  remaining gap is a model-identity mismatch that MaaS's own design prevents fixing from
-  here. The served identity is always KServe's `publishers/zuno-ai-run/models/gpt-oss-20b`
-  because MaaS mandates adopting KServe's HTTPRoute — it refuses outright when the route is
-  on any other gateway — while maas-api, the `MaaSAuthPolicy` OPA map and the generated
-  `TokenRateLimitPolicy` all key on `zuno-ai-run/gpt-oss-20b-maas`. The entitlement plane
-  itself is correct: querying maas-api's `/internal/v1/subscriptions/select` with the MaaS
-  form returns `gpt-oss-20b-tekos`, ready, priority 10. Four local fixes were tried live
-  and each eliminated by test — a second HTTPRoute cannot be governed, removing the gateway
-  ref breaks the LLMInferenceService, a dedicated KServe gateway is rejected by MaaS, and
-  `MaaSModelRef.spec.endpointOverride` (a real CRD field, missed by the first sweep) only
-  changes a status field, never the adopted route or its identity — the CEL/OPA rules that
-  decide identity read only `request.path`/`X-Gateway-Model-Name`, never `MaaSModelRef`.
-  Fixed along the way and no longer blocking: the ipp EnvoyFilter anchor, the 9004 sidecar
-  interception trap, the missing `sales` OpenShift group, and the path-prefix 504.
-  A fifth, genuinely untested lead was found: the same HTTPRoute has a header-free
-  path-based rule set that, combined with the confirmed body-to-header `ipp-pre` behavior,
-  might let a client supply the MaaS-form identity directly — unproven because this
-  gateway's `AuthPolicy` only accepts an OpenShift `TokenReview` token or a MaaS API key
-  (`sk-oai-...`), neither of which is available to test with today (no key provisioned, no
-  suitable in-cluster identity found). The ask to RHOAI is correspondingly narrower now:
-  not "add an identity-override field" (it exists, doesn't help) but either accept the
-  modelRef's own identity form on the header-gated route rules, or document the intended
-  non-browser calling convention for reaching a published model directly. Full evidence in
-  ADR-0201's 2026-08-25 notes.)
+- **State:** Done for the governance plane; agent-integration wiring deferred by scope
+  decision, not by any remaining blocker (2026-08-25: **RESOLVED**, not upstream-blocked
+  after all. The apparent identity mismatch — MaaS mandates adopting KServe's HTTPRoute,
+  whose `publishers/...` identity never matched what maas-api/OPA/TokenRateLimitPolicy key
+  on (`zuno-ai-run/gpt-oss-20b-maas`) — had a working path the whole time: the same
+  HTTPRoute also exposes a header-free, path-based rule set
+  (`/zuno-ai-run/gpt-oss-20b/v1/chat/completions`), and the already-working `ipp-pre`
+  ext_proc copies the request body's `model` field into the identity header when no header
+  is set. A real OpenShift token for `consultant-01` (headless `oc login`, since Keycloak is
+  a registered OIDC IdP with `directAccessGrantsEnabled` — no MaaS API key needed) proved
+  this live: `POST .../v1/chat/completions` with `{"model":
+  "zuno-ai-run/gpt-oss-20b-maas"}` and no explicit header now returns a real completion,
+  `200`. Getting there surfaced two more self-inflicted bugs, both fixed: (a) this chart's
+  `networkpolicy-gptoss.yaml` never allow-listed `maas-default-gateway` to reach the
+  workload directly (`dafab7f`) — every request 504'd after passing auth; (b) vLLM never
+  knew the MaaS identity as a servable name — fixed by repeating
+  `--served-model-name` with all three names (KServe's two plus the MaaS one) on
+  `llminferenceservice-gptoss.yaml`, since KServe's launcher appends its own pair after the
+  chart's args and vLLM's argparse takes the last occurrence (`d9b6fab`). Proven live for
+  both subscribed groups (`consultant-01`/`agent_tekos` and `sale-01`/`sales`, both `200`
+  with their own distinct `MaaSSubscription`) plus a denial
+  (`consultant-role-only-user-01`, in neither group, `403`); `limitador`'s
+  `authorized_calls` counter for the real route confirms genuine rate-limit enforcement,
+  not a deny-all pass-through. The four previously-eliminated repo-side attempts (a second
+  HTTPRoute, dropping the gateway ref, a dedicated KServe gateway, `endpointOverride`) all
+  stay correctly eliminated — none of them was the actual blocker, which sat one layer
+  further down. Two acceptance bullets below (Agent Runtime traversal, trace correlation)
+  remain open: `ai-gateway`'s local `gpt-oss-20b` calls deliberately continue to bypass MaaS
+  (a scope decision made 2026-08-25 — routing through MaaS needs a minted+Vault-seeded API
+  key and adds a hop/latency to every local-model call, not undertaken here). The `/v1/models`
+  listing bug (a separate NetworkPolicy gap, `maas-api`→workload rather than
+  `gateway`→workload) was investigated but left open — it doesn't block consumption. Full
+  evidence in ADR-0201's final 2026-08-25 note.)
   Original note (2026-08-15 — repo work merged: `gitops/charts/models/templates/maas.yaml` renders `MaaSModelRef` (publishing the local chat model via `ExternalModel`, wrapping the existing vLLM predictor's OpenAI-compatible endpoint — see values.yaml's `maas.modelRef` comment for the documented `LLMInferenceService`-vs-`ExternalModel` tradeoff this makes, flagged `# CONFIRM`), two `MaaSSubscription`s (`agent_tekos`/`sales` Keycloak groups, differentiated token-rate limits) and one `MaaSAuthPolicy` scoped to just those two groups (proving denial-by-omission for any other group); every field schema-checked against the live cluster's `maas.opendatahub.io/v1alpha1` CRDs (`oc explain`, 2026-08-15) except the explicitly marked `# CONFIRM`/`# verify-on-cluster` fields. API-key lifecycle: new `externalsecret-maas.yaml` resolves a Vault-seeded key (new `maas/gateway-api-key` seed) into the `llm-provider-maas` Secret the adapter already expected. Usage/trace correlation: `X-Zuno-Request-Id` now threads end to end (agent-runtime's `AgentState.request_id` → `ModelRouter` → ai-gateway's `model_call_span` → `maas_adapter.chat_model_via_maas`'s own request header). External-egress guard: new `MAAS_EXTERNAL_EGRESS_ENABLED` gate (default off), independent of `MAAS_ADAPTER_ENABLED`, with 2 new security-negative tests proving external egress stays blocked until explicitly opted in, on top of the existing C3/local-only eligibility test. Day 1 check extended (`ansible/roles/models/tasks/precheck.yml`, diagnostic only, skips gracefully when MaaS isn't enabled). All new manifests/gates ship disabled by default (`maas.enabled: false`, `maasAdapter.externalEgressEnabled: false`). Awaiting the operator follow-up below: every numbered ADR-0201 acceptance bullet on the live cluster, plus the operator+user external-egress lifecycle decision. 2026-08-21: significant live progress since this note — local model published/consumable, governance pairing proven, and the previously-flagged sidecar-injection gap for `payload-processing`/`payload-pre-processing` is confirmed live and healthy. The authenticated end-to-end request still fails, now root-caused to a RHOAI-owned NetworkPolicy allow-list (`maas-default-gateway` was never permitted to reach those pods) that a live patch could not even get to stick momentarily — a controller/webhook enforces it synchronously. See ADR-0201's 2026-08-21 note for the full trace. Not resolvable from this repo without operator-level access to the `ModelsAsService` operator itself; staying `Operator pending`.)
 - **ADRs:** ADR-0201 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-03 (merged)

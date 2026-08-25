@@ -205,7 +205,7 @@ Goal: make the OpenShift AI MaaS governance plane live and route agent model cal
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.5 | Partially implemented | Complete the OpenShift AI MaaS governance plane integration |
+| [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.5 | Implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | v0.5 | Implemented | Define OKF quota policy enforced via Kuadrant |
 | [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.5 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
 
