@@ -3,8 +3,14 @@
 # postgrescluster.yaml "postgres" user comment, and the git history of
 # gitops/charts/grafana/templates/dashboard-infra-data.yaml): Crunchy PGO
 # 5.8.8 never creates the ccp_monitoring role for postgresVersion 18
-# ("postgres_exporter not supported for pg18" - it also loops a harmless
-# but noisy `schema "monitor" does not exist` reconcile error). Without
+# ("postgres_exporter not supported for pg18" - it also loops a
+# `schema "monitor" does not exist` reconcile error, which is NOT
+# harmless: live-verified 2026-08-25, that psql failure aborts PGO's
+# whole reconcile with "command terminated with exit code 3" BEFORE the
+# databaseInitSQL step, so spec.databaseInitSQL (configmap-init-sql.yaml
+# - every CREATE EXTENSION vector) silently never runs on a fresh
+# cluster; creating the schema unwedged the reconcile and PGO applied
+# init.sql within seconds). Without
 # this role, the exporter sidecar's DSN authentication fails outright
 # (pg_up=0) and every PostgreSQL panel on dashboard-infra-data.yaml goes
 # empty, even though the exporter itself is a stock postgres_exporter

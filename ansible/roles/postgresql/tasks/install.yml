@@ -226,6 +226,92 @@
   retries: 60
   delay: 10
 
+# PGO 5.8.8 + postgresVersion 18: the operator's pgMonitor step targets a
+# "monitor" schema (and the exporter needs a ccp_monitoring role) it never
+# creates for pg18. The missing schema is NOT just log noise - the psql
+# failure aborts every PostgresCluster reconcile ("command terminated with
+# exit code 3") BEFORE the databaseInitSQL step, so spec.databaseInitSQL
+# (every CREATE EXTENSION vector in configmap-init-sql.yaml) silently never
+# runs on a fresh cluster - downstream, every schema-apply Job then dies
+# with "permission denied to create extension vector" and zuno-ogx
+# CrashLoops (live-diagnosed 2026-08-25). The chart's own automation
+# (job-monitoring-role.yaml) would fix this, but that ArgoCD Sync-hook Job
+# is never created by ArgoCD (unresolved - see the chart comment), so this
+# role guarantees the fix directly. All statements are idempotent.
+- name: "postgresql | look up the current Postgres primary pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-data
+    label_selectors:
+      - postgres-operator.crunchydata.com/role=master
+  register: _postgresql_primary_pod
+  until: (_postgresql_primary_pod.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "postgresql | read the PGO-generated monitoring password"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-data
+    name: zuno-postgresql-monitoring
+  register: _postgresql_monitoring_secret
+  until: (_postgresql_monitoring_secret.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+- name: "postgresql | ensure the ccp_monitoring role exists (pg18: PGO never creates it)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _postgresql_primary_pod.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -U postgres -v ON_ERROR_STOP=1 -c
+      "DO $zuno$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ccp_monitoring')
+       THEN CREATE ROLE ccp_monitoring LOGIN; END IF; END $zuno$;"
+  changed_when: true
+
+- name: "postgresql | sync ccp_monitoring's password with the zuno-postgresql-monitoring Secret"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _postgresql_primary_pod.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -U postgres -v ON_ERROR_STOP=1 -c
+      {{ ("ALTER ROLE ccp_monitoring LOGIN PASSWORD '"
+          ~ ((_postgresql_monitoring_secret.resources[0].data.password | b64decode) | replace("'", "''"))
+          ~ "'") | quote }}
+  changed_when: true
+  no_log: true
+
+- name: "postgresql | grant monitoring access and create the monitor schema (unwedges the PGO reconcile)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _postgresql_primary_pod.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -U postgres -v ON_ERROR_STOP=1
+      -c "GRANT pg_monitor TO ccp_monitoring;"
+      -c "GRANT CONNECT ON DATABASE postgres TO ccp_monitoring;"
+      -c "CREATE SCHEMA IF NOT EXISTS monitor AUTHORIZATION ccp_monitoring;"
+  changed_when: true
+
+# The real acceptance signal: PGO only stamps status.databaseInitSQL after a
+# reconcile got far enough to run spec.databaseInitSQL - i.e. the extensions
+# every downstream schema-apply Job depends on now exist.
+- name: "postgresql | wait for PGO to record that databaseInitSQL has been applied"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _postgresql_cluster_initsql
+  until: >-
+    (_postgresql_cluster_initsql.resources | default([]) | length) > 0 and
+    (_postgresql_cluster_initsql.resources[0].status.databaseInitSQL | default('')) != ''
+  retries: 30
+  delay: 10
+
 - name: "postgresql | configure summary"
   ansible.builtin.debug:
     msg: >-
