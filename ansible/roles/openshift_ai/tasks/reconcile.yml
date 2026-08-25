@@ -212,6 +212,34 @@
           metadata:
             annotations:
               sidecar.istio.io/inject: "true"
+              # Port 9004 is the ext_proc gRPC port the MaaS gateway dials
+              # for inference payload processing, and it MUST stay out of
+              # inbound interception. The gateway proxy belongs to the
+              # `openshift-gateway` revision (istiod-openshift-gateway, in
+              # openshift-ingress) while these pods get injected by the
+              # `default` revision (istiod in zuno-mesh) - two separate
+              # control planes with no shared identity, so the gateway
+              # speaks plaintext and an intercepting sidecar resets it.
+              #
+              # Confirmed live 2026-08-25, immediately after this task
+              # first injected the sidecars and ADR-0201's re-anchored ipp
+              # filter started actually dialling 9004: cx_connect_fail
+              # climbing 1:1 with requests on the
+              # outbound|9004||payload-processing cluster, gateway log
+              # "Received gRPC error on stream: 14 ... TLS_error:
+              # Connection_reset_by_peer", and - because the ipp filter
+              # runs failure_mode_allow: false by RHOAI's design - a hard
+              # 500 on every MaaS request including /maas-api/health.
+              #
+              # Same exclusion, same reason, as the 9002 EPP port already
+              # carried in gitops/charts/models/values.yaml's
+              # schedulerAnnotations. NOTE the trap that pairs with it:
+              # excluded traffic arrives directly rather than tunnelled,
+              # so it is matched by L4 NetworkPolicy - the 9004 ingress
+              # allows in gitops/charts/openshift-ai/templates/
+              # maas-gateway.yaml are what keep it reachable, and removing
+              # them would break this path in a different way.
+              traffic.sidecar.istio.io/excludeInboundPorts: "9004"
             labels:
               sidecar.istio.io/inject: "true"
   loop: "{{ _openshift_ai_ipp_deployments.results | default([]) }}"
@@ -221,7 +249,8 @@
     - (item.resources | default([]) | length) > 0
     - >-
       ((item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true") or
-      ((item.resources[0].spec.template.metadata.labels | default({}))["sidecar.istio.io/inject"] | default('') != "true")
+      ((item.resources[0].spec.template.metadata.labels | default({}))["sidecar.istio.io/inject"] | default('') != "true") or
+      ((item.resources[0].spec.template.metadata.annotations | default({}))["traffic.sidecar.istio.io/excludeInboundPorts"] | default('') != "9004")
 
 - name: "openshift_ai | reconcile: wait for the payload-processing/payload-pre-processing rollout to pick up the sidecar"
   kubernetes.core.k8s_info:
