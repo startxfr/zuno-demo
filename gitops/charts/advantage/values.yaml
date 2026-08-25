@@ -79,3 +79,8 @@ keycloak:
   # trusts the same chain the user's browser is redirected to. Empty
   # disables the volume/mount/env var entirely.
   caConfigMapName: agent-frontend-keycloak-ca
+  # Where the BFF actually fetches the JWKS (issuerUrl stays the iss
+  # comparison string) - the in-cluster Service path avoids the external
+  # Route's Vault-internal CA. See gitops/charts/tekos/values.yaml for the
+  # same pattern.
+  jwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
