@@ -68,6 +68,14 @@ metadata:
     zuno.io/lora-adapter-classifications: {{ .Values.loraAdapters | mustToJson | quote }}
 {{- end }}
 spec:
+  {{- if .Values.llmInferenceService.podAnnotations }}
+  # ADR-0521 (WP-076): propagates through the generated Deployment's pod
+  # template to the Istio injector (verified live) - see
+  # values.yaml's llmInferenceService.podAnnotations comment for why this
+  # workload needs a bigger istio-proxy sidecar than the cluster default.
+  annotations:
+    {{- toYaml .Values.llmInferenceService.podAnnotations | nindent 4 }}
+  {{- end }}
   baseRefs:
     - name: {{ .Values.llmInferenceService.baseRef }}
   model:

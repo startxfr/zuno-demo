@@ -37,6 +37,14 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
+  {{- if .Values.gptOssModel.llmInferenceService.podAnnotations }}
+  # ADR-0521 (WP-076): propagates through the generated Deployment's pod
+  # template to the Istio injector (verified live on qwen's own
+  # LLMInferenceService, same mechanism) - see values.yaml's
+  # gptOssModel.llmInferenceService.podAnnotations comment.
+  annotations:
+    {{- toYaml .Values.gptOssModel.llmInferenceService.podAnnotations | nindent 4 }}
+  {{- end }}
   baseRefs:
     - name: {{ .Values.gptOssModel.llmInferenceService.baseRef }}
   model:

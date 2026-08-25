@@ -103,6 +103,41 @@ llmInferenceService:
   # needed, see gptOssModel.llmInferenceService.schedulerAnnotations.
   schedulerAnnotations:
     traffic.sidecar.istio.io/excludeInboundPorts: "9002"
+  # ADR-0521 (WP-076), 2026-08-25/26: the cluster-wide istio-proxy sidecar
+  # injection default (256Mi limit / 64Mi request - not set by this chart,
+  # confirmed identical on every pod in this namespace) is too tight for
+  # this workload's own sidecar specifically. Live 6h Thanos data
+  # (max_over_time(container_memory_working_set_bytes{container=
+  # "istio-proxy"}[6h])) showed qwen's sidecar peaking 151-183Mi - the
+  # clear outlier across ~40 pods in zuno-ai-run, which otherwise peak
+  # 90-145Mi - and it was repeatedly OOMKilled (exit 137) during Envoy's
+  # cold-start xDS-config processing right after WP-076 step 2 added a
+  # second model's worth of MaaS AuthPolicy/TokenRateLimitPolicy/
+  # HTTPRoute for it to load. An OOMKilled istio-proxy takes the whole
+  # pod's networking down with it (its iptables redirect rules survive
+  # the crash but Envoy isn't there to proxy through them), which is what
+  # actually broke storage-initializer's S3 downloads, not an S3/network
+  # problem itself.
+  # Scoped to this workload via Istio's own sidecar.istio.io/proxy* pod
+  # annotations rather than a mesh-wide default change (every other
+  # pod's peak stays comfortably under 256Mi) - verified live that
+  # spec.annotations here propagates through KServe's controller to the
+  # generated Deployment's pod template, which the Istio injector then
+  # reads at pod admission. New limit (512Mi) is ~2.8x the highest
+  # observed peak; new request (160Mi) sits just above the observed
+  # steady floor. CPU annotations are set explicitly alongside memory
+  # despite being unchanged from the 500m/50m default - confirmed live
+  # that supplying only the memory annotations drops the cpu key from
+  # the resulting resources block entirely (no cluster LimitRange exists
+  # in this namespace to backfill it), leaving the container's CPU
+  # genuinely unbounded rather than falling back to the injector's usual
+  # default - low-risk given real usage is 1-4m cores, but not a change
+  # to make silently.
+  podAnnotations:
+    sidecar.istio.io/proxyMemory: "160Mi"
+    sidecar.istio.io/proxyMemoryLimit: "512Mi"
+    sidecar.istio.io/proxyCPU: "50m"
+    sidecar.istio.io/proxyCPULimit: "500m"
 
 # ADR-0301 (WP-34 Part B): vLLM native multi-LoRA, additive to the same
 # ServingRuntime/InferenceService above - NOT a second deployment per
@@ -373,6 +408,24 @@ gptOssModel:
     # DestinationRule/sidecar defaults themselves.
     schedulerAnnotations:
       traffic.sidecar.istio.io/excludeInboundPorts: "9002"
+    # ADR-0521 (WP-076), 2026-08-25/26: same fix as (and applied
+    # preventively alongside) qwenModel's own llmInferenceService.
+    # podAnnotations above - qwen's istio-proxy was repeatedly OOMKilled
+    # on the cluster-wide 256Mi sidecar default (live Thanos data:
+    # cold-start peaks of 151-183Mi against 90-145Mi for the rest of the
+    # namespace). gpt-oss-20b's own sidecar hasn't OOMed, but was already
+    # the second-highest peak in the same 6h window (131-145Mi, trending
+    # up alongside qwen's as WP-076 grew the mesh's MaaS policy surface) -
+    # same root cause exposure, just not yet over the line. Not live
+    # crash-tested on this specific workload (nothing to reproduce), but
+    # the propagation mechanism (spec.annotations -> generated Deployment
+    # pod template -> Istio injector) is proven identical via qwen's own
+    # live verification.
+    podAnnotations:
+      sidecar.istio.io/proxyMemory: "160Mi"
+      sidecar.istio.io/proxyMemoryLimit: "512Mi"
+      sidecar.istio.io/proxyCPU: "50m"
+      sidecar.istio.io/proxyCPULimit: "500m"
   # cpu/memory sized like the old qwen-maas-backend's own mig-1g.24gb
   # workload (proven to fit alongside the other Card A co-resident
   # predictors on the g7e.4xlarge managed node), not the old workergpu
