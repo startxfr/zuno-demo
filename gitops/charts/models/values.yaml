@@ -313,7 +313,20 @@ gptOssModel:
     # (platform/ai-gateway/provider-routing.yaml's local-gpt-oss endpoint),
     # never via maas-default-gateway. Flip back to true to restore the
     # previous topology.
-    attachRouterToMaasGateway: false
+    # 2026-08-25: TESTED FALSE ON THE LIVE CLUSTER AND REVERTED TO TRUE.
+    # Omitting router.gateway.refs does not make KServe publish nothing - it
+    # falls back to a cluster-default gateway openshift-ingress/
+    # openshift-ai-inference, which does not exist here, so the
+    # LLMInferenceService went RouterReady=False / Ready=False
+    # ("Managed HTTPRoute references non-existent Gateway") and the
+    # MaaSModelRef followed it to Unhealthy/BackendNotReady. Serving itself
+    # stayed up (MainWorkloadReady/InferencePoolReady true, and ai-gateway
+    # talks to the workload Service directly), but the model was no longer
+    # Ready, which is strictly worse than the identity mismatch it was meant
+    # to fix. Left true; see the note above for the mismatch this does NOT
+    # solve. Any future attempt must point the ref at a DIFFERENT, existing
+    # gateway rather than removing it.
+    attachRouterToMaasGateway: true
     # Same RHOAI 3.5 EA2 vLLM/CUDA preset the qwen MaaS backend used
     # (`oc get llminferenceserviceconfig -n redhat-ods-applications`) -
     # generic serving image, not qwen-specific.
