@@ -77,29 +77,38 @@
     gitops_app_wait_delay: 15
 
 # ADR-0354 recovery path: `make d1 uninstall aap` DROPs the aap/aap-eda
-# databases directly via psql (ansible/roles/aap/tasks/uninstall.yml) - it
-# never touches gitops/charts/postgresql's values.yaml, so PGO's
-# PostgresCluster spec.users[] still declares both databases and recreates
-# them on its own reconcile loop, independent of this install ever
-# running. But PGO always creates a fresh dedicated database owned by
-# "postgres" (configmap-schema-grants.yaml), and PostgreSQL 15+ doesn't
-# imply schema-level CREATE on `public` from the database-level grant PGO
-# does give - so every Gateway/Controller/Hub/EDA pod's first DB migration
-# hits "permission denied for schema public" (hit live twice, 2026-08-25)
-# until the postgresql chart's schema-grants Sync-hook Job reruns. That
-# Job only reruns on a real ArgoCD sync *operation* of zuno-postgresql-d1,
-# which `make d1 install aap` never triggers on its own (this role never
-# touches the postgresql chart) - so recovering from an aap
-# uninstall/reinstall cycle needs both steps done explicitly, in order:
-#   1. wait for PGO to have actually recreated both databases - its own
-#      reconcile loop, not tied to this install, can lag behind an
-#      uninstall that ran moments ago
-#   2. only then force-sync zuno-postgresql-d1, so the schema-grants Job's
-#      single ON_ERROR_STOP=1 script doesn't abort on a `\connect aap` (or
-#      "aap-eda") to a database that doesn't exist yet - which would also
-#      leave the OTHER dedicated databases' grants unapplied, since aap/
-#      aap-eda sit in the middle of that script's $databases list, not
-#      last (configmap-schema-grants.yaml).
+# databases and roles directly via psql (ansible/roles/aap/tasks/
+# uninstall.yml). CORRECTED LIVE 2026-08-25 (WP-077's first live run):
+# PGO does NOT recreate a database/role that disappears out from under an
+# already-bootstrapped cluster - confirmed via the operator's own logs
+# (openshift-operators/pgo), which error-looped every ~2s on
+# `reconcilePostgresUsersInPostgreSQL`: `psql:<stdin>:47: ERROR: database
+# "aap" does not exist` / `command terminated with exit code 3`, forever,
+# never creating it. PGO's ongoing reconcile only manages roles/grants
+# *inside* databases it assumes already exist (apparently a different
+# codepath than initial cluster bootstrap, which does create them) - the
+# original plan's premise that "PGO's continuous reconcile of
+# spec.users[] recreates a dropped database" was wrong. This block
+# creates both explicitly instead of waiting for PGO to do it.
+#
+# Both roles use the "bring your own password" SCRAM verifier already
+# sitting in the PGO-managed zuno-postgresql-pguser-<role> Secret
+# (persists untouched by the drop - it belongs to the postgresql chart,
+# never touched by aap uninstall) rather than a fresh random password, so
+# every existing consumer of that credential (Vault-sourced
+# ExternalSecrets, etc.) keeps working unchanged. Both databases are
+# created owned by "postgres" with the owner role granted database-level
+# CREATE/TEMPORARY/CONNECT - the chart's own documented/intended model
+# (configmap-schema-grants.yaml's comment), matching aap-eda's actual
+# live structure rather than perpetuating aap's unexplained
+# aapgateway-direct-ownership anomaly from the original WP-072 bootstrap.
+# Schema-level CREATE/USAGE on `public` (PG15+ doesn't imply it from the
+# database-level grant above) is deliberately NOT applied here - the
+# force-sync step below reruns the postgresql chart's schema-grants
+# Sync-hook Job for exactly that, keeping this role from duplicating
+# logic that already exists and is exercised for every other dedicated
+# database in this cluster.
+#
 # postgresql (Day 1, earlier than aap in day1_install.yml) must already be
 # installed by this point for aap to even reach here (Gateway/EDA's own
 # external-database config reads Secrets sourced from the same
@@ -135,18 +144,35 @@
 - name: "aap | recover the aap/aap-eda databases and schema grants if either is missing"
   when: (_aap_pg_db_precheck.stdout | default('0') | trim | int) < 2
   block:
-    - name: "aap | wait for PGO to (re)create the aap and aap-eda databases"
+    - name: "aap | read the aapgateway/aapeda PGO-managed password verifiers"
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: zuno-data
+        name: "{{ item }}"
+      loop:
+        - zuno-postgresql-pguser-aapgateway
+        - zuno-postgresql-pguser-aapeda
+      register: _aap_pg_pguser_secrets
+      no_log: true
+
+    - name: "aap | recreate the aapgateway/aapeda roles and the aap/aap-eda databases"
       kubernetes.core.k8s_exec:
         namespace: zuno-data
         pod: "{{ _aap_pg_primary_pod.resources[0].metadata.name }}"
         container: database
         command: >-
-          psql -U postgres -tA -c
-          "SELECT count(*) FROM pg_database WHERE datname IN ('aap', 'aap-eda');"
-      register: _aap_pg_db_wait
-      until: (_aap_pg_db_wait.stdout | default('0') | trim | int) == 2
-      retries: 60
-      delay: 15
+          psql -U postgres -v ON_ERROR_STOP=1
+          -c 'DROP ROLE IF EXISTS aapgateway;'
+          -c "CREATE ROLE aapgateway LOGIN PASSWORD '{{ (_aap_pg_pguser_secrets.results[0].resources[0].data.verifier | b64decode) }}';"
+          -c 'DROP DATABASE IF EXISTS aap WITH (FORCE);'
+          -c 'CREATE DATABASE aap;'
+          -c 'GRANT CREATE, TEMPORARY, CONNECT ON DATABASE aap TO aapgateway;'
+          -c 'DROP ROLE IF EXISTS aapeda;'
+          -c "CREATE ROLE aapeda LOGIN PASSWORD '{{ (_aap_pg_pguser_secrets.results[1].resources[0].data.verifier | b64decode) }}';"
+          -c 'DROP DATABASE IF EXISTS "aap-eda" WITH (FORCE);'
+          -c 'CREATE DATABASE "aap-eda";'
+          -c 'GRANT CREATE, TEMPORARY, CONNECT ON DATABASE "aap-eda" TO aapeda;'
+      no_log: true
 
     - name: "aap | force a sync of zuno-postgresql-d1 so the schema-grants Job reruns"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_argocd_sync.yml"
