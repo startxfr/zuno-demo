@@ -7,6 +7,14 @@
 # pointed at this LLMInferenceService's own -kserve-workload-svc
 # Service); rag-service is kept in the allow-list for symmetry with the
 # qwen policy - this chart can't know which role a given instance plays.
+# ADR-0201 (WP-27), 2026-08-25: maas-default-gateway is the third caller.
+# The MaaS data path routes gateway -> (EPP-selected) workload pod :8000
+# directly; with the gateway absent from this allow-list the connection
+# is silently dropped and every MaaS request 504s at the outer HAProxy -
+# AFTER auth, subscription selection and TRLP all passed (proven live:
+# ipp-pre set the header from the body, EPP picked the target, then
+# nothing). Same pod-label selector convention the openshift-ai chart's
+# maas-gateway.yaml NetworkPolicies already use for this gateway.
 # Metrics scraping is NOT covered here: RHOAI's own LLMInferenceService
 # controller scrapes this independently (see
 # templates/servicemonitor-vllm.yaml's comment), no NetworkPolicy
@@ -38,6 +46,12 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: rag-service
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: maas-default-gateway
       ports:
         - protocol: TCP
           port: 8000
