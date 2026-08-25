@@ -18,6 +18,12 @@
     day1_build_components:
       - supply_chain_signer_build
       - ai_gateway_build
+      # aiagent-operator is the same "no CI-published image on a fresh
+      # cluster" shape as ai-gateway: its Day 1 run component only applies
+      # GitOps Applications, so without this entry nothing ever creates the
+      # BuildConfig/ImageStream and the operator Deployment sits in
+      # ImagePullBackOff on a fresh cluster (hit live 2026-08-25).
+      - aiagent_operator_build
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
