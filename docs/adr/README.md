@@ -245,6 +245,7 @@ Goal: automate the release/supply-chain pipeline using GitHub Actions (build, si
 | [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Proposed | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
 | [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Proposed | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
 | [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Proposed | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
+| [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Proposed | Parallelize the detect-changes read stage's per-document S3 GETs |
 
 ## Standard clauses
 

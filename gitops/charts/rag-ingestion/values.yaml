@@ -1673,6 +1673,14 @@ resources:
   index:
     requests: {cpu: "500m", memory: "1Gi"}
     limits: {cpu: "2", memory: "4Gi"}
+  detectChanges:
+    # WP-58: bounds the per-document S3 GET pool that rebuilds
+    # detect-changes' "current" state (DETECT_CHANGES_READ_CONCURRENCY) -
+    # network/S3-latency-bound, same rationale as resources.fetch's
+    # concurrency knobs above. No requests/limits block here (unlike the
+    # stages above) - none existed for this stage before this WP, and
+    # pod-level cpu/memory sizing is out of scope.
+    readConcurrency: 16
 
 networkPolicy:
   enabled: true

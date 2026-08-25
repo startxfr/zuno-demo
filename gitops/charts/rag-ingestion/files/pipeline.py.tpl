@@ -79,6 +79,9 @@ CONFIG_KEYS = {
     # incident SXA_S3_ENDPOINT's own comment above documents).
     "FETCH_REDHAT_CONCURRENCY": "FETCH_REDHAT_CONCURRENCY",
     "FETCH_SXA_WRITE_CONCURRENCY": "FETCH_SXA_WRITE_CONCURRENCY",
+    # WP-58: detect-changes' per-document S3 read pool - same
+    # every-domain-ConfigMap requirement as the two keys above.
+    "DETECT_CHANGES_READ_CONCURRENCY": "DETECT_CHANGES_READ_CONCURRENCY",
 }
 
 # Per-domain wiring (rendered from values.yaml's domains map): which

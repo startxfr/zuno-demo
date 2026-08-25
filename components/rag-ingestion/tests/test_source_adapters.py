@@ -21,6 +21,7 @@ from rag_ingestion import (  # noqa: E402
     _parse_duration_spec,
     _parse_http_last_modified,
     _run_source_adapter,
+    stage_detect_changes,
     stage_normalize,
     stage_validate,
 )
@@ -928,6 +929,61 @@ def test_normalize_omits_stale_after_when_no_duration_is_configured():
     metadata = _normalize_one(config, raw)
     assert "stale_after" not in metadata
     assert metadata["source_modified_at"] == "2026-08-15T00:00:00Z"  # fetched_at fallback
+
+
+# --- detect-changes (WP-58) --------------------------------------------------
+
+
+def _raw_record(doc_id, sha256, url="https://docs.test/x"):
+    return {"doc_id": doc_id, "sha256": sha256, "url": url}
+
+
+def test_stage_detect_changes_classifies_new_changed_deleted_unchanged():
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = FakeStore()
+    store.json[f"{config.manifest_prefix}/manifest.json"] = {
+        "doc-changed": {"sha256": "old-sha", "url": "https://docs.test/changed"},
+        "doc-unchanged": {"sha256": "same-sha", "url": "https://docs.test/unchanged"},
+        "doc-deleted": {"sha256": "gone-sha", "url": "https://docs.test/deleted"},
+    }
+    store.json[f"{config.raw_prefix}/doc-new.json"] = _raw_record("doc-new", "new-sha", "https://docs.test/new")
+    store.json[f"{config.raw_prefix}/doc-changed.json"] = _raw_record(
+        "doc-changed", "new-sha", "https://docs.test/changed"
+    )
+    store.json[f"{config.raw_prefix}/doc-unchanged.json"] = _raw_record(
+        "doc-unchanged", "same-sha", "https://docs.test/unchanged"
+    )
+
+    stage_detect_changes(config, store)
+
+    changeset = store.json[f"{config.manifest_prefix}/changeset.json"]
+    assert changeset["new"] == ["doc-new"]
+    assert changeset["changed"] == ["doc-changed"]
+    assert changeset["deleted"] == ["doc-deleted"]
+    assert changeset["deleted_urls"] == ["https://docs.test/deleted"]
+    assert changeset["unchanged"] == ["doc-unchanged"]
+    manifest = store.json[f"{config.manifest_prefix}/manifest.json"]
+    assert set(manifest) == {"doc-new", "doc-changed", "doc-unchanged"}
+
+
+def test_stage_detect_changes_reads_raw_records_concurrently():
+    """WP-58: exercises the ThreadPoolExecutor branch (pool smaller than
+    the number of raw keys) and confirms every per-doc GET result still
+    lands in `current` correctly regardless of thread scheduling order."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech", DETECT_CHANGES_READ_CONCURRENCY="2")
+    store = FakeStore()
+    doc_ids = [f"doc-{i}" for i in range(5)]
+    for doc_id in doc_ids:
+        store.json[f"{config.raw_prefix}/{doc_id}.json"] = _raw_record(doc_id, f"sha-{doc_id}")
+
+    stage_detect_changes(config, store)
+
+    changeset = store.json[f"{config.manifest_prefix}/changeset.json"]
+    assert sorted(changeset["new"]) == doc_ids
+    assert changeset["changed"] == []
+    assert changeset["deleted"] == []
+    manifest = store.json[f"{config.manifest_prefix}/manifest.json"]
+    assert set(manifest) == set(doc_ids)
 
 
 class _FakeValidateCursor:

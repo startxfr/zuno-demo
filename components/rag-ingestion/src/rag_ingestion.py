@@ -248,6 +248,14 @@ class IngestionConfig:
     fetch_redhat_concurrency: int
     fetch_sxa_write_concurrency: int
 
+    # WP-58: bounds the per-document S3 GET pool that rebuilds
+    # detect-changes' "current" state (network/S3-latency-bound work,
+    # same rationale as the two fields above - a live sxa run's
+    # raw-sxa/ prefix held 314,428 objects, exposing the previously
+    # sequential read loop as the pipeline's next bottleneck once
+    # fetch-sxa stopped masking it).
+    detect_changes_read_concurrency: int
+
 
 def _env(name: str, default: Optional[str] = None, required: bool = False) -> Optional[str]:
     val = os.environ.get(name, default)
@@ -349,6 +357,7 @@ def load_config() -> IngestionConfig:
         corpus_delete_orphans=_env_bool("CORPUS_DELETE_ORPHANS", True),
         fetch_redhat_concurrency=_env_int("FETCH_REDHAT_CONCURRENCY", 8),
         fetch_sxa_write_concurrency=_env_int("FETCH_SXA_WRITE_CONCURRENCY", 8),
+        detect_changes_read_concurrency=_env_int("DETECT_CHANGES_READ_CONCURRENCY", 16),
     )
 
 
@@ -378,6 +387,12 @@ class CorpusStore:
                 connect_timeout=10,
                 read_timeout=60,
                 retries={"max_attempts": 4, "mode": "standard"},
+                # WP-58: botocore's default (10) is below
+                # detect_changes_read_concurrency's default (16) - without
+                # this, excess threads would queue for a free pooled
+                # connection instead of actually running in parallel,
+                # silently capping the gain this store's callers pay for.
+                max_pool_connections=32,
             ),
         }
         if config.s3_endpoint:
@@ -1629,11 +1644,15 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
 
     raw_keys = [k for k in store.list_keys(f"{config.raw_prefix}/") if k.endswith(".json")]
     current: dict = {}
-    for key in raw_keys:
-        record = store.get_json(key)
-        if not record:
-            continue
-        current[record["doc_id"]] = {"sha256": record["sha256"], "url": record["url"]}
+    # WP-58: one GET per raw/<domain>/ object - network/S3-latency-bound,
+    # not CPU-bound. pool.map preserves order and results are folded into
+    # `current` back on this thread, so there is no concurrent dict
+    # mutation to guard against.
+    with ThreadPoolExecutor(max_workers=max(1, config.detect_changes_read_concurrency)) as pool:
+        for record in pool.map(store.get_json, raw_keys):
+            if not record:
+                continue
+            current[record["doc_id"]] = {"sha256": record["sha256"], "url": record["url"]}
 
     if not config.corpus_incremental:
         new_ids = list(current.keys())
