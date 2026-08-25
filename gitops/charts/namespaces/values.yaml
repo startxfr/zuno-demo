@@ -143,6 +143,7 @@ platformNamespaces:
       operands, pending a follow-up decision on removal/repurposing.
     allowedFromNamespaces: []
     extraLabels:
+      opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-ai-build
@@ -169,6 +170,7 @@ platformNamespaces:
     # injection rather than excluding build pods, to preserve this
     # namespace's phase-4 mTLS-enforcement staging above.
     extraLabels:
+      opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-mlops
@@ -190,6 +192,7 @@ platformNamespaces:
       - zuno-data
     # Sidecar-injected + mTLS-enforced, same posture as zuno-ai-build.
     extraLabels:
+      opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-ai-run
