@@ -73,6 +73,12 @@ CONFIG_KEYS = {
     # omitted stale_after from every chunk and validate fail-closed on the
     # whole corpus once rows actually indexed.
     "STALE_AFTER": "STALE_AFTER",
+    # WP-57: fetch-stage concurrency knobs - must be present in every
+    # domain's ConfigMap the same way every key above is (missing one
+    # here is a CreateContainerConfigError at pod start, the exact
+    # incident SXA_S3_ENDPOINT's own comment above documents).
+    "FETCH_REDHAT_CONCURRENCY": "FETCH_REDHAT_CONCURRENCY",
+    "FETCH_SXA_WRITE_CONCURRENCY": "FETCH_SXA_WRITE_CONCURRENCY",
 }
 
 # Per-domain wiring (rendered from values.yaml's domains map): which

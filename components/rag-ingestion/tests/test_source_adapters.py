@@ -62,10 +62,11 @@ def _config(**env):
 
 
 class _FakeResponse:
-    def __init__(self, payload=None, text="", headers=None):
+    def __init__(self, payload=None, text="", headers=None, status_code=200):
         self._payload = payload
         self.text = text
         self.headers = headers or {}
+        self.status_code = status_code
 
     def raise_for_status(self):
         return None
@@ -128,6 +129,78 @@ def test_fetch_redhat_stamps_domain_and_canonical_technology():
     assert sat["technology"] == "satellite"
     # Unmapped slug: technology omitted, never invented (ADR-0202).
     assert "technology" not in by_slug["red-hat-quay"]
+
+
+def test_fetch_redhat_sends_conditional_headers_and_skips_a_304():
+    """WP-57: a second run must send If-None-Match/If-Modified-Since built
+    from the previous run's stored etag/last_modified, and a 304 response
+    must leave that record untouched rather than overwrite it."""
+    sources = (
+        '[{"product": "Satellite", "productSlug": "red-hat-satellite", '
+        '"version": "6.15", "documentationUrl": "https://docs.test/sat"}]'
+    )
+    config = _config(REDHAT_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    store = FakeStore()
+
+    first_resp = _FakeResponse(text=_REDHAT_HTML, headers={"ETag": '"v1"'})
+    with mock.patch.object(rag_ingestion, "_http_get", return_value=first_resp):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-redhat"], config, store)
+    (raw_key,) = [k for k in store.json if k.startswith(f"{config.raw_prefix}/")]
+    first_record = dict(store.json[raw_key])
+    assert first_record["etag"] == '"v1"'
+
+    # This source has one URL (its own base_url) - fetched unconditionally
+    # to discover links, so the conditional-header assertion targets that
+    # same fetch on the second run.
+    def assert_conditional_and_return_304(url, **kwargs):
+        assert kwargs.get("headers", {}).get("If-None-Match") == '"v1"'
+        return _FakeResponse(status_code=304)
+
+    with mock.patch.object(rag_ingestion, "_http_get", side_effect=assert_conditional_and_return_304):
+        # base_url itself is always fetched unconditionally (to discover
+        # links) by _fetch_redhat's own top-level call - only
+        # _fetch_redhat_one's per-URL fetches are conditional. With a
+        # single-URL source, exercise _fetch_redhat_one directly instead
+        # to isolate that conditional-GET path from the unconditional
+        # base_url fetch.
+        written = rag_ingestion._fetch_redhat_one(
+            config, store, {"productSlug": "red-hat-satellite", "version": "6.15"}, "https://docs.test/sat"
+        )
+    assert written is False
+    assert store.json[raw_key] == first_record
+
+
+def test_fetch_redhat_fetches_discovered_links_concurrently():
+    """WP-57: exercises the ThreadPoolExecutor branch specifically (the
+    other fetch-redhat tests' fixture HTML has no discoverable links, so
+    `remaining` is always empty there and that branch runs zero times)."""
+    landing_html = (
+        "<html><body><h1>Satellite Guide</h1>"
+        '<a href="https://docs.test/html/chapter1/index">Chapter 1</a>'
+        '<a href="https://docs.test/html/chapter2/index">Chapter 2</a>'
+        "</body></html>"
+    )
+    sources = (
+        '[{"product": "Satellite", "productSlug": "red-hat-satellite", '
+        '"version": "6.15", "documentationUrl": "https://docs.test/sat"}]'
+    )
+    config = _config(REDHAT_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech", FETCH_REDHAT_CONCURRENCY="4")
+    store = FakeStore()
+
+    def fake_get(url, **kwargs):
+        if url == "https://docs.test/sat":
+            return _FakeResponse(text=landing_html)
+        return _FakeResponse(text=_REDHAT_HTML)
+
+    with mock.patch.object(rag_ingestion, "_http_get", side_effect=fake_get):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-redhat"], config, store)
+
+    records = [v for k, v in store.json.items() if k.startswith(f"{config.raw_prefix}/")]
+    assert {r["url"] for r in records} == {
+        "https://docs.test/sat",
+        "https://docs.test/html/chapter1/index",
+        "https://docs.test/html/chapter2/index",
+    }
 
 
 def test_fetch_confluence_uses_explicit_per_source_technology():
@@ -626,7 +699,10 @@ def test_fetch_sxa_writes_one_record_per_row_without_any_sql_engine():
     with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
         _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
 
-    records = list(store.json.values())
+    # WP-57: store.json also carries the dump-checksum short-circuit
+    # marker (manifests/sxa-dump-checksum.json) alongside the raw/
+    # records - filter to raw/ the same way detect-changes itself does.
+    records = [v for k, v in store.json.items() if k.startswith(f"{config.raw_prefix}/")]
     assert len(records) == 2
     (record,) = [r for r in records if "customers/1" in r["url"]]
     assert record["domain"] == "knowledge.sxa"
@@ -657,9 +733,45 @@ def test_fetch_sxa_reimport_of_same_export_is_idempotent():
         _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
         first = {k: dict(v) for k, v in store.json.items()}
         _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
+    # WP-57: the second run's dump checksum matches the first's, so it
+    # short-circuits before writing anything - a stronger idempotency
+    # than "re-computes the same bytes" (raw/ is never even touched the
+    # second time). Excludes the checksum marker itself (no sha256 field).
     assert set(store.json) == set(first)
     for key, record in store.json.items():
+        if key == f"{config.manifest_prefix}/sxa-dump-checksum.json":
+            continue
         assert record["sha256"] == first[key]["sha256"]
+
+
+def test_fetch_sxa_short_circuits_when_dump_checksum_is_unchanged():
+    """WP-57: a second run against a byte-identical dump must skip the
+    parse loop entirely (not just happen to reproduce the same output) -
+    asserted directly on _fetch_sxa's return value and by proving
+    _parse_insert_rows is never called the second time."""
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa",
+        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
+        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
+        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
+    )
+    store = FakeStore()
+
+    def fake_fetch(_config, key):
+        if key.endswith("schema.sql"):
+            return _SXA_CORPUS_SCHEMA.encode("utf-8")
+        return _SXA_CORPUS_DATA.encode("utf-8")
+
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
+        first_written = rag_ingestion._fetch_sxa(config, store)
+        assert first_written == 2
+
+        with mock.patch.object(
+            rag_ingestion, "_parse_insert_rows", wraps=rag_ingestion._parse_insert_rows
+        ) as spy:
+            second_written = rag_ingestion._fetch_sxa(config, store)
+            spy.assert_not_called()
+    assert second_written == 0
 
 
 def test_fetch_sxa_refuses_non_schema_content_and_missing_keys():

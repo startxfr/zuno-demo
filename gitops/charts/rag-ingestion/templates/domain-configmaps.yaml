@@ -85,6 +85,11 @@ data:
   # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/{{ $name }}/domain.yaml's
   # freshness.operation_classes.semantic-read.max_staleness.
   STALE_AFTER: {{ $domain.staleAfter | default "none" | quote }}
+  # WP-57: same fleet-wide values as templates/configmap.yaml (tech's) -
+  # always rendered, pipeline.py.tpl's CONFIG_KEYS requires every domain's
+  # ConfigMap to carry these regardless of that domain's source type.
+  FETCH_REDHAT_CONCURRENCY: {{ $root.Values.resources.fetch.redhatConcurrency | quote }}
+  FETCH_SXA_WRITE_CONCURRENCY: {{ $root.Values.resources.fetch.sxaWriteConcurrency | quote }}
 ---
 {{- end }}
 {{- end }}

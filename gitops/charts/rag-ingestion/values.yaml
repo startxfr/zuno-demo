@@ -1656,6 +1656,14 @@ resources:
   fetch:
     requests: {cpu: "250m", memory: "512Mi"}
     limits: {cpu: "2", memory: "2Gi"}
+    # WP-57: both bound network/S3-latency-bound worker pools (thread
+    # count higher than CPU count is fine and expected), not CPU-bound
+    # work - separate from the cpu/memory requests above.
+    # redhatConcurrency: fetch-redhat's per-source page-fetch pool
+    # (FETCH_REDHAT_CONCURRENCY). sxaWriteConcurrency: fetch-sxa's
+    # per-row S3-write pool (FETCH_SXA_WRITE_CONCURRENCY).
+    redhatConcurrency: 8
+    sxaWriteConcurrency: 8
   normalize:
     requests: {cpu: "1", memory: "2Gi"}
     limits: {cpu: "4", memory: "8Gi"}

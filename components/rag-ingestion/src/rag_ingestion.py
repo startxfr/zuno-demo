@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -42,6 +43,7 @@ from urllib.parse import urljoin, urlparse
 import boto3
 import psycopg
 import requests
+import sqlparse
 from bs4 import BeautifulSoup, NavigableString
 from botocore.exceptions import ClientError
 from pgvector.psycopg import register_vector
@@ -236,6 +238,16 @@ class IngestionConfig:
     corpus_hash_algorithm: str
     corpus_delete_orphans: bool
 
+    # WP-57: both concurrency knobs default to a conservative worker count
+    # (network/S3-latency-bound work, not CPU-bound - higher than the CPU
+    # count is fine and expected). Configurable rather than hardcoded so an
+    # operator can tune per-cluster network conditions without a code
+    # change. fetch_redhat_concurrency bounds the per-source page-fetch
+    # pool in _fetch_redhat; fetch_sxa_write_concurrency bounds the
+    # per-row S3-write pool in _fetch_sxa.
+    fetch_redhat_concurrency: int
+    fetch_sxa_write_concurrency: int
+
 
 def _env(name: str, default: Optional[str] = None, required: bool = False) -> Optional[str]:
     val = os.environ.get(name, default)
@@ -335,6 +347,8 @@ def load_config() -> IngestionConfig:
         corpus_incremental=_env_bool("CORPUS_INCREMENTAL", True),
         corpus_hash_algorithm=os.environ.get("CORPUS_HASH_ALGORITHM", "sha256"),
         corpus_delete_orphans=_env_bool("CORPUS_DELETE_ORPHANS", True),
+        fetch_redhat_concurrency=_env_int("FETCH_REDHAT_CONCURRENCY", 8),
+        fetch_sxa_write_concurrency=_env_int("FETCH_SXA_WRITE_CONCURRENCY", 8),
     )
 
 
@@ -533,6 +547,72 @@ def _run_source_adapter(adapter: SourceAdapter, config: IngestionConfig, store: 
 # --------------------------------------------------------------------------
 
 
+def _build_redhat_record(source: dict, url: str, page) -> Optional[dict]:
+    """Builds one fetch-redhat record from an already-fetched response, or
+    None if the page has no extractable text (skip - unchanged from the
+    pre-WP-57 behavior)."""
+    title, text = _extract_title_and_text(page.text)
+    if not text.strip():
+        return None
+    doc_id = doc_id_for(url)
+    record = {
+        "doc_id": doc_id,
+        "url": url,
+        "title": title or url,
+        "raw_html": page.text,
+        "domain": "knowledge.tech",
+        "product": source["productSlug"],
+        "version": source["version"],
+        "language": _normalize_language((source.get("languages") or ["en-US"])[0]),
+        "source_type": "product-doc",
+        "classification": "C1",
+        "acl_groups": [],
+        "fetched_at": _utcnow_iso(),
+        "sha256": hashlib.sha256(page.text.encode("utf-8")).hexdigest(),
+        "provenance": url,
+        "last_modified": _parse_http_last_modified(page.headers.get("Last-Modified")),
+        # WP-57: enables a conditional GET (If-None-Match) against this
+        # same URL on the next run.
+        "etag": page.headers.get("ETag"),
+    }
+    technology = TECHNOLOGY_BY_PRODUCT_SLUG.get(source["productSlug"])
+    if technology:
+        record["technology"] = technology
+    return record
+
+
+def _fetch_redhat_one(config: IngestionConfig, store: CorpusStore, source: dict, url: str) -> bool:
+    """Fetches and stores one page, run concurrently across a source's
+    discovered URLs (WP-57 - sequential per-page fetching was the
+    dominant cost of fetch-redhat). Uses a conditional GET against any
+    ETag/Last-Modified this URL's raw record carries from a previous run:
+    a 304 leaves that record untouched rather than re-fetching/re-parsing
+    it - safe because nothing ever purges raw/<domain>/ between runs, so
+    detect-changes still finds the existing file. Returns True if a
+    record was (re)written."""
+    doc_id = doc_id_for(url)
+    raw_key = f"{config.raw_prefix}/{doc_id}.json"
+    previous = store.get_json(raw_key)
+    headers: Dict[str, str] = {}
+    if previous:
+        if previous.get("etag"):
+            headers["If-None-Match"] = previous["etag"]
+        if previous.get("last_modified"):
+            headers["If-Modified-Since"] = previous["last_modified"]
+    try:
+        page = _http_get(url, headers=headers)
+    except requests.RequestException as exc:
+        logger.error("fetch-redhat: failed to fetch %s: %s", url, exc)
+        return False
+    if page.status_code == 304:
+        return False
+    record = _build_redhat_record(source, url, page)
+    if record is None:
+        return False
+    store.put_json(raw_key, record)
+    return True
+
+
 def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
     fetched = 0
     for source in config.redhat_sources:
@@ -556,38 +636,20 @@ def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
         exclude = source.get("exclude") or []
         urls = [u for u in dict.fromkeys(urls) if _matches_filters(u, include, exclude)]
 
-        for url in urls:
-            try:
-                page = base_resp if url == base_url else _http_get(url)
-            except requests.RequestException as exc:
-                logger.error("fetch-redhat: failed to fetch %s: %s", url, exc)
-                continue
-            title, text = _extract_title_and_text(page.text)
-            if not text.strip():
-                continue
-            doc_id = doc_id_for(url)
-            record = {
-                "doc_id": doc_id,
-                "url": url,
-                "title": title or url,
-                "raw_html": page.text,
-                "domain": "knowledge.tech",
-                "product": source["productSlug"],
-                "version": source["version"],
-                "language": _normalize_language((source.get("languages") or ["en-US"])[0]),
-                "source_type": "product-doc",
-                "classification": "C1",
-                "acl_groups": [],
-                "fetched_at": _utcnow_iso(),
-                "sha256": hashlib.sha256(page.text.encode("utf-8")).hexdigest(),
-                "provenance": url,
-                "last_modified": _parse_http_last_modified(page.headers.get("Last-Modified")),
-            }
-            technology = TECHNOLOGY_BY_PRODUCT_SLUG.get(source["productSlug"])
-            if technology:
-                record["technology"] = technology
-            store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
+        # base_url's response is already in hand (fetched unconditionally
+        # above to discover links) - store it directly rather than
+        # re-fetching it conditionally. WP-57: every OTHER discovered URL
+        # runs through the concurrent conditional-GET path below.
+        base_record = _build_redhat_record(source, base_url, base_resp)
+        if base_record is not None:
+            store.put_json(f"{config.raw_prefix}/{base_record['doc_id']}.json", base_record)
             fetched += 1
+
+        remaining = [u for u in urls if u != base_url]
+        if remaining:
+            with ThreadPoolExecutor(max_workers=max(1, config.fetch_redhat_concurrency)) as pool:
+                results = pool.map(lambda u: _fetch_redhat_one(config, store, source, u), remaining)
+                fetched += sum(1 for written in results if written)
     return fetched
 
 
@@ -1036,36 +1098,19 @@ def _split_sql_statements(dump_text: str) -> list:
     Comment lines (`-- ...`) are stripped per-line *before* splitting, not
     by checking whether a whole (possibly multi-line) statement starts
     with `--` - a comment line immediately followed by a real statement on
-    the next line is not itself a comment once joined."""
+    the next line is not itself a comment once joined.
+
+    WP-57: delegates the actual splitting to sqlparse.split() (a compiled
+    tokenizer) instead of a pure-Python char-by-char state machine, which
+    was the dominant cost of fetch-sxa on large dumps. sqlparse.split()
+    KEEPS the trailing `;` on each statement (verified empirically) -
+    _INSERT_RE's `values` group (`(?P<values>.+)$`, re.DOTALL) would
+    otherwise absorb it into the last value, so stripping it here is a
+    correctness requirement, not cosmetic."""
     lines = [line for line in dump_text.splitlines() if not line.strip().startswith("--")]
     stripped_text = "\n".join(lines)
-
-    statements = []
-    current: list = []
-    in_string: Optional[str] = None
-    escaped = False
-    for ch in stripped_text:
-        current.append(ch)
-        if escaped:
-            escaped = False
-            continue
-        if ch == "\\" and in_string in ("'", '"'):
-            escaped = True
-            continue
-        if in_string:
-            if ch == in_string:
-                in_string = None
-            continue
-        if ch in ("'", '"', "`"):
-            in_string = ch
-            continue
-        if ch == ";":
-            statements.append("".join(current[:-1]))
-            current = []
-    tail = "".join(current).strip()
-    if tail:
-        statements.append(tail)
-    return [s.strip() for s in statements if s.strip()]
+    statements = [s.strip().rstrip(";").strip() for s in sqlparse.split(stripped_text)]
+    return [s for s in statements if s]
 
 
 _CREATE_VIEW_RE = re.compile(
@@ -1483,9 +1528,25 @@ def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
         raise SystemExit(
             f"fetch-sxa: no object at s3://{config.sxa_corpus_s3_bucket}/{config.sxa_corpus_data_s3_key}"
         )
+    checksum = hashlib.sha256(schema_bytes + b"\n" + data_bytes).hexdigest()
+
+    # WP-57: short-circuit before the (previously dominant) parse cost -
+    # _split_sql_statements/_parse_insert_rows over thousands of rows -
+    # when this exact dump byte-for-byte matches the last run's. Safe:
+    # nothing ever purges raw/<domain>/ between runs (verified), so the
+    # existing raw-sxa/<doc_id>.json records from that prior run stay in
+    # place and detect-changes still finds them.
+    checksum_key = f"{config.manifest_prefix}/sxa-dump-checksum.json"
+    previous_checksum = store.get_json(checksum_key)
+    if previous_checksum and previous_checksum.get("checksum") == checksum:
+        logger.info(
+            "fetch-sxa: dump unchanged since last run (checksum %s) - skipping re-parse",
+            checksum[:16],
+        )
+        return 0
+
     schema_text = schema_bytes.decode("utf-8", errors="replace")
     data_text = data_bytes.decode("utf-8", errors="replace")
-    checksum = hashlib.sha256(schema_bytes + b"\n" + data_bytes).hexdigest()
     snapshot_id = config.sxa_corpus_snapshot_id or f"sha256-{checksum[:16]}"
     fetched_at = _utcnow_iso()
 
@@ -1496,7 +1557,7 @@ def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
         )
 
     columns_by_table = _parse_create_table_columns(schema_text)
-    written = 0
+    records = []
     for table, row in _parse_insert_rows(data_text, columns_by_table):
         text = _render_record_text(row)
         if not text.strip():
@@ -1504,7 +1565,7 @@ def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
         row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
         record_url = f"sxa-corpus://{table}/{row_id}"
         doc_id = doc_id_for(record_url)
-        record = {
+        records.append({
             "doc_id": doc_id,
             "url": record_url,
             "title": f"SXA {table} #{row_id}",
@@ -1525,10 +1586,19 @@ def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
                 "checksum": checksum,
                 "table": table,
             },
-        }
-        store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
-        written += 1
-    return written
+        })
+
+    # WP-57: parallel S3 writes - one synchronous put_object per row (up
+    # to thousands of sequential network round-trips) was the other
+    # dominant cost of this stage.
+    if records:
+        with ThreadPoolExecutor(max_workers=max(1, config.fetch_sxa_write_concurrency)) as pool:
+            list(pool.map(
+                lambda r: store.put_json(f"{config.raw_prefix}/{r['doc_id']}.json", r),
+                records,
+            ))
+    store.put_json(checksum_key, {"checksum": checksum, "fetched_at": fetched_at})
+    return len(records)
 
 
 # --------------------------------------------------------------------------
