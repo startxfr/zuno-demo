@@ -11,6 +11,11 @@ ADR-0414: that dedicated backend is retired - this now publishes
 gpt-oss-20b's own LLMInferenceService (templates/llminferenceservice-gptoss.yaml)
 instead, folding what were two separate GPU-consuming deployments into
 one.
+Correction, 2026-08-25: MaaSModelRef.spec also has an endpointOverride
+field (`oc explain maasmodelref.spec --recursive`) - missed by the earlier
+sweep, which only recursed into spec.modelRef. See values.yaml's
+maas.endpointOverride comment and ADR-0201's dated notes for what this
+tests.
 */ -}}
 {{- if .Values.maas.enabled }}
 # MaaSAuthPolicy's admission webhook rejects the whole batch unless a
@@ -58,6 +63,9 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
 spec:
+  {{- if .Values.maas.endpointOverride }}
+  endpointOverride: {{ .Values.maas.endpointOverride }}
+  {{- end }}
   modelRef:
     kind: LLMInferenceService
     name: {{ .Values.gptOssModel.inferenceServiceName }}

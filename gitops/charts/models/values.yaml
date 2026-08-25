@@ -422,6 +422,24 @@ maas:
   # underlying deployment's name.
   publishedName: gpt-oss-20b-maas
 
+  # ADR-0201/WP-27, 2026-08-25, attempt 4: MaaSModelRef.spec.endpointOverride
+  # exists on the live CRD (`oc explain maasmodelref.spec --recursive`) and
+  # was missed by the 2026-08-25 sweep, which only recursed into
+  # spec.modelRef. Description: "overrides the endpoint URL that the
+  # controller would otherwise discover from the backend (e.g.
+  # LLMInferenceService status or Gateway/HTTPRoute)." Attempts 1-3
+  # (routerGateway's comment block above) all failed by changing WHERE
+  # KServe's route lives; this one leaves routerGateway untouched
+  # (LLMInferenceService stays Ready=True) and instead gives MaaSModelRef a
+  # concrete endpoint so it doesn't need to discover/adopt KServe's route to
+  # find one - testing whether that also changes which identity the data
+  # path serves under. Value reuses the same in-cluster Service ai-gateway's
+  # own MaaS-bypass route already calls (platform/ai-gateway/
+  # provider-routing.yaml), proven reachable/TLS-SIMPLE-compatible.
+  # Empty by default; set live to test, revert to "" if it doesn't help
+  # (same retained-but-disabled pattern as routerGateway).
+  endpointOverride: ""
+
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
   # model via different token rate limits (MaaSSubscription has no
