@@ -18,7 +18,9 @@ import csv
 import io
 import json
 import pathlib
+import re
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -27,6 +29,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 REPORTS_DIR = REPO_ROOT / "evaluations" / "day2-reports"
 
 _FORMAT_EXTENSIONS = {"json": "json", "csv": "csv"}
+_HTTP_STATUS_RE = re.compile(r"status[=_ ](\d{3})")
 
 
 @dataclass
@@ -38,6 +41,21 @@ class Day2Result:
     passed: bool
     detail: str = ""
     duration_ms: float = 0.0
+
+
+def log_test_line(agent: str, layer: str, test_id: str, description: str, passed: bool, detail: str) -> None:
+    """One line per test, printed to stderr as each test completes (unlike
+    the single aggregated JSON array day2_stresstest.py/day2_bulk.py print
+    to stdout at the very end) - so `oc logs -f` on a running stresstest
+    Job shows live progress instead of nothing until the whole run exits.
+    HTTP status is extracted best-effort from `detail` (most checks already
+    embed "status=NNN"); "-" when a check has no HTTP call to report.
+    """
+    now = time.strftime("%H:%M:%S") + f".{int((time.time() % 1) * 1000):03d}"
+    match = _HTTP_STATUS_RE.search(detail)
+    http_code = match.group(1) if match else "-"
+    mark = "PASS" if passed else "FAIL"
+    print(f"{now} [{agent}] {layer}#{test_id} http={http_code} {mark} {description}", file=sys.stderr)
 
 
 def summarize(results: List[Day2Result]) -> Dict[str, object]:

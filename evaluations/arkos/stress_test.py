@@ -55,6 +55,11 @@ os.environ.setdefault("AGENT", "arkos")
 # entrypoint isn't what's needed here).
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
 from run_scenarios import AGENT, RUNTIME_URL, auth_headers, cleanup_created_runs, record_run_id  # noqa: E402
+try:
+    from day2_report import log_test_line
+except ImportError:
+    def log_test_line(*_args, **_kwargs) -> None:
+        pass
 
 PERSONA = "consultant-01"
 
@@ -70,9 +75,11 @@ class StressResult:
 
 def _safe(id_: str, category: str, title: str, fn, *args) -> StressResult:
     try:
-        return fn(*args)
+        result = fn(*args)
     except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
-        return StressResult(id_, category, title, False, f"unhandled error: {exc}")
+        result = StressResult(id_, category, title, False, f"unhandled error: {exc}")
+    log_test_line(AGENT, "stress_test", result.id, title, result.passed, result.detail)
+    return result
 
 
 # --------------------------------------------------------------------------

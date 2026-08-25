@@ -32,6 +32,19 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import httpx
 import yaml
 
+try:
+    # Present alongside this file once mounted into the stresstest Job pod
+    # (ansible/roles/day3/kustomize/stresstest-scripts/kustomization.yaml
+    # projects platform/testing/day2_report.py unprefixed into the same
+    # flat directory) - absent for a standalone `cd evaluations/tekos &&
+    # python3 run_scenarios.py` dev run outside that pod, which is fine:
+    # verbose per-scenario logging is a pod-log convenience, not required
+    # for this file's own pass/fail correctness.
+    from day2_report import log_test_line
+except ImportError:
+    def log_test_line(*_args, **_kwargs) -> None:
+        pass
+
 # ADR-0342/WP-31: which agent this run evaluates - drives the frontend/BFF
 # hostnames, the OIDC client id, and (via TASK_NAME below) which OKF task
 # name is declared to the MCP Gateway. Defaults to "tekos" so every
@@ -696,12 +709,14 @@ def run() -> List[ScenarioResult]:
     for s in scenarios:
         handler = HANDLERS.get(s["type"])
         if handler is None:
-            results.append(ScenarioResult(s["id"], s["title"], False, f"no handler for type '{s['type']}'"))
-            continue
-        try:
-            results.append(handler(s))
-        except Exception as exc:  # noqa: BLE001 - a scenario erroring is a fail, not a crash
-            results.append(ScenarioResult(s["id"], s["title"], False, f"unhandled error: {exc}"))
+            result = ScenarioResult(s["id"], s["title"], False, f"no handler for type '{s['type']}'")
+        else:
+            try:
+                result = handler(s)
+            except Exception as exc:  # noqa: BLE001 - a scenario erroring is a fail, not a crash
+                result = ScenarioResult(s["id"], s["title"], False, f"unhandled error: {exc}")
+        results.append(result)
+        log_test_line(AGENT, "scenario", str(result.id), result.title, result.passed, result.detail)
     return results
 
 

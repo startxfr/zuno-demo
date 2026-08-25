@@ -34,6 +34,12 @@ from dataclasses import dataclass
 
 import yaml
 
+try:
+    from day2_report import log_test_line
+except ImportError:
+    def log_test_line(*_args, **_kwargs) -> None:
+        pass
+
 
 @dataclass
 class CheckResult:
@@ -194,9 +200,11 @@ def run() -> list[CheckResult]:
     results = []
     for check in CHECKS:
         try:
-            results.append(check())
+            result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
-            results.append(CheckResult(check.__name__, False, f"unhandled error: {exc}"))
+            result = CheckResult(check.__name__, False, f"unhandled error: {exc}")
+        results.append(result)
+        log_test_line("tekos", "gate", result.name, result.name, result.passed, result.detail)
     return results
 
 

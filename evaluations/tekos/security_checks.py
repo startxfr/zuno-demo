@@ -38,6 +38,13 @@ import httpx
 import yaml
 
 from run_scenarios import BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers
+try:
+    from day2_report import log_test_line
+except ImportError:
+    def log_test_line(*_args, **_kwargs) -> None:
+        pass
+
+_LOG_AGENT = "tekos"
 
 # Not part of run_scenarios.py's URL set since none of the 20 fixed
 # scenarios call ai-gateway directly (only agent-runtime does, internally).
@@ -328,9 +335,11 @@ def run() -> list:
     results = []
     for check in CHECKS:
         try:
-            results.append(check())
+            result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
-            results.append(CheckResult(check.__name__, False, f"unhandled error: {exc}"))
+            result = CheckResult(check.__name__, False, f"unhandled error: {exc}")
+        results.append(result)
+        log_test_line(_LOG_AGENT, "security", result.name, result.name, result.passed, result.detail)
     return results
 
 

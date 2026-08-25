@@ -37,13 +37,13 @@ import pathlib
 import sys
 import time
 from dataclasses import asdict
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import httpx
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from day2_report import Day2Result  # noqa: E402
+from day2_report import Day2Result, log_test_line  # noqa: E402
 
 AGENT = os.getenv("AGENT", "tekos")
 BULK_INTERACTIONS = int(os.getenv("BULK_INTERACTIONS", "0") or "0")
@@ -113,8 +113,8 @@ def _percentile(sorted_values: List[float], pct: float) -> float:
     return sorted_values[index]
 
 
-def _post_chat(headers: Dict[str, str], message: str, i: int) -> "tuple[bool, bool, float]":
-    """One /api/chat call. Returns (ok, timed_out, elapsed_ms)."""
+def _post_chat(headers: Dict[str, str], message: str, i: int) -> "tuple[bool, bool, Optional[int], float]":
+    """One /api/chat call. Returns (ok, timed_out, status_code, elapsed_ms)."""
     import run_scenarios
 
     start = time.monotonic()
@@ -129,11 +129,11 @@ def _post_chat(headers: Dict[str, str], message: str, i: int) -> "tuple[bool, bo
         if resp.status_code == 200:
             run_scenarios.record_run_id(PERSONA, body)
         ok = resp.status_code == 200 and bool(body.get("reply"))
-        return ok, False, (time.monotonic() - start) * 1000
+        return ok, False, resp.status_code, (time.monotonic() - start) * 1000
     except httpx.TimeoutException:
-        return False, True, (time.monotonic() - start) * 1000
+        return False, True, None, (time.monotonic() - start) * 1000
     except Exception:  # noqa: BLE001 - a call erroring counts as one failed interaction, not a crash
-        return False, False, (time.monotonic() - start) * 1000
+        return False, False, None, (time.monotonic() - start) * 1000
 
 
 def run() -> List[Day2Result]:
@@ -153,18 +153,22 @@ def run() -> List[Day2Result]:
     timeouts = 0
     for i in range(BULK_INTERACTIONS):
         message = corpus[i % len(corpus)]
-        ok, timed_out, elapsed_ms = _post_chat(headers, message, i)
+        ok, timed_out, status_code, elapsed_ms = _post_chat(headers, message, i)
         if not ok and timed_out:
             # One retry on a bare timeout absorbs a single slow response
             # instead of counting normal single-replica backend latency
             # as a hard failure.
-            ok, timed_out, retry_ms = _post_chat(headers, message, i)
+            ok, timed_out, status_code, retry_ms = _post_chat(headers, message, i)
             elapsed_ms += retry_ms
         latencies.append(elapsed_ms)
         if not ok:
             errors += 1
             if timed_out:
                 timeouts += 1
+        log_test_line(
+            AGENT, "bulk_load", str(i), f"call {i + 1}/{BULK_INTERACTIONS}", ok,
+            f"status={status_code}" if status_code is not None else "status=timeout",
+        )
 
     latencies.sort()
     error_rate = errors / BULK_INTERACTIONS
