@@ -86,11 +86,20 @@ cluster-ods:
   DSCInitialization:
     enabled: false
     name: default-dsci
+    # metrics (ADR-0522, WP-078): side-by-side with the existing
+    # zuno-monitoring stack (ADR-0029/ADR-0413), scoped to RHOAI-managed
+    # workloads only - no application code/exporter changes. alerting requires
+    # metrics.storage to be set (CRD validation).
     spec: |
       applicationsNamespace: redhat-ods-applications
       monitoring:
         managementState: Managed
         namespace: redhat-ods-monitoring
+        metrics:
+          storage:
+            size: 25Gi
+            retention: 15d
+        alerting: {}
 
   # Superseded by the top-level dataScienceCluster key below, rendered by this
   # chart's own templates/datasciencecluster.yaml instead (see that file for
