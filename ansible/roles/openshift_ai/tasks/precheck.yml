@@ -100,6 +100,75 @@
     - (_openshift_ai_maas_api_restarts | int) > 0
     - blocked_findings is defined
 
+# --- MaaS /llm/ path-identity off-by-one tripwire (ADR-0201) ----------------
+# Latent upstream defect, verified live 2026-08-25: every model-identity
+# extraction in the generated AuthPolicy/maas-gateway-auth that fires on
+# /llm/-prefixed paths indexes the path segments without accounting for the
+# "llm" prefix segment itself - five CEL expressions plus the OPA rego, all
+# computing filtered[0] + "/" + filtered[1], i.e. "llm/<ns>" where maas-api
+# needs "<ns>/<model>". maas-api returns not_found for the computed form and
+# a real subscription for the shifted one, so every request on an /llm/
+# route would 403 "no matching subscription found for user" regardless of
+# entitlement - indistinguishable, caller-side, from a genuine denial.
+#
+# Harmless today: no HTTPRoute matches /llm/, the branch is dead code. This
+# watch exists so that the day RHOAI (or anyone) starts routing /llm/ on
+# maas-default-gateway, the breakage is named before a demo rediscovers it
+# the hard way. Not fixable here: the policy is controller-generated and
+# reconciled. Lives in precheck (not diagnose.yml) deliberately: diagnose
+# only runs when the component is NOT installed, and an /llm/ route
+# appearing would leave everything Ready while silently 403ing - this
+# must run on every `make d1 check`. Full reproduction for the upstream
+# report:
+# docs/roadmap/evidence/maas-llm-path-identity-off-by-one.md
+- name: "openshift_ai | precheck: look up HTTPRoutes for the /llm/ tripwire"
+  kubernetes.core.k8s_info:
+    api_version: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+  register: _oai_diag_httproutes
+
+- name: "openshift_ai | precheck: look up the generated maas-gateway-auth AuthPolicy"
+  kubernetes.core.k8s_info:
+    api_version: kuadrant.io/v1
+    kind: AuthPolicy
+    name: maas-gateway-auth
+    namespace: openshift-ingress
+  register: _oai_diag_maas_authpolicy
+
+- name: "openshift_ai | precheck: collect /llm/-prefixed route matches on maas-default-gateway"
+  ansible.builtin.set_fact:
+    _oai_llm_route_hits: >-
+      {%- set hits = [] -%}
+      {%- for r in (_oai_diag_httproutes.resources | default([])) -%}
+        {%- set parents = (r.spec.parentRefs | default([])) | map(attribute='name') | list -%}
+        {%- if 'maas-default-gateway' in parents -%}
+          {%- for rule in (r.spec.rules | default([])) -%}
+            {%- for m in (rule.matches | default([])) -%}
+              {%- set pv = (m.path | default({})).get('value', '') -%}
+              {%- if pv.startswith('/llm') -%}
+                {%- set _ = hits.append(r.metadata.namespace ~ '/' ~ r.metadata.name ~ ':' ~ pv) -%}
+              {%- endif -%}
+            {%- endfor -%}
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ hits | unique | list }}
+
+- name: "openshift_ai | precheck: record that a live /llm/ route has hit the identity off-by-one"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "AuthPolicy/maas-gateway-auth (openshift-ingress) + {{ _oai_llm_route_hits | join(', ') }}"
+      state: "an /llm/-prefixed route is live while the AuthPolicy still extracts path identities [0]-indexed"
+      cause: "ADR-0201 - the generated policy computes the model identity for /llm/<ns>/<model>/... as 'llm/<ns>' (off by one; five CEL expressions plus the OPA rego), which maas-api rejects with not_found, so EVERY request through this route 403s 'no matching subscription found for user' regardless of the caller's real entitlement"
+      solution: "Upstream RHOAI fix required (shift the extraction to filtered[1]/filtered[2], or drop the /llm/ prefix from the guard); until then do not route /llm/ - the entry point cannot authorize anyone"
+      auto_fix: "manual only - upstream RHOAI defect, see docs/roadmap/evidence/maas-llm-path-identity-off-by-one.md"
+  when:
+    - (_oai_llm_route_hits | default([]) | length) > 0
+    - "'path_parts[0]' in (_oai_diag_maas_authpolicy.resources | default([]) | to_json)"
+    - blocked_findings is defined
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-
