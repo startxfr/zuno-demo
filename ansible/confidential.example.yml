@@ -127,6 +127,18 @@ zuno_aap_hub_s3_region: "xxxxxx"
 zuno_aap_hub_s3_access_key_id: "xxxxxx"
 zuno_aap_hub_s3_secret_access_key: "xxxxxx"
 
+# --- RHOAI monitoring traces S3 bucket (ADR-0522/WP-079: Tempo's object -----
+# storage backend for RHOAI's own side-by-side monitoring stack, distinct
+# from zuno-monitoring's TempoMonolithic. Dedicated bucket, same "bucket
+# name and region sourced here" pattern as AAP Hub S3 above - see
+# gitops/charts/openshift-ai/templates/externalsecret-traces-s3.yaml. Use a
+# dedicated, bucket-scoped IAM user, never the account's admin
+# credentials.) --------------------------------------------------------------
+zuno_rhoai_traces_s3_bucket_name: "xxxxxx"
+zuno_rhoai_traces_s3_region: "xxxxxx"
+zuno_rhoai_traces_s3_access_key_id: "xxxxxx"
+zuno_rhoai_traces_s3_secret_access_key: "xxxxxx"
+
 # --- Model weights storage (gitops/charts/models) ---------------------------
 # Not secrets - listed here because this file is where every ansible-driven
 # feature flag/S3 knob lives; both have defaults in

@@ -28,6 +28,11 @@ spec:
           clusterBaseDomain: apps.mycluster.example.com
         maasDb:
           enabled: true
+        # ADR-0522/WP-079: RHOAI monitoring's Tempo traces S3 credential -
+        # must exist before/alongside DSCInitialization reconciles, same
+        # sync-wave grouping as maasDb above.
+        tracesS3:
+          enabled: true
         prometheusK8s: null
         userWorkloadMonitoring:
             enabled: false

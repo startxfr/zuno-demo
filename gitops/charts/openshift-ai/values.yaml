@@ -86,10 +86,14 @@ cluster-ods:
   DSCInitialization:
     enabled: false
     name: default-dsci
-    # metrics (ADR-0522, WP-078): side-by-side with the existing
-    # zuno-monitoring stack (ADR-0029/ADR-0413), scoped to RHOAI-managed
-    # workloads only - no application code/exporter changes. alerting requires
-    # metrics.storage to be set (CRD validation).
+    # metrics/traces (ADR-0522, WP-078/WP-079): side-by-side with the
+    # existing zuno-monitoring stack (ADR-0029/ADR-0413), scoped to
+    # RHOAI-managed workloads only - no application code/exporter changes.
+    # alerting requires metrics.storage to be set (CRD validation).
+    # traces.storage.secret names the Secret rendered by
+    # templates/externalsecret-traces-s3.yaml (tracesS3 below) - required
+    # once backend != pv; the CRD also forbids traces.storage.size for any
+    # non-pv backend, so it's deliberately absent here.
     spec: |
       applicationsNamespace: redhat-ods-applications
       monitoring:
@@ -100,6 +104,12 @@ cluster-ods:
             size: 25Gi
             retention: 15d
         alerting: {}
+        traces:
+          sampleRatio: "1.0"
+          storage:
+            backend: s3
+            secret: rhoai-traces-s3-credentials
+            retention: 48h
 
   # Superseded by the top-level dataScienceCluster key below, rendered by this
   # chart's own templates/datasciencecluster.yaml instead (see that file for
@@ -293,6 +303,23 @@ maasDb:
   port: 5432
   database: maas
   targetNamespace: redhat-ods-applications
+
+# ADR-0522/WP-079 prerequisite: DataScienceCluster's (well, DSCInitialization's)
+# TempoAvailable condition requires monitoring.traces.storage.secret to name a
+# real Secret once backend: s3. Rendered by
+# templates/externalsecret-traces-s3.yaml from Vault (zuno/rhoai/traces-s3,
+# seeded by ansible/roles/vault/tasks/install.yml from
+# ansible/confidential.yml's zuno_rhoai_traces_s3_* vars) into
+# rhoai-traces-s3-credentials in redhat-ods-monitoring. Same two-gate shape as
+# maasDb above - false by default, opted in by
+# gitops/apps/openshift-ai/application-d1.yaml alongside DSCInitialization.
+tracesS3:
+  enabled: false
+  secretName: rhoai-traces-s3-credentials
+  namespace: redhat-ods-monitoring
+  vaultPath: rhoai/traces-s3
+  secretStoreName: vault-backend
+  refreshInterval: 1h
 
 # Third chart-local MaaS prerequisite: ModelsAsServiceReady also requires
 # User Workload Monitoring (ConfigMap cluster-monitoring-config in
