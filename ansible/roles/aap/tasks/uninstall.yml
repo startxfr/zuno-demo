@@ -17,3 +17,54 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-aap-d0"
+
+# ADR-0354 cleanup: AAP's two dedicated Postgres databases (aap, aap-eda)
+# and their dedicated roles (aapgateway, aapeda - gitops/charts/postgresql/
+# values.yaml's aapDatabase/aapEdaDatabase) are declared and owned by the
+# separate postgresql chart/Applications (zuno-postgresql-d1), never by
+# zuno-aap-d0/zuno-aap-d1 above - deleting those Applications never removes
+# them. Manually DROP'd twice live during the 2026-08-25 incident; this
+# automates that. Placed last, after the Applications/operator are gone,
+# so nothing is still actively connected when the databases are dropped -
+# WITH (FORCE) (PG13+) would handle live connections anyway, but there's
+# no reason to race Gateway/EDA's own shutdown against it.
+#
+# DROP DATABASE before DROP ROLE: a role that still owns a database cannot
+# be dropped. Both roles are single-purpose, dedicated to AAP alone (never
+# shared - see configmap-schema-grants.yaml's per-consumer isolation
+# model), so each is expected to own nothing else once its database is
+# gone. IF EXISTS on every statement plus ON_ERROR_STOP=1 makes this
+# idempotent (re-running after the databases are already gone, or against
+# an environment that never had them, is a no-op) while still surfacing a
+# clear psql error if a role unexpectedly still owns something else.
+- name: "aap | look up the current Postgres primary pod (for aap/aap-eda database cleanup)"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-data
+    label_selectors:
+      - postgres-operator.crunchydata.com/role=master
+  register: _aap_uninstall_pg_primary_pod
+
+- name: "aap | drop the aap/aap-eda databases and their dedicated roles"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _aap_uninstall_pg_primary_pod.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -U postgres -v ON_ERROR_STOP=1
+      -c 'DROP DATABASE IF EXISTS "aap" WITH (FORCE);'
+      -c 'DROP DATABASE IF EXISTS "aap-eda" WITH (FORCE);'
+      -c 'DROP ROLE IF EXISTS aapgateway;'
+      -c 'DROP ROLE IF EXISTS aapeda;'
+  changed_when: true
+  when: (_aap_uninstall_pg_primary_pod.resources | default([]) | length) > 0
+
+- name: "aap | note that Postgres cleanup was skipped (no primary pod found)"
+  ansible.builtin.debug:
+    msg: >-
+      No Postgres primary pod found (label
+      postgres-operator.crunchydata.com/role=master, namespace zuno-data) -
+      the postgresql component may not be installed on this cluster.
+      Skipped dropping the aap/aap-eda databases and their aapgateway/
+      aapeda roles; nothing to clean up.
+  when: (_aap_uninstall_pg_primary_pod.resources | default([]) | length) == 0

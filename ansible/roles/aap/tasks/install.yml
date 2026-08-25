@@ -76,6 +76,85 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
+# ADR-0354 recovery path: `make d1 uninstall aap` DROPs the aap/aap-eda
+# databases directly via psql (ansible/roles/aap/tasks/uninstall.yml) - it
+# never touches gitops/charts/postgresql's values.yaml, so PGO's
+# PostgresCluster spec.users[] still declares both databases and recreates
+# them on its own reconcile loop, independent of this install ever
+# running. But PGO always creates a fresh dedicated database owned by
+# "postgres" (configmap-schema-grants.yaml), and PostgreSQL 15+ doesn't
+# imply schema-level CREATE on `public` from the database-level grant PGO
+# does give - so every Gateway/Controller/Hub/EDA pod's first DB migration
+# hits "permission denied for schema public" (hit live twice, 2026-08-25)
+# until the postgresql chart's schema-grants Sync-hook Job reruns. That
+# Job only reruns on a real ArgoCD sync *operation* of zuno-postgresql-d1,
+# which `make d1 install aap` never triggers on its own (this role never
+# touches the postgresql chart) - so recovering from an aap
+# uninstall/reinstall cycle needs both steps done explicitly, in order:
+#   1. wait for PGO to have actually recreated both databases - its own
+#      reconcile loop, not tied to this install, can lag behind an
+#      uninstall that ran moments ago
+#   2. only then force-sync zuno-postgresql-d1, so the schema-grants Job's
+#      single ON_ERROR_STOP=1 script doesn't abort on a `\connect aap` (or
+#      "aap-eda") to a database that doesn't exist yet - which would also
+#      leave the OTHER dedicated databases' grants unapplied, since aap/
+#      aap-eda sit in the middle of that script's $databases list, not
+#      last (configmap-schema-grants.yaml).
+# postgresql (Day 1, earlier than aap in day1_install.yml) must already be
+# installed by this point for aap to even reach here (Gateway/EDA's own
+# external-database config reads Secrets sourced from the same
+# aap/postgresql-app, aap-eda/postgresql-app Vault paths postgresql's
+# chart renders) - so the one-shot check below always has a primary pod
+# to query. On every normal install where both databases are already
+# present (the overwhelmingly common case: a fresh environment, or any
+# re-run that isn't recovering from a prior uninstall), this whole
+# recovery block is skipped after a single fast psql query - no
+# meaningful cost added to the normal install path.
+- name: "aap | look up the current Postgres primary pod (for the aap/aap-eda database check)"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-data
+    label_selectors:
+      - postgres-operator.crunchydata.com/role=master
+  register: _aap_pg_primary_pod
+  until: (_aap_pg_primary_pod.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+- name: "aap | check whether the aap and aap-eda databases already exist"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _aap_pg_primary_pod.resources[0].metadata.name }}"
+    container: database
+    command: >-
+      psql -U postgres -tA -c
+      "SELECT count(*) FROM pg_database WHERE datname IN ('aap', 'aap-eda');"
+  register: _aap_pg_db_precheck
+  changed_when: false
+
+- name: "aap | recover the aap/aap-eda databases and schema grants if either is missing"
+  when: (_aap_pg_db_precheck.stdout | default('0') | trim | int) < 2
+  block:
+    - name: "aap | wait for PGO to (re)create the aap and aap-eda databases"
+      kubernetes.core.k8s_exec:
+        namespace: zuno-data
+        pod: "{{ _aap_pg_primary_pod.resources[0].metadata.name }}"
+        container: database
+        command: >-
+          psql -U postgres -tA -c
+          "SELECT count(*) FROM pg_database WHERE datname IN ('aap', 'aap-eda');"
+      register: _aap_pg_db_wait
+      until: (_aap_pg_db_wait.stdout | default('0') | trim | int) == 2
+      retries: 60
+      delay: 15
+
+    - name: "aap | force a sync of zuno-postgresql-d1 so the schema-grants Job reruns"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_argocd_sync.yml"
+      vars:
+        gitops_app_name: "zuno-postgresql-d1"
+        gitops_app_wait_retries: 30
+        gitops_app_wait_delay: 10
+
 # Gateway+Controller+Hub+EDA starting together, even non-HA, is comparable
 # to openshift_ai's DataScienceCluster - generous retries, longer delay.
 - name: "aap | apply the aap GitOps Application (d1: AnsibleAutomationPlatform CR)"

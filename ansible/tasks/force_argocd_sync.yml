@@ -1,0 +1,73 @@
+---
+# Forces a real ArgoCD sync operation on an Application that's already
+# applied - the same spec.operation.sync patch the `argocd app sync` CLI
+# uses under the hood, needed because a plain argocd.argoproj.io/refresh:
+# hard annotation only recalculates diff/health and does NOT rerun
+# Sync-hook Jobs when the Application is already Synced with no pending
+# git diff. Same mechanism apply_gitops_app.yml uses when
+# gitops_app_refresh is set (see that file's own comment for the history:
+# a refresh-then-poll race was hit live 2026-08-24, WP-071), factored out
+# here on purpose rather than reused directly: apply_gitops_app.yml always
+# re-renders and re-applies the target component's OWN Application
+# manifest first, and its gitops_app_extra_helm_values REPLACES
+# spec.source.helm.values wholesale rather than merging - calling it for
+# an Application owned by a different role (e.g. postgresql's
+# zuno-postgresql-d1, forced from the aap role) would require re-deriving
+# every runtime-computed Helm value that role's own install.yml supplies
+# (S3 backup credentials, operator channel/catalog), risking silently
+# clobbering them with the checked-in manifest's placeholder defaults.
+# This file never touches spec.source at all - only spec.operation and
+# reads of status - so it's safe to call against any already-applied
+# Application regardless of who owns applying it. Requires
+# gitops_app_name.
+- name: "gitops | validate gitops_app_name is set"
+  ansible.builtin.assert:
+    that:
+      - gitops_app_name is defined
+      - gitops_app_name | length > 0
+    fail_msg: "force_argocd_sync.yml requires 'gitops_app_name' to be set by the including role"
+
+- name: "gitops | trigger a sync operation for {{ gitops_app_name }}"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ gitops_app_name }}"
+    definition:
+      operation:
+        sync: {}
+
+# operationState.phase only reaches Succeeded once every sync-wave,
+# including Sync-hook Jobs (e.g. postgresql's schema-grants Job), has
+# run and succeeded - a failed hook fails the operation too (this Job
+# isn't annotated to ignore hook failure), so this is a race-free signal
+# without needing to poll the Job object by name (which gets deleted via
+# hook-delete-policy: BeforeHookCreation right before each rerun, making
+# "watch the same Job name across syncs" fragile).
+- name: "gitops | wait for the {{ gitops_app_name }} sync operation to finish"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ gitops_app_name }}"
+  register: _force_sync_operation
+  until: >-
+    (_force_sync_operation.resources | length > 0) and
+    (_force_sync_operation.resources[0].status.operationState.phase | default('') == 'Succeeded')
+  retries: "{{ gitops_app_wait_retries | default(30) }}"
+  delay: "{{ gitops_app_wait_delay | default(10) }}"
+
+- name: "gitops | wait for {{ gitops_app_name }} to become Synced and Healthy"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ gitops_app_name }}"
+  register: _force_sync_status
+  until: >-
+    (_force_sync_status.resources | length > 0) and
+    (_force_sync_status.resources[0].status.sync.status | default('') == 'Synced') and
+    (_force_sync_status.resources[0].status.health.status | default('') == 'Healthy')
+  retries: "{{ gitops_app_wait_retries | default(30) }}"
+  delay: "{{ gitops_app_wait_delay | default(10) }}"
