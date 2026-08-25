@@ -76,4 +76,48 @@ spec:
           # same split-brain issuer/JWKS default every other Keycloak
           # consumer chart in this repo already uses.
           jwksUrl: {{ .Values.quotaEnforcement.keycloakJwksUrl }}
+    # Without this block the RateLimitPolicy silently enforces nothing.
+    #
+    # Authorino authenticates the request and returns OK, but the identity
+    # it resolved stays inside Authorino unless it is explicitly published
+    # as ext_authz dynamic metadata. Kuadrant's wasm-shim evaluates the
+    # RateLimitPolicy's counter expressions - auth.identity.sub and
+    # auth.identity.groups, see COUNTER_EXPRESSIONS in
+    # platform/okf/generate_quota_enforcement.py - against that metadata,
+    # so with no `identity` entry every counter expression fails to
+    # resolve. Confirmed live 2026-08-25 on the gateway proxy:
+    #   kuadrant_wasm_shim: Failed to evaluate message builder:
+    #   CelError::Resolve { NoSuchKey("identity") }
+    # one line per request, after which the shim skips the rate-limit
+    # action entirely - the Limitador cluster showed cx_total 0 / rq_total
+    # 0 while kuadrant-auth-service showed rq_total 90 for the same 86
+    # requests. The failure mode is a clean 200 on every request, with
+    # RateLimitPolicy status still Accepted+Enforced and the limits still
+    # compiled into Limitador, which is why it survived this long: nothing
+    # anywhere reports an error, requests are simply never counted.
+    #
+    # `filters` (not `headers`) is the AuthPolicy field that renders into
+    # the AuthConfig's response.success.dynamicMetadata. RHOAI's own
+    # maas-gateway-auth AuthPolicy publishes an identically-named
+    # `identity` filter, which is why MaaS's TokenRateLimitPolicy works on
+    # the sibling gateway and this one did not.
+    #
+    # Property names are load-bearing: they must match the `auth.identity.
+    # <name>` suffixes the generated RateLimitPolicy counts on.
+    # generate_quota_enforcement.py --check asserts that correspondence.
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                sub:
+                  expression: auth.identity.sub
+                groups:
+                  # Defaulted rather than assumed present: a token issued
+                  # to a client with no group mapper has no `groups` claim
+                  # at all, and an unresolvable expression here would put
+                  # us straight back to the silent no-op above. An empty
+                  # list still produces a stable counter key.
+                  expression: 'has(auth.identity.groups) ? auth.identity.groups : []'
 {{- end }}

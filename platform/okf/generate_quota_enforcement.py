@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import re
 import sys
 from typing import Dict, List
 
@@ -56,6 +57,12 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 POLICY_PATH = REPO_ROOT / "policies" / "quotas" / "quota-policy.yaml"
 RLP_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" / "quota-ratelimitpolicies.yaml"
 BUDGETS_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_budgets.yaml"
+# Not generated - hand-authored, because it carries the demo route's own
+# Gateway/JWKS wiring and the rationale comments for it. But its AuthPolicy
+# has to publish exactly the identity properties the generated counters
+# below dereference, so _check_identity_filter() below asserts that
+# correspondence rather than leaving it to survive on care alone.
+AUTHPOLICY_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" / "quota-demo-route.yaml"
 
 REGEN_CMD = "python3 platform/okf/generate_quota_enforcement.py"
 
@@ -184,6 +191,61 @@ def _render_budgets(doc: Dict) -> str:
     return header + yaml.safe_dump(slim, sort_keys=False)
 
 
+def _required_identity_properties() -> List[str]:
+    """The `auth.identity.<name>` suffixes the generated counters read."""
+    names = set()
+    for expression in COUNTER_EXPRESSIONS.values():
+        names.update(re.findall(r"auth\.identity\.([A-Za-z_][A-Za-z0-9_]*)", expression))
+    return sorted(names)
+
+
+def _check_identity_filter() -> List[str]:
+    """Guards the one drift that fails silently and completely.
+
+    Kuadrant's wasm-shim resolves each counter expression against the
+    ext_authz dynamic metadata Authorino publishes. A property the
+    AuthPolicy does not publish makes its expression unresolvable, and an
+    unresolvable expression makes the shim skip the rate-limit call
+    altogether - every request returns a clean 200, the RateLimitPolicy
+    still reports Accepted+Enforced, and the limits are still compiled
+    into Limitador. Nothing surfaces an error anywhere (confirmed live
+    2026-08-25: 86 requests, zero 429s, zero 5xx, Limitador never dialled;
+    the only trace was a wasm-shim CelError::Resolve NoSuchKey("identity")
+    line on the gateway proxy itself).
+
+    So this correspondence cannot be left implicit: adding a counter
+    dimension whose expression reads a new auth.identity field, without
+    also publishing that field, must fail the lint rather than quietly
+    disable enforcement.
+    """
+    if not AUTHPOLICY_PATH.is_file():
+        return [f"{AUTHPOLICY_PATH.relative_to(REPO_ROOT)}: missing"]
+    text = AUTHPOLICY_PATH.read_text(encoding="utf-8")
+    # A Helm template, so it is not parseable as YAML; the properties block
+    # is plain literal text though, so match it directly. Comment lines are
+    # dropped first - this file documents the failure mode in prose that
+    # itself names the properties.
+    body = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+    match = re.search(r"filters:\s*\n\s*identity:\s*\n\s*json:\s*\n\s*properties:\s*\n(.*)", body, re.S)
+    if match is None:
+        return [
+            f"{AUTHPOLICY_PATH.relative_to(REPO_ROOT)}: AuthPolicy publishes no "
+            "response.success.filters.identity block, so every auth.identity.* "
+            "counter silently disables rate limiting"
+        ]
+    published = set(re.findall(r"^\s{16}([A-Za-z_][A-Za-z0-9_]*):", match.group(1), re.M))
+    missing = [n for n in _required_identity_properties() if n not in published]
+    if missing:
+        return [
+            f"{AUTHPOLICY_PATH.relative_to(REPO_ROOT)}: identity filter does not "
+            f"publish {', '.join(missing)} - counter expression(s) referencing "
+            "them will not resolve and rate limiting will silently no-op "
+            "(add them under spec.rules.response.success.filters.identity."
+            "json.properties, one `<name>: {expression: auth.identity.<name>}` each)"
+        ]
+    return []
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="ADR-0511 quota enforcement generator")
     parser.add_argument("--check", action="store_true",
@@ -196,14 +258,22 @@ def main() -> int:
         BUDGETS_PATH: _render_budgets(doc),
     }
 
-    failures: List[str] = []
+    # Runs in both modes: a regeneration that leaves enforcement silently
+    # inert is not a success, so this is reported even when writing.
+    failures: List[str] = _check_identity_filter()
     written: List[str] = []
     for path, content in expected.items():
         rel = path.relative_to(REPO_ROOT)
         current = path.read_text(encoding="utf-8") if path.is_file() else None
         if args.check:
             if current != content:
-                failures.append(f"{rel}: {'missing' if current is None else 'differs from regeneration'}")
+                # The hint is attached per-failure, not printed for every
+                # entry below: _check_identity_filter()'s findings are not
+                # regeneration drift and regenerating will not clear them.
+                failures.append(
+                    f"{rel}: {'missing' if current is None else 'differs from regeneration'}"
+                    f" (run: {REGEN_CMD})"
+                )
             continue
         if current != content:
             path.write_text(content, encoding="utf-8")
@@ -213,13 +283,18 @@ def main() -> int:
         if failures:
             print(f"{len(failures)} quota-enforcement drift issue(s):")
             for f in failures:
-                print(f"  ✗ {f} (run: {REGEN_CMD})")
+                print(f"  ✗ {f}")
             print("\nRESULT: FAIL - enforcement must match quota-policy.yaml (ADR-0511).")
             return 1
         print("RESULT: PASS - generated quota enforcement matches quota-policy.yaml.")
         return 0
 
     print(f"Regenerated {len(written)} file(s): {', '.join(written) or '(none - all current)'}")
+    if failures:
+        for f in failures:
+            print(f"  ✗ {f}")
+        print("\nRESULT: FAIL - see above (ADR-0511).")
+        return 1
     return 0
 
 

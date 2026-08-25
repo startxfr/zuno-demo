@@ -107,6 +107,14 @@
                     value: "https://keycloak.{{ cluster_base_domain }}"
                   - name: FRONTEND_URL
                     value: "https://{{ day2_stress_agent }}.{{ cluster_base_domain }}"
+                  # ADR-0511/WP-54's quota layer builds the quota-demo
+                  # Route's hostname from this. quota_429.py can also
+                  # recover it by stripping the agent label off
+                  # FRONTEND_URL, but passing it outright keeps that
+                  # fallback for standalone dev runs rather than making
+                  # the Job depend on string surgery.
+                  - name: CLUSTER_BASE_DOMAIN
+                    value: "{{ cluster_base_domain }}"
                   - name: BULK_INTERACTIONS
                     value: "{{ bulk_interactions | default(0) }}"
                   # Makefile's CLEANUP=<0|1> (default 1) - read by

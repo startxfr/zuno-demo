@@ -154,6 +154,24 @@ def _stress_test_results() -> List[Day2Result]:
     ]
 
 
+def _quota_results() -> List[Day2Result]:
+    """ADR-0511/WP-54: proves Kuadrant actually returns 429 once a demo
+    persona crosses a per-class request limit.
+
+    Belongs in the harness rather than staying an operator one-liner
+    because the failure mode it guards is invisible from every other
+    angle: when the AuthPolicy stops publishing the identity the counter
+    expressions read, the wasm-shim skips the rate-limit call and every
+    request returns a clean 200, while the RateLimitPolicy still reports
+    Accepted+Enforced and Limitador still holds the compiled limits. Only
+    driving real traffic past the threshold distinguishes "enforcing" from
+    "silently inert" (confirmed live 2026-08-25 - see the WP-54 State log).
+    """
+    import quota_429
+
+    return quota_429.run()
+
+
 def _rag_ingestion_results() -> List[Day2Result]:
     """WP-25/ADR-0110: a fast, bounded, read-only proof that
     reconcile-acls's live Confluence listing path is reachable and
@@ -213,6 +231,7 @@ def main() -> int:
     results += _safe_run("gate", _gate_check_results)
     results += _safe_run("stress_test", _stress_test_results)
     results += _safe_run("rag_ingestion", _rag_ingestion_results)
+    results += _safe_run("quota", _quota_results)
 
     print(json.dumps([asdict(r) for r in results]))
 

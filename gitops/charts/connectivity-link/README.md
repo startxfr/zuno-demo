@@ -187,15 +187,31 @@ Day1 Gateway/ConfigMap/Route/EnvoyFilter, applied via
 whichever half you flip off. Nothing outside this chart references any
 object rendered here.
 
-**Verification:** a demo persona's requests to
-`https://tekos-quota-demo.apps.<cluster-domain>/` should be rate-limited
-with an explicit `429` after the `standard` class's per-user limit (60
-req/5m); `oc get limitador -n kuadrant-system -o yaml` should show the
-compiled `zuno-quota-*` descriptors alongside the pre-existing MaaS
-ones. The ext_authz transport path itself (WP-071) is live-verified as of
-2026-08-24 — the remaining step is running this exact quota-exceedance
-pass with a real token, no longer blocked by any TLS or wasm-shim defect.
-(Evidence recorded in `docs/roadmap/work-packages/wp-54-quota-policy-and-kuadrant-translation.md`'s State log once run.)
+**Verification:** run `python3 platform/testing/quota_429.py` (also wired
+into `make d3 stresstest tekos` as the `quota` layer). It drives a demo
+persona past both classes' per-user limits against
+`https://tekos-quota-demo.apps.<cluster-domain>/` and asserts the
+`429` — `intensive` at 10 req/5m, `standard` at 60 req/5m, the two
+thresholds differing being the evidence that the per-class counters are
+keyed independently.
+
+`oc get limitador -n kuadrant-system -o yaml` should show the compiled
+limits alongside the pre-existing MaaS ones. Note they appear as six
+entries named `standard-user`, `standard-group`, `standard-project` and
+their `intensive-` counterparts, under `namespace:
+zuno-ai-run/tekos-quota-demo` — *not* under a `zuno-quota-*` name, which
+is the RateLimitPolicy's own name rather than anything Limitador
+reproduces. (An earlier revision of this paragraph said to look for
+`zuno-quota-*` descriptors; that reads as a failure when it is a pass.)
+
+Do not treat `Accepted`/`Enforced` on the RateLimitPolicy, or the
+presence of those compiled limits, as proof that limiting works: both
+remain true when the AuthPolicy stops publishing the identity the
+counters read, in which case the wasm-shim skips the rate-limit call and
+every request returns `200`. That is what the `429` run actually
+distinguishes, and why it is a harness layer rather than a one-off
+command. See the ADR-0511/WP-54 comment block in
+`templates/quota-demo-route.yaml`.
 
 Identity/key semantics (also in the generated file's header): user =
 `auth.identity.sub`; group = the caller's sorted group set joined with

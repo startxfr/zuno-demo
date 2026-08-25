@@ -15,6 +15,12 @@ configMapGenerator:
       - day2_report.py=../../../../../platform/testing/day2_report.py
       - day2_stresstest.py=../../../../../platform/testing/day2_stresstest.py
       - day2_bulk.py=../../../../../platform/testing/day2_bulk.py
+      # ADR-0511/WP-54's live 429 proof, imported by day2_stresstest.py's
+      # _quota_results() layer. Shared like the files above rather than
+      # per-agent-prefixed: the module gates itself to Tekos internally
+      # (the quota-demo Route is Tekos-only today) and returns a coverage
+      # row for every other agent, so one unprefixed key is correct.
+      - quota_429.py=../../../../../platform/testing/quota_429.py
       # Repo policy/routing files security_checks.py, gate_checks.py and
       # stress_test.py each read relative to their own resolved location
       # once mounted (same ConfigMap-symlink-indirection arithmetic
