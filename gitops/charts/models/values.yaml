@@ -283,6 +283,37 @@ gptOssModel:
   # reasoning tasks far more room than the qwen chat model's 8192.
   maxModelLen: 32768
   llmInferenceService:
+    # ADR-0201/WP-27, 2026-08-25: whether KServe's own router attaches to
+    # maas-default-gateway.
+    #
+    # Attaching it (the old behaviour, true) makes KServe publish the
+    # HTTPRoute on that gateway, and the MaaSModelRef then *adopts* that
+    # route rather than publishing one of its own - confirmed by
+    # MaaSModelRef.status.httpRouteName pointing at gpt-oss-20b-kserve-route.
+    # Everything downstream then speaks KServe's identity form,
+    # publishers/zuno-ai-run/models/gpt-oss-20b, while maas-api, the
+    # MaaSAuthPolicy's OPA map and the generated TokenRateLimitPolicy all key
+    # on the MaaS form, zuno-ai-run/gpt-oss-20b-maas. The two never meet:
+    # sending the MaaS form 404s (no route matches it) and sending the
+    # publisher form 403s ("no matching subscription found for user").
+    # Proven by calling maas-api's own /internal/v1/subscriptions/select with
+    # each candidate string - only the MaaS form returns a subscription.
+    #
+    # Adding a second HTTPRoute keyed on the MaaS form does not work either
+    # and was reverted (see the revert of 689f8a5): the controller generates a
+    # subscription's TokenRateLimitPolicy only for the route the MaaSModelRef
+    # adopted, so any hand-authored route on this gateway is governed solely
+    # by the gateway-level deny-all default (limit 0/1m) and 429s on every
+    # request.
+    #
+    # So the gateway ref is dropped, letting MaaS publish its own route with
+    # its own identity and its own controller-generated TRLP. Safe because
+    # nothing else routes through this gateway: ai-gateway reaches the model
+    # directly at gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000
+    # (platform/ai-gateway/provider-routing.yaml's local-gpt-oss endpoint),
+    # never via maas-default-gateway. Flip back to true to restore the
+    # previous topology.
+    attachRouterToMaasGateway: false
     # Same RHOAI 3.5 EA2 vLLM/CUDA preset the qwen MaaS backend used
     # (`oc get llminferenceserviceconfig -n redhat-ods-applications`) -
     # generic serving image, not qwen-specific.

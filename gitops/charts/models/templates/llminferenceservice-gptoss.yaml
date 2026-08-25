@@ -58,6 +58,7 @@ spec:
         resources:
           {{- toYaml .Values.gptOssModel.resources | nindent 10 }}
   router:
+    {{- if .Values.gptOssModel.llmInferenceService.attachRouterToMaasGateway }}
     # Same explicit Gateway ref maas.yaml's old LLMInferenceService used -
     # an empty gateway: {} does not auto-create/reuse an existing Gateway
     # on this RHOAI build (see maas.yaml's own comment history).
@@ -65,6 +66,14 @@ spec:
       refs:
         - name: maas-default-gateway
           namespace: openshift-ingress
+    {{- else }}
+    # ADR-0201/WP-27: no gateway ref, so KServe does not publish a route on
+    # maas-default-gateway and the MaaSModelRef publishes its own instead of
+    # adopting KServe's - which is what makes the served identity and the
+    # controller-generated TokenRateLimitPolicy agree on
+    # zuno-ai-run/gpt-oss-20b-maas. Full reasoning, and how to revert, in
+    # values.yaml's attachRouterToMaasGateway comment.
+    {{- end }}
     route: {}
     # scheduler: {} is not optional - the controller's own defaulting
     # always adds it to a gateway-enabled LLMInferenceService regardless
