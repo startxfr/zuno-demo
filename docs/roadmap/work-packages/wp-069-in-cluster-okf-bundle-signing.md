@@ -1,17 +1,22 @@
 # WP-069: Cut OKF bundle signing over to in-cluster Vault Transit
 
-- **State:** Repo work merged, live-verified 2026-08-22 on
-  api.demo222.startx.fr: all 8 agent bundles signed by the in-cluster Job,
-  written to Vault KV, synced by the ExternalSecret into a real Secret,
-  and independently re-verified using the actual deployed
-  `app/_sign_okf_bundle.py`/`app/registry.py` code path with
-  `ZUNO_REQUIRE_SIGNED_BUNDLES=true` in a debug pod - `AgentRegistry` loaded
-  all 8 agents with zero load errors, and a tampered copy was correctly
-  rejected. Operator action remaining: flip `requireSignedBundles: true` on
-  the real chart (not yet done - a live enforcement cutover on the running
-  Deployment, held back pending explicit go-ahead).
-- **ADRs:** ADR-0106 (Partially implemented -> superseded-in-part by
-  ADR-0420 for the signing mechanism), ADR-0420
+- **State:** Done. Live-verified 2026-08-22 on api.demo222.startx.fr: all 8
+  agent bundles signed by the in-cluster Job, written to Vault KV, synced
+  by the ExternalSecret into a real Secret, and independently re-verified
+  using the actual deployed `app/_sign_okf_bundle.py`/`app/registry.py`
+  code path with `ZUNO_REQUIRE_SIGNED_BUNDLES=true` in a debug pod -
+  `AgentRegistry` loaded all 8 agents with zero load errors, and a
+  tampered copy was correctly rejected. `requireSignedBundles: true` was
+  then flipped on the real chart the same day and has been live since.
+  Re-verified again 2026-08-25 (both live and offline, all 8 agents) -
+  found and fixed a stale committed trust-anchor file
+  (`platform/supply-chain/keys/zuno-platform-signer.pub`) that had
+  drifted from the live Vault Transit key after an apparent key
+  regeneration on 2026-08-24; this had been silently breaking the
+  offline `make d2 check agents` path while live production stayed
+  healthy throughout (see ADR-0106's 2026-08-25 note for the full
+  diagnosis).
+- **ADRs:** ADR-0106 (Implemented), ADR-0420
 - **Depends on:** WP-068 (Vault Transit signing backend)
 - **Blocks:** —
 - **Estimated files touched:** ~8
@@ -97,12 +102,15 @@ agent-runtime pod, exactly as ADR-0106's 2026-08-21 note already warned.
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Run the signing Job for real; confirm all 8 agents
+Done 2026-08-22 (flip), re-verified 2026-08-25 (all 8 agents live and
+offline, trust-anchor drift found and fixed - see ADR-0106).
+
+1. ~~Run the signing Job for real; confirm all 8 agents
    (tekos, comage, advantage, finage, arkos, naveo, soursage, cognos) have a
-   live, verifying `.sig` in the mounted Secret.
-2. Flip `ZUNO_REQUIRE_SIGNED_BUNDLES` on a scaled-to-1 debug Deployment
+   live, verifying `.sig` in the mounted Secret.~~
+2. ~~Flip `ZUNO_REQUIRE_SIGNED_BUNDLES` on a scaled-to-1 debug Deployment
    first, confirm every agent still loads, only then flip the real chart
-   value.
+   value.~~
 
 ## Out of scope / deferred
 

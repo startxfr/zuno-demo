@@ -1,9 +1,40 @@
 # ADR-0106: Enforce OKF bundle signing and validation
 
-- **Status:** Partially implemented - signing mechanism superseded by ADR-0420 (2026-08-22, WP-069): `sign_okf_bundle.py` now signs via the in-cluster Vault Transit key instead of keyless GitHub-OIDC/Fulcio/Rekor, and the distribution gap the 2026-08-21 note below describes is closed - the signing Job writes straight to Vault KV, consumed by `gitops/charts/agent-runtime/templates/externalsecret-okf-signatures.yaml`. `ZUNO_REQUIRE_SIGNED_BUNDLES` stays off until an operator runs the signing Job for real and confirms all 8 agents verify - see WP-069's own Operator follow-up.
+- **Status:** Implemented - signing mechanism superseded by ADR-0420 (2026-08-22, WP-069): `sign_okf_bundle.py` now signs via the in-cluster Vault Transit key instead of keyless GitHub-OIDC/Fulcio/Rekor, and the distribution gap the 2026-08-21 note below describes is closed - the signing Job writes straight to Vault KV, consumed by `gitops/charts/agent-runtime/templates/externalsecret-okf-signatures.yaml`. `ZUNO_REQUIRE_SIGNED_BUNDLES` has been `true` and live on the running Deployment since 2026-08-22; re-verified live 2026-08-25 (all 8 agents), see the dated note below.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team
+
+## Implementation note (2026-08-25)
+
+Re-ran WP-069's Operator follow-up for real. The in-cluster signing Job
+(`okf-bundle-signing`, `zuno-ai-build`) had already completed; fetched
+each of the 8 agents' signatures from Vault KV (`zuno/okf-signatures`)
+and verified them offline - every one initially **failed** with an ASN.1
+signature error, uniformly, which is the signature of a wrong trust
+anchor rather than 8 independent bad signatures. Confirmed: Vault
+Transit key `zuno-platform-signer` shows `creation_time:
+2026-08-24T13:11:44Z`, i.e. it was regenerated after WP-068's commit
+(`c2ac0e8`) exported the public key now committed at
+`platform/supply-chain/keys/zuno-platform-signer.pub` - most likely the
+unseal-configure script's idempotent "create if missing" check fired
+again following a Vault storage reset (see the post-restart recovery
+pattern noted elsewhere in this repo's history). The **live** deployment
+was never actually affected: `components/agent-runtime/app/registry.py`
+verifies against a `cosign.pub` synced dynamically into the
+`agent-runtime-okf-signatures` Secret via `ExternalSecret`, not this
+static file, and the running pod (`zuno-ai-run`) has been healthy for
+hours, all 8 bundles loading successfully. But every *offline* check
+using the committed file - `make d2 check agents` /
+`ansible/tasks/verify_okf_signatures.yml`, `platform/supply-chain/
+verify_signatures.py`, and any CI step that shells out to `sign_okf_
+bundle.py verify` - has been silently red since the rotation, a false
+signal unrelated to bundle integrity. Re-exported the current live
+Transit public key into `zuno-platform-signer.pub`; all 8 agents
+(tekos, comage, advantage, finage, arkos, naveo, soursage, cognos) now
+verify cleanly both live and offline. No automation exists to re-export
+this file automatically after a key rotation/regeneration - flagged
+here as a known manual step, not fixed as part of this pass.
 
 ## Implementation note (2026-08-22)
 
