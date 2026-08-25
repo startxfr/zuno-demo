@@ -45,3 +45,12 @@ MaaS environment, then decide per capability whether to flip a provider's
 `via_maas` field. If the comparison concludes MaaS should become the
 default transport for local models, that is a direction change requiring a
 superseding ADR — not an edit to ADR-0114's Decision text.
+
+**2026-08-25: that direction-change ADR has been written.** WP-27 proved the
+governance-plane rows live (group-based subscriptions, rate limiting, both
+positive and negative access proofs), and
+[ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md) is the
+decision this section anticipated — see WP-076 for its implementation
+tracking. The remaining `verify-on-cluster` rows (usage/cost telemetry,
+streaming, API-key lifecycle) are carried forward as ADR-0521's own
+acceptance criteria rather than duplicated here.
