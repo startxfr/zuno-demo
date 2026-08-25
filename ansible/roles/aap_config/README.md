@@ -60,6 +60,24 @@ An existing authenticator is never PATCHed - config drift (e.g. a rotated
 client secret) is fixed by deleting the authenticator in the Gateway UI
 and re-running `make d1 install aap-config`.
 
+## Known limitation: `aap-day0-check` cannot confirm vault's seal state
+
+Confirmed live 2026-08-25, first real `zuno-day0-check` run: `vault`'s
+`precheck.yml` calls `vault status` via `pods/exec` to determine whether
+the server is unsealed - `cluster-reader` does not grant `pods/exec`
+(unlike `secrets`, it's not merely excluded, it's entirely absent from
+the built-in role), so that step never runs and `vault` always reports
+"NOT installed" through this credential, even when it's healthy. **This
+was left unfixed on purpose**: unlike the Secrets read
+(`rolebinding-vault-secrets.yaml`, existence/metadata only), `pods/exec`
+is execute-any-command-in-that-pod, not a bounded read - RBAC has no
+finer-grained way to scope it to just the `vault status` invocation. The
+operator decided this one false negative is an acceptable trade against
+widening the credential's capability class. `make d0 check vault` from
+an operator shell (cluster-admin) remains the source of truth for vault's
+real state; `zuno-day0-check`'s report should be read with that one
+known gap in mind.
+
 ## What's unverified against a live cluster
 
 Everything above the API layer was confirmed live on 2026-08-25 (CRD

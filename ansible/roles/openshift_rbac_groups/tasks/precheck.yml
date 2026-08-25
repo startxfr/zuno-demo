@@ -18,7 +18,15 @@
   kubernetes.core.k8s_info:
     api_version: rbac.authorization.k8s.io/v1
     kind: ClusterRoleBinding
-    name: zuno-admin-cluster-admin
+    # Stale name, found live 2026-08-25 (first day0_check run through the
+    # AAP zuno-day0-check Job Template, WP-073): the chart
+    # (gitops/charts/openshift-rbac-groups/templates/clusterrolebinding.yaml)
+    # names this "zuno-ocp-paas-ops-cluster-admin", not
+    # "zuno-admin-cluster-admin" - the ADR-0349 persona/group restructure
+    # renamed the binding without updating this precheck, so `make d0
+    # check openshift-rbac-groups` has reported a false "NOT installed"
+    # ever since, on every cluster.
+    name: zuno-ocp-paas-ops-cluster-admin
   register: _openshift_rbac_groups_crb_lookup
 
 - name: "openshift_rbac_groups | compute install state"
