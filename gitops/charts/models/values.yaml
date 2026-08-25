@@ -438,7 +438,7 @@ maas:
   # provider-routing.yaml), proven reachable/TLS-SIMPLE-compatible.
   # Empty by default; set live to test, revert to "" if it doesn't help
   # (same retained-but-disabled pattern as routerGateway).
-  endpointOverride: ""
+  endpointOverride: "https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1"
 
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
