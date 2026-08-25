@@ -407,74 +407,117 @@ gptOssModel:
 # this chart deploys and belongs to the same install/uninstall lifecycle.
 maas:
   # ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane -
-  # publishes a local chat model, group-based subscriptions and an
+  # publishes local chat models, group-based subscriptions and an
   # authorization policy proving denial for an unentitled group.
-  # ADR-0414: publishes gpt-oss-20b (gptOssModel above) instead of a
-  # dedicated qwen25-7b-instruct-maas-backend copy - one LLMInferenceService
-  # deployment now serves both ai-gateway's local routing AND this
-  # governance-plane publication, retiring the old standalone backend
-  # entirely (templates/maas.yaml no longer owns its own
-  # ExternalSecret/ServiceAccount/LLMInferenceService trio - those live
-  # with gptOssModel/templates/llminferenceservice-gptoss.yaml now).
+  # ADR-0414: gpt-oss-20b (gptOssModel above) was the first model
+  # published this way, folding what used to be a dedicated
+  # qwen25-7b-instruct-maas-backend copy into the same LLMInferenceService
+  # that serves ai-gateway's own local routing - no separate
+  # MaaS-only deployment. ADR-0521 (WP-076): generalized from one hardcoded
+  # model to this list - qwen3.6-27b-instruct joined once it too became an
+  # LLMInferenceService (a MaaSModelRef can only ever reference
+  # LLMInferenceService or ExternalModel, confirmed via `oc explain
+  # maasmodelref.spec.modelRef.kind` - never a classic InferenceService).
+  # Every entry below renders its own MaaSModelRef/MaaSSubscription(s)/
+  # MaaSAuthPolicy triple (templates/maas.yaml); the Tenant CR stays a
+  # singleton (one per namespace, CEL-enforced) outside this list.
   enabled: true
 
-  # The MaaSModelRef CR's own name (the "published entry"), distinct from
-  # the backend it points at (gptOssModel.inferenceServiceName). Kept
-  # separate so the published/governed identity doesn't have to match the
-  # underlying deployment's name.
-  publishedName: gpt-oss-20b-maas
+  models:
+    # The proven WP-27 reference: gpt-oss-20b, live-verified end-to-end
+    # (Ready MaaSModelRef, group-based subscription access, denial for an
+    # unentitled group). qwen below mirrors this exactly per its own
+    # WP-076 scoping decision - same two groups, same rate limits - so
+    # this stays the reference to diff against.
+    - # The MaaSModelRef CR's own name (the "published entry"), distinct
+      # from the backend it points at (gptOssModel.inferenceServiceName).
+      # Kept separate so the published/governed identity doesn't have to
+      # match the underlying deployment's name.
+      publishedName: gpt-oss-20b-maas
+      # The LLMInferenceService this entry publishes - must match exactly
+      # one of gptOssModel.inferenceServiceName / (this chart's top-level)
+      # inferenceServiceName.
+      backendInferenceServiceName: gpt-oss-20b
 
-  # ADR-0201/WP-27, 2026-08-25, attempt 4 - TESTED LIVE AND ELIMINATED.
-  # MaaSModelRef.spec.endpointOverride exists on the live CRD (`oc explain
-  # maasmodelref.spec --recursive`) and was missed by the earlier sweep,
-  # which only recursed into spec.modelRef. Set live to
-  # https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1 (the
-  # same Service ai-gateway's own MaaS-bypass route already calls). Result:
-  # status.endpoint DID change to that value, but maas-controller's logs
-  # still show "HTTPRoute validated for LLMInferenceService" for the same
-  # adopted gpt-oss-20b-kserve-route on maas-default-gateway immediately
-  # after - route adoption is unconditional on modelRef.kind:
-  # LLMInferenceService and does not consult endpointOverride at all. The
-  # field only overrides the informational status.endpoint (and whatever
-  # maas-api's own access probe dials), never route publication or the
-  # auth/identity path. Confirmed independently: the AuthPolicy's CEL rules
-  # (`oc get authpolicy maas-gateway-auth -n openshift-ingress`) only ever
-  # read request.path or the request's X-Gateway-Model-Name header - never
-  # MaaSModelRef - so this field is structurally incapable of fixing the
-  # identity mismatch. Kept wired (disabled) rather than removed, matching
-  # routerGateway's retained-but-disabled pattern - documents a real CRD
-  # field for the next attempt without pretending it does more than it does.
-  endpointOverride: ""
+      # ADR-0201/WP-27, 2026-08-25, attempt 4 - TESTED LIVE AND ELIMINATED.
+      # MaaSModelRef.spec.endpointOverride exists on the live CRD (`oc
+      # explain maasmodelref.spec --recursive`) and was missed by the
+      # earlier sweep, which only recursed into spec.modelRef. Set live to
+      # https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+      # (the same Service ai-gateway's own MaaS-bypass route already
+      # calls). Result: status.endpoint DID change to that value, but
+      # maas-controller's logs still show "HTTPRoute validated for
+      # LLMInferenceService" for the same adopted gpt-oss-20b-kserve-route
+      # on maas-default-gateway immediately after - route adoption is
+      # unconditional on modelRef.kind: LLMInferenceService and does not
+      # consult endpointOverride at all. The field only overrides the
+      # informational status.endpoint (and whatever maas-api's own access
+      # probe dials), never route publication or the auth/identity path.
+      # Confirmed independently: the AuthPolicy's CEL rules (`oc get
+      # authpolicy maas-gateway-auth -n openshift-ingress`) only ever read
+      # request.path or the request's X-Gateway-Model-Name header - never
+      # MaaSModelRef - so this field is structurally incapable of fixing
+      # the identity mismatch. Kept wired (disabled) rather than removed,
+      # matching routerGateway's retained-but-disabled pattern - documents
+      # a real CRD field for the next attempt without pretending it does
+      # more than it does. This finding is structural (about the CRD/
+      # controller, not about gpt-oss-20b specifically) - qwen's own entry
+      # below stays disabled too rather than re-testing the same dead end.
+      endpointOverride: ""
 
-  # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
-  # demonstrating different MaaSSubscription access to the same published
-  # model via different token rate limits (MaaSSubscription has no
-  # separate "which models" dimension beyond modelRefs[], so
-  # differentiated *rate* is the schema-supported way to show two groups
-  # getting different access) - agent_tekos (Tekos's own primary
-  # consumers) gets the higher limit, sales a materially lower one to
-  # make the difference obvious in a live comparison.
-  subscriptions:
-    - name: gpt-oss-20b-tekos
-      group: agent_tekos
-      tokenRateLimits:
-        - limit: 100000
-          window: 1h
-      priority: 10
-    - name: gpt-oss-20b-sales
-      group: sales
-      tokenRateLimits:
-        - limit: 5000
-          window: 1h
-      priority: 1
+      # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
+      # demonstrating different MaaSSubscription access to the same
+      # published model via different token rate limits (MaaSSubscription
+      # has no separate "which models" dimension beyond modelRefs[], so
+      # differentiated *rate* is the schema-supported way to show two
+      # groups getting different access) - agent_tekos (Tekos's own
+      # primary consumers) gets the higher limit, sales a materially
+      # lower one to make the difference obvious in a live comparison.
+      subscriptions:
+        - name: gpt-oss-20b-tekos
+          group: agent_tekos
+          tokenRateLimits:
+            - limit: 100000
+              window: 1h
+          priority: 10
+        - name: gpt-oss-20b-sales
+          group: sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
 
-  # Proves a group/model combination WITHOUT entitlement is denied
-  # (ADR-0201 acceptance bullet 3): only the groups above are subjects -
-  # any other group (e.g. `finance`, used in the operator's live negative
-  # test) is denied by omission. The live proof itself is the WP-27
-  # follow-up's job; this manifest is what makes that proof possible.
-  authPolicy:
-    name: gpt-oss-20b-entitlement
+      # Proves a group/model combination WITHOUT entitlement is denied
+      # (ADR-0201 acceptance bullet 3): only the groups above are subjects
+      # - any other group (e.g. `finance`, used in the operator's live
+      # negative test) is denied by omission.
+      authPolicy:
+        name: gpt-oss-20b-entitlement
+
+    # ADR-0521 (WP-076): qwen3.6-27b-instruct, generalizing the gpt-oss-20b
+    # pattern above to the primary/default local chat model. Same two
+    # groups and rate limits as gpt-oss-20b (user-confirmed scoping
+    # decision, WP-076) rather than every agent_* group - this stays a
+    # pure structural generalization of the proven pattern; broader group
+    # coverage is a deliberate follow-up, not this step's job.
+    - publishedName: qwen36-27b-instruct-maas
+      backendInferenceServiceName: qwen36-27b-instruct
+      endpointOverride: ""
+      subscriptions:
+        - name: qwen36-27b-instruct-tekos
+          group: agent_tekos
+          tokenRateLimits:
+            - limit: 100000
+              window: 1h
+          priority: 10
+        - name: qwen36-27b-instruct-sales
+          group: sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
+      authPolicy:
+        name: qwen36-27b-instruct-entitlement
 
 lmEval:
   enabled: true

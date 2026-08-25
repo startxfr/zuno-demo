@@ -16,7 +16,17 @@ paths:
   - MaaS clients reach it through the router/gateway config below, same
     mechanism templates/maas.yaml used for the old dedicated backend.
 S3-only, same as before: no PVC/download-Job mode exists for this model.
+ADR-0521 (WP-076): .Values.maas restructured from one hardcoded model into
+a .Values.maas.models list (qwen3.6-27b-instruct joined) - $gptOssMaas
+below finds this model's own entry by backendInferenceServiceName rather
+than assuming it's the only one.
 */ -}}
+{{- $gptOssMaas := "" }}
+{{- range .Values.maas.models }}
+{{- if eq .backendInferenceServiceName $.Values.gptOssModel.inferenceServiceName }}
+{{- $gptOssMaas = . }}
+{{- end }}
+{{- end }}
 apiVersion: serving.kserve.io/v1alpha2
 kind: LLMInferenceService
 metadata:
@@ -55,7 +65,7 @@ spec:
           # the resolved vLLM image before relying on it.
           - --enable-auto-tool-choice
           - --tool-call-parser=openai
-          {{- if .Values.maas.enabled }}
+          {{- if and .Values.maas.enabled $gptOssMaas }}
           # ADR-0201 (WP-27), 2026-08-25: MaaS clients name this model by the
           # policy plane's identity (<namespace>/<MaaSModelRef name>) in the
           # request body - proven live to traverse auth/subscription/TRLP and
@@ -70,7 +80,7 @@ spec:
           - --served-model-name
           - {{ .Values.gptOssModel.servedModelName | quote }}
           - "publishers/{{ .Values.namespace }}/models/{{ .Values.gptOssModel.inferenceServiceName }}"
-          - "{{ .Values.namespace }}/{{ .Values.maas.publishedName }}"
+          - "{{ .Values.namespace }}/{{ $gptOssMaas.publishedName }}"
           {{- end }}
         resources:
           {{- toYaml .Values.gptOssModel.resources | nindent 10 }}

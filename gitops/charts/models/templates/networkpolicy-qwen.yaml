@@ -3,10 +3,13 @@
 # app.kubernetes.io/name/kserve.io/component labels, not
 # serving.kserve.io/inferenceservice, and its OpenAI-compatible API
 # listens on port 8000, not 8080 (same shape as
-# templates/networkpolicy-gptoss.yaml, which this file now mirrors).
-# maas-default-gateway is NOT allowed here yet - qwen has no MaaSModelRef
-# until WP-076 step 2 lands templates/maas.yaml's qwen entry; add the same
-# allowance networkpolicy-gptoss.yaml has once that happens.
+# templates/networkpolicy-gptoss.yaml, which this file mirrors).
+# maas-default-gateway is now allowed below (WP-076 step 2, once qwen got
+# its own MaaSModelRef in templates/maas.yaml) - same gap that 504'd every
+# MaaS request for gpt-oss-20b AFTER auth/subscription/TRLP had already
+# passed (ADR-0201/WP-27, 2026-08-25): the MaaS data path routes gateway
+# -> (EPP-selected) workload pod :8000 directly, and without this rule the
+# connection is silently dropped at the outer HAProxy.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -34,6 +37,12 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: rag-service
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: maas-default-gateway
       ports:
         - protocol: TCP
           port: 8000

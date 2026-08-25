@@ -12,14 +12,13 @@ Same two access paths as gpt-oss-20b (templates/llminferenceservice-gptoss.yaml)
     directly (port 8000), bypassing router/gateway entirely.
   - MaaS clients (once templates/maas.yaml's qwen entry lands, WP-076 step 2)
     reach it through the router/gateway config below.
-No --served-model-name override here yet, same as gpt-oss-20b before its own
-maas.enabled conditional landed: KServe's generated launcher already derives
-`--served-model-name "<spec.model.name>" "publishers/<ns>/models/<metadata.name>"`
-on its own, i.e. "qwen3.6-27b-instruct" and
-"publishers/zuno-ai-run/models/qwen36-27b-instruct" - the WP-076 step that
-adds this model to templates/maas.yaml will add the repeated-flag MaaS-alias
-block then, not before (see llminferenceservice-gptoss.yaml's own comment on
-why the flag must be repeated, not just appended, once that happens).
+Now that templates/maas.yaml's qwen entry exists (WP-076 step 2), this adds
+the same repeated --served-model-name MaaS-alias block gpt-oss-20b's own
+template has - see that file's comment for why the flag must be REPEATED,
+not appended (KServe's generated launcher already emits
+`--served-model-name "qwen3.6-27b-instruct"
+"publishers/zuno-ai-run/models/qwen36-27b-instruct"` before these chart
+args ($@), and vLLM's argparse keeps only the last occurrence).
 S3-only, same as gpt-oss-20b: no PVC/download-Job mode for this model
 anymore (the old modelStorage.downloadJob legacy mode was qwen-only and is
 removed with the classic InferenceService it backed).
@@ -44,6 +43,12 @@ on it, same caveat the original ServingRuntime carried.
 {{- if ne .classification "C1" }}
 {{- fail (printf "loraAdapters[%s].classification=%s cannot attach while maas.enabled is true (externally-eligible serving path) - ADR-0301 point 4/ADR-0021" .name .classification) }}
 {{- end }}
+{{- end }}
+{{- end }}
+{{- $qwenMaas := "" }}
+{{- range .Values.maas.models }}
+{{- if eq .backendInferenceServiceName $.Values.inferenceServiceName }}
+{{- $qwenMaas = . }}
 {{- end }}
 {{- end }}
 apiVersion: serving.kserve.io/v1alpha2
@@ -88,6 +93,20 @@ spec:
           - --enable-auto-tool-choice
           - --tool-call-parser=qwen3_xml
           - --reasoning-parser=qwen3
+          {{- if and .Values.maas.enabled $qwenMaas }}
+          # ADR-0201/WP-27 pattern, generalized here by ADR-0521/WP-076 -
+          # see llminferenceservice-gptoss.yaml's comment for the full
+          # "why REPEAT, not append" rationale (vLLM's argparse keeps only
+          # the last --served-model-name occurrence, and KServe's launcher
+          # already emits the first two names before these chart args).
+          # UNVERIFIED against a live cluster: confirm the workload's
+          # /v1/models lists all three names after rollout, same as
+          # gpt-oss-20b's own verification.
+          - --served-model-name
+          - {{ .Values.servedModelName | quote }}
+          - "publishers/{{ .Values.namespace }}/models/{{ .Values.inferenceServiceName }}"
+          - "{{ .Values.namespace }}/{{ $qwenMaas.publishedName }}"
+          {{- end }}
           {{- if .Values.loraAdapters }}
           - --enable-lora
           - --lora-modules

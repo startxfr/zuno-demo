@@ -3,28 +3,35 @@ ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane.
 Schema-checked against the maas.opendatahub.io/v1alpha1 and
 serving.kserve.io/v1alpha2 CRDs confirmed installed on the live cluster
 (`oc explain maasmodelref/maassubscription/maasauthpolicy/llminferenceservice
---recursive`, 2026-08-15/16). MaaSModelRef.spec.modelRef.kind's hard enum
-(LLMInferenceService | ExternalModel only) ruled out ExternalModel on its
-own schema (built for authenticated third-party SaaS, not an internal
-vLLM Service) back when this first stood up a dedicated backend.
-ADR-0414: that dedicated backend is retired - this now publishes
-gpt-oss-20b's own LLMInferenceService (templates/llminferenceservice-gptoss.yaml)
-instead, folding what were two separate GPU-consuming deployments into
-one.
+--recursive`, 2026-08-15/16, re-confirmed 2026-08-25 for ADR-0521).
+MaaSModelRef.spec.modelRef.kind's hard enum (LLMInferenceService |
+ExternalModel only) ruled out ExternalModel on its own schema (built for
+authenticated third-party SaaS, not an internal vLLM Service) back when
+this first stood up a dedicated backend.
+ADR-0414: that dedicated backend is retired - gpt-oss-20b's own
+LLMInferenceService (templates/llminferenceservice-gptoss.yaml) was the
+first model published this way, folding two separate GPU-consuming
+deployments into one.
+ADR-0521 (WP-076): generalized from one hardcoded model to a
+`range .Values.maas.models` loop - qwen3.6-27b-instruct
+(templates/llminferenceservice-qwen.yaml) joined once it too became an
+LLMInferenceService. The Tenant CR below stays a singleton (CEL-enforced
+one-per-namespace), outside the loop.
 Correction, 2026-08-25: MaaSModelRef.spec also has an endpointOverride
 field (`oc explain maasmodelref.spec --recursive`) - missed by the earlier
 sweep, which only recursed into spec.modelRef. See values.yaml's
-maas.endpointOverride comment and ADR-0201's dated notes for what this
-tests.
+maas.models[].endpointOverride comment and ADR-0201's dated notes for what
+this tests.
 */ -}}
 {{- if .Values.maas.enabled }}
 # MaaSAuthPolicy's admission webhook rejects the whole batch unless a
 # Tenant CR exists first ("namespace zuno-ai-run is not enabled for MaaS
 # tenant resources. Create a Tenant CR in this namespace to enable it.").
 # Tenant is namespace-scoped and CEL-enforced as a singleton named
-# "default-tenant" per namespace (v1alpha1). gatewayRef sets the
-# tenant-wide default; the LLMInferenceService's own router.gateway.refs
-# below is still explicit for clarity/defense-in-depth.
+# "default-tenant" per namespace (v1alpha1), shared by every model in
+# .Values.maas.models below. gatewayRef sets the tenant-wide default; each
+# LLMInferenceService's own router.gateway.refs is still explicit for
+# clarity/defense-in-depth.
 # OPEN (2026-08-25, ADR-0201): this Tenant never reconciles. Live it sits
 # with a completely empty .status while the operator-generated
 # models-as-a-service/default-tenant reports Ready=True/Reconciled, and
@@ -49,28 +56,29 @@ spec:
   gatewayRef:
     name: maas-default-gateway
     namespace: openshift-ingress
+{{- range .Values.maas.models }}
 ---
-# ADR-0414: the published backend is gpt-oss-20b's own LLMInferenceService
-# (templates/llminferenceservice-gptoss.yaml) - no dedicated MaaS-only
-# copy anymore. That template owns its own S3 credentials
-# (templates/s3-serving-credentials-gptoss.yaml) and GPU resources; this
-# CR only points MaaS's governance plane at it by name.
+{{- $model := . }}
+# The published backend is {{ .backendInferenceServiceName }}'s own
+# LLMInferenceService - no dedicated MaaS-only copy. That template owns
+# its own S3 credentials and GPU resources; this CR only points MaaS's
+# governance plane at it by name.
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSModelRef
 metadata:
-  name: {{ .Values.maas.publishedName }}
-  namespace: {{ .Values.namespace }}
+  name: {{ .publishedName }}
+  namespace: {{ $.Values.namespace }}
   labels:
     zuno.io/managed-by: argocd
 spec:
-  {{- if .Values.maas.endpointOverride }}
-  endpointOverride: {{ .Values.maas.endpointOverride }}
+  {{- if .endpointOverride }}
+  endpointOverride: {{ .endpointOverride }}
   {{- end }}
   modelRef:
     kind: LLMInferenceService
-    name: {{ .Values.gptOssModel.inferenceServiceName }}
+    name: {{ .backendInferenceServiceName }}
 ---
-{{- range .Values.maas.subscriptions }}
+{{- range .subscriptions }}
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSSubscription
 metadata:
@@ -79,7 +87,7 @@ metadata:
   # MAAS_SUBSCRIPTION_NAMESPACE=models-as-a-service (an operator-generated,
   # hardcoded namespace it creates itself at startup) and its tenant
   # controller never reconciles anything outside that namespace - our own
-  # Tenant CR in .Values.namespace (below) never leaves an empty status,
+  # Tenant CR in .Values.namespace (above) never leaves an empty status,
   # and MaaSSubscription/MaaSAuthPolicy created in .Values.namespace
   # alongside the ModelRef never get discovered for pairing ("No active
   # subscription and auth policy pairing found" on the ModelRef,
@@ -96,7 +104,7 @@ spec:
       - name: {{ .group }}
   priority: {{ .priority }}
   modelRefs:
-    - name: {{ $.Values.maas.publishedName }}
+    - name: {{ $model.publishedName }}
       namespace: {{ $.Values.namespace }}
       tokenRateLimits:
         {{- toYaml .tokenRateLimits | nindent 8 }}
@@ -105,18 +113,19 @@ spec:
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSAuthPolicy
 metadata:
-  name: {{ .Values.maas.authPolicy.name }}
+  name: {{ .authPolicy.name }}
   # Same centralized-namespace requirement as MaaSSubscription above.
   namespace: models-as-a-service
   labels:
     zuno.io/managed-by: argocd
 spec:
   modelRefs:
-    - name: {{ .Values.maas.publishedName }}
-      namespace: {{ .Values.namespace }}
+    - name: {{ .publishedName }}
+      namespace: {{ $.Values.namespace }}
   subjects:
     groups:
-      {{- range .Values.maas.subscriptions }}
+      {{- range .subscriptions }}
       - name: {{ .group }}
       {{- end }}
+{{- end }}
 {{- end }}
