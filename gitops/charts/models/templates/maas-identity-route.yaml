@@ -1,0 +1,104 @@
+# ADR-0201 (WP-27): routes the MaaS-published model identity.
+#
+# THE MISMATCH THIS CLOSES
+# Two different strings name the same model, and until this template they
+# never met:
+#
+#   routing accepts   publishers/zuno-ai-run/models/gpt-oss-20b
+#   auth accepts      zuno-ai-run/gpt-oss-20b-maas
+#
+# The first is KServe's publisher form, baked into every header match on
+# gpt-oss-20b-kserve-route. The second is `<modelRef namespace>/<modelRef
+# name>`, which is what maas-api's /internal/v1/subscriptions/select
+# actually keys on - proven live 2026-08-25 by calling that endpoint with
+# each candidate string in turn: only `zuno-ai-run/gpt-oss-20b-maas`
+# returned a subscription (gpt-oss-20b-tekos, ready, priority 10); the
+# publisher form, the bare name and the published name all returned
+# `not_found` / "no matching subscription found for user".
+#
+# The same string is independently expected by two more components, which
+# is what makes it the correct identity rather than an arbitrary choice:
+#   - the MaaSAuthPolicy's OPA rule, whose map is keyed
+#     {"zuno-ai-run/gpt-oss-20b-maas": {"groups": ["agent_tekos","sales"]}}
+#   - the generated TokenRateLimitPolicy, whose predicates read
+#     auth.identity.selected_subscription_key ==
+#       "models-as-a-service/gpt-oss-20b-tekos@zuno-ai-run/gpt-oss-20b-maas"
+#
+# So three parts of the policy plane agree, and only the data path did not.
+#
+# WHY A SECOND ROUTE RATHER THAN EDITING THE FIRST
+# gpt-oss-20b-kserve-route is generated and owned by KServe, because
+# templates/llminferenceservice-gptoss.yaml attaches router.gateway.refs
+# straight to maas-default-gateway - so MaaS adopts that route
+# (MaaSModelRef.status.httpRouteName confirms it) instead of publishing
+# one of its own. Editing a controller-generated object loses on the next
+# reconcile; adding a separately-owned one that unions with it is this
+# repo's established pattern for exactly that situation (see the
+# payload-processing NetworkPolicy in gitops/charts/openshift-ai and
+# WP-071's quota-demo-gateway-authn-ssl.yaml EnvoyFilter).
+#
+# HOW A CLIENT REACHES IT
+# The caller puts the MaaS identity in the request body, not in a header:
+#   {"model": "zuno-ai-run/gpt-oss-20b-maas", "messages": [...]}
+# RHOAI's ipp-pre ext_proc filter copies that body field verbatim into
+# X-Gateway-Model-Name and clears the route cache, so the injected value
+# is what routing matches. Verified live 2026-08-25: with no explicit
+# header at all, a body naming the publisher form routed and reached auth
+# (403), while an explicit header was overwritten by the body value - the
+# body is authoritative. That ipp-pre hop only runs because
+# gitops/charts/openshift-ai/templates/maas-gateway-ipp-anchor.yaml
+# re-anchored it; before that it silently no-op'd and this route would
+# have been unreachable.
+{{- if and .Values.maas.enabled .Values.maas.identityRoute.enabled }}
+{{- $modelKey := printf "%s/%s" .Values.namespace .Values.maas.publishedName }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Values.maas.publishedName }}-identity-route
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-maas-governance
+  annotations:
+    # After the LLMInferenceService (which creates the InferencePool this
+    # backends onto) and after the MaaS CRs in maas.yaml.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.maas.gatewayName | default "maas-default-gateway" }}
+      namespace: {{ .Values.maas.gatewayNamespace | default "openshift-ingress" }}
+  rules:
+    {{- range $path := list "/v1/chat/completions" "/v1/completions" "/v1/responses" "/v1/messages" }}
+    # Both the bare and trailing-slash forms, mirroring KServe's own rule
+    # pairs - the wasm actionSets Kuadrant generates match url_path
+    # exactly, so a missing trailing-slash variant is an auth gap, not just
+    # a routing inconvenience.
+    - backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ $.Values.gptOssModel.inferenceServiceName }}-inference-pool
+          port: {{ $.Values.maas.inferencePoolPort | default 8000 }}
+          weight: 1
+      matches:
+        - headers:
+            - name: X-Gateway-Model-Name
+              type: Exact
+              value: {{ $modelKey | quote }}
+          path:
+            type: Exact
+            value: {{ $path | quote }}
+        - headers:
+            - name: X-Gateway-Model-Name
+              type: Exact
+              value: {{ $modelKey | quote }}
+          path:
+            type: Exact
+            value: {{ printf "%s/" $path | quote }}
+      # Streaming completions must not be cut short by a gateway timeout;
+      # KServe's own generated rules set the same disabled pair.
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    {{- end }}
+{{- end }}

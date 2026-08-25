@@ -359,6 +359,26 @@ maas:
   # underlying deployment's name.
   publishedName: gpt-oss-20b-maas
 
+  # ADR-0201: publishes a second HTTPRoute keyed on the identity the MaaS
+  # policy plane actually accepts - "<namespace>/<publishedName>", i.e.
+  # zuno-ai-run/gpt-oss-20b-maas. KServe's own generated route only matches
+  # its publisher form (publishers/zuno-ai-run/models/gpt-oss-20b), which
+  # maas-api rejects with "no matching subscription found for user", so
+  # without this the two strings never meet and no entitled caller can
+  # reach the model. Full evidence in templates/maas-identity-route.yaml.
+  # Requires the ipp-pre ext_proc filter to be attached (see
+  # gitops/charts/openshift-ai maasGateway.ippAnchorWorkaround) - that is
+  # what turns the request body's `model` field into the routing header.
+  identityRoute:
+    enabled: true
+  # The Gateway the published route attaches to. Matches the Tenant's
+  # gatewayRef above and the LLMInferenceService's router.gateway.refs.
+  gatewayName: maas-default-gateway
+  gatewayNamespace: openshift-ingress
+  # Port of the KServe-generated InferencePool the route backends onto,
+  # matching gpt-oss-20b-kserve-route's own backendRefs.
+  inferencePoolPort: 8000
+
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
   # model via different token rate limits (MaaSSubscription has no
