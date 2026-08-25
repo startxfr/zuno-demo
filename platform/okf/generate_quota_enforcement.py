@@ -91,10 +91,33 @@ def _class_predicate(cls_name: str) -> str:
     # "invalid argument to has() macro" on has(request.headers['...'])) -
     # hyphenated header names can't use has()'s dot-notation form either,
     # so map-key presence uses CEL's `in` operator instead.
+    #
+    # Every predicate is wrapped in a conditional rather than guarded with
+    # `||` / `&&`. The CEL spec says a logical operator absorbs an error in
+    # one operand when the other decides the result, so
+    #   !('x' in request.headers) || request.headers['x'] == 'standard'
+    # should be plain `true` for a request with no such header. The
+    # wasm-shim's evaluator does not absorb it - confirmed live 2026-08-25,
+    # one line per header-less request:
+    #   kuadrant_wasm_shim: Failed to evaluate message builder:
+    #   CelError::Resolve { NoSuchKey("x-zuno-quota-class") }
+    #
+    # And the blast radius is not just that predicate: a single failed
+    # expression fails the whole message builder, so NO descriptor is sent
+    # for the request at all and every limit - including ones whose own
+    # predicates were fine - goes uncounted. That is what made the standard
+    # class (header absent by design: "absent => standard" is the policy
+    # file's documented default) return 200 forever while the intensive
+    # class, which always carries the header, rate-limited correctly.
+    #
+    # The conditional operator has to evaluate lazily to mean anything, so
+    # it is the safe construct here: the bracket lookup is only reached on
+    # the branch where the key is known to exist.
+    presence = f"'{CLASS_HEADER}' in request.headers"
     if cls_name == "standard":
-        return (f"!('{CLASS_HEADER}' in request.headers) || "
-                f"request.headers['{CLASS_HEADER}'] == 'standard'")
-    return f"request.headers['{CLASS_HEADER}'] == '{cls_name}'"
+        # Absent header => standard, per policies/quotas/quota-policy.yaml.
+        return f"({presence}) ? request.headers['{CLASS_HEADER}'] == 'standard' : true"
+    return f"({presence}) ? request.headers['{CLASS_HEADER}'] == '{cls_name}' : false"
 
 
 def _render_rlp(classes: Dict[str, Dict]) -> str:
