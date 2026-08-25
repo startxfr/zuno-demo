@@ -20,6 +20,17 @@ one.
 # "default-tenant" per namespace (v1alpha1). gatewayRef sets the
 # tenant-wide default; the LLMInferenceService's own router.gateway.refs
 # below is still explicit for clarity/defense-in-depth.
+# OPEN (2026-08-25, ADR-0201): this Tenant never reconciles. Live it sits
+# with a completely empty .status while the operator-generated
+# models-as-a-service/default-tenant reports Ready=True/Reconciled, and
+# maas-api itself runs with TENANT_NAME=models-as-a-service - so the
+# controller only ever reconciles the tenant in its own managed namespace
+# and this one is inert. Recorded rather than removed because the
+# relationship to the still-open entitlement gap (/v1/models returns an
+# empty list even for a persona in a subscribed group, and the header-form
+# completion returns "no matching subscription found for user") is not yet
+# established; deleting it blind could remove a dependency the
+# MaaSModelRef in this namespace relies on. See ADR-0201's dated notes.
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: Tenant
 metadata:
