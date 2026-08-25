@@ -130,13 +130,17 @@ sizing:
     defaultWorkerReplicas: 1
     activationWorkerReplicas: 1
 
-# Hub content storage. Moved from file_storage (ReadWriteOnce EBS PVC shared
-# across api/content/worker) to S3 (WP-075): EBS RWO only attaches to one
-# node at a time, and WP-072's podAffinity fix only covered worker->content,
-# not api - api landing on a separate node deadlocked its migration init
-# container, confirmed live 2026-08-25. file_storage_* fields are kept
-# (unused while storageType: s3) only so the file-storage path still works
-# if ever rolled back.
+# Hub content storage. Django's default storage backend moved from
+# file_storage to S3 (WP-075). Note this does NOT remove the local
+# ReadWriteOnce file_storage PVC (aap-hub-file-storage) - the
+# automation-hub-operator mounts it into api/content/worker as scratch
+# space unconditionally, in both file and s3 mode (confirmed live
+# 2026-08-25). The actual fix for the RWO Multi-Attach deadlock (api
+# landing on a different node than content/worker, WP-072's podAffinity
+# only covered worker->content) is the podAffinity in aap.yaml, which now
+# applies unconditionally to api and worker alike, not the S3 switch by
+# itself. file_storage_* fields are kept (unused while storageType: s3)
+# only so the file-storage path still works if ever rolled back.
 hub:
   storageType: s3
   fileStorageAccessMode: ReadWriteOnce

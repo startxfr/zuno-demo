@@ -63,31 +63,31 @@ spec:
     postgres_configuration_secret: {{ .Values.postgresql.hub.secretName }}
     storage_type: {{ .Values.hub.storageType }}
 {{- if eq .Values.hub.storageType "s3" }}
-    # S3 backend (WP-075) - replaces the RWO-EBS file_storage PVC that
-    # deadlocked api against content/worker across 2 nodes (WP-072).
+    # S3 backend for Hub's content storage (WP-075). Does NOT remove the
+    # local file_storage PVC below - see that comment block for why the
+    # podAffinity still applies in this mode too.
     object_storage_s3_secret: {{ .Values.hub.s3.secretName }}
 {{- else }}
     file_storage_access_mode: {{ .Values.hub.fileStorageAccessMode }}
     file_storage_size: {{ .Values.hub.fileStorageSize }}
 {{- end }}
+    # api/content/worker all mount the same ReadWriteOnce file_storage PVC
+    # (EBS-backed local scratch space, this cluster has no RWX storage
+    # class) - the automation-hub-operator provisions and mounts this PVC
+    # into all three unconditionally, regardless of storage_type, so this
+    # applies in both file and s3 mode (confirmed live 2026-08-25: even
+    # with storage_type: s3, api/content/worker still each mount
+    # aap-hub-file-storage - WP-075 only moved Django's *content* storage
+    # backend to S3, it did not remove this local PVC). RWO only allows
+    # attachment on one node at a time, so api and worker's pods must be
+    # forced onto whichever node content's pod(s) already landed on, or
+    # they hang on FailedAttachVolume/Multi-Attach - confirmed live
+    # 2026-08-24/25 (WP-072 covered worker only, missed api - that gap is
+    # what actually deadlocked live and prompted WP-075). podAffinity (not
+    # nodeAffinity): content's own scheduling is unconstrained, so api and
+    # worker both follow it rather than racing for a fixed node.
     api:
       replicas: {{ .Values.sizing.hub.apiReplicas }}
-    web:
-      replicas: {{ .Values.sizing.hub.webReplicas }}
-    content:
-      replicas: {{ .Values.sizing.hub.contentReplicas }}
-    worker:
-      replicas: {{ .Values.sizing.hub.workerReplicas }}
-{{- if ne .Values.hub.storageType "s3" }}
-      # content/worker both mount the same ReadWriteOnce file_storage PVC
-      # (EBS-backed, this cluster has no RWX storage class - see values.yaml
-      # hub.fileStorageAccessMode). RWO only allows attachment on one node
-      # at a time, so worker's pod must be forced onto whichever node
-      # content's pod(s) already landed on, or it hangs on
-      # FailedAttachVolume/Multi-Attach - confirmed live 2026-08-24/25
-      # (WP-072). podAffinity (not nodeAffinity): content's own scheduling
-      # is unconstrained, so worker follows it rather than both racing for a
-      # fixed node. Not needed once storageType: s3 - no shared PVC (WP-075).
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -95,7 +95,19 @@ spec:
                 matchLabels:
                   app.kubernetes.io/component: content-server
               topologyKey: kubernetes.io/hostname
-{{- end }}
+    web:
+      replicas: {{ .Values.sizing.hub.webReplicas }}
+    content:
+      replicas: {{ .Values.sizing.hub.contentReplicas }}
+    worker:
+      replicas: {{ .Values.sizing.hub.workerReplicas }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: content-server
+              topologyKey: kubernetes.io/hostname
   eda:
     # EDA's own standalone CRD (eda.ansible.com/v1alpha1) marks
     # automation_server_url as required (confirmed live) - the URL EDA
