@@ -53,6 +53,23 @@ metadata:
   labels:
     app.kubernetes.io/part-of: zuno-quota-enforcement
 data:
+  # Same istio-proxy resources override as maas-gateway-config: the istio
+  # default 256Mi limit OOMKills envoy during cold-start init once the
+  # Kuadrant wasm filter + quota config are part of the initial LDS push
+  # (pod stuck PRE_INITIALIZING, startup probe on 15021 never answers).
+  deployment: |
+    spec:
+      template:
+        spec:
+          containers:
+            - name: istio-proxy
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
   service: |
     metadata:
       annotations:
