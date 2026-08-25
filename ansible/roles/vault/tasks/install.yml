@@ -292,6 +292,42 @@
       see the output above.
   when: (_vault_unseal_configure_job.resources[0].status.succeeded | default(0)) == 0
 
+- name: "vault | read the live Transit key's public key (kept in sync with agents/zuno-platform-signer.pub on every install - ADR-0420/WP-069, self-heals a silent key regeneration like the one behind the 2026-08-25 incident)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault read -format=json transit/keys/zuno-platform-signer"
+  register: _vault_transit_key_raw
+  changed_when: false
+
+- name: "vault | select the Transit key's latest version (indexed by latest_version, not hardcoded, so a real future rotation stays correct)"
+  ansible.builtin.set_fact:
+    _vault_transit_key_json: "{{ _vault_transit_key_raw.stdout | from_json }}"
+
+- name: "vault | extract that version's public key + creation time"
+  ansible.builtin.set_fact:
+    _vault_transit_pubkey: >-
+      {{ _vault_transit_key_json.data.keys[_vault_transit_key_json.data.latest_version | string].public_key }}
+    _vault_transit_key_created: >-
+      {{ _vault_transit_key_json.data.keys[_vault_transit_key_json.data.latest_version | string].creation_time }}
+
+- name: "vault | write the current Transit public key to the committed trust anchor"
+  ansible.builtin.copy:
+    dest: "{{ zuno_repo_root }}/agents/zuno-platform-signer.pub"
+    content: "{{ _vault_transit_pubkey }}"
+  register: _vault_pubkey_file
+
+- name: "vault | commit the trust anchor if the live key changed (pathspec-limited add+commit - never touches any other pending change in the working tree, local commit only, no push)"
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      git add -- agents/zuno-platform-signer.pub &&
+      git commit -m "vault: sync zuno-platform-signer.pub with live Transit key (version {{ _vault_transit_key_json.data.latest_version }}, created {{ _vault_transit_key_created }})" -- agents/zuno-platform-signer.pub
+    chdir: "{{ zuno_repo_root }}"
+  when: _vault_pubkey_file.changed
+
 - name: "vault | generate and seed self-generatable application secrets (idempotent - first run only, see vault_seed_if_missing.yml)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   loop: "{{ _vault_generated_secrets | dict2items }}"
