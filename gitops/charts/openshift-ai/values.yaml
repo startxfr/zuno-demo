@@ -254,6 +254,14 @@ maasGateway:
   # Placeholder auto-substituted with the real cluster domain by
   # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
   clusterBaseDomain: apps.mycluster.example.com
+  # ADR-0201: workaround for an RHOAI-side EnvoyFilter anchor mismatch that
+  # leaves both inference-payload-processing ext_proc filters unattached,
+  # which 404s the OpenAI-native /v1/chat/completions call shape and skips
+  # response-side usage metering. Full explanation, and the conditions for
+  # removing it, in templates/maas-gateway-ipp-anchor.yaml's header.
+  # Default on: without it a documented MaaS entry point is simply broken.
+  ippAnchorWorkaround:
+    enabled: true
 
 # Second chart-local MaaS prerequisite (same pattern as maasGateway above):
 # DataScienceCluster's ModelsAsServiceReady condition requires a Secret

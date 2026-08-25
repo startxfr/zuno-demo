@@ -1,0 +1,153 @@
+# ADR-0201 (WP-27): re-anchors RHOAI's inference-payload-processing (IPP)
+# ext_proc filters onto the gateway's real filter chain.
+#
+# THE BUG (RHOAI-side, confirmed live 2026-08-25)
+# RHOAI's own `payload-processing` EnvoyFilter - owned by
+# Config.maas.opendatahub.io/default, targetRefs maas-default-gateway -
+# inserts its two ext_proc filters relative to a subFilter it names:
+#
+#   subFilter.name: extensions.istio.io/wasmplugin/openshift-ingress.kuadrant-maas-default-gateway
+#     ipp-pre  INSERT_BEFORE   (request side: reads the body, sets
+#                               X-Gateway-Model-Name from {"model": ...})
+#     ipp      INSERT_AFTER    (response side: meters token usage)
+#
+# That name assumes Kuadrant published its wasm filter through the
+# `WasmPlugin` CRD, which is what produces the
+# `extensions.istio.io/wasmplugin/<ns>.<name>` naming. Kuadrant on this
+# platform does not: it authors raw EnvoyFilters directly (`oc get
+# wasmplugin -A` is empty cluster-wide) and names the filter plainly
+# `envoy.filters.http.wasm`. The anchor therefore matches nothing and
+# BOTH insertions silently no-op - Istio reports no error for an
+# EnvoyFilter patch whose match never applies.
+#
+# Live filter chain on maas-default-gateway-istio before this file:
+#   ... istio.stats -> envoy.filters.http.wasm -> envoy.filters.http.router
+# with no .ipp-pre and no .ipp anywhere, and only the base
+# envoy.filters.http.ext_proc (cluster_name "dummy", a placeholder).
+#
+# WHAT IT ACTUALLY BREAKS
+# Nothing injects X-Gateway-Model-Name, so the OpenAI-native call shape -
+# POST /v1/chat/completions carrying only {"model": "gpt-oss-20b"} -
+# matches none of gpt-oss-20b-kserve-route's header-keyed rules and
+# returns 404. Verified live: identical request WITH the header returns
+# 401/403 (auth and entitlement both engaged), WITHOUT it returns 404.
+# The path-prefixed shape (/zuno-ai-run/gpt-oss-20b/v1/chat/completions)
+# is unaffected and stays fully governed. The response-side `ipp` filter
+# never running also means RHOAI's own usage metering never runs.
+#
+# WHY A MIRRORING FILTER RATHER THAN AN ALIAS
+# The tempting minimal fix - publish an inert filter carrying the long
+# wasmplugin name so RHOAI's anchor matches - cannot work. Istio applies
+# an INSERT_BEFORE/INSERT_AFTER patch at the FIRST filter whose name
+# matches and then stops, so one alias cannot satisfy both an
+# INSERT_BEFORE and an INSERT_AFTER that need to land on opposite sides
+# of the wasm filter: whichever side the alias sits on, the other
+# insertion lands wrong. So this file carries the insertions itself,
+# anchored on the name the filter really has.
+#
+# The filter NAMES below deliberately match RHOAI's own
+# (envoy.filters.http.ext_proc.ipp-pre / .ipp). RHOAI's EnvoyFilter also
+# carries two HTTP_ROUTE MERGE patches that disable ipp-pre on
+# redhat-ods-applications.maas-api-route.0/.1 via typed_per_filter_config
+# keyed by that exact filter name - reusing the names keeps those
+# route-level disables applying to these filters for free, instead of
+# needing to be duplicated here too.
+#
+# NOT a hand-edit of RHOAI's EnvoyFilter: that object is controller-owned
+# and reconciles back synchronously (the same trap
+# templates/maas-gateway.yaml's payload-processing-maas-gateway-allow
+# NetworkPolicy already documents for the ModelsAsService controller).
+# This is a separate, ArgoCD-tracked object that unions with it, which is
+# this repo's established pattern for beating a reconciling controller -
+# see gitops/charts/connectivity-link/templates/quota-demo-gateway-authn-ssl.yaml
+# for the same shape applied to WP-071's TLS gap.
+#
+# REMOVING THIS
+# It is a workaround for an upstream defect and must not outlive it. If
+# RHOAI re-anchors `payload-processing` onto envoy.filters.http.wasm (or
+# Kuadrant starts emitting a real WasmPlugin), both filters would insert
+# and the chain would carry ipp-pre/ipp twice. ansible/roles/openshift_ai/
+# tasks/diagnose.yml watches the live anchor and raises a finding the day
+# it changes; set maasGateway.ippAnchorWorkaround.enabled: false and
+# delete this file when that fires.
+{{- if and .Values.maasGateway.enabled .Values.maasGateway.ippAnchorWorkaround.enabled }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: maas-gateway-ipp-anchor
+  namespace: {{ .Values.maasGateway.namespace | default "openshift-ingress" }}
+  annotations:
+    # Same wave as the rest of the MaaS gateway objects in this chart -
+    # the Gateway this targetRefs must exist first.
+    argocd.argoproj.io/sync-wave: "-5"
+  labels:
+    app.kubernetes.io/part-of: zuno-maas-governance
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: maas-default-gateway
+  configPatches:
+    # Request side. failure_mode_allow: true is RHOAI's own setting and is
+    # kept: this filter only enriches routing metadata, so a
+    # payload-pre-processing outage must not take model traffic down with
+    # it - the path-prefixed call shape keeps working regardless.
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.wasm
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.ext_proc.ipp-pre
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+            allow_mode_override: true
+            failure_mode_allow: true
+            grpc_service:
+              envoy_grpc:
+                cluster_name: outbound|9004||payload-pre-processing.openshift-ingress.svc.cluster.local
+            processing_mode:
+              request_body_mode: FULL_DUPLEX_STREAMED
+              request_header_mode: SEND
+              request_trailer_mode: SEND
+              response_body_mode: NONE
+              response_header_mode: SKIP
+    # Response side. failure_mode_allow: false is likewise RHOAI's own:
+    # this is the metering hop, and letting usage go uncounted on failure
+    # would silently under-report against the MaaSSubscription token
+    # limits. Must land AFTER the wasm filter so auth/entitlement have
+    # already run.
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.wasm
+      patch:
+        operation: INSERT_AFTER
+        value:
+          name: envoy.filters.http.ext_proc.ipp
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+            allow_mode_override: true
+            failure_mode_allow: false
+            grpc_service:
+              envoy_grpc:
+                cluster_name: outbound|9004||payload-processing.openshift-ingress.svc.cluster.local
+            processing_mode:
+              request_body_mode: FULL_DUPLEX_STREAMED
+              request_header_mode: SEND
+              request_trailer_mode: SEND
+              response_body_mode: FULL_DUPLEX_STREAMED
+              response_header_mode: SEND
+              response_trailer_mode: SEND
+{{- end }}

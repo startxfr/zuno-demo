@@ -230,3 +230,47 @@
     - >-
       ((item.resources[0].spec.template.metadata.annotations | default({}))["sidecar.istio.io/inject"] | default('') != "true") or
       ((item.resources[0].spec.template.metadata.labels | default({}))["sidecar.istio.io/inject"] | default('') != "true")
+
+# --- MaaS IPP filter-anchor workaround retirement watch (ADR-0201) ----------
+# The inverse of a normal check: this one fires when the UPSTREAM defect is
+# FIXED, not when it is present. gitops/charts/openshift-ai/templates/
+# maas-gateway-ipp-anchor.yaml re-inserts RHOAI's ipp-pre/ipp ext_proc
+# filters at the anchor they actually need (envoy.filters.http.wasm),
+# because RHOAI anchors them on a WasmPlugin-style subfilter name Kuadrant
+# never emits. The day RHOAI corrects that anchor, both EnvoyFilters would
+# insert and the chain would carry each filter twice - so the workaround
+# has to be retired at that moment, and nothing else would notice.
+- name: "openshift_ai | diagnose: look up RHOAI's payload-processing EnvoyFilter"
+  kubernetes.core.k8s_info:
+    api_version: networking.istio.io/v1alpha3
+    kind: EnvoyFilter
+    name: payload-processing
+    namespace: openshift-ingress
+  register: _oai_diag_ipp_anchor
+
+- name: "openshift_ai | diagnose: collect the subfilter anchors RHOAI's payload-processing targets"
+  ansible.builtin.set_fact:
+    _oai_ipp_anchors: >-
+      {{
+        (_oai_diag_ipp_anchor.resources | default([]) | first | default({}))
+        .get('spec', {}).get('configPatches', [])
+        | selectattr('applyTo', 'defined')
+        | selectattr('applyTo', 'equalto', 'HTTP_FILTER')
+        | map(attribute='match.listener.filterChain.filter.subFilter.name')
+        | unique | list
+      }}
+  when: (_oai_diag_ipp_anchor.resources | default([]) | length) > 0
+
+- name: "openshift_ai | diagnose: record that the IPP anchor workaround can now be retired"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "EnvoyFilter/payload-processing (openshift-ingress)"
+      state: "RHOAI now anchors its ext_proc filters on envoy.filters.http.wasm"
+      cause: "ADR-0201 - our maas-gateway-ipp-anchor EnvoyFilter exists only because RHOAI anchored ipp-pre/ipp on a subfilter named extensions.istio.io/wasmplugin/... that Kuadrant never emits (it authors raw EnvoyFilters, naming the filter plainly envoy.filters.http.wasm), so both insertions silently no-op'd. That anchor now matches, which means RHOAI's own insertions apply AND ours do - the gateway filter chain will carry ipp-pre and ipp twice"
+      solution: "Set maasGateway.ippAnchorWorkaround.enabled: false in gitops/charts/openshift-ai/values.yaml, sync, then delete templates/maas-gateway-ipp-anchor.yaml and this diagnose block"
+      auto_fix: ""
+  when:
+    - (_oai_ipp_anchors | default([]) | length) > 0
+    - "'envoy.filters.http.wasm' in (_oai_ipp_anchors | default([]))"
