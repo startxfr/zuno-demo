@@ -2,7 +2,12 @@
 
 > ADR-0511 retargeted to v0.5 (make the MaaS governance plane live and used by agents) on 2026-08-24 — see `docs/roadmap/versions.md`.
 
-- **State:** Operator pending (Parts A+B merged 2026-08-18; demo
+- **State:** Done (2026-08-25 — the 429-exceedance acceptance run passed
+  live with a real token, and finding three stacked defects on the way is
+  the substance of this close-out. See the 2026-08-25 entry at the end of
+  this State log, and ADR-0511's 2026-08-25 implementation note for the
+  full trace.) Historical log follows.
+  (Parts A+B merged 2026-08-18; demo
   Gateway/HTTPRoute/AuthPolicy attached and `quotaEnforcement.enabled`
   flipped `true` the same day, discovering and fixing six further live
   bugs — see the connectivity-link chart README. 2026-08-21: with all six
@@ -28,6 +33,40 @@
   log shows the request arriving. The request-limit half of this demo is
   no longer blocked — only the final 429-exceedance acceptance run (real
   token, repeated requests) remains, a normal remaining task.
+  **2026-08-25: run executed — it was not a normal remaining task.** The
+  first pass sent 86 authenticated requests and got a clean `200` on every
+  one, with no `429` anywhere and no component reporting an error. Three
+  stacked defects, each hidden behind the previous: (1) the AuthPolicy
+  never published the identity as ext_authz dynamic metadata, so
+  `auth.identity.sub`/`.groups` were unresolvable and the shim skipped the
+  rate-limit call outright — `kuadrant-auth-service` at `rq_total 90`
+  while `kuadrant-ratelimit-service` sat at `cx_total 0`; (2) with that
+  fixed, `intensive` limited correctly but `standard` did not, because
+  this shim's CEL evaluator does not absorb an error in one operand of
+  `||` the way the spec requires, and one failed expression fails the
+  whole message builder — so a header-less request (the documented
+  `standard` default) sent no descriptor at all; (3) replacing the
+  disjunction with a conditional still failed, because Kuadrant
+  concatenates every limit's predicate into one `||` chain and `?:` binds
+  looser, shredding an unparenthesized ternary. Fixed in commits
+  `3bdbdf2`, `24f836c`, `497378b`.
+  **Acceptance evidence** (`consultant-01`, real Keycloak token,
+  `https://tekos-quota-demo.apps.demo222.startx.fr/`): unauthenticated
+  `401`; `intensive` first `429` at request 11/18 against 10/5m;
+  `standard` first `429` at request 61/68 against 60/5m; distinct
+  thresholds evidencing per-class counter keying; zero `5xx` across 86
+  requests. Compiled limits visible in Limitador as
+  `standard-user`/`standard-group`/`standard-project` and their
+  `intensive-` counterparts under namespace `zuno-ai-run/tekos-quota-demo`
+  — *not* under a `zuno-quota-*` prefix, which the chart README wrongly
+  told operators to look for; corrected in the same pass.
+  **What now guards this.** All three defects fail silently and
+  completely — `Accepted`+`Enforced` stays true, the limits stay compiled,
+  requests return `200`. So the run is now
+  `platform/testing/quota_429.py`, wired into `day2_stresstest.py` as the
+  `quota` layer rather than left as an operator command, and
+  `generate_quota_enforcement.py` asserts every `auth.identity.<name>` its
+  counters dereference is actually published by the AuthPolicy.
   **Placement decision (Part B step 5):** Kuadrant-native —
   the generated per-class `RateLimitPolicy`s live in the
   connectivity-link chart (it owns the Kuadrant plane), values-gated

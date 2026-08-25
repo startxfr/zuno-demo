@@ -754,6 +754,30 @@ not here.
   residual gap is live two-turn verification on the real cluster, not yet
   attempted.
 
+### Dated entries (roadmap work packages, v0.5) — current status per ADR
+
+- **ADR-0511 (WP-54)**: OKF quota policy enforced via Kuadrant —
+  **Implemented / Done 2026-08-25.** The 429-exceedance run passed live
+  (`intensive` 429 at request 11 against 10/5m, `standard` at 61 against
+  60/5m, zero 5xx, `consultant-01` with a real Keycloak token).
+  The run itself found three stacked defects, all of which presented as a
+  clean `200` on every request while `RateLimitPolicy` reported
+  `Accepted`+`Enforced` and Limitador held all six compiled limits:
+  (1) the AuthPolicy published no identity dynamic metadata, so
+  `auth.identity.*` counters were unresolvable and the wasm-shim skipped
+  the rate-limit call entirely; (2) the shim's CEL evaluator does not
+  absorb an error in one operand of `||` as the spec requires, and one bad
+  expression fails the whole message builder — which broke exactly the
+  `standard` class, whose documented default is an *absent* header;
+  (3) Kuadrant concatenates every limit's predicate into one `||` chain
+  and `?:` binds looser, so an unparenthesized ternary is shredded.
+  **Standing lesson: `Accepted`/`Enforced` plus compiled Limitador limits
+  are not evidence of enforcement.** Only driving traffic past a threshold
+  distinguishes enforcing from silently inert — hence
+  `platform/testing/quota_429.py` as a `day2_stresstest.py` layer, and a
+  generator lint asserting every `auth.identity.<name>` the counters read
+  is actually published by the AuthPolicy.
+
 ### Dated entries (roadmap work packages, v0.3) — current status per ADR
 
 - **ADR-0327 (WP-37)**: `AIAgent` CRD contract
