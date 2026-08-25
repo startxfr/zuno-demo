@@ -60,6 +60,43 @@ job before it starts - not a repo-side gap):
 Per WP-11's closure rule, ADR-0111 stays **Partially implemented** -
 these three rows are the entire remaining v0.1 gap set; the ADR reaches
 `Implemented` the moment WP-04/WP-05 close them.
+
+## Status update (2026-08-25/26)
+
+Of the three rows this ADR was waiting on above, two have since closed
+via other WPs, not WP-04/WP-05: first-party image signature verification
+and OKF bundle signature both flipped to `enforced-in-cluster` on
+2026-08-22 (WP-070 and WP-069/ADR-0420 respectively - see
+`docs/security/secnumcloud-controls.md`'s Supply chain section). The
+**sole remaining `gap`** is immutable chart image tags, still blocked on
+WP-04's external GitHub billing lock.
+
+Also ran the live-cluster verification pass this ADR's "genuinely
+live-cluster-only" rows were always waiting on, re-confirming the
+2026-08-18 Wave 1 results still hold and closing the one row that had
+never actually been proven live:
+
+- **WP-12/WP-13 re-verified live** (failover drill and restore drill
+  re-run, same procedure as 2026-08-18): results consistent with no
+  regression - see `docs/platform/slo.md`'s 2026-08-25/26 note and
+  `docs/platform/backup-recovery.md`'s 2026-08-25 notes for the full
+  numbers.
+- **WP-26 (binding auth-mode) proven live for the first time**: an
+  authenticated live call (`consultant-01`, real Keycloak token) to
+  `list_drive_files` (`delegated-user`, no delegated credential
+  available) got a live `403 delegated_credential_missing` from the
+  running mcp-gateway - the first real proof of this control beyond
+  `test_auth_mode_enforcement.py`. The `provider-delegated` branch
+  (`workday.profile.*`) could not be exercised the same way: no agent
+  declares any Workday tool in an `agent.okf.md` yet, so a live call is
+  denied earlier, at the agent-declaration check, before `invoke_tool`
+  ever reaches the auth_mode dispatch. Not a bug - correct fail-closed
+  behavior from an earlier layer - but it means that specific branch
+  stays proven only by inspection/CI until some agent actually adopts a
+  `provider-delegated` tool.
+
+ADR-0111 stays **Partially implemented**, now down to exactly the one
+WP-04-owned gap.
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

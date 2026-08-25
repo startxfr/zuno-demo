@@ -167,3 +167,24 @@ mechanics deliver near-zero-loss behavior the moment `replicas` ≥ 2
 (the production profile ADR-0101 targets). The rag-service drill's two
 timeouts are endpoint-deregistration lag at pod kill, not a PDB or
 scheduling failure.
+
+## Failover drill re-run (2026-08-25/26, ADR-0111 live re-verification)
+
+Same procedure repeated (pod deleted at T0, ArgoCD `selfHeal` bypassed by
+deleting pods), to re-confirm the 2026-08-18 result still holds:
+
+| Service | Drill | Result |
+|---|---|---|
+| PostgreSQL (PGO, 3 instances) | primary pod deleted | new primary elected + Ready in **24.9s**, writable in **45.0s** (Patroni); cluster back to 3/3 healthy |
+| rag-service (scaled to 2 for the drill, PDB `minAvailable: 1`) | 1 of 2 pods deleted under a ~2 req/s probe (40 requests) | **40/40 requests OK**, zero timeouts; PDB held (`ALLOWED DISRUPTIONS: 0` while the replacement was still initializing) |
+| mcp-gateway (1 replica) | pod deleted | replacement Ready in **32.8s** |
+| ai-gateway (1 replica) | pod deleted | replacement Ready in **34.9s** |
+| agent-runtime (1 replica) | pod deleted | replacement Ready in **34.9s**; fresh startup also re-verified all 8 OKF bundle signatures cleanly (WP-069's trust-anchor fix holds) |
+| redis (`zuno-redis-master-0`) | pod deleted | Ready in **59.2s** |
+| keycloak (`zuno-0`, RHBK operator) | pod deleted | Ready in **55.7s**; realm OIDC endpoint 200 immediately after |
+
+All results within the same order of magnitude as the 2026-08-18 run
+and well inside the 43.2 min/30d error budget; rag-service's continuity
+was better this time (zero failed requests vs. 2 transient timeouts
+previously) - both are consistent with PDB + spread mechanics working
+as intended, not a regression or a fluke.

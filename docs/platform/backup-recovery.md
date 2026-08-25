@@ -96,6 +96,24 @@ no `options` (latest backup). Results:
 
 The scratch cluster was deleted after verification.
 
+**Restore drill re-run: 2026-08-25 (ADR-0111 live re-verification).**
+Repeated with a smaller-footprint scratch cluster (1 instance replica
+instead of matching the source's 3, reduced CPU/memory/storage requests
+- the restore mechanism doesn't depend on replica count, and the
+cluster was under real memory pressure at the time) named
+`zuno-postgresql-restore-test` in `zuno-data`, `dataSource.postgresCluster`
+on `repo1`, no `options` (latest backup):
+
+- pgBackRest restore finished and the instance reported Ready **~330
+  seconds** after `oc apply` (slower than the first run's 203s, expected
+  given the smaller/cold-cache scratch instance; still ≤ 4h RTO with a
+  wide margin).
+- Data verification: `rag-tech`'s `rag.document_embeddings` matched the
+  live primary exactly - **68,944 rows**, identical
+  `max(created_at) = 2026-08-25T14:49:09.605023+00`.
+
+The scratch cluster and its PVCs were deleted after verification.
+
 ## Vault
 
 ### Backup mechanism
@@ -158,6 +176,23 @@ drill). Results:
   live value at **T+39s** wall clock. RTO ≤ 4h met with ~370x margin.
 - RPO: the newest ready snapshot was 10h old (daily 04:00 schedule,
   `retentionCount: 7`), inside the 24h objective.
+
+The scratch pod/PVC/ConfigMap were deleted after verification.
+
+**Restore drill re-run: 2026-08-25 (ADR-0111 live re-verification).**
+Restored from the current live snapshot (`vault-data-20260825080912`,
+~13h old at drill time - the doc's originally-referenced
+`vault-data-20260818073439` had long since been pruned by the daily
+CronJob's retention policy) into a fresh scratch PVC + single bare pod
+in `zuno-vault`, same minimal file-storage HCL as the first drill:
+
+- Pod Running within seconds; unsealed with the **live** unseal key
+  immediately after (`Initialized: true` straight from the restored
+  filesystem, confirming the keyring restored intact again); known
+  secret (`zuno/confluence/technical`, field `email`) read and matched
+  the live value at **~64 seconds** wall clock (PVC provisioning from a
+  CSI snapshot is the dominant cost, not the unseal/read itself). RTO
+  ≤ 4h met with a wide margin.
 
 The scratch pod/PVC/ConfigMap were deleted after verification.
 
