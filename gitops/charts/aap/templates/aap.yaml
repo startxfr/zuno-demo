@@ -42,16 +42,23 @@ spec:
   # databases nobody provisions on our unmanaged postgres (its awx read
   # default even targets a database named "automationcontroller"; ours is
   # aap-controller) - the web pod then CrashLoops on /health 503
-  # (diagnosed live 2026-08-25). Field shape mirrors what the operator
-  # itself writes to the generated MetricsService CR
-  # (spec.database.{database_secret,externally_managed,
-  # ms_awx_readonly_user_secret}); aap.spec.metrics is an opaque
-  # passthrough on this CRD version.
+  # (diagnosed live 2026-08-25). The parent-CR contract differs from the
+  # generated MetricsService CR's shape: the gateway operator only reads
+  # ms_awx_readonly_user_secret / externally_managed_ms_awx_readonly_user
+  # at metrics top level (postgres/tasks/set_configuration_secret.yml,
+  # "externally-managed read token" path) - under metrics.database they
+  # are silently ignored. These two keys are also what skips the
+  # operator's grant_metrics_readonly_on_controller.yml task, which is
+  # fatal here (it needs a "postgres" superuser login our unmanaged
+  # Crunchy cluster doesn't allow) and otherwise aborts every parent
+  # reconcile before the override ever reaches the MetricsService CR.
+  # Only database_secret is honored under metrics.database.
   metrics:
+    externally_managed_ms_awx_readonly_user: true
+    ms_awx_readonly_user_secret: {{ .Values.postgresql.metricsReadOnly.secretName }}
     database:
       database_secret: {{ .Values.postgresql.metrics.secretName }}
       externally_managed: true
-      ms_awx_readonly_user_secret: {{ .Values.postgresql.metricsReadOnly.secretName }}
   hub:
     postgres_configuration_secret: {{ .Values.postgresql.hub.secretName }}
     storage_type: {{ .Values.hub.storageType }}
