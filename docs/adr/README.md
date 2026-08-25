@@ -209,6 +209,7 @@ Goal: make the OpenShift AI MaaS governance plane live and route agent model cal
 | [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | v0.5 | Implemented | Define OKF quota policy enforced via Kuadrant |
 | [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.5 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
 | [ADR-0521](0521-route-local-model-traffic-through-maas.md) | v0.5 | Proposed | Route ai-gateway's local model traffic through MaaS |
+| [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) | v0.5 | Proposed | Enable OpenShift AI's built-in monitoring stack, side-by-side with the existing observability stack |
 
 ## version 0.6
 
