@@ -1043,6 +1043,28 @@
     and zuno_sxa_corpus_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
+# AAP Hub's file_storage replacement (WP-075, gitops/charts/aap's hub.s3
+# block). Unlike rag/s3 above, bucket/region are also seeded here (not
+# plain chart values) per explicit request - all 4 fields read together by
+# externalsecret-hub-s3.yaml.
+- name: "vault | seed the AAP Hub S3 config from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/hub-s3
+      bucketName={{ zuno_aap_hub_s3_bucket_name | quote }}
+      region={{ zuno_aap_hub_s3_region | quote }}
+      accessKeyId={{ zuno_aap_hub_s3_access_key_id | quote }}
+      secretAccessKey={{ zuno_aap_hub_s3_secret_access_key | quote }}"
+  when: >-
+    zuno_aap_hub_s3_bucket_name | default('xxxxxx') != 'xxxxxx'
+    and zuno_aap_hub_s3_region | default('xxxxxx') != 'xxxxxx'
+    and zuno_aap_hub_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_aap_hub_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
 - name: "vault | check whether operator-supplied secrets already exist"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

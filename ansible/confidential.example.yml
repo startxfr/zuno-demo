@@ -115,6 +115,18 @@ zuno_rag_s3_secret_access_key: "xxxxxx"
 zuno_sxa_corpus_s3_access_key_id: "xxxxxx"
 zuno_sxa_corpus_s3_secret_access_key: "xxxxxx"
 
+# --- AAP Hub S3 bucket (WP-075: Automation Hub's file_storage replacement -
+# WP-072's RWO EBS PVC deadlocked api against content/worker across 2 nodes.
+# Unlike rag/s3 and sxa-corpus/s3 above, bucket name and region are also
+# sourced here and pushed to Vault alongside the credentials, not committed
+# as plain chart values - see
+# gitops/charts/aap/templates/externalsecret-hub-s3.yaml. Use a dedicated,
+# bucket-scoped IAM user, never the account's admin credentials.) ----------
+zuno_aap_hub_s3_bucket_name: "xxxxxx"
+zuno_aap_hub_s3_region: "xxxxxx"
+zuno_aap_hub_s3_access_key_id: "xxxxxx"
+zuno_aap_hub_s3_secret_access_key: "xxxxxx"
+
 # --- Model weights storage (gitops/charts/models) ---------------------------
 # Not secrets - listed here because this file is where every ansible-driven
 # feature flag/S3 knob lives; all three have defaults in

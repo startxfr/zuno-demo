@@ -24,6 +24,11 @@
     (not RWX-only) - Hub is configured `storage_type: file` +
     `ReadWriteOnce`, matching this repository's `gp3-csi`-everywhere
     convention with no new storage class or S3 dependency.
+    **Superseded by WP-075 (2026-08-25):** the shared RWO PVC across
+    api/content/worker deadlocked live when `api` landed on a different
+    node than content/worker (this WP's `podAffinity` only covered
+    worker->content) - Hub moved to `storage_type: s3` to remove the
+    failure class.
   - Confirmed live replica-count field names for non-HA sizing:
     `spec.api.replicas` (Gateway); `spec.controller.replicas`/
     `web_replicas`/`task_replicas`; `spec.hub.{api,web,worker}.replicas`;

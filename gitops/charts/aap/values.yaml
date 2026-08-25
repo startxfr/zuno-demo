@@ -130,10 +130,22 @@ sizing:
     defaultWorkerReplicas: 1
     activationWorkerReplicas: 1
 
-# Hub content storage - ReadWriteOnce confirmed live as a valid
-# file_storage_access_mode (not RWX-only), matching this repository's
-# gp3-csi-everywhere convention (no RWX storage class, no in-cluster S3).
+# Hub content storage. Moved from file_storage (ReadWriteOnce EBS PVC shared
+# across api/content/worker) to S3 (WP-075): EBS RWO only attaches to one
+# node at a time, and WP-072's podAffinity fix only covered worker->content,
+# not api - api landing on a separate node deadlocked its migration init
+# container, confirmed live 2026-08-25. file_storage_* fields are kept
+# (unused while storageType: s3) only so the file-storage path still works
+# if ever rolled back.
 hub:
-  storageType: file
+  storageType: s3
   fileStorageAccessMode: ReadWriteOnce
   fileStorageSize: 10Gi
+  s3:
+    secretName: aap-hub-s3-credentials
+    externalSecret:
+      remoteKey: "aap/hub-s3"
+      bucketNameProperty: bucketName
+      regionProperty: region
+      accessKeyProperty: accessKeyId
+      secretKeyProperty: secretAccessKey

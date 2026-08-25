@@ -64,16 +64,24 @@ component's postgres connection fails after `make d1 install aap`,
 check that pod's logs for the exact missing/unexpected key before
 assuming the chart is otherwise broken.
 
-## Storage: Hub stays ReadWriteOnce, no S3 dependency
+## Storage: Hub moved to S3 (WP-075, supersedes this section's original call)
 
-`automationhub.spec.file_storage_access_mode` accepts `ReadWriteOnce`
-(confirmed live via `oc explain` - not only `ReadWriteMany`, which this
-repository's storage classes don't provide - see `gitops/charts/*` for
-the `gp3-csi` convention used everywhere else). Hub is configured
-`storage_type: file` with `file_storage_access_mode: ReadWriteOnce`,
-avoiding both an RWX storage class this cluster doesn't have and an
-external S3 dependency this repository doesn't otherwise carry
-in-cluster.
+Originally: `automationhub.spec.file_storage_access_mode` accepts
+`ReadWriteOnce` (confirmed live via `oc explain` - not only
+`ReadWriteMany`, which this repository's storage classes don't provide),
+so Hub was configured `storage_type: file` with
+`file_storage_access_mode: ReadWriteOnce`, avoiding both an RWX storage
+class this cluster doesn't have and an external S3 dependency.
+
+That RWO choice turned out fragile: `aap-hub-api`/`aap-hub-content`/
+`aap-hub-worker` all mount the same RWO EBS PVC, which only attaches to
+one node at a time. WP-072's `podAffinity` fix forced `worker` onto
+`content`'s node, but never covered `api` - when `api` landed on a
+different node (confirmed live 2026-08-25), it deadlocked indefinitely
+on `FailedAttachVolume`/`Multi-Attach`, blocking Hub's migrations and
+cascading into CrashLoopBackOff everywhere downstream. See WP-075: Hub
+now uses `storage_type: s3` (`gitops/charts/aap/values.yaml`'s `hub.s3`
+block), removing the shared-PVC failure class entirely.
 
 ## Non-HA sizing
 
