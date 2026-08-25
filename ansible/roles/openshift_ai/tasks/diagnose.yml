@@ -24,7 +24,7 @@
       state: "NotFound"
       cause: "The zuno-openshift-ai-d0 Application never created the Subscription"
       solution: "Re-apply the d0 Application"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   when: (_oai_diag_sub.resources | default([]) | length) == 0
 
 - name: "openshift_ai | diagnose: record unhealthy catalog sources"
@@ -54,7 +54,7 @@
       state: "{{ _oai_diag_sub.resources[0].status.state | default('InstallPlanPending') }}"
       cause: "installPlanApproval is Manual (deliberate - pins the EA2 build) and no InstallPlan has been approved"
       solution: "Approve the InstallPlan whose CSV matches the pinned startingCSV {{ _oai_diag_sub.resources[0].spec.startingCSV | default('(unset)') }}"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   when:
     - (_oai_diag_sub.resources | default([]) | length) > 0
     - >-
@@ -99,7 +99,7 @@
         {{ (_oai_diag_ip.resources[0].status.conditions | default([{}]))[0].message
            | default('Manual installPlanApproval; nothing approved the plan yet') }}
       solution: "Approve the InstallPlan pinned to {{ _oai_diag_sub.resources[0].spec.startingCSV | default('(unset)') }}"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   when:
     - (_oai_diag_ip.resources | default([]) | length) > 0
     - _oai_diag_ip.resources[0].spec.clusterServiceVersionNames == [_oai_diag_sub.resources[0].spec.startingCSV]
@@ -127,7 +127,7 @@
       state: "phase={{ _oai_diag_csv.resources[0].status.phase | default('unknown') }} ({{ _oai_diag_csv.resources[0].status.reason | default('no reason') }})"
       cause: "{{ _oai_diag_csv.resources[0].status.message | default('operator CSV has not reached Succeeded') }}"
       solution: "Inspect `oc describe csv {{ _oai_diag_csv.resources[0].metadata.name }} -n redhat-ods-operator` and the operator pod logs"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   when:
     - (_oai_diag_csv.resources | default([]) | length) > 0
     - (_oai_diag_csv.resources[0].status.phase | default('')) != 'Succeeded'
@@ -156,7 +156,7 @@
       state: "{{ item.type | default('?') }}=False (phase={{ _oai_diag_dsc.resources[0].status.phase | default('unknown') }})"
       cause: "{{ item.message | default('no condition message') }}"
       solution: "{{ _oai_dsc_solutions[item.type | default('')] | default('See the condition message; usually fixed by a reconcile re-sync') }}"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   loop: >-
     {{ (_oai_diag_dsc.resources | default([], true) | first | default({})).get('status', {}).get('conditions', [])
        | selectattr('status', 'equalto', 'False') | list }}
@@ -192,7 +192,7 @@
       state: "NotFound"
       cause: "ADR-0343 prerequisite for the DataScienceCluster is missing"
       solution: "{{ _oai_prereq_solutions[item.item.name] }}"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   loop: "{{ _oai_diag_prereqs.results | default([]) }}"
   loop_control:
     label: "{{ item.item.kind }}/{{ item.item.name }}"
@@ -221,7 +221,7 @@
       state: "sidecar.istio.io/inject label missing"
       cause: "ADR-0201 - RHOAI's ModelsAsService controller deploys this Deployment without opting it into the mesh; mTLS to the MaaS AuthPolicy fails before authentication runs (500s on the MaaS gateway). The LABEL specifically (not just the annotation) is required - the zuno-mesh sidecar injector's per-object opt-in rule filters via objectSelector, which Kubernetes only ever evaluates against labels (VERIFIED live, 2026-08-20: annotation-only was not enough, istiod never got called)"
       solution: "Patch the Deployment's pod template with sidecar.istio.io/inject: \"true\" as both a label and an annotation (targeted, not a namespace-wide istio-injection label - that would also inject the default HAProxy router pods)"
-      auto_fix: "make d0 reconcile openshift-ai"
+      auto_fix: "make d0 reconcile   (or, targeted: ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/day0_reconcile.yml -e target_component=openshift-ai)"
   loop: "{{ _oai_diag_ipp.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"

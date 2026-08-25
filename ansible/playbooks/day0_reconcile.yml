@@ -26,6 +26,13 @@
       - nfd
       - nvidia_gpu
       - custom_metrics_autoscaler
+      # openshift_ai is a Day 1 component but is the ONLY role with a
+      # tasks/reconcile.yml, and this playbook's own header already names
+      # it as such. Omitting it from this list meant `make d0 reconcile`
+      # (component defaults to `all`) silently skipped the one component
+      # reconcile exists for - ADR-0201's payload-processing sidecar
+      # remediation had never actually been reachable that way.
+      - openshift_ai
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
