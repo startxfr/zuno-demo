@@ -29,7 +29,9 @@ from app import telemetry  # noqa: E402
 from app import main as app_main  # noqa: E402
 from app.routing import ProviderCandidate  # noqa: E402
 
-_QWEN_URL = "http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1"
+# ADR-0521: qwen is an LLMInferenceService now, reached via its own
+# -kserve-workload-svc Service (port 8000), not a classic predictor.
+_QWEN_URL = "https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1"
 
 
 # --- stream_usage=True at construction ---------------------------------

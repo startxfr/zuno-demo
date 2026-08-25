@@ -98,53 +98,61 @@
 
 # ADR-0301 (WP-34 Part B): reports whether every LoRA adapter declared in
 # gitops/charts/models's loraAdapters values is actually loaded and
-# healthy on the running vLLM predictor. Diagnostic only, never gates
+# healthy on the running vLLM workload. Diagnostic only, never gates
 # _state_is_installed below - same posture as the LMEvalJob/MaaS blocks
 # above: an undeclared or unloaded adapter is a real gap an operator
 # needs to see, but it doesn't mean the base model deployment itself is
-# unhealthy. Reads the declared set from the ServingRuntime's own
+# unhealthy. Reads the declared set from the LLMInferenceService's own
 # zuno.io/lora-adapter-classifications annotation (templates/
-# servingruntime.yaml) rather than re-parsing values.yaml, so this check
-# always agrees with what's actually deployed, not what's merely
+# llminferenceservice-qwen.yaml, ADR-0521 - formerly the ServingRuntime's,
+# before that was retired) rather than re-parsing values.yaml, so this
+# check always agrees with what's actually deployed, not what's merely
 # checked in. UNVERIFIED against a live cluster: vLLM's OpenAI-compatible
 # /v1/models endpoint is assumed to list loaded LoRA module names
 # alongside the base model id (the documented behavior for
-# --enable-lora) - confirm against the real predictor and correct this
+# --enable-lora) - confirm against the real workload and correct this
 # task if the response shape differs.
-- name: "models | look up the ServingRuntime's declared LoRA adapters"
+- name: "models | look up the LLMInferenceService's declared LoRA adapters"
   kubernetes.core.k8s_info:
-    api_version: serving.kserve.io/v1alpha1
-    kind: ServingRuntime
+    api_version: serving.kserve.io/v1alpha2
+    kind: LLMInferenceService
     namespace: "{{ models_lmeval_namespace | default('zuno-ai-run') }}"
-    name: "{{ models_serving_runtime_name | default('vllm-runtime') }}"
-  register: _models_servingruntime
+    name: "{{ models_inference_service_name | default('qwen36-27b-instruct') }}"
+  register: _models_llminferenceservice
   ignore_errors: true
 
 - name: "models | parse the declared adapter set"
   ansible.builtin.set_fact:
     _models_declared_adapters: >-
       {{
-        (_models_servingruntime.resources | default([{}]) | first
+        (_models_llminferenceservice.resources | default([{}]) | first
         ).metadata.annotations['zuno.io/lora-adapter-classifications']
         | default('[]') | from_json
       }}
-  when: (_models_servingruntime.resources | default([]) | length) > 0
+  when: (_models_llminferenceservice.resources | default([]) | length) > 0
 
 - name: "models | note no LoRA adapters are declared"
   ansible.builtin.debug:
     msg: >-
       No zuno.io/lora-adapter-classifications annotation found (or the
-      ServingRuntime itself hasn't synced) - no LoRA adapters are
+      LLMInferenceService itself hasn't synced) - no LoRA adapters are
       declared for this deployment (ADR-0301, opt-in via
       gitops/charts/models's loraAdapters value, default empty).
   when: (_models_declared_adapters | default([]) | length) == 0
 
-- name: "models | query the predictor's loaded models"
+# ADR-0521: https on port 8000, not http on 8080 - the LLMInferenceService
+# workload pod terminates real TLS with a cert issued by the cluster's own
+# openshift-service-serving-signer CA (same as ai-gateway's own
+# LOCAL_GPT_OSS_CA_BUNDLE trusts), which this ansible control host has no
+# reason to already trust - validate_certs: false since this check is
+# diagnostic-only (ignore_errors: true) and never gates install state.
+- name: "models | query the workload's loaded models"
   ansible.builtin.uri:
-    url: "http://{{ models_predictor_service | default('qwen36-27b-instruct-predictor') }}.{{ models_lmeval_namespace | default('zuno-ai-run') }}.svc.cluster.local:8080/v1/models"
+    url: "https://{{ models_workload_service | default('qwen36-27b-instruct-kserve-workload-svc') }}.{{ models_lmeval_namespace | default('zuno-ai-run') }}.svc.cluster.local:8000/v1/models"
     method: GET
     status_code: [200]
     return_content: true
+    validate_certs: false
   register: _models_loaded_models
   ignore_errors: true
   when: (_models_declared_adapters | default([]) | length) > 0

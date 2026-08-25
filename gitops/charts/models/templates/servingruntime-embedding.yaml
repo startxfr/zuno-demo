@@ -1,7 +1,9 @@
 # Namespace-scoped ServingRuntime, not ClusterServingRuntime, to keep this
-# scoped to zuno-ai-run rather than the cluster-wide catalog. Second
-# instance alongside templates/servingruntime.yaml, serving embeddings
-# instead of chat completions.
+# scoped to zuno-ai-run rather than the cluster-wide catalog. The chat
+# model's own classic ServingRuntime this used to sit alongside was
+# retired under ADR-0521 (it's an LLMInferenceService now,
+# templates/llminferenceservice-qwen.yaml) - this is the only classic
+# ServingRuntime left in this chart.
 apiVersion: serving.kserve.io/v1alpha1
 kind: ServingRuntime
 metadata:
@@ -30,16 +32,16 @@ spec:
         # still defines RunnerOption/ConvertOption, not TaskOption).
         - --runner=pooling
         - --convert=embed
-        # See templates/servingruntime.yaml's --port comment: vLLM
-        # defaults to 8000, but containerPort/readiness/Service/
+        # vLLM defaults to 8000, but containerPort/readiness/Service/
         # NetworkPolicy all assume 8080.
         - --port=8080
       ports:
         - containerPort: 8080
           protocol: TCP
-      # Same rationale as templates/servingruntime.yaml: vLLM writes a
-      # HuggingFace/compilation cache under its container filesystem at
-      # startup, so no readOnlyRootFilesystem/runAsNonRoot override here.
+      # Same rationale as templates/llminferenceservice-qwen.yaml's chat
+      # model: vLLM writes a HuggingFace/compilation cache under its
+      # container filesystem at startup, so no
+      # readOnlyRootFilesystem/runAsNonRoot override here.
       securityContext:
         allowPrivilegeEscalation: false
         capabilities:

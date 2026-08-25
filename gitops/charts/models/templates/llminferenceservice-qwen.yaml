@@ -1,0 +1,121 @@
+{{- /*
+ADR-0521 (WP-076): qwen3.6-27b-instruct as an LLMInferenceService, replacing
+the old classic InferenceService + dedicated ServingRuntime
+(templates/inferenceservice.yaml, templates/servingruntime.yaml - both
+removed). Forced by the same MaaSModelRef.spec.modelRef.kind hard enum
+(LLMInferenceService | ExternalModel only, confirmed via `oc explain
+maasmodelref.spec.modelRef.kind`) that already drove gpt-oss-20b's ADR-0414
+migration - a classic InferenceService can never get a MaaSModelRef.
+Same two access paths as gpt-oss-20b (templates/llminferenceservice-gptoss.yaml):
+  - ai-gateway's own local routing (platform/ai-gateway/provider-routing.yaml)
+    calls this LLMInferenceService's plain -kserve-workload-svc Service
+    directly (port 8000), bypassing router/gateway entirely.
+  - MaaS clients (once templates/maas.yaml's qwen entry lands, WP-076 step 2)
+    reach it through the router/gateway config below.
+No --served-model-name override here yet, same as gpt-oss-20b before its own
+maas.enabled conditional landed: KServe's generated launcher already derives
+`--served-model-name "<spec.model.name>" "publishers/<ns>/models/<metadata.name>"`
+on its own, i.e. "qwen3.6-27b-instruct" and
+"publishers/zuno-ai-run/models/qwen36-27b-instruct" - the WP-076 step that
+adds this model to templates/maas.yaml will add the repeated-flag MaaS-alias
+block then, not before (see llminferenceservice-gptoss.yaml's own comment on
+why the flag must be repeated, not just appended, once that happens).
+S3-only, same as gpt-oss-20b: no PVC/download-Job mode for this model
+anymore (the old modelStorage.downloadJob legacy mode was qwen-only and is
+removed with the classic InferenceService it backed).
+
+ADR-0301 point 4 / ADR-0034: ported unchanged from the retired
+vllm-runtime ServingRuntime - this is the ONE runtime loraAdapters ever
+attaches to (ADR-0303: "only the qwen one registers loraAdapters" -
+gpt-oss-20b's own LLMInferenceService never references loraAdapters at
+all), so removing the old ServingRuntime without porting this would have
+silently orphaned the whole LoRA-adapter feature (values.yaml's
+loraAdapters list would keep validating and rendering nowhere). The
+`{{ fail }}` guard is defense-in-depth alongside values.schema.json's own
+if/then validation (same rule, template-time backstop for callers that
+skip schema validation, e.g. `helm template --skip-schema-validation`).
+UNVERIFIED against a live cluster: no adapter has been trained/registered
+yet (loraAdapters defaults to []) to prove --enable-lora/--lora-modules
+against this base image's vLLM build - confirm with --help before relying
+on it, same caveat the original ServingRuntime carried.
+*/ -}}
+{{- if .Values.maas.enabled }}
+{{- range .Values.loraAdapters }}
+{{- if ne .classification "C1" }}
+{{- fail (printf "loraAdapters[%s].classification=%s cannot attach while maas.enabled is true (externally-eligible serving path) - ADR-0301 point 4/ADR-0021" .name .classification) }}
+{{- end }}
+{{- end }}
+{{- end }}
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+{{- if .Values.loraAdapters }}
+    # ADR-0034: classification propagates to the adapter, not just its
+    # outputs - recorded here per-adapter so it's inspectable (`oc get
+    # llminferenceservice -o yaml`) without needing components/mlops's own
+    # train_manifest.json/S3 state.
+    zuno.io/lora-adapter-classifications: {{ .Values.loraAdapters | mustToJson | quote }}
+{{- end }}
+spec:
+  baseRefs:
+    - name: {{ .Values.llmInferenceService.baseRef }}
+  model:
+    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.servedModelName }}/"
+    name: {{ .Values.servedModelName | quote }}
+  replicas: {{ .Values.minReplicas }}
+  template:
+    # Same generic GPU-family guard the other GPU workloads use; the
+    # resources request's mig-2g.48gb type is the real scheduling steer
+    # (only Card A's managed MIG node advertises it).
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    serviceAccountName: {{ .Values.inferenceServiceName }}-s3
+    containers:
+      - name: main
+        args:
+          # Ported unchanged from the retired vllm-runtime ServingRuntime -
+          # --enforce-eager works around a MIG/NVML CUDA-graph crash on this
+          # vLLM build (see ADR-0518); the tool-call/reasoning parsers are
+          # Qwen3.6's own XML/hybrid-thinking formats.
+          - --max-model-len={{ .Values.maxModelLen }}
+          - --enforce-eager
+          - --enable-auto-tool-choice
+          - --tool-call-parser=qwen3_xml
+          - --reasoning-parser=qwen3
+          {{- if .Values.loraAdapters }}
+          - --enable-lora
+          - --lora-modules
+          {{- range .Values.loraAdapters }}
+          - {{ printf "%s=%s" .name .path | quote }}
+          {{- end }}
+          {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+  router:
+    # An explicit ref is mandatory: an empty gateway: {} does not
+    # auto-create or reuse a Gateway on this RHOAI build, and omitting the
+    # ref makes KServe fall back to a non-existent cluster default. A
+    # dedicated/second gateway was tried and reverted for gpt-oss-20b (see
+    # values.yaml's llmInferenceService.routerGateway comment) - MaaS
+    # mandates route adoption on its own gateway, so this must point
+    # straight at maas-default-gateway.
+    gateway:
+      refs:
+        - name: {{ .Values.llmInferenceService.routerGateway.name }}
+          namespace: {{ .Values.llmInferenceService.routerGateway.namespace }}
+    route: {}
+    # scheduler: {} is not optional - the controller's own defaulting
+    # always adds it to a gateway-enabled LLMInferenceService regardless of
+    # what this manifest sends. excludeInboundPorts is mandatory, not
+    # polish: without it every ext_proc call from maas-default-gateway
+    # resets mid-handshake against this pod's Istio sidecar (ADR-0201/WP-27
+    # root cause, see values.yaml's schedulerAnnotations comment).
+    scheduler:
+      annotations:
+        {{- toYaml .Values.llmInferenceService.schedulerAnnotations | nindent 8 }}

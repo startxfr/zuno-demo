@@ -42,8 +42,9 @@ OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 # default (1800) predates ADR-0518: it was sized against the old chat
 # model's --max-model-len=8192, with headroom for the system prompt
 # (~500) and RAG context (~2500). Both local models now serve 32768
-# (gitops/charts/models/templates/servingruntime.yaml), so this default
-# is deliberately conservative rather than binding - an agent wanting a
+# (gitops/charts/models/templates/llminferenceservice-qwen.yaml,
+# templates/llminferenceservice-gptoss.yaml), so this default is
+# deliberately conservative rather than binding - an agent wanting a
 # larger window declares it explicitly in its own bundle instead of this
 # shared default silently inflating every agent's per-turn token spend.
 HISTORY_TOKEN_BUDGET_DEFAULT = int(os.getenv("HISTORY_TOKEN_BUDGET", "1800"))

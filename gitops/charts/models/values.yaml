@@ -7,28 +7,26 @@ namespace: zuno-ai-run
 # queue depth, TTFT, KV-cache usage, token throughput) for
 # dashboard-ai-models.yaml (ADR-0413). Gates both
 # templates/servicemonitor-vllm.yaml and the extra openshift-monitoring/UWM
-# ingress rule the three templates/networkpolicy*.yaml files add - without
-# that rule the ServiceMonitor renders but the scrape is dead on arrival
-# (each policy's existing allow-list is scoped to ai-gateway/rag-service
-# only). Note this only covers the three classic InferenceServices this
-# chart owns directly; the MaaS LLMInferenceService backend
-# (templates/maas.yaml) is already scraped independently by RHOAI's own
-# LLMInferenceService controller (job
-# "zuno-ai-run/kserve-llm-isvc-vllm-engine-default" already reports
-# vllm:num_requests_running for qwen2.5-7b-instruct-maas) - no
-# ServiceMonitor needed here for that one.
+# ingress rule templates/networkpolicy-embedding.yaml adds - without that
+# rule the ServiceMonitor renders but the scrape is dead on arrival (that
+# policy's existing allow-list is scoped to ai-gateway/rag-service only).
+# ADR-0521 (WP-076): this now only covers the ONE remaining classic
+# InferenceService this chart owns directly (embeddings) - qwen joined
+# gpt-oss-20b as an LLMInferenceService, scraped independently by RHOAI's
+# own LLMInferenceService controller, no ServiceMonitor entry from this
+# chart needed for either.
 metrics:
   enabled: true
 
-servingRuntimeName: vllm-runtime
 inferenceServiceName: qwen36-27b-instruct
 
-# The HF repository id the download Job pulls (hf://<modelId>).
-# ADR-0518: Qwen3.6-27B in the official FP8 checkpoint (~28GB weights) -
-# BF16 (~54GB) would not fit the 2g.48gb MIG slice. The arch is
-# Qwen3_5ForConditionalGeneration (hybrid Gated-DeltaNet linear
-# attention, NOT plain Qwen3 dense) - verified supported by the live
-# rhaii-early-access vLLM image (0.21.0+rhaiv.10) before this migration.
+# The HF repository id the original weights were published under - S3
+# provenance only, no template reads this anymore (ADR-0521 removed the
+# legacy HF-predownload Job that did). ADR-0518: Qwen3.6-27B in the
+# official FP8 checkpoint (~28GB weights) - BF16 (~54GB) would not fit the
+# 2g.48gb MIG slice. The arch is Qwen3_5ForConditionalGeneration (hybrid
+# Gated-DeltaNet linear attention, NOT plain Qwen3 dense) - verified
+# supported by the live rhaii-early-access vLLM image (0.21.0+rhaiv.10).
 modelId: Qwen/Qwen3.6-27B-FP8
 # The OpenAI-compatible API id vLLM serves (--served-model-name) - the
 # platform-wide canonical model id every consumer routes by
@@ -38,6 +36,11 @@ modelId: Qwen/Qwen3.6-27B-FP8
 # ("The model `qwen2.5-7b-instruct` does not exist") - the two ids are
 # different concerns.
 servedModelName: qwen3.6-27b-instruct
+# ADR-0518: 32768 (was 8192 on the 7B model) - Qwen3.6-27B-FP8 leaves
+# ~18GB of the 2g.48gb slice for KV after its ~28GB of weights, comfortable
+# for this length at demo concurrency. If multi-agent load starts
+# 503ing/preempting, lower this before touching anything else.
+maxModelLen: 32768
 
 image:
   # Fallback for `helm template`/standalone testing only; ansible always
@@ -45,7 +48,10 @@ image:
   # OpenShift AI catalog. Intentionally NOT mirrored by ansible/roles/
   # image_mirrors: the real deployed image is discovered live (ADR-0048),
   # so this static fallback is never what's actually running - mirroring it
-  # wouldn't reduce real quay.io traffic.
+  # wouldn't reduce real quay.io traffic. ADR-0521: now consumed only by
+  # templates/servingruntime-embedding.yaml - the chat model's own
+  # LLMInferenceService gets its image from llmInferenceService.baseRef
+  # instead.
   vllm: quay.io/modh/vllm:rhoai-2.16-cuda
   pullPolicy: IfNotPresent
 
@@ -73,6 +79,30 @@ resources:
 
 minReplicas: 1
 maxReplicas: 1
+
+# ADR-0521 (WP-076): qwen3.6-27b-instruct as an LLMInferenceService - same
+# shape as gptOssModel.llmInferenceService below, factored out because this
+# IS the top-level/default model's own config (see inferenceServiceName
+# above), not a second named model.
+llmInferenceService:
+  # Same RHOAI 3.5 EA2 vLLM/CUDA preset gpt-oss-20b uses (`oc get
+  # llminferenceserviceconfig -n redhat-ods-applications`) - confirmed live
+  # to resolve to the exact same image digest the retired vllm-runtime
+  # ServingRuntime pinned, so this migration is not an image change.
+  baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+  # Same gpt-oss-20b routing constraint (see gptOssModel.llmInferenceService
+  # below for the full "why not a dedicated gateway" history) - MaaS
+  # mandates route adoption on maas-default-gateway itself.
+  routerGateway:
+    name: maas-default-gateway
+    namespace: openshift-ingress
+    manage: false
+  # ADR-0201/WP-27: the controller-generated scheduler (EPP) pod's Istio
+  # sidecar resets every ext_proc TLS handshake from maas-default-gateway
+  # on port 9002 unless excluded from interception - same fix gpt-oss-20b
+  # needed, see gptOssModel.llmInferenceService.schedulerAnnotations.
+  schedulerAnnotations:
+    traffic.sidecar.istio.io/excludeInboundPorts: "9002"
 
 # ADR-0301 (WP-34 Part B): vLLM native multi-LoRA, additive to the same
 # ServingRuntime/InferenceService above - NOT a second deployment per
@@ -113,53 +143,23 @@ loraAdapters: []
 #     path: /mnt/loras/comage-lora
 #     classification: C2
 
-# Predownloads the chat model into a PVC (via templates/job-model-download.yaml)
-# instead of storageUri: hf://, which downloads straight into the GPU
-# node's ephemeral root disk on every pod (re)start. Verified on-cluster:
-# the node's 75GB root volume can't hold the CUDA vLLM image (17.67GB) + a
-# fresh ~15GB hf:// download + NVIDIA driver build artifacts (~7GB) at
-# once - kubelet evicted the pod for ephemeral-storage pressure on first
-# real deploy. A PVC survives pod restarts and isn't bounded by node disk
-# size.
+# ADR-0521: the legacy HF-predownload PVC/Job mode (pvc-model.yaml,
+# job-model-download.yaml) was qwen-only and is removed along with the
+# classic InferenceService it backed - the chat model is S3-only now, same
+# as gpt-oss-20b (templates/llminferenceservice-qwen.yaml). What's left of
+# this block is shared with paths that never depended on that toggle:
+# storageClassName/initializerImage are also read by
+# templates/pvc-lmeval-cache.yaml and templates/job-lmeval-cache-prefetch.yaml
+# for the (unrelated) lm-eval tokenizer cache.
 modelStorage:
-  # Feature flag (ansible passes zuno_models_download_enabled, default
-  # false - the model is staged in modelsS3 below, so the HF predownload
-  # is opt-in, no longer a Day 1 step). Gates pvc-model.yaml
-  # and job-model-download.yaml TOGETHER and flips inferenceservice.yaml's
-  # storageUri in the same conditional - never gate the Job alone: with
-  # this app's automated.prune a skipped PVC gets deleted under the
-  # running predictor, and a PVC rendered without its consumer Job
-  # deadlocks a fresh sync at wave -15 (see pvc-model.yaml's header).
-  # true (chart default, so `helm template`/standalone keeps the legacy
-  # rendering): HF -> PVC predownload + storageUri: pvc://.
-  # false: the predictor reads s3://<modelsS3.bucket>/<modelsS3.prefix>/
-  # <servedModelName>/ through templates/s3-serving-credentials.yaml -
-  # the per-(re)start download cost above returns, but ~15GB from
-  # same-region S3, not a flaky HF transfer, and no single-AZ PVC pinning.
-  downloadJob:
-    enabled: true
-  size: 30Gi
   storageClassName: gp3-csi
-  # gp3-csi is WaitForFirstConsumer + single-AZ (EBS): the download Job (the
-  # PVC's first consumer) and the predictor must land in the same zone, or
-  # the predictor's mount fails with a volume node-affinity conflict once
-  # the PVC is bound elsewhere. No zone is pinned here: a hardcoded value
-  # stops matching the live GPU node's actual zone the moment the demo's
-  # GPU topology changes underneath it, driving both the predictor and the
-  # MaaS backend Pending. Both job-model-download.yaml and
-  # inferenceservice.yaml instead nodeSelect on the generic
-  # `nvidia.com/gpu.present: "true"` NFD label: WaitForFirstConsumer means
-  # the PVC only binds once the download Job's pod actually lands, so it
-  # always binds in whichever zone that GPU node turns out to be in - no
-  # zone value to keep in sync, and it keeps working as more GPU nodes are
-  # added in other zones.
   # Pinned to the odh-kserve-storage-initializer image this cluster's own
-  # KServe controller already generates for the hf:// init container
-  # (read off the live InferenceService's generated pod spec) - unlike
-  # image.vllm (ADR-0048), this is not (yet) discovered at deploy time.
-  # Mirrored through the zuno-ai-build ImageStream (ansible/roles/
-  # image_mirrors, tag "rhel9", importPolicy.scheduled: false so the
-  # mirror stays pinned to this exact digest).
+  # KServe controller generates for hf:// init containers (read off a live
+  # generated pod spec) - unlike image.vllm (ADR-0048), this is not (yet)
+  # discovered at deploy time. Mirrored through the zuno-ai-build
+  # ImageStream (ansible/roles/image_mirrors, tag "rhel9",
+  # importPolicy.scheduled: false so the mirror stays pinned to this exact
+  # digest).
   initializerImage: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-kserve-storage-initializer-rhel9:rhel9
 
 # Where model weights live in S3 (ansible: zuno_models_s3_bucket /
@@ -196,9 +196,11 @@ modelsS3:
 # gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and
 # rag-service's query-side embedding calls. inferenceServiceName is
 # "embeddings", not "embeddings-predictor": KServe RawDeployment appends
-# "-predictor" to the InferenceService name to build its Service name
-# (see qwen36-27b-instruct -> qwen36-27b-instruct-predictor below), and
-# gitops/charts/rag-service/values.yaml's embeddingServiceUrl /
+# "-predictor" to a classic InferenceService's own name to build its
+# Service name (this is still the last classic InferenceService this
+# chart owns - qwen joined gpt-oss-20b as an LLMInferenceService under
+# ADR-0521, which names its Service <name>-kserve-workload-svc instead),
+# and gitops/charts/rag-service/values.yaml's embeddingServiceUrl /
 # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL default
 # already hardcode http://embeddings-predictor.zuno-ai-run.svc:8080 -
 # this closes that previously-dangling reference rather than inventing a
@@ -487,9 +489,13 @@ lmEval:
   jobs:
     - name: qwen36-27b-instruct-mmlu
       model: local-completions
+      # ADR-0521: qwen is an LLMInferenceService now, no more
+      # -predictor Service - https on port 8000 like gpt-oss-20b's own
+      # -kserve-workload-svc, hence trustLocalCA below.
+      trustLocalCA: true
       modelArgs:
         - name: base_url
-          value: http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1/completions
+          value: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1/completions
         - name: model
           value: qwen3.6-27b-instruct
         # lm-eval-harness's TemplateAPI defaults to

@@ -28,76 +28,47 @@ deploying the `values.yaml` fallback; bypass discovery entirely with
 
 ## RawDeployment, not Serverless
 
-`templates/inferenceservice.yaml` sets
-`serving.kserve.io/deploymentMode: Standard` explicitly, matching the
-`openshift_ai` role's cluster-wide `kserve.serving.managementState: Removed`
-(`ansible/roles/openshift_ai/tasks/prepare.yml`) - this model runs
-`minReplicas == maxReplicas == 1`, always on, with no use for Serverless's
-scale-to-zero, and RawDeployment avoids requiring the Service Mesh/
-Serverless operators plus cert-manager that Serverless mode would need
-(none of which this repository installs).
+The chat model (`templates/llminferenceservice-qwen.yaml`, ADR-0521) and
+the embedding model (`templates/inferenceservice-embedding.yaml`) both run
+`minReplicas == maxReplicas == 1`/`replicas: 1`, always on, with no use for
+Serverless's scale-to-zero. `openshift_ai`'s cluster-wide
+`kserve.serving.managementState: Removed`
+(`ansible/roles/openshift_ai/tasks/prepare.yml`) means neither model
+requires the Service Mesh/Serverless operators plus cert-manager that
+Serverless mode would need (none of which this repository installs); the
+embedding model's classic `InferenceService` sets
+`serving.kserve.io/deploymentMode: Standard` explicitly for the same
+reason.
 
 Depends on the `openshift_ai` role's `DataScienceCluster` having the
 `kserve` component enabled, and the `nvidia_gpu` role's GPU Operator
 (with `nfd` prepared first) being ready - all Day 0 components installed
 before `models` (a Day 1 component) in `ansible/playbooks/day0_install.yml`.
 
-## Chat model storage: S3 by default, opt-in HF→PVC predownload
+## Chat model storage: S3, straight into the LLMInferenceService
 
 Since 2026-08-18 the chat model's weights are staged in S3
 (`s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/`, see
 `values.yaml`'s `modelsS3` block - same bucket/credential as
-rag-ingestion's corpus, `models/` prefix) and
-`modelStorage.downloadJob.enabled` picks how the predictor gets them:
+rag-ingestion's corpus, `models/` prefix). `templates/llminferenceservice-
+qwen.yaml`'s `spec.model.uri` reads straight from there, authenticated via
+the `ServiceAccount` + `serving.kserve.io/s3-*`-annotated Secret from
+`templates/s3-serving-credentials.yaml` - the same mechanism (and Vault
+`rag/s3` credential) `templates/s3-serving-credentials-gptoss.yaml` uses
+for gpt-oss-20b's own `LLMInferenceService`. KServe's storage-initializer
+downloads ~15GB from same-region S3 onto the node at pod (re)start.
 
-- **`false` (what `ansible/roles/models` passes by default, via
-  `zuno_models_download_enabled`)**: no PVC, no download Job.
-  `templates/inferenceservice.yaml` uses `storageUri: s3://...` with the
-  `ServiceAccount` + `serving.kserve.io/s3-*`-annotated Secret from
-  `templates/s3-serving-credentials.yaml` - the same mechanism (and Vault
-  `rag/s3` credential) the MaaS `LLMInferenceService` already uses in
-  `templates/maas.yaml`. KServe's storage-initializer downloads ~15GB
-  from same-region S3 onto the node at pod (re)start.
-- **`true` (chart default, so standalone `helm template` keeps the legacy
-  rendering)**: `templates/pvc-model.yaml` +
-  `templates/job-model-download.yaml` predownload the model from Hugging
-  Face into a PVC once, and `storageUri: pvc://...` mounts it with no
-  download step at pod start. This was the original design: the GPU
-  node's 75GB root volume couldn't hold the CUDA vLLM image (17.67GB) +
-  a fresh ~15GB `hf://` download + NVIDIA driver build artifacts (~7GB)
-  at once, and in-cluster HF transfers to ephemeral storage proved
-  unreliable besides (see `templates/maas.yaml`'s hang history).
-
-The flag flips the PVC, the Job and the `storageUri` **as one unit** -
-never gate the Job alone: with this app's `automated.prune` an
-un-rendered PVC is deleted under the running predictor, and a PVC
-rendered without its consumer Job deadlocks a fresh sync at wave -15
-(`templates/pvc-model.yaml`'s deadlock note). The embedding model is
-unaffected (still `storageUri: hf://`, ~130MB).
-
-The rest of this section documents the **`enabled: true`** (PVC) mode:
-
-The PVC and the download Job are both plain sync-wave resources (both
-wave -15, before the ServingRuntime's -5 - sharing one wave is
-load-bearing, see `templates/pvc-model.yaml`'s deadlock note), not ArgoCD `PreSync`
-hooks - hooks would make ArgoCD delete and recreate the PVC (and its
-~15GB downloaded model) on every resync. As plain, wave-ordered resources,
-ArgoCD only touches either object again when its own spec actually
-changes; the Job's pod, one wave later, is still `gp3-csi`'s first
-consumer, so `WaitForFirstConsumer` binding still works.
-
-Both the Job and the `InferenceService`'s predictor carry the same
-`nodeSelector: nvidia.com/gpu.present: "true"` - not a specific zone.
-`gp3-csi` is single-AZ (EBS), so the PVC only mounts on nodes in the zone it
-bound in, but since `WaitForFirstConsumer` delays binding until the Job's
-pod is actually scheduled, the PVC always ends up bound in whichever zone
-that GPU node happens to be in - and the predictor, requiring a GPU node
-too, is then implicitly constrained to a matching node by the bound PV's
-own node-affinity. Neither template needs to know the zone name, and this
-keeps working unchanged as GPU nodes are added in other zones. (An earlier
-version of this chart hardcoded a zone value here - see `values.yaml`'s
-`modelStorage` comment for why that broke the moment the demo's GPU
-topology changed.)
+ADR-0521 removed the earlier HF→PVC predownload alternative
+(`templates/pvc-model.yaml` + `templates/job-model-download.yaml`, gated
+by a now-deleted `modelStorage.downloadJob.enabled` flag) along with the
+classic `InferenceService`/`ServingRuntime` pair it backed: a classic
+`InferenceService` can never get a `MaaSModelRef` (confirmed via `oc
+explain maasmodelref.spec.modelRef.kind` - `LLMInferenceService` or
+`ExternalModel` only), so the chat model had to become an
+`LLMInferenceService` to ever be MaaS-published, same as gpt-oss-20b
+before it (ADR-0414). The embedding model is unaffected - still its own
+classic `InferenceService`/`ServingRuntime` pair, `storageUri: hf://`,
+~130MB, no MaaS involvement.
 
 ## Second model: embeddings
 
@@ -134,27 +105,28 @@ filesystem `path` vLLM reads it from, and its inherited classification
 request is static config here - dynamic, per-request selection is
 ADR-0303/WP-39's own scope, not this chart's.
 
-**Adapter download is not wired up yet** - unlike the chat model's own
-PVC + `job-model-download.yaml` predownload, nothing in this chart moves
-a registered adapter onto the pod's filesystem at the declared `path`.
-An operator promoting an adapter today must also arrange for it to land
+**Adapter download is not wired up yet** - nothing in this chart moves a
+registered adapter onto the pod's filesystem at the declared `path`. An
+operator promoting an adapter today must also arrange for it to land
 there (a follow-up PVC/init-container, deliberately out of this WP's own
 ~4-file scope) before it actually serves traffic.
 
 **Classification gate**: `values.schema.json` and
-`templates/servingruntime.yaml`'s own template-time `fail` both reject
-any `loraAdapters[]` entry with `classification` other than `C1` while
-`maas.enabled` is `true` (ADR-0201 publishes this same InferenceService
-externally, making it an externally-eligible serving path) - a C2/C3
-adapter must never widen ADR-0021's C1/C2/C3 routing. Two independent
-enforcements (schema + template) so the rule holds even for a caller that
-renders this chart without schema validation.
+`templates/llminferenceservice-qwen.yaml`'s own template-time `fail`
+(ADR-0521 - formerly `templates/servingruntime.yaml`'s, before the chat
+model's classic `InferenceService`/`ServingRuntime` pair was retired) both
+reject any `loraAdapters[]` entry with `classification` other than `C1`
+while `maas.enabled` is `true` (ADR-0201 publishes an
+`LLMInferenceService` externally, making it an externally-eligible serving
+path) - a C2/C3 adapter must never widen ADR-0021's C1/C2/C3 routing. Two
+independent enforcements (schema + template) so the rule holds even for a
+caller that renders this chart without schema validation.
 
 `ansible/roles/models/tasks/precheck.yml` reads the declared adapter set
-back off the ServingRuntime's own `zuno.io/lora-adapter-classifications`
-annotation (never re-parsing `values.yaml`, so it always agrees with
-what's actually deployed) and queries the predictor's `/v1/models`
-endpoint to report whether each one is actually loaded - diagnostic only,
-UNVERIFIED against a live cluster (no GPU/vLLM instance in this repo's
-sandbox to confirm the exact `/v1/models` response shape with LoRA
-modules loaded).
+back off the `LLMInferenceService`'s own
+`zuno.io/lora-adapter-classifications` annotation (never re-parsing
+`values.yaml`, so it always agrees with what's actually deployed) and
+queries the workload's `/v1/models` endpoint to report whether each one is
+actually loaded - diagnostic only, UNVERIFIED against a live cluster (no
+GPU/vLLM instance in this repo's sandbox to confirm the exact `/v1/models`
+response shape with LoRA modules loaded).

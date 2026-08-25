@@ -129,16 +129,16 @@ zuno_aap_hub_s3_secret_access_key: "xxxxxx"
 
 # --- Model weights storage (gitops/charts/models) ---------------------------
 # Not secrets - listed here because this file is where every ansible-driven
-# feature flag/S3 knob lives; all three have defaults in
+# feature flag/S3 knob lives; both have defaults in
 # ansible/roles/models/tasks/install.yml, so they may be omitted entirely.
-# zuno_models_download_enabled: re-enables the legacy Day 1 HF->PVC
-# predownload Job (qwen36-27b-instruct-model-download). Default false: the
-# chat model's weights are staged in the bucket below and the predictor
-# reads them straight from S3 (same rag/s3 Vault credential as the RAG
-# corpus - reuses zuno_rag_s3_* above, no extra secret).
 # zuno_models_s3_bucket/_prefix: which bucket and directory contain the
-# model weights, layout s3://<bucket>/<prefix>/<servedModelName>/.
-zuno_models_download_enabled: false
+# model weights, layout s3://<bucket>/<prefix>/<servedModelName>/ - every
+# local model (both LLMInferenceServices, ADR-0521) reads straight from
+# S3 (same rag/s3 Vault credential as the RAG corpus - reuses
+# zuno_rag_s3_* above, no extra secret). ADR-0521 removed the legacy Day 1
+# HF->PVC predownload Job this bucket/prefix pair used to be an
+# alternative to (zuno_models_download_enabled, qwen-only, gone with the
+# classic InferenceService it backed).
 zuno_models_s3_bucket: "zuno-demo-rag-corpus"
 zuno_models_s3_prefix: "models"
 

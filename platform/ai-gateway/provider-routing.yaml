@@ -67,10 +67,15 @@
 # see the ADR for the full key. No entry below sets it yet.
 
 providers:
+  # ADR-0521: qwen is an LLMInferenceService now (no more <name>-predictor
+  # Service), same shape local-gpt-oss already has below - see that
+  # entry's own comment for the full https/CA-bundle rationale, which
+  # applies identically here (LOCAL_GPT_OSS_CA_BUNDLE already covers any
+  # local candidate, not just gpt-oss, despite the env var's name).
   - name: local
     kind: local
     model: qwen3.6-27b-instruct
-    endpoint: http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1
+    endpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
     eligible_for: [C1, C2, C3]

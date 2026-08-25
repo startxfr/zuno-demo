@@ -21,7 +21,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import providers  # noqa: E402
 from app.routing import ProviderCandidate  # noqa: E402
 
-_QWEN_URL = "http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1"
+# ADR-0521: qwen is an LLMInferenceService now too, reached via its own
+# -kserve-workload-svc Service (port 8000), not a classic predictor.
+_QWEN_URL = "https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1"
 # ADR-0414: gpt-oss-20b is now an LLMInferenceService, reached via its own
 # -kserve-workload-svc Service (port 8000), not a classic predictor.
 _GPTOSS_URL = "http://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1"

@@ -79,14 +79,14 @@ def chat_model_for(
     if candidate.kind == "local":
         from langchain_openai import ChatOpenAI
 
-        # 2026-08-21: local-gpt-oss's endpoint is https (its
-        # LLMInferenceService pod terminates real TLS, unlike qwen's classic
-        # ServingRuntime, which stays plain http) - see provider-routing.yaml's
-        # own comment on that endpoint. LOCAL_GPT_OSS_CA_BUNDLE, when set,
+        # 2026-08-21/ADR-0521: every local candidate's endpoint is https now
+        # (both are LLMInferenceServices, which always terminate real TLS -
+        # see provider-routing.yaml's own comments on the `local` and
+        # `local-gpt-oss` entries). LOCAL_GPT_OSS_CA_BUNDLE, when set,
         # points at the namespace's openshift-service-ca.crt ConfigMap
         # (gitops/charts/ai-gateway's deployment.yaml) so that cert verifies
-        # instead of failing closed. Harmless for qwen's plain-http endpoint -
-        # httpx's verify= is simply unused there.
+        # instead of failing closed - despite the env var's gpt-oss-specific
+        # name, it applies to any local candidate reaching this branch.
         http_async_client = None
         ca_bundle = os.getenv("LOCAL_GPT_OSS_CA_BUNDLE")
         if ca_bundle:
@@ -99,7 +99,7 @@ def chat_model_for(
                 "endpoint",
                 os.getenv(
                     "LOCAL_MODEL_ENDPOINT",
-                    "http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1",
+                    "https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1",
                 ),
             ),
             api_key=os.getenv("LOCAL_MODEL_API_KEY", "not-required"),

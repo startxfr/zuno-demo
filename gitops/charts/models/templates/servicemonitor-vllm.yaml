@@ -14,21 +14,22 @@
 # successfully and never be scraped by prometheus-k8s, the Prometheus that
 # actually backs the dashboards and Thanos querier Grafana reads from.
 #
-# One ServiceMonitor for the two classic-predictor Services this chart
-# still owns (qwen36-27b-instruct-predictor, embeddings-predictor) via
-# matchExpressions on the label KServe stamps on every predictor Service,
-# rather than near-identical CRs per model - both expose port 80 (name
-# "http") -> targetPort 8080, the same port templates/servingruntime*.yaml's
+# One ServiceMonitor for the ONE classic-predictor Service this chart
+# still owns (embeddings-predictor) via matchExpressions on the label
+# KServe stamps on every predictor Service - port 80 (name "http") ->
+# targetPort 8080, the same port templates/servingruntime-embedding.yaml's
 # --port=8080 and the NetworkPolicy ingress rules below assume. The
-# embeddings runtime may not populate the vllm:* series the same way the
+# embeddings runtime may not populate the vllm:* series the same way a
 # chat runtime does (pooling/embed mode, not generation) - harmless
 # either way, it simply contributes no series.
-# ADR-0414: gpt-oss-20b is no longer a classic predictor - it's an
-# LLMInferenceService now (templates/llminferenceservice-gptoss.yaml),
-# scraped independently by RHOAI's own LLMInferenceService controller
-# (same mechanism already used for the old qwen-maas-backend:
-# vllm:num_requests_running was already present for it with no
-# ServiceMonitor from this chart) - no entry needed here.
+# ADR-0414/ADR-0521: neither gpt-oss-20b nor qwen3.6-27b-instruct is a
+# classic predictor anymore - both are LLMInferenceServices now
+# (templates/llminferenceservice-gptoss.yaml,
+# templates/llminferenceservice-qwen.yaml), scraped independently by
+# RHOAI's own LLMInferenceService controller (same mechanism already used
+# for the old qwen-maas-backend: vllm:num_requests_running was already
+# present for it with no ServiceMonitor from this chart) - no entry
+# needed here for either.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

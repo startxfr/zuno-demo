@@ -147,7 +147,7 @@ metric and the request's own trace span (`app/telemetry.py:record_cache_outcome`
 |---|---|---|
 | `KEYCLOAK_ISSUER` | `https://keycloak-zuno.apps.mycluster.example.com/realms/zuno` | JWT issuer / JWKS base |
 | `PROVIDER_ROUTING_PATH` | `/app/config/provider-routing.yaml` | routing config (ConfigMap-mounted, not baked into the image) |
-| `LOCAL_MODEL_ENDPOINT` | `http://qwen36-27b-instruct-predictor.zuno-ai-run.svc:8080/v1` | local vLLM `InferenceService` OpenAI-compatible base URL |
+| `LOCAL_MODEL_ENDPOINT` | `https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1` | local vLLM `LLMInferenceService` OpenAI-compatible base URL |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` | unset | sourced from the `ExternalSecret`s `ansible/roles/llm` registers against `zuno/providers/<name>` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces/metrics |
 | `SEMANTIC_CACHE_ENABLED` | `false` | global cache switch (chart value `semanticCache.enabled`) |

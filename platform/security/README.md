@@ -23,8 +23,8 @@ instead of the full baseline, because this repo does not control their raw
 PodSpec and guessing at unverified CRD/chart fields risks breaking the
 workload outright rather than hardening it - see the comments in
 `gitops/charts/keycloak/templates/keycloak.yaml` (Keycloak Operator) and
-`gitops/charts/models/templates/servingruntime.yaml` (KServe vLLM
-container: needs a writable HuggingFace/compilation cache, so
+`gitops/charts/models/templates/servingruntime-embedding.yaml` (KServe
+vLLM container: needs a writable HuggingFace/compilation cache, so
 `readOnlyRootFilesystem` is intentionally not set). Crunchy Postgres
 Operator (PGO, `gitops/charts/postgresql`) and the upstream HashiCorp
 Vault chart (`gitops/apps/vault/application-d1.yaml`) are not checked at all
