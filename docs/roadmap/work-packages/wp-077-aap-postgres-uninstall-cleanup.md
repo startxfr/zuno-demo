@@ -1,8 +1,12 @@
 # WP-077: Automate aap/aap-eda Postgres cleanup on `aap` uninstall/install
 
-- **State:** Code committed 2026-08-25, corrected after first live run
-  exposed a wrong assumption (see "Correction" below), pending a full
-  clean live run.
+- **State:** Done (live-verified 2026-08-25). Full `make d1 uninstall aap`
+  + `make d1 install aap` cycle completed with zero manual intervention:
+  all pods Running, CR `Successful`/no failures, Gateway API 200, no
+  `InvalidToken`/"permission denied for schema public" anywhere,
+  `aap`/`aap-eda` correctly recreated with matching database+schema
+  grants, ArgoCD apps Synced/Healthy, Hub still on S3 (WP-075) with
+  api/content/worker correctly co-located on one node.
 - **Depends on:** WP-072 (`aap` chart/role), WP-075 ([[wp075-aap-hub-s3-live-verified]]).
 - **Related:** [[aap-uninstall-reinstall-encryption-key-trap]]
 
