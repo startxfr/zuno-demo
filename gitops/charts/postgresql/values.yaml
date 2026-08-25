@@ -282,3 +282,20 @@ aapEdaDatabase:
   name: aap-eda
   owner: aapeda
   vaultPath: aap-eda/postgresql-app
+
+# AAP 2.7's Automation Metrics service (auto-deployed by the AAP operator).
+# With type: unmanaged postgres the operator cannot provision anything, so
+# this database/role follows the same BYO-password pattern as the four AAP
+# databases above.
+aapMetricsDatabase:
+  name: metricsservice
+  owner: metricsservice
+  vaultPath: aap-metrics/postgresql-app
+
+# Read-only role the Metrics service uses to read the Controller database.
+# Not a database of its own: PGO creates the role (spec.users entry with
+# aap-controller in its databases list) and ansible/roles/postgresql's
+# post-rollout SQL applies the actual SELECT-only grants.
+aapMetricsReadOnly:
+  owner: msawxreadonly
+  vaultPath: aap-metrics/postgresql-awx-readonly

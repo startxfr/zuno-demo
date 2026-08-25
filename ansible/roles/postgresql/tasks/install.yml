@@ -312,6 +312,46 @@
   retries: 30
   delay: 10
 
+# spec.databaseInitSQL is once-at-bootstrap only: databases/roles added to
+# the chart AFTER the cluster first initialized (e.g. metricsservice,
+# msawxreadonly) never get their extensions/grants from PGO. The script is
+# fully idempotent (CREATE EXTENSION IF NOT EXISTS / GRANT / ALTER DEFAULT
+# PRIVILEGES), so replay it as superuser on every install. Retried because
+# a `\connect` to a database PGO is still creating fails under
+# ON_ERROR_STOP until the reconcile catches up.
+- name: "postgresql | read the init.sql ConfigMap"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: zuno-data
+    name: zuno-postgresql-init-sql
+  register: _postgresql_init_sql_cm
+  until: (_postgresql_init_sql_cm.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+
+# psql -c cannot mix \connect meta-commands with SQL, so ship the script
+# into the pod and run it with -f (same reason the schema-apply Jobs
+# mount their SQL as files).
+- name: "postgresql | copy init.sql into the primary pod"
+  kubernetes.core.k8s_cp:
+    namespace: zuno-data
+    pod: "{{ _postgresql_primary_pod.resources[0].metadata.name }}"
+    container: database
+    remote_path: /tmp/zuno-init-replay.sql
+    content: "{{ _postgresql_init_sql_cm.resources[0].data['init.sql'] }}"
+
+- name: "postgresql | replay init.sql idempotently (covers databases added after bootstrap)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: "{{ _postgresql_primary_pod.resources[0].metadata.name }}"
+    container: database
+    command: psql -U postgres -f /tmp/zuno-init-replay.sql
+  register: _postgresql_init_sql_replay
+  until: _postgresql_init_sql_replay.rc | default(1) == 0
+  retries: 30
+  delay: 10
+  changed_when: true
+
 - name: "postgresql | configure summary"
   ansible.builtin.debug:
     msg: >-

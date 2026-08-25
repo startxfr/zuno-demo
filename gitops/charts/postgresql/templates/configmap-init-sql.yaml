@@ -84,4 +84,17 @@ data:
     -- needed, unlike the embeddings-bearing databases above.
     \connect {{ .Values.conversationsDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.conversationsDatabase.owner }};
+
+    -- AAP 2.7 Automation Metrics service (Django) - plain relational.
+    \connect {{ .Values.aapMetricsDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.aapMetricsDatabase.owner }};
+
+    -- Metrics' read-only access to the Controller database: PGO only
+    -- grants database-level CONNECT; table reads need explicit grants.
+    -- ALTER DEFAULT PRIVILEGES covers the tables the Controller's own
+    -- migrations create later (they run as the owner role below).
+    \connect {{ .Values.aapControllerDatabase.name }}
+    GRANT USAGE ON SCHEMA public TO {{ .Values.aapMetricsReadOnly.owner }};
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ .Values.aapMetricsReadOnly.owner }};
+    ALTER DEFAULT PRIVILEGES FOR ROLE {{ .Values.aapControllerDatabase.owner }} IN SCHEMA public GRANT SELECT ON TABLES TO {{ .Values.aapMetricsReadOnly.owner }};
 {{- end }}

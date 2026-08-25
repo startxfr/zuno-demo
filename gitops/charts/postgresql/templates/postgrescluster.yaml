@@ -253,6 +253,16 @@ spec:
     - name: {{ .Values.aapEdaDatabase.owner }}
       databases:
         - {{ .Values.aapEdaDatabase.name }}
+    - name: {{ .Values.aapMetricsDatabase.owner }}
+      databases:
+        - {{ .Values.aapMetricsDatabase.name }}
+    # Read-only metrics access to the Controller database: PGO only
+    # creates the role and grants database-level access (sharing a
+    # database between users is supported); the SELECT-only table grants
+    # come from ansible/roles/postgresql's post-rollout SQL.
+    - name: {{ .Values.aapMetricsReadOnly.owner }}
+      databases:
+        - {{ .Values.aapControllerDatabase.name }}
 
   # Runs once at bootstrap against "postgres", not the app database - see
   # templates/configmap-init-sql.yaml's `\connect` comment for why.

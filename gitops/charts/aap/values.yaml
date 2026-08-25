@@ -84,6 +84,23 @@ postgresql:
     database: aap-eda
     secretName: aap-eda-postgres-config
     vaultPath: aap-eda/postgresql-app
+  # AAP 2.7's Automation Metrics service - deployed by the operator even
+  # when unconfigured, with generated secrets pointing at databases nobody
+  # provisions (its awx read default even targets a database literally
+  # named "automationcontroller"; ours is aap-controller). Both connection
+  # secrets are therefore overridden from Vault here, same pattern as the
+  # four components above.
+  metrics:
+    database: metricsservice
+    secretName: aap-metrics-postgres-config
+    vaultPath: aap-metrics/postgresql-app
+  # The Metrics service's read-only connection into the Controller
+  # database (username/password from Vault; SELECT grants applied by
+  # ansible/roles/postgresql's post-rollout SQL).
+  metricsReadOnly:
+    database: aap-controller
+    secretName: aap-metrics-read-config
+    vaultPath: aap-metrics/postgresql-awx-readonly
 
 # Non-HA sizing (ADR-0354 clause 3) - every sub-component's replica count
 # trimmed to its minimum. Field names confirmed live via `oc explain`

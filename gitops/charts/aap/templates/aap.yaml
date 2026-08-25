@@ -37,6 +37,21 @@ spec:
     web_replicas: {{ .Values.sizing.controller.webReplicas }}
     task_replicas: {{ .Values.sizing.controller.taskReplicas }}
     postgres_configuration_secret: {{ .Values.postgresql.controller.secretName }}
+  # AAP 2.7's Automation Metrics service is deployed by the operator even
+  # with no spec.metrics block, generating connection secrets for
+  # databases nobody provisions on our unmanaged postgres (its awx read
+  # default even targets a database named "automationcontroller"; ours is
+  # aap-controller) - the web pod then CrashLoops on /health 503
+  # (diagnosed live 2026-08-25). Field shape mirrors what the operator
+  # itself writes to the generated MetricsService CR
+  # (spec.database.{database_secret,externally_managed,
+  # ms_awx_readonly_user_secret}); aap.spec.metrics is an opaque
+  # passthrough on this CRD version.
+  metrics:
+    database:
+      database_secret: {{ .Values.postgresql.metrics.secretName }}
+      externally_managed: true
+      ms_awx_readonly_user_secret: {{ .Values.postgresql.metricsReadOnly.secretName }}
   hub:
     postgres_configuration_secret: {{ .Values.postgresql.hub.secretName }}
     storage_type: {{ .Values.hub.storageType }}
