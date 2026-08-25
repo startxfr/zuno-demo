@@ -15,6 +15,18 @@
     _diag_component: >-
       {{ gitops_component_name
          | default(gitops_app_name | regex_replace('^zuno-', '') | regex_replace('-d[01]$', '')) }}
+    # This file is reached from apply_gitops_app.yml/check_gitops_app_state.yml,
+    # which ~30 roles call across Day 0, Day 1 and Day 2 - so a hardcoded
+    # "make d0 reconcile" printed a command the Makefile rejects for every
+    # Day 1 and Day 2 component. zuno_day is set by each dayN_*.yml playbook.
+    # Deliberately NOT gitops_app_phase: that is the ArgoCD Application phase
+    # (openshift-ai has both a d0 and a d1 Application while being a Day 1
+    # make component), a different axis from which `make dN` accepts it.
+    _diag_fix_cmd: >-
+      {{ ('make d2 install ' if (zuno_day | default('d0')) == 'd2'
+          else 'make ' ~ (zuno_day | default('d0')) ~ ' reconcile ')
+         ~ (gitops_component_name
+            | default(gitops_app_name | regex_replace('^zuno-', '') | regex_replace('-d[01]$', ''))) }}
 
 - name: "diagnose | look up Application {{ gitops_app_name }}"
   kubernetes.core.k8s_info:
@@ -33,7 +45,7 @@
       state: "NotFound"
       cause: "The Application manifest was never applied to the cluster (Applications are Ansible-applied, not git-synced - ADR-0311)"
       solution: "Re-apply gitops/apps/{{ _diag_component }}/ via install or reconcile"
-      auto_fix: "make d0 reconcile {{ _diag_component }}"
+      auto_fix: "{{ _diag_fix_cmd }}"
   when: (_diag_app.resources | default([]) | length) == 0
 
 # Everything below reads the live Application status once.
@@ -51,7 +63,7 @@
       state: "condition {{ item.type }}"
       cause: "{{ item.message | default('no condition message') }}"
       solution: "Fix the Application source/spec error above, then re-sync"
-      auto_fix: "make d0 reconcile {{ _diag_component }}"
+      auto_fix: "{{ _diag_fix_cmd }}"
   loop: "{{ (_diag_status.conditions | default([])) | selectattr('type', 'search', 'Error') | list }}"
   loop_control:
     label: "{{ item.type }}"
@@ -66,7 +78,7 @@
       state: "sync operation {{ _diag_status.operationState.phase }}"
       cause: "{{ _diag_status.operationState.message | default('no operation message') }}"
       solution: "Resolve the sync error above, then retry the sync"
-      auto_fix: "make d0 reconcile {{ _diag_component }}"
+      auto_fix: "{{ _diag_fix_cmd }}"
   when:
     - (_diag_app.resources | default([]) | length) > 0
     - (_diag_status.operationState.phase | default('')) in ['Failed', 'Error']
@@ -95,7 +107,7 @@
       state: "sync={{ blocked.status | default('n/a') }}, health={{ blocked.health.status | default('n/a') }}"
       cause: "{{ blocked.health.message | default('no health message reported') }}"
       solution: "Inspect with `oc get {{ blocked.kind | default('?') | lower }} {{ blocked.name | default('?') }}{{ (' -n ' + blocked.namespace) if blocked.namespace is defined else '' }}`; usually fixed by a re-sync/re-apply"
-      auto_fix: "make d0 reconcile {{ _diag_component }}"
+      auto_fix: "{{ _diag_fix_cmd }}"
   loop: "{{ (_diag_blocked_resources | default([]) | unique)[:10] }}"
   loop_control:
     loop_var: "blocked"
@@ -111,7 +123,7 @@
       state: "{{ (_diag_blocked_resources | unique | length) - 10 }} more blocked resource(s) not listed"
       cause: "Per-resource findings are capped at 10 per Application"
       solution: "Inspect the full list with `oc describe application {{ gitops_app_name }} -n openshift-gitops`"
-      auto_fix: "make d0 reconcile {{ _diag_component }}"
+      auto_fix: "{{ _diag_fix_cmd }}"
   when:
     - (_diag_app.resources | default([]) | length) > 0
     - (_diag_blocked_resources | default([]) | unique | length) > 10
@@ -129,7 +141,7 @@
       state: "sync={{ _diag_status.sync.status | default('n/a') }}, health={{ _diag_status.health.status | default('n/a') }}"
       cause: "{{ _diag_status.health.message | default(_diag_status.operationState.message | default('no health message - the app is still progressing (a Subscription waiting on OLM, an operator still rolling out...)')) }}"
       solution: "Give the rollout time or force a re-sync; inspect with `oc describe application {{ gitops_app_name }} -n openshift-gitops`"
-      auto_fix: "make d0 reconcile {{ _diag_component }}"
+      auto_fix: "{{ _diag_fix_cmd }}"
   when:
     - (_diag_app.resources | default([]) | length) > 0
     - (_diag_status.sync.status | default('') != 'Synced') or (_diag_status.health.status | default('') != 'Healthy')

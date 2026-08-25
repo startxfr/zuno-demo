@@ -11,6 +11,9 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d0
     # ADR-0354/WP-073: zuno_repo_root normally comes from
     # ansible/inventories/demo/group_vars/all/auto.yml, auto-loaded
     # because `make d0/d1 ...` always passes `-i ansible/inventories/

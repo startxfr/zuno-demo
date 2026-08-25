@@ -42,7 +42,7 @@
       state: "NotFound"
       cause: "the ingress operator has not published the default router CA - not a healthy OpenShift cluster"
       solution: "Verify the ingress clusteroperator is Available (`oc get co ingress`), then re-run"
-      auto_fix: "make d0 reconcile openshift-oauth"
+      auto_fix: "make d1 reconcile openshift-oauth"
   when: (_openshift_oauth_router_ca.resources | default([]) | length) == 0
 
 - name: "openshift_oauth | fail loudly if the router CA isn't available to copy"

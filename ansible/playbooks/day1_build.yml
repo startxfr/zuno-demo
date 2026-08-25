@@ -10,6 +10,9 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d1
     # Read by ansible/tasks/apply_openshift_build.yml to force a genuinely
     # fresh Build here - an explicit `make d1 build X` always means
     # "build," unlike the implicit "ensure an image exists" dependency

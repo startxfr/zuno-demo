@@ -7,6 +7,9 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d0
     day0_components:
       - custom_metrics_autoscaler
       - nvidia_gpu

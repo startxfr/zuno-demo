@@ -62,7 +62,13 @@ VERSION_SCAN_FILES = [
 BACKTICK_SPAN_RE = re.compile(r"```(.*?)```|`([^`\n]+)`", re.DOTALL)
 # [ \t]+, not \s+: must not cross a newline, or the optional trailing
 # group can capture the *next* line's leading word (e.g. another "make").
-MAKE_COMMAND_RE = re.compile(r"\bmake[ \t]+(d0|d1)[ \t]+(\S+)(?:[ \t]+(\S+))?")
+MAKE_COMMAND_RE = re.compile(r"\bmake[ \t]+(?:day)?(d?[0-3])[ \t]+(\S+)(?:[ \t]+(\S+))?")
+# Ansible blocked-findings carry an `auto_fix:` string telling the operator
+# which make command repairs the finding. Nothing executes it, so until it
+# is linted it can name a command the Makefile rejects - which is exactly
+# what happened to `make d0 reconcile openshift-ai` (a Day 0 verb applied
+# to a Day 1 component), printed by nine findings and runnable by none.
+AUTO_FIX_RE = re.compile(r"^\s*auto_fix:\s*[\"']?(.+?)[\"']?\s*$", re.MULTILINE)
 OPENSHIFT_VERSION_RE = re.compile(r"OpenShift(?: Container Platform)? (\d+\.\d+)\b")
 OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 
@@ -93,11 +99,62 @@ def _load_profile() -> dict:
 def _parse_makefile_lists() -> dict:
     text = MAKEFILE_PATH.read_text()
     lists = {}
-    for name in ("DAY0_VERBS", "DAY0_COMPONENTS", "DAY1_VERBS", "DAY1_RUN_COMPONENTS", "DAY1_BUILD_COMPONENTS"):
+    for name in ("DAY0_VERBS", "DAY0_COMPONENTS",
+                 "DAY1_VERBS", "DAY1_RUN_COMPONENTS", "DAY1_BUILD_COMPONENTS",
+                 "DAY2_VERBS", "DAY2_RUN_COMPONENTS", "DAY2_BUILD_COMPONENTS",
+                 "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS"):
         match = re.search(rf"^{name}\s*:=\s*(.*)$", text, re.MULTILINE)
         lists[name] = match.group(1).split() if match else []
     return lists
 
+
+def _normalize_day(day: str) -> str:
+    """`make day1 ...` and `make d1 ...` are the same Makefile target."""
+    return day if day.startswith("d") else f"d{day}"
+
+
+def _verbs_for(day: str, lists: dict) -> List[str]:
+    return lists.get(f"DAY{_normalize_day(day)[1]}_VERBS", [])
+
+
+def _components_for(day: str, verb: str, lists: dict) -> List[str]:
+    """Which component list a given day+verb validates against.
+
+    Day 0 shares one list across every verb; Day 1 and Day 2 split
+    build-only components from run components; Day 3's verbs each own a
+    narrower list, so it unions them rather than rejecting a valid pair.
+    """
+    day = _normalize_day(day)
+    if day == "d0":
+        return lists["DAY0_COMPONENTS"]
+    if day in ("d1", "d2"):
+        key = "BUILD" if verb == "build" else "RUN"
+        return lists[f"DAY{day[1]}_{key}_COMPONENTS"]
+    return lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
+
+
+def _check_one_make_command(day: str, verb: str, component: str,
+                            lists: dict, origin: str, check: str) -> List[Finding]:
+    findings: List[Finding] = []
+    day = _normalize_day(day)
+    verbs = _verbs_for(day, lists)
+    if verb not in verbs:
+        findings.append(Finding(
+            check,
+            f"{origin} names 'make {day} {verb}' which is an unsupported verb "
+            f"(expected one of: {' '.join(verbs)})",
+        ))
+        return findings
+    if not component or component == "all":
+        return findings
+    components = _components_for(day, verb, lists)
+    if component not in components:
+        findings.append(Finding(
+            check,
+            f"{origin} names 'make {day} {verb} {component}' which is an "
+            f"unsupported component (expected one of: {' '.join(components)} or all)",
+        ))
+    return findings
 
 def check_make_commands() -> List[Finding]:
     findings: List[Finding] = []
@@ -110,29 +167,63 @@ def check_make_commands() -> List[Finding]:
     for block, inline in BACKTICK_SPAN_RE.findall(text):
         span = block or inline
         for day, verb, component in MAKE_COMMAND_RE.findall(span):
+            # README prose puts trailing `# explanation` comments and a
+            # closing backtick inside the captured group.
             component = (component or "").split("#", 1)[0].strip().rstrip("`")
-            verbs = lists["DAY0_VERBS"] if day == "d0" else lists["DAY1_VERBS"]
-            if verb not in verbs:
+            findings += _check_one_make_command(
+                day, verb, component, lists, "README.md example", "make_commands")
+    return findings
+
+
+def check_auto_fix_commands() -> List[Finding]:
+    """Every Ansible blocked-finding's `auto_fix` must name a real command.
+
+    `auto_fix` is printed by ansible/tasks/report_blocked_findings.yml as
+    the remedy for a blocked resource, and an operator types it verbatim.
+    Nothing executes it during a run, so an unrunnable string survives
+    indefinitely while looking authoritative - `make d0 reconcile
+    openshift-ai` (a Day 0 verb applied to a Day 1 component) sat in nine
+    findings and was rejected by the Makefile every single time, which is
+    why ADR-0201's payload-processing sidecar remediation was written,
+    tested, documented and never once applied.
+
+    Values beginning "manual only" are prose by convention, not commands.
+    A component that is a Jinja expression cannot be resolved statically,
+    but its day and verb still can - and those are what broke.
+    """
+    findings: List[Finding] = []
+    lists = _parse_makefile_lists()
+    for path in sorted((REPO_ROOT / "ansible").rglob("*.yml")):
+        rel = path.relative_to(REPO_ROOT)
+        for value in AUTO_FIX_RE.findall(path.read_text(encoding="utf-8")):
+            # An unquoted-capture artefact leaves a stray quote behind for
+            # `auto_fix: ""`, which means "no automatic fix" - the finding's
+            # own `solution` field carries the human instruction there.
+            value = value.strip().strip("\"'").strip()
+            if not value or value.lower().startswith("manual only"):
+                continue
+            matches = MAKE_COMMAND_RE.findall(value)
+            if not matches:
+                # A value whose *day* is a Jinja expression is resolved at
+                # runtime from the playbook's zuno_day, so there is nothing
+                # static to check. That indirection is the fix for this whole
+                # bug class, not an instance of it - the shared tasks are
+                # reached from every day and cannot name one.
+                if "{{" in value:
+                    continue
                 findings.append(Finding(
-                    "make_commands",
-                    f"README.md example 'make {day} {verb}' uses an unsupported verb "
-                    f"(expected one of: {' '.join(verbs)})",
+                    "auto_fix",
+                    f"{rel}: auto_fix {value!r} names no 'make dN <verb>' command; "
+                    "use a runnable command or prefix the string with 'manual only - '",
                 ))
                 continue
-            if not component:
-                continue
-            if day == "d0":
-                components = lists["DAY0_COMPONENTS"]
-            elif verb == "build":
-                components = lists["DAY1_BUILD_COMPONENTS"]
-            else:
-                components = lists["DAY1_RUN_COMPONENTS"]
-            if component not in components and component != "all":
-                findings.append(Finding(
-                    "make_commands",
-                    f"README.md example 'make {day} {verb} {component}' uses an "
-                    f"unsupported component (expected one of: {' '.join(components)} or all)",
-                ))
+            for day, verb, component in matches:
+                component = (component or "").strip().strip("`\"'")
+                # Jinja-templated component: day+verb are still checkable.
+                if "{{" in component or "{{" in verb:
+                    component = ""
+                findings += _check_one_make_command(
+                    day, verb, component, lists, f"{rel}: auto_fix", "auto_fix")
     return findings
 
 
@@ -247,12 +338,14 @@ def main() -> int:
     profile = _load_profile()
     findings = (
         check_make_commands()
+        + check_auto_fix_commands()
         + check_adr_index()
         + check_day0_day1_roles()
         + check_version_consistency(profile)
     )
 
-    print("Checked README.md Make commands, docs/adr/README.md index, "
+    print("Checked README.md Make commands, Ansible auto_fix commands, "
+          "docs/adr/README.md index, "
           "Makefile/ansible role consistency, and platform version prose "
           f"against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
     if not findings:

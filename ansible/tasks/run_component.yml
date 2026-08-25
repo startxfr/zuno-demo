@@ -1,12 +1,20 @@
 ---
-# Runs one Day 0 component's install or reconcile inside a block/rescue so a
-# blocked component records its findings and the run CONTINUES to the
-# remaining components (block/rescue cannot wrap a looped include_role, hence
-# this per-item wrapper - see day0_install.yml / day0_reconcile.yml).
+# Runs ONE component's install or reconcile inside a block/rescue so a blocked
+# component records its findings and the run CONTINUES to the remaining
+# components (block/rescue cannot wrap a looped include_role, hence this
+# per-item wrapper - see day0_install.yml / day0_reconcile.yml /
+# day1_reconcile.yml).
+#
+# Day-agnostic since ADR-0201's follow-up: `reconcile` exists on Day 0 and
+# Day 1, and this file was previously run_day0_component.yml with `day0_`
+# hardcoded into every variable name and every auto_fix hint. That hardcoding
+# is exactly what made the printed remedy wrong for Day 1 components.
 #
 # Inputs:
-#   day0_component_role  role name, underscore form (e.g. openshift_ai)
-#   day0_tasks_from      "install" or "reconcile"
+#   run_component_day         "d0" or "d1" - drives the AUTO-FIX hint so it
+#                             names a command the Makefile actually accepts
+#   run_component_role        role name, underscore form (e.g. openshift_ai)
+#   run_component_tasks_from  "install" or "reconcile"
 #
 # For reconcile, roles without a tasks/reconcile.yml fall back to their
 # idempotent install: re-applying the component's Application manifest IS the
@@ -14,37 +22,37 @@
 # ADR-0311/ADR-0343), and the install waits re-run through the diagnosing
 # apply_gitops_app.yml. The first_found probe is required because
 # include_role hard-fails on a missing tasks_from file.
-- name: "day0 | {{ day0_component_role }}: run {{ day0_tasks_from }}"
+- name: "{{ run_component_day }} | {{ run_component_role }}: run {{ run_component_tasks_from }}"
   block:
-    - name: "day0 | {{ day0_component_role }}: detect reconcile support"
+    - name: "{{ run_component_day }} | {{ run_component_role }}: detect reconcile support"
       ansible.builtin.set_fact:
-        _day0_effective_tasks_from: >-
+        _run_component_effective_tasks_from: >-
           {{ 'reconcile'
              if lookup('ansible.builtin.first_found',
-                       {'files': [zuno_repo_root + '/ansible/roles/' + day0_component_role + '/tasks/reconcile.yml'],
+                       {'files': [zuno_repo_root + '/ansible/roles/' + run_component_role + '/tasks/reconcile.yml'],
                         'skip': true})
              else 'install' }}
-      when: day0_tasks_from == 'reconcile'
+      when: run_component_tasks_from == 'reconcile'
 
-    - name: "day0 | {{ day0_component_role }}: no reconcile.yml - falling back to the idempotent install re-run"
+    - name: "{{ run_component_day }} | {{ run_component_role }}: no reconcile.yml - falling back to the idempotent install re-run"
       ansible.builtin.debug:
         msg: >-
-          Role {{ day0_component_role }} has no tasks/reconcile.yml - re-running
+          Role {{ run_component_role }} has no tasks/reconcile.yml - re-running
           its idempotent install (re-applies the Application manifest and
           re-runs the Synced/Healthy waits), which is the baseline remediation.
       when:
-        - day0_tasks_from == 'reconcile'
-        - _day0_effective_tasks_from == 'install'
+        - run_component_tasks_from == 'reconcile'
+        - _run_component_effective_tasks_from == 'install'
 
-    - name: "day0 | {{ day0_component_role }}: {{ day0_tasks_from }}"
+    - name: "{{ run_component_day }} | {{ run_component_role }}: {{ run_component_tasks_from }}"
       ansible.builtin.include_role:
-        name: "{{ day0_component_role }}"
-        tasks_from: "{{ _day0_effective_tasks_from if day0_tasks_from == 'reconcile' else day0_tasks_from }}"
+        name: "{{ run_component_role }}"
+        tasks_from: "{{ _run_component_effective_tasks_from if run_component_tasks_from == 'reconcile' else run_component_tasks_from }}"
   rescue:
-    - name: "day0 | {{ day0_component_role }} {{ day0_tasks_from }} blocked - continuing with the remaining components"
+    - name: "{{ run_component_day }} | {{ run_component_role }} {{ run_component_tasks_from }} blocked - continuing with the remaining components"
       ansible.builtin.debug:
         msg: >-
-          Component {{ day0_component_role | replace('_', '-') }} is blocked;
+          Component {{ run_component_role | replace('_', '-') }} is blocked;
           its findings (if any) are summarized at the end of the run.
 
     # The role died on something the diagnosis layer didn't record (assert,
@@ -52,21 +60,21 @@
     # end-of-run summary never silently drops a failed component.
     # ansible_failed_result is version-sensitive inside rescue around
     # include_role, hence the defaults.
-    - name: "day0 | {{ day0_component_role }}: record a coarse finding for an undiagnosed failure"
+    - name: "{{ run_component_day }} | {{ run_component_role }}: record a coarse finding for an undiagnosed failure"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
       vars:
         blocked_finding:
-          component: "{{ day0_component_role | replace('_', '-') }}"
-          resource: "role {{ day0_component_role }} ({{ day0_tasks_from }})"
+          component: "{{ run_component_role | replace('_', '-') }}"
+          resource: "role {{ run_component_role }} ({{ run_component_tasks_from }})"
           state: "failed"
           cause: "{{ ansible_failed_result.msg | default('unknown error - see the failed task above') }}"
           solution: "Fix the cause above, then re-run"
-          auto_fix: "make d0 reconcile {{ day0_component_role | replace('_', '-') }}"
+          auto_fix: "make {{ run_component_day }} reconcile {{ run_component_role | replace('_', '-') }}"
       when: >-
         (blocked_findings | default([])
-         | selectattr('component', 'equalto', day0_component_role | replace('_', '-'))
+         | selectattr('component', 'equalto', run_component_role | replace('_', '-'))
          | list | length) == 0
 
-    - name: "day0 | {{ day0_component_role }}: mark the run as failed"
+    - name: "{{ run_component_day }} | {{ run_component_role }}: mark the run as failed"
       ansible.builtin.set_fact:
-        _day0_any_component_failed: true
+        _run_component_any_failed: true

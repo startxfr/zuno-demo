@@ -57,3 +57,9 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0320](0320-pre-provision-openshift-users-rbac-and-console-favorites-via-keycloak.md)
 - [ADR-0332](0332-remove-console-favorites-provisioning.md)
 - [ADR-0344](0344-track-blocked-resources-and-add-a-day-0-reconcile-verb.md)
+
+## Implementation note (2026-08-25) — the `make d0 reconcile openshift-oauth` command in this ADR was never runnable
+
+This ADR names `make d0 reconcile openshift-oauth` as the remedy for a router-cert rotation. That command has never worked: `openshift-oauth` is a Day 1 component (`DAY1_RUN_COMPONENTS`), and `reconcile` was a Day 0 verb, so the Day 0 dispatcher rejected the pair. The same string was recorded as an `auto_fix` hint in `ansible/roles/openshift_oauth/tasks/install.yml`, where nothing validated or executed it.
+
+`reconcile` now exists on Day 1 as well, so **read every occurrence here as `make d1 reconcile openshift-oauth`**. See ADR-0344's 2026-08-25 note for the verb change and for the `check_docs.py` lint that now fails CI on any `auto_fix` naming a command the Makefile would reject.

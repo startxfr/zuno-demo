@@ -14,6 +14,9 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d2
     # Read by ansible/tasks/apply_openshift_build.yml (reached indirectly
     # by a handful of install.yml roles ensuring their own image exists)
     # to keep today's re-verify-only behavior - installs must never

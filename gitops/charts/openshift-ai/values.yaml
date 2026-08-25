@@ -216,7 +216,7 @@ dataScienceCluster:
       # removal from spec - i.e. the operand itself was already inactive;
       # this change only makes the *declared* spec match that already-true
       # state. RESIDUAL VERIFICATION (operator, not yet performed): confirm
-      # a `make d0 reconcile openshift-ai` after this change leaves the
+      # a `make d1 reconcile openshift-ai` after this change leaves the
       # deprecated component's operand still absent/inactive, rather than
       # the operator treating an omitted managementState differently from
       # an explicit Removed - the CRD schema documents no default for that

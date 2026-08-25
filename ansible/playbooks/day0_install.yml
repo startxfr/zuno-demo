@@ -8,6 +8,9 @@
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d0
     day0_components:
       - argocd
       - admin_context
@@ -37,7 +40,7 @@
     - name: Initialize blocked-resource tracking
       ansible.builtin.set_fact:
         blocked_findings: []
-        _day0_any_component_failed: false
+        _run_component_any_failed: false
 
     # A blocked component records its findings and the loop continues, so one
     # run reports EVERY blocked resource (summary + solution + auto-fix at the
@@ -45,10 +48,11 @@
     # blocked component still burn their own wait retries before being
     # recorded too; shorten with EXTRA_VARS='-e gitops_app_wait_retries=3'.
     - name: Install Day 0 components
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_day0_component.yml"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_component.yml"
       vars:
-        day0_component_role: "{{ item }}"
-        day0_tasks_from: install
+        run_component_day: d0
+        run_component_role: "{{ item }}"
+        run_component_tasks_from: install
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
@@ -62,5 +66,5 @@
           At least one component failed without a recorded blocked-resource
           finding - scroll up to its failed task for the cause.
       when:
-        - _day0_any_component_failed | bool
+        - _run_component_any_failed | bool
         - (blocked_findings | default([])) | length == 0

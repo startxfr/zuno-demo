@@ -26,7 +26,7 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # (Project/Job Template/SSO) inside the AAP instance "aap" just installed.
 DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap aap-config connectivity-link lws jobset kueue openshift-ai aiagent-operator
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aiagent-operator
-DAY1_VERBS := check install build uninstall all reinstall
+DAY1_VERBS := check install build uninstall reconcile all reinstall
 
 # Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
 # content ingestion (sql-schema, rag, rag-ingestion, mcp, agents, mlops) -
@@ -95,6 +95,7 @@ help:
 	  '  make day1|d1 build [component]      Build one/all Day 1 component images' \
 	  '  make day1|d1 install [component]    Install/deploy one/all Day 1 components (no component: builds first)' \
 	  '  make day1|d1 uninstall [component]  Uninstall one/all Day 1 components (reverse order)' \
+	  '  make day1|d1 reconcile [component]  Diagnose blocked resources and apply known remediations automatically' \
 	  '  make day1|d1 all [component]        check + build + install, whichever apply to the component' \
 	  '  make day1|d1 reinstall [component]  Uninstall then install one/all Day 1 components' \
 	  '' \
@@ -253,6 +254,7 @@ if [[ -z "$$verb" ]]; then \
     '  build       Build one/all Day 1 component images' \
     '  install     Install/deploy one/all Day 1 components (no component: builds first)' \
     '  uninstall   Uninstall one/all Day 1 components (reverse order)' \
+    '  reconcile   Diagnose blocked resources and apply known remediations automatically' \
     '  all         check + build + install, whichever apply to the component' \
     '  reinstall   Uninstall then install one/all Day 1 components' \
     '' \
@@ -271,6 +273,7 @@ run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_check.y
 run_build() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_build.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_install() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_install.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_reconcile() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_reconcile.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 check component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
@@ -285,6 +288,9 @@ case "$$verb" in \
   uninstall) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 uninstall component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     run_uninstall ;; \
+  reconcile) \
+    case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 reconcile component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_reconcile ;; \
   all) \
     is_run=0; is_build=0; \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) is_run=1;; esac; \

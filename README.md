@@ -74,6 +74,7 @@ make d1 check
 make d1 check keycloak
 make d1 install
 make d1 all openshift-ai   # check + install, one component
+make d1 reconcile openshift-ai   # diagnose blockers and apply known remediations
 
 # Day 2 (ADR-0060): AI infrastructure (llm, models) and content
 # ingestion - build the platform's own component images, then run them.

@@ -83,7 +83,7 @@
       state: "NotFound"
       cause: "cert-manager-istio-csr has not distributed the CA root ConfigMap into the source namespace - service_mesh is not installed or not reconciled"
       solution: "Reconcile the service-mesh component first, then re-run this reconcile"
-      auto_fix: "make d1 install service-mesh"
+      auto_fix: "make d1 reconcile service-mesh"
   when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
 
 - name: "openshift_ai | reconcile: re-copy istio-ca-root-cert into openshift-ingress"

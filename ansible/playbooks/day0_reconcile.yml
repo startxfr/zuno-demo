@@ -6,13 +6,19 @@
 # install re-run, which re-applies the component's Application manifest - the
 # baseline remediation, since Applications are Ansible-applied, not
 # git-synced (ADR-0311/ADR-0343) - and re-runs the diagnosing waits.
-# openshift_oauth moved to Day 1 (after keycloak) - no day1_reconcile.yml
-# exists in this repo, so it has no reconcile-list counterpart.
+# openshift_oauth moved to Day 1 (after keycloak), and openshift_ai - the
+# one role with a tasks/reconcile.yml - is a Day 1 component too. Both are
+# reconciled by ansible/playbooks/day1_reconcile.yml (`make d1 reconcile`),
+# not from here: a Day 0 verb cannot take a Day 1 component, which is the
+# whole reason `make d1 reconcile openshift-ai` was never runnable.
 - name: "Day 0: reconcile blocked prerequisites"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
+    # Which `make dN` accepts this component - drives the AUTO-FIX hints
+    # in the shared blocked-findings tasks (ADR-0201 follow-up).
+    zuno_day: d0
     day0_components:
       - argocd
       - admin_context
@@ -26,13 +32,6 @@
       - nfd
       - nvidia_gpu
       - custom_metrics_autoscaler
-      # openshift_ai is a Day 1 component but is the ONLY role with a
-      # tasks/reconcile.yml, and this playbook's own header already names
-      # it as such. Omitting it from this list meant `make d0 reconcile`
-      # (component defaults to `all`) silently skipped the one component
-      # reconcile exists for - ADR-0201's payload-processing sidecar
-      # remediation had never actually been reachable that way.
-      - openshift_ai
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -46,13 +45,14 @@
     - name: Initialize blocked-resource tracking
       ansible.builtin.set_fact:
         blocked_findings: []
-        _day0_any_component_failed: false
+        _run_component_any_failed: false
 
     - name: Reconcile Day 0 components
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_day0_component.yml"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_component.yml"
       vars:
-        day0_component_role: "{{ item }}"
-        day0_tasks_from: reconcile
+        run_component_day: d0
+        run_component_role: "{{ item }}"
+        run_component_tasks_from: reconcile
       loop: "{{ selected_components }}"
       loop_control:
         label: "{{ item }}"
@@ -66,5 +66,5 @@
           At least one component failed without a recorded blocked-resource
           finding - scroll up to its failed task for the cause.
       when:
-        - _day0_any_component_failed | bool
+        - _run_component_any_failed | bool
         - (blocked_findings | default([])) | length == 0

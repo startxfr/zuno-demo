@@ -4,6 +4,18 @@
 # RESOURCE/STATE/CAUSE/SOLUTION/AUTO-FIX entry per finding, then fails the
 # play when anything was blocked - unless `blocked_report_fail: false`
 # (day0_check.yml: "blocked" is a reportable outcome there, not an error).
+# The default AUTO-FIX prefix. `reconcile` exists on Day 0 and Day 1; Day 2's
+# equivalent remediation is its own idempotent install re-apply, which is
+# exactly what a reconcile falls back to for a role with no tasks/reconcile.yml.
+# zuno_day is set by each dayN_*.yml playbook - NOT gitops_app_phase, which is
+# the ArgoCD Application phase and a different axis entirely (openshift-ai has
+# both a d0 and a d1 Application while being a Day 1 make component).
+- name: "blocked | resolve the day-appropriate auto-fix verb"
+  ansible.builtin.set_fact:
+    _blocked_default_fix: >-
+      {{ 'make d2 install ' if (zuno_day | default('d0')) == 'd2'
+         else 'make ' ~ (zuno_day | default('d0')) ~ ' reconcile ' }}
+
 - name: "blocked | summary: no blocked resources"
   ansible.builtin.debug:
     msg: "All resources Synced/Healthy - nothing blocked."
@@ -20,7 +32,7 @@
       {%- set _ = lines.append('  STATE:    ' + (f.state | default('unknown'))) -%}
       {%- set _ = lines.append('  CAUSE:    ' + (f.cause | default('no message reported'))) -%}
       {%- set _ = lines.append('  SOLUTION: ' + (f.solution | default('inspect the resource'))) -%}
-      {%- set _ = lines.append('  AUTO-FIX: ' + (f.auto_fix | default('make d0 reconcile ' + (f.component | default('all'))))) -%}
+      {%- set _ = lines.append('  AUTO-FIX: ' + (f.auto_fix | default(_blocked_default_fix + (f.component | default('all'))))) -%}
       {%- endfor -%}
       {{ lines }}
   when: (blocked_findings | default([])) | length > 0
@@ -33,7 +45,7 @@
       See the BLOCKED RESOURCES summary above for the cause and solution of
       each. Auto-fix:
       {{ blocked_findings | map(attribute='component') | unique
-         | map('regex_replace', '^(.*)$', 'make d0 reconcile \1') | join('; ') }}.
+         | map('regex_replace', '^(.*)$', _blocked_default_fix + '\1') | join('; ') }}.
   when:
     - blocked_report_fail | default(true) | bool
     - (blocked_findings | default([])) | length > 0
