@@ -113,11 +113,21 @@ def _class_predicate(cls_name: str) -> str:
     # The conditional operator has to evaluate lazily to mean anything, so
     # it is the safe construct here: the bracket lookup is only reached on
     # the branch where the key is known to exist.
+    # The conditional MUST be wrapped in its own outer parentheses.
+    # Kuadrant does not evaluate each limit's predicate separately - it
+    # concatenates them all with `||` into one expression deciding whether
+    # the actionSet applies at all. CEL binds `?:` looser than `||`, so an
+    # unparenthesized ternary is destroyed by that concatenation:
+    #   A ? B : false || C ? D : true || ...
+    # parses as A ? B : ((false || C) ? D : (true || ...)). Confirmed live
+    # 2026-08-25 from the shim's own error, which prints both the mangled
+    # AST and the concatenated `source` it built. Wrapped, each term is a
+    # self-contained boolean and the concatenation is well-formed.
     presence = f"'{CLASS_HEADER}' in request.headers"
     if cls_name == "standard":
         # Absent header => standard, per policies/quotas/quota-policy.yaml.
-        return f"({presence}) ? request.headers['{CLASS_HEADER}'] == 'standard' : true"
-    return f"({presence}) ? request.headers['{CLASS_HEADER}'] == '{cls_name}' : false"
+        return f"(({presence}) ? request.headers['{CLASS_HEADER}'] == 'standard' : true)"
+    return f"(({presence}) ? request.headers['{CLASS_HEADER}'] == '{cls_name}' : false)"
 
 
 def _render_rlp(classes: Dict[str, Dict]) -> str:
