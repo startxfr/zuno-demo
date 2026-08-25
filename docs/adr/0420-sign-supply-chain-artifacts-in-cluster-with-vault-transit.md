@@ -68,9 +68,9 @@ never leaves Vault and cannot be exported
 (`transit/keys/zuno-platform-signer/config` sets
 `exportable=false`/`allow_plaintext_backup=false`). Verification needs only
 the exported public key
-(`platform/supply-chain/keys/zuno-platform-signer.pub`, committed to Git as
-the trust anchor) - a verifier never needs Vault access, a token, or
-network egress. This is a smaller trust surface than the GitHub-OIDC model
+(`agents/zuno-platform-signer.pub`, committed to Git as the trust anchor,
+kept in sync automatically by `ansible/roles/vault`'s install/uninstall
+tasks) - a verifier never needs Vault access, a token, or network egress. This is a smaller trust surface than the GitHub-OIDC model
 it replaces, where any verifier needed network access to Sigstore's public
 Rekor to check the transparency log.
 

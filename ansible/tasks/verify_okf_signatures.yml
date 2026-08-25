@@ -1,8 +1,8 @@
 ---
 # ADR-0420/WP-069: verifies every agent bundle's current signature (Vault
 # KV zuno/okf-signatures, written by the in-cluster signing Job) against
-# the committed trust anchor (platform/supply-chain/keys/
-# zuno-platform-signer.pub) and the bundle's own current content - entirely
+# the committed trust anchor (agents/zuno-platform-signer.pub) and the
+# bundle's own current content - entirely
 # offline once the signature is fetched, same `cosign verify-blob` path
 # `sign_okf_bundle.py verify`/the runtime use. A missing signature is
 # reported, not failed: ZUNO_REQUIRE_SIGNED_BUNDLES stays off until every
@@ -64,7 +64,7 @@
       echo {{ fetched_result.stdout | quote }} > /tmp/{{ (fetched_result.agent_dir.path | basename) }}.sig &&
       python3 platform/supply-chain/sign_okf_bundle.py verify {{ fetched_result.agent_dir.path }}
       --signature /tmp/{{ (fetched_result.agent_dir.path | basename) }}.sig
-      --public-key platform/supply-chain/keys/zuno-platform-signer.pub
+      --public-key agents/zuno-platform-signer.pub
     chdir: "{{ zuno_repo_root }}"
   loop: "{{ _okf_verify_fetched.results | default([]) }}"
   loop_control:

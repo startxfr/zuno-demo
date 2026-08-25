@@ -26,7 +26,7 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
 WORKDIR /app
 
 # ADR-0106/ADR-0420: cosign verify-blob against the committed
-# platform/supply-chain/keys/zuno-platform-signer.pub, used by
+# agents/zuno-platform-signer.pub, used by
 # app/_sign_okf_bundle.py (baked in below) only when
 # ZUNO_REQUIRE_SIGNED_BUNDLES=true (default false - see app/registry.py).
 # Pinned to the same version components/supply-chain-signer/Dockerfile

@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 
 COPY platform/supply-chain/sign_in_cluster.py ./sign_in_cluster.py
 COPY platform/supply-chain/sign_okf_bundle.py ./sign_okf_bundle.py
-COPY platform/supply-chain/keys/zuno-platform-signer.pub ./zuno-platform-signer.pub
+COPY agents/zuno-platform-signer.pub ./zuno-platform-signer.pub
 
 ENTRYPOINT ["python3", "/app/sign_in_cluster.py"]
 CMD ["dry-run"]

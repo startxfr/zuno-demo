@@ -19,9 +19,9 @@ Three independent operations:
                 local sandbox.
     verify    - `cosign verify-blob --key <public-key-file>`. Needs only
                 the bundle, its signature and the committed public key
-                (`platform/supply-chain/keys/zuno-platform-signer.pub`) -
-                NO Vault access and NO network, so this mode works
-                anywhere, including a fully offline check.
+                (`agents/zuno-platform-signer.pub`) - NO Vault access and
+                NO network, so this mode works anywhere, including a
+                fully offline check.
 
 Digest determinism: sorted (relative_path, sha256(content)) pairs over
 every file in the bundle tree, joined and hashed - independent of
@@ -35,7 +35,7 @@ Run from the repository root:
     python3 platform/supply-chain/sign_okf_bundle.py sign agents/tekos --output-dir /tmp/sigs
     python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \\
         --signature /tmp/sigs/tekos.sig \\
-        --public-key platform/supply-chain/keys/zuno-platform-signer.pub
+        --public-key agents/zuno-platform-signer.pub
 """
 from __future__ import annotations
 

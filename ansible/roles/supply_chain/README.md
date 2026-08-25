@@ -2,7 +2,7 @@
 
 Day 2 `check`-only component (ADR-0420/WP-070, `make day2|d2 check supply-chain`).
 Verifies every first-party image's signature against the committed Vault
-Transit public key (`platform/supply-chain/keys/zuno-platform-signer.pub`)
+Transit public key (`agents/zuno-platform-signer.pub`)
 - see `ansible/tasks/verify_image_signatures.yml` for the mechanism (an
 in-cluster Job, since `cosign verify`'s registry pull needs network access
 to the internal registry that the ansible controller itself doesn't have).

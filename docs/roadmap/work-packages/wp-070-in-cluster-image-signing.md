@@ -111,7 +111,7 @@ gate instead of one that finds nothing to verify.
    deliberately in this WP, not a side effect to discover after deleting the
    file.
 4. **Trust anchor reuse**: no new public key - the same
-   `platform/supply-chain/keys/zuno-platform-signer.pub` WP-068 committed
+   `agents/zuno-platform-signer.pub` WP-068 committed (moved there later)
    covers images too (see ADR-0420's "one key, not two" note; split later
    only if a real rotation need appears).
 

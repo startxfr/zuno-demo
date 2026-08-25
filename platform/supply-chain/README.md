@@ -105,7 +105,7 @@ python3 platform/supply-chain/sign_okf_bundle.py digest agents/tekos
 python3 platform/supply-chain/sign_okf_bundle.py sign agents/tekos --output-dir /tmp/sigs
 python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \
     --signature /tmp/sigs/tekos.sig \
-    --public-key platform/supply-chain/keys/zuno-platform-signer.pub
+    --public-key agents/zuno-platform-signer.pub
 ```
 
 `sign` needs `VAULT_ADDR`/`VAULT_TOKEN` in the environment and can only

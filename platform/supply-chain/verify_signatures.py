@@ -6,8 +6,8 @@ published under the internal `image-registry...svc:5000/zuno-ai-build/`
 registry - what every chart actually deploys, per RELEASING.md), resolves
 each one's LIVE `ImageStreamTag` digest (`oc get istag`), and runs
 `cosign verify --key` against it using the committed Vault Transit public
-key (`platform/supply-chain/keys/zuno-platform-signer.pub`) - not a
-keyless GitHub OIDC identity.
+key (`agents/zuno-platform-signer.pub`) - not a keyless GitHub OIDC
+identity.
 
 Resolving the live digest rather than expecting an already-pinned one in
 `values.yaml` is deliberate: every chart still declares `tag: latest`
@@ -57,7 +57,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 FIRST_PARTY_REGISTRY_PREFIX = "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/"
 BUILD_NAMESPACE = "zuno-ai-build"
 
-DEFAULT_PUBLIC_KEY_PATH = REPO_ROOT / "platform" / "supply-chain" / "keys" / "zuno-platform-signer.pub"
+DEFAULT_PUBLIC_KEY_PATH = REPO_ROOT / "agents" / "zuno-platform-signer.pub"
 
 IGNORED_TAG_VALUES = {""}
 

@@ -174,10 +174,11 @@ data:
     # signing (replaces GitHub-OIDC/Fulcio/Rekor keyless cosign - see the
     # ADR for the full rationale). A single non-exportable ECDSA key signs
     # server-side via cosign's native hashivault:// KMS mode; verifiers only
-    # ever need the exported public key (platform/supply-chain/keys/
-    # zuno-platform-signer.pub), never Vault access - smaller blast radius
-    # than the PKI engine above, whose pki/issue would hand back a private
-    # key that would then need to live in a Secret.
+    # ever need the exported public key (agents/zuno-platform-signer.pub,
+    # kept in sync by this role's install.yml on every run), never Vault
+    # access - smaller blast radius than the PKI engine above, whose
+    # pki/issue would hand back a private key that would then need to
+    # live in a Secret.
     enable_if_new "Transit secrets engine at transit/" vault secrets enable -path=transit transit
 
     if ! vault read transit/keys/zuno-platform-signer >/dev/null 2>&1; then
