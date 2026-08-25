@@ -53,6 +53,19 @@ spec:
         # multi-agent load starts 503ing/preempting, lower this before
         # touching anything else.
         - --max-model-len=32768
+        # ADR-0518: verified live on this cluster - without this flag,
+        # startup crashes deep in vLLM's CUDA-graph memory profiling
+        # (profile_cudagraph_memory -> _allocate_kv_cache_tensors) with
+        # "NVML_SUCCESS == r INTERNAL ASSERT FAILED" in PyTorch's CUDA
+        # caching allocator, every restart, right after weight loading
+        # succeeds (28.51GiB logged) - a known PyTorch/NVML gap on
+        # MIG-partitioned GPUs the old dense qwen2.5-7b-instruct never
+        # hit (Qwen3.6's hybrid linear/full-attention layers take a
+        # different CUDA-graph-capture path). --enforce-eager skips
+        # graph capture entirely, trading some per-token latency for a
+        # startup that doesn't depend on this MIG/NVML interaction.
+        # Revisit if a driver/vLLM upgrade fixes the underlying gap.
+        - --enforce-eager
         # vLLM defaults to 8000; must match the containerPort below, which
         # the readiness probe, Service and NetworkPolicy all assume is
         # 8080 - verified on-cluster: without this, vLLM serves on 8000
