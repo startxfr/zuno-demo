@@ -9,14 +9,24 @@
   on any other gateway — while maas-api, the `MaaSAuthPolicy` OPA map and the generated
   `TokenRateLimitPolicy` all key on `zuno-ai-run/gpt-oss-20b-maas`. The entitlement plane
   itself is correct: querying maas-api's `/internal/v1/subscriptions/select` with the MaaS
-  form returns `gpt-oss-20b-tekos`, ready, priority 10. Three local fixes were tried live
+  form returns `gpt-oss-20b-tekos`, ready, priority 10. Four local fixes were tried live
   and each eliminated by test — a second HTTPRoute cannot be governed, removing the gateway
-  ref breaks the LLMInferenceService, and a dedicated KServe gateway is rejected by MaaS.
+  ref breaks the LLMInferenceService, a dedicated KServe gateway is rejected by MaaS, and
+  `MaaSModelRef.spec.endpointOverride` (a real CRD field, missed by the first sweep) only
+  changes a status field, never the adopted route or its identity — the CEL/OPA rules that
+  decide identity read only `request.path`/`X-Gateway-Model-Name`, never `MaaSModelRef`.
   Fixed along the way and no longer blocking: the ipp EnvoyFilter anchor, the 9004 sidecar
   interception trap, the missing `sales` OpenShift group, and the path-prefix 504.
-  Needs RHOAI to accept the adopted route's identity when resolving a subscription, or to
-  expose a way to declare the published model key. Full evidence in ADR-0201's 2026-08-25
-  notes.)
+  A fifth, genuinely untested lead was found: the same HTTPRoute has a header-free
+  path-based rule set that, combined with the confirmed body-to-header `ipp-pre` behavior,
+  might let a client supply the MaaS-form identity directly — unproven because this
+  gateway's `AuthPolicy` only accepts an OpenShift `TokenReview` token or a MaaS API key
+  (`sk-oai-...`), neither of which is available to test with today (no key provisioned, no
+  suitable in-cluster identity found). The ask to RHOAI is correspondingly narrower now:
+  not "add an identity-override field" (it exists, doesn't help) but either accept the
+  modelRef's own identity form on the header-gated route rules, or document the intended
+  non-browser calling convention for reaching a published model directly. Full evidence in
+  ADR-0201's 2026-08-25 notes.)
   Original note (2026-08-15 — repo work merged: `gitops/charts/models/templates/maas.yaml` renders `MaaSModelRef` (publishing the local chat model via `ExternalModel`, wrapping the existing vLLM predictor's OpenAI-compatible endpoint — see values.yaml's `maas.modelRef` comment for the documented `LLMInferenceService`-vs-`ExternalModel` tradeoff this makes, flagged `# CONFIRM`), two `MaaSSubscription`s (`agent_tekos`/`sales` Keycloak groups, differentiated token-rate limits) and one `MaaSAuthPolicy` scoped to just those two groups (proving denial-by-omission for any other group); every field schema-checked against the live cluster's `maas.opendatahub.io/v1alpha1` CRDs (`oc explain`, 2026-08-15) except the explicitly marked `# CONFIRM`/`# verify-on-cluster` fields. API-key lifecycle: new `externalsecret-maas.yaml` resolves a Vault-seeded key (new `maas/gateway-api-key` seed) into the `llm-provider-maas` Secret the adapter already expected. Usage/trace correlation: `X-Zuno-Request-Id` now threads end to end (agent-runtime's `AgentState.request_id` → `ModelRouter` → ai-gateway's `model_call_span` → `maas_adapter.chat_model_via_maas`'s own request header). External-egress guard: new `MAAS_EXTERNAL_EGRESS_ENABLED` gate (default off), independent of `MAAS_ADAPTER_ENABLED`, with 2 new security-negative tests proving external egress stays blocked until explicitly opted in, on top of the existing C3/local-only eligibility test. Day 1 check extended (`ansible/roles/models/tasks/precheck.yml`, diagnostic only, skips gracefully when MaaS isn't enabled). All new manifests/gates ship disabled by default (`maas.enabled: false`, `maasAdapter.externalEgressEnabled: false`). Awaiting the operator follow-up below: every numbered ADR-0201 acceptance bullet on the live cluster, plus the operator+user external-egress lifecycle decision. 2026-08-21: significant live progress since this note — local model published/consumable, governance pairing proven, and the previously-flagged sidecar-injection gap for `payload-processing`/`payload-pre-processing` is confirmed live and healthy. The authenticated end-to-end request still fails, now root-caused to a RHOAI-owned NetworkPolicy allow-list (`maas-default-gateway` was never permitted to reach those pods) that a live patch could not even get to stick momentarily — a controller/webhook enforces it synchronously. See ADR-0201's 2026-08-21 note for the full trace. Not resolvable from this repo without operator-level access to the `ModelsAsService` operator itself; staying `Operator pending`.)
 - **ADRs:** ADR-0201 (To be implemented -> Partially implemented -> Implemented)
 - **Depends on:** WP-03 (merged)

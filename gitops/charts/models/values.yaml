@@ -422,23 +422,27 @@ maas:
   # underlying deployment's name.
   publishedName: gpt-oss-20b-maas
 
-  # ADR-0201/WP-27, 2026-08-25, attempt 4: MaaSModelRef.spec.endpointOverride
-  # exists on the live CRD (`oc explain maasmodelref.spec --recursive`) and
-  # was missed by the 2026-08-25 sweep, which only recursed into
-  # spec.modelRef. Description: "overrides the endpoint URL that the
-  # controller would otherwise discover from the backend (e.g.
-  # LLMInferenceService status or Gateway/HTTPRoute)." Attempts 1-3
-  # (routerGateway's comment block above) all failed by changing WHERE
-  # KServe's route lives; this one leaves routerGateway untouched
-  # (LLMInferenceService stays Ready=True) and instead gives MaaSModelRef a
-  # concrete endpoint so it doesn't need to discover/adopt KServe's route to
-  # find one - testing whether that also changes which identity the data
-  # path serves under. Value reuses the same in-cluster Service ai-gateway's
-  # own MaaS-bypass route already calls (platform/ai-gateway/
-  # provider-routing.yaml), proven reachable/TLS-SIMPLE-compatible.
-  # Empty by default; set live to test, revert to "" if it doesn't help
-  # (same retained-but-disabled pattern as routerGateway).
-  endpointOverride: "https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1"
+  # ADR-0201/WP-27, 2026-08-25, attempt 4 - TESTED LIVE AND ELIMINATED.
+  # MaaSModelRef.spec.endpointOverride exists on the live CRD (`oc explain
+  # maasmodelref.spec --recursive`) and was missed by the earlier sweep,
+  # which only recursed into spec.modelRef. Set live to
+  # https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1 (the
+  # same Service ai-gateway's own MaaS-bypass route already calls). Result:
+  # status.endpoint DID change to that value, but maas-controller's logs
+  # still show "HTTPRoute validated for LLMInferenceService" for the same
+  # adopted gpt-oss-20b-kserve-route on maas-default-gateway immediately
+  # after - route adoption is unconditional on modelRef.kind:
+  # LLMInferenceService and does not consult endpointOverride at all. The
+  # field only overrides the informational status.endpoint (and whatever
+  # maas-api's own access probe dials), never route publication or the
+  # auth/identity path. Confirmed independently: the AuthPolicy's CEL rules
+  # (`oc get authpolicy maas-gateway-auth -n openshift-ingress`) only ever
+  # read request.path or the request's X-Gateway-Model-Name header - never
+  # MaaSModelRef - so this field is structurally incapable of fixing the
+  # identity mismatch. Kept wired (disabled) rather than removed, matching
+  # routerGateway's retained-but-disabled pattern - documents a real CRD
+  # field for the next attempt without pretending it does more than it does.
+  endpointOverride: ""
 
   # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
   # demonstrating different MaaSSubscription access to the same published
