@@ -129,10 +129,13 @@ because their charts are gone:
    Orphaned seeds: no ExternalSecret consumes either path any more, so they
    are inert rather than harmful, and this is housekeeping.
 
-4. Re-apply the Keycloak realm. The repo edit this step assumed was already
-   done was in fact missing until `de1524e` — the realm JSON still described
-   the `sales`/`adv` groups as granting sales-db rights. The re-apply itself
-   is still open.
+4. ~~Re-apply the Keycloak realm.~~ **DONE 2026-08-26.** `KeycloakRealmImport`
+   is create-only — it has no update path for an already-existing group's
+   attributes, so the `de1524e` repo edit alone would never have reached the
+   live realm via ArgoCD sync. Patched both group descriptions directly via
+   the Keycloak admin REST API instead. Verified live just now: `GET
+   /admin/realms/zuno/groups/{sales,adv}` both return the "grants web-search
+   tool rights" wording with no mention of sales-db.
 
 Then, once deployed:
 
@@ -167,6 +170,22 @@ Then, once deployed:
    to `sxa-dump://` did rewrite every `doc_id`, but with the index empty
    `deleteOrphans` has nothing to delete. The cost is the initial ingestion
    and the throughput fix in item 5 is what makes it survivable.
+
+   **First attempt (`e62e61cb`, triggered 14:20) hit a second throughput bug
+   and was terminated 16:51, still on `detect-changes`.** `load-sxa-dump`
+   completed cleanly (310,537 raw docs, ~37 min). `detect-changes` then
+   pegged one core at 100% for over 2h with no completion in sight —
+   confirmed via `ps` inside the pod, not a hang, genuinely CPU-bound.
+   Root cause: `unchanged_ids = [d for d in current if d not in new_ids and
+   d not in changed_ids]` tested list membership against `new_ids`
+   (~310k long here, since this is a first full index — see above) inside a
+   loop over all 310k current docs — O(n²), tens of billions of comparisons.
+   Item 5's throughput fix covered `normalize`/`chunk`/`embed`/
+   `index-pgvector`; this stage was untouched because it was already fast at
+   every previously-tested corpus size. Fixed in `d340e7a` (set union instead
+   of list membership); pushed. **Needs a rebuild (item 5 must be re-run
+   against `d340e7a`) and a fresh trigger — the terminated run produced no
+   usable output.**
 6b. **Rebuild and redeploy `mcp-gateway`, `agent-runtime` and `rag-service`
    — discovered missing 2026-08-26, and it gates steps 7 and 8.** All three
    bake the policy/binding files into their images rather than mounting them
