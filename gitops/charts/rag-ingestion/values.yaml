@@ -1429,7 +1429,12 @@ pipeline:
   # knobs. A PipelineVersion object is immutable, so any CONFIG_KEYS change
   # needs a new version name here - re-applying v0-3-0 with a changed spec
   # is rejected with "Pipeline spec is immutable".
-  version: v0-4-0
+  # v0-5-0: wires real cpu/memory requests+limits into every stage
+  # (RESOURCES dict in files/pipeline.py.tpl). v0-4-0 itself got applied
+  # once from a stale rendered ConfigMap (ArgoCD hadn't synced yet) before
+  # this fix landed, so it's permanently stuck without resources - same
+  # immutability rule as above forces yet another new version name here.
+  version: v0-5-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
