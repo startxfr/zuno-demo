@@ -69,10 +69,21 @@ traces. The debugging trail, all confirmed live:
    enough to need it). Third defect in the same pipeline, after the Instrumentation CR's
    nonexistent-Service endpoint (ADR-0523).
 5. Incidental catch: the first reconcile run was blocked by latent WP-079 drift -
-   `DSCInitialization`'s `traces.storage.retention: 48h` normalizes to `48h0m0s` in the stored
-   CR, so ArgoCD saw permanent OutOfSync and the app-wait timed out. Fixed by canonicalizing
-   the chart value; and reconcile.yml's header claimed a `make d0 reconcile openshift-ai` form
-   that doesn't exist (openshift-ai is DAY1_RUN) - both corrected here.
+   `DSCInitialization`'s `traces.storage.retention: 48h` comes back from the cluster as
+   `48h0m0s`, so ArgoCD saw permanent OutOfSync and the app-wait timed out. Fixed by
+   canonicalizing the chart value; and reconcile.yml's header claimed a `make d0 reconcile
+   openshift-ai` form that doesn't exist (openshift-ai is DAY1_RUN) - both corrected here.
+   **The mechanism is not API-server normalization** (an early note in this WP said so and was
+   wrong): the API server stores CRD strings byte-for-byte, and other `metav1.Duration` fields
+   in this repo prove it (`Certificate.spec.duration` stores `8760h`, all 95
+   `ExternalSecret.spec.refreshInterval` store `1h`). It is the **CRD conversion webhook**:
+   `dscinitializations` serves v1 but stores **v2**, and this chart renders v1, so every write
+   round-trips v1 -> operator Go structs -> v2 and canonicalizes whatever is a `metav1.Duration`
+   in Go. The control experiment sits two keys away in the same chart: `metrics.storage.
+   retention: 15d` crosses the identical webhook untouched, because it is a plain Go `string` -
+   so that one must NOT be "canonicalized" (`MonitoringStack.spec.retention` even carries a
+   pattern regex that would reject `360h0m0s`). `oc explain` prints `<string>` for both and
+   cannot tell them apart.
 
 **Final design**: bypass RHOAI's collector entirely. `zuno-otel-collector`'s `otlp/rhoai`
 exporter goes straight to the Tempo **gateway** on 8090 with the documented RHOSDT pattern -
@@ -117,7 +128,49 @@ could come up against near-zero load.
    (`tempo-tempo:3200/api/search`) still returns embeddings traces - existing Grafana path
    intact.
 
+## Follow-up hardening (2026-08-26, after closure)
+
+Both live findings above were one-off patches; this turned them into properties of the platform.
+No new ADR/WP - the decisions are unchanged, this is robustness only.
+
+**The trace pipeline can no longer starve silently.** The TempoStack right-sizing moved out of
+`reconcile.yml` into a shared
+`ansible/roles/openshift_ai/tasks/right_size_monitoring_stack.yml`, now included by
+`install.yml` too - it had only ever run on the reconcile path, so a **fresh install** came up
+with RHOAI's starving defaults and a pipeline that looks healthy while dropping every span.
+Install needs an `until`/`retries` wait the reconcile path didn't: RHOAI creates the TempoStack
+asynchronously after the DSC goes Ready, so a bare lookup there would silently no-op.
+`precheck.yml` (i.e. `make d1 check openshift-ai`) gains a tripwire for the failure mode itself -
+gateway pod not fully ready, or the `opa-openshift` sidecar sized below a floor
+(`openshift_ai_tempo_opa_min_memory_mb`, default 64). Memory is parsed from raw bytes as well as
+Mi/Gi because the Tempo Operator's split emits `85899344`, which a Mi-only parse would read as 85
+million MiB and wave through. Verified live both ways: silent at the real 81Mi, fires with
+`-e openshift_ai_tempo_opa_min_memory_mb=999`.
+
+**Silent ArgoCD drift now explains itself.** New `platform/gitops/argocd_drift.py` asks ArgoCD's
+own `managed-resources` API which fields differ (desired-as-subset, so operator-defaulted fields
+aren't reported), restricted to resources ArgoCD itself marks OutOfSync - without that filter,
+anything covered by `ignoreDifferences` false-positives, since ArgoCD strips ignored fields from
+the normalized live state. `ansible/tasks/diagnose_gitops_app.yml` (shared by ~30 roles) now uses
+it for the `cause` in place of `no health message reported`, and points at a git-side fix rather
+than "re-sync" - a canonicalization mismatch survives any number of re-syncs. Proven against the
+cluster's genuinely OutOfSync apps (`OAuth/cluster spec.identityProviders: git="<1 items>"
+live="<2 items>"`) and silent on every Synced one.
+
+**Latent instances of the same trap, closed:** `gitops/charts/kueue/templates/queue-resources.yaml`
+rendered `v1beta1` while `v1beta2` is storage with a conversion webhook - the exact DSCI topology,
+no duration fields today but a trap for whoever adds one - now bumped; `mariadb`'s
+`PhysicalBackup.spec.maxRetention` pre-canonicalized to `168h0m0s`; and a deliberately **narrow**
+`ignoreDifferences` on `/spec/monitoring/traces/storage/retention` in
+`gitops/apps/openshift-ai/application-d1.yaml` (a blanket `/spec` ignore would blind real drift).
+That last one also closes a process bug: `application-d0.yaml` already carried a DSCI `/spec`
+ignore, but d0 sets `DSCInitialization.enabled: false` - the guard was written for the
+Application that doesn't render the resource and omitted from the one that does. A repo-wide
+sweep found **no other active drift** (104 of 106 Applications Synced; the two that aren't are
+vendor apps outside `gitops/apps/`).
+
 ## Status updates
 
 - WP-081 → Done (live-verified 2026-08-26). ADR-0523 stays `To be implemented` until WP-082's
   workload-level path is also live.
+- 2026-08-26 follow-up: hardening above landed; no ADR/WP status change (decisions unchanged).
