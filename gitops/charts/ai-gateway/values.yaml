@@ -98,10 +98,23 @@ providerSecrets:
 # wired but no longer primary now that MAAS_SA_TOKEN_PATH (WP-076 step 3)
 # authenticates as ai-gateway's own ServiceAccount identity instead;
 # optional so the Deployment still comes up before/without it.
+# `apiKeyEnabled` (WP-076 step 4, 2026-08-26 live incident) is DELIBERATELY
+# separate from `enabled` above: templates/externalsecret-maas.yaml's own
+# header comment already warned that rendering it while the Vault path
+# maas/gateway-api-key is unseeded leaves it permanently Degraded and
+# wedges ArgoCD's wave-ordered sync before it ever reaches the Deployment
+# - written for a world where enabling the adapter meant the key was
+# seeded first. Since step 3 made the SA-token path primary, `enabled:
+# true` no longer implies a real key exists (ADR-0521 item 1's issuance
+# flow is still unresolved) - live-confirmed: flipping enabled alone
+# wedged zuno-ai-gateway-d1's sync exactly as that comment predicted.
+# Stays false until a real key is minted and seeded; flip this, not
+# `enabled`, once it is.
 maasAdapter:
   enabled: true
   endpoint: https://maas-default-gateway-istio.openshift-ingress.svc
   secretName: llm-provider-maas
+  apiKeyEnabled: false
   # ADR-0201 (WP-27): distinct from `enabled` above - routing the LOCAL
   # model's own traffic through MaaS (enabled: true alone) never leaves
   # the cluster network; letting an EXTERNAL SaaS candidate (via_maas:
