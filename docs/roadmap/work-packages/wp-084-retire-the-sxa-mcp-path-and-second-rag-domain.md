@@ -106,20 +106,24 @@ because their charts are gone:
    already absent, so the `make d2 uninstall mcp` retired-resource cleanup is
    a no-op here. Both are kept for clusters that *did* provision them.
 
-2. **The one genuine teardown item.** `rag-sxa` still exists in Postgres —
-   8422 kB, `document_embeddings` at 0 rows, 0 active connections, owned by
-   `postgres` — together with the `ragsxa` role. The live
-   `postgrescluster.spec.users` no longer lists `ragsxa`, so PGO has already
-   let go of it and will never reclaim it:
+2. ~~Drop the stranded `rag-sxa` database and `ragsxa` role.~~ **DONE
+   2026-08-26.** Pre-flight confirmed it was safe to remove: 8438 kB with
+   `document_embeddings` at 0 rows, 0 active connections, the role owned no
+   databases and held no memberships, and `postgrescluster.spec.users` no
+   longer listed `ragsxa` — PGO had already let go of it and would never
+   reclaim it.
 
    ```
    oc -n zuno-data exec zuno-postgresql-instance1-vb9g-0 -c database -- \
      psql -U postgres -c 'DROP DATABASE "rag-sxa";' -c 'DROP ROLE ragsxa;'
    ```
 
-   Irreversible — PGO never recreates a dropped database — but the index is
-   empty, so nothing is lost. `rag-sxa-legacy` is a different database and
-   must be left alone.
+   Verified after: `pg_database` holds `rag-adv`, `rag-project`, `rag-sales`,
+   `rag-sxa-legacy`, `rag-tech`; the only remaining sxa role is
+   `ragsxalegacy`; all four `sxa-legacy` secrets intact. PGO reconcile stayed
+   healthy — `wrote PostgreSQL users` with empty stderr, no error loop, which
+   is the specific failure mode a *declared-but-missing* database causes.
+   `rag-sxa-legacy` was left untouched.
 
 3. `vault kv delete zuno/sxa/mariadb-db` and `zuno/rag-sxa/postgresql-app`.
    Orphaned seeds: no ExternalSecret consumes either path any more, so they
@@ -172,7 +176,10 @@ Then, once deployed:
 - 2026-08-26: operator steps 1-4 re-scoped against the live cluster. Step 1
   is a no-op (MariaDB never held `sxa`); step 2 is the only real deletion and
   the database it removes is empty; step 4's repo prerequisite was missing and
-  landed in `de1524e`. Steps 2-4 and 6-8 remain open.
+  landed in `de1524e`.
+- 2026-08-26: step 2 executed - `rag-sxa` and `ragsxa` dropped, PGO reconcile
+  verified healthy afterwards. Steps 3, 4 and 6-8 remain open; step 6 (the
+  first full index of 314,428 documents) is the critical path.
 - After the operator steps above land: flip this WP to `Done` and add a dated
   MEMORY.md bullet.
 
