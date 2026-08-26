@@ -44,13 +44,23 @@ spec:
   # Everything allowed below is the istio sidecar's own requirement, not the
   # app's - which is exactly why this policy can be this tight.
   egress:
-    # Cluster DNS. The sidecar resolves istiod/istio-csr through it; without
-    # this the pod cannot bootstrap at all.
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: openshift-dns
-      ports:
+    # Cluster DNS, allowed by PORT ONLY - deliberately no `to` selector.
+    #
+    # Live-verified 2026-08-26: a `namespaceSelector` on `openshift-dns` does
+    # NOT work here. That namespace carries `openshift.io/run-level: 0`, so
+    # OVN-Kubernetes never puts its pods in a NetworkPolicy address set and
+    # the peer matches nothing - UDP/53 is dropped even though the rule reads
+    # as allowing it. The symptom is a pod that resolves nothing while the
+    # policy looks correct, and whose sidecar therefore cannot re-bootstrap
+    # on its next restart.
+    #
+    # Do not "tighten" this back into a namespaceSelector without re-testing
+    # UDP specifically. A TCP probe cannot detect the breakage: istio's
+    # `includeOutboundIPRanges: "*"` terminates outbound TCP at the sidecar,
+    # so a TCP connect succeeds locally whether or not the packet could ever
+    # reach the real destination. UDP is not captured, so only a UDP query
+    # tells the truth.
+    - ports:
         - protocol: UDP
           port: 53
         - protocol: TCP
