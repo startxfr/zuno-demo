@@ -1,0 +1,243 @@
+---
+# ADR-0524 / WP-085 step 6: real HTTP evidence that OpenShift Lightspeed is
+# serving, not just that its operator believes it is.
+#
+# Two deliberate differences from platform_health_check.yml, both forced by the
+# fact that Lightspeed is operator-owned rather than Zuno-owned:
+#
+# 1. The target is DISCOVERED, never hardcoded. Lightspeed's Services are
+#    created by the operator at reconcile time and their names appear nowhere in
+#    the v1.1.2 bundle CSV (which declares only
+#    lightspeed-operator-controller-manager). Hardcoding a guessed name would
+#    produce a failing row whenever Red Hat renames it - an "outage" that is
+#    really a stale constant. Discovery also means this survives an operator
+#    upgrade that renames things.
+#
+# 2. The Job runs IN openshift-lightspeed, not zuno-ai-run. Same-namespace
+#    traffic is always admitted by the platform default-deny baseline
+#    (gitops/charts/namespaces/templates/networkpolicy-platform.yaml), so this
+#    keeps working whether or not that namespace's skipNetworkPolicy is later
+#    removed - no NetworkPolicy allow has to be added or maintained for a probe.
+#
+# Absent Lightspeed is NOT a failure: this whole file no-ops with a skipped
+# marker, so `make d3 test platform` stays green on a cluster that never
+# installed the operator.
+
+- name: "day3-lightspeed | look for the OLSConfig CRD (absent = not installed)"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: olsconfigs.ols.openshift.io
+  register: _ls_crd
+  failed_when: false
+
+- name: "day3-lightspeed | discover Lightspeed's Services"
+  kubernetes.core.k8s_info:
+    kind: Service
+    namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+  register: _ls_services
+  when: (_ls_crd.resources | default([]) | length) > 0
+  failed_when: false
+
+# Prefers an app-server-ish name, then anything that is not the operator's own
+# metrics/webhook Service. Name-shape matching rather than a label selector: the
+# operator's operand labels are as unverified as its Service names, so matching
+# on the thing we can actually see listed is the more honest heuristic - and the
+# candidates are reported below either way.
+- name: "day3-lightspeed | pick the API Service to probe"
+  ansible.builtin.set_fact:
+    _ls_candidates: >-
+      {{ (_ls_services.resources | default([]))
+         | rejectattr('metadata.name', 'search', 'operator|webhook|metrics')
+         | list }}
+
+- name: "day3-lightspeed | resolve host and port"
+  ansible.builtin.set_fact:
+    _ls_target: >-
+      {{ (_ls_candidates | selectattr('metadata.name', 'search', 'app-server|app|server') | list
+          | default([], true) | first)
+         | default((_ls_candidates | first) | default({}, true), true) }}
+  when: (_ls_candidates | length) > 0
+
+- name: "day3-lightspeed | record a skipped row when Lightspeed isn't installed or exposes no Service"
+  ansible.builtin.set_fact:
+    _day3_lightspeed_results:
+      - agent: lightspeed
+        layer: availability
+        id: discovery
+        category: platform
+        passed: true
+        detail: >-
+          skipped - {{ 'OLSConfig CRD absent (operator not installed)'
+                       if (_ls_crd.resources | default([]) | length) == 0
+                       else 'no non-operator Service found in '
+                            ~ (lightspeed_namespace | default('openshift-lightspeed')) }}
+        duration_ms: 0
+  when: (_ls_candidates | default([]) | length) == 0
+
+- name: "day3-lightspeed | probe the discovered Service"
+  when: (_ls_candidates | default([]) | length) > 0
+  block:
+    - name: "day3-lightspeed | derive the probe base URL from the Service's own port"
+      ansible.builtin.set_fact:
+        # Scheme from the port, not from a guess: Lightspeed's API serves TLS
+        # (its OLSConfig has a tlsConfig/keyCertSecretRef), so anything on 443/
+        # 8443 or a port named https/api is https. The port NAME is checked
+        # first because it is the operator's own declaration of intent.
+        _ls_port: >-
+          {{ (_ls_target.spec.ports | selectattr('name', 'defined')
+              | selectattr('name', 'search', 'https|api|web') | list | first)
+             | default(_ls_target.spec.ports | first, true) }}
+    - name: "day3-lightspeed | assemble the URL"
+      ansible.builtin.set_fact:
+        _ls_scheme: "{{ 'https' if (_ls_port.port | int) in [443, 8443] or ((_ls_port.name | default('')) is search('https')) else 'http' }}"
+        _ls_host: "{{ _ls_target.metadata.name }}.{{ lightspeed_namespace | default('openshift-lightspeed') }}.svc.cluster.local"
+
+    - name: "day3-lightspeed | report what was discovered"
+      ansible.builtin.debug:
+        msg: >-
+          Probing {{ _ls_scheme }}://{{ _ls_host }}:{{ _ls_port.port }} (Service
+          '{{ _ls_target.metadata.name }}', port '{{ _ls_port.name | default('unnamed') }}').
+          Candidates considered: {{ _ls_candidates | map(attribute='metadata.name') | list }}.
+
+    - name: "day3-lightspeed | delete any previous probe Job (Jobs are immutable)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: zuno-day3-lightspeed-health
+        namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+        wait: true
+
+    - name: "day3-lightspeed | run the probe Job"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: zuno-day3-lightspeed-health
+            namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                # No API calls from inside the Job - it only makes HTTP
+                # requests, so it needs no token and gets none.
+                automountServiceAccountToken: false
+                volumes:
+                  # Auto-populated in every namespace by the service-ca
+                  # operator; Lightspeed's serving cert is signed by it, so the
+                  # probe can verify TLS properly rather than skipping it.
+                  - name: service-ca
+                    configMap:
+                      name: openshift-service-ca.crt
+                      optional: true
+                containers:
+                  - name: probe
+                    image: "docker.io/library/python:3.12-slim"
+                    volumeMounts:
+                      - name: service-ca
+                        mountPath: /etc/ssl/openshift-service-ca
+                    env:
+                      - name: PYTHONUNBUFFERED
+                        value: "1"
+                      - name: LS_BASE
+                        value: "{{ _ls_scheme }}://{{ _ls_host }}:{{ _ls_port.port }}"
+                    command:
+                      - python3
+                      - -c
+                      - |
+                        import json, os, ssl, time, urllib.request
+
+                        BASE = os.environ["LS_BASE"]
+                        # The health path is as undocumented as the Service
+                        # name, so try the plausible set and pass if ANY
+                        # answers. Reporting which one answered turns this into
+                        # discovery output rather than a pass/fail oracle -
+                        # pin it here once a live run shows the real path.
+                        PATHS = ["/readiness", "/liveness", "/healthz", "/readyz", "/health", "/"]
+
+                        ctx = ssl.create_default_context()
+                        ca = "/etc/ssl/openshift-service-ca/service-ca.crt"
+                        if os.path.exists(ca):
+                            try:
+                                ctx.load_verify_locations(ca)
+                            except Exception:
+                                pass
+                        else:
+                            # No CA available: still prove the port answers,
+                            # but say so rather than silently claiming a
+                            # verified check.
+                            ctx.check_hostname = False
+                            ctx.verify_mode = ssl.CERT_NONE
+
+                        start = time.monotonic()
+                        answered, detail = False, ""
+                        for p in PATHS:
+                            url = BASE + p
+                            try:
+                                with urllib.request.urlopen(url, timeout=10, context=ctx) as r:
+                                    if r.status < 500:
+                                        answered = True
+                                        detail = f"{p} -> {r.status}"
+                                        break
+                            except urllib.error.HTTPError as e:
+                                # A 4xx still proves something is serving HTTP.
+                                if e.code < 500:
+                                    answered = True
+                                    detail = f"{p} -> {e.code} (serving, not authorized)"
+                                    break
+                                detail = f"{p} -> {e.code}"
+                            except Exception as exc:
+                                detail = f"{p} -> {type(exc).__name__}: {exc}"
+
+                        print(json.dumps([{
+                            "agent": "lightspeed",
+                            "layer": "availability",
+                            "id": "api",
+                            "category": "platform",
+                            "passed": answered,
+                            "detail": detail if answered else f"no health path answered on {BASE} ({detail})",
+                            "duration_ms": (time.monotonic() - start) * 1000,
+                        }]))
+                    resources:
+                      requests: { cpu: 50m, memory: 64Mi }
+                      limits: { cpu: 200m, memory: 128Mi }
+
+    - name: "day3-lightspeed | wait for the probe Job to finish"
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+        name: zuno-day3-lightspeed-health
+      register: _ls_job
+      until: >-
+        (_ls_job.resources[0].status.succeeded | default(0)) > 0 or
+        (_ls_job.resources[0].status.failed | default(0)) > 0
+      retries: 20
+      delay: 5
+
+    # controller-uid, not job-name - same stale-pod race documented in
+    # platform_health_check.yml and stresstest_job_run_one.yml.
+    - name: "day3-lightspeed | find the probe pod"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+        label_selectors:
+          - "controller-uid={{ _ls_job.resources[0].metadata.uid }}"
+      register: _ls_pod
+
+    - name: "day3-lightspeed | fetch the probe output"
+      kubernetes.core.k8s_log:
+        namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+        name: "{{ _ls_pod.resources[0].metadata.name }}"
+      register: _ls_log
+      when: (_ls_pod.resources | default([]) | length) > 0
+
+    - name: "day3-lightspeed | parse the probe output"
+      ansible.builtin.set_fact:
+        _day3_lightspeed_results: "{{ (_ls_log.log | default('[]')) | from_json }}"

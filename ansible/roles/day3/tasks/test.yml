@@ -21,8 +21,18 @@
   ansible.builtin.include_tasks: platform_health_check.yml
   when: target_component in ['platform', 'all']
 
+# ADR-0524: Lightspeed is a platform service but not a Zuno-owned one, so it
+# gets its own file rather than another row in platform_health_check.yml's fixed
+# TARGETS list - its Service name is discovered at run time and its probe runs
+# in its own namespace. Same pure-fact-producer contract as the two above: it
+# never fails or renders on its own, and it no-ops (with a skipped row) when the
+# operator isn't installed.
+- name: "day2-test | run the Lightspeed availability check"
+  ansible.builtin.include_tasks: lightspeed_health_check.yml
+  when: target_component in ['platform', 'all']
+
 - name: "day2-test | combine agents + platform results into one report"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
   vars:
-    _day2_render_results: "{{ (_day2_availability_results | default([])) + (_day2_platform_results | default([])) }}"
+    _day2_render_results: "{{ (_day2_availability_results | default([])) + (_day2_platform_results | default([])) + (_day3_lightspeed_results | default([])) }}"
     day2_render_component: "{{ target_component }}"

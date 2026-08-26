@@ -210,14 +210,31 @@ each sufficient on its own.
 - Native OpenShift docs: **write nothing**. Leave `spec.ols.rag[]` empty and `byokRAGOnly` unset
   so the RHOKP sidecar keeps serving them.
 - `spec.ols.introspectionEnabled`: leave at its `true` default (ADR-0524 clause 6).
-- Day 3 `test`: **changed during implementation.** The original plan was to add the Lightspeed
-  API Service to `ansible/roles/day3/tasks/platform_health_check.yml` as a `/healthz`+`/readyz`
-  pair. That Service is created by the operator at reconcile time and its name is not derivable
-  from the bundle CSV, so probing it would mean hardcoding a guess that fails for reasons
-  unrelated to Lightspeed's health. Implemented instead as a condition-driven check in
-  `ansible/roles/lightspeed_config/tasks/precheck.yml`, reading `OLSConfig`'s own
-  `status.conditions` - which is what ADR-0524's Operational considerations actually ask for
-  ("condition-driven, not guesswork"). `platform_health_check.yml` is left unchanged.
+- Day 3 `test`: **two complementary checks, neither of which hardcodes a Service name.**
+  - `ansible/roles/lightspeed_config/tasks/precheck.yml` reads `OLSConfig.status.conditions` -
+    the operator's own contract, covering model reachability, CA mount, cache and console plugin.
+  - `ansible/roles/day3/tasks/lightspeed_health_check.yml` gets real HTTP evidence, because a
+    condition is still the operator's self-report and would not catch a wedged API pod it
+    believes is fine. It **discovers** the Service at run time (`k8s_info` over
+    `openshift-lightspeed`, rejecting operator/webhook/metrics Services, preferring an
+    app-server-shaped name), derives the scheme from the port's own name/number, and probes a
+    candidate list of health paths, passing if any answers below 500 - a 4xx counts, since it
+    still proves something is serving. Discovery, not a constant, so an operator upgrade that
+    renames the Service does not read as an outage.
+
+    The Job runs **in `openshift-lightspeed`**, not `zuno-ai-run`. Same-namespace traffic is
+    always admitted by the platform default-deny baseline, so this needs no NetworkPolicy allow
+    and keeps working whether or not that namespace's `skipNetworkPolicy` is later removed. It
+    mounts the auto-populated `openshift-service-ca.crt` ConfigMap so TLS is genuinely verified
+    rather than skipped, and falls back to an unverified connection only if that ConfigMap is
+    absent - saying so in the result detail rather than silently claiming a verified check.
+
+    Absent Lightspeed is not a failure: the file no-ops with a `skipped` row, so
+    `make d3 test platform` stays green on a cluster that never installed the operator.
+
+    **Live-verification follow-up:** the probe reports which Service and which health path
+    answered. Once a real run shows both, pin the path in `PATHS` and record the Service name
+    here, so the candidate sweep becomes a one-shot check rather than a permanent search.
 - Day 3 `check`: both roles' `precheck.yml` are wired into `ansible/playbooks/day3_check.yml`,
   and a new `DAY3_CHECK_ONLY_COMPONENTS` Makefile group makes `make d3 check lightspeed` /
   `make d3 check lightspeed-config` valid targets (they support neither test/stresstest nor

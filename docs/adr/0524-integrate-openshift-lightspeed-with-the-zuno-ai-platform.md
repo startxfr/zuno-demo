@@ -210,9 +210,15 @@ would put the platform in the business of patching a Red Hat operand. Reachabili
 `zuno-ai-run` is therefore a NetworkPolicy question only - `mcp-gateway`'s policy today admits
 only `agent-runtime` and `acceptance-gate` pods and must gain a namespace-scoped allow.
 
-Day 3 gains Lightspeed coverage on both existing verbs: `platform_health_check.yml` probes the
-Lightspeed API service the same way it probes `mcp-gateway`, and `make d3 check lightspeed`
-delegates to the component's own `precheck.yml`.
+Day 3 gains Lightspeed coverage on both existing verbs, in two layers. `make d3 check
+lightspeed[-config]` delegates to each component's own `precheck.yml`, the operand's reading
+`OLSConfig.status.conditions`. `make d3 test platform` additionally runs a real HTTP probe - but
+against a **discovered** Service rather than a hardcoded one, since Lightspeed's Services are
+created by the operator at reconcile time and named nowhere in the bundle CSV; a pinned constant
+would turn any future rename into a phantom outage. That probe runs inside `openshift-lightspeed`,
+where same-namespace traffic is admitted by the default-deny baseline unconditionally, so it needs
+no NetworkPolicy allow of its own and is unaffected by whether this namespace's
+`skipNetworkPolicy` is later removed.
 
 ## Migration / evolution
 
