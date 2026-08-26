@@ -1,6 +1,10 @@
 # ADR-0516: Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation
 
-- **Status:** Proposed
+- **Status:** Implemented - landed in `3304b39` (2026-08-23), with the
+  render-failure defect fixed in `93b070d`; `diagram-render` is live in
+  `zuno-ai-run` and both GitOps Applications are Synced/Healthy. See the
+  2026-08-23/26 implementation note below and
+  [evidence](../roadmap/evidence/adr-0516-diagram-render.md).
 - **Target:** v0.4
 - **Date:** 2026-08-23
 - **Decision owners:** Zuno Demo architecture team
@@ -168,6 +172,43 @@ same reason (see Alternatives).
   Remediation: none beyond the description wording; if this proves
   insufficient in practice, a follow-up could add an explicit disambiguation
   turn, but that's speculative ahead of real usage data.
+
+## Implementation note (2026-08-23/26)
+
+The decision landed whole in `3304b39` (2026-08-23) - `components/
+diagram-render` (Node.js + `@mermaid-js/mermaid-cli` + headless Chromium),
+`components/mcp-gateway/app/handlers/diagram_gen.py`, the
+`diagram.generation.create` capability in `policies/tools/tool-policy.yaml`
+and `platform/bindings/tools/tool-bindings.yaml`, the
+`gitops/charts/diagram-render` chart plus its d0/d1 Applications, the
+`generate_diagram` tool schema and SVG-grounding in
+`components/agent-runtime/app/graph/nodes.py`, the arkos/comage/tekos OKF
+grants, and the rewritten Tekos boundary checks. Every one of the eight
+decision items above is in effect as written; nothing was descoped.
+
+One real defect surfaced after landing and was fixed in `93b070d`:
+**Mermaid never throws on invalid syntax** - it draws an error placeholder
+into the SVG and exits successfully, so a failed render returned HTTP 200
+with a picture of an error message all the way back to the model.
+`findRenderIssue()` in `components/diagram-render/server.js` now inspects
+the rendered SVG content and fails the request instead, which is what makes
+the one-shot self-correction retry in `nodes.py` reachable.
+
+Two items deliberately remain open:
+
+- The **egress `NetworkPolicy`** for `diagram-render` (the SSRF-via-Mermaid-
+  external-image-reference risk in Accepted risks above) is still not
+  written. Only ingress is restricted. This was accepted as non-blocking at
+  decision time and that assessment is unchanged.
+- Closure rests on merged code plus the live, healthy deployment - not on a
+  fresh end-to-end `generate_diagram` call captured as evidence. See
+  [evidence](../roadmap/evidence/adr-0516-diagram-render.md).
+
+The `components/mcp-servers/lucidchart` placeholder README, which this
+decision supersedes, was deleted as part of this closeout, along with the
+"Lucidchart integration planned" claims it left behind in `MEMORY.md`,
+`agents/arkos/`, `docs/architecture/logical-architecture.md` and the two
+`components/mcp-*/README.md` enumerations.
 
 ## Related ADRs
 

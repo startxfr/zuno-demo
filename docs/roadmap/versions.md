@@ -18,7 +18,7 @@ Multi-agent rollout and optimization: the four remaining agent slices (Arkos, Co
 
 ## v0.4
 
-Agent-to-agent evolution (ADR-0401 – ADR-0409): A2A protocol adoption, identity propagation across agent calls, controlled shared memory, delegation traceability and limits, specialized task-oriented frontend views, automated removal of inaccessible private RAG content and advanced human approval workflows.
+Agent-to-agent evolution (ADR-0401 – ADR-0409): A2A protocol adoption, identity propagation across agent calls, controlled shared memory, delegation traceability and limits, specialized task-oriented frontend views, automated removal of inaccessible private RAG content and advanced human approval workflows. Also carries ADR-0516 (diagram generation from LLM-authored Mermaid, rendered in-cluster by the `diagram-render` component alongside ADR-0415's SDXL `generate_image`), which is Implemented — landed 2026-08-23, status closed out 2026-08-26 with no work package, see [evidence](evidence/adr-0516-diagram-render.md).
 
 ## v0.5
 

@@ -11,7 +11,7 @@ flowchart TB
     MCPGW --> MCP1[Sales DB MCP]
     MCPGW --> MCP2[Confluence MCP]
     MCPGW --> MCP3[Google Workspace MCP]
-    MCPGW --> MCP4[Lucidchart MCP]
+    MCPGW --> DR[Diagram Render]
     RAG --> VDB[(PostgreSQL + pgvector)]
     AIGW --> LOCAL[OpenShift AI Local Models]
     AIGW --> SAAS[Approved SaaS Models]

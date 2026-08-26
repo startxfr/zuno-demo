@@ -105,8 +105,8 @@ audit/observability (the downstream server doesn't itself re-validate it -
 the gateway's own policy intersection already happened). Each endpoint
 comes from that capability's `endpoint` block in the binding registry.
 
-The three other MCP servers named in `tool-policy.yaml`'s `mcp_server`
-field (`google-workspace`, `lucidchart`, `web-search`) have no real
+The two other MCP servers named in `tool-policy.yaml`'s `mcp_server`
+field (`google-workspace`, `web-search`) have no real
 implementation yet - `components/mcp-servers/<name>/` is a one-line
 README each; their traffic is still served by this gateway's own
 `app/handlers/*.py` demo-mode functions. `confluence` was the second

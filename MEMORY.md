@@ -147,7 +147,7 @@ A shared Google Workspace MCP server uses delegated end-user OAuth2.
 - Arkos `/dat` requires an existing and selected project Drive folder. If no project folder is known, DAT generation must refuse to start.
 - DAT workflow: collect -> outline -> explicit user review -> generation -> review -> final Google Doc.
 - Intermediate workflow state is persistent and resumable.
-- DAT output may include architecture diagrams, with Lucidchart integration planned.
+- DAT output may include architecture diagrams, generated in-cluster from LLM-authored Mermaid via the `generate_diagram` tool (ADR-0516), which supersedes the originally-planned Lucidchart integration.
 - Odyssey workshop preparation starts from an existing project Google Sheet and Google Slides template library in Drive and produces workshop material, architecture/build/run roadmap, slides and workshop reports.
 
 ## 9. Agent details

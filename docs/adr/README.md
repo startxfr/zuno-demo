@@ -198,6 +198,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Proposed | Execute Day 0 and Day 1 operations as AAP Job Templates |
 | [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Proposed | Split model preference into preferred/fallback, with prompt-slot overrides |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Implemented | Sign supply-chain artifacts in-cluster with Vault Transit |
+| [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Implemented | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
 
 ## version 0.5
 
@@ -255,7 +256,6 @@ Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part o
 | [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | OKF v0.1 | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | OKF v0.1 | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
 | [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Implemented | Open per-conversation tabs with one browser tab per agent |
-| [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Proposed | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
 | [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Proposed | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
 | [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Proposed | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
 | [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Proposed | Parallelize the detect-changes read stage's per-document S3 GETs |

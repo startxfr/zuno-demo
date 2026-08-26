@@ -79,9 +79,9 @@ resumable intermediate state - is staged work: the explicit-review
 checkpoints between stages are a later iteration, not built by this task.
 "Optional Lucidchart diagrams" from that same original plan is superseded
 by ADR-0516's `generate_diagram` (self-hosted Mermaid rendering) - built,
-not staged; a real Lucidchart integration (`components/mcp-servers/
-lucidchart`, still just a placeholder README) was never built and this
-task no longer depends on it. Live Jira is deferred until its MCP
+not staged; a real Lucidchart integration was never built (its
+`components/mcp-servers/lucidchart` placeholder was removed when ADR-0516
+was closed out) and this task no longer depends on it. Live Jira is deferred until its MCP
 server exists (WP-02's template, not yet scheduled for Jira); Confluence
 read/search are live today (`components/mcp-servers/confluence`, ADR-0117).
 

@@ -3,7 +3,7 @@
 - **Purpose:** Architecture assistant
 - **Primary integrations:** Technical RAG, Confluence, Google Drive/Docs,
   Mermaid diagram generation (ADR-0516 - supersedes the originally-planned
-  Lucidchart integration, never built beyond a placeholder README).
+  Lucidchart integration, which was never built).
   Photorealistic image generation (stable-diffusion-xl, ADR-0415) is not
   offered to Arkos - it's Comage-exclusive, scoped to marketing visuals.
 - **Initial tasks:** Draft architecture testimonial (DAT); prepare Odyssey
