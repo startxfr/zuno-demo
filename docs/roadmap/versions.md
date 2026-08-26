@@ -6,11 +6,11 @@ Seven-day internal vertical slice and five-agent demo, prioritizing Tekos as the
 
 ## v0.1
 
-Industrialization: HA shared services, resumable workflows, automated ingestion/evaluation, stronger signing, source freshness, ACL synchronization and SecNumCloud-oriented hardening. Open ADRs: 0101–0117 plus 0322/0330 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 1. (ADR-0111, SecNumCloud-oriented hardening, retargeted to v0.7 on 2026-08-26 — see that band below.)
+Industrialization: HA shared services, resumable workflows, automated ingestion/evaluation, stronger signing, source freshness, ACL synchronization and SecNumCloud-oriented hardening. Open ADRs: 0101–0117 plus 0322/0330 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 1. (ADR-0111, SecNumCloud-oriented hardening, retargeted to v0.7 on 2026-08-26 — see that band below.) (ADR-0105, source-specific ingestion cadences, retargeted to v0.7 on 2026-08-26 — see that band below.)
 
 ## v0.2
 
-Knowledge governance: logical knowledge domains, knowledge authorization as policy intersection, multi-domain RAG generalization, indexed-vs-live routing, Salesforce/SXA-legacy separation, standardized tool authentication, project-scoped agent memory. Open ADRs: 0202–0209 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 2. (ADR-0201, MaaS governance-plane completion, retargeted to v0.5 on 2026-08-24 — see that band below.) Also carries ADR-0354 (retargeted from v0.3 on 2026-08-24), installing Ansible Automation Platform as a new Day 1 component (`aap`) plus a companion `aap-config` component that registers this repository as an AAP Project with a `day0_check` Job Template. Open WPs: WP-072, WP-073.
+Knowledge governance: logical knowledge domains, knowledge authorization as policy intersection, multi-domain RAG generalization, indexed-vs-live routing, Salesforce/SXA-legacy separation, standardized tool authentication, project-scoped agent memory. Open ADRs: 0202–0209 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 2. (ADR-0201, MaaS governance-plane completion, retargeted to v0.5 on 2026-08-24 — see that band below.) (ADR-0206, Salesforce/SXA-legacy separation, retargeted to v0.7 on 2026-08-26 — see that band below.) Also carries ADR-0354 (retargeted from v0.3 on 2026-08-24), installing Ansible Automation Platform as a new Day 1 component (`aap`) plus a companion `aap-config` component that registers this repository as an AAP Project with a `day0_check` Job Template. Open WPs: WP-072, WP-073.
 
 ## v0.3
 
@@ -31,6 +31,8 @@ Prove the platform's Day 0–3 automation is complete and portable by redeployin
 ## v0.7
 
 Automate the release/supply-chain pipeline using GitHub Actions (build, sign, publish, promote). Carries ADR-0115 (immutable/verifiable software supply-chain artifacts), retargeted from v0.1 on 2026-08-24 — WP-04's three-stage GitHub Actions + Quay release work. Also carries ADR-0111 (strengthen SecNumCloud-oriented security controls), retargeted from v0.1 on 2026-08-26 — its one remaining gap (immutable chart image tags) is blocked on the same WP-04 GitHub billing lock as ADR-0115.
+
+Separately, and unrelated to the GitHub-Actions release-automation goal above, this band also carries ADR-0105 (automate source-specific knowledge ingestion, retargeted from v0.1 on 2026-08-26) and ADR-0206 (separate current Salesforce knowledge from legacy SXA, retargeted from v0.2 on 2026-08-26) as a roadmap reprioritization. Only their `Target` moved — WP-22 remains `Done` and WP-23 remains `Operator pending`, and their status fields are unchanged.
 
 ## OKF stream
 

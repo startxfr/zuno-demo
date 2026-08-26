@@ -1,7 +1,7 @@
 # WP-23: Sales vs SXA-legacy separation
 
 - **State:** Operator pending (2026-08-15 — repo work merged: `sales.*` capabilities renamed to `sxa.*` in `platform/bindings/tools/tool-bindings.yaml`/`policies/tools/tool-policy.yaml` (legacy tool-name aliases kept, `sales.*` namespace vacated for WP-33); two new deterministic structured-query tools (`aggregate_revenue_by_year`, `lookup_record`, no raw-SQL path, `sxa.aggregate.revenue-by-year`/`sxa.record.lookup`, Sales+Direction/`board` only, C3 by default per `policies/knowledge/knowledge-policy.yaml`'s already-merged `knowledge.sxa-legacy` entry); `load-sxa-dump` idempotent re-index verified by test; binding-layer write-path guard test proving no `sales.*` capability resolves. Awaiting the operator follow-up below: real approved SXA snapshot load, live role-denial check with real Keycloak users, and the user's scheduling of the C3 field-level data review.)
-- **ADRs:** ADR-0206 (To be implemented -> Partially implemented -> Implemented)
+- **ADRs:** ADR-0206 (To be implemented -> Partially implemented -> Implemented, retargeted to v0.7 on 2026-08-26 — roadmap reprioritization alongside ADR-0105, unrelated to the WP-04/WP-11 GitHub-Actions v0.7 theme)
 - **Depends on:** WP-20 (merged), WP-21 (merged); WP-22's `load-sxa-dump`
   adapter (merged 2026-08-15, already satisfied — not a live blocker;
   WP-22's own remaining scope is unrelated recurring-cadence automation)

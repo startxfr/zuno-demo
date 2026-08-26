@@ -18,6 +18,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-26):** ADR-0111 (v0.1 -> v0.7, Partially implemented -> Deferred) - its sole remaining gap (immutable chart image tags) is blocked on the same WP-04 external GitHub billing lock that already parked ADR-0115 in Deferred status under the v0.7 milestone; ADR-0111 now groups there alongside it. Numbering (01xx band) is unchanged; only `Target`/`Status` move.
 
+**Retargeting note (2026-08-26):** ADR-0105 (v0.1 -> v0.7) and ADR-0206 (v0.2 -> v0.7) move to the v0.7 band as a separate, unrelated deferred-items group - not part of WP-04's GitHub-Actions release-automation scope already there. Status unchanged for both (`Partially implemented`); only `Target` moves.
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -90,7 +92,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | v0.1 | Implemented | Target 99.9 percent platform availability |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Implemented | Persist resumable long-running agent workflows |
 | [ADR-0104](0104-introduce-controlled-semantic-caching.md) | v0.1 | Implemented | Introduce controlled semantic caching |
-| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.1 | Partially implemented | Automate source-specific knowledge ingestion |
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | v0.1 | Implemented | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | v0.1 | Implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Implemented | Automate model evaluation with LM-Eval |
@@ -113,7 +114,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v0.2 | Implemented | Enforce knowledge authorization as policy intersection |
 | [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Implemented | Generalize the RAG platform to multiple isolated knowledge domains |
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | v0.2 | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
-| [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.2 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v0.2 | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | Implemented | Introduce project-scoped agent memory |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | v0.2 | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
@@ -228,6 +228,13 @@ Goal: automate the release/supply-chain pipeline using GitHub Actions (build, si
 |---|---|---|---|
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Deferred | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.7 | Deferred | Use immutable and verifiable software supply chain artifacts |
+
+Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part of the GitHub-Actions release-automation goal above):
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.7 | Partially implemented | Automate source-specific knowledge ingestion |
+| [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.7 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
 
 ## OKF stream
 
