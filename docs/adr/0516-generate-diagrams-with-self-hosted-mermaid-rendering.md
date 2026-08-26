@@ -195,14 +195,16 @@ the rendered SVG content and fails the request instead, which is what makes
 the one-shot self-correction retry in `nodes.py` reachable.
 
 The **egress `NetworkPolicy`** left open in Accepted risks above (the
-SSRF-via-Mermaid-external-image-reference vector) was written as part of this
-closeout: `gitops/charts/diagram-render/templates/networkpolicy.yaml` now
-declares `Egress` as well as `Ingress`, allowing only cluster DNS and the
-`zuno-mesh` control plane. The app itself needs no egress whatsoever - it
-renders a local file to a local file - so everything allowed there is the
-istio sidecar's own requirement, which is what let the policy be this tight.
+SSRF-via-Mermaid-external-image-reference vector) was attempted during this
+closeout and **reverted the same day**; the risk stands as originally
+accepted. Allowing only cluster DNS plus the `zuno-mesh` control plane is not
+sufficient for the istio sidecar to bootstrap - proven with an A/B pod pair,
+one carrying the `diagram-render` label and one not. See
+`gitops/charts/diagram-render/templates/networkpolicy.yaml`, which records the
+full finding and the two verification traps involved, and the
+[evidence](../roadmap/evidence/adr-0516-diagram-render.md).
 
-One item remains open: closure rests on merged code plus the live, healthy
+A second item remains open: closure rests on merged code plus the live, healthy
 deployment - not on a fresh end-to-end `generate_diagram` call captured as
 evidence. See [evidence](../roadmap/evidence/adr-0516-diagram-render.md).
 
