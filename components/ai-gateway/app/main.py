@@ -353,6 +353,27 @@ async def images_generations(
     )
 
 
+def _adapter_skips_maas(
+    cfg: Dict[str, Any],
+    adapter_decl: Optional[AdapterDeclaration],
+) -> bool:
+    """ADR-0521 (WP-076) closeout: an adapter-resolved request must never
+    ride a via_maas candidate. A LoRA adapter id replaces the request
+    body's `model` field, which MaaS's whole auth chain keys on (ipp-pre
+    copies it into X-Gateway-Model-Name for the OPA rules; no MaaSModelRef
+    exists for adapter ids) - and app/providers.py's own guard would
+    otherwise silently drop the adapter on a via_maas candidate, degrading
+    the task to the base model without any signal. Skipping lands the
+    request on the same model's direct sibling instead (provider-routing
+    .yaml guarantees one immediately after each -maas entry). Deliberately
+    coarse: it also skips a via_maas candidate whose model doesn't serve
+    adapters at all (e.g. local-gpt-oss-maas) - for an adapter-declared
+    (agent, task) that's a same-model transport downgrade, not a
+    behavior change, and cheaper than resolving sibling capabilities
+    here."""
+    return adapter_decl is not None and bool(cfg.get("via_maas", False))
+
+
 def _resolve_adapter(
     candidate: ProviderCandidate,
     cfg: Dict[str, Any],
@@ -439,6 +460,12 @@ async def _invoke_with_fallback(
     errors: List[str] = []
     for candidate in candidates:
         cfg = routing_table.provider_config(candidate.name)
+        if _adapter_skips_maas(cfg, adapter_decl):
+            logger.debug(
+                "skipping via_maas candidate %s: adapter declaration resolved, "
+                "adapters cannot traverse MaaS", candidate.name,
+            )
+            continue
         model_name = cfg.get("model", candidate.name)
         # ADR-0303 (WP-39): adapter_name is None unless this candidate is
         # local AND a declaration exists - effective_model_name is what
@@ -557,6 +584,12 @@ async def _stream_completion(
 
     for candidate in candidates:
         cfg = routing_table.provider_config(candidate.name)
+        if _adapter_skips_maas(cfg, adapter_decl):
+            logger.debug(
+                "skipping via_maas candidate %s: adapter declaration resolved, "
+                "adapters cannot traverse MaaS", candidate.name,
+            )
+            continue
         model_name = cfg.get("model", candidate.name)
         adapter_name = _resolve_adapter(candidate, cfg, adapter_decl)
         effective_model_name = adapter_name or model_name

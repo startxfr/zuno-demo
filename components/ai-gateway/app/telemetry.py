@@ -81,6 +81,14 @@ _NODE_USD_PER_HOUR = {
 _COST_PER_SECOND_LOCAL = {
     "local": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,  # ~$0.000556/s (qwen3.6-27b-instruct, half the shared card)
     "local-gpt-oss": _NODE_USD_PER_HOUR["g7e.2xlarge"] / 3600.0,   # ~$0.000933/s (gpt-oss-20b, whole card)
+    # ADR-0521 (WP-076): the MaaS-transport siblings burn the exact same
+    # GPU seconds on the exact same cards - transport never changes the
+    # economics. Keyed separately because this table is keyed by PROVIDER
+    # name (candidate.name), and a via_maas call reports under its own
+    # entry name - without these rows every MaaS-routed local call
+    # silently fell through to zero cost.
+    "local-maas": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,
+    "local-gpt-oss-maas": _NODE_USD_PER_HOUR["g7e.2xlarge"] / 3600.0,
 }
 
 _tracer: Optional[trace.Tracer] = None

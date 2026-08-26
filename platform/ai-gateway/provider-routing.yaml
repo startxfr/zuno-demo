@@ -28,24 +28,26 @@
 # external provider fallback order: OpenAI, Gemini, Anthropic, Mistral".
 # Since ADR-0412 there are TWO local models: `local` (qwen, the default)
 # and gpt-oss-20b, the reasoning-preferred second local and C3's
-# first-ever fallback. ADR-0521 (WP-076) step 4: gpt-oss-20b now has TWO
-# candidate entries - `local-gpt-oss-maas` (via_maas: true, tried first)
-# and `local-gpt-oss` (direct, unchanged) - so "MaaS unreachable -> same
+# first-ever fallback. ADR-0521 (WP-076): BOTH local models now carry TWO
+# candidate entries each - a `-maas` sibling (via_maas: true, tried
+# first) and the direct entry (unchanged) - so "MaaS unreachable -> same
 # model still answers directly" is a config outcome of this file's own
-# fallback order, no new code (ADR-0521 item 6). qwen has no MaaS entry
-# yet: a live, reproducible bug routes qwen's MaaS-path responses to an
-# empty body (auth/routing/subscription all pass; something between vLLM
-# and the client drops it) - `local` stays direct-only until that's
-# root-caused.
+# fallback order, no new code (ADR-0521 item 6). qwen's `local-maas`
+# entry was blocked for a day by a live empty-body bug on the MaaS path;
+# root-caused 2026-08-26 to a KServe HTTPRoute rule-name collision plus
+# an Envoy ext_proc response-path race in the endpoint-picker (EPP), both
+# fixed in gitops/charts/models/templates/_llmisvc-route.tpl - full
+# analysis in docs/roadmap/evidence/adr-0521-maas-local-traffic.md.
 # A per-(agent,task) `preferences:` entry in policies/model-routing/
 # model-routing-policy.yaml may REORDER the candidates that survive
 # eligibility/local-only filtering (e.g. putting the gpt-oss pair first
 # for reflexional tasks) - reorder only, it can never add a provider this
 # list's `eligible_for` filtered out. Every `prefer`/`preferred` entry
 # that names `local-gpt-oss` lists `local-gpt-oss-maas` immediately before
+# it, and every entry naming `local` lists `local-maas` immediately before
 # it - required, not cosmetic: _apply_preference's "unlisted survivors
 # follow in provider-routing.yaml order" rule would otherwise strand
-# local-gpt-oss-maas wherever the reordered list's unlisted tail lands,
+# the -maas sibling wherever the reordered list's unlisted tail lands,
 # breaking "MaaS-preferred, same-model-direct-fallback" for any task with
 # an explicit preference.
 #
@@ -88,6 +90,26 @@
 # see the ADR for the full key. No entry below sets it yet.
 
 providers:
+  # ADR-0521 (WP-076) closeout: qwen's MaaS-preferred sibling, tried first
+  # (declared before `local`; file order = fallback order). Same shape and
+  # rationale as local-gpt-oss-maas below - path-prefixed MaaS endpoint,
+  # maas_model_ref carrying the MaaSModelRef identity the request body's
+  # `model` field must use, SA-token auth. Deliberately NO serves_adapters:
+  # a LoRA adapter id replaces the body's model name, which MaaS auth keys
+  # on (no MaaSModelRef exists for adapter ids), so adapter-resolved
+  # requests must never ride MaaS - app/main.py's candidate loop skips
+  # via_maas candidates whenever an adapter declaration resolved, landing
+  # them on the direct `local` entry below instead.
+  - name: local-maas
+    kind: local
+    model: qwen3.6-27b-instruct
+    via_maas: true
+    maas_model_ref: zuno-ai-run/qwen36-27b-instruct-maas
+    endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+
   # ADR-0521: qwen is an LLMInferenceService now (no more <name>-predictor
   # Service), same shape local-gpt-oss already has below - see that
   # entry's own comment for the full https/CA-bundle rationale, which

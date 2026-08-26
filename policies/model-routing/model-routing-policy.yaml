@@ -50,16 +50,19 @@ adapters: []
 # in the per-row comments; simple lookup/listing/transactional tasks are
 # deliberately absent (qwen stays their first candidate).
 #
-# ADR-0521 (WP-076) step 4: every entry naming `local-gpt-oss` lists
-# `local-gpt-oss-maas` immediately before it - NOT optional styling.
+# ADR-0521 (WP-076): every entry naming `local-gpt-oss` lists
+# `local-gpt-oss-maas` immediately before it, and every entry naming
+# `local` lists `local-maas` immediately before it - NOT optional styling.
 # _apply_preference's "unlisted survivors follow in provider-routing.yaml
-# order" rule means an unlisted local-gpt-oss-maas would land wherever the
-# reordered tail happens to fall, not necessarily right after
-# local-gpt-oss - breaking "MaaS-preferred, same-model-direct-fallback"
-# for exactly the tasks this file exists to reorder. qwen (`local`) has no
-# -maas sibling yet (a live, reproducible bug empties its MaaS-path
-# response body - see the WP-076 tracking note) - do not add one until
-# that's resolved.
+# order" rule means an unlisted -maas sibling would land wherever the
+# reordered tail happens to fall, not necessarily right after its direct
+# peer - breaking "MaaS-preferred, same-model-direct-fallback" for
+# exactly the tasks this file exists to reorder. (qwen's `local-maas` was
+# held back a day by the MaaS empty-body bug, root-caused and fixed
+# 2026-08-26 - see docs/roadmap/evidence/adr-0521-maas-local-traffic.md.)
+# Note adapter-declared (agent, task) pairs never reach a -maas candidate
+# regardless of this ordering: app/main.py skips via_maas candidates when
+# an adapter declaration resolved (adapter ids can't traverse MaaS auth).
 preferences:
   # Multi-doc synthesis with citations (tekos's primary task).
   # ADR-0419: local models still lead (unchanged doctrine - reasoning-heavy
@@ -72,15 +75,15 @@ preferences:
   # lookup, but stays reachable at the very end rather than excluded.
   - agent: tekos
     task: answer-technical-question
-    preferred: [local-gpt-oss-maas, local-gpt-oss, local, ovhcloud-gpt-oss-120b]
+    preferred: [local-gpt-oss-maas, local-gpt-oss, local-maas, local, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   - agent: tekos
     task: find-relevant-docs
-    preferred: [local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    preferred: [local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   - agent: tekos
     task: check-my-drive-docs
-    preferred: [local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    preferred: [local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   # Plan->draft->reflect->write document workflow; C3 by agent seed - the
   # flagship local-only reflexional case. draft_node's own call is always
@@ -91,38 +94,38 @@ preferences:
   # (agent, task) preference key.
   - agent: arkos
     task: draft-architecture-testimonial
-    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # ADR-0514: workshop-presentation shares draft-architecture-
   # testimonial's exact reasoning - same plan/retrieve/draft/reflect/write
   # shape, same C3 agent seed, same reflect-slot C2 ceiling that's what
   # actually makes ovhcloud-gpt-oss-120b reachable at this preference.
   - agent: arkos
     task: workshop-presentation
-    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Multi-year comparison/analysis over C3 sxa-legacy data.
   - agent: comage
     task: compare-historical-deals
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Project/bid synthesis.
   - agent: advantage
     task: answer-project-question
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Detection + judgment over adv knowledge (PO within 3 rolling days).
   - agent: advantage
     task: identify-new-business-with-po
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Margin analysis by state/customer/technology.
   - agent: advantage
     task: monthly-sales-report
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Invoice-readiness evaluation over sxa financial data (C3-intended).
   - agent: finage
     task: identify-business-ready-to-invoice
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Aggregation report over sxa financial data (C3-intended).
   - agent: finage
     task: monthly-invoice-report
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Board-level strategic/financial work, C3 agent seed - forward-declared
   # (cognos is a placeholder with no runtime route yet; inert until then).
   # ADR-0416: ovhcloud-gpt-oss-120b leads the chain for turns that compute
@@ -133,7 +136,7 @@ preferences:
   # local exactly as before.
   - agent: cognos
     task: coming-soon
-    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
 
   # ADR-0417: coding requests. Arkos's write-code call is a scoped,
   # early-exit branch of an otherwise C3-seeded agent (evaluated at a
@@ -154,7 +157,7 @@ preferences:
   # free from already-live machinery.
   - agent: tekos
     task: write-code
-    prefer: [mistral-codestral, local-gpt-oss-maas, local-gpt-oss, local]
+    prefer: [mistral-codestral, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
 
 # ADR-0304 (WP-40 Part B): per (agent, task) "task class" quality/cost/
 # latency objectives, consumed by evaluations/routing_report.py alongside
