@@ -145,6 +145,36 @@ spec:
       global:
         repo1-retention-full: "4"
         repo1-retention-full-type: count
+      # WP-083 follow-up: the repo host ran with NO requests and NO limits at
+      # all - its only QoS came from the injected istio sidecar. That made it
+      # invisible to the scheduler and, more to the point, the first candidate
+      # evicted under node memory pressure. It now sits on a control-plane
+      # node, and the moment it is most exposed is the moment it is doing the
+      # one job it exists for.
+      # Sized from 48h of live metrics at 30s resolution (5m rates hide it -
+      # a full backup runs ~60s and gets averaged away):
+      #   idle       cpu ~2.5m   mem ~39Mi   (>99% of the time)
+      #   diff backup cpu 27m    mem 140Mi   (2026-08-26, 769MB database)
+      #   full backup cpu 181m   mem ~17Mi   (2026-08-25, 203MB database)
+      # Requests track the idle state, because that is what this pod actually
+      # is almost always - except memory, which is deliberately set ABOVE the
+      # 180Mi observed peak rather than near the 39Mi average: memory is
+      # incompressible, eviction ranks pods by usage-over-request, and sizing
+      # the request below the backup peak would make the backup itself the
+      # trigger that kills it. CPU can be throttled instead of killed, so a
+      # low request there is safe.
+      # The cpu limit is ~5x the measured peak on purpose: that 181m was
+      # compressing a 203MB database, and the database reached 769MB the very
+      # next day. pgBackRest CPU is compression-bound, so the peak grows with
+      # the data.
+      repoHost:
+        resources:
+          requests:
+            cpu: {{ .Values.backups.repoHost.resources.requests.cpu | quote }}
+            memory: {{ .Values.backups.repoHost.resources.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.backups.repoHost.resources.limits.cpu | quote }}
+            memory: {{ .Values.backups.repoHost.resources.limits.memory | quote }}
       repos:
         - name: repo1
           schedules:

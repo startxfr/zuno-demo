@@ -108,6 +108,18 @@ pgBouncer:
 # PGO requires at least one pgBackRest repository; repo1 is always a local
 # PVC. repo2 (S3, off-cluster) is added only once real credentials exist.
 backups:
+  # Dedicated pgBackRest repository host. See the long comment on
+  # spec.backups.pgbackrest.repoHost in templates/postgrescluster.yaml for the
+  # measurements these come from and why memory is sized to the backup peak
+  # while cpu is sized to the idle state.
+  repoHost:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
   storageSize: 500Gi
   s3:
     enabled: false
