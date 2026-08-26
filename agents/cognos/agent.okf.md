@@ -79,9 +79,9 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `coming-soon` | `C3` | `local-gpt-oss` | `local` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `review-historical-commercial-data` | `C3` | `local` | `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `coming-soon` | `C3` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `review-historical-commercial-data` | `C3` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
 
-**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local`, `local-gpt-oss`.
+**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`.
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

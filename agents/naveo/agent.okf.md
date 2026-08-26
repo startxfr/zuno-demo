@@ -80,8 +80,8 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `C1` | `local` | `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `C1` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
 
-**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local`, `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
+**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `openai`, `gemini`, `anthropic`, `mistral`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

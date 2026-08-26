@@ -58,3 +58,5 @@ spec:
     - read_gmail
     - sxa.opportunity.search
     - sxa.aggregate.revenue-by-year
+    - diagram.generation.create
+    - image.generation.create

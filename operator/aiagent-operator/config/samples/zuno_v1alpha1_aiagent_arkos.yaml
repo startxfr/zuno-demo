@@ -56,3 +56,10 @@ spec:
     - confluence.page.search
     - drive.document.create
     - drive.document.update
+    - diagram.generation.create
+    - git.repository.read
+    - git.repository.list
+    - git.repository.create
+    - git.file.write
+    - git.repository.private.read
+    - git.repository.private.list

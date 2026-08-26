@@ -55,3 +55,6 @@ spec:
     - search_confluence
     - web_search
     - list_drive_files
+    - diagram.generation.create
+    - git.repository.read
+    - git.repository.list
