@@ -3,6 +3,17 @@
 
 namespace: zuno-ai-run
 
+# WP-086: keep the three GPU predictors off the same node when the cluster has
+# more than one MIG node, so losing a node degrades inference instead of killing
+# it outright. Every constraint it gates is
+# `preferredDuringSchedulingIgnoredDuringExecution` - a hard one would leave a
+# pod Pending during a node loss rather than packing it onto the survivor, which
+# is the opposite of the goal. ADR-0351 decision 1 removed the *hard*
+# full-GPU-era anti-affinity for exactly that reason; this soft form honours it.
+# Set false to go back to packing everything onto one node (single-GPU-node
+# clusters, or a deliberate consolidation) without editing templates.
+spreadAcrossGpuNodes: true
+
 # Scrapes each predictor's own vLLM /metrics endpoint (the vllm:* series -
 # queue depth, TTFT, KV-cache usage, token throughput) for
 # dashboard-ai-models.yaml (ADR-0413). Gates both

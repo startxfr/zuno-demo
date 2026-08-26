@@ -202,6 +202,11 @@ Ordered; each gates the next.
 - `MEMORY.md` updated: the GPU capacity paragraph described one permanent node plus a
   replicas-0 failover MachineSet, which is no longer true.
 - `python3 platform/docs/check_docs.py` passes.
+- **2026-08-26, later the same day:** this WP's steady state was not actually reached on close-out.
+  `zuno-gpu-c`'s machine had been created *before* the `volumeSize: 250` fix landed in the
+  MachineSet template, so it came back on the old 149GB disk and stayed cordoned; all three
+  models ran on `zuno-gpu-a` alone. [WP-086](wp-086-spread-models-and-platform-hygiene.md)
+  replaces that machine and spreads the predictors across both nodes.
 
 ### What the live run changed about the plan
 

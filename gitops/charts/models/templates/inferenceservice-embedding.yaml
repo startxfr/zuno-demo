@@ -25,13 +25,35 @@ spec:
     {{- end }}
     minReplicas: {{ .Values.embeddingModel.minReplicas }}
     maxReplicas: {{ .Values.embeddingModel.maxReplicas }}
-    # No anti-affinity against the chat model anymore (ADR-0351): a hard
-    # hostname anti-affinity used to keep the two full-GPU pods from racing
-    # for one node's single nvidia.com/gpu, but under MIG they request
-    # *different, co-resident* slice resources (this one mig-1g.24gb, the
-    # chat model mig-2g.48gb) and packing all inference onto the one
-    # permanent GPU node is exactly the intended layout - the old
-    # constraint would forbid it outright.
+    # ADR-0351 removed the *hard* hostname anti-affinity against the chat
+    # model: written for the one-full-GPU-per-node world, it forbade the
+    # single-node packing MIG makes desirable, since the two pods request
+    # different, co-resident slice types (this one mig-1g.24gb, the chat model
+    # mig-2g.48gb). That removal still stands - what follows is soft.
+    {{- if .Values.spreadAcrossGpuNodes }}
+    # WP-086: with two permanent MIG nodes, prefer the node that is NOT running
+    # qwen. The selector names qwen specifically rather than reusing the LLM
+    # pods' `kserve.io/component: workload`: after the two chat models spread,
+    # both nodes host one of them, so the broad selector would score every node
+    # identically and steer nothing. Isolating qwen is the point - it is the
+    # heaviest predictor on disk and the one MaaS and the agents depend on.
+    # Preferred, never required: if only one node survives, all three pack onto
+    # it rather than going Pending.
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  # inferenceServiceName, NOT servedModelName: KServe derives
+                  # this label from the LLMInferenceService's metadata.name
+                  # (qwen36-27b-instruct), which differs from the served model
+                  # id (qwen3.6-27b-instruct). Getting it wrong matches nothing
+                  # and degrades silently to no constraint at all.
+                  app.kubernetes.io/name: {{ .Values.inferenceServiceName }}
+    {{- end }}
     # Carries the serving.kserve.io/s3-* annotated Secret KServe's
     # storage-initializer auto-detects for the s3:// storageUri below
     # (templates/s3-serving-credentials-embedding.yaml).

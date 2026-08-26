@@ -85,9 +85,29 @@ spec:
   template:
     # Same generic GPU-family guard the other GPU workloads use; the
     # resources request's mig-2g.48gb type is the real scheduling steer
-    # (only Card A's managed MIG node advertises it).
+    # (WP-083: both permanent MIG nodes now advertise it, so this no longer
+    # pins the pod to one node on its own).
     nodeSelector:
       nvidia.com/gpu.present: "true"
+    {{- if .Values.spreadAcrossGpuNodes }}
+    # WP-086: keep this pod off whichever node already runs the other LLM
+    # predictor. `kserve.io/component: workload` is set by KServe and matches
+    # exactly the two LLMInferenceService model pods cluster-wide - the
+    # router-scheduler pods carry `app.kubernetes.io/component` instead, so they
+    # are not counted. A custom shared label is not an option here:
+    # LLMInferenceService.spec.template is a bare PodSpec with no `metadata`,
+    # and the CR's own labels are not propagated to the pod template.
+    # Soft on purpose - see values.yaml's spreadAcrossGpuNodes.
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  kserve.io/component: workload
+    {{- end }}
     serviceAccountName: {{ .Values.inferenceServiceName }}-s3
     containers:
       - name: main
