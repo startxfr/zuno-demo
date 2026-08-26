@@ -91,13 +91,45 @@ cluster-machine:
         # ansible/roles/nvidia_gpu's spec overlay.
         additionnalsLabels: |-
           nvidia.com/mig.config: all-balanced
-      # AZ-failover twin of zuno-gpu-a, in the only other zone offering
-      # g7e. Stays at 0 and is NOT autoscaled: the ClusterAutoscaler can
+        # Same PreferNoSchedule rationale as zuno-gpu-c below. NOTE: a
+        # MachineSet template change does not retaint a node that already
+        # exists - this only takes effect on a replacement machine, so the
+        # running zuno-gpu-a node must be tainted live once with
+        # `oc adm taint node <node> nvidia.com/gpu=true:PreferNoSchedule`.
+        additionnalsTaints: |-
+          - key: nvidia.com/gpu
+            value: "true"
+            effect: PreferNoSchedule
+      # Second PERMANENT inference node since 2026-08-26, no longer the
+      # scale-on-demand failover twin it was designed as. It is still NOT
+      # autoscaled, and for the original reason: the ClusterAutoscaler can
       # only scale from zero for plain nvidia.com/gpu (via the
       # capacity.cluster-autoscaler.kubernetes.io/gpu-count/gpu-type
       # annotations) - nvidia.com/mig-* capacity is invisible to it, so
-      # Pending MIG-slice pods can never trigger this set. Failover is the
-      # one-command runbook in this chart's README.
+      # Pending MIG-slice pods could never have triggered this set. That
+      # is precisely why it cannot stay at 0: a second MIG node has to be
+      # standing before it is needed, or it is never summoned at all.
+      #
+      # It replaces demo222-kpkqk-workergpu-eu-west-2a, the installer's
+      # IPI GPU node, which carried an entire idle 96GB GPU. Four reasons
+      # this swap is worth a size step (g7e.2xlarge -> g7e.4xlarge):
+      #   1. 8 vCPU cannot drive a 3-slice MIG partition. With ~3.5 cores
+      #      already taken by platform pods, the workergpu node had 4.5
+      #      cores for 3 slices - one model pod fit, so 96GB of VRAM was
+      #      bought to use 24GB of it.
+      #   2. The IPI MachineSet is outside this chart, so no
+      #      nvidia.com/mig.config label can be pushed to it declaratively
+      #      - any MIG partition there is manual and lost on node replace.
+      #   3. Zero AZ redundancy today: zuno-gpu-a AND workergpu are both
+      #      in eu-west-2a. This set is in 2c.
+      #   4. Symmetry is what makes failover real - two identical
+      #      all-balanced g7e.4xlarge means qwen36-27b (48GB slice, 16Gi
+      #      RAM) can actually land on either. It could never fit on the
+      #      g7e.2xlarge under load.
+      # Net cluster effect is +8 vCPU / +64GiB of general-purpose capacity
+      # despite the taint below, since the node it retires is half its
+      # size. Decommissioning the IPI set is a live `oc scale` - it is not
+      # declared here and cannot be retired by this chart.
       - name: zuno-gpu-c
         az: c
         type: worker
@@ -112,9 +144,27 @@ cluster-machine:
               iops: 0
               volumeSize: 150
               volumeType: gp3
-        replicas: 0
+        replicas: 1
         additionnalsLabels: |-
           nvidia.com/mig.config: all-balanced
+        # PreferNoSchedule, deliberately NOT NoSchedule. The intent is to
+        # stop platform pods from creeping back onto the inference nodes
+        # and re-starving them of CPU - the failure this whole change
+        # undoes - not to evict what is already placed. A hard taint here
+        # would be unschedulable in practice: dedicating both GPU nodes
+        # means relocating ~10.2 cores of platform requests onto 12.0
+        # cores of headroom that lives mostly on the three masters, taking
+        # them from ~75% to ~98% cpu-requests. Soft means the GPU nodes
+        # stay the overflow of last resort and the scheduler degrades
+        # instead of deadlocking.
+        # Model pods need no matching toleration: they are the only pods
+        # requesting nvidia.com/mig-*, which no other node advertises, so
+        # the resource requirement already pins them here and the soft
+        # penalty has nothing to bias them towards.
+        additionnalsTaints: |-
+          - key: nvidia.com/gpu
+            value: "true"
+            effect: PreferNoSchedule
       # Burst training node, scale-from-zero (the MachineAutoscaler below).
       # MIG stays DISABLED here - the whole 96GB GPU is advertised as
       # nvidia.com/gpu: 1, the only resource shape the ClusterAutoscaler
