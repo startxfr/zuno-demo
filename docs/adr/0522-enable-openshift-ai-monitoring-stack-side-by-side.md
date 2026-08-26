@@ -1,6 +1,9 @@
 # ADR-0522: Enable OpenShift AI's built-in monitoring stack, side-by-side with the existing observability stack
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-26 via WP-078/WP-079/WP-080 - metrics, traces
+  and Perses all live and healthy in `redhat-ods-monitoring`, fully side-by-side with
+  `zuno-monitoring`, zero application code changes). Phase 2 (unifying the two stacks) is a
+  separate, not-yet-started follow-up - see WP-080's "Phase 2" section.
 - **Target:** v0.5
 - **Date:** 2026-08-26
 - **Decision owners:** Zuno Demo architecture team
