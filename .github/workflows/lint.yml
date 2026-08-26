@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          # ADR-0043 bumped mcp-gateway/sales-db off the old fastapi/
+          # ADR-0043 bumped mcp-gateway off the old fastapi/
           # starlette pins; ADR-0042 needs go-redis/v9, which requires Go
           # 1.24 - both components/agent-frontend/go.mod and
           # components/agent-bff/go.mod build under this version.
@@ -160,7 +160,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_auth.py
-          python3 tests/test_downstream_sales_db.py
+          python3 tests/test_downstream_streamable_http.py
           python3 tests/test_bindings.py
           python3 tests/test_auth_mode_enforcement.py
       - name: ai-gateway tests
@@ -183,11 +183,6 @@ jobs:
       - name: supply-chain sign_okf_bundle.py tests (ADR-0106)
         working-directory: platform/supply-chain
         run: python3 tests/test_sign_okf_bundle.py
-      - name: sales-db MCP server tests
-        working-directory: components/mcp-servers/sales-db
-        run: |
-          pip install -r requirements.txt
-          python3 tests/test_mcp_protocol.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

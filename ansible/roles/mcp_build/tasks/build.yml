@@ -1,6 +1,6 @@
 ---
 # Builds mcp-gateway, plus every real MCP server under
-# components/mcp-servers/<name>/Dockerfile (sales-db, confluence -
+# components/mcp-servers/<name>/Dockerfile (confluence, salesforce -
 # ADR-0117, salesforce - ADR-0326/WP-33, and any later one - ADR-0119/
 # WP-057). Drive/Gmail/web-search handlers still live inside mcp-gateway
 # itself, not as separate images.

@@ -53,8 +53,6 @@ spec:
               value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
             - name: KEYCLOAK_JWKS_URL
               value: {{ .Values.keycloakJwksUrl | quote }}
-            - name: SALES_DB_MCP_URL
-              value: {{ .Values.salesDbMcpUrl | quote }}
             - name: AI_GATEWAY_URL
               value: {{ .Values.aiGatewayUrl | quote }}
             - name: INTERNAL_EMAIL_DOMAINS

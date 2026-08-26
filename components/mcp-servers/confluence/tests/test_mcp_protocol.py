@@ -2,7 +2,7 @@
 this server's /mcp endpoint speaks real, standards-compliant MCP
 streamable-HTTP (the official `mcp` SDK), exercised with the actual SDK
 client against this server's real ASGI app in-process (no real socket) -
-same style as `components/mcp-servers/sales-db/tests/test_mcp_protocol.py`.
+same style as `components/mcp-servers/salesforce/tests/test_mcp_protocol.py`.
 
 Confluence Cloud itself is mocked (`server._client` is patched to return a
 fake `httpx.AsyncClient`-shaped object) - these tests prove the MCP
@@ -134,7 +134,7 @@ async def test_search_pages_round_trip(transport) -> None:
 
     assert not result.is_error, result.content
     # Verified against the real SDK (mcp==2.0.0), same as
-    # components/mcp-servers/sales-db's own tests: a tool whose return type
+    # components/mcp-servers/salesforce's own tests: a tool whose return type
     # annotation is a plain Dict[str, Any] gets its structured content
     # wrapped as {"result": <value>} (MCP requires an object-typed
     # top-level schema; a bare dict has none) - the gateway's own

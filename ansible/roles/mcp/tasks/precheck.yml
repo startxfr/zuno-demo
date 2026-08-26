@@ -18,18 +18,6 @@
   ansible.builtin.set_fact:
     _mcp_d1_installed: "{{ _state_check_result }}"
 
-# The sales-db server (d1) is installed by this component (see
-# install.yml's deadlock note); its d0 schema Application stays with
-# sql_schema's own precheck.
-- name: "mcp | check the sales-db MCP server Application (d1)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
-  vars:
-    gitops_app_name: "zuno-mcp-sales-db-d1"
-
-- name: "mcp | save the sales-db d1 check result"
-  ansible.builtin.set_fact:
-    _mcp_sales_db_d1_installed: "{{ _state_check_result }}"
-
 # ADR-0117: the confluence MCP server, applied by install.yml above under
 # this same run component - see its own comment there.
 - name: "mcp | check the confluence MCP server Application (d0)"
@@ -99,7 +87,6 @@
   vars:
     _state_is_installed: >-
       {{ _mcp_d0_installed and _mcp_d1_installed and
-         _mcp_sales_db_d1_installed and
          _mcp_confluence_d0_installed and _mcp_confluence_d1_installed and
          _mcp_git_forge_d0_installed and _mcp_git_forge_d1_installed and
          _mcp_diagram_render_d0_installed and _state_check_result }}

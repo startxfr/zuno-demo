@@ -15,9 +15,7 @@ that component now lives in (ADR-0060) - see
 Most components have real content on only one side - a component with no
 OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
 `models`, `rag`) has an empty `-d0`, pointing at `gitops/charts/noop` (see
-that chart's README). `mcp-sales-db` and `namespaces` have real content on
-*both* sides: `mcp-sales-db`'s `-d0` (`gitops/charts/sql-schema`) is a
-schema/fixtures prerequisite, not an operator. `namespaces`' `-d0`
+that chart's README). `namespaces` has real content on *both* sides: its `-d0`
 (Namespace objects) and `-d1` (ResourceQuota/NetworkPolicy) also span the
 *macro* Day 0/Day 2 split (`day0_install.yml` and `day2_install.yml`
 respectively, per ADR-0060 - moved from Day 1) - see
@@ -52,20 +50,18 @@ this since Day 0 now runs `argocd` first - see `admin-context` in the
 table below. `vault`'s imperative unseal is a one-shot action, not a
 standing component.
 
-`sql_schema`'s and `rag`'s one-shot SQL `Job`s (schema/fixtures applies
-against PostgreSQL) are covered here too, unlike `vault`'s unseal: each is
-an ArgoCD `Sync` hook Job templated into the consuming chart
-(`gitops/charts/sql-schema`'s `-d0` "prerequisites" Application for
-`mcp-sales-db`; `gitops/charts/rag-service`'s own `-d1` Application for
-`rag`), with `hook-delete-policy: BeforeHookCreation` (Jobs are immutable).
-The static SQL/fixtures `ConfigMap` each Job mounts used to be Ansible-applied
-for both (`ansible/roles/{sql_schema,rag}/kustomize/schema/`, plain
-`configMapGenerator`s reading `data/{sxa,rag}/`), entirely outside GitOps -
-`rag`'s is now rendered by the chart itself instead
+`rag`'s one-shot SQL `Job` (schema/fixtures applied against PostgreSQL) is
+covered here too, unlike `vault`'s unseal: it is an ArgoCD `Sync` hook Job
+templated into the consuming chart (`gitops/charts/rag-service`'s own `-d1`
+Application), with `hook-delete-policy: BeforeHookCreation` (Jobs are
+immutable). The static SQL/fixtures `ConfigMap` it mounts used to be
+Ansible-applied (a plain `configMapGenerator` reading `data/rag/`), entirely
+outside GitOps; it is now rendered by the chart itself instead
 (`gitops/charts/rag-service/templates/configmap-schema.yaml`, `.Files.Get`
 on a copy of the same SQL under that chart's own `files/sql/`), so it's part
-of the same ArgoCD-tracked flow as the Job that consumes it. `sql_schema`'s
-ConfigMap (`zuno-sxa-schema`) is still the older Ansible-applied pattern.
+of the same ArgoCD-tracked flow as the Job that consumes it. ADR-0219
+retired the last remaining Ansible-applied schema ConfigMap
+(`zuno-sxa-schema`, owned by the deleted `sql_schema` role).
 
 `nfd`, `nvidia_gpu`, `openshift_ai`, `external_secrets`, `smtp` and
 `observability` each have their own `-d0`/`-d1` Application pair backed by
@@ -165,7 +161,6 @@ Directories present:
 | `namespaces` | local chart, `gitops/charts/namespaces` (`-d0`: Namespace objects, `namespace.enabled`; `-d1`: ResourceQuota/NetworkPolicy scaffolding, `policy.enabled` - spans the macro Day 0/Day 2 split (ADR-0060), not just this component's own internal ordering) |
 | `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
-| `mcp-sales-db` | local chart, `gitops/charts/mcp-sales-db` (applied by the `sql_schema` role, after its schema/fixtures Job) - no operator, `-d0` is a no-op |
 | `machines` | local chart, `gitops/charts/machines` (ADR-0351 - `-d0`: startx `cluster-machine` dependency for the GPU MachineSets/MachineAutoscaler/ClusterAutoscaler, all cluster-scoped, no operator; `-d1` is a no-op - see that chart's README for the scale-from-zero and AZ-failover design) |
 | `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: startx `cluster-nfd` dependency, entirely - Namespace/OperatorGroup/Subscription; `-d1`: `cluster-nfd`'s own NodeFeatureDiscovery CR) |
 | `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: startx `cluster-gpu` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-gpu`'s own ClusterPolicy CR, spec injected once discovered - see that chart's README) |

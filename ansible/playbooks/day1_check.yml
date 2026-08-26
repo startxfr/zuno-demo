@@ -1,7 +1,7 @@
 ---
 # Day 1 state check (`make day1 check`) - the AI-platform-operator stack
 # only, plus aiagent_operator. `namespaces`, `llm`, `models`, and
-# content-ingestion (sql_schema/rag/rag_ingestion/mcp/agents/mlops) all
+# content-ingestion (rag/rag_ingestion/mcp/agents/mlops) all
 # moved to Day 2 - see day2_check.yml.
 - name: "Day 1: check install state"
   hosts: localhost

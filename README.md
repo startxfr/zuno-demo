@@ -32,7 +32,7 @@ Each agent has a dedicated frontend and BFF deployment while consuming shared pl
 
 - **Tekos** is the sole mandatory end-to-end agent for v0 (ADR-0031): real
   frontend, BFF, Agent Runtime (LangGraph), MCP Gateway, RAG service,
-  sales-db MCP tool, and Keycloak login with 13 anonymized demo personas
+  and Keycloak login with 13 anonymized demo personas
   across two group dimensions — agent entitlement and business role
   (ADR-0040/0041).
 - **Comage, Advantage, Finage, Arkos** are catalog-only: OKF definitions

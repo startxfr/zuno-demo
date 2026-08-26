@@ -9,7 +9,7 @@ Service Mesh / Maistra, `servicemeshoperator`, mesh-wide mTLS), `smtp`,
 `nfd`, `nvidia-gpu`, `observability`, `openshift-ai`.
 
 Day 1 (build + run the platform) components: `llm`, `models`,
-`sql_schema`, `rag`, `mcp`, `agents`, `mlops`.
+`rag`, `mcp`, `agents`, `mlops`.
 
 `make day0|d0 install [component]` / `make day1|d1 install [component]`
 apply one or all components in controlled order - see `ansible/README.md`

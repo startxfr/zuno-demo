@@ -17,7 +17,7 @@
 # whose built-in collectors work fine once the role exists with
 # pg_monitor granted - no Crunchy-specific setup needed at all.
 #
-# ArgoCD Sync hook at wave 0 (same pattern as gitops/charts/sql-schema's
+# ArgoCD Sync hook at wave 0 (same pattern as gitops/charts/rag-service's
 # Job - see ADR-0313's incident note on why this must be a Sync hook, not
 # PreSync): both secrets this Job needs
 # ({{ .Values.cluster.name }}-pguser-postgres and
@@ -41,7 +41,7 @@
 # 2026-08-24. See that ConfigMap's own comment for why the SQL also avoids a
 # DO/PL-pgSQL block (dollar-quoting separately disables colon-interpolation,
 # regardless of `-c` vs `-f`). Same ConfigMap+`-f` pattern as
-# gitops/charts/sql-schema's Job.
+# gitops/charts/rag-service's Job.
 #
 # Pod template opts out of Istio sidecar injection (sidecar.istio.io/inject:
 # "false" below): live-verified 2026-08-24 that with injection on, `psql`
@@ -71,7 +71,7 @@ spec:
   # A handful of DDL/DCL statements takes seconds; without a deadline a pod
   # stuck in CreateContainerConfigError (not a pod *failure*, so
   # backoffLimit never triggers) hangs the whole sync operation forever -
-  # same reasoning as gitops/charts/{sql-schema,rag-service}'s Jobs.
+  # same reasoning as gitops/charts/rag-service's Jobs.
   activeDeadlineSeconds: 300
   template:
     metadata:

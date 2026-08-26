@@ -106,8 +106,8 @@ Readiness returns `503` until the PostgreSQL pool is connected.
 ## Schema assumption
 
 This service reads a table it does not own or migrate (that belongs to
-another track's `sql_schema`/`postgresql` roles, base table created by
-`data/sxa/schema/002_pgvector.sql`; this track's own `ansible/roles/rag`
+another track's `postgresql` role, base table created by this chart's own
+`files/sql/002_pgvector.sql`; this track's own `ansible/roles/rag`
 extends it with `data/rag/schema/003_rag_metadata.sql`). It assumes:
 
 ```

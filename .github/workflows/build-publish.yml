@@ -132,7 +132,7 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim
-          # ADR-0119 (WP-057): sales-db/confluence/salesforce used to be
+          # ADR-0119 (WP-057): confluence/salesforce used to be
           # listed here by hand, one entry each. They - and every future
           # components/mcp-servers/<name>/Dockerfile - are now built by
           # the discover-mcp-servers/build-publish-sign-mcp-servers job

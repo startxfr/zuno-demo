@@ -40,7 +40,7 @@ spec:
   # bundle's first entry is the Vault PKI root (CN=zuno-demo.internal,
   # the same root ADR-0347/0411 already trust platform-wide), so a server
   # cert issued by cert-manager's vault-issuer chains correctly for DSP
-  # with zero DSPO-side config. required stays false: sales-db-mcp and
+  # with zero DSPO-side config. required stays false: rag-ingestion and
   # the mariadb-operator's own connections keep speaking plaintext -
   # MariaDB TLS is per-connection optional, only clients that ASK for TLS
   # (the DSP components) get it.

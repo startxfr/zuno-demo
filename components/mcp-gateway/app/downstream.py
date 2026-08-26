@@ -40,11 +40,11 @@ DOWNSTREAM_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_TIMEOUT_SECONDS", "40")
 # secret/zuno/mcp/gateway-workload-token) proving this call actually came
 # from the MCP Gateway, not merely from a pod that happens to be
 # network-adjacent - NetworkPolicy is the first layer (gitops/charts/
-# mcp-sales-db's NetworkPolicy restricts ingress to this service's pods
+# mcp-each downstream server's NetworkPolicy restricts ingress to this service's pods
 # specifically); this is the "validate the gateway workload identity in
 # addition to relying on network location" second layer this ADR requires
 # for sensitive MCP servers. Not enforced as a hard startup requirement
-# here (unlike sales-db's own validation) so this gateway still starts and
+# here (unlike the downstream server's own validation) so this gateway still starts and
 # serves every other tool if the secret hasn't landed yet - the MCP call
 # itself degrades to a clear 502 from the missing/rejected header.
 MCP_GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
@@ -121,7 +121,7 @@ async def _invoke_streamable_http(
     binding: Binding, arguments: Dict[str, Any], bearer_token: str
 ) -> Dict[str, Any]:
     # ADR-0043: real, standards-compliant MCP servers (streamable-HTTP
-    # transport, e.g. components/mcp-servers/sales-db/server.py mounted at
+    # transport, e.g. components/mcp-servers/salesforce/server.py mounted at
     # /mcp) reached via the official `mcp` SDK's ClientSession. The endpoint
     # comes from the binding's registry entry (environment-resolved at call
     # time), and the tool actually called is the binding's `provider_tool` -
@@ -158,7 +158,7 @@ async def _invoke_streamable_http(
 
     if result.structured_content is not None:
         # Verified against the real SDK (mcp==2.0.0): a tool whose return
-        # type annotation is a plain dict (every sales-db tool) gets its
+        # type annotation is a plain dict (every confluence tool) gets its
         # structured content wrapped as {"result": <value>} - MCP requires
         # structured content to have an object-typed top-level schema, and
         # a bare dict return has none, so the SDK wraps it. Unwrap that

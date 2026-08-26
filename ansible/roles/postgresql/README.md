@@ -141,20 +141,16 @@ the real cluster and adjust any of the above that turns out to be wrong.
 
 ## Consumed by
 
-- `ansible/roles/sql_schema` (applies `data/sxa/schema/*.sql` and
-  `data/sxa/fixtures/seed.sql` against this cluster) and `ansible/roles/
-  rag` (applies the RAG schema/fixtures the same way) - both one-shot
-  Jobs, connecting through PgBouncer.
-- `components/mcp-servers/sales-db` (reads the same `zunoapp` credentials
-  via its own `ExternalSecret`).
-- Track D's RAG service (queries `document_embeddings`, see
-  `data/sxa/schema/002_pgvector.sql`).
+- `ansible/roles/rag` (applies the RAG schema/fixtures) - a one-shot Job,
+  connecting through PgBouncer.
+- Track D's RAG service (queries `document_embeddings`, created by
+  `gitops/charts/rag-service/files/sql/002_pgvector.sql`).
 - `ansible/roles/keycloak` - a **second**, dedicated `keycloak`/`keycloak`
   database/role (not `zunoapp`/`zuno`), via its own `ExternalSecret`
   (`gitops/charts/keycloak/templates/externalsecret-postgresql.yaml`)
   reading the same `zuno/keycloak/postgresql-app` Vault path this
   chart's `templates/externalsecret-keycloak.yaml` also resolves - same
-  cross-namespace pattern as `mcp-sales-db`.
+  cross-namespace pattern as `mcp-confluence`.
 - `ansible/roles/rag_ingestion` - a **third**, dedicated `ragtech`/
   `rag-tech` database/role for the ingestion pipeline's structured
   corpus/index tables, via its own `ExternalSecret`

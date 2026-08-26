@@ -25,7 +25,7 @@ PGPORT = int(os.getenv("PGPORT", "5432"))
 PG_POOL_MIN_SIZE = int(os.getenv("PG_POOL_MIN_SIZE", "1"))
 PG_POOL_MAX_SIZE = int(os.getenv("PG_POOL_MAX_SIZE", "10"))
 
-# Table assumed to be owned/migrated by another track (sql_schema /
+# Table assumed to be owned/migrated by another track (postgresql /
 # postgresql roles). Columns assumed per the Track D task brief:
 # id, source, title, content, embedding vector, metadata jsonb.
 DOCUMENT_EMBEDDINGS_TABLE = os.getenv("DOCUMENT_EMBEDDINGS_TABLE", "document_embeddings")

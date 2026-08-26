@@ -101,7 +101,7 @@ from starlette.types import ASGIApp
 {upper}_API_TOKEN = os.getenv("{upper}_API_TOKEN", "")
 
 # ADR-0037: required, not optional - this server has no purpose other than
-# serving the gateway (same reasoning as sales-db/server.py).
+# serving the gateway (same reasoning as confluence/server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
 

@@ -9,12 +9,12 @@
 # scripts, just stdlib urllib against a fixed URL list.
 #
 # Deliberately does NOT probe the individual MCP servers (confluence,
-# git-forge, sales-db, salesforce), even though each has a real
+# git-forge, salesforce), even though each has a real
 # gitops/charts/mcp-* Service - live-cluster-confirmed 2026-08-21: every
 # one of their NetworkPolicies (gitops/charts/mcp-*/templates/
 # networkpolicy.yaml) accepts ingress ONLY from pods labeled
 # app.kubernetes.io/name: mcp-gateway (ADR-0037's workload-identity
-# boundary; sales-db-mcp's own chart comment: "must accept traffic ONLY
+# boundary; confluence-mcp's own chart comment: "must accept traffic ONLY
 # from the MCP Gateway, not other same-namespace pods"). This Job's own
 # acceptance-gate identity was never going to reach any of them, by
 # design, regardless of their actual health - always-failing rows with

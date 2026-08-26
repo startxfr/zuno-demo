@@ -1,6 +1,0 @@
-apiVersion: v2
-name: mcp-sales-db
-description: Three deterministic, read-only MCP tools over the sales schema.
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

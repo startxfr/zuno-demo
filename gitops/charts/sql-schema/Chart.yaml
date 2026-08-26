@@ -1,8 +1,0 @@
-apiVersion: v2
-name: sql-schema
-description: >-
-  Applies the SXA-derived PostgreSQL schema and synthetic fixtures the
-  sales-db MCP server reads from, as an ArgoCD PreSync hook Job.
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

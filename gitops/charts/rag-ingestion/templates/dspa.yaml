@@ -51,7 +51,7 @@ spec:
     # the probe fails "context deadline exceeded" forever and the whole
     # KFP stack never deploys. The pipeline pods themselves run in
     # zuno-ai-build (istio-injected) and reach MariaDB through mesh mTLS
-    # exactly like mcp-sales-db already does - the probe is the ONLY
+    # exactly like every other meshed MariaDB client - the probe is the ONLY
     # non-mesh client, so it is disabled rather than un-meshing port 3306
     # for everyone. A genuinely broken credential now surfaces as the
     # apiserver pod's own crashloop/logs instead of the CR condition.

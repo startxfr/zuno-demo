@@ -2,7 +2,7 @@
 
 Zuno's first real external MCP integration: a real, standards-compliant
 MCP server (the `mcp` SDK's `MCPServer`, streamable-HTTP transport,
-mounted at /mcp - same shape as `components/mcp-servers/sales-db`)
+mounted at /mcp - same shape as `components/mcp-servers/salesforce`)
 fronting the real Confluence Cloud REST API, replacing
 `components/mcp-gateway/app/handlers/confluence.py`'s demo-mode handler.
 
@@ -30,13 +30,13 @@ has no per-user identity to check, by design.
 ADR-0037: the gateway is still the trust boundary. This server does not
 re-validate the caller's end-user JWT; every /mcp call must carry
 X-Zuno-Gateway-Token, a shared secret only the gateway holds - same
-Starlette-middleware pattern as sales-db.
+Starlette-middleware pattern as salesforce.
 
     POST /mcp    - real MCP streamable-HTTP transport (initialize,
                    tools/list, tools/call)
     GET /healthz -> 200 once CONFLUENCE_BASE_URL/EMAIL/API_TOKEN are
                    configured. Deliberately does NOT make a live
-                   Confluence call on every probe (unlike sales-db's
+                   Confluence call on every probe (unlike confluence's
                    healthz, which does a free local DB round-trip) - a
                    Kubernetes liveness/readiness probe firing every
                    ~10-15s against a real external SaaS API would be a
@@ -65,7 +65,7 @@ CONFLUENCE_API_TOKEN = os.getenv("CONFLUENCE_API_TOKEN", "")
 HTTP_TIMEOUT_SECONDS = float(os.getenv("CONFLUENCE_HTTP_TIMEOUT_SECONDS", "20"))
 
 # ADR-0037: required, not optional - this server has no purpose other than
-# serving the gateway (same reasoning as sales-db/server.py).
+# serving the gateway (same reasoning as salesforce/server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
 
@@ -158,7 +158,7 @@ mcp_server = MCPServer(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Same requirement as sales-db/server.py: the mounted MCP sub-app's
+    # Same requirement as salesforce/server.py: the mounted MCP sub-app's
     # session manager needs the parent app's lifespan to run its task group.
     async with mcp_server.session_manager.run():
         yield
@@ -261,7 +261,7 @@ async def update_page(page_id: str, body_html: str, title: Optional[str] = None)
 
 class GatewayTokenMiddleware(BaseHTTPMiddleware):
     """ADR-0037 workload-identity check, ahead of any MCP protocol handling
-    (identical pattern to sales-db/server.py's own middleware)."""
+    (identical pattern to salesforce/server.py's own middleware)."""
 
     async def dispatch(self, request: Request, call_next):
         caller_token = request.headers.get("x-zuno-gateway-token", "")

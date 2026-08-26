@@ -80,7 +80,7 @@ Agent Runtime
   --Authorization: Bearer <access_token>-->
 MCP Gateway  (policy-intersection enforcement point - ADR-0011)
   --Authorization: Bearer <access_token>-->
-MCP tool server (confluence / google-workspace / sales-db / web-search / smtp-technical)
+MCP tool server (confluence / google-workspace / confluence / web-search / smtp-technical)
 ```
 
 - The MCP Gateway is the single point that evaluates the full

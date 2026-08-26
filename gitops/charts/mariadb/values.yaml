@@ -197,15 +197,3 @@ mlopsDatabase:
   name: mlops
   owner: mlops
   vaultPath: mlops/dspa-mysql
-
-# ADR-0216/WP-065: a third database on the same shared instance, real
-# business content (imported SXA data) rather than pipeline metadata -
-# still an internal service credential (only sales-db and rag-ingestion
-# connect), self-generated the same way mlopsDatabase's is, not
-# operator-supplied. Reuses this instance's existing mesh sidecar-
-# exclusion fix (templates/mariadb.yaml) for free - no new mesh work
-# needed for a second logical database on it.
-sxaDatabase:
-  name: sxa
-  owner: sxa
-  vaultPath: sxa/mariadb-db

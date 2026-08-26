@@ -11,7 +11,7 @@ langchain-openai==0.2.4
 # built against langgraph-checkpoint<3.0.0 (langgraph==0.2.39's own
 # constraint - a newer langgraph-checkpoint-postgres pulls in
 # langgraph-checkpoint>=4.0.0 and conflicts). psycopg version matches
-# components/mcp-servers/sales-db/requirements.txt for consistency.
+# components/mcp-servers/confluence/requirements.txt for consistency.
 langgraph-checkpoint-postgres==2.0.25
 psycopg[binary,pool]==3.2.1
 opentelemetry-sdk==1.27.0

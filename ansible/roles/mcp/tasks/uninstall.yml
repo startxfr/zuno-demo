@@ -43,14 +43,47 @@
   vars:
     gitops_app_name: "zuno-mcp-confluence-d0"
 
-# The sales-db server (d1) is installed by this component right after the
-# gateway (see install.yml's deadlock note), so it's deleted here right
-# before the gateway - its d0 schema Application stays with sql_schema's
-# own uninstall.
-- name: "mcp | delete the sales-db MCP server ArgoCD Application (d1)"
+# RETIRED RESOURCE CLEANUP (ADR-0219, 2026-08-26). The sales-db MCP server
+# and its d0 schema Application no longer exist in this repository, and
+# neither does ansible/roles/sql_schema, which used to delete the d0 half.
+# These two deletes are deliberately KEPT so that `make d2 uninstall`
+# still reclaims them on a cluster installed before ADR-0219 landed -
+# without them those Applications, plus the workloads they own, would be
+# stranded with nothing left in the repo able to remove them. Same
+# self-healing-uninstall discipline as WP-077's Postgres cleanup.
+#
+# delete_gitops_app.yml is a no-op when the Application is absent, so this
+# costs a fresh cluster nothing. Remove once no environment predates
+# ADR-0219.
+- name: "mcp | delete the retired sales-db MCP server ArgoCD Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-mcp-sales-db-d1"
+
+- name: "mcp | delete the retired sales-db schema ArgoCD Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-mcp-sales-db-d0"
+
+# The rest of the retired sql_schema component's footprint in zuno-data,
+# moved here from ansible/roles/sql_schema/tasks/uninstall.yml before that
+# role was deleted. The namespace itself is left in place - it is owned by
+# the Day 0 namespaces chart and still holds PostgreSQL.
+- name: "mcp | delete the retired sql-schema postgresql credentials ExternalSecret"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    name: sql-schema-postgresql-credentials
+    namespace: zuno-data
+
+- name: "mcp | delete the retired SXA schema ConfigMap"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: zuno-sxa-schema
+    namespace: zuno-data
 
 - name: "mcp | delete the mcp ArgoCD Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"

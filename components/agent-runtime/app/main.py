@@ -68,7 +68,7 @@ def _active_agent_or_404(agent: str) -> AgentDefinition:
 
 
 # ADR-0103: separate PG* variables (never a single combined DSN env var),
-# same convention as components/mcp-servers/sales-db/server.py's
+# same convention as components/mcp-servers/confluence/server.py's
 # _conninfo() - a hand-built "key=value" conninfo string never needs
 # percent-encoding a generated password that might contain
 # URI-special characters, unlike a postgresql:// URI would.

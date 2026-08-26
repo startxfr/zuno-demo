@@ -24,7 +24,7 @@ would punch a hole through `zuno-auth`'s existing
 default-deny-other-namespaces baseline) in favor of a hand-authored one
 (`templates/networkpolicy.yaml`) scoped to `app.kubernetes.io/component:
 frontend` pods in any namespace carrying the `zuno.io/agent` label - the
-same least-privilege bar `gitops/charts/mcp-sales-db` sets for a
+same least-privilege bar `gitops/charts/mcp-confluence` sets for a
 comparable backing service.
 
 ## Secret

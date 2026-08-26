@@ -14,9 +14,6 @@ ansible/confidential.yml
 # Real / unapproved business data
 *.dump
 *.sql.gz
-data/sxa/fixtures/private/
-data/sxa/fixtures/raw/
-data/sxa/source-data/
 
 # Python / Ansible
 __pycache__/

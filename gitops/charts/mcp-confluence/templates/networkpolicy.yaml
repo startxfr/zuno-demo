@@ -1,6 +1,5 @@
 # confluence-mcp must accept traffic ONLY from the MCP Gateway, not other
-# same-namespace pods (e.g. agent-runtime) - same reasoning as
-# gitops/charts/mcp-sales-db's NetworkPolicy. The app also validates the
+# same-namespace pods (e.g. agent-runtime). The app also validates the
 # X-Zuno-Gateway-Token shared secret as defense in depth.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

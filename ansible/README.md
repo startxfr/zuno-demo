@@ -40,7 +40,7 @@ ingestion), and Day 3 (agent test/stresstest operations):
 3. `make day2 check` / `build` / `install` / `uninstall` (or the `d2`
    alias) walk `DAY2_RUN_COMPONENTS` - `namespaces`' ResourceQuota/
    NetworkPolicy overlay, then AI infrastructure and content ingestion
-   (`llm`, `models`, `sql-schema`, `rag`, `rag-ingestion`, `mcp`,
+   (`llm`, `models`, `rag`, `rag-ingestion`, `mcp`,
    `agents`, `mlops`). Every scope applies its own child ArgoCD
    `Application` under `gitops/apps/<scope>/` via the shared task
    `ansible/tasks/apply_gitops_app.yml`, rather than configuring anything

@@ -29,7 +29,7 @@ DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aiagent-operator
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
 # Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
-# content ingestion (sql-schema, rag, rag-ingestion, mcp, agents, mlops) -
+# content ingestion (rag, rag-ingestion, mcp, agents, mlops) -
 # moved here from Day 1 (ADR-0060). "namespaces" is here despite being a
 # Day 0 component everywhere else in this Makefile - only its
 # quota/network-policy overlay is Day 2 now, see
@@ -41,7 +41,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # "install" operate on the 9 deployable components, plus "supply-chain"
 # (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
 # only a signature-verification gate (ansible/roles/supply_chain).
-DAY2_RUN_COMPONENTS := namespaces llm models sql-schema rag rag-ingestion mcp agents mlops supply-chain
+DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops supply-chain
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
 DAY2_VERBS := check install build uninstall all reinstall
 

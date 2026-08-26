@@ -6,7 +6,7 @@
 #
 # The Job runs in zuno-ai-run labeled app.kubernetes.io/name: acceptance-gate,
 # explicitly allow-listed in the relevant NetworkPolicies - never a
-# namespace-wide baseline. sales-db-mcp is deliberately NOT allow-listed;
+# namespace-wide baseline. confluence-mcp is deliberately NOT allow-listed;
 # denial of direct calls to it is itself part of what the gate proves.
 #
 # KEYCLOAK_URL uses the Keycloak CR's actual Route hostname

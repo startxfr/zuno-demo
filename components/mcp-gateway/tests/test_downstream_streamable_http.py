@@ -1,8 +1,8 @@
 """ADR-0043 compatibility test for app/downstream.py's
 `_invoke_streamable_http` (the ADR-0116 binding-driven generalization of
-the former `_invoke_sales_db`): exercises the real `mcp` SDK client against
+the former `_invoke_downstream`): exercises the real `mcp` SDK client against
 a small local MCP server (not a cross-import of
-components/mcp-servers/sales-db - each component's tests stay
+components/mcp-servers/the downstream MCP server - each component's tests stay
 self-contained, matching this repository's convention) that mimics the same
 shape: one tool that succeeds with a plain-dict return, one that raises (an
 MCP tool-level error), plus the ADR-0037 workload-identity check as
@@ -22,7 +22,7 @@ Proves `_invoke_streamable_http` correctly:
 
 Run from this directory:
 
-    python3 tests/test_downstream_sales_db.py
+    python3 tests/test_downstream_downstream.py
 """
 from __future__ import annotations
 
@@ -51,13 +51,13 @@ from app.bindings import Binding  # noqa: E402
 BASE_URL = "http://localhost:8000"
 
 
-def _sales_db_binding(provider_tool: str) -> Binding:
-    """A binding shaped exactly like the real sales-db entries in
+def _downstream_binding(provider_tool: str) -> Binding:
+    """A binding shaped exactly like the real the downstream MCP server entries in
     platform/bindings/tools/tool-bindings.yaml, pointed at the local fake
     server (endpoint default wins because the env var is unset in tests)."""
     return Binding(
         capability=f"sales.test.{provider_tool}",
-        backend="sales-db",
+        backend="the downstream MCP server",
         transport="streamable-http",
         provider_tool=provider_tool,
         auth_mode="service-identity",
@@ -65,14 +65,14 @@ def _sales_db_binding(provider_tool: str) -> Binding:
     )
 
 
-def _build_fake_sales_db_app() -> Starlette:
-    mcp_server = MCPServer(name="fake-sales-db", version="0.1.0")
+def _build_fake_downstream_app() -> Starlette:
+    mcp_server = MCPServer(name="fake-the downstream MCP server", version="0.1.0")
 
     # The `-> Dict[str, Any]` return annotation is required, not
     # decorative - verified directly, twice: a bare `-> dict` annotation
     # was NOT enough to make the SDK derive a structured-content schema
     # (it still fell back to text-only content); matching
-    # components/mcp-servers/sales-db/server.py's real tools' exact
+    # components/mcp-servers/the downstream MCP server/server.py's real tools' exact
     # `typing.Dict[str, Any]` annotation is what actually works.
     @mcp_server.tool()
     async def get_customer(customer_id: int) -> Dict[str, Any]:
@@ -104,7 +104,7 @@ async def test_successful_call_unwraps_structured_content_envelope(transport) ->
     httpx2.AsyncClient = patched
     try:
         result = await downstream._invoke_streamable_http(
-            _sales_db_binding("get_customer"), {"customer_id": 42}, "fake-bearer"
+            _downstream_binding("get_customer"), {"customer_id": 42}, "fake-bearer"
         )
     finally:
         httpx2.AsyncClient = orig_client_cls
@@ -125,7 +125,7 @@ async def test_tool_error_becomes_downstream_error_502(transport) -> None:
     try:
         try:
             await downstream._invoke_streamable_http(
-                _sales_db_binding("get_customer"), {"customer_id": 999}, "fake-bearer"
+                _downstream_binding("get_customer"), {"customer_id": 999}, "fake-bearer"
             )
             raise AssertionError("expected DownstreamError")
         except downstream.DownstreamError as exc:
@@ -148,7 +148,7 @@ async def test_unknown_tool_becomes_downstream_error_502(transport) -> None:
     try:
         try:
             await downstream._invoke_streamable_http(
-                _sales_db_binding("no_such_tool"), {}, "fake-bearer"
+                _downstream_binding("no_such_tool"), {}, "fake-bearer"
             )
             raise AssertionError("expected DownstreamError")
         except downstream.DownstreamError as exc:
@@ -165,7 +165,7 @@ TESTS = [
 
 
 async def _run_all() -> int:
-    fake_app = _build_fake_sales_db_app()
+    fake_app = _build_fake_downstream_app()
     transport = ASGITransport(app=fake_app)
     lifespan_cm = fake_app.router.lifespan_context(fake_app)
     await lifespan_cm.__aenter__()

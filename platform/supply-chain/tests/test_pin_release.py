@@ -33,7 +33,6 @@ FULL_PINS = [
     {"chart_values": "gitops/charts/agent-runtime/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/ai-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/mcp-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mcp-sales-db/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/rag-service/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/tekos/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/rag-ingestion/values.yaml", "path": "images.ingestion.tag", "tag": "v0.1.0"},

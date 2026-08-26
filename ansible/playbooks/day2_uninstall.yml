@@ -17,7 +17,6 @@
       - mcp
       - rag_ingestion
       - rag
-      - sql_schema
       - models
       - llm
       - namespaces

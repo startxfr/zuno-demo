@@ -10,7 +10,7 @@ ID to whichever tool name this server actually exposes).
 
 Transport: a real, standards-compliant MCP server - the
 official `mcp` Python SDK's `MCPServer`, streamable-HTTP transport, mounted
-at `POST /mcp` - same shape as `components/mcp-servers/sales-db`. The
+at `POST /mcp` - same shape as `components/mcp-servers/salesforce`. The
 gateway remains the trust boundary; this server does not re-validate the
 caller's end-user JWT, since the gateway's policy intersection already
 happened before this server is ever reached.
@@ -19,7 +19,7 @@ Network location (`gitops/charts/mcp-confluence`'s
 `NetworkPolicy`, restricting ingress to the gateway's pods specifically)
 is not the only control. Every `POST /mcp` call must also carry
 `X-Zuno-Gateway-Token`, a shared secret only the gateway holds (same
-pattern as sales-db).
+pattern as salesforce).
 
 **Authentication mode: `service-identity`.** Every call to
 Confluence uses one shared technical identity - email + API token, HTTP
@@ -39,7 +39,7 @@ questions.
 
 `GET /healthz` checks that `CONFLUENCE_BASE_URL`/`CONFLUENCE_EMAIL`/
 `CONFLUENCE_API_TOKEN` are configured; it deliberately does **not** make a
-live Confluence call on every probe (unlike sales-db's healthz, which does
+live Confluence call on every probe (unlike salesforce's healthz, which does
 a free local DB round-trip) - a Kubernetes liveness/readiness probe firing
 every ~10-15s against a real external SaaS API would be a needless,
 avoidable load/quota cost.

@@ -2,7 +2,7 @@
 # The mandatory other half of mariadb.yaml's excludeInboundPorts "3306"
 # (see the full server-first-protocol rationale there): with 3306 out of
 # sidecar interception, istio auto-mTLS on IN-MESH clients (e.g.
-# sales-db-mcp in zuno-ai-run) would still send mTLS to a port nothing
+# rag-ingestion in zuno-ai-build) would still send mTLS to a port nothing
 # terminates TLS on. This pins client-side TLS OFF for this one host so
 # every consumer - meshed or not - speaks plaintext MySQL to it inside
 # the cluster network. First DestinationRule in this repo; the istio

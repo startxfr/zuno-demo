@@ -144,7 +144,7 @@ consumer shares. Keycloak owns and migrates its own schema, and PGO's
 `spec.users[].databases` model has no per-schema scoping, so sharing
 would give one workload blanket rights over the other's tables.
 
-Wiring, mirroring the `mcp-sales-db` "own ExternalSecret + secretKeyRef"
+Wiring, mirroring the `mcp-confluence` "own ExternalSecret + secretKeyRef"
 pattern:
 
 - `ansible/roles/vault/tasks/install.yml` seeds `zuno/keycloak/postgresql-app`

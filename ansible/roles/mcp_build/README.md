@@ -1,7 +1,7 @@
 # mcp_build
 
 Day 1 `build` component (ADR-0056, `make day1|d1 build mcp`). Builds
-`mcp-gateway`, `mcp-sales-db` and `mcp-confluence` (ADR-0117) via native
+`mcp-gateway` and `mcp-confluence` (ADR-0117) via native
 OpenShift `BuildConfig`/`ImageStream` in `zuno-ai-build` - see
 `ansible/tasks/apply_openshift_build.yml` for the shared mechanism
 (git-source Docker-strategy build, `ConfigChange` trigger, waits for

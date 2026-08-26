@@ -1,6 +1,6 @@
 ---
 # Day 2 install (`make day2 install`) - namespace policy overlay, AI
-# infrastructure (llm, models), and content-ingestion (sql_schema, rag,
+# infrastructure (llm, models), and content-ingestion (rag,
 # rag_ingestion, mcp, agents, mlops). `namespaces` runs first so the
 # ResourceQuota/NetworkPolicy overlay (its Day 2 half - see
 # ansible/roles/namespaces/README.md; internal task/Application naming
@@ -26,7 +26,6 @@
       - namespaces
       - llm
       - models
-      - sql_schema
       - rag
       - rag_ingestion
       - mcp

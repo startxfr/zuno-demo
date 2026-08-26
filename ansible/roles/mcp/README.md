@@ -12,7 +12,7 @@ ADR-0117), `gitops/apps/mcp-salesforce` (`gitops/charts/mcp-salesforce`,
 ADR-0326/WP-33) and `gitops/apps/mcp-git-forge` (`gitops/charts/mcp-git-forge`,
 ADR-0120/WP-058): the real Confluence Cloud, Salesforce Opportunity and
 GitHub/GitLab MCP servers, under this same run component - same
-name-mismatch self-sufficiency pattern `ansible/roles/sql_schema` uses for
-`gitops/apps/mcp-sales-db`. All four images (`mcp-gateway`,
+name-mismatch self-sufficiency pattern this role uses throughout. All four
+images (`mcp-gateway`,
 `mcp-confluence`, `mcp-salesforce`, `mcp-git-forge`) build via the
 `mcp_build` Day 1 build component (`make d1 build mcp`).

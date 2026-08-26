@@ -14,7 +14,7 @@
 # runs last -
 # standard operator-before-CR ordering: it must be running before Day 2's
 # `agents` component creates any `AIAgent` CRs. `namespaces`, `llm`,
-# `models`, and content-ingestion (sql_schema/rag/rag_ingestion/mcp/
+# `models`, and content-ingestion (rag/rag_ingestion/mcp/
 # agents/mlops) all moved to Day 2 - see day2_install.yml.
 - name: "Day 1: install components"
   hosts: localhost

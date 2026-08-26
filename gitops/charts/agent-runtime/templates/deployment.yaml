@@ -62,7 +62,7 @@ spec:
             # ADR-0103: resumable-workflow checkpointing, optional -
             # secretKeyRef optional: true so the Deployment still comes up
             # before the ExternalSecret has synced, exactly like
-            # gitops/charts/mcp-sales-db's own db credentials.
+            # gitops/charts/mcp-confluence's own credentials.
             - name: CHECKPOINT_PGHOST
               value: {{ .Values.checkpointDb.host | quote }}
             - name: CHECKPOINT_PGPORT

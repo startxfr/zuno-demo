@@ -36,7 +36,6 @@ DEPLOYMENT_CHARTS = [
     "agent-runtime",
     "ai-gateway",
     "mcp-gateway",
-    "mcp-sales-db",
     # ADR-0117/WP-02 added this chart without updating this list - a real
     # gap ADR-0111's own repo-wide audit found and closed: every workload
     # this repo directly controls must be checked, not just the ones this
@@ -211,7 +210,7 @@ def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
 # whose availability shape (PodDisruptionBudget, topologySpreadConstraints,
 # probes) this repo directly authors and controls. Deliberately a
 # separate, narrower list than DEPLOYMENT_CHARTS above (which also covers
-# mcp-sales-db/mcp-confluence/tekos/models) - WP-12's own authoritative
+# mcp-confluence/tekos/models) - WP-12's own authoritative
 # scope list names only these four as "runtime/gateways"; the others were
 # never given the mechanism and checking them here would just be a
 # self-inflicted permanent failure, not a real regression.
@@ -367,7 +366,7 @@ def main() -> int:
     # ADR-0119: mcp-salesforce was missing here (a real gap the new
     # check_mcp_server_conformance.py checker caught) - same class of
     # omission as ADR-0111's own comment above for mcp-confluence.
-    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-sales-db", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "rag-service", "models"]:
+    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "rag-service", "models"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

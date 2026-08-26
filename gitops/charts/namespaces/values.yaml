@@ -14,9 +14,9 @@ policy:
 # per-agent namespace.
 
 # Default-deny-other-namespaces baseline platform namespaces. zuno-ai-run is deliberately excluded: it hosts
-# mcp-sales-db, which must not trust arbitrary same-namespace pods, so a
+# mcp-confluence, which must not trust arbitrary same-namespace pods, so a
 # namespace-wide baseline would silently defeat its per-workload
-# NetworkPolicy (see gitops/charts/mcp-sales-db). zuno-ai-build is also
+# NetworkPolicy (see gitops/charts/mcp-confluence). zuno-ai-build is also
 # excluded - it's created and given its own baseline by the Day 1 build
 # mechanism, not this Day 0 chart.
 #
@@ -64,7 +64,7 @@ platformNamespaces:
     description: >-
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
-    # postgresql: sales-db-mcp (cross-ns). vault: ESO's ClusterSecretStore
+    # postgresql: rag-service (cross-ns). vault: ESO's ClusterSecretStore
     # controller. keycloak: dedicated postgres database, ADR-0315.
     # redhat-ods-applications: maas-api's dedicated maas database on
     # zuno-postgresql (MaaS prerequisite - see
@@ -208,7 +208,7 @@ platformNamespaces:
     # allowed" ingress rule has no port restriction, so it would silently
     # grant every zuno-ai-run pod (agent-runtime, ai-gateway, ...) access to
     # every port of every other zuno-ai-run pod, additively overriding
-    # mcp-sales-db's own precise, port-8000-only, gateway-only
+    # mcp-confluence's own precise, port-8000-only, gateway-only
     # NetworkPolicy (ADR-0037) - exactly the risk this file's own comment
     # above already documented in prose but templates/
     # networkpolicy-platform.yaml never actually enforced (a real,

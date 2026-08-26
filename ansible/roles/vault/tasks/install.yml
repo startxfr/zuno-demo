@@ -440,13 +440,6 @@
         username: ragadv
         password: "{{ zuno_admin_rag_adv_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-      rag-sxa/postgresql-app:
-        # knowledge.sxa's rag-sxa database (ADR-0217/WP-067) - distinct from
-        # rag-sxa-legacy above (knowledge.sxa-legacy). See
-        # rag-sales/postgresql-app above for the shared rationale.
-        username: ragsxa
-        password: "{{ zuno_admin_rag_sxa_postgresql_root_password |
-          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       rag-project/postgresql-app:
         # knowledge.project's rag-project database (ADR-0209/WP-28) - see
         # rag-sales/postgresql-app above. Unlike the other four domain
@@ -761,21 +754,6 @@
       password: "{{ zuno_admin_mlops_pipeline_db_password |
         default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
-# ADR-0216/WP-065: the sxa database's own MariaDB user
-# (gitops/charts/mariadb's sxaDatabase, consumed by sales-db and
-# rag-ingestion) - same self-generated, internal-service-credential
-# pattern as the mlops pipeline DB password above, not from
-# confidential.yml. Holds real imported SXA content, not pipeline
-# metadata, but the credential itself is just as internal.
-- name: "vault | generate and seed the sxa MariaDB database password (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: sxa/mariadb-db
-    vault_seed_fields:
-      password: "{{ zuno_admin_sxa_mariadb_db_password |
-        default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-
 # These can't be self-generated - real external service credentials,
 # supplied via ansible/confidential.yml and re-applied idempotently.
 
@@ -1059,10 +1037,10 @@
     and zuno_rag_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# fetch-sxa's own dedicated corpus bucket (ADR-0217/WP-067 - distinct from
-# rag/s3 above, which holds unrelated corpus content, and from sxa/s3 below,
-# which is the ADR-0216/WP-065 MariaDB-import bucket). Same camelCase
-# property convention as rag/s3 above.
+# The SXA corpus bucket - the single source knowledge.sxa-legacy's
+# load-sxa-dump stage reads (ADR-0219), distinct from rag/s3 above, which
+# holds unrelated corpus content. Same camelCase property convention as
+# rag/s3 above.
 - name: "vault | seed the SXA corpus S3 credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault

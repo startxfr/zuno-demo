@@ -7,9 +7,9 @@
 # the ConfigMap is part of the same ArgoCD-tracked flow as the Job that
 # consumes it. Files are copied under files/sql/, not referenced from
 # data/ - Helm's .Files.Get is chart-root-relative and can't traverse ..
-# out of the chart. data/rag/schema/ and data/sxa/schema/002_pgvector.sql
+# out of the chart. data/rag/schema/ and this chart's own 002_pgvector.sql
 # remain the canonical human-readable source; keep this copy in sync by
-# hand (same convention gitops/charts/sql-schema uses for its own still
+# hand (the same convention this repo's other schema Jobs use for their still
 # Ansible-applied equivalent, zuno-sxa-schema).
 apiVersion: v1
 kind: ConfigMap

@@ -1,6 +1,6 @@
 {{- if and .Values.monitoring.enabled .Values.postgresCluster.enabled }}
 # Mounted by job-monitoring-role.yaml's Sync-hook Job at /sql (ConfigMap+`-f`
-# pattern, same as gitops/charts/sql-schema and gitops/charts/rag-service).
+# pattern, same as gitops/charts/rag-service).
 # The SQL avoids a DO/PL-pgSQL block on purpose: psql's `:'var'` colon-
 # interpolation is skipped entirely inside dollar-quoted strings (`$$...$$`
 # or `$tag$...$tag$`), by design, live-verified 2026-08-24 - a `DO $$ ... :

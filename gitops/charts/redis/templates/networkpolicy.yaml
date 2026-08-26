@@ -5,7 +5,7 @@
 # baseline (gitops/charts/namespaces), and not from anywhere in the
 # cluster (which is what bitnami/redis's own default NetworkPolicy would
 # otherwise allow - disabled in values.yaml in favor of this). Same
-# least-privilege bar gitops/charts/mcp-sales-db already sets. Every
+# least-privilege bar gitops/charts/mcp-confluence already sets. Every
 # active agent's frontend, and every shared platform service, deploys
 # into the single shared zuno-ai-run namespace (ADR-0329, supersedes
 # ADR-0023's namespace-per-agent model), so this matches that namespace by
@@ -36,7 +36,7 @@ spec:
               # frontend Deployment label exactly (app.kubernetes.io/
               # component: frontend, not .../name - this chart's own
               # convention, not the app.kubernetes.io/name one
-              # mcp-gateway/mcp-sales-db use).
+              # mcp-gateway/mcp-confluence use).
               app.kubernetes.io/component: frontend
         - namespaceSelector:
             matchLabels:

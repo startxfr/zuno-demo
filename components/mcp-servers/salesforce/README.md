@@ -19,7 +19,7 @@ reached.
 Network location (`gitops/charts/mcp-salesforce`'s `NetworkPolicy`,
 restricting ingress to the gateway's pods specifically) is not the only
 control. Every `POST /mcp` call must also carry `X-Zuno-Gateway-Token`, a
-shared secret only the gateway holds (same pattern as confluence/sales-db).
+shared secret only the gateway holds (same pattern as confluence/salesforce).
 
 **Authentication mode: `service-identity`.** Every call to Salesforce uses
 one shared technical connected-app identity - a pre-issued OAuth2 bearer
@@ -39,8 +39,11 @@ mutable field's CURRENT value) and any write - not a second, parallel
 read path for ordinary questions (ADR-0205).
 
 `knowledge.sales`/`salesforce.*` are strictly separate from
-`knowledge.sxa-legacy`/`sxa.*` in both directions (ADR-0206) - this server
-never touches the legacy SXA snapshot (`components/mcp-servers/sales-db`).
+`knowledge.sxa-legacy` in both directions (ADR-0206) - this server never
+touches the legacy SXA corpus. ADR-0219 removed the `sxa.*` capabilities
+and the server behind them entirely: SXA is a closed pre-2021 record served
+through retrieval only, so this is now the only structured commercial-data
+path, and the `sales.*` capability namespace stays reserved for it.
 
 `GET /healthz` checks that `SALESFORCE_BASE_URL`/`SALESFORCE_ACCESS_TOKEN`
 are configured; it deliberately does **not** make a live Salesforce call

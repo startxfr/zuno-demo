@@ -83,7 +83,7 @@ aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 checkpointDb:
   # PGO's own PgBouncer Service in front of the shared zuno-postgresql
   # PostgresCluster - same pooled-connection convention as
-  # gitops/charts/mcp-sales-db.
+  # gitops/charts/mcp-confluence.
   host: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
   port: "5432"
   database: agent-checkpoints

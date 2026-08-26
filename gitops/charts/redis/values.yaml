@@ -82,7 +82,7 @@ redis:
   # respect it. Disabled here in favor of this chart's own
   # templates/networkpolicy.yaml, scoped to agent-frontend pods
   # specifically - the same least-privilege bar
-  # gitops/charts/mcp-sales-db already sets for a comparable
+  # gitops/charts/mcp-confluence already sets for a comparable
   # security-relevant backing service.
   networkPolicy:
     enabled: false

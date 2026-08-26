@@ -43,7 +43,7 @@ this server has no per-user identity to check, by design.
 ADR-0037: the gateway is still the trust boundary. This server does not
 re-validate the caller's end-user JWT; every /mcp call must carry
 X-Zuno-Gateway-Token, a shared secret only the gateway holds - same
-Starlette-middleware pattern as confluence/sales-db.
+Starlette-middleware pattern as confluence.
 
     POST /mcp    - real MCP streamable-HTTP transport (initialize,
                    tools/list, tools/call)
@@ -74,7 +74,7 @@ SALESFORCE_API_VERSION = os.getenv("SALESFORCE_API_VERSION", "v59.0")
 HTTP_TIMEOUT_SECONDS = float(os.getenv("SALESFORCE_HTTP_TIMEOUT_SECONDS", "20"))
 
 # ADR-0037: required, not optional - this server has no purpose other than
-# serving the gateway (same reasoning as confluence/sales-db's server.py).
+# serving the gateway (same reasoning as confluence's server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
 
@@ -248,7 +248,7 @@ async def update_opportunity(
 
 class GatewayTokenMiddleware(BaseHTTPMiddleware):
     """ADR-0037 workload-identity check, ahead of any MCP protocol handling
-    (identical pattern to confluence/sales-db's own middleware)."""
+    (identical pattern to confluence's own middleware)."""
 
     async def dispatch(self, request: Request, call_next):
         caller_token = request.headers.get("x-zuno-gateway-token", "")
