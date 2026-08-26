@@ -1,6 +1,7 @@
 # WP-082: OTel auto-instrumentation for the model-serving workloads
 
-- **State:** In progress (pushed, awaiting rollout + live verification).
+- **State:** Done (live-verified 2026-08-26 on embeddings + qwen; gpt-oss-20b blocked on a
+  pre-existing GPU-node capacity problem, see "Live finding: rollout deadlock" below).
 - **ADRs:** ADR-0523 (To be implemented)
 - **Depends on:** WP-079 (RHOAI traces stack live), WP-080 (diagnosed the zero-traces root causes)
 - **Related:** WP-081 (mesh-level path, independent), WP-076/ADR-0521 (proved the
@@ -56,18 +57,56 @@ newer SDK does not.
   both LLM arg lists carry the flag; `tracing.enabled=false` renders everything back to the
   prior shape.
 
+## Live finding: any GPU-workload spec change deadlocks its own rollout
+
+Not caused by this WP, but it blocks every rollout of these three workloads and cost most of
+this WP's time, so it is recorded here. The `zuno-ai-run-gpu-cap` ResourceQuota caps MIG slices
+at exactly the number in steady-state use (`mig-1g.24gb: 2`, `mig-2g.48gb: 1`), while the
+KServe-generated Deployments use `RollingUpdate` with 25%/25% - at `replicas: 1` that rounds to
+`maxSurge 1, maxUnavailable 0`. So the new ReplicaSet must create its pod *before* the old pod
+is removed, but the quota is already fully consumed by that old pod:
+`ReplicaFailure/FailedCreate: exceeded quota: zuno-ai-run-gpu-cap`, forever. The rollout is
+silently stuck with `UPTODATE: 0` while `oc get pods` shows a healthy old pod. Deleting the old
+pod (the WP-076 reflex) does NOT help - its own old ReplicaSet immediately recreates it.
+**Escape used here: `oc scale rs <old-rs> --replicas=0`**, which frees the quota and lets the
+new ReplicaSet create. A durable fix (e.g. `spec.predictor.deploymentStrategy: Recreate` on the
+classic InferenceService - the field exists; LLMInferenceService has no equivalent) or raising
+the quota by one slice per profile is NOT attempted here - it needs its own WP and a decision
+about GPU headroom.
+
+Compounding, pre-existing and unrelated to this WP: the single GPU node has been CPU-saturated
+since ~08:40 on 2026-08-26 (13676m/88% requested, ~8.9 cores of non-model workload), so only
+ONE of the two 4-core LLMs can be scheduled at a time - qwen and gpt-oss-20b have been trading
+the node ever since, whichever is (re)created first. qwen won here; **`gpt-oss-20b` is
+therefore `Pending` with the correct new spec but never scheduled**, and its half of item 3 is
+unverified. Its spec is identical in shape to qwen's (same `spec.annotations` path, same args
+block), so the risk is scheduling, not correctness.
+
 ## Verification checklist
 
-1. ⬜ Pre-checks: `oc explain instrumentation.spec.exporter/.sampler/.propagators` before
-   authoring the CR; `vllm serve --help | grep -i otlp` in the embeddings kserve-container.
-2. ⬜ After rollout, the qwen/gptoss workload pods and the embeddings predictor pod carry the
-   `inject-sdk` annotation AND the operator-injected `OTEL_*` env in `main`/`kserve-container`
-   (proves both KServe annotation propagation and webhook injection).
-3. ⬜ A real chat/completions call through the MaaS gateway produces vLLM-originated spans in
-   RHOAI's Tempo (search API, non-empty `traces` array with the model's service name).
-4. ⬜ GPU rollout watched for the replicas=1/MIG-slice Pending deadlock (WP-076 precedent:
-   delete the old pod if stuck).
+1. ✅ Pre-checks: `oc explain instrumentation.spec.exporter/.sampler/.propagators` run before
+   authoring the CR; `--otlp-traces-endpoint` confirmed present on the embeddings pod's vLLM
+   build too (via `vllm serve --help=all` - hidden from plain `--help`).
+2. ✅ Both KServe annotation-propagation paths proven live, and the webhook injected on both:
+   - embeddings (`spec.predictor.annotations`, the previously-unproven classic-InferenceService
+     path): pod carries both annotations, `kserve-container` has 10 `OTEL_*` vars
+     (`OTEL_SERVICE_NAME=embeddings-predictor`, endpoint = platform collector,
+     `OTEL_TRACES_SAMPLER=traceidratio`, `OTEL_PROPAGATORS=tracecontext,baggage`).
+   - qwen (`spec.annotations`): same 10 vars in `main`
+     (`OTEL_SERVICE_NAME=qwen36-27b-instruct-kserve`) **plus** the
+     `--otlp-traces-endpoint=...` arg on the vLLM command line, echoed back by vLLM's own
+     startup `ObservabilityConfig(otlp_traces_endpoint='http://zuno-otel-collector-collector...')`.
+3. ✅ Real inference (HTTPS `POST /v1/chat/completions` on qwen, HTTP 200 - note the endpoint is
+   TLS, KServe's own cert) produced **vLLM in-process spans** searchable in RHOAI's Tempo:
+   `tags=service.name=qwen36-27b-instruct-kserve` → traces named `llm_request` (plus an
+   `Overall Loading` model-load span). Tempo's `service.name` tag-values list now includes
+   `qwen36-27b-instruct-kserve` and `isvc.embeddings-predictor.zuno-ai-run`.
+   ⬜ gpt-oss-20b half: not verified, see the capacity finding above.
+4. ✅ Dual-stack confirmed: the same `llm_request` traces are also in `zuno-monitoring`'s Tempo
+   (`tempo-tempo:3200`), i.e. WP-081's fan-out delivers workload spans to both backends.
 
 ## Status updates
 
-_None yet._
+- WP-082 → Done (live-verified 2026-08-26), with the gpt-oss-20b scheduling caveat above.
+- ADR-0523 → `Implemented`: both paths (mesh-level WP-081, workload-level WP-082) are live and
+  trace data is landing in RHOAI's Tempo from real traffic. `docs/adr/README.md` row updated.

@@ -1,6 +1,9 @@
 # ADR-0523: Dual-export traces into the RHOAI monitoring stack
 
-- **Status:** To be implemented
+- **Status:** Implemented (live-verified 2026-08-26 via WP-081/WP-082 - real Envoy and vLLM
+  spans searchable in RHOAI's Tempo, `zuno-monitoring`'s pipeline unchanged and still receiving
+  the same traces). One caveat: `gpt-oss-20b` carries the correct spec but is unscheduled on a
+  pre-existing GPU-node capacity problem, so only qwen's vLLM spans are proven - see WP-082.
 - **Target:** v0.5
 - **Date:** 2026-08-26
 - **Decision owners:** Zuno Demo architecture team
