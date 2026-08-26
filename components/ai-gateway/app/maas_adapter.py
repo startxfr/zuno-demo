@@ -154,6 +154,26 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
 
     default_headers = {"X-Zuno-Request-Id": request_id} if request_id else None
 
+    # ADR-0521 (WP-076) step 4, live incident 2026-08-26: maas-default-
+    # gateway's TLS cert is issued by the same cluster
+    # openshift-service-serving-signer CA every local LLMInferenceService
+    # endpoint already uses (confirmed live: `oc get secret
+    # maas-gateway-service-tls -n openshift-ingress` and
+    # gpt-oss-20b-kserve-workload-svc's cert share the same issuer) - not
+    # in this pod's default trust store, so without this the openai SDK's
+    # own httpx client fails TLS verification and every via_maas call
+    # surfaces as a generic "Connection error" (silently falling back to
+    # the direct candidate rather than actually reaching MaaS). Same
+    # LOCAL_GPT_OSS_CA_BUNDLE env var/mounted file app/providers.py's
+    # local branch already trusts - despite the name, it's the cluster
+    # CA, not something gpt-oss-specific.
+    http_async_client = None
+    ca_bundle = os.getenv("LOCAL_GPT_OSS_CA_BUNDLE")
+    if ca_bundle:
+        import httpx
+
+        http_async_client = httpx.AsyncClient(verify=ca_bundle)
+
     return ChatOpenAI(
         base_url=endpoint,
         api_key=_maas_bearer_token(),
@@ -161,6 +181,7 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
         temperature=cfg.get("temperature", 0.2),
         timeout=cfg.get("timeout_seconds", 60),
         default_headers=default_headers,
+        http_async_client=http_async_client,
         # Same reasoning as app/providers.py's local/openai branches - keeps
         # this dormant adapter from becoming a landmine once it's wired up.
         stream_usage=True,

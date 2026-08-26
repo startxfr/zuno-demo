@@ -37,6 +37,7 @@ def _reset_adapter_env(**overrides: str) -> None:
         "MAAS_GATEWAY_API_KEY_ENV",
         "MAAS_EXTERNAL_EGRESS_ENABLED",
         "MAAS_SA_TOKEN_PATH",
+        "LOCAL_GPT_OSS_CA_BUNDLE",
     ):
         os.environ.pop(key, None)
     os.environ.update(overrides)
@@ -146,6 +147,58 @@ def test_chat_model_via_maas_falls_back_to_global_endpoint() -> None:
     assert kwargs["base_url"] == "http://maas.example/global/v1"
 
 
+def test_chat_model_via_maas_trusts_the_cluster_ca_when_configured() -> None:
+    """ADR-0521 (WP-076) step 4, live incident 2026-08-26: without this,
+    every via_maas call TLS-fails against maas-default-gateway's cert
+    (same cluster openshift-service-serving-signer CA every local
+    LLMInferenceService endpoint uses) and silently falls back to the
+    direct candidate - proven live before this fix landed."""
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test-ca")])
+    now = datetime.datetime(2026, 1, 1)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".crt", delete=False) as fh:
+        fh.write(cert.public_bytes(serialization.Encoding.PEM))
+        ca_path = fh.name
+    try:
+        _reset_adapter_env(
+            MAAS_ADAPTER_ENABLED="true",
+            MAAS_GATEWAY_ENDPOINT="http://maas.example/global/v1",
+            LOCAL_GPT_OSS_CA_BUNDLE=ca_path,
+        )
+        with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
+            maas_adapter.chat_model_via_maas({"model": "gpt-oss-20b"})
+        (_, kwargs) = chat_openai.call_args
+        assert kwargs["http_async_client"] is not None
+    finally:
+        os.unlink(ca_path)
+
+
+def test_chat_model_via_maas_no_ca_client_when_unset() -> None:
+    _reset_adapter_env(MAAS_ADAPTER_ENABLED="true", MAAS_GATEWAY_ENDPOINT="http://maas.example/global/v1")
+    with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
+        maas_adapter.chat_model_via_maas({"model": "gpt-oss-20b"})
+    (_, kwargs) = chat_openai.call_args
+    assert kwargs["http_async_client"] is None
+    assert kwargs["base_url"] == "http://maas.example/global/v1"
+
+
 def test_maas_adapter_never_widens_c3_local_only_eligibility() -> None:
     """Security-negative: with the adapter globally enabled, a C3/local-only
     request's candidate set is unchanged - still exactly the local
@@ -212,6 +265,8 @@ TESTS = [
     test_bearer_token_prefers_sa_token_when_present,
     test_chat_model_via_maas_prefers_per_provider_endpoint,
     test_chat_model_via_maas_falls_back_to_global_endpoint,
+    test_chat_model_via_maas_trusts_the_cluster_ca_when_configured,
+    test_chat_model_via_maas_no_ca_client_when_unset,
     test_maas_adapter_never_widens_c3_local_only_eligibility,
     test_external_egress_stays_blocked_even_when_adapter_and_provider_both_opt_in,
     test_external_egress_opt_in_only_affects_non_local_candidates,
