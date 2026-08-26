@@ -63,10 +63,14 @@ Discover catalog and channel from the `PackageManifest` at run time rather than 
 same pattern `ansible/roles/aap/tasks/install.yml` uses (fail loudly if the package is absent).
 Confirmed on this cluster 2026-08-26: package `lightspeed-operator`, catalog `redhat-operators`,
 `defaultChannel: stable`, CSV `lightspeed-operator.v1.1.2`, InstallModes **`OwnNamespace` only**.
-`openshift-lightspeed` is rendered by this chart's own vendored startx `project` subchart, the
-`lws`/`custom-metrics-autoscaler` shape - **not** added to `gitops/charts/namespaces/values.yaml`,
-which owns only `zuno-*` namespaces (verified 2026-08-26: `openshift-lws-operator`,
-`openshift-keda` and `openshift-cert-manager` are all absent from it). No `istio-injection` label.
+`openshift-lightspeed` is added to `gitops/charts/namespaces/values.yaml` and owned solely by
+`zuno-namespaces-d0`. It is an `openshift-*` operator namespace, which normally means the
+component's own chart creates it (`lws`, `custom-metrics-autoscaler`) - but it holds a mandatory
+singleton CR, so it is tracked centrally like the RHOAI namespaces instead. This chart's vendored
+`project` block is therefore left **disabled**; enabling it in both places makes ArgoCD report the
+Namespace as shared between two Applications. No `istio-injection` label. The entry sets
+`skipNetworkPolicy: true` and no quota - see ADR-0524's Operational considerations for why both
+are deferred rather than guessed, and treat replacing them as live-verification work.
 The OperatorGroup is OwnNamespace-scoped (`target: openshift-lightspeed`) because the CSV supports
 no other install mode - subscribing through a shared AllNamespaces OperatorGroup puts the CSV in
 `Failed`/`UnsupportedOperatorGroup`, the exact failure `lws` documents.
@@ -116,22 +120,31 @@ Record which one won and why.
 
 ### Step 3 - Day 2: MCP front-door on the existing gateway
 
-**Implementation finding (2026-08-26), resolved: Lightspeed needs an OKF bundle.**
+**Implementation finding (2026-08-26): a caller with no OKF bundle is denied everything.**
 `app/policy.py`'s `evaluate()` fails closed on a caller that declares no agent and no task
 (`"missing X-Zuno-Agent/X-Zuno-Task declaration"`), then requires that agent to declare the
 requested tool in the named task - ADR-0011's first two factors, made enforced rather than
-aspirational by ADR-0036. Lightspeed declares neither, so every call would have been denied.
+aspirational by ADR-0036. A standard MCP client declares neither.
 
-The fix is **not** a bypass in the front-door, which would create the second authorization path
-ADR-0036 exists to prevent. It is `agents/lightspeed/agent.okf.md`, a **declaration-only** OKF
-bundle (`status: external-client`) with one task allowing exactly `confluence.page.search` and
-`confluence.page.read`. `agents/cognos` and `agents/soursage` are the existing precedent for a
-bundle with no chart, no Application and no workload; this one is additionally absent from
-`ansible/roles/agents/tasks/install.yml`'s deploy list, so nothing is ever deployed for it.
+An OKF bundle for Lightspeed was built and then **removed on the decision that Lightspeed is not a
+Zuno agent and should not appear as one**. The replacement is an explicit, narrow exception:
 
-The result is strictly stronger than the ADR described: a write capability is now denied at the
-*agent-declaration* factor, before policy groups are even consulted, and that denial is one of
-three independent layers rather than the only one.
+- `evaluate_without_declaration()` in `app/policy.py` runs factors 3-5 only. It shares
+  `_evaluate_tool_policy()` with `evaluate()`, so there is no duplicated policy logic and no way
+  for the two to drift. Its docstring names the single sanctioned caller.
+- The front-door carries a **capability allowlist** in place of the missing bundle -
+  `lightspeed.frontdoorCapabilities` in `gitops/charts/mcp-gateway/values.yaml`, delivered as
+  `MCP_FRONTDOOR_CAPABILITIES`. It is enforced on `tools/list` **and** on `tools/call`; enforcing
+  it only on `tools/list` would make it advisory, since a client may call a name it was never
+  advertised.
+- `_authorize_and_invoke(frontdoor_policy=True)` is the only place the exception reaches the
+  invoke path. Everything after the decision - self-scope check, auth_mode, delegated credentials,
+  telemetry - is shared with the REST path.
+
+Net effect: the ceiling is now harder to widen than a bundle would have been (a Helm value visible
+in the Deployment spec, versus a Markdown edit under `agents/`), and factors 3-5 still run per
+call. What is genuinely given up is per-*agent* scoping, which is meaningless for a caller that is
+not an agent.
 
 Add a standard MCP streamable-HTTP endpoint at `/mcp` to `components/mcp-gateway`, in the same
 FastAPI app as `/v1/tools/{tool_name}/invoke`.
@@ -152,24 +165,37 @@ FastAPI app as `/v1/tools/{tool_name}/invoke`.
 - Rebuild and redeploy `mcp-gateway`. **Push first** - the BuildConfig clones `origin/main`, not
   the local tree.
 
-### Step 4 - Day 2: identity, both modes (ADR-0524 clause 5)
+### Step 4 - Day 2: per-user identity (ADR-0524 clause 5)
 
-Both modes ship in this WP, service identity first so step 3 is provable end to end before the
-harder path lands.
+**Per-user is the default.** `mcp.identityMode: perUser` sets
+`mcpServers[0].headers[0].valueFrom.type: client`, so Lightspeed forwards the console user's own
+OpenShift token, and `validate_token_or_kubernetes()` in `app/auth.py` resolves it through the
+Kubernetes `TokenReview` API.
 
-- *Service identity*: a `lightspeed` Keycloak client (client-credentials) in
-  `gitops/charts/keycloak/files/realm-zuno.json` with a `groups` claim carrying a new read-only
-  group; the token reaches Lightspeed as a Vault-seeded Secret referenced by
-  `mcpServers[0].headers[0].valueFrom.type: secret`. No change to `auth.py`.
-- *Per-user identity*: switch the header to `valueFrom.type: client` and add a second, additive
-  branch to `components/mcp-gateway/app/auth.py` - when the bearer token is not a JWT, resolve it
-  through the Kubernetes `TokenReview` API and map the returned OpenShift groups onto Keycloak
-  groups before `evaluate()` runs. The Keycloak-JWT branch stays the primary path and is not
-  modified; the new branch fails closed on any error.
+No group-mapping table was needed, which was not obvious up front: `oc get groups` on this cluster
+returns `consultant` and `sales` among others, and both are already `allowed_groups` in
+`policies/tools/tool-policy.yaml`. The reviewed groups therefore feed ADR-0011 directly.
+`system:authenticated`, `system:authenticated:oauth` and `system:masters` are stripped first -
+every authenticated principal carries them, so leaving them in would let any cluster user match a
+policy entry that happened to list one.
 
-**Verify before building the per-user branch:** that the Lightspeed console plugin actually
-forwards the user's token for `type: client` on v1.1.2. If it does not, ship the service-identity
-mode, mark the per-user half blocked in this WP with the evidence, and do not simulate it.
+The JWT path is untouched: `_looks_like_jwt()` routes three-segment tokens to the existing
+Keycloak validator and everything else to TokenReview, and the new dependency is used **only** by
+`/mcp`, so the REST contract still accepts Keycloak tokens and nothing else.
+
+RBAC: `gitops/charts/mcp-gateway/templates/rbac-tokenreview.yaml` binds the gateway's
+ServiceAccount to `system:auth-delegator` - create on tokenreviews/subjectaccessreviews and
+nothing more. It is gated on `lightspeed.enabled`, because this is the only reason mcp-gateway
+touches the Kubernetes API at all (its ServiceAccount previously carried no RBAC by design).
+
+*Service identity* remains available as `identityMode: serviceIdentity` (Keycloak
+client-credentials via a Vault-seeded Secret, group `lightspeed_readonly`) but is a **compatibility
+fallback only**: it collapses every console user onto one identity and loses per-user Confluence
+scoping.
+
+**Verify live:** that the console plugin actually forwards the user token for `type: client` on
+v1.1.2. If it does not, flip `identityMode` to `serviceIdentity`, record the evidence here, and do
+not simulate it.
 
 ### Step 5 - Day 2: read-only Confluence
 

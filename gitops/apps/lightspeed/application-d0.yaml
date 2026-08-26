@@ -1,6 +1,6 @@
 ---
-# OpenShift Lightspeed operator install (namespace + OperatorGroup +
-# Subscription). The OLSConfig operand is NOT here and is not even in this
+# OpenShift Lightspeed operator install (OperatorGroup + Subscription). The
+# namespace itself is created and governed by zuno-namespaces-d0, not here. The OLSConfig operand is NOT here and is not even in this
 # chart - it belongs to the Day 2 "lightspeed-config" component
 # (gitops/apps/lightspeed-config/application-d1.yaml), see ADR-0524 clause 7.
 apiVersion: argoproj.io/v1alpha1
@@ -20,8 +20,9 @@ spec:
     helm:
       releaseName: zuno-lightspeed-d0
       values: |
-        project:
-          enabled: true
+        # project intentionally omitted - the namespace belongs to
+        # zuno-namespaces-d0 (ADR-0524, and the redhat-ods-operator precedent
+        # in gitops/charts/namespaces/values.yaml).
         operator:
           enabled: true
   destination:

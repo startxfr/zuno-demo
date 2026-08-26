@@ -87,8 +87,20 @@ mcp:
   #
   # Only ONE may be active: they both set the Authorization header, and the
   # CRD has no precedence rule between two entries with the same header name.
-  # templates/checks.yaml fails the render if both or neither are enabled.
-  identityMode: serviceIdentity  # serviceIdentity | perUser
+  # templates/checks.yaml fails the render if the value is not one of the two.
+  #
+  # perUser is the DEFAULT and the intended mode: the Confluence content a user
+  # reaches through the console assistant is then exactly what their own
+  # OpenShift groups already permit, and `consultant`/`sales` are both real
+  # OpenShift groups AND tool-policy allowed_groups on this cluster, so no
+  # mapping table is needed. mcp-gateway resolves the forwarded token through
+  # TokenReview (app/auth.py's validate_token_or_kubernetes).
+  #
+  # Fall back to serviceIdentity ONLY if the console plugin turns out not to
+  # forward the user token on v1.1.2 - it collapses every console user onto one
+  # shared identity and loses per-user Confluence scoping, so it is a
+  # compatibility fallback, not an equivalent alternative.
+  identityMode: perUser  # perUser | serviceIdentity
 
   serviceIdentity:
     secretName: lightspeed-mcp-token

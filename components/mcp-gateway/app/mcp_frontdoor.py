@@ -21,9 +21,40 @@ to keep correct because it is computed, not written down.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger("mcp_gateway.frontdoor")
+
+# ADR-0524: the capability allowlist that replaces ADR-0011's factors 1-2 for
+# this endpoint.
+#
+# A standard MCP client has no OKF bundle, so it cannot satisfy
+# agent_declaration/task_rights. Rather than give it a synthetic bundle, the
+# reachable surface is pinned HERE, at deployment time. This is the stricter of
+# the two: a bundle can be widened by editing Markdown under agents/ and
+# re-syncing, whereas widening this requires a values change, an image rebuild
+# or an explicit env override that shows up in the Deployment spec.
+#
+# Everything else still applies per caller: allowed_groups, min_classification
+# and the caller's own groups are enforced for each capability below, so this
+# list is a CEILING, never a grant. A user who may not read Confluence still
+# cannot read it here.
+DEFAULT_FRONTDOOR_CAPABILITIES = ("confluence.page.search", "confluence.page.read")
+
+
+def frontdoor_capabilities() -> List[str]:
+    """The allowlist, overridable per deployment via a comma-separated env var.
+
+    Empty or unset means the default read-only Confluence pair. An explicitly
+    empty string disables the front-door's tool surface entirely, which is the
+    intended kill switch: tools/list returns nothing and every tools/call is
+    refused, without having to remove the endpoint.
+    """
+    raw = os.getenv("MCP_FRONTDOOR_CAPABILITIES")
+    if raw is None:
+        return list(DEFAULT_FRONTDOOR_CAPABILITIES)
+    return [c.strip() for c in raw.split(",") if c.strip()]
 
 # The MCP revision this front-door implements. Clients send their own in
 # `initialize`; we echo ours back and let the client decide whether it can
@@ -112,11 +143,8 @@ def _input_schema(binding: Any) -> Dict[str, Any]:
 def list_tools(
     *,
     policy_store: Any,
-    agents: Any,
     binding_registry: Any,
     identity: Any,
-    agent_name: str,
-    task_name: str,
     classification: str,
 ) -> List[Dict[str, Any]]:
     """Every capability this caller is actually authorized for, right now.
@@ -126,19 +154,20 @@ def list_tools(
     network call - cheap enough to do per request, and it means the advertised
     surface can never drift from the enforced one.
     """
-    from app.policy import evaluate
+    from app.policy import evaluate_without_declaration
 
     tools: List[Dict[str, Any]] = []
-    for capability in binding_registry.capabilities():
+    for capability in frontdoor_capabilities():
         binding = binding_registry.resolve(capability)
         if binding is None:
+            logger.warning(
+                "frontdoor allowlist names '%s', which resolves to no binding - skipping",
+                capability,
+            )
             continue
-        decision = evaluate(
+        decision = evaluate_without_declaration(
             store=policy_store,
-            agents=agents,
             tool_name=capability,
-            agent_name=agent_name,
-            task_name=task_name,
             caller_groups=identity.groups,
             request_classification=classification,
             equivalent_names=binding.all_names(),
@@ -169,11 +198,8 @@ async def dispatch(
     message: Dict[str, Any],
     *,
     policy_store: Any,
-    agents: Any,
     binding_registry: Any,
     identity: Any,
-    agent_name: str,
-    task_name: str,
     classification: str,
     invoke_tool: Callable[..., Any],
 ) -> Optional[Dict[str, Any]]:
@@ -232,11 +258,8 @@ async def dispatch(
             {
                 "tools": list_tools(
                     policy_store=policy_store,
-                    agents=agents,
                     binding_registry=binding_registry,
                     identity=identity,
-                    agent_name=agent_name,
-                    task_name=task_name,
                     classification=classification,
                 )
             },
@@ -252,6 +275,24 @@ async def dispatch(
         arguments = params.get("arguments") or {}
         if not isinstance(arguments, dict):
             raise JsonRpcError(INVALID_PARAMS, "'params.arguments' must be an object")
+
+        # The allowlist is enforced HERE as well as in tools/list. Relying on
+        # tools/list alone would make the ceiling advisory: a client is free to
+        # call a name it was never advertised, and this endpoint's whole
+        # read-only guarantee rests on that not working.
+        if name not in frontdoor_capabilities():
+            logger.warning(
+                "frontdoor refused '%s' - not in MCP_FRONTDOOR_CAPABILITIES (caller=%s)",
+                name,
+                getattr(identity, "sub", "?"),
+            )
+            return _result(
+                request_id,
+                _tool_error(
+                    f"'{name}' is not exposed through this MCP endpoint "
+                    "(ADR-0524 front-door capability allowlist)"
+                ),
+            )
 
         try:
             payload = await invoke_tool(tool_name=name, arguments=arguments)

@@ -1,0 +1,32 @@
+{{- if .Values.lightspeed.enabled }}
+# ADR-0524: lets the gateway resolve an OpenShift END-USER token through the
+# TokenReview API, so /mcp calls are authorized as the real console user rather
+# than as a shared service account.
+#
+# This is the ONE reason mcp-gateway talks to the Kubernetes API at all - the
+# ServiceAccount's own comment used to say "no RBAC binding: this service only
+# calls HTTP APIs", which is why this binding is gated on the front-door being
+# in use rather than granted unconditionally.
+#
+# system:auth-delegator is the standard, minimal role for this: it grants create
+# on tokenreviews and subjectaccessreviews and nothing else. It permits
+# VALIDATING a presented token; it does not permit minting one, reading Secrets,
+# or impersonating the user it just validated.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcp-gateway-token-review
+  labels:
+    app.kubernetes.io/name: mcp-gateway
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: mcp-gateway
+    namespace: {{ .Values.namespace }}
+{{- end }}

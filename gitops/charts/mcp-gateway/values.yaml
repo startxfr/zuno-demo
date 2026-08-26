@@ -81,3 +81,21 @@ internalEmailDomains: zuno.example.internal
 lightspeed:
   enabled: false
   namespace: openshift-lightspeed
+  # ADR-0524: what the /mcp front-door may ever expose, for ANY caller. This is
+  # a ceiling, not a grant - each capability is still checked against the
+  # caller's own groups and the request classification, so listing something
+  # here does not entitle anyone to it.
+  #
+  # It exists because a standard MCP client carries no OKF bundle and so cannot
+  # satisfy ADR-0011's agent_declaration/task_rights factors. This replaces them,
+  # and is deliberately harder to widen than a bundle would be: changing it is a
+  # values change visible in the Deployment spec, not a Markdown edit under
+  # agents/.
+  #
+  # Keep it read-only. ADR-0524 clause 4's read-only guarantee rests on this
+  # list, NOT on the caller's groups - a consultant is entitled to
+  # confluence.page.create elsewhere in the platform and would reach it here the
+  # moment it were added.
+  frontdoorCapabilities:
+    - confluence.page.search
+    - confluence.page.read

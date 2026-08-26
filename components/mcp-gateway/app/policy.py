@@ -262,6 +262,25 @@ def evaluate(
             ),
         )
 
+    return _evaluate_tool_policy(store, tool_name, names, caller_groups, request_classification)
+
+
+def _evaluate_tool_policy(
+    store: PolicyStore,
+    tool_name: str,
+    names: set,
+    caller_groups: List[str],
+    request_classification: str,
+) -> PolicyDecision:
+    """ADR-0011 factors 3-5 only: tool-policy.yaml routing/allowed_groups/
+    min_classification, the caller's groups, and the request classification.
+
+    Split out of evaluate() so the two callers that need exactly these three
+    share one implementation. evaluate() runs them after factors 1-2
+    (agent_declaration, task_rights); evaluate_without_declaration() runs them
+    alone, for the one caller ADR-0524 exempts from those two - see its own
+    docstring for why that exemption is narrow and what replaces it.
+    """
     if store.load_error:
         return PolicyDecision(allowed=False, reason=f"policy store unavailable: {store.load_error}")
 
@@ -313,3 +332,34 @@ def evaluate(
         allow_external_context=entry.allow_external_context,
         subject_field=entry.subject_field,
     )
+
+
+def evaluate_without_declaration(
+    store: PolicyStore,
+    tool_name: str,
+    caller_groups: List[str],
+    request_classification: str,
+    equivalent_names: Optional[List[str]] = None,
+) -> PolicyDecision:
+    """ADR-0011 factors 3-5 for a caller that has no OKF agent bundle.
+
+    THE ONLY SANCTIONED CALLER IS THE /mcp FRONT-DOOR (ADR-0524), and it may
+    only pass capabilities from its own configured allowlist. Do not call this
+    from the REST invoke path, and do not widen it to 'any caller without a
+    declaration' - that would turn ADR-0036's single intersection back into
+    the two-tier check it was written to remove.
+
+    What is given up: factors 1-2, agent_declaration and task_rights. Those
+    exist to stop an agent from reaching a tool its bundle never declared. A
+    standard MCP client has no bundle to declare anything in, so for this
+    caller they are replaced by a static, deployment-time capability allowlist
+    (MCP_FRONTDOOR_CAPABILITIES) - a narrower control than a bundle, because it
+    cannot be widened by editing a Markdown file in agents/.
+
+    What is NOT given up: the caller's own identity still decides everything
+    else. allowed_groups, min_classification and the caller's real groups are
+    all still enforced here, so a user who may not read Confluence still cannot
+    read it through this path.
+    """
+    names = set(equivalent_names or [tool_name])
+    return _evaluate_tool_policy(store, tool_name, names, caller_groups, request_classification)

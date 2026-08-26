@@ -18,12 +18,12 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.agent_declarations import AgentDeclarationStore
-from app.auth import CallerIdentity, validate_token
+from app.auth import CallerIdentity, validate_token, validate_token_or_kubernetes
 from app.bindings import BindingRegistry
 from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
-from app.policy import PolicyDecision, PolicyStore, evaluate
+from app.policy import PolicyDecision, PolicyStore, evaluate, evaluate_without_declaration
 from app import mcp_frontdoor
 from app.telemetry import init_telemetry, tool_invoke_span
 
@@ -157,6 +157,7 @@ async def _authorize_and_invoke(
     x_zuno_agent: str,
     x_zuno_task: str,
     x_zuno_run_id: str = "",
+    frontdoor_policy: bool = False,
 ) -> Dict[str, Any]:
     """The complete ADR-0011 authorization + invoke path, shared by both
     front doors: the REST contract (`POST /v1/tools/{name}/invoke`) and the
@@ -166,6 +167,14 @@ async def _authorize_and_invoke(
     grow its own policy check - ADR-0036 requires exactly one intersection in
     this gateway, and two entry points sharing one function is how that stays
     true as either side evolves.
+
+    `frontdoor_policy` selects WHICH intersection, and is the single place
+    ADR-0524's exception is visible in the invoke path: False (the REST default)
+    runs all five ADR-0011 factors; True runs factors 3-5 and relies on the
+    front-door's capability allowlist in place of the agent bundle it has no way
+    to carry. Everything after the decision - the self-scope check, auth_mode
+    handling, delegated credentials, telemetry - is identical either way, which
+    is exactly why this is a flag and not a second function.
     """
     request_id = str(uuid.uuid4())
     started = time.monotonic()
@@ -180,16 +189,25 @@ async def _authorize_and_invoke(
         call.capability = binding.capability
         call.binding = binding.backend
 
-        decision = evaluate(
-            store=policy_store,
-            agents=agent_declarations,
-            tool_name=tool_name,
-            agent_name=x_zuno_agent,
-            task_name=x_zuno_task,
-            caller_groups=identity.groups,
-            request_classification=classification,
-            equivalent_names=binding.all_names(),
-        )
+        if frontdoor_policy:
+            decision = evaluate_without_declaration(
+                store=policy_store,
+                tool_name=tool_name,
+                caller_groups=identity.groups,
+                request_classification=classification,
+                equivalent_names=binding.all_names(),
+            )
+        else:
+            decision = evaluate(
+                store=policy_store,
+                agents=agent_declarations,
+                tool_name=tool_name,
+                agent_name=x_zuno_agent,
+                task_name=x_zuno_task,
+                caller_groups=identity.groups,
+                request_classification=classification,
+                equivalent_names=binding.all_names(),
+            )
         call.mcp_server = decision.mcp_server
         call.reason = decision.reason
 
@@ -327,33 +345,36 @@ async def invoke_tool(
 # what lets OpenShift Lightspeed (and any other standard MCP client) consume the
 # gateway without a shim deployment, which ADR-0524's non-goals rule out.
 #
-# Identity note: this endpoint deliberately does NOT invent a caller identity.
-# It requires the same validated token every other route does, and it requires
-# the same X-Zuno-Agent/X-Zuno-Task declaration, because ADR-0011's first two
-# factors are agent_declaration and task_rights. Lightspeed satisfies them with
-# agents/lightspeed/agent.okf.md - a declaration-only OKF bundle with no
-# workload - rather than this endpoint bypassing them.
+# Identity: PER-USER by preference. A standard MCP client cannot be asked to
+# send Zuno-specific headers - OLSConfig can attach exactly one, Authorization -
+# so this endpoint accepts either credential shape and derives everything else:
+#
+#   * an OpenShift user token (`sha256~...`), forwarded by Lightspeed's console
+#     plugin as `valueFrom.type: client`. Resolved through TokenReview, giving
+#     the REAL end user's username and groups. This is the preferred mode: the
+#     Confluence content a user can reach through the console assistant is then
+#     the content their own groups already permit.
+#   * a Keycloak JWT, for the service-identity fallback when the plugin cannot
+#     forward a user token.
+#
+# Both land on the same authorization decision. What this endpoint does NOT do
+# is carry an agent/task declaration: ADR-0011's factors 1-2 need an OKF bundle,
+# a standard MCP client has none, and inventing one for it was rejected. They are
+# replaced by mcp_frontdoor.frontdoor_capabilities(), a deployment-time ceiling
+# enforced on both tools/list and tools/call - see evaluate_without_declaration()
+# for the full reasoning on what that trades away and what it does not.
 @app.post("/mcp")
 async def mcp_frontdoor_endpoint(
     request: Request,
-    identity: CallerIdentity = Depends(validate_token),
+    identity: CallerIdentity = Depends(validate_token_or_kubernetes),
     x_zuno_data_classification: str = Header(default="C2", alias="X-Zuno-Data-Classification"),
-    x_zuno_agent: str = Header(default="lightspeed", alias="X-Zuno-Agent"),
-    x_zuno_task: str = Header(default="answer-openshift-question", alias="X-Zuno-Task"),
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
 ) -> JSONResponse:
-    # The agent/task defaults exist because a standard MCP client cannot be
-    # asked to send Zuno-specific headers - Lightspeed's OLSConfig can only set
-    # ONE header (Authorization). They are a DEFAULT, not an override: any
-    # caller that does send the headers gets its own declaration evaluated, and
-    # the defaults still go through the identical intersection, so they widen
-    # nothing. A token whose groups do not intersect the lightspeed task's tools
-    # is still denied.
-    #
-    # Classification defaults to C2 for the same reason: `confluence` is a C2
-    # domain (policies/data-classification/classification.yaml), and a C1
-    # default would deny every Confluence call for a reason the client could
-    # neither see nor fix.
+    # Classification defaults to C2 because `confluence` is a C2 domain
+    # (policies/data-classification/classification.yaml). A C1 default would
+    # deny every Confluence call for a reason the client could neither see nor
+    # fix. It is still a header, so a caller may declare HIGHER; declaring lower
+    # only narrows what it can reach.
     raw = await request.body()
     try:
         message = json.loads(raw) if raw else None
@@ -374,9 +395,10 @@ async def mcp_frontdoor_endpoint(
                 arguments=arguments,
                 identity=identity,
                 classification=x_zuno_data_classification.upper(),
-                x_zuno_agent=x_zuno_agent,
-                x_zuno_task=x_zuno_task,
+                x_zuno_agent="",
+                x_zuno_task="",
                 x_zuno_run_id=x_zuno_run_id,
+                frontdoor_policy=True,
             )
         except HTTPException as exc:
             if exc.status_code == 404:
@@ -398,11 +420,8 @@ async def mcp_frontdoor_endpoint(
             resp = await mcp_frontdoor.dispatch(
                 msg,
                 policy_store=policy_store,
-                agents=agent_declarations,
                 binding_registry=binding_registry,
                 identity=identity,
-                agent_name=x_zuno_agent,
-                task_name=x_zuno_task,
                 classification=x_zuno_data_classification.upper(),
                 invoke_tool=_invoke,
             )

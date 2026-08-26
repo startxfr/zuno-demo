@@ -69,12 +69,10 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-lightspeed-d0"
     gitops_app_extra_helm_values:
-      # project.enabled: true must be repeated here even though
-      # application-d0.yaml already sets it - gitops_app_extra_helm_values
-      # REPLACES spec.source.helm.values wholesale rather than merging (same
-      # gotcha ansible/roles/lws and ansible/roles/keycloak both document).
-      project:
-        enabled: true
+      # No `project` block: openshift-lightspeed is owned by
+      # gitops/charts/namespaces (zuno-namespaces-d0), which runs in Day 0,
+      # well before this. Enabling it here too would make ArgoCD report the
+      # Namespace as shared between two Applications.
       operator:
         enabled: true
         subscription:

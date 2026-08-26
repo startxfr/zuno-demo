@@ -3,11 +3,17 @@
 # via the vendored startx `operator` chart. Both default false so templates
 # render nothing unless an Application explicitly turns them on.
 #
-# openshift-lightspeed is created HERE rather than in
-# gitops/charts/namespaces: that chart owns only the zuno-* namespaces.
-# Every openshift-* operator namespace in this repo (openshift-lws-operator,
-# openshift-keda, openshift-cert-manager) is created by its own component's
-# chart, same as this one.
+# openshift-lightspeed is NOT created here. `project.enabled` stays false and
+# the vendored block is kept only as a documented, disabled fallback - exactly
+# gitops/charts/openshift-ai's posture for redhat-ods-operator.
+#
+# The namespace is owned by gitops/charts/namespaces (zuno-namespaces-d0),
+# because the OLSConfig operand is a mandatory singleton that lives in it: the
+# namespace is a permanent, CR-bearing part of the platform, not an install
+# artifact of this chart. Enabling the block here TOO is not merely redundant -
+# it makes ArgoCD report Namespace/openshift-lightspeed as shared between
+# zuno-lightspeed-d0 and zuno-namespaces-d0, the collision the
+# redhat-ods-operator entry in that chart's values.yaml documents.
 #
 # There is no operand CR in this chart. OLSConfig is a Day 2 concern
 # (gitops/charts/lightspeed-config, ADR-0524 clause 7): an OLSConfig created

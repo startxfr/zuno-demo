@@ -294,6 +294,49 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
 
+  # ADR-0524: OpenShift Lightspeed's operator namespace. The operator's CSV
+  # is OwnNamespace-only and its OLSConfig operand is a mandatory singleton
+  # that lives here, so the namespace is a permanent, CR-bearing part of the
+  # platform rather than an install detail - tracked here for the same reason
+  # the RHOAI namespaces below are.
+  #
+  # zuno-namespaces-d0 is this namespace's SOLE owner: gitops/charts/lightspeed
+  # ships a vendored `project` block that is deliberately left disabled, exactly
+  # like gitops/charts/openshift-ai's - enabling it in both places makes ArgoCD
+  # report the Namespace as shared between two Applications (see the
+  # redhat-ods-operator entry below, which documents that same collision).
+  - name: openshift-lightspeed
+    displayName: OpenShift Lightspeed
+    description: >-
+      OpenShift Lightspeed operator and its operands - API server, console
+      plugin, RHOKP documentation sidecar, conversation-cache PostgreSQL and
+      the built-in openshift-mcp-server (ADR-0524).
+    # NOT mesh-injected: these Deployments are operator-owned, so a sidecar
+    # would have to be re-patched on every reconcile.
+    extraLabels:
+      zuno.io/managed: "true"
+    # DELIBERATE, and the one judgement call in this entry. The default-deny
+    # baseline in networkpolicy-platform.yaml admits same-namespace traffic,
+    # router ingress and whatever allowedFromNamespaces lists - nothing else.
+    # Lightspeed additionally needs the OpenShift console (openshift-console) to
+    # reach its console-plugin Service, and openshift-monitoring to scrape the
+    # metrics its CSV opts into via operatorframework.io/cluster-monitoring.
+    # Neither of those Service/port shapes can be confirmed before the operator
+    # is installed, and getting them wrong presents as "the assistant is missing
+    # from the console" rather than as a policy error.
+    #
+    # So the namespace is governed here (created, labelled, owned) but its
+    # NetworkPolicy is deferred rather than guessed - the same explicit opt-out
+    # zuno-ai-run takes above. WP-085's live verification step should replace
+    # this with `allowedFromNamespaces: [openshift-console, openshift-monitoring]`
+    # once both are confirmed against the running operator.
+    skipNetworkPolicy: true
+    # No resourceQuota/limitRange on purpose: the operand footprint (app server
+    # + console plugin + RHOKP/Solr + PostgreSQL + openshift-mcp-server + OTel
+    # collector) is unknown until it runs, and an under-sized quota leaves the
+    # CSV Failed with pods stuck in FailedCreate - the failure mode the
+    # redhat-ods-operator entry below had to be resized to escape.
+
   # ADR-0331: RHOAI's own default namespaces, given the same governance
   # (labels/NetworkPolicy/quota) zuno-ai-platform used to get, now that
   # applicationsNamespace/monitoring.namespace/registriesNamespace are all

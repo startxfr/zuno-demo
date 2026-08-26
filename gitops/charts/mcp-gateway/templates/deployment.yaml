@@ -49,6 +49,15 @@ spec:
             - name: http
               containerPort: 8080
           env:
+{{- if .Values.lightspeed.enabled }}
+            # ADR-0524: the /mcp front-door's capability ceiling. Comma-separated;
+            # an empty string disables the front-door's tool surface entirely
+            # (tools/list returns nothing, every tools/call is refused) without
+            # removing the endpoint. Unset falls back to the read-only Confluence
+            # pair compiled into app/mcp_frontdoor.py.
+            - name: MCP_FRONTDOOR_CAPABILITIES
+              value: {{ join "," .Values.lightspeed.frontdoorCapabilities | quote }}
+{{- end }}
             - name: KEYCLOAK_ISSUER
               value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
             - name: KEYCLOAK_JWKS_URL

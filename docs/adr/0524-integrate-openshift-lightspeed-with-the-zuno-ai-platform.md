@@ -79,32 +79,55 @@ pipeline and no pgvector corpus for it.
 
 **3. Internal knowledge through the existing MCP Gateway, via a new MCP front-door on it.**
 `components/mcp-gateway` gains a standard MCP streamable-HTTP endpoint (`/mcp`) served by the
-**same deployment, same process and same policy path** as the existing REST contract. No new
+**same deployment, same process and same invoke path** as the existing REST contract. No new
 workload is deployed for this. Lightspeed registers exactly one entry in `spec.mcpServers[]`
-pointing at that endpoint, with `spec.featureGates: [MCPServer]` set. `tools/list` over `/mcp`
-advertises only what the caller's policy intersection already permits, so the tool surface is
-derived from `policies/tools/tool-policy.yaml`, never hand-listed.
+pointing at that endpoint, with `spec.featureGates: [MCPServer]` set.
 
-**4. Read-only Confluence, enforced in three independent places.** The Lightspeed identity is
-granted a group that appears only on `confluence.page.search` and `confluence.page.read` in
-`policies/tools/tool-policy.yaml`; the `/mcp` front-door advertises only read capabilities; and
-`spec.ols.toolsApprovalConfig` keeps its `tool_annotations` default. A write attempt therefore
-fails closed at the gateway even if the first two layers were misconfigured.
+This endpoint carries a **narrow, explicit exception to ADR-0011's first two factors**, and it is
+the only such exception in the platform. `agent_declaration` and `task_rights` presuppose an OKF
+bundle; a standard MCP client has none and cannot be given one without inventing a Zuno agent that
+has no workload, no frontend and no runtime. Rather than manufacture that fiction, the front-door
+replaces those two factors with a **deployment-time capability allowlist**
+(`lightspeed.frontdoorCapabilities`, surfaced as `MCP_FRONTDOOR_CAPABILITIES`), enforced on both
+`tools/list` and `tools/call`.
 
-**5. Two identity modes, service-level and per-user.** Lightspeed's MCP calls carry identity in
-one of two ways, both delivered together:
-- *Service identity* - a dedicated Keycloak `lightspeed` client (client-credentials) whose token
-  carries a read-only group, supplied as `headers[].valueFrom.type: secret`. Works with no change
-  to `auth.py`, and is the fallback whenever a per-user token is absent.
-- *Per-user identity* - `headers[].valueFrom.type: client` forwards the console user's own
-  OpenShift token; `mcp-gateway` gains a **second, additive** authentication path that resolves
-  such a token through the Kubernetes `TokenReview` API and maps the resulting OpenShift groups
-  onto Keycloak groups before ADR-0011's intersection runs.
+The trade is deliberate and, for this caller, favourable: an OKF bundle can be widened by editing
+Markdown under `agents/` and resyncing, whereas this ceiling is a Helm value visible in the
+Deployment spec. Factors 3-5 - `tool-policy.yaml`'s `allowed_groups` and `min_classification`, and
+the caller's own groups - are untouched and still evaluated per call, by the same code the REST
+path runs (`_evaluate_tool_policy`). The exception lives in one named function,
+`evaluate_without_declaration()`, whose only sanctioned caller is this endpoint.
 
-  The Keycloak-JWT path remains the primary and unchanged one; the `TokenReview` path is
-  additive and fails closed. This preserves ADR-0032/ADR-0033 - identity is still derived only
-  from a validated token, never from request content - while giving real per-user authorization
-  when the console forwards a user token.
+**4. Read-only Confluence, enforced in three independent places.** The `/mcp` front-door's
+capability allowlist contains only `confluence.page.search` and `confluence.page.read`, and is
+checked on both `tools/list` and `tools/call` - so a write is refused before any policy lookup,
+for every caller, however entitled. The service-identity fallback additionally carries a group
+(`lightspeed_readonly`) that appears on only those two entries in `policies/tools/tool-policy.yaml`.
+And `spec.ols.toolsApprovalConfig` keeps its `tool_annotations` default. A write attempt fails
+closed even if any one layer were misconfigured.
+
+**5. Per-user identity, with a service identity only as a compatibility fallback.** Lightspeed's
+MCP calls are authorized as the **real console user**, not as a shared robot account:
+- *Per-user (default)* - `headers[].valueFrom.type: client` forwards the console user's own
+  OpenShift token. `mcp-gateway` gains a second, **additive** authentication path
+  (`validate_token_or_kubernetes`) that resolves such a token through the Kubernetes `TokenReview`
+  API. No mapping table is required: on this cluster `consultant` and `sales` are simultaneously
+  OpenShift groups and `tool-policy.yaml` `allowed_groups`, so the reviewed groups feed the
+  intersection directly. `system:authenticated`-class groups are stripped first - they prove
+  nothing about entitlement and would otherwise let any cluster user match a policy entry.
+- *Service identity (fallback)* - a dedicated Keycloak `lightspeed` client whose token carries a
+  read-only group, supplied as `valueFrom.type: secret`. Used only if the console plugin turns out
+  not to forward a user token on v1.1.2. It collapses every console user onto one identity and
+  loses per-user Confluence scoping, so it is a compatibility fallback, not an equivalent.
+
+The Keycloak-JWT path is unchanged and stays primary for every other caller; the `TokenReview`
+branch is reached only for tokens that cannot be a JWT, and fails closed. ADR-0032/ADR-0033 hold:
+identity is still derived only from a validated token, never from request content.
+
+Note what per-user identity does *not* do: it does not make the integration read-only. A
+`consultant` is entitled to `confluence.page.create` elsewhere in the platform and would reach it
+here the moment the clause-3 allowlist named it. Read-only is clause 4's job, and clause 4's first
+layer is that allowlist - not the caller's groups.
 
 **6. Introspection stays enabled.** `spec.ols.introspectionEnabled` keeps its `true` default, so
 the operator's own `openshift-mcp-server` answers live questions about this cluster. That server
@@ -119,7 +142,9 @@ allowing Lightspeed in) and `agents`. Two Ansible roles and **two Helm charts**,
 component - the same shape `aap`/`aap-config` already uses (ADR-0354, WP-072/WP-073). Each chart
 is rendered by the repository's standard **two** Applications, `-d0` (namespace + operator) and
 `-d1` (operand), whose value gates keep their rendered resource sets disjoint; `lightspeed`'s
-`-d1` points at `gitops/charts/noop`, since its operand is `lightspeed-config`'s job in Day 2.
+`-d0` renders the OperatorGroup and Subscription only (the namespace belongs to
+`gitops/charts/namespaces`), and its `-d1` points at `gitops/charts/noop`, since its operand is
+`lightspeed-config`'s job in Day 2.
 The split is by component lifecycle and day tier, not by any ArgoCD limitation - `aap` proves one
 chart serves two Applications cleanly.
 
@@ -161,9 +186,26 @@ PostgreSQL is operator-managed inside `openshift-lightspeed` and is **not** a PG
 deviation, not an oversight, and it is deliberately excluded from Day 3's pgBackRest
 backup/restore scope - conversation cache is disposable state.
 
-`openshift-lightspeed` is created by `gitops/charts/lightspeed`'s own vendored `project`
-subchart, following `lws` and `custom-metrics-autoscaler` - `gitops/charts/namespaces` owns only
-`zuno-*` namespaces, never `openshift-*` operator ones. It is **not** mesh-injected: Lightspeed's Deployments are operator-owned, and injecting a sidecar into them
+`openshift-lightspeed` is created and governed by `gitops/charts/namespaces`, whose Application
+`zuno-namespaces-d0` is its sole owner. Although it is an `openshift-*` operator namespace - the
+kind `lws` and `custom-metrics-autoscaler` create from their own charts - it holds a **mandatory
+singleton CR** (`OLSConfig/cluster`), which makes it a permanent, CR-bearing part of the platform
+rather than an install artifact, the same reason the RHOAI namespaces are tracked there.
+`gitops/charts/lightspeed` therefore keeps its vendored `project` block disabled: enabling it in
+both places makes ArgoCD report the Namespace as shared between two Applications, the collision
+that chart's `redhat-ods-operator` entry already documents.
+
+Its NetworkPolicy is the one deferred item. The chart's default-deny baseline admits only
+same-namespace traffic, router ingress and an explicit `allowedFromNamespaces` list; Lightspeed
+additionally needs `openshift-console` (to serve its console plugin) and `openshift-monitoring`
+(the CSV opts into `operatorframework.io/cluster-monitoring`). Neither shape can be confirmed
+before the operator runs, and getting them wrong presents as "the assistant is missing from the
+console" rather than as a policy error - so the entry sets `skipNetworkPolicy: true`, the same
+explicit opt-out `zuno-ai-run` takes, to be replaced once verified. No `resourceQuota`/`limitRange`
+either: the operand footprint is unknown until it runs, and an under-sized quota leaves the CSV
+`Failed` with pods stuck in `FailedCreate`.
+
+The namespace is **not** mesh-injected: Lightspeed's Deployments are operator-owned, and injecting a sidecar into them
 would put the platform in the business of patching a Red Hat operand. Reachability into
 `zuno-ai-run` is therefore a NetworkPolicy question only - `mcp-gateway`'s policy today admits
 only `agent-runtime` and `acceptance-gate` pods and must gain a namespace-scoped allow.
