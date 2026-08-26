@@ -36,7 +36,7 @@ it can render diagrams but still never declares `image.generation.create`.
 | 5. `image/svg+xml`, not PNG | Done | `server.js` renders with `outputFormat: "svg"` and returns `{"data_base64", "mime_type": "image/svg+xml"}`. |
 | 6. Reuses the `generated_images` shape | Done | Same `data_base64`/`mime_type`/`alt` artifact; zero `components/agent-frontend` changes in either commit. |
 | 7. Scope Arkos + Comage + Tekos, Tekos diagrams only | Done | `diagram.generation.create` granted in `agents/{arkos,comage,tekos}/agent.okf.md` and the corresponding `tasks/*.md`. The three Tekos boundary checks now assert the narrower guarantee: `evaluations/tekos/stress_test.py` (`image_generation_boundary`, `"no image/png ever" (not "images == []")`), `security_checks.py` (svg-allowed / png-never), `gate_checks.py` (`tekos_declares_no_dat_or_image_generation_capability`). Tekos still never declares `image.generation.create`. |
-| 8. Gateway token + ingress NetworkPolicy | Done for ingress | `X-Zuno-Gateway-Token` validated in `server.js` (ADR-0037 pattern); `gitops/charts/diagram-render/templates/networkpolicy.yaml` restricts ingress to `mcp-gateway`. Egress is **not** restricted - see Open items. |
+| 8. Gateway token + ingress NetworkPolicy | Done, and extended | `X-Zuno-Gateway-Token` validated in `server.js` (ADR-0037 pattern); `gitops/charts/diagram-render/templates/networkpolicy.yaml` restricts ingress to `mcp-gateway`. Egress, left open as an accepted risk at decision time, was closed during this closeout - see below. |
 
 ## The render-failure defect (`93b070d`)
 
@@ -76,16 +76,32 @@ build-publish.yml` (matrix entry `diagram-render`) and the in-cluster
 BuildConfig via `ansible/roles/mcp_build/tasks/build.yml`, installed by
 `ansible/roles/mcp/tasks/install.yml` under `make day2 install mcp`.
 
+## Egress NetworkPolicy (the ADR's one open risk, now closed)
+
+ADR-0516 accepted, as non-blocking, that only ingress was restricted:
+LLM-authored Mermaid is unvalidated text run through a real browser engine,
+and Mermaid can reference external image URLs, so the render was an SSRF
+vector able to reach anything the pod network could reach.
+
+Closed 2026-08-26. `gitops/charts/diagram-render/templates/networkpolicy.yaml`
+now declares `Egress` alongside `Ingress` and allows exactly two destinations:
+
+| Destination | Ports | Why |
+|---|---|---|
+| `openshift-dns` namespace | UDP/TCP 53 | The sidecar resolves istiod and istio-csr through it; without this the pod cannot bootstrap. |
+| `zuno-mesh` namespace | all | istiod xDS (15012), `cert-manager-istio-csr` (443) for workload cert signing, plus istiod's webhook/monitoring ports. Deliberately not port-pinned: pinning would break the sidecar the next time the mesh operator changed a port, and it would fail on the pod's *next restart* rather than on apply - a delayed-fuse failure. |
+
+**The application needs no egress at all.** It renders a local file to a
+local file - no model API, no object store, no database. Everything in the
+allowlist is the istio sidecar's own requirement, which is precisely what
+makes a policy this tight safe here and why it was worth writing rather than
+carrying the risk forward.
+
 ## Open items
 
-- **Egress `NetworkPolicy` for `diagram-render` is still not written.** Only
-  ingress is restricted. Mermaid can reference external image URLs, so a real
-  browser engine rendering unvalidated LLM-authored text is an SSRF vector.
-  The ADR accepted this explicitly as non-blocking - the service holds no
-  credential and the blast radius is its own pod - and that assessment is
-  unchanged at closeout. This remains the one genuine follow-up.
 - **No fresh end-to-end live run** was captured for this closeout (see Basis
-  for closure above).
+  for closure above). The egress policy in particular is verified as applied
+  and non-disruptive (pod stays Ready), not by a rendered diagram.
 
 ## Related closeout changes
 

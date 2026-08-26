@@ -23,6 +23,7 @@ spec:
       app.kubernetes.io/name: diagram-render
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     - from:
         - podSelector:
@@ -31,3 +32,37 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+  # ADR-0516 closed this gap on 2026-08-26. It was recorded as an accepted
+  # risk at decision time ("NetworkPolicy restricts diagram-render's own
+  # egress is *not* currently restricted"): Mermaid source is LLM-generated,
+  # unvalidated text run through a real browser engine, and Mermaid can
+  # reference external image URLs - an SSRF vector reaching anything the pod
+  # network can reach.
+  #
+  # diagram-render renders a local file to a local file. It needs no network
+  # egress of its own at all: no model API, no object store, no database.
+  # Everything allowed below is the istio sidecar's own requirement, not the
+  # app's - which is exactly why this policy can be this tight.
+  egress:
+    # Cluster DNS. The sidecar resolves istiod/istio-csr through it; without
+    # this the pod cannot bootstrap at all.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # The mesh control plane: istiod xDS (15012), cert-manager-istio-csr
+    # (443) for workload cert signing, and istiod's own webhook/monitoring
+    # ports. Deliberately not port-restricted - zuno-mesh is the control
+    # plane this pod's sidecar must talk to, it holds nothing an SSRF would
+    # want, and pinning ports here would silently break the sidecar the next
+    # time the mesh operator changes one (the pod would go unready on its
+    # next restart, not on apply, making it a delayed-fuse failure).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-mesh

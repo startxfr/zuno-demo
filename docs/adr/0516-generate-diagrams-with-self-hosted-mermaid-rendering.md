@@ -194,15 +194,17 @@ with a picture of an error message all the way back to the model.
 the rendered SVG content and fails the request instead, which is what makes
 the one-shot self-correction retry in `nodes.py` reachable.
 
-Two items deliberately remain open:
+The **egress `NetworkPolicy`** left open in Accepted risks above (the
+SSRF-via-Mermaid-external-image-reference vector) was written as part of this
+closeout: `gitops/charts/diagram-render/templates/networkpolicy.yaml` now
+declares `Egress` as well as `Ingress`, allowing only cluster DNS and the
+`zuno-mesh` control plane. The app itself needs no egress whatsoever - it
+renders a local file to a local file - so everything allowed there is the
+istio sidecar's own requirement, which is what let the policy be this tight.
 
-- The **egress `NetworkPolicy`** for `diagram-render` (the SSRF-via-Mermaid-
-  external-image-reference risk in Accepted risks above) is still not
-  written. Only ingress is restricted. This was accepted as non-blocking at
-  decision time and that assessment is unchanged.
-- Closure rests on merged code plus the live, healthy deployment - not on a
-  fresh end-to-end `generate_diagram` call captured as evidence. See
-  [evidence](../roadmap/evidence/adr-0516-diagram-render.md).
+One item remains open: closure rests on merged code plus the live, healthy
+deployment - not on a fresh end-to-end `generate_diagram` call captured as
+evidence. See [evidence](../roadmap/evidence/adr-0516-diagram-render.md).
 
 The `components/mcp-servers/lucidchart` placeholder README, which this
 decision supersedes, was deleted as part of this closeout, along with the
