@@ -1,7 +1,7 @@
 # WP-086: Spread the GPU predictors across both MIG nodes, plus two platform-hygiene fixes
 
-- **State:** Repo work merged (2026-08-26). Machine replacement and live rollout still open —
-  see `## Operator actions remaining`.
+- **State:** Done (live-verified 2026-08-26). Machine replaced, predictors spread, all checks
+  green except #9, which needs a deliberate node cordon.
 - **ADRs:** none new. Relates to ADR-0351 decision 1 (which removed the *hard* anti-affinity
   this WP re-adds in soft form) and ADR-0521 (models are S3-only, so pod placement is not
   pinned by a zone-bound PVC).
@@ -173,6 +173,63 @@ occupancy while downloading. On a 149GB node that projects to `44.8 + 2 x 45.9 ~
 against a `nodefs.available < 10%` eviction threshold of ~144.5GB used: ~6% margin, and
 precisely the peak that already evicted a pod on this node. On 250GB it is ~46% of capacity.
 
+## Live finding: a soft anti-affinity is only as good as the scheduling order
+
+The predictors ended up **gpt-oss on node A, qwen + embeddings on node C** — not the
+predicted "qwen alone on one node".
+
+`preferredDuringSchedulingIgnoredDuringExecution` is evaluated once, at scheduling time,
+against the pods already placed. During the rolling update the order was:
+
+1. embeddings' new pod scheduled while the **old** qwen pod was still on node A, so it
+   correctly avoided A and went to C;
+2. qwen's new pod scheduled next, avoided the node holding the other LLM workload (A), and
+   also went to C — landing on top of embeddings;
+3. gpt-oss rolled last, avoided C (now holding qwen), and stayed on A.
+
+Every term did exactly what it says. The embeddings term's *intent* — sit away from qwen —
+still lost, because nothing re-evaluates it once qwen moves. `IgnoredDuringExecution` is not
+a footnote; it is the whole contract.
+
+The outcome is still a 2/1 split and still delivers the blast-radius reduction this WP is
+for, so no change was made. Worth knowing before assuming a specific layout: **if a
+particular pairing ever matters, it has to be enforced at eviction time (a descheduler
+policy), not at scheduling time.**
+
+## Live results (2026-08-26)
+
+Replacement node `ip-10-18-67-65` (`zuno-gpu-c-cnhhz`, eu-west-2c) came up in 7 minutes:
+Ready at 3m40s, `mig.config.state=success` at 7m, slices advertised 30s later.
+
+| | node A `ip-10-18-15-25` | node C `ip-10-18-67-65` |
+|---|---|---|
+| Disk | 249GB | 249GB |
+| Slices | 2x `1g` + 1x `2g` | 2x `1g` + 1x `2g` |
+| Ephemeral used | 66.4GB (**25%**) | 77.6GB (**29%**) |
+| Predictors | gpt-oss-20b | qwen + embeddings |
+
+Both nodes now sit at roughly a quarter of capacity, against the 91% the three models
+projected onto a 149GB node.
+
+Warm completions, 200 tokens, from inside the mesh:
+
+```
+qwen3.6-27b-instruct   11.0s / 10.9s / 10.9s   18.2-18.4 tok/s
+gpt-oss-20b             2.9s /  2.3s /  2.3s   61.1-85.9 tok/s
+```
+
+qwen's throughput is unchanged from before the move (18 tok/s), so the new node's slice
+performs identically.
+
+**The first request after a pod replacement is not representative.** It timed out at 90s;
+the vLLM log shows why — Triton kernel JIT compilation (`_fused_post_conv_kernel`,
+`_triton_mrope_forward`, `layer_norm_fwd_kernel`, ...) fires on the first inference of a cold
+pod, and vLLM itself warns "consider extending warmup to cover this shape/config". Readiness
+was already `True`. Any post-rollout smoke test must warm the pod first or it will report a
+false failure.
+
+`make d2 check models`, `make d0 check machines` and `make d3 test platform` (8/8) all pass.
+
 ## Verification checklist
 
 | # | Check | Expected |
@@ -213,6 +270,10 @@ real outage.
 - `c6cbda4` and `ef21189` are live and verified: repo host `3/3 Running` with the new requests
   and its backup chain intact; `modelCache` torn down with the `kserve` reconcile rate down
   from 36/min to 2/min and the DSC back to `Ready=True`.
-- The anti-affinity change is merged but **not yet live** — it lands with the rolling update
-  that follows the machine replacement.
+- The anti-affinity change is live. `zuno-gpu-c-wnkhl` was replaced by `zuno-gpu-c-cnhhz`
+  (`ip-10-18-67-65`, 249GB) and the rolling update spread the predictors 2/1 across the two
+  nodes. See `## Live results` — and `## Live finding` for why the split is not the one the
+  plan predicted.
+- Check #9 (cordon the qwen node, delete the pod, confirm it packs onto the survivor rather
+  than going Pending) is **not yet run** — it needs a deliberate node cordon.
 - `python3 platform/docs/check_docs.py` passes.
