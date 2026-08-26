@@ -22,7 +22,7 @@ Agent-to-agent evolution (ADR-0401 – ADR-0409): A2A protocol adoption, identit
 
 ## v0.5
 
-Make the OpenShift AI MaaS governance plane live and route agent model calls through it end-to-end. Carries ADR-0201 (MaaS governance plane), ADR-0511 (OKF quota policy via Kuadrant), ADR-0512 (project-bound tasks with Salesforce-verified context) and ADR-0521 (route ai-gateway's local model traffic through MaaS, added 2026-08-25 as the direction-change ADR-0114's evidence doc anticipated once WP-27 proved the governance plane live) — all grouped here since their live-MaaS objective is one and the same milestone. Open WPs: WP-55, WP-076 (WP-27 and WP-54 closed Done 2026-08-25 — ADR-0201/ADR-0511 both Implemented).
+Make the OpenShift AI MaaS governance plane live and route agent model calls through it end-to-end. Carries ADR-0201 (MaaS governance plane), ADR-0511 (OKF quota policy via Kuadrant), ADR-0512 (project-bound tasks with Salesforce-verified context) and ADR-0521 (route ai-gateway's local model traffic through MaaS, added 2026-08-25 as the direction-change ADR-0114's evidence doc anticipated once WP-27 proved the governance plane live) — all grouped here since their live-MaaS objective is one and the same milestone. Open WPs: WP-55 (WP-27 and WP-54 closed Done 2026-08-25 — ADR-0201/ADR-0511 both Implemented; WP-076 closed Done 2026-08-26 — ADR-0521 Implemented, both local models routed through MaaS with drill-proven direct fallback).
 
 ## v0.6
 

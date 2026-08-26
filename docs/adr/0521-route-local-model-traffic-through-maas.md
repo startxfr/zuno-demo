@@ -1,6 +1,6 @@
 # ADR-0521: Route ai-gateway's local model traffic through MaaS
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.5
 - **Date:** 2026-08-25
 - **Decision owners:** Zuno Demo architecture team

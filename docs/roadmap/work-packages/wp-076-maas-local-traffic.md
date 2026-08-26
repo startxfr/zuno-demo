@@ -1,7 +1,14 @@
 # WP-076: Route ai-gateway's local model traffic through MaaS
 
-- **State:** Not started
-- **ADRs:** ADR-0521 (Proposed)
+- **State:** Done (2026-08-26 — all five steps executed and live-verified
+  against `demo222.startx.fr`; both local models route through MaaS with
+  direct fallback, drill-proven. Full proofs, discovered constraints
+  (LLMInferenceService-only CRD kind, path-prefixed per-model endpoints,
+  SA-token auth replacing the never-found API-key issuance flow, the
+  empty-body double root cause and its EPP bypass) and the recorded
+  quota.py/LoRA decisions are in
+  [the evidence doc](../evidence/adr-0521-maas-local-traffic.md).)
+- **ADRs:** ADR-0521 (Implemented)
 - **Depends on:** WP-27 (Done — the live MaaS proof this generalizes)
 - **Estimated files touched:** ~10-15 (scales with the number of local models)
 
