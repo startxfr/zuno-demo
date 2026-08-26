@@ -16,6 +16,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-24, afternoon):** three new platform version bands added - v0.5 (make the MaaS governance plane live and used by agents), v0.6 (prove platform automation via a from-scratch redeploy on a new cluster), v0.7 (GitHub-Actions-based release automation). ADR-0201/ADR-0511/ADR-0512 move again, this time from the morning's generic v0.3 catch-all into the dedicated v0.5 MaaS milestone (same root blocker, better-scoped home). ADR-0115 (v0.1 -> v0.7) joins WP-04's GitHub Actions release-pipeline scope. ADR-0517 is a new small ADR authored for v0.6 (demo333 cluster redeploy). No new ADR numbering band was reserved - v0.5/v0.7 reuse existing ADR numbers, and ADR-0517 simply takes the next free sequential number after ADR-0516.
 
+**Retargeting note (2026-08-26):** ADR-0111 (v0.1 -> v0.7, Partially implemented -> Deferred) - its sole remaining gap (immutable chart image tags) is blocked on the same WP-04 external GitHub billing lock that already parked ADR-0115 in Deferred status under the v0.7 milestone; ADR-0111 now groups there alongside it. Numbering (01xx band) is unchanged; only `Target`/`Status` move.
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -94,7 +96,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | v0.1 | Implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | v0.1 | Implemented | Implement source freshness and trust scoring |
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | v0.1 | Implemented | Automate document ACL synchronization |
-| [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.1 | Partially implemented | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | v0.1 | Implemented | Implement production-grade backup and recovery |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Superseded by ADR-0118 | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | v0.1 | Implemented | Decouple logical tool capabilities from physical backend bindings |
@@ -110,7 +111,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 |---|---|---|---|
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | v0.2 | Implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | v0.2 | Implemented | Enforce knowledge authorization as policy intersection |
-| [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Partially implemented | Generalize the RAG platform to multiple isolated knowledge domains |
+| [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Implemented | Generalize the RAG platform to multiple isolated knowledge domains |
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | v0.2 | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.2 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | v0.2 | Implemented | Standardize enterprise tool authentication and delegation |
@@ -225,6 +226,7 @@ Goal: automate the release/supply-chain pipeline using GitHub Actions (build, si
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
+| [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Deferred | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.7 | Deferred | Use immutable and verifiable software supply chain artifacts |
 
 ## OKF stream

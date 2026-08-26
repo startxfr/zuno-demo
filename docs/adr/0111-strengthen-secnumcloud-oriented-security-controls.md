@@ -1,6 +1,6 @@
 # ADR-0111: Strengthen SecNumCloud-oriented security controls
 
-- **Status:** Partially implemented - control matrix and first increment merged (`docs/security/secnumcloud-controls.md`, `platform/security/check_workload_hardening.py`'s new NetworkPolicy-coverage audit and hardcoded-secret check); the audit found and closed a real gap (`zuno-ai-run` was silently receiving an all-ports same-namespace NetworkPolicy, contradicting ADR-0037/0052's stated design - confirmed not yet live on the cluster, `policy.enabled` is currently false there) (2026-08-14, roadmap WP-11)
+- **Status:** Deferred - control matrix and first increment merged (`docs/security/secnumcloud-controls.md`, `platform/security/check_workload_hardening.py`'s new NetworkPolicy-coverage audit and hardcoded-secret check); the audit found and closed a real gap (`zuno-ai-run` was silently receiving an all-ports same-namespace NetworkPolicy, contradicting ADR-0037/0052's stated design - confirmed not yet live on the cluster, `policy.enabled` is currently false there) (2026-08-14, roadmap WP-11)
 
 ## Implementation note (2026-08-15)
 
@@ -97,7 +97,20 @@ never actually been proven live:
 
 ADR-0111 stays **Partially implemented**, now down to exactly the one
 WP-04-owned gap.
-- **Target:** v0.1
+
+## Status update (2026-08-26) — Deferred, retargeted to v0.7
+
+The sole remaining gap (immutable chart image tags, blocked on WP-04's
+external GitHub billing lock) is the same blocker that already parked
+ADR-0115 in **Deferred** status under the v0.7 milestone. Rather than
+leave ADR-0111 indefinitely `Partially implemented` for a gap it has no
+repo-side path to close, it moves to **Deferred** alongside ADR-0115:
+real, working infrastructure stays in the repo untouched (the control
+matrix, `platform/security/check_workload_hardening.py`, the WP-12/WP-13
+live-verified controls), but no further gap-closing work is planned
+until a future ADR reactivates the GitHub Actions/immutable-tag stream.
+- **Target:** v0.7 (retargeted from v0.1 on 2026-08-26 — grouped with
+  ADR-0115 under the same WP-04 GitHub-billing-lock blocker)
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team
 
