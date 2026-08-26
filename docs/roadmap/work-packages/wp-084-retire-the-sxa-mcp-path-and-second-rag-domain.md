@@ -97,14 +97,38 @@ reclaim the sales-db Applications, the `zuno-sxa-schema` ConfigMap and the
 `sql-schema-postgresql-credentials` ExternalSecret. What it does *not* cover,
 because their charts are gone:
 
-1. `oc -n zuno-data delete database.k8s.mariadb.com sxa` plus the matching
-   `user`/`grant` CRs, then drop the `sxa` MariaDB database itself.
-2. `oc -n zuno-data delete postgrescluster`-managed `rag-sxa` database/role
-   (the retired `knowledge.sxa` index) — note PGO never recreates a dropped
-   database, so confirm this is the intended, permanent removal first.
+1. ~~Delete the `sxa` MariaDB `Database`/`User`/`Grant` CRs and the database
+   itself.~~ **Verified 2026-08-26 — nothing to do on this cluster.** No
+   `sxa` MariaDB CR exists in any namespace, and MariaDB holds only `mlops`
+   and `mlpipeline`; the `sxa` database and user were never provisioned here.
+   The same is true of the `sales-db` ArgoCD Applications, the
+   `zuno-sxa-schema` ConfigMap and the `sql-schema` ExternalSecret — all
+   already absent, so the `make d2 uninstall mcp` retired-resource cleanup is
+   a no-op here. Both are kept for clusters that *did* provision them.
+
+2. **The one genuine teardown item.** `rag-sxa` still exists in Postgres —
+   8422 kB, `document_embeddings` at 0 rows, 0 active connections, owned by
+   `postgres` — together with the `ragsxa` role. The live
+   `postgrescluster.spec.users` no longer lists `ragsxa`, so PGO has already
+   let go of it and will never reclaim it:
+
+   ```
+   oc -n zuno-data exec zuno-postgresql-instance1-vb9g-0 -c database -- \
+     psql -U postgres -c 'DROP DATABASE "rag-sxa";' -c 'DROP ROLE ragsxa;'
+   ```
+
+   Irreversible — PGO never recreates a dropped database — but the index is
+   empty, so nothing is lost. `rag-sxa-legacy` is a different database and
+   must be left alone.
+
 3. `vault kv delete zuno/sxa/mariadb-db` and `zuno/rag-sxa/postgresql-app`.
-4. Re-apply the Keycloak realm: the `sales`/`adv` group descriptions no
-   longer mention sales-db.
+   Orphaned seeds: no ExternalSecret consumes either path any more, so they
+   are inert rather than harmful, and this is housekeeping.
+
+4. Re-apply the Keycloak realm. The repo edit this step assumed was already
+   done was in fact missing until `de1524e` — the realm JSON still described
+   the `sales`/`adv` groups as granting sales-db rights. The re-apply itself
+   is still open.
 
 Then, once deployed:
 
@@ -123,10 +147,12 @@ Then, once deployed:
    `manifests-sxa-legacy/manifest.json` first: that manifest survived the
    2026-08-25 database recreation, so `detect-changes` reports zero changes
    against an index that is empty and the run reports `SUCCEEDED` having
-   written nothing. `rag-sxa-legacy` holds 0 rows today. **Expect a full
-   re-embed of `rag-sxa-legacy`**: every `doc_id` changed with the URL scheme, and with
-   `deleteOrphans`/`incremental` enabled the run deletes the old corpus and
-   indexes the new one. One-time cost, not steady state.
+   written nothing. `rag-sxa-legacy` holds 0 rows today (verified
+   2026-08-26). This is therefore a **first full index of 314,428
+   documents, not a re-embed** — the URL-scheme change from `sxa-mariadb://`
+   to `sxa-dump://` did rewrite every `doc_id`, but with the index empty
+   `deleteOrphans` has nothing to delete. The cost is the initial ingestion
+   and the throughput fix in item 5 is what makes it survivable.
 7. Live-verify retrieval by role: Comage/Cognos/Advantage/Finage each reach
    `knowledge.sxa-legacy`; a caller in none of `[sales, board, adv, finance]`
    is denied.
@@ -143,6 +169,10 @@ Then, once deployed:
   the CONFIG_KEYS/ConfigMap contract verified live at 44/44 on both domains.
   Steps 1-4 and 6-8 remain open — nothing has been ingested yet, so the
   throughput fix is deployed but unproven end-to-end.
+- 2026-08-26: operator steps 1-4 re-scoped against the live cluster. Step 1
+  is a no-op (MariaDB never held `sxa`); step 2 is the only real deletion and
+  the database it removes is empty; step 4's repo prerequisite was missing and
+  landed in `de1524e`. Steps 2-4 and 6-8 remain open.
 - After the operator steps above land: flip this WP to `Done` and add a dated
   MEMORY.md bullet.
 
