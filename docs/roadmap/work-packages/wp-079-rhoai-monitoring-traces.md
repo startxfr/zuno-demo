@@ -1,7 +1,6 @@
 # WP-079: Enable RHOAI monitoring traces (Tempo, dedicated S3 bucket)
 
-- **State:** Repo change done, live verification pending (operator step — needs the real bucket
-  and IAM credentials seeded into `ansible/confidential.yml` first).
+- **State:** Repo change done, two live-found bugs fixed same day, live verification in progress.
 - **ADRs:** ADR-0522 (Proposed)
 - **Depends on:** WP-078 (metrics — same `DSCInitialization.spec.monitoring` block)
 - **Related:** WP-080 (Perses/Route/dashboard verification, next)
@@ -49,6 +48,31 @@ one, to keep this fully side-by-side and independently lifecycled.
 - Verified with `helm lint`/`helm template` on `gitops/charts/openshift-ai` — the rendered
   `DSCInitialization` and `ExternalSecret` both parse and match the live cluster's own
   `dscinitializations.dscinitialization.opendatahub.io` CRD schema (`oc explain`).
+
+## Live incident during first reconcile (2026-08-26, fixed same day)
+
+The bucket/credentials were seeded and `make d1 reconcile openshift-ai` run; ArgoCD stayed
+`OutOfSync`/never converged and two PVCs sat `Pending`. Two independent, real bugs, both
+confirmed from `oc get dsci default-dsci -o jsonpath='{.status.conditions}'` and namespace
+events, neither a cluster drift issue:
+
+1. **TempoStack admission webhook rejection.** The DSCI's own `Ready`/`ProvisioningSucceeded`
+   conditions on the generated `TempoStack` named the exact cause: `"endpoint" field of storage
+   secret must be a valid URL`. `externalsecret-traces-s3.yaml` rendered a bare hostname
+   (`s3.eu-west-2.amazonaws.com`); the Tempo Operator's `vtempostack` webhook requires a full URL
+   with scheme. Fixed: `endpoint: "https://s3.{{ .region }}.amazonaws.com"`.
+2. **`redhat-ods-monitoring`'s `ResourceQuota` already exhausted.** `oc get events` showed four
+   separate `FailedCreate ... exceeded quota: zuno-platform-quota` (Prometheus, Alertmanager,
+   Perses, the OTel collector's target-allocator) — the two `Pending` PVCs
+   (`prometheus-data-science-monitoringstack-db-...`, `storage-data-science-perses-0`) were a
+   downstream symptom: `gp3-csi` is `WaitForFirstConsumer`, so a PVC stays `Pending` until its
+   pod is actually scheduled, and these pods were never even created. The namespace's quota
+   (`gitops/charts/namespaces/values.yaml`, `redhat-ods-monitoring` entry) was sized for the
+   original empty-namespace baseline (500m cpu/1Gi mem requests, 4 cpu/8Gi mem limits) — already
+   at 410m/916Mi from the OTel collector (×2) and the two Prometheus/Thanos proxies alone, before
+   Prometheus/Alertmanager/Perses/target-allocator/TempoStack's several components ever start.
+   Raised to `requests: 2 cpu / 6Gi`, `limits: 4 cpu / 10Gi` (limits.cpu kept at 4 — an explicit
+   choice, not auto-derived).
 
 ## Verification checklist (operator step — ask before running)
 
