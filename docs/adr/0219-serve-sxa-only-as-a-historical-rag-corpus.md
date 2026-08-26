@@ -140,9 +140,34 @@ every `doc_id`. With `deleteOrphans` and `incremental` both enabled, the next
 `rag-sxa-legacy` index — a correct but one-time expensive re-ingestion, not a
 steady-state cost.
 
+**That re-ingestion is 314,428 documents** — the dump renders one record per
+table row, measured live on 2026-08-26. At that scale it was not merely
+expensive but impossible: `normalize`, `chunk`, `embed` and `index-pgvector`
+were strictly serial, at one to two S3 round-trips per document. `normalize`
+alone was measured at 747 documents/minute (~7h for that stage), the whole
+run projected past 30h, and the three real attempts died at 2h08, 5h41 and
+6h28. `embed` was the worst of them: its batching loop sat *inside* a single
+record, and since the average document is ~1.2 KB against a 320-token budget
+almost every document is one chunk — so `EMBEDDING_BATCH_SIZE` was inert and
+the stage issued one request per document. Commit `3258a1f` parallelised the
+three S3-bound stages on the pool idiom `detect-changes` already used, pooled
+`embed`'s chunks *across* documents into full batches, and moved
+`index-pgvector` from a commit per document to a commit per window. Four
+knobs (`NORMALIZE_CONCURRENCY`, `CHUNK_CONCURRENCY`, `EMBED_CONCURRENCY`,
+`INDEX_READ_CONCURRENCY`) tune it per cluster. The projected gain has not yet
+been observed end-to-end — no full run has been executed against the new
+image.
+
+A second trap this exposed, generic to every domain: `manifest.json` lives in
+S3 and survives a database recreation, so `detect-changes` can report zero
+changes against an index that is empty. Runs then report `SUCCEEDED` having
+written nothing. `rag-sxa-legacy` sits in exactly that state today (0 rows),
+as do `rag-sales` and the retired `rag-sxa`. A green pipeline is not evidence
+of a populated index; check the row count.
+
 Removing the uninstall paths for `sales-db`, `sql-schema` and the MariaDB
 `sxa` database leaves those resources stranded on any already-installed
-cluster. WP-083 carries a one-time operator teardown checklist to be run
+cluster. WP-084 carries a one-time operator teardown checklist to be run
 **before** the deletion commits are deployed.
 
 ## Acceptance criteria

@@ -38,7 +38,20 @@ only. No live SQL content, no MCP tool surface, one knowledge domain.
    database and its Vault seed; `knowledge.sxa`, `fetch-sxa`, the `rag-sxa`
    pgvector database.
 
-5. **Ten negative evaluation probes retargeted**, not deleted — deleting the
+5. **Ingestion throughput fixed so the re-ingestion is possible at all**
+   (commit `3258a1f`). `load-sxa-dump` renders one document per table row —
+   314,428 of them, measured live. `normalize`, `chunk`, `embed` and
+   `index-pgvector` were strictly serial: `normalize` clocked 747 docs/min,
+   the full run projected past 30h, and no attempt had ever survived past
+   6h28. `embed` batched only *within* a record, so on a corpus of
+   single-chunk documents `EMBEDDING_BATCH_SIZE` was inert. The three
+   S3-bound stages now use the pool idiom `detect-changes` already had,
+   `embed` pools chunks across documents, and `index-pgvector` commits per
+   window. Four knobs (`NORMALIZE_CONCURRENCY`, `CHUNK_CONCURRENCY`,
+   `EMBED_CONCURRENCY`, `INDEX_READ_CONCURRENCY`) are wired through
+   values.yaml, both ConfigMap templates and `CONFIG_KEYS`.
+
+6. **Ten negative evaluation probes retargeted**, not deleted — deleting the
    bindings turns an unbound name into a 404, not the 403 they assert.
    ADR-0037's mandatory gateway-bypass test moves from `sales-db-mcp` to
    `confluence-mcp`, which carries the identical NetworkPolicy and gateway
@@ -95,10 +108,23 @@ because their charts are gone:
 
 Then, once deployed:
 
-5. Rebuild the rag-ingestion image and recompile the PipelineVersion
-   (`make d2 build rag-ingestion`, then `make d2 install rag-ingestion`).
-6. Trigger one on-demand `load-sxa-dump` run. **Expect a full re-embed of
-   `rag-sxa-legacy`**: every `doc_id` changed with the URL scheme, and with
+5. ~~Rebuild the rag-ingestion image and recompile the PipelineVersion~~
+   **DONE 2026-08-26**: `make d2 build rag-ingestion` produced Build
+   `rag-ingestion-13` from `de1524e` (signed,
+   `rag-ingestion@sha256:c2426f4f…`), and `make d2 install rag-ingestion`
+   applied PipelineVersions `v0-5-0` / `v0-5-0-sxa-legacy`. Both plays ended
+   `failed=0`. Verified live: `CONFIG_KEYS` requires 44 keys and both
+   `rag-ingestion-config` and `rag-ingestion-config-sxa-legacy` carry all 44
+   (`missing=NONE`) — a key in `CONFIG_KEYS` absent from any domain's
+   ConfigMap is a `CreateContainerConfigError` at pod start. The
+   recurring-run reconciler touched `knowledge.tech` only; `sxa-legacy` is
+   correctly unscheduled per decision 2.
+6. Trigger one on-demand `load-sxa-dump` run — **still open**. Delete
+   `manifests-sxa-legacy/manifest.json` first: that manifest survived the
+   2026-08-25 database recreation, so `detect-changes` reports zero changes
+   against an index that is empty and the run reports `SUCCEEDED` having
+   written nothing. `rag-sxa-legacy` holds 0 rows today. **Expect a full
+   re-embed of `rag-sxa-legacy`**: every `doc_id` changed with the URL scheme, and with
    `deleteOrphans`/`incremental` enabled the run deletes the old corpus and
    indexes the new one. One-time cost, not steady state.
 7. Live-verify retrieval by role: Comage/Cognos/Advantage/Finage each reach
@@ -113,6 +139,10 @@ Then, once deployed:
 - 2026-08-26: repo work merged across six commits. ADR-0219 `Implemented`,
   index row `Implemented`, ADR-0216/0217 `Superseded by ADR-0219`, ADR-0016
   `Superseded by ADR-0219`, WP-065/WP-067 `Abandoned`.
+- 2026-08-26: operator step 5 executed (build + install, both `failed=0`);
+  the CONFIG_KEYS/ConfigMap contract verified live at 44/44 on both domains.
+  Steps 1-4 and 6-8 remain open — nothing has been ingested yet, so the
+  throughput fix is deployed but unproven end-to-end.
 - After the operator steps above land: flip this WP to `Done` and add a dated
   MEMORY.md bullet.
 
