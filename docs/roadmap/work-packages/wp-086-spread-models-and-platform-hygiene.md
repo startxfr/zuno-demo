@@ -1,7 +1,7 @@
 # WP-086: Spread the GPU predictors across both MIG nodes, plus two platform-hygiene fixes
 
-- **State:** Done (live-verified 2026-08-26). Machine replaced, predictors spread, all checks
-  green except #9, which needs a deliberate node cordon.
+- **State:** Done (live-verified 2026-08-26). Machine replaced, predictors spread, all 11
+  checks green including the soft-affinity failover proof.
 - **ADRs:** none new. Relates to ADR-0351 decision 1 (which removed the *hard* anti-affinity
   this WP re-adds in soft form) and ADR-0521 (models are S3-only, so pod placement is not
   pinned by a zone-bound PVC).
@@ -242,13 +242,32 @@ false failure.
 | 6 | 200-token completion on qwen **and** gpt-oss | under 15s, HTTPS on 8000 |
 | 7 | `make d0 check machines` | passes, covers both GPU MachineSets |
 | 8 | `make d3 test platform` | 8/8 |
-| 9 | Cordon the qwen node, delete the pod | qwen reschedules onto the other node **despite** the anti-affinity |
+| 9 | Cordon a node, delete a predictor pod | it reschedules onto the survivor **despite** the anti-affinity — see below |
 | 10 | `oc get pv \| grep localmodel` | nothing |
 | 11 | `pgbackrest info --stanza=db` on the repo host | `status: ok`, backup chain intact |
 
 Check **9** is the only one that proves the property that matters. An anti-affinity mistakenly
 written as `required` passes 1 through 8 without complaint and only reveals itself during a
 real outage.
+
+**Run 2026-08-26, passed.** Tested with `gpt-oss-20b` rather than qwen: it proves the identical
+property (its term points at the same `kserve.io/component: workload` selector, and qwen was on
+the other node) while loading 13.8GB instead of 30.9GB, and it is the model MaaS and the agents
+do *not* depend on.
+
+```
+oc adm cordon ip-10-18-15-25        # A, gpt-oss's node - leaves only C, which holds qwen
+oc delete pod gpt-oss-20b-kserve-... # its anti-affinity points away from C
+```
+
+Scheduled onto C **within 15 seconds**, never passing through `Pending`. A `required` term
+would have left it unschedulable indefinitely. Restored by uncordoning A and deleting the pod
+again: it returned to A, its preferred node, confirming the preference still steers when it
+has a choice. gpt-oss cold-started in ~75s and served at 1.8s / 0.9s / 0.7s.
+
+Unlike qwen, gpt-oss showed no Triton JIT stall on its first request — the warm-up cost noted
+above is specific to qwen's larger, non-MXFP4 checkpoint, not a general property of a cold
+vLLM pod.
 
 ## Out of scope
 
@@ -274,6 +293,7 @@ real outage.
   (`ip-10-18-67-65`, 249GB) and the rolling update spread the predictors 2/1 across the two
   nodes. See `## Live results` — and `## Live finding` for why the split is not the one the
   plan predicted.
-- Check #9 (cordon the qwen node, delete the pod, confirm it packs onto the survivor rather
-  than going Pending) is **not yet run** — it needs a deliberate node cordon.
+- Check #9 passed on 2026-08-26: the pod packed onto the survivor in under 15s with no
+  `Pending` phase, and returned to its preferred node once the cordon was lifted. The layout is
+  back to gpt-oss on node A, qwen + embeddings on node C, with neither node cordoned.
 - `python3 platform/docs/check_docs.py` passes.
