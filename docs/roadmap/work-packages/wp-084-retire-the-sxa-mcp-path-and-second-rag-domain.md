@@ -157,6 +157,36 @@ Then, once deployed:
    to `sxa-dump://` did rewrite every `doc_id`, but with the index empty
    `deleteOrphans` has nothing to delete. The cost is the initial ingestion
    and the throughput fix in item 5 is what makes it survivable.
+6b. **Rebuild and redeploy `mcp-gateway`, `agent-runtime` and `rag-service`
+   — discovered missing 2026-08-26, and it gates steps 7 and 8.** All three
+   bake the policy/binding files into their images rather than mounting them
+   (`components/mcp-gateway/Dockerfile:40,44` copies `policies` and
+   `platform/bindings`; `agent-runtime/Dockerfile:50` copies
+   `policies/knowledge`; `rag-service/Dockerfile:35` copies
+   `platform/bindings/knowledge`). Step 5 rebuilt only rag-ingestion, so
+   ADR-0219's policy plane is **not live**. Verified inside the running pods:
+
+   - `mcp-gateway` still binds all five `sxa.*` capabilities (32 capabilities
+     against the repo's 27) and its `tool-policy.yaml` still carries 10 `sxa.`
+     references.
+   - `agent-runtime` and `mcp-gateway` both still resolve
+     `knowledge.sxa-legacy` to `[sales, board]` — **not** the widened
+     `[sales, board, adv, finance]` — and still carry a live `knowledge.sxa`
+     domain.
+   - `rag-service` still declares `knowledge.sxa` bound to database `rag-sxa`,
+     which step 2 dropped.
+
+   The deployed state is internally *consistent* (bindings and policy are both
+   pre-ADR-0219), so nothing is half-broken today — but step 7 would deny
+   `adv` and `finance` on `knowledge.sxa-legacy` and look like a policy bug
+   when it is only staleness.
+
+   The dangling `rag-service` → `rag-sxa` binding is benign and self-resolving:
+   `connect_all()` "never raises - a domain with no live pool is simply absent
+   from `get_pool()`'s results (fail closed at query time, not startup time)".
+   The domain lands in `_pool_errors` and is retried at most once per 15s, so
+   the cost until the rebuild is log noise, not a crashloop.
+
 7. Live-verify retrieval by role: Comage/Cognos/Advantage/Finage each reach
    `knowledge.sxa-legacy`; a caller in none of `[sales, board, adv, finance]`
    is denied.
@@ -177,6 +207,13 @@ Then, once deployed:
   is a no-op (MariaDB never held `sxa`); step 2 is the only real deletion and
   the database it removes is empty; step 4's repo prerequisite was missing and
   landed in `de1524e`.
+- 2026-08-26: static pre-check of step 8 - all 15 negative `403` tool probes
+  across the six agents resolve to bound capabilities in the repo's
+  `tool-bindings.yaml` (including the aliases `generate_image` ->
+  `image.generation.create`, `read_gmail` -> `gmail.message.read`,
+  `search_confluence` -> `confluence.page.search`), and no `sxa.*` capability
+  remains. The 404-instead-of-403 risk is therefore cleared at the binding
+  layer; the gates still need a live run once step 6b lands.
 - 2026-08-26: step 2 executed - `rag-sxa` and `ragsxa` dropped, PGO reconcile
   verified healthy afterwards. Steps 3, 4 and 6-8 remain open; step 6 (the
   first full index of 314,428 documents) is the critical path.
