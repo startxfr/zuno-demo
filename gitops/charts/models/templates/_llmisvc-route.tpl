@@ -168,4 +168,31 @@ rules:
     timeouts:
       backendRequest: 0s
       request: 0s
+  # Status-plane anchor, NOT a traffic rule (2026-08-26, same incident as
+  # the header comment): KServe gates the LLMInferenceService's
+  # InferencePoolReady condition on its InferencePool being referenced by
+  # an accepted gateway route, and switching every real rule above to
+  # Service backends left the pool unreferenced - LLMISvc Ready=False
+  # (WaitingForGateway), which MaaSModelRef then surfaces as
+  # Unhealthy/BackendNotReady even though traffic is fine. This rule's
+  # only job is to reference the pool: an Exact match on a path nothing
+  # ever calls (vLLM serves no such endpoint anyway - a stray hit would
+  # 404 at the backend, or drop its body to the ext_proc race like any
+  # EPP-routed response, which is exactly why real rules avoid the pool).
+  # The per-route EPP ext_proc override Istio generates for it exists
+  # only on this dead route.
+  - name: {{ .name }}-inference-pool-anchor
+    matches:
+      - path:
+          type: Exact
+          value: /{{ .namespace }}/{{ .name }}/.zuno-pool-anchor
+    backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: {{ .name }}-inference-pool
+        port: 8000
+        weight: 1
+    timeouts:
+      backendRequest: 0s
+      request: 0s
 {{- end -}}
