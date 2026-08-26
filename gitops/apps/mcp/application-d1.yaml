@@ -20,6 +20,15 @@ spec:
         # pattern as gitops/apps/api) - feeds the chart's derived
         # keycloak issuer.
         clusterBaseDomain: apps.mycluster.example.com
+        # ADR-0524: turns on the /mcp front-door's supporting resources -
+        # the NetworkPolicy allow for openshift-lightspeed, the
+        # system:auth-delegator binding that lets the gateway resolve an
+        # end-user token via TokenReview, and the
+        # MCP_FRONTDOOR_CAPABILITIES ceiling. The endpoint itself is
+        # always present in the image; without this it simply has no RBAC
+        # and no configured capability list.
+        lightspeed:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
