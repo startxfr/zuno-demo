@@ -147,11 +147,21 @@ Then, once deployed:
    ConfigMap is a `CreateContainerConfigError` at pod start. The
    recurring-run reconciler touched `knowledge.tech` only; `sxa-legacy` is
    correctly unscheduled per decision 2.
-6. Trigger one on-demand `load-sxa-dump` run — **still open**. Delete
-   `manifests-sxa-legacy/manifest.json` first: that manifest survived the
-   2026-08-25 database recreation, so `detect-changes` reports zero changes
-   against an index that is empty and the run reports `SUCCEEDED` having
-   written nothing. `rag-sxa-legacy` holds 0 rows today (verified
+6. Trigger one on-demand `load-sxa-dump` run — **still open**.
+
+   An earlier revision of this step said to delete
+   `manifests-sxa-legacy/manifest.json` first, on the theory that the stale
+   manifest would make `detect-changes` report zero changes against an empty
+   index and "succeed" having written nothing. **That does not apply to this
+   run.** `detect-changes` classifies by doc_id membership
+   (`new_ids = [d for d in current if d not in manifest]`), and
+   `doc_id_for()` is `sha256(url)[:32]`. Because decision 3 moved every record
+   URL from `sxa-mariadb://` to `sxa-dump://`, not one new doc_id can collide
+   with a stale manifest entry: the run classifies all 310,537 records as
+   **new** and every old manifest entry as **deleted**. A leftover manifest is
+   therefore inert here, and deleting it changes nothing. The zero-delta trap
+   is real, but only for a re-run where the URL scheme has *not* changed —
+   which is every future run of this domain. `rag-sxa-legacy` holds 0 rows today (verified
    2026-08-26). This is therefore a **first full index of 314,428
    documents, not a re-embed** — the URL-scheme change from `sxa-mariadb://`
    to `sxa-dump://` did rewrite every `doc_id`, but with the index empty
