@@ -67,22 +67,43 @@ Add `openshift-lightspeed` to `gitops/charts/namespaces/values.yaml` (no `istio-
 - `gitops/charts/models/values.yaml`: add a `MaaSSubscription` + `MaaSAuthPolicy` subject for
   Lightspeed's ServiceAccount, mirroring the existing `*-ai-gateway` entries (`user:
   system:serviceaccount:openshift-lightspeed:<sa>`, own rate limit, own priority).
-  **Verify the actual SA name from the running CSV before writing it** - the live
-  `AuthPolicy/maas-gateway-auth` OPA `model_access` map today lists only
-  `system:serviceaccount:zuno-ai-run:ai-gateway` plus groups `agent_tekos`/`sales`, so an
-  unlisted identity is denied by omission.
+  **The SA name cannot be determined ahead of the install** - checked 2026-08-26 against the
+  v1.1.2 bundle CSV, which declares only `lightspeed-operator-controller-manager` (the operator's
+  own SA); the operand ServiceAccounts are created by the operator at reconcile time. Read it off
+  the running cluster after step 1 and before writing this value. It matters because the live
+  `AuthPolicy/maas-gateway-auth` OPA `model_access` map lists only
+  `system:serviceaccount:zuno-ai-run:ai-gateway` plus groups `agent_tekos`/`sales` - an unlisted
+  identity is denied by omission, silently.
 - `OLSConfig.spec.llm.providers[0]`: `type: rhoai_vllm`, `url` the MaaS gateway path for
   `qwen36-27b-instruct-maas`, `credentialsSecretRef` + `credentialKey`.
 - `spec.ols.defaultProvider` / `defaultModel` set to that provider/model.
 - `spec.ols.additionalCAConfigMapRef` for the MaaS gateway's serving CA (the CRD documents this
   field as CA trust "between OLS service and LLM Provider" - exactly this hop).
 
-**Open item to settle during implementation:** `credentialsSecretRef` takes a static Secret, but
-MaaS authenticates via Kubernetes `TokenReview` (audience `https://kubernetes.default.svc`) or an
-`sk-oai-*` API key. A projected SA token file is not an option here. Prefer a MaaS-issued
-`sk-oai-*` key seeded through Vault -> `ExternalSecret`; fall back to a long-lived
-`kubernetes.io/service-account-token` Secret only if the key path does not work, and record which
-one won.
+**Open item, narrowed 2026-08-26 (do not simply copy ai-gateway).** `credentialsSecretRef` takes
+a **static Secret**, and neither of MaaS's two accepted credentials drops into that shape cleanly:
+
+- *SA token* - the path this platform actually proved. `ai-gateway` mounts a **projected**
+  ServiceAccount token (`audience: https://kubernetes.default.svc`, `expirationSeconds: 3600`),
+  matching `AuthPolicy/maas-gateway-auth`'s `kubernetesTokenReview.audiences` exactly. WP-076 step
+  3 made this the primary path. **Lightspeed's CRD cannot express a projected token** - there is no
+  volume/projection field on `OLSConfig`, only `credentialsSecretRef`. Reproducing it means a
+  long-lived `kubernetes.io/service-account-token` Secret, which is audience-less. Whether
+  `TokenReview` accepts an audience-less legacy token when the policy requests an explicit audience
+  must be **verified live against this cluster**, not assumed - it is the single fact this step
+  turns on.
+- *`sk-oai-*` API key* - fits `credentialsSecretRef` perfectly, but is currently **disabled
+  platform-wide**: `gitops/charts/ai-gateway/values.yaml` sets `maasAdapter.apiKeyEnabled: false`
+  and the Vault path `maas/gateway-api-key` is unseeded. That gate exists because of a live
+  incident on 2026-08-26 - rendering the `ExternalSecret` against an unseeded Vault path leaves it
+  permanently Degraded, and ArgoCD's wave-ordered sync then never reaches the Deployment, wedging
+  the whole Application.
+
+**Therefore:** decide by testing the legacy-token audience behaviour first, since it needs no new
+secret material. If it works, use it. If it does not, mint and seed a real MaaS key **before**
+rendering anything - and `gitops/charts/lightspeed-config` must replicate ai-gateway's
+`apiKeyEnabled`-style gate so an unseeded path renders nothing rather than wedging the app.
+Record which one won and why.
 
 ### Step 3 - Day 2: MCP front-door on the existing gateway
 
@@ -167,8 +188,10 @@ each sufficient on its own.
 
 1. **Console plugin token forwarding** (step 4) - the single largest unknown; gates the per-user
    half only, not the WP.
-2. **MaaS credential shape** (step 2) - `credentialsSecretRef` vs. `TokenReview`; resolve early,
-   it blocks every downstream step.
+2. **MaaS credential shape** (step 2) - narrowed to one live test: does `TokenReview` accept an
+   audience-less legacy SA-token Secret when the policy requests an explicit audience? Resolve
+   early, it blocks every downstream step. Note the API-key alternative carries a known
+   ArgoCD-wedging failure mode if rendered unseeded.
 3. **MCP protocol conformance** - Lightspeed's client is stricter than `agent-runtime`'s REST
    caller. Test `tools/list`/`tools/call` against the real Lightspeed pod, not only against
    `components/mcp-gateway/tests`.
