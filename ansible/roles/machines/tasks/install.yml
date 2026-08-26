@@ -25,16 +25,25 @@
 # node only becomes schedulable for GPU work after the NVIDIA driver build,
 # but that later part is nvidia_gpu's wait, not this one's - here we only
 # wait for the Machine to be Running and the Node Ready.
-- name: "machines | wait for the permanent GPU MachineSet to have its node available"
+# WP-083: waits on every permanent inference MachineSet, not just
+# zuno-gpu-a - same reason as precheck.yml's lookup. Waiting on one name
+# would let this task report success with the second GPU node missing
+# entirely. The label excludes zuno-gpu-burst-a (group gpu-burst), which
+# is legitimately at 0 and would never satisfy a >0 wait. Both nodes boot
+# concurrently, so the 40x20s budget still covers a two-node fleet.
+- name: "machines | wait for the permanent GPU MachineSets to have their nodes available"
   kubernetes.core.k8s_info:
     api_version: machine.openshift.io/v1beta1
     kind: MachineSet
     namespace: openshift-machine-api
-    name: zuno-gpu-a
-  register: _machines_gpu_a
+    label_selectors:
+      - "machine.startx.io/group=gpu"
+  register: _machines_gpu
   until: >-
-    (_machines_gpu_a.resources | default([]) | length) > 0 and
-    (_machines_gpu_a.resources[0].status.availableReplicas | default(0)) ==
-    (_machines_gpu_a.resources[0].spec.replicas | default(-1))
+    (_machines_gpu.resources | default([]) | length) > 0 and
+    (_machines_gpu.resources | map(attribute='spec.replicas') | map('int') | sum) > 0 and
+    (_machines_gpu.resources | map(attribute='status.availableReplicas', default=0)
+       | map('int') | sum) ==
+    (_machines_gpu.resources | map(attribute='spec.replicas') | map('int') | sum)
   retries: 40
   delay: 20
