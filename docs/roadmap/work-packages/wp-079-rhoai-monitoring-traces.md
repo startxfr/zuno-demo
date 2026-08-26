@@ -1,6 +1,10 @@
 # WP-079: Enable RHOAI monitoring traces (Tempo, dedicated S3 bucket)
 
-- **State:** Repo change done, two live-found bugs fixed same day, live verification in progress.
+- **State:** Done (live-verified 2026-08-26). Full metrics+traces stack Running in
+  `redhat-ods-monitoring`: Prometheus/Alertmanager/Perses/Thanos-querier/OTel collector and every
+  TempoStack component (distributor/ingester/querier/query-frontend/compactor/gateway) all
+  `Running`, 0 CrashLoopBackOff. Three live-found bugs fixed same day (see "Live incident" and
+  "Second correction" below, plus the TempoStack resources fix below that).
 - **ADRs:** ADR-0522 (Proposed)
 - **Depends on:** WP-078 (metrics — same `DSCInitialization.spec.monitoring` block)
 - **Related:** WP-080 (Perses/Route/dashboard verification, next)
@@ -88,23 +92,48 @@ effective `requests.cpu`, **~9220m** effective `limits.cpu` across the whole nam
 headroom above a +40% margin on that measurement: `requests: { cpu: "4", memory: "15Gi" }`,
 `limits: { cpu: "14", memory: "40Gi" }`.
 
-## Verification checklist (operator step — ask before running)
+## Third correction (2026-08-26, same day): TempoStack's own resources.total is hardcoded too small
 
-1. Create the `zuno-demo-rhoai-traces` S3 bucket and a bucket-scoped IAM user (never the
-   account's admin credentials).
-2. Fill in `zuno_rhoai_traces_s3_access_key_id`/`_secret_access_key` in `ansible/confidential.yml`
-   with the real values.
-3. `make d0 install vault` (or `reconcile`) to seed `zuno/rhoai/traces-s3`.
-4. `make d1 reconcile openshift-ai`.
-5. `oc get dsci default-dsci -o jsonpath='{.status.conditions}'` shows `TempoAvailable` and
+Once the quota fix above unblocked pod creation, Tempo's components still failed
+(`CrashLoopBackOff`/`OOMKilled`) — a completely separate bug. RHOAI's monitoring service
+generates the `TempoStack` CR (`data-science-tempostack`, `redhat-ods-monitoring`) with
+`spec.resources.total` hardcoded to `limits: 1cpu/256Mi`, `requests: 100m/256Mi` — unrelated to
+anything `DSCInitialization.spec.monitoring.traces` exposes (that field has no `resources` knob
+at all). The Tempo Operator proportionally splits that 256Mi across all 7 containers
+(distributor/ingester/querier/query-frontend/compactor/gateway/gateway-opa), leaving
+`query-frontend` with a **~5MB** memory limit.
+
+Also found live: the `zuno_rhoai_traces_s3_*` credentials in `confidential.yml` were identical to
+`zuno_aap_hub_s3_*` — that IAM user (`zuno-sxa-corpus-s3`) had no policy grant on the new
+`zuno-demo-rhoai-traces` bucket (`s3:ListBucket` denied). Fixed on the AWS/operator side (IAM
+policy), not in this repo.
+
+Confirmed live (2026-08-26) that patching `TempoStack.spec.resources.total` directly (`limits:
+2cpu/2Gi`, `requests: 500m/1Gi`) is **not** reverted by RHOAI's own reconciler — held steady
+across a >3.5 minute observation window, and the Tempo Operator propagated it down to every
+component proportionally. This is not a fight against another controller; RHOAI just never
+revisits the field after generating the CR once. Persisted as a new remediation block in
+`ansible/roles/openshift_ai/tasks/reconcile.yml` (same state-restoring, idempotent shape as this
+file's existing InstallPlan-approval/istio-ca-root-cert/ipp-sidecar remediations) — re-applied on
+every `make d1 reconcile openshift-ai`, so it's also self-healing if the CR is ever recreated from
+scratch (uninstall/reinstall, fresh redeploy).
+
+## Verification checklist
+
+1. ✅ Created the `zuno-demo-rhoai-traces` S3 bucket and IAM access, filled into
+   `ansible/confidential.yml`.
+2. ✅ `make d0 install vault` seeded `zuno/rhoai/traces-s3`.
+3. ✅ `make d1 reconcile openshift-ai` (run repeatedly across the three corrections above).
+4. ✅ `oc get dsci default-dsci -o jsonpath='{.status.conditions}'` shows `TempoAvailable` and
    `OpenTelemetryCollectorAvailable` both `True`.
-6. `oc get tempostack,tempomonolithic,opentelemetrycollector -n redhat-ods-monitoring` and pods
-   `Running`.
-7. Trigger a real inference call through an existing KServe/MaaS model endpoint and confirm a
-   trace lands in RHOAI's own Tempo (not `zuno-monitoring`'s) — positive proof of RHOAI's own
-   auto-instrumentation, with zero application code changes.
+5. ✅ `oc get pods -n redhat-ods-monitoring` — every component (Prometheus ×2, Alertmanager ×2,
+   Perses, OTel collector ×2 + target-allocator, Thanos-querier, and all 6 TempoStack components)
+   `Running`, 0 `CrashLoopBackOff`/`OOMKilled`.
+6. ⬜ Trigger a real inference call through an existing KServe/MaaS model endpoint and confirm a
+   trace lands in RHOAI's own Tempo (not `zuno-monitoring`'s) — deferred to WP-080 alongside the
+   Perses/Route verification, since it needs the same live-traffic check.
 
-## Status updates (once live-verified)
+## Status updates
 
 - ADR-0522 stays `Proposed` until WP-080 also lands and verifies — this WP alone only closes the
   traces half of ADR-0522's acceptance criteria.

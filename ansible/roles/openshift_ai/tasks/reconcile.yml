@@ -271,6 +271,49 @@
   loop_control:
     label: "{{ item }}"
 
+# --- TempoStack resources.total right-sizing (ADR-0522/WP-079 live incident,
+# 2026-08-26): RHOAI's monitoring service hardcodes the TempoStack it
+# generates from DSCInitialization.spec.monitoring.traces to
+# spec.resources.total = 1cpu/256Mi limits, 100m/256Mi requests - nothing to
+# do with anything this repo configures (DSCInitialization exposes no
+# resources field under monitoring.traces at all). The Tempo Operator then
+# proportionally splits that 256Mi across all 7 containers (distributor/
+# ingester/querier/query-frontend/compactor/gateway/gateway-opa), leaving
+# query-frontend with a ~5MB memory limit - every component OOMKilled or
+# CrashLoopBackOff on first reconcile. Confirmed live: patching
+# spec.resources.total directly is NOT reverted by RHOAI's own reconciler
+# (held steady >3.5 minutes of observation) - not a fight against another
+# controller, just a value RHOAI itself never revisits after creating the CR.
+# Re-applied every reconcile so it's also self-healing if the CR is ever
+# recreated from scratch (uninstall/reinstall, fresh redeploy) - same
+# state-restoring, idempotent shape as every other remediation in this file.
+- name: "openshift_ai | reconcile: look up the RHOAI-generated TempoStack"
+  kubernetes.core.k8s_info:
+    api_version: tempo.grafana.com/v1alpha1
+    kind: TempoStack
+    name: data-science-tempostack
+    namespace: redhat-ods-monitoring
+  register: _openshift_ai_tempostack
+
+- name: "openshift_ai | reconcile: right-size TempoStack.spec.resources.total (RHOAI's own 256Mi/1cpu default OOMKills every component)"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: tempo.grafana.com/v1alpha1
+    kind: TempoStack
+    name: data-science-tempostack
+    namespace: redhat-ods-monitoring
+    definition:
+      spec:
+        resources:
+          total:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+  when: (_openshift_ai_tempostack.resources | default([]) | length) > 0
+
 # --- Optional pod restart (default OFF: side-effect safety - Deployments
 # recreate deleted pods, but reconcile stays state-restoring-only unless the
 # operator explicitly opts in) ------------------------------------------------
