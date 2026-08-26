@@ -1,0 +1,33 @@
+{{- if .Values.tracing.enabled }}
+# ADR-0523 (WP-082): repo-owned replacement for RHOAI's
+# data-science-instrumentation, which points at a nonexistent Service and
+# feeds a collector whose own Tempo export never worked (see values.yaml's
+# tracing comment); the CR is controller-owned, so patching it in place
+# would be reconciled away. Referenced by the
+# instrumentation.opentelemetry.io/inject-sdk pod annotations on the
+# model workloads; the OTel operator's pod webhook resolves the name
+# in the pod's own namespace, hence this lives in {{ .Values.namespace }}.
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: zuno-models-instrumentation
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    # Before the InferenceServices (wave 0) whose pods reference it.
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  exporter:
+    endpoint: {{ .Values.tracing.exporterEndpoint }}
+  sampler:
+    # Mirrors RHOAI's own Monitoring.spec.traces sampleRatio ("1.0") and
+    # the mesh-wide Telemetry CR's randomSamplingPercentage: 100 - a
+    # demo-cluster choice, same rationale as
+    # gitops/charts/service-mesh/templates/telemetry.yaml.
+    type: traceidratio
+    argument: "1.0"
+  propagators:
+    - tracecontext
+    - baggage
+{{- end }}

@@ -101,6 +101,14 @@ spec:
           - --enable-auto-tool-choice
           - --tool-call-parser=qwen3_xml
           - --reasoning-parser=qwen3
+          {{- if .Values.tracing.enabled }}
+          # ADR-0523 (WP-082): activates vLLM's native OTel tracing (the
+          # SDK ships in this image, verified live; the operator-injected
+          # env alone does not enable it). Fed from values, not the
+          # injected OTEL_EXPORTER_OTLP_ENDPOINT - see values.yaml's
+          # qwen podAnnotations comment.
+          - --otlp-traces-endpoint={{ .Values.tracing.exporterEndpoint }}
+          {{- end }}
           {{- if and .Values.maas.enabled $qwenMaas }}
           # ADR-0201/WP-27 pattern, generalized here by ADR-0521/WP-076 -
           # see llminferenceservice-gptoss.yaml's comment for the full

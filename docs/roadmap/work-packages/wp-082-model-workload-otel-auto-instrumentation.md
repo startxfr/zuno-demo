@@ -1,6 +1,6 @@
 # WP-082: OTel auto-instrumentation for the model-serving workloads
 
-- **State:** Not started.
+- **State:** In progress (pushed, awaiting rollout + live verification).
 - **ADRs:** ADR-0523 (To be implemented)
 - **Depends on:** WP-079 (RHOAI traces stack live), WP-080 (diagnosed the zero-traces root causes)
 - **Related:** WP-081 (mesh-level path, independent), WP-076/ADR-0521 (proved the
@@ -9,11 +9,13 @@
 ## Goal
 
 Make in-process KServe/vLLM spans reach RHOAI's Tempo. Ship a repo-owned `Instrumentation` CR
-(`zuno-models-instrumentation`, `zuno-ai-run`) pointing at the **corrected** collector endpoint
-(`data-science-collector-collector.redhat-ods-monitoring.svc.cluster.local:4317` - RHOAI
-3.5.0-ea.2's own `data-science-instrumentation` names a Service that does not exist, see
-ADR-0523), and reference it from all three model workloads via
-`instrumentation.opentelemetry.io/inject-sdk` pod annotations:
+(`zuno-models-instrumentation`, `zuno-ai-run`) pointing at the **platform** collector
+(`zuno-otel-collector-collector.zuno-monitoring.svc.cluster.local:4317`), whose WP-081 fan-out
+carries a copy to RHOAI's Tempo with the gateway auth an in-process SDK cannot do - both Tempo
+stacks get the workload spans. Deliberately NOT RHOAI's own collector: its
+`data-science-instrumentation` names a Service that does not exist AND its Tempo export dials
+a port the gateway never exposes, unfixable in place (see ADR-0523 and WP-081). Referenced from
+all three model workloads via `instrumentation.opentelemetry.io/inject-sdk` pod annotations:
 
 - `llminferenceservice-qwen.yaml` / `llminferenceservice-gptoss.yaml` via the existing
   `podAnnotations` values keys (`spec.annotations` propagation, live-proven by WP-076), plus
@@ -33,7 +35,26 @@ newer SDK does not.
 
 ## What changed
 
-_To be filled during implementation._
+- New `gitops/charts/models/templates/instrumentation.yaml`: `zuno-models-instrumentation`
+  (`zuno-ai-run`, sync-wave -5), endpoint = the platform collector (see Goal),
+  `traceidratio`/`"1.0"` sampler (mirrors RHOAI's `sampleRatio` and the mesh Telemetry CR's
+  100%), `tracecontext`+`baggage` propagators. Fields checked via `oc explain` first.
+- `gitops/charts/models/values.yaml`: new top-level `tracing:` block (`enabled`,
+  `exporterEndpoint`); `inject-sdk` + `container-names` annotations added to qwen's
+  `llmInferenceService.podAnnotations`, gptoss's `gptOssModel.llmInferenceService.podAnnotations`
+  (`main`), and a new `embeddingModel.podAnnotations` key (`kserve-container`).
+- `gitops/charts/models/templates/inferenceservice-embedding.yaml`: new
+  `spec.predictor.annotations` block fed from `embeddingModel.podAnnotations`.
+- `gitops/charts/models/templates/llminferenceservice-qwen.yaml` / `-gptoss.yaml`:
+  `--otlp-traces-endpoint={{ tracing.exporterEndpoint }}` appended to the vLLM args, gated on
+  `tracing.enabled`.
+- Pre-check result: `--otlp-traces-endpoint` (and `--collect-detailed-traces`) confirmed
+  present on the embeddings pod's vLLM build too (`vllm serve --help=all` - the flag is hidden
+  from plain `--help`), so enabling the flag there later is a values-only follow-up once
+  pooling-request span coverage is confirmed worthwhile.
+- `helm template` verified: Instrumentation CR renders, embedding predictor annotations render,
+  both LLM arg lists carry the flag; `tracing.enabled=false` renders everything back to the
+  prior shape.
 
 ## Verification checklist
 

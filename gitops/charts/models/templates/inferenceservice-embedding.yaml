@@ -15,6 +15,14 @@ metadata:
     serving.kserve.io/deploymentMode: Standard
 spec:
   predictor:
+    {{- if .Values.embeddingModel.podAnnotations }}
+    # ADR-0523 (WP-082): predictor-level annotations reach the generated
+    # Deployment's pod template (KServe ComponentExtensionSpec) - the
+    # classic-InferenceService analogue of the LLMInferenceServices'
+    # spec.annotations path.
+    annotations:
+      {{- toYaml .Values.embeddingModel.podAnnotations | nindent 6 }}
+    {{- end }}
     minReplicas: {{ .Values.embeddingModel.minReplicas }}
     maxReplicas: {{ .Values.embeddingModel.maxReplicas }}
     # No anti-affinity against the chat model anymore (ADR-0351): a hard

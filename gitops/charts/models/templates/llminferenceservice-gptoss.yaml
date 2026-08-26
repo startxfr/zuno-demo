@@ -73,6 +73,11 @@ spec:
           # the resolved vLLM image before relying on it.
           - --enable-auto-tool-choice
           - --tool-call-parser=openai
+          {{- if .Values.tracing.enabled }}
+          # ADR-0523 (WP-082): same vLLM native OTel tracing activation as
+          # llminferenceservice-qwen.yaml - see that file's comment.
+          - --otlp-traces-endpoint={{ .Values.tracing.exporterEndpoint }}
+          {{- end }}
           {{- if and .Values.maas.enabled $gptOssMaas }}
           # ADR-0201 (WP-27), 2026-08-25: MaaS clients name this model by the
           # policy plane's identity (<namespace>/<MaaSModelRef name>) in the

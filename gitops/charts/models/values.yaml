@@ -18,6 +18,21 @@ namespace: zuno-ai-run
 metrics:
   enabled: true
 
+# ADR-0523 (WP-082): OTel auto-instrumentation of the model workloads.
+# Gates templates/instrumentation.yaml and the vLLM --otlp-traces-endpoint
+# args below; the inject-sdk pod annotations reference the Instrumentation
+# CR by name. The endpoint is the PLATFORM collector (zuno-monitoring),
+# whose otlp/rhoai fan-out (WP-081) carries a copy to RHOAI's Tempo with
+# the gateway auth an in-process SDK cannot do - deliberately NOT RHOAI's
+# own data-science-collector: its Instrumentation CR names a nonexistent
+# Service AND its Tempo-gateway export dials a port the gateway never
+# exposes, both unfixable in place (operator-reverted, see
+# gitops/charts/observability/templates/opentelemetrycollector.yaml and
+# ADR-0523). Bonus: both Tempo stacks get the workload spans this way.
+tracing:
+  enabled: true
+  exporterEndpoint: http://zuno-otel-collector-collector.zuno-monitoring.svc.cluster.local:4317
+
 inferenceServiceName: qwen36-27b-instruct
 
 # The HF repository id the original weights were published under - S3
@@ -138,6 +153,17 @@ llmInferenceService:
     sidecar.istio.io/proxyMemoryLimit: "512Mi"
     sidecar.istio.io/proxyCPU: "50m"
     sidecar.istio.io/proxyCPULimit: "500m"
+    # ADR-0523 (WP-082): env-only OTel injection (endpoint/resource/
+    # sampler env vars, no code) from templates/instrumentation.yaml's CR.
+    # inject-sdk, NOT inject-python: this vLLM image ships its own newer
+    # opentelemetry-sdk (1.43.0, verified in the running pod) and a
+    # sitecustomize carrying the operator's older SDK is an avoidable
+    # risk on a GPU pod. Tracing itself is activated by the
+    # --otlp-traces-endpoint arg in the template, deliberately not read
+    # from this injected env (the webhook's failurePolicy is Ignore, so
+    # injection may silently skip; startup must not depend on it).
+    instrumentation.opentelemetry.io/inject-sdk: "zuno-models-instrumentation"
+    instrumentation.opentelemetry.io/container-names: "main"
 
 # ADR-0301 (WP-34 Part B): vLLM native multi-LoRA, additive to the same
 # ServingRuntime/InferenceService above - NOT a second deployment per
@@ -289,6 +315,18 @@ embeddingModel:
       nvidia.com/mig-1g.24gb: "1"
   minReplicas: 1
   maxReplicas: 1
+  # ADR-0523 (WP-082): same env-only OTel injection as the two
+  # LLMInferenceServices, but through the classic InferenceService's
+  # spec.predictor.annotations instead (this is the one propagation path
+  # not yet live-proven - WP-082's checklist covers it). Annotation only,
+  # no --otlp-traces-endpoint arg yet: the flag exists on this build
+  # (--help=all, verified live) but vLLM's span coverage of pooling/embed
+  # requests is unverified, and mesh-level spans (WP-081) already cover
+  # this endpoint. Container name differs: KServe classic names the
+  # serving container kserve-container, not main.
+  podAnnotations:
+    instrumentation.opentelemetry.io/inject-sdk: "zuno-models-instrumentation"
+    instrumentation.opentelemetry.io/container-names: "kserve-container"
 
 # ADR-0414 (supersedes ADR-0412): gpt-oss-20b as an LLMInferenceService,
 # not a classic InferenceService+ServingRuntime pair anymore.
@@ -426,6 +464,11 @@ gptOssModel:
       sidecar.istio.io/proxyMemoryLimit: "512Mi"
       sidecar.istio.io/proxyCPU: "50m"
       sidecar.istio.io/proxyCPULimit: "500m"
+      # ADR-0523 (WP-082): same env-only OTel injection as qwenModel's
+      # llmInferenceService.podAnnotations above - see that comment for
+      # the inject-sdk-not-inject-python rationale.
+      instrumentation.opentelemetry.io/inject-sdk: "zuno-models-instrumentation"
+      instrumentation.opentelemetry.io/container-names: "main"
   # cpu/memory sized like the old qwen-maas-backend's own mig-1g.24gb
   # workload (proven to fit alongside the other Card A co-resident
   # predictors on the g7e.4xlarge managed node), not the old workergpu
