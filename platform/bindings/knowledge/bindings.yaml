@@ -83,7 +83,12 @@ bindings:
       name: rag-adv
       schema: rag
       credential_env_prefix: RAGADV
-    ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.adv"
+    # No rag-ingestion source (ADR-0218, 2026-08-26): this domain's only
+    # adapter was fetch-aramis, removed along with the chart's domains.adv
+    # entry. The binding is retained so the domain keeps its dedicated
+    # database, but nothing writes to it until a future ADR decides a
+    # replacement source - see knowledge/adv/domain.yaml.
+    ingestion_config_ref: "none (ADR-0218 removed this domain's only adapter)"
 
   - domain: knowledge.project
     database:

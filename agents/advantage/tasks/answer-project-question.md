@@ -19,8 +19,8 @@ zuno:
 
 Answer a free-form question about project/delivery status, ownership,
 business-unit or bid/proposal support, grounded in `knowledge.adv`
-(asynchronously ingested from Aramis, WP-22) and any durable
-`knowledge.project` memory for the engagement. Falls back to a
+(no ingestion adapter since ADR-0218 - its source is an open decision)
+and any durable `knowledge.project` memory for the engagement. Falls back to a
 constrained web search when the internal corpus has no grounded answer.
 
 This is the task Agent Runtime's `retrieve_reason_respond` graph shape
@@ -28,8 +28,8 @@ This is the task Agent Runtime's `retrieve_reason_respond` graph shape
 ADR-0342) executes for Advantage - the same shape module Tekos's and
 Comage's primary tasks run, closed over Advantage's own agent/task data
 (`app/graph/nodes.py`'s `_make_*` factories). Declares no `live_read_tool`:
-no live Aramis MCP capability exists yet (WP-22 built a batch ingestion
-adapter, not a real-time query tool), so this task is indexed-read only -
+no live adv MCP capability exists, and ADR-0218 removed the batch adapter
+that used to fill `knowledge.adv`, so this task is indexed-read only -
 `tool_call_node` cleanly no-ops rather than attempting a live call
 (ADR-0326).
 

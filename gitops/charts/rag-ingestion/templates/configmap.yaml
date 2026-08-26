@@ -19,7 +19,6 @@ data:
   REDHAT_SOURCES_JSON: {{ .Values.redhat | toJson | quote }}
   CONFLUENCE_SOURCES_JSON: {{ .Values.confluence | toJson | quote }}
   SALESFORCE_SOURCES_JSON: "[]"
-  ARAMIS_SOURCES_JSON: "[]"
   SXA_DUMP_SCHEMA_S3_KEY: ""
   SXA_DUMP_DATA_S3_KEY: ""
   SXA_SNAPSHOT_ID: ""

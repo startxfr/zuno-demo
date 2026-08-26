@@ -21,8 +21,8 @@ no shared local disk between them:
 ADR-0204 (WP-22): the fetch stages are implementations of one source-adapter
 interface (SOURCE_ADAPTERS below), each bound to exactly one logical knowledge
 domain: fetch-redhat + fetch-confluence -> knowledge.tech, fetch-salesforce ->
-knowledge.sales, fetch-aramis -> knowledge.adv, load-sxa-dump ->
-knowledge.sxa-legacy, fetch-sxa -> knowledge.sxa (ADR-0217: a distinct,
+knowledge.sales, load-sxa-dump -> knowledge.sxa-legacy, fetch-sxa ->
+knowledge.sxa (ADR-0217: a distinct,
 already-anonymized weekly SXA source - no MariaDB, no MCP tools, unlike
 load-sxa-dump). A pipeline run targets one domain (--domain /
 INGESTION_DOMAIN): running a fetch stage against the wrong domain aborts
@@ -58,7 +58,6 @@ STAGES = (
     "fetch-redhat",
     "fetch-confluence",
     "fetch-salesforce",
-    "fetch-aramis",
     "load-sxa-dump",
     "fetch-sxa",
     "detect-changes",
@@ -147,12 +146,9 @@ class IngestionConfig:
     redhat_sources: list
     confluence_sources: list
     salesforce_sources: list
-    aramis_sources: list
 
     salesforce_instance_url: Optional[str]
     salesforce_token: Optional[str]
-    aramis_base_url: Optional[str]
-    aramis_token: Optional[str]
 
     # load-sxa-dump reads the operator-supplied, approved snapshot from its
     # own dedicated bucket (ADR-0025: no dump ever lives in git; ADR-0216:
@@ -298,11 +294,8 @@ def load_config() -> IngestionConfig:
         redhat_sources=_env_json("REDHAT_SOURCES_JSON", []),
         confluence_sources=_env_json("CONFLUENCE_SOURCES_JSON", []),
         salesforce_sources=_env_json("SALESFORCE_SOURCES_JSON", []),
-        aramis_sources=_env_json("ARAMIS_SOURCES_JSON", []),
         salesforce_instance_url=os.environ.get("SALESFORCE_INSTANCE_URL"),
         salesforce_token=os.environ.get("SALESFORCE_TOKEN"),
-        aramis_base_url=os.environ.get("ARAMIS_BASE_URL"),
-        aramis_token=os.environ.get("ARAMIS_TOKEN"),
         sxa_dump_schema_s3_key=os.environ.get("SXA_DUMP_SCHEMA_S3_KEY"),
         sxa_dump_data_s3_key=os.environ.get("SXA_DUMP_DATA_S3_KEY"),
         sxa_snapshot_id=os.environ.get("SXA_SNAPSHOT_ID"),
@@ -975,78 +968,6 @@ def _fetch_salesforce(config: IngestionConfig, store: CorpusStore) -> int:
 
 
 # --------------------------------------------------------------------------
-# fetch-aramis (knowledge.adv)
-# --------------------------------------------------------------------------
-
-
-def _fetch_aramis(config: IngestionConfig, store: CorpusStore) -> int:
-    """Aramis API/export ingestion -> one raw record per exported item,
-    carrying ADR-0202's adv metadata extensions. Endpoint/token via
-    env/ESO (operator-supplied); fixture-driven in tests."""
-    if not config.aramis_sources:
-        logger.info("fetch-aramis: no aramis sources configured")
-        return 0
-    if not config.aramis_base_url:
-        raise SystemExit(
-            "fetch-aramis: ARAMIS_BASE_URL not set - supply it via the chart "
-            "before enabling this domain"
-        )
-    base = config.aramis_base_url.rstrip("/")
-    headers = {}
-    if config.aramis_token:
-        headers["Authorization"] = f"Bearer {config.aramis_token}"
-    fetched = 0
-    for source in config.aramis_sources:
-        if not source.get("enabled", True):
-            continue
-        endpoint = source["endpoint"]
-        try:
-            resp = requests.get(f"{base}{endpoint}", headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
-            resp.raise_for_status()
-        except requests.RequestException as exc:
-            logger.error("fetch-aramis: export failed for %s: %s", endpoint, exc)
-            continue
-        payload = resp.json()
-        items = payload if isinstance(payload, list) else payload.get("items", [])
-        for item in items:
-            item_id = str(item.get("id") or item.get("reference") or "")
-            if not item_id:
-                continue
-            fields = {k: v for k, v in item.items() if not isinstance(v, (dict, list))}
-            text = _render_record_text(fields)
-            if not text.strip():
-                continue
-            record_url = f"aramis://{source.get('name', endpoint.strip('/'))}/{item_id}"
-            doc_id = doc_id_for(record_url)
-            record = {
-                "doc_id": doc_id,
-                "url": record_url,
-                "title": item.get("title") or item.get("name") or record_url,
-                "text": text,
-                "domain": "knowledge.adv",
-                "product": None,
-                "version": None,
-                "language": _normalize_language(source.get("language")),
-                "source_type": "aramis-export",
-                "classification": source.get("classification", "C2"),
-                "acl_groups": source.get("requiredGroups") or [],
-                "fetched_at": _utcnow_iso(),
-                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                "provenance": record_url,
-                "last_modified": item.get("updated_at") or item.get("modified"),
-                # ADR-0202 adv extensions.
-                "adv": {
-                    "project_type": source.get("projectType"),
-                    "status": item.get("status"),
-                    "customer": item.get("customer"),
-                },
-            }
-            store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
-            fetched += 1
-    return fetched
-
-
-# --------------------------------------------------------------------------
 # load-sxa-dump (knowledge.sxa-legacy)
 # --------------------------------------------------------------------------
 
@@ -1630,7 +1551,6 @@ SOURCE_ADAPTERS = {
         SourceAdapter("fetch-redhat", "knowledge.tech", _fetch_redhat),
         SourceAdapter("fetch-confluence", "knowledge.tech", _fetch_confluence),
         SourceAdapter("fetch-salesforce", "knowledge.sales", _fetch_salesforce),
-        SourceAdapter("fetch-aramis", "knowledge.adv", _fetch_aramis),
         SourceAdapter("load-sxa-dump", "knowledge.sxa-legacy", _load_sxa_dump),
         SourceAdapter("fetch-sxa", "knowledge.sxa", _fetch_sxa),
     )
@@ -1765,7 +1685,7 @@ def stage_normalize(config: IngestionConfig, store: CorpusStore) -> None:
                 preserve_tables=config.chunk_preserve_tables,
             )
         else:
-            # Structured-source adapters (salesforce/aramis/sxa-dump) emit
+            # Structured-source adapters (salesforce/sxa-dump) emit
             # ready text, not HTML - nothing to clean up.
             title, text = raw.get("title") or "", raw.get("text") or ""
         if not text.strip():
@@ -1775,10 +1695,10 @@ def stage_normalize(config: IngestionConfig, store: CorpusStore) -> None:
         # ADR-0205/WP-24: distinct fields, not the old conflated
         # `last_modified` - source_modified_at is the SOURCE's own
         # modification signal when the adapter captured one (Confluence's
-        # history.lastUpdated.when, Salesforce's LastModifiedDate, Aramis'
-        # updated_at/modified, or a best-effort HTTP Last-Modified header
-        # for product docs - see _fetch_redhat); when a source genuinely
-        # exposes none, `fetched_at` is the best available lower bound,
+        # history.lastUpdated.when, Salesforce's LastModifiedDate, or a
+        # best-effort HTTP Last-Modified header for product docs - see
+        # _fetch_redhat); when a source genuinely exposes none,
+        # `fetched_at` is the best available lower bound,
         # not an invented value. indexed_at is always this pipeline's own
         # clock at normalize time, independent of whatever the source
         # reported - the two are only ever equal by coincidence now.

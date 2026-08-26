@@ -5,9 +5,11 @@ title: Advantage
 description: >-
   Sales administration assistant. Surfaces new business whose client
   purchase order has just been received and produces monthly in-progress
-  sales reporting, drawing on ADV/project knowledge asynchronously
-  ingested from Aramis - never live Salesforce data (ADR-0326: explicit
-  cross-domain boundary, not implicit inheritance from Comage).
+  sales reporting, drawing on indexed ADV/project knowledge - never
+  live Salesforce data (ADR-0326: explicit cross-domain boundary, not
+  implicit inheritance from Comage). ADR-0218 removed `knowledge.adv`'s
+  only ingestion adapter, so that domain has no source today; choosing a
+  replacement is an open decision for this slice.
 provenance:
   maintainer: Zuno Demo architecture team
   repository: zuno-demo
@@ -16,7 +18,7 @@ verification:
 freshness:
   last_reviewed: "2026-08-05"
 sources:
-  - "knowledge.adv (asynchronously ingested from Aramis, WP-22)"
+  - "knowledge.adv (no ingestion adapter since ADR-0218; source undecided)"
   - "knowledge.project"
 zuno:
   name: advantage
@@ -34,7 +36,7 @@ zuno:
       Placeholder pending the live acceptance gate; C2 matches
       `knowledge.adv`'s own classification
       (policies/data-classification/classification.yaml's `sales-data`
-      domain covers Aramis-sourced ADV content too, ADR-0034).
+      domain covers ADV business content too, ADR-0034).
   access:
     # ADR-0040: agent entitlement group, orthogonal to the `adv` business
     # role that governs tool/data permissions inside Advantage.
@@ -65,8 +67,9 @@ same LangGraph workflow module Tekos's and Comage's chat turns execute -
 proving a THIRD agent reuses this shape with zero code change.
 `answer-project-question` (`tasks/answer-project-question.md`) is the one
 live-routed task: it reads `knowledge.adv` + `knowledge.project`, and
-declares no `live_read_tool` at all (no live Aramis MCP capability exists
-yet - WP-22 built a batch ingestion adapter, not a real-time query tool).
+declares no `live_read_tool` at all, and since ADR-0218 dropped
+`fetch-aramis` there is no batch adapter behind `knowledge.adv` either -
+neither an indexed source nor a live adv capability exists today.
 Advantage's other three declared tasks
 (`identify-new-business-with-po`, `monthly-sales-report`,
 `check-my-drive-and-mail`) are v1-scope catalog entries with no dedicated

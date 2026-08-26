@@ -1,9 +1,27 @@
 # WP-22: Ingestion source adapters and cadences (completes ADR-0204; promotes ADR-0105)
 
-- **State (2026-08-23):** Salesforce and Aramis dropped from this WP's scope by
+- **State (2026-08-26):** [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
+  amended and enacted. Aramis is no longer merely untracked here: the
+  `fetch-aramis` adapter and every trace of its wiring are removed from the
+  repository - `_fetch_aramis`/`STAGES`/`SOURCE_ADAPTERS`/`IngestionConfig`
+  and its fixture test in `components/rag-ingestion/`, the `domains.adv`
+  entry + `aramis` ExternalSecret + `ARAMIS_SOURCES_JSON` keys + KFP
+  component + `fetchStages` schema enum value in
+  `gitops/charts/rag-ingestion/`, the `zuno/aramis/technical` Vault seed and
+  `zuno_aramis_*` variables in `ansible/`, the source class in
+  `knowledge/adv/domain.yaml`, the `domains.adv` pointer in
+  `platform/bindings/knowledge/bindings.yaml`, and the Aramis attributions in
+  `agents/advantage/`. `knowledge.adv` itself is retained (descriptor, policy
+  entry, `rag-adv` binding) with no ingestion adapter of any kind. Salesforce
+  is *deferred, not dropped*: `fetch-salesforce`, `domains.sales`
+  (`enabled: false`) and the `zuno/salesforce/technical` seed all stay in the
+  tree, and its cadence now has a real band - v0.7, not an unscheduled
+  backlog. Deploy-side no-op: `domains.adv` was never enabled and the Aramis
+  Vault path was never populated.
+- **State (2026-08-23, amended by the above):** Salesforce and Aramis dropped from this WP's scope by
   [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) —
   Aramis will never be provisioned, and Salesforce's batch-ingestion cadence
-  is deferred to an unscheduled backlog (Comage's live Salesforce MCP-tool
+  is deferred (to v0.7 since 2026-08-26; Comage's live Salesforce MCP-tool
   access and the `knowledge.sales` domain/database binding are unaffected).
   Remaining scope is the already-merged tech/legacy adapters and cadence
   automation below; no Salesforce/Aramis credential or snapshot follow-up
@@ -11,7 +29,7 @@
   `rag-dspa`-readiness blocker on live per-domain runs (WP-07's 2026-08-17
   finding) — unrelated to the dropped adapters.
 - **State (2026-08-17, superseded by the above):** ~~live check confirmed the exact blockers: `salesforce-technical-credentials` ExternalSecret genuinely has no Vault data (`SecretSyncedError`) - `ansible/roles/vault/tasks/install.yml` only seeds it when real credentials are supplied, working as designed; no Aramis ExternalSecret exists yet at all~~; full test suite (38 tests)/`helm lint`/`helm template`/`check_knowledge_refs.py` all still pass - no repo-side gap found. Repo work (below) unchanged from 2026-08-15.
-- **State (2026-08-15, repo work):** ADR-0105 promoted to a full record; fetch stages refactored behind one SourceAdapter interface with a per-run domain guard (fail closed) and first-ever fixture tests for the pipeline (`components/rag-ingestion/tests/test_source_adapters.py`); `fetch-salesforce`/`fetch-aramis`/`load-sxa-dump` adapters added (fixture-driven, snapshot_id/import-timestamp/checksum on sxa records; `fetch-salesforce`/`fetch-aramis` are now inert per ADR-0218, left in place unused); normalize writes `domain` + canonical `technology` (redhat slug map + explicit per-Confluence-source values) and the runtime forwards `technology`; chart gained a `domains:` map (per-domain ConfigMaps/ExternalSecrets/Pipeline CRs, per-domain S3 prefixes, all shipped `enabled: false`), one schedule ConfigMap per scheduled domain, and `ansible/roles/rag_ingestion` now creates recurring runs from those ConfigMaps (values cron is finally authoritative). Remaining operator follow-up: an approved SXA snapshot, per-domain live runs and KFP schedule confirmation for tech/legacy only.
+- **State (2026-08-15, repo work):** ADR-0105 promoted to a full record; fetch stages refactored behind one SourceAdapter interface with a per-run domain guard (fail closed) and first-ever fixture tests for the pipeline (`components/rag-ingestion/tests/test_source_adapters.py`); `fetch-salesforce`/`fetch-aramis`/`load-sxa-dump` adapters added (fixture-driven, snapshot_id/import-timestamp/checksum on sxa records; per ADR-0218 `fetch-aramis` was since removed from the repository entirely and `fetch-salesforce` is inert, left in place unused pending v0.7); normalize writes `domain` + canonical `technology` (redhat slug map + explicit per-Confluence-source values) and the runtime forwards `technology`; chart gained a `domains:` map (per-domain ConfigMaps/ExternalSecrets/Pipeline CRs, per-domain S3 prefixes, all shipped `enabled: false`), one schedule ConfigMap per scheduled domain, and `ansible/roles/rag_ingestion` now creates recurring runs from those ConfigMaps (values cron is finally authoritative). Remaining operator follow-up: an approved SXA snapshot, per-domain live runs and KFP schedule confirmation for tech/legacy only.
 - **ADRs:** ADR-0204 part 2 (-> Implemented with WP-21, Salesforce/Aramis bullets superseded by ADR-0218); ADR-0105 (Proposed -> To be implemented -> Partially implemented, Salesforce/Aramis clauses superseded by ADR-0218, retargeted to v0.7 on 2026-08-26 — roadmap reprioritization, unrelated to the WP-04/WP-11 GitHub-Actions v0.7 theme)
 - **Depends on:** WP-21 (merged), WP-07 (merged)
 - **Blocks:** — (2026-08-20 correction: previously listed WP-23/WP-33/WP-35
@@ -32,8 +50,9 @@ existing web/Confluence ones — and promote + implement ADR-0105's per-source
 scheduled cadences (weekly tech / on-demand legacy, manual refresh retained).
 Salesforce and Aramis adapters were originally in scope here but are dropped
 per [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
-(2026-08-23) — Aramis will never be provisioned, and Salesforce's cadence is
-deferred to an unscheduled backlog.
+(2026-08-23, amended 2026-08-26) — Aramis will never be provisioned and its
+implementation is now removed from the repository; Salesforce's cadence is
+deferred to v0.7.
 
 ## ADR references
 
@@ -79,7 +98,8 @@ deferred to an unscheduled backlog.
    fixture tests must stay green unchanged.
 2. **New adapters:** `fetch-salesforce` (REST query of configured objects →
    normalized records with ADR-0202 sales metadata), `fetch-aramis`
-   (API/export ingestion → adv metadata), `load-sxa-dump` (validated SQL
+   (API/export ingestion → adv metadata; **removed from the repository
+   2026-08-26 per ADR-0218** — this step is historical), `load-sxa-dump` (validated SQL
    dump snapshot → sxa-legacy metadata with versioned snapshot ID,
    import timestamp, checksum — per ADR-0206). Credentials via env/ESO;
    fixture-driven tests per adapter (no live calls in CI).
@@ -91,6 +111,8 @@ deferred to an unscheduled backlog.
    tech weekly; sales hours-scale, configurable; adv configurable;
    sxa-legacy no schedule, on-demand only), reusing the recurring-run
    activation path in `ansible/roles/rag_ingestion/tasks/install.yml`.
+   (The `adv` cadence no longer exists — its domain entry was deleted with
+   the Aramis adapter on 2026-08-26, ADR-0218.)
 5. **Manual refresh:** document and verify the on-demand path per domain.
 
 ## What NOT to touch
@@ -109,8 +131,8 @@ deferred to an unscheduled backlog.
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Operator: supply an approved SXA dump snapshot (Salesforce/Aramis
-   credentials no longer required — dropped per ADR-0218).
+1. Operator: supply an approved SXA dump snapshot (Aramis credentials no
+   longer exist; Salesforce credentials are v0.7 work — ADR-0218).
 2. Operator: run the tech/legacy adapters once on cluster (`make d1 install
    rag-ingestion` per domain), verify rows land in the correct per-domain
    database with correct metadata; confirm the recurring schedules exist in
@@ -131,8 +153,9 @@ deferred to an unscheduled backlog.
 
 - Salesforce and Aramis ingestion adapters — superseded by
   [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
-  (2026-08-23): Aramis dropped entirely, Salesforce cadence moved to
-  unscheduled backlog.
+  (2026-08-23, amended 2026-08-26): Aramis dropped entirely and its code
+  removed from the repository; Salesforce cadence deferred to v0.7 with its
+  adapter and inert chart scaffolding left in the tree.
 - Deterministic SXA query capabilities + C3 policy (WP-23 / ADR-0206).
 - Freshness-driven live-read routing (WP-24 / ADR-0205 + ADR-0109).
 - ACL synchronization (WP-25 / ADR-0110).

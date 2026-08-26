@@ -84,7 +84,6 @@ def test_every_fetch_stage_has_an_adapter_bound_to_one_domain():
         "fetch-redhat": "knowledge.tech",
         "fetch-confluence": "knowledge.tech",
         "fetch-salesforce": "knowledge.sales",
-        "fetch-aramis": "knowledge.adv",
         "load-sxa-dump": "knowledge.sxa-legacy",
         "fetch-sxa": "knowledge.sxa",
     }
@@ -380,34 +379,6 @@ def test_fetch_salesforce_without_credentials_fails_closed():
         raise AssertionError("expected SystemExit")
     except SystemExit as exc:
         assert "SALESFORCE_INSTANCE_URL" in str(exc)
-
-
-# --- fetch-aramis (knowledge.adv) -------------------------------------------
-
-
-def test_fetch_aramis_writes_adv_metadata_from_fixture_export():
-    sources = '[{"name": "projects", "endpoint": "/api/projects", "projectType": "delivery"}]'
-    config = _config(
-        INGESTION_DOMAIN="knowledge.adv",
-        ARAMIS_SOURCES_JSON=sources,
-        ARAMIS_BASE_URL="https://aramis.test",
-        ARAMIS_TOKEN="fixture-token",
-    )
-    store = FakeStore()
-    payload = [
-        {"id": 41, "name": "Refonte SI", "status": "active", "customer": "ACME", "budget": 120000},
-    ]
-    with mock.patch.object(
-        rag_ingestion.requests, "get", return_value=_FakeResponse(payload=payload)
-    ):
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-aramis"], config, store)
-    (record,) = store.json.values()
-    assert record["domain"] == "knowledge.adv"
-    assert record["source_type"] == "aramis-export"
-    assert record["url"] == "aramis://projects/41"
-    assert record["adv"]["project_type"] == "delivery"
-    assert record["adv"]["status"] == "active"
-    assert record["adv"]["customer"] == "ACME"
 
 
 # --- load-sxa-dump (knowledge.sxa-legacy, ADR-0216/WP-065) ------------------
@@ -1109,7 +1080,7 @@ def test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_syst
     """ADR-0205: "RAG stays write-free - a mutation of a source system
     goes through a live tool capability, never through indexed
     retrieval/ingestion." The fetch stages here only ever read from
-    Confluence/Salesforce/Aramis; the sole requests.post in this file is
+    Confluence/Salesforce; the sole requests.post in this file is
     _embed_batch's call to the embedding service (a compute call, not a
     source-system mutation) - this test pins that down structurally so a
     future fetch-stage edit can't silently start writing back to a
@@ -1157,7 +1128,6 @@ TESTS = [
     test_fetch_confluence_resolves_a_shared_directory_scope_only_once,
     test_fetch_salesforce_writes_sales_metadata_from_fixture_records,
     test_fetch_salesforce_without_credentials_fails_closed,
-    test_fetch_aramis_writes_adv_metadata_from_fixture_export,
     test_load_sxa_dump_natively_imports_and_writes_one_record_per_row,
     test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
     test_load_sxa_dump_refuses_non_dump_content_and_missing_key,

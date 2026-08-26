@@ -24,7 +24,6 @@ CONFIG_KEYS = {
     "REDHAT_SOURCES_JSON": "REDHAT_SOURCES_JSON",
     "CONFLUENCE_SOURCES_JSON": "CONFLUENCE_SOURCES_JSON",
     "SALESFORCE_SOURCES_JSON": "SALESFORCE_SOURCES_JSON",
-    "ARAMIS_SOURCES_JSON": "ARAMIS_SOURCES_JSON",
     "SXA_DUMP_SCHEMA_S3_KEY": "SXA_DUMP_SCHEMA_S3_KEY",
     "SXA_DUMP_DATA_S3_KEY": "SXA_DUMP_DATA_S3_KEY",
     "SXA_SNAPSHOT_ID": "SXA_SNAPSHOT_ID",
@@ -112,12 +111,6 @@ SOURCE_SECRETS = {
         {"SALESFORCE_INSTANCE_URL": "SALESFORCE_INSTANCE_URL", "SALESFORCE_TOKEN": "SALESFORCE_TOKEN"},
     ),
 {{- end }}
-{{- if and $domain.enabled $domain.aramis }}
-    "{{ $name }}": (
-        "{{ $domain.aramis.secretName }}",
-        {"ARAMIS_BASE_URL": "ARAMIS_BASE_URL", "ARAMIS_TOKEN": "ARAMIS_TOKEN"},
-    ),
-{{- end }}
 {{- if and $domain.enabled $domain.sxaCorpus }}
     "{{ $name }}": (
         "{{ $domain.sxaCorpus.s3.secretName }}",
@@ -203,7 +196,6 @@ def configure(task, *, domain="tech", confluence=False, postgres=False, embeddin
 fetch_redhat = component("fetch-redhat")
 fetch_confluence = component("fetch-confluence")
 fetch_salesforce = component("fetch-salesforce")
-fetch_aramis = component("fetch-aramis")
 load_sxa_dump = component("load-sxa-dump")
 fetch_sxa = component("fetch-sxa")
 detect_changes = component("detect-changes")
@@ -218,7 +210,6 @@ FETCH_COMPONENTS = {
     "fetch-redhat": fetch_redhat,
     "fetch-confluence": fetch_confluence,
     "fetch-salesforce": fetch_salesforce,
-    "fetch-aramis": fetch_aramis,
     "load-sxa-dump": load_sxa_dump,
     "fetch-sxa": fetch_sxa,
 }

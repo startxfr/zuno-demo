@@ -844,7 +844,7 @@ connection; fleet-wide `imagePullPolicy: Always` is required (stale
 per-agent ConfigMap projections + an internal CA. Remaining gate failures
 are scenario-design/harness/credential issues, not platform defects.
 Credential-blocked pending operator action: Route53 (ADR-0211),
-Salesforce, Aramis, rag-S3, MaaS key.
+Salesforce, rag-S3, MaaS key. (Aramis dropped 2026-08-26, ADR-0218.)
 
 **2026-08-21: ADR-0059 formalizes the in-cluster build → auto-redeploy
 trigger** (`image.openshift.io/triggers`, shipped by commit `649243c`

@@ -1443,10 +1443,17 @@ pipeline:
 # (rag-corpus-ingestion-<name>) and - when schedule.enabled - a schedule
 # ConfigMap the Ansible role turns into a KFP recurring run.
 #
-# All three ship enabled: false: their databases/Vault credentials only
-# exist after the operator provisions them (WP-21 follow-up), and their
-# source credentials are operator-supplied (WP-22 follow-up) - flipping a
-# domain on is that operator step, not a code change.
+# `sales` ships enabled: false: its database/Vault credentials only exist
+# after the operator provisions them (WP-21 follow-up) and its source
+# credentials are operator-supplied - flipping it on is that operator
+# step, not a code change. Its batch-ingestion cadence is deferred to v0.7
+# per ADR-0218; Comage's live Salesforce MCP-tool access is unaffected.
+#
+# ADR-0218 (2026-08-26): the `adv` domain entry was removed from this map.
+# Aramis will never be provisioned as a service, so `fetch-aramis` and all
+# its wiring are gone. knowledge.adv keeps its domain descriptor
+# (knowledge/adv/domain.yaml) and its rag-adv database binding, but has no
+# ingestion adapter of any kind - restoring one needs a new ADR.
 domains:
   sales:
     enabled: false
@@ -1486,38 +1493,6 @@ domains:
     # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/sales/domain.yaml's
     # freshness.operation_classes.semantic-read.max_staleness.
     staleAfter: 4h
-  adv:
-    enabled: false
-    fetchStages: [fetch-aramis]
-    postgres:
-      database: rag-adv
-      schema: rag
-      secretName: rag-postgres-adv
-      externalSecret:
-        remoteKey: "rag-adv/postgresql-app"
-        usernameProperty: username
-        passwordProperty: password
-    aramis:
-      # Operator-supplied: base URL + token at Vault zuno/aramis/technical.
-      secretName: rag-aramis
-      externalSecret:
-        remoteKey: "aramis/technical"
-        baseUrlProperty: base_url
-        tokenProperty: token
-      sources:
-        - enabled: true
-          name: projects
-          endpoint: /api/projects
-          projectType: delivery
-          requiredGroups: [adv]
-    # ADR-0105: configurable - daily by default.
-    schedule:
-      enabled: true
-      cron: "0 0 3 * * *"
-      timezone: Europe/Paris
-    # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/adv/domain.yaml's
-    # freshness.operation_classes.semantic-read.max_staleness.
-    staleAfter: 1d
   sxa-legacy:
     # Enabled 2026-08-23 (amended Part B): no separate raw dump exists, so
     # this domain reuses ADR-0217/WP-067's already-anonymized corpus

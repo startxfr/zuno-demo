@@ -24,7 +24,6 @@ data:
   REDHAT_SOURCES_JSON: "[]"
   CONFLUENCE_SOURCES_JSON: "[]"
   SALESFORCE_SOURCES_JSON: {{ ($domain.salesforce).sources | default list | toJson | quote }}
-  ARAMIS_SOURCES_JSON: {{ ($domain.aramis).sources | default list | toJson | quote }}
   SXA_DUMP_SCHEMA_S3_KEY: {{ ($domain.sxaDump).schemaS3Key | default "" | quote }}
   SXA_DUMP_DATA_S3_KEY: {{ ($domain.sxaDump).dataS3Key | default "" | quote }}
   SXA_SNAPSHOT_ID: {{ ($domain.sxaDump).snapshotId | default "" | quote }}

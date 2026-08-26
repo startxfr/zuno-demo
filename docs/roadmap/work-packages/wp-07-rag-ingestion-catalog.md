@@ -120,6 +120,7 @@ Remaining work recorded by the ADR:
 
 ## Out of scope / deferred
 
-- New source adapters (Salesforce/Aramis/SQL-dump) — WP-22 / ADR-0204.
+- New source adapters (Salesforce/SQL-dump) — WP-22 / ADR-0204. (The Aramis
+  adapter was built here too, then removed 2026-08-26 per ADR-0218.)
 - Per-domain cadence scheduling — WP-22 / ADR-0105.
 - Confluence ACL synchronization — WP-25 / ADR-0110.

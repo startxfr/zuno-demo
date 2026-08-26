@@ -28,14 +28,14 @@ common:
     description: >-
       Stable identifier/URL of the originating document within its source
       system (Confluence page, product-doc URL, Salesforce record, SXA
-      dump row, Aramis project). Unique per document within a domain.
+      dump row). Unique per document within a domain.
 
   - name: source_type
     type: string
     required: true
     description: >-
       The kind of source system that produced this chunk (e.g.
-      product-doc, confluence, salesforce, sxa-dump, aramis).
+      product-doc, confluence, salesforce, sxa-dump).
 
   - name: language
     type: string

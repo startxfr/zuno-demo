@@ -1,43 +1,58 @@
 # Knowledge domain: adv (ADR-0202)
 #
-# ADV/project knowledge asynchronously ingested from Aramis. NO physical
+# ADV/project business knowledge. This domain has NO source ingestion
+# pipeline: ADR-0218 (2026-08-26) dropped the only adapter that ever
+# targeted it, and no replacement source has been decided. NO physical
 # database names, service endpoints, secrets or credentials belong in this
 # file - see platform/bindings/knowledge/bindings.yaml (ADR-0204, WP-21)
-# for the physical binding.
+# for the physical binding, which is retained.
 
 id: knowledge.adv
 title: ADV project knowledge
 description: >-
-  Project/delivery knowledge asynchronously ingested from Aramis (project
-  status, ownership, business-unit, delivery history).
+  Project/delivery knowledge (project status, ownership, business-unit,
+  delivery history). The domain, its policy entry and its dedicated
+  database binding are retained, but nothing writes to it today: its
+  source adapter was removed by ADR-0218 and choosing a replacement
+  source is a separate future decision for whoever owns the Advantage
+  slice (ADR-0326, WP-35).
 
 taxonomy:
-  source_classes:
-    - aramis   # WP-22 fetch-aramis adapter
+  # Empty by decision, not by omission (ADR-0218): no adapter produces
+  # content for this domain, so no source class is declared. Restoring
+  # any adv ingestion requires a new ADR, which is where the source class
+  # would be reinstated.
+  source_classes: []
 
 freshness:
-  # Realized as a KFP recurring-run schedule (WP-22 / ADR-0105); this is
-  # the objective, not the concrete cron expression.
-  objective: configurable
+  # No cadence to schedule (ADR-0105 does not apply - there is no source
+  # pipeline), the same situation as knowledge.project, which is written
+  # directly rather than ingested.
+  objective: none
   rationale: >-
-    Aramis project state changes at a pace between tech's documentation
-    cadence and sales' hours-scale cadence; the exact schedule is a
-    per-deployment operational choice, not a fixed platform decision.
-  # Allowed staleness per operation class (WP-24 / ADR-0109) - between
-  # tech's and sales' windows, matching this domain's own cadence
-  # position above.
+    No ingestion adapter exists for this domain after ADR-0218, so there
+    is nothing to refresh on any cadence. A future sourcing decision
+    would restate a freshness objective alongside its adapter.
+  # "none" (WP-24 / ADR-0109): with no ingested content there is no
+  # computed stale_after and no "freshness untrusted" trust-scoring
+  # penalty to apply - the knowledge.sxa-legacy convention.
   operation_classes:
     semantic-read:
-      max_staleness: 1d
+      max_staleness: none
     current-state-read:
-      max_staleness: 1h
+      max_staleness: none
 
 classification:
-  default_by_source_type:
-    aramis: C2   # business-sensitive (policies/data-classification/classification.yaml)
+  # No source types to map while the domain has no adapter. Any future
+  # source arrives with its own default classification; C2
+  # (business-sensitive, policies/data-classification/classification.yaml)
+  # was the level the removed adapter used and remains the expectation
+  # for ADV business content.
+  default_by_source_type: {}
 
 policy_ref: policies/knowledge/knowledge-policy.yaml
 
 related_adrs:
   - ADR-0204   # multi-domain RAG platform generalization (WP-21)
   - ADR-0205   # prefer indexed knowledge for read, live tools for write/freshness
+  - ADR-0218   # dropped this domain's only ingestion adapter

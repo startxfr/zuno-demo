@@ -203,13 +203,6 @@ zuno_llm_provider_ovhcloud_api_key: "xxxxxx"
 
 zuno_admin_mainpwd: "AbcdeF_Ghi123"
 
-# --- Aramis (adv-domain source API for rag-ingestion's fetch-aramis
-# adapter, ADR-0204/WP-22 - fields read by ansible/roles/vault/tasks/
-# install.yml's aramis seed, previously undocumented here) ----------------
-zuno_aramis_base_url: "xxxxxx"     # e.g. https://aramis.example.com/api
-zuno_aramis_token: "xxxxxx"
-zuno_aramis_enabled: false
-
 # --- AAP Red Hat subscription activation (ADR-0354/WP-072 follow-up) -------
 # Set true to auto-activate AAP's Red Hat subscription at the end of
 # `make d1 install aap` (the Gateway/Controller "Subscription" screen

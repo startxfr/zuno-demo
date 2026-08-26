@@ -1,7 +1,7 @@
 # Advantage Agent
 
 - **Purpose:** Sales administration assistant
-- **Primary integrations:** Sales data (Salesforce, Aramis-sourced ADV knowledge)
+- **Primary integrations:** Sales data (Salesforce, indexed ADV knowledge)
 - **Initial tasks:** New client-PO-received business; monthly in-progress sales reporting
 
 ## Stage (ADR-0502)
@@ -19,8 +19,10 @@ empty directories retained, filled at promotion).
   tasks.
 - Evaluations: `evaluations/advantage/` authored (including its
   hand-authored narrative security checks); **human scenario review,
-  the 75 % gate and Aramis live verification are the open promotion
-  steps** (per WP-35).
+  the 75 % gate are the open promotion steps** (per WP-35). Aramis
+  live verification is no longer one of them: ADR-0218 dropped the
+  adapter, leaving `knowledge.adv` with no source and its sourcing an
+  open decision for this slice.
 
 **Next step:** `platform/templates/agent/PROMOTION.md` from step 1
 (scenario review); CR migration alongside step 2.

@@ -63,8 +63,9 @@ alongside, without editing that matrix's existing sxa-legacy row).
   `gitops/charts/rag-ingestion/values.yaml`'s `domains.sxa-legacy` block (the
   patterns being deliberately NOT reused - MariaDB import, on-demand
   schedule, sales/board-only access); `components/rag-ingestion/src/
-  rag_ingestion.py`'s `_fetch_salesforce`/`_fetch_aramis` (the plain-adapter
-  shape `fetch-sxa` follows) and `_split_sql_statements` (the quote-aware
+  rag_ingestion.py`'s `_fetch_salesforce` (the plain-adapter
+  shape `fetch-sxa` follows; `_fetch_aramis` was the other example until
+  ADR-0218 removed it on 2026-08-26) and `_split_sql_statements` (the quote-aware
   parsing idiom `fetch-sxa`'s own parser extends); `gitops/charts/rag-ingestion/
   files/pipeline.py.tpl` in full (CONFIG_KEYS/SOURCE_SECRETS wiring a new
   domain must extend in two places or a key silently drops - the
@@ -124,7 +125,7 @@ alongside, without editing that matrix's existing sxa-legacy row).
    bucket-credential ExternalSecret. `files/pipeline.py.tpl` gains the
    `SXA_CORPUS_*` `CONFIG_KEYS` entries, a `fetch_sxa` component, and a
    `SOURCE_SECRETS` entry for its bucket credential (the plain one-secret
-   pattern salesforce/aramis use, not the two-secret `SXA_SOURCE_SECRETS`
+   pattern salesforce uses, not the two-secret `SXA_SOURCE_SECRETS`
    pattern sxa-legacy needs for its extra MariaDB credential).
 8. **Agent access**: `agents/comage/tasks/compare-historical-deals.md`,
    `agents/advantage/tasks/answer-project-question.md`, and

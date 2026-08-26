@@ -955,12 +955,14 @@
   no_log: true
 
 # ADR-0204/ADR-0105 (WP-22): source credentials for the knowledge.sales
-# and knowledge.adv ingestion adapters (gitops/charts/rag-ingestion's
-# domains.sales.salesforce / domains.adv.aramis ExternalSecrets). Property
-# names (instance_url/token, base_url/token) match those ExternalSecrets'
-# remoteRef properties. Operator-supplied in ansible/confidential.yml;
-# skipped while placeholders remain - the domains ship enabled: false
-# until then (WP-22 operator follow-up).
+# ingestion adapter (gitops/charts/rag-ingestion's
+# domains.sales.salesforce ExternalSecret). Property names
+# (instance_url/token) match that ExternalSecret's remoteRef properties.
+# Operator-supplied in ansible/confidential.yml; skipped while
+# placeholders remain - the domain ships enabled: false until then.
+# ADR-0218 (2026-08-26): the companion Aramis seed (zuno/aramis/technical)
+# was removed with the fetch-aramis adapter; the Salesforce batch cadence
+# is deferred to v0.7 but its credential path stays here.
 - name: "vault | seed the Salesforce technical credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -976,21 +978,6 @@
     and zuno_salesforce_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-- name: "vault | seed the Aramis technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aramis/technical
-      base_url={{ zuno_aramis_base_url | quote }}
-      token={{ zuno_aramis_token | quote }}
-      enabled={{ (zuno_aramis_enabled | default(false)) | quote }}"
-  when: >-
-    zuno_aramis_base_url | default('xxxxxx') != 'xxxxxx'
-    and zuno_aramis_token | default('xxxxxx') != 'xxxxxx'
-  no_log: true
-
 # ADR-0201 (WP-27): the ai-gateway MaaS adapter's programmatic-client API
 # key (components/ai-gateway/app/maas_adapter.py,
 # gitops/charts/ai-gateway/templates/externalsecret-maas.yaml). Unlike the
@@ -998,7 +985,7 @@
 # MaaS itself once a real MaaSSubscription/API-key request flow runs on
 # the live cluster (operator action, WP-27 follow-up) - ansible cannot
 # generate it, only seed a value the operator already obtained, same
-# operator-supplied pattern as confluence/salesforce/aramis above. Skipped
+# operator-supplied pattern as confluence/salesforce above. Skipped
 # while the placeholder remains, so maasAdapter.enabled stays effectively
 # inert (MAAS_GATEWAY_API_KEY unset) until this is seeded.
 - name: "vault | seed the MaaS gateway API key from ansible/confidential.yml"

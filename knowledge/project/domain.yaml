@@ -1,9 +1,10 @@
 # Knowledge domain: project (ADR-0209)
 #
 # Caller-supplied, per-engagement memory scope open to any agent -
-# explicitly distinct from `knowledge.adv` (Aramis-sourced ADV *business*
-# knowledge, a fixed source pipeline). `knowledge.project` has no source
-# ingestion pipeline at all: content is written directly by Agent
+# explicitly distinct from `knowledge.adv` (ADV *business* knowledge).
+# `knowledge.project` has no source ingestion pipeline at all in the same
+# sense `knowledge.adv` has none since ADR-0218, but for a different
+# reason: here it is by design, because content is written directly by Agent
 # Runtime's memory-extraction step (components/agent-runtime/app/memory.py,
 # WP-28), never by components/rag-ingestion. NO physical database names,
 # service endpoints, secrets or credentials belong in this file - see

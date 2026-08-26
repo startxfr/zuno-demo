@@ -1,5 +1,7 @@
 # WP-066: Role-based conversation sharing between colleagues (promotes ADR-0213)
 
+> ADR-0213 retargeted to v0.7 (roadmap reprioritization, grouped with ADR-0105/ADR-0206) on 2026-08-26 — see `docs/roadmap/versions.md`.
+
 - **State:** Repo work merged (2026-08-21)
 - **ADRs:** ADR-0213
 - **Depends on:** ADR-0212's conversation substrate (`conversations`,
