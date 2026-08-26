@@ -33,6 +33,12 @@ spec:
         # sync-wave grouping as maasDb above.
         tracesS3:
           enabled: true
+        # ADR-0522/WP-080: bare Route to Perses's own dashboards.
+        persesRoute:
+          enabled: true
+          # Placeholder auto-substituted with the real cluster domain by
+          # ansible/tasks/apply_gitops_app.yml.
+          clusterBaseDomain: apps.mycluster.example.com
         prometheusK8s: null
         userWorkloadMonitoring:
             enabled: false

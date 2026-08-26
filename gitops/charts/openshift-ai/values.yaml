@@ -321,6 +321,27 @@ tracesS3:
   secretStoreName: vault-backend
   refreshInterval: 1h
 
+# ADR-0522/WP-080: direct Route to Perses's own dashboards
+# (data-science-perses:8080, redhat-ods-monitoring) - RHOAI auto-creates
+# Routes of its own for Prometheus (x2) and Thanos-querier in this namespace,
+# and for Tempo via its gateway component (which fronts it with its own OPA
+# sidecar for authz), but deliberately does not create one for Perses itself.
+# A bare edge Route, same shape as the existing data-science-thanos-querier-
+# route RHOAI created (verified live: unauthenticated) - explicit choice,
+# not a gap: Perses has no built-in auth of its own (single container, no
+# oauth-proxy sidecar, no --oidc/--auth flag), so this is exactly as exposed
+# as RHOAI's own thanos-querier route already is. RHOAI Dashboard's "Observe"
+# tab (rhods-dashboard route, already authenticated) is the protected access
+# path; this Route is the explicitly-requested unauthenticated direct one.
+persesRoute:
+  enabled: false
+  serviceName: data-science-perses
+  serviceNamespace: redhat-ods-monitoring
+  servicePort: http
+  # Placeholder auto-substituted with the real cluster domain by
+  # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
+  clusterBaseDomain: apps.mycluster.example.com
+
 # Third chart-local MaaS prerequisite: ModelsAsServiceReady also requires
 # User Workload Monitoring (ConfigMap cluster-monitoring-config in
 # openshift-monitoring with enableUserWorkload: true) for its

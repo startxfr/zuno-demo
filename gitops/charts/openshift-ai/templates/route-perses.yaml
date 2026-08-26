@@ -1,0 +1,25 @@
+{{- if .Values.persesRoute.enabled }}
+# ADR-0522/WP-080: bare edge Route to RHOAI monitoring's own Perses
+# dashboards - see values.yaml's persesRoute comment for why this is
+# deliberately unauthenticated (matches RHOAI's own thanos-querier route in
+# the same namespace) rather than a gap.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: data-science-perses-route
+  namespace: {{ .Values.persesRoute.serviceNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  host: "data-science-perses-route-{{ .Values.persesRoute.serviceNamespace }}.{{ .Values.persesRoute.clusterBaseDomain }}"
+  to:
+    kind: Service
+    name: {{ .Values.persesRoute.serviceName }}
+  port:
+    targetPort: {{ .Values.persesRoute.servicePort }}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}
