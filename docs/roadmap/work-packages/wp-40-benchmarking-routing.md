@@ -36,16 +36,18 @@
   itself (grep clean). Quality is compared at agent granularity
   (`quality_gate.py`'s own `scenario_rate` measurement granularity, not
   a finer per-task-class one) - a documented simplification, not false
-  precision. 21 new tests (`test_benchmark.py`: 12, `test_check_policy_artifacts_*`
-  fail-closed and pass cases included; `test_routing_report.py`: 10,
-  including the WP's own two named acceptance cases - a regression
-  produces a downgrade recommendation, an improvement produces an
-  upgrade one) plus the full pre-existing `evaluations/` suite, all
-  green - verified both via this repo's own established direct-script
-  convention AND via real `pytest` collection (33/33 passed), confirming
-  the brief's own literal `python3 -m pytest evaluations/ -q` acceptance
-  command works once pytest is actually installed (not a repo dependency
-  anywhere else, so not assumed present by default).
+  precision. 26 new tests (`test_benchmark.py`: 16, `test_check_policy_artifacts_*`
+  fail-closed and pass cases included, plus the cluster-read and
+  `read_results_via_exec` cases added after this brief was first written;
+  `test_routing_report.py`: 10, including the WP's own two named acceptance
+  cases - a regression produces a downgrade recommendation, an improvement
+  produces an upgrade one) plus the full pre-existing `evaluations/` suite
+  (`test_quality_gate.py`: 11), 37 in total, all green - verified via this
+  repo's own established direct-script convention. At merge time a real
+  `pytest` collection also passed (33/33 against the then-smaller suite),
+  confirming the brief's own literal `python3 -m pytest evaluations/ -q`
+  acceptance command works once pytest is actually installed (not a repo
+  dependency anywhere else, so not assumed present by default).
   `python3 platform/docs/check_docs.py` PASS.
 - **ADRs:** ADR-0305, ADR-0304 (Partially implemented merged here -> Implemented after the live benchmark+report loop)
 - **Depends on:** WP-10 (merged), WP-34 (merged); WP-39 useful but not required
