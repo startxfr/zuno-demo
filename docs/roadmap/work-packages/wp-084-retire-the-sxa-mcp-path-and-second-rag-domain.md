@@ -186,8 +186,39 @@ Then, once deployed:
    of list membership); pushed. **Needs a rebuild (item 5 must be re-run
    against `d340e7a`) and a fresh trigger — the terminated run produced no
    usable output.**
-6b. **Rebuild and redeploy `mcp-gateway`, `agent-runtime` and `rag-service`
-   — discovered missing 2026-08-26, and it gates steps 7 and 8.** All three
+6b. ~~Rebuild and redeploy `mcp-gateway`, `agent-runtime` and `rag-service`.~~
+   **DONE 2026-08-26.** `make d2 build mcp|rag|agent`, all three `failed=0`,
+   every image from `Git@ef21189` (= `origin/main`; the only unpushed commits
+   were docs, so no push was needed). Verified *inside the running pods*:
+   `mcp-gateway` carries 26 bound capabilities and **zero** `sxa.*` bindings
+   (the one remaining `sxa.` in `tool-policy.yaml` is a comment citing this
+   ADR); `mcp-gateway` and `agent-runtime` both resolve
+   `knowledge.sxa-legacy` to `['sales','board','adv','finance']` with
+   `knowledge.sxa` **ABSENT**; `rag-service` retains only the
+   `knowledge.sxa-legacy` binding.
+
+   **Hazard for any future `make d2 build agent`.** The role builds the image
+   *first*, the ImageStream trigger immediately rolls a new pod, and the OKF
+   re-signing Job runs **last**. The pod verifies bundles against the
+   `agent-runtime-okf-signatures` ExternalSecret, whose `refreshInterval` is
+   **1h** — so the new pod starts against signatures that predate the re-sign
+   and dies with `failed to load OKF bundles: ... invalid signature when
+   validating ASN.1 encoded signature` for all 8 agents. Seen here: the pod
+   hit `CrashLoopBackOff` (6 restarts) while the previous pod kept serving.
+   Recovery is to force the secret and restart:
+
+   ```
+   oc -n zuno-ai-run annotate externalsecret agent-runtime-okf-signatures \
+     force-sync="$(date +%s)" --overwrite
+   oc -n zuno-ai-run delete pod -l app=agent-runtime
+   ```
+
+   Left as an operational note rather than a code fix: reordering the role so
+   signing precedes the build, or shortening the refresh interval, is a
+   separate change and needs its own ADR discussion.
+
+   Original finding, kept for the record: **the policy plane was never
+   redeployed.** All three
    bake the policy/binding files into their images rather than mounting them
    (`components/mcp-gateway/Dockerfile:40,44` copies `policies` and
    `platform/bindings`; `agent-runtime/Dockerfile:50` copies
@@ -236,6 +267,18 @@ Then, once deployed:
   is a no-op (MariaDB never held `sxa`); step 2 is the only real deletion and
   the database it removes is empty; step 4's repo prerequisite was missing and
   landed in `de1524e`.
+- 2026-08-26: step 6b executed and verified in-pod; the ADR-0219 policy plane
+  is now live. Uncovered an ordering hazard in `agent_build` (image built and
+  rolled before the OKF re-signing Job runs, against a 1h-refresh secret),
+  documented inline above.
+- 2026-08-26: the step 6 run `rag-corpus-ingestion-sxa-legacy-manual-wp084`
+  was **terminated at 16:50:18Z**, not failed on its merits. Its
+  `activeDeadlineSeconds` was `0` while both prior successful runs have the
+  field unset, and the controller logged `Terminating pod which has exceeded
+  workflow deadline` with the deadline equal to the run's own start time -
+  Argo's terminate signature. `load-sxa-dump` had already written 310,537
+  documents and its checksum, so a relaunch resumes at `detect-changes`. Owner
+  of the termination unidentified; two peer sessions disclaimed it.
 - 2026-08-26: static pre-check of step 8 - all 15 negative `403` tool probes
   across the six agents resolve to bound capabilities in the repo's
   `tool-bindings.yaml` (including the aliases `generate_image` ->
