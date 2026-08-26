@@ -21,7 +21,7 @@ export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
 export FRONTEND_URL=https://arkos.apps.<cluster-domain>
 export ARKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/arkos-frontend)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL /
+# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / CONFLUENCE_MCP_URL /
 # AI_GATEWAY_URL default to their in-cluster Service DNS names - override if
 # running this from outside the cluster via a port-forward instead. Reaching
 # those in-cluster names at all requires running from a network location the
@@ -80,6 +80,6 @@ business role but no `agent_arkos` entitlement, denied by the BFF itself
 with 403 before the request ever reaches the Agent Runtime - ADR-0349
 moved Arkos's audience from board to the consultant tier, so the shared
 consultant fixture now carries this converse case), and a direct call to
-`sales-db-mcp` that bypasses the MCP Gateway entirely is denied by the
+`confluence-mcp` that bypasses the MCP Gateway entirely is denied by the
 server itself (401) - a platform-wide (ADR-0037), not Arkos-specific,
 boundary this gate still verifies.

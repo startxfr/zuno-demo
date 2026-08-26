@@ -128,10 +128,10 @@ scenarios:
     persona: sale-01
 
   - id: 18
-    title: MCP Gateway denies sxa.opportunity.search for check-deal-status, which doesn't declare it even though compare-historical-deals does (ADR-0036 task_rights factor narrows the agent's own declaration)
+    title: MCP Gateway denies salesforce.opportunity.update for check-deal-status, which doesn't declare it even though update-opportunity-status does (ADR-0036 task_rights factor narrows the agent's own declaration)
     type: mcp_gateway_denied
     persona: sale-01
-    tool: sxa.opportunity.search
+    tool: salesforce.opportunity.update
     arguments: { }
     expect_status: 403
 
@@ -155,7 +155,7 @@ scenarios:
   - id: 20
     title: Every service's health endpoint returns 200
     type: health_endpoints_all_ok
-    # sales-db-mcp/salesforce-mcp are deliberately excluded: their
+    # confluence-mcp/salesforce-mcp are deliberately excluded: their
     # NetworkPolicies (ADR-0037) allow ingress only from mcp-gateway, so a
     # direct probe from this gate always times out by design, not by
     # fault - mcp-gateway's own health, still checked below, is the honest

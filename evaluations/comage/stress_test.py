@@ -27,17 +27,15 @@ reading the code rather than assumed:
   - The live `POST /v1/agents/comage/chat` endpoint always executes only
     `agent_def.primary_task` (components/agent-runtime/app/main.py), which
     for Comage is `check-deal-status` (agents/comage/agent.okf.md). The
-    task that actually declares SXA tools/knowledge -
-    `compare-historical-deals`, with `sxa.opportunity.search` and
-    `sxa.aggregate.revenue-by-year` - has no live route (its own task file
-    says as much: "no distinct Agent Runtime route exists for it yet in
-    v0").
-  - Even routed, no tool counts *devis* (quotes) by year or year range -
-    `sxa.aggregate.revenue-by-year` sums *invoice* totals for one single
-    year, not a count of quotes across a decade.
-  - No data for 2003-2013 exists anywhere: the Postgres fixture path
-    (data/sxa/fixtures/seed.sql) only covers 2025-2026; the real MariaDB
-    SXA dump (ADR-0216/WP-065 Part B) has never been imported.
+    task that actually declares SXA knowledge -
+    `compare-historical-deals` - has no live route (its own task file says
+    as much: "no distinct Agent Runtime route exists for it yet in v0").
+  - Even routed, there is no aggregation capability of any kind. ADR-0219
+    deleted the deterministic `sxa.*` tools outright: SXA is a closed
+    pre-2021 record served through retrieval only, so nothing can count
+    *devis* (quotes) by year, and `compare-historical-deals` now declares
+    `allowed_tools: []`. This premise is strictly stronger than it was
+    when those tools merely lacked a route.
   - There is no charting/plotting tool anywhere in this repo. The only
     "visual" capability `check-deal-status` declares is
     `image.generation.create` (ADR-0415's SDXL-via-OVHcloud text-to-image

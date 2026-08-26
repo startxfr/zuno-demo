@@ -79,7 +79,7 @@ entitlement but no business role, denied `list_drive_files` by the MCP
 Gateway with 403; `adv-role-only-user-01`: `adv` business role but no
 `agent_advantage` entitlement, denied by the BFF itself with 403 before
 the request ever reaches the Agent Runtime), and a direct call to
-`sales-db-mcp` that bypasses the MCP Gateway entirely is denied by the
+`confluence-mcp` that bypasses the MCP Gateway entirely is denied by the
 server itself (401) - a platform-wide (ADR-0037), not Advantage-specific,
 boundary this gate still verifies.
 
@@ -90,7 +90,10 @@ nothing new to classify): it parses every `agents/advantage/tasks/*.md`
 file's actual YAML frontmatter (never the Markdown body, which may
 legitimately reference other agents' capabilities by name in prose) and
 fails if any task's `allowed_knowledge` includes the sales knowledge
-domain or `allowed_tools` includes a `salesforce.*`/`sxa.*` capability -
+domain or `allowed_tools` includes a `salesforce.*` capability. ADR-0219
+narrowed this deliberately: the `sxa.*` capabilities no longer exist, and
+Advantage now reaches `knowledge.sxa-legacy` on purpose, so
+`knowledge.sales` is the boundary that still holds -
 the config-level half of this slice's signature proof, independent of
 (and redundant with) the live MCP Gateway denials scenarios 12/13 prove
 at runtime.

@@ -67,10 +67,9 @@ BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.loca
 RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080")
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")
 RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster.local:8080")
-SALES_DB_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
 # ADR-0326/WP-33: Comage's own live MCP server (evaluations/comage's
 # scenario 20 includes it in `services:`; harmless to resolve unconditionally
-# for every agent, same as SALES_DB_URL above already was before WP-33).
+# for every agent).
 SALESFORCE_MCP_URL = os.getenv("SALESFORCE_MCP_URL", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 REALM = "zuno"
@@ -94,7 +93,6 @@ SERVICE_HEALTH_URLS = {
     "agent-runtime": f"{RUNTIME_URL}/healthz",
     "mcp-gateway": f"{MCP_GATEWAY_URL}/healthz",
     "rag-service": f"{RAG_URL}/healthz",
-    "sales-db-mcp": f"{SALES_DB_URL}/healthz",
     "salesforce-mcp": f"{SALESFORCE_MCP_URL}/healthz",
 }
 
@@ -543,8 +541,9 @@ def _invoke_tool(persona: str, tool: str, arguments: Dict[str, Any], classificat
     # ADR-0036: X-Zuno-Agent/X-Zuno-Task are required - every scenario here
     # calls the gateway as if it were Tekos's one real task, since this
     # harness is evaluations/tekos/. A tool this task doesn't declare (e.g.
-    # scenario 12/18's get_customer) is still correctly denied by the
-    # gateway's agent_declaration factor - no per-scenario override needed.
+    # scenario 12's salesforce.opportunity.read, scenario 18's
+    # git.repository.delete) is still correctly denied by the gateway's
+    # agent_declaration factor - no per-scenario override needed.
     return httpx.post(
         f"{MCP_GATEWAY_URL}/v1/tools/{tool}/invoke",
         headers={

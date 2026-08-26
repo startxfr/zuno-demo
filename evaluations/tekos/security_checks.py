@@ -54,9 +54,16 @@ AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.
 # operation (components/mcp-gateway/app/downstream.py) - this check
 # deliberately bypasses the gateway to prove the server itself denies an
 # unauthorized direct caller (ADR-0037), independent of the NetworkPolicy
-# layer (gitops/charts/mcp-sales-db's NetworkPolicy), which an HTTP-level
+# layer (gitops/charts/mcp-confluence's NetworkPolicy), which an HTTP-level
 # check like this can't directly exercise.
-SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
+#
+# ADR-0219 retargeted this from sales-db-mcp, which it deleted, to
+# confluence-mcp: identical gateway-pod-only ingress NetworkPolicy and the
+# same GatewayTokenMiddleware (both enforced by
+# platform/supply-chain/check_mcp_server_conformance.py), so the boundary
+# under test is unchanged. ADR-0037's acceptance test is retargeted, never
+# dropped.
+CONFLUENCE_MCP_URL = os.getenv("CONFLUENCE_MCP_URL", "http://confluence-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 
 @dataclass
@@ -213,14 +220,14 @@ def business_role_without_entitlement_denied_by_bff() -> CheckResult:
     )
 
 
-def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
-    """ADR-0037's mandatory acceptance test: a call to sales-db-mcp that
+def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
+    """ADR-0037's mandatory acceptance test: a call to confluence-mcp that
     bypasses the MCP Gateway entirely (no X-Zuno-Gateway-Token, the shared
     workload-identity secret only the gateway holds - ansible/roles/vault/
     tasks/configure.yml, secret/zuno/mcp/gateway-workload-token) must be
     denied - by the server's own workload-identity check (401) if the
     caller's network path can reach it at all, or by the NetworkPolicy
-    boundary itself (gitops/charts/mcp-sales-db's NetworkPolicy, ADR-0052)
+    boundary itself (gitops/charts/mcp-confluence's NetworkPolicy, ADR-0052)
     if it can't. Since ADR-0053 wires this into `make check` as a Job
     running from inside the cluster (ansible/roles/agents/tasks/check.yml),
     that NetworkPolicy - which allows ingress only from the mcp-gateway
@@ -232,24 +239,24 @@ def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
     """
     try:
         resp = httpx.post(
-            f"{SALES_DB_MCP_URL}/mcp",
+            f"{CONFLUENCE_MCP_URL}/mcp",
             json={
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "tools/call",
-                "params": {"name": "get_customer", "arguments": {"customer_id": 1}},
+                "params": {"name": "search_confluence", "arguments": {"query": "test"}},
             },
             timeout=15,
         )
     except httpx.TransportError as exc:
         return CheckResult(
-            "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+            "direct_call_to_confluence_mcp_denied_without_gateway_token",
             True,
             f"denied at the network layer (NetworkPolicy) before any HTTP response: {exc}",
         )
     ok = resp.status_code == 401
     return CheckResult(
-        "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+        "direct_call_to_confluence_mcp_denied_without_gateway_token",
         ok,
         f"status={resp.status_code} body={resp.text[:200]}",
     )
@@ -325,7 +332,7 @@ CHECKS = [
     ai_gateway_local_only_forces_local_provider,
     entitlement_without_business_role_denied_confluence,
     business_role_without_entitlement_denied_by_bff,
-    direct_call_to_sales_db_mcp_denied_without_gateway_token,
+    direct_call_to_confluence_mcp_denied_without_gateway_token,
     mcp_gateway_denies_generate_image_for_tekos_agent_declaration,
     tekos_chat_never_returns_photorealistic_images,
 ]

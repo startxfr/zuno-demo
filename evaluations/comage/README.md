@@ -22,7 +22,7 @@ export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
 export FRONTEND_URL=https://comage.apps.<cluster-domain>
 export COMAGE_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/comage-frontend)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL /
+# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / CONFLUENCE_MCP_URL /
 # SALESFORCE_MCP_URL / AI_GATEWAY_URL default to their in-cluster Service DNS
 # names - override if running this from outside the cluster via a
 # port-forward instead. Reaching those in-cluster names at all requires
@@ -54,9 +54,9 @@ citation expected) versus a question asking for a mutable field's CURRENT
 value, which triggers a live `salesforce.opportunity.read` search visible
 in the reply's citations (10), RAG retrieval contributing a citation for
 a sales topic (11), MCP Gateway policy enforcement (12-13, 18 - 18 is the
-sharpest of the three: `sxa.opportunity.search` is denied for
+sharpest of the three: `salesforce.opportunity.update` is denied for
 `check-deal-status` even though Comage's OTHER task,
-`compare-historical-deals`, declares it - proving ADR-0011's task_rights
+`update-opportunity-status`, declares it - proving ADR-0011's task_rights
 factor narrows independently of the broader agent_declaration factor,
 not just "a tool no task declares at all" the way scenario 12/13 do),
 model routing/classification fail-closed behavior (14-15,
@@ -92,5 +92,5 @@ with 403; `sales-role-only-user-01`: `sales` business role but no
 `agent_comage` entitlement, denied by the BFF itself with 403 before the
 request ever reaches the Agent Runtime), and a direct call to
 `salesforce-mcp` - Comage's own new server, unlike Arkos's re-proof
-against the already-covered `sales-db-mcp` - that bypasses the MCP
+against the already-covered `confluence-mcp` - that bypasses the MCP
 Gateway entirely is denied by the server itself (401).

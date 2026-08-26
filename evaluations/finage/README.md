@@ -22,7 +22,7 @@ export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
 export FRONTEND_URL=https://finage.apps.<cluster-domain>
 export FINAGE_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/finage-frontend)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL /
+# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / CONFLUENCE_MCP_URL /
 # AI_GATEWAY_URL default to their in-cluster Service DNS names - override if
 # running this from outside the cluster via a port-forward instead. Reaching
 # those in-cluster names at all requires running from a network location the
@@ -53,10 +53,10 @@ authentication (3), the chat contract synchronous and streaming (7-9),
 RAG retrieval over `knowledge.project` (10), MCP Gateway policy
 enforcement (11-13, 18 - **this slice's signature proof, three
 independent MCP denials**: 12 denies a live Salesforce capability, 13
-denies a Comage-only legacy SXA pipeline-search capability neither
-declared anywhere in Finage's bundle, and 18 denies
-`sxa.aggregate.revenue-by-year` for the *live* task specifically - a
-tool Finage's own `monthly-invoice-report` task DOES declare, but
+denies image generation - Comage-exclusive among the live agents, and
+`finance` is not in its allowed_groups - and 18 denies `read_gmail` for
+the *live* task specifically - a tool Finage's own
+`check-my-drive-and-mail` task DOES declare, but
 `answer-finance-question` does not, proving the ADR-0011 task_rights
 factor narrows independently of agent_declaration, the same sharp proof
 Comage's own scenario 18 established first), model routing/classification
@@ -64,9 +64,7 @@ fail-closed behavior (14-15, config-consistency checks that don't need a
 live cluster), BFF JWT validation (16-17), namespace isolation (19 - an
 intentionally empty `agents: []` list: every agent now has a real,
 deployed frontend/BFF, so this is a vacuously-true pass marking the
-milestone rather than a removed check), and service health including
-`sales-db-mcp` (20, the backend Finage's own `sxa.*` capabilities are
-served by).
+milestone rather than a removed check), and service health (20).
 
 This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what a full
@@ -84,14 +82,15 @@ the local provider even for a C2 request that would otherwise be
 SaaS-eligible, the two-dimension group model is enforced server-side in
 both directions using two new fixture personas mirroring the prior
 slices' own (`finage-entitlement-only-user-01`: `agent_finage`
-entitlement but no business role, denied `sxa.customer.read` by the MCP
+entitlement but no business role, denied `read_gmail` by the MCP
 Gateway with 403; `finance-role-only-user-01`: `finance` business role
 but no `agent_finage` entitlement, denied by the BFF itself with 403
 before the request ever reaches the Agent Runtime), and a direct call to
-`sales-db-mcp` that bypasses the MCP Gateway entirely is denied by the
-server itself (401) - directly relevant here since that's the same
-backend Finage's own `sxa.*` capabilities are served by, not just a
-platform-wide boundary borrowed from another slice.
+`confluence-mcp` that bypasses the MCP Gateway entirely is denied by the
+server itself (401) - a platform-wide (ADR-0037) boundary this gate still
+verifies. ADR-0219 retargeted it here from the deleted `sales-db-mcp`;
+`confluence-mcp` carries the identical gateway-pod-only NetworkPolicy and
+gateway-token check, so the boundary under test is unchanged.
 
 `finage_never_declares_sales_or_adv_knowledge_domains` is this slice's
 own addition, mirroring Advantage's own equivalent check: it parses

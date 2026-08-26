@@ -109,10 +109,10 @@ scenarios:
     expect_status: 403
 
   - id: 13
-    title: MCP Gateway denies a Comage-only legacy SXA pipeline-search capability - Finage never declares it, least privilege beyond just invoicing
+    title: MCP Gateway denies image generation - explicitly Comage-exclusive among the live agents, and `finance` is not in its allowed_groups
     type: mcp_gateway_denied
     persona: finance-01
-    tool: sxa.opportunity.search
+    tool: generate_image
     arguments: {}
     expect_status: 403
 
@@ -136,11 +136,11 @@ scenarios:
     persona: finance-01
 
   - id: 18
-    title: MCP Gateway denies sxa.aggregate.revenue-by-year for the live answer-finance-question task, which declares no sxa.* tool at all (ADR-0036 task_rights factor narrows the agent's own declaration)
+    title: MCP Gateway denies read_gmail for the live answer-finance-question task, which doesn't declare it even though check-my-drive-and-mail does (ADR-0036 task_rights factor narrows the agent's own declaration)
     type: mcp_gateway_denied
     persona: finance-01
-    tool: sxa.aggregate.revenue-by-year
-    arguments: { year: 2026 }
+    tool: read_gmail
+    arguments: { }
     expect_status: 403
 
   - id: 19
@@ -157,7 +157,7 @@ scenarios:
   - id: 20
     title: Every service's health endpoint returns 200
     type: health_endpoints_all_ok
-    # sales-db-mcp is deliberately excluded: its NetworkPolicy (ADR-0037)
+    # confluence-mcp is deliberately excluded: its NetworkPolicy (ADR-0037)
     # allows ingress only from mcp-gateway, so a direct probe from this
     # gate always times out by design, not by fault - mcp-gateway's own
     # health, still checked below, is the honest proxy for "can this

@@ -861,8 +861,8 @@ scenarios:
     title: "MCP Gateway denies a tool {spec.title}'s task doesn't declare (ADR-0036 agent_declaration factor)"
     type: mcp_gateway_denied
     persona: consultant-user-01
-    tool: get_customer
-    arguments: {{customer_id: 1}}
+    tool: git.repository.delete
+    arguments: {{repository: "startx-cloud/zuno-demo"}}
     expect_status: 403
 
   - id: 19

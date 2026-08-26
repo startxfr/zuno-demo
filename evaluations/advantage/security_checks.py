@@ -65,7 +65,7 @@ AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.
 # direct caller (ADR-0037), independent of the NetworkPolicy layer.
 # Reused here (not Advantage-specific) - thematically apt for this
 # slice's own "not inheriting Comage/Sales" boundary story too.
-SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
+CONFLUENCE_MCP_URL = os.getenv("CONFLUENCE_MCP_URL", "http://confluence-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -136,8 +136,17 @@ def advantage_never_declares_the_sales_knowledge_domain() -> CheckResult:
     allowed_tools declaration (the YAML frontmatter - never the Markdown
     body, which is free-form prose and may legitimately reference other
     agents' capabilities by name, e.g. explaining a v1-scope task by
-    analogy) may declare the sales knowledge domain or any
-    salesforce.*/sxa.* capability. The runtime half (a live attempt
+    analogy) may declare the sales knowledge domain or any salesforce.*
+    capability.
+
+    ADR-0219 narrowed what this proves, deliberately. It used to also bar
+    every sxa.* capability; those no longer exist, and legacy SXA is now
+    reachable by Advantage on purpose - ADR-0219 widened
+    knowledge.sxa-legacy's allowed_groups to include `adv`, carrying over
+    the grant ADR-0217 had made through a separate domain. The boundary
+    that still holds, and that this check asserts, is knowledge.sales:
+    Advantage never reaches Comage's CURRENT commercial data. The runtime
+    half (a live attempt
     denied by the MCP Gateway) is scenarios 12/13/18 in scenarios.yaml,
     not repeated here - this check instead proves the declaration itself
     never exists to be exploited, the same "provably not inheriting
@@ -159,13 +168,13 @@ def advantage_never_declares_the_sales_knowledge_domain() -> CheckResult:
         if "knowledge.sales" in allowed_knowledge:
             offending.append(f"{task_path.name}: allowed_knowledge includes knowledge.sales")
         for tool in allowed_tools:
-            if tool.startswith("salesforce.") or tool.startswith("sxa."):
+            if tool.startswith("salesforce."):
                 offending.append(f"{task_path.name}: allowed_tools includes {tool}")
     ok = not offending
     return CheckResult(
         "advantage_never_declares_the_sales_knowledge_domain",
         ok,
-        f"offending={offending}" if offending else f"checked {checked} task file(s)' frontmatter, none declare sales/SXA",
+        f"offending={offending}" if offending else f"checked {checked} task file(s)' frontmatter, none declare current-Salesforce access",
     )
 
 
@@ -246,10 +255,10 @@ def business_role_without_entitlement_denied_by_bff() -> CheckResult:
     )
 
 
-def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
+def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
     """ADR-0037's mandatory acceptance test (platform-wide boundary, not
     Advantage-specific - see this module's own docstring for why it's
-    still included here): a call to sales-db-mcp that bypasses the MCP
+    still included here): a call to confluence-mcp that bypasses the MCP
     Gateway entirely (no X-Zuno-Gateway-Token, the shared workload-
     identity secret only the gateway holds) must be denied - by the
     server's own workload-identity check (401) if the caller's network
@@ -258,20 +267,20 @@ def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
     """
     try:
         resp = httpx.post(
-            f"{SALES_DB_MCP_URL}/mcp",
+            f"{CONFLUENCE_MCP_URL}/mcp",
             json={"jsonrpc": "2.0"},
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
             timeout=15,
         )
     except httpx.TransportError as exc:
         return CheckResult(
-            "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+            "direct_call_to_confluence_mcp_denied_without_gateway_token",
             True,
             f"denied at the network layer (NetworkPolicy) before any HTTP response: {exc}",
         )
     ok = resp.status_code == 401
     return CheckResult(
-        "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+        "direct_call_to_confluence_mcp_denied_without_gateway_token",
         ok,
         f"status={resp.status_code} body={resp.text[:200]}",
     )
@@ -284,7 +293,7 @@ CHECKS = [
     ai_gateway_local_only_forces_local_provider,
     entitlement_without_business_role_denied_drive,
     business_role_without_entitlement_denied_by_bff,
-    direct_call_to_sales_db_mcp_denied_without_gateway_token,
+    direct_call_to_confluence_mcp_denied_without_gateway_token,
 ]
 
 

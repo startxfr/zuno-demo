@@ -104,8 +104,8 @@ scenarios:
     title: MCP Gateway denies a tool call outside the caller's allowed groups
     type: mcp_gateway_denied
     persona: consultant-01
-    tool: get_customer
-    arguments: { customer_id: 1 }
+    tool: salesforce.opportunity.read
+    arguments: { query: "Acme" }
     expect_status: 403
 
   - id: 13
@@ -138,8 +138,8 @@ scenarios:
     title: MCP Gateway denies a tool no v0 agent declares (ADR-0036 agent_declaration factor)
     type: mcp_gateway_denied
     persona: board-01
-    tool: get_customer
-    arguments: { customer_id: 1 }
+    tool: git.repository.delete
+    arguments: { repository: "startx-cloud/zuno-demo" }
     expect_status: 403
 
   - id: 19
@@ -167,7 +167,7 @@ scenarios:
   - id: 20
     title: Every service's health endpoint returns 200
     type: health_endpoints_all_ok
-    # sales-db-mcp is deliberately excluded: its NetworkPolicy (ADR-0037)
+    # confluence-mcp is deliberately excluded: its NetworkPolicy (ADR-0037)
     # allows ingress only from mcp-gateway, so a direct probe from this
     # gate always times out by design, not by fault - mcp-gateway's own
     # health, still checked below, is the honest proxy for "can this

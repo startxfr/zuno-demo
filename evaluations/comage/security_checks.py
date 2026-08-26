@@ -69,7 +69,7 @@ AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.
 # layer (gitops/charts/mcp-salesforce's NetworkPolicy), which an HTTP-level
 # check like this can't directly exercise. Unlike Arkos's own equivalent
 # check (which re-proves this boundary against an already-covered server,
-# sales-db-mcp), this one exercises Comage's OWN new server for real.
+# confluence-mcp), this one exercises Comage's OWN new server for real.
 SALESFORCE_MCP_URL = os.getenv("SALESFORCE_MCP_URL", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 

@@ -27,7 +27,7 @@ export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
 export FRONTEND_URL=https://tekos.apps.<cluster-domain>
 export TEKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/tekos-frontend)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / SALES_DB_MCP_URL /
+# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / CONFLUENCE_MCP_URL /
 # AI_GATEWAY_URL default to their in-cluster Service DNS names - override if
 # running this from outside the cluster via a port-forward instead. Reaching
 # those in-cluster names at all requires running from a network location the
@@ -84,10 +84,10 @@ group model is enforced server-side in both directions: a caller with the
 by the MCP Gateway (403), and a caller with the `consultant` business role
 but no `agent_tekos` entitlement is denied by the BFF itself (403) before
 the request ever reaches the Agent Runtime, and a direct call to
-`sales-db-mcp` that bypasses the MCP Gateway entirely (no
+`confluence-mcp` that bypasses the MCP Gateway entirely (no
 `X-Zuno-Gateway-Token`) is denied by the server itself (401) - the
 workload-identity layer required in addition to the NetworkPolicy
-boundary (`gitops/charts/mcp-sales-db`'s `NetworkPolicy`, which an
+boundary (`gitops/charts/mcp-confluence`'s `NetworkPolicy`, which an
 HTTP-level check like this can't directly exercise;
 `platform/security/check_workload_hardening.py` statically verifies that
 policy and the rest of the hardening baseline exist in every chart's

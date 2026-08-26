@@ -109,11 +109,11 @@ scenarios:
     expect_status: 403
 
   - id: 13
-    title: MCP Gateway denies a legacy SXA/sales capability - Advantage never declares it, provably not inheriting Comage's capabilities
+    title: MCP Gateway denies a live Salesforce WRITE capability - Advantage never declares it, provably not inheriting Comage's capabilities
     type: mcp_gateway_denied
     persona: adv-01
-    tool: sxa.customer.read
-    arguments: { customer_id: 1 }
+    tool: salesforce.opportunity.update
+    arguments: { opportunity_id: "006000000000000" }
     expect_status: 403
 
   - id: 14

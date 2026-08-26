@@ -62,10 +62,11 @@ AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.
 # MCP Gateway calls this directly in normal operation - this check
 # deliberately bypasses the gateway to prove the server itself denies an
 # unauthorized direct caller (ADR-0037), independent of the NetworkPolicy
-# layer. Reused here (not Finage-specific) - Finage's own declared sxa.*
-# capabilities are served by this same backend, so it's a directly
-# relevant boundary for this slice too.
-SALES_DB_MCP_URL = os.getenv("SALES_DB_MCP_URL", "http://sales-db-mcp.zuno-ai-run.svc.cluster.local:8000")
+# layer. Reused here (not Finage-specific): ADR-0219 retargeted it from
+# the deleted sales-db-mcp to confluence-mcp, which carries the identical
+# gateway-pod-only NetworkPolicy and GatewayTokenMiddleware, so the
+# boundary under test is unchanged.
+CONFLUENCE_MCP_URL = os.getenv("CONFLUENCE_MCP_URL", "http://confluence-mcp.zuno-ai-run.svc.cluster.local:8000")
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -197,25 +198,30 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     return CheckResult("ai_gateway_local_only_forces_local_provider", ok, f"zuno_provider={provider}")
 
 
-def entitlement_without_business_role_denied_sxa() -> CheckResult:
+def entitlement_without_business_role_denied() -> CheckResult:
     """ADR-0040: agent entitlement and business role are orthogonal.
     finage-entitlement-only-user-01 holds agent_finage (can sign in /
     reach Finage) but no business role at all - not finance, not board.
     The MCP Gateway's user_group_rights factor
-    (policies/tools/tool-policy.yaml: sxa.customer.read.allowed_groups:
-    [sales, adv, board, finance]) must still deny the call with 403,
-    proving agent entitlement alone never substitutes for the
-    business-role check.
+    (policies/tools/tool-policy.yaml: gmail.message.read.allowed_groups:
+    [consultant, board, cdp, sales, adv, finance]) must still deny the
+    call with 403, proving agent entitlement alone never substitutes for
+    the business-role check.
+
+    Probes read_gmail, which Finage DOES declare
+    (tasks/check-my-drive-and-mail.md), so the agent_declaration factor
+    passes and this check isolates the group factor exactly as it did
+    before ADR-0219 removed the sxa.customer.read it originally used.
     """
     resp = _invoke_tool(
         "finage-entitlement-only-user-01",
-        "sxa.customer.read",
-        {"customer_id": 1},
-        classification="C2",
+        "read_gmail",
+        {"query": "invoice"},
+        classification="C1",
     )
     ok = resp.status_code == 403
     return CheckResult(
-        "entitlement_without_business_role_denied_sxa",
+        "entitlement_without_business_role_denied",
         ok,
         f"status={resp.status_code} body={resp.text[:200]}",
     )
@@ -224,7 +230,7 @@ def entitlement_without_business_role_denied_sxa() -> CheckResult:
 def business_role_without_entitlement_denied_by_bff() -> CheckResult:
     """ADR-0040: the converse case. finance-role-only-user-01 holds the
     finance business role (would pass the MCP Gateway's group check for
-    sxa.customer.read) but lacks agent_finage entitlement. The BFF's
+    read_gmail) but lacks agent_finage entitlement. The BFF's
     server-side entitlement check (components/agent-bff/main.go) must
     deny the call with 403 before it ever reaches the Agent Runtime,
     proving business role alone never substitutes for agent entitlement.
@@ -243,31 +249,30 @@ def business_role_without_entitlement_denied_by_bff() -> CheckResult:
     )
 
 
-def direct_call_to_sales_db_mcp_denied_without_gateway_token() -> CheckResult:
-    """ADR-0037's mandatory acceptance test: a call to sales-db-mcp that
+def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
+    """ADR-0037's mandatory acceptance test: a call to confluence-mcp that
     bypasses the MCP Gateway entirely (no X-Zuno-Gateway-Token, the
     shared workload-identity secret only the gateway holds) must be
     denied - by the server's own workload-identity check (401) if the
     caller's network path can reach it at all, or by the NetworkPolicy
-    boundary itself if it can't. Directly relevant to Finage: this is the
-    same backend its own sxa.* capabilities are served by.
+    boundary itself if it can't.
     """
     try:
         resp = httpx.post(
-            f"{SALES_DB_MCP_URL}/mcp",
+            f"{CONFLUENCE_MCP_URL}/mcp",
             json={"jsonrpc": "2.0"},
             headers={"Accept": "application/json, text/event-stream", "Content-Type": "application/json"},
             timeout=15,
         )
     except httpx.TransportError as exc:
         return CheckResult(
-            "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+            "direct_call_to_confluence_mcp_denied_without_gateway_token",
             True,
             f"denied at the network layer (NetworkPolicy) before any HTTP response: {exc}",
         )
     ok = resp.status_code == 401
     return CheckResult(
-        "direct_call_to_sales_db_mcp_denied_without_gateway_token",
+        "direct_call_to_confluence_mcp_denied_without_gateway_token",
         ok,
         f"status={resp.status_code} body={resp.text[:200]}",
     )
@@ -278,9 +283,9 @@ CHECKS = [
     runtime_ignores_mismatched_user_sub,
     finage_never_declares_sales_or_adv_knowledge_domains,
     ai_gateway_local_only_forces_local_provider,
-    entitlement_without_business_role_denied_sxa,
+    entitlement_without_business_role_denied,
     business_role_without_entitlement_denied_by_bff,
-    direct_call_to_sales_db_mcp_denied_without_gateway_token,
+    direct_call_to_confluence_mcp_denied_without_gateway_token,
 ]
 
 
