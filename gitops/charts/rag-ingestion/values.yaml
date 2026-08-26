@@ -1569,9 +1569,17 @@ images:
     tag: latest
 
 resources:
+  # Every stage below was live-verified (2026-08-26, WP-067 sxa
+  # verification) to run with NO cpu/memory request or limit applied at
+  # all - this block existed for four of the eight stages but nothing in
+  # files/pipeline.py.tpl ever read it (dead config; see that file's
+  # RESOURCES dict for where it's now actually wired). Sized at 3x the
+  # memory / 2x the cpu of the original (still-conservative) numbers, and
+  # extended to the four stages (chunk, validate, reconcileAcls,
+  # detectChanges) that never had a requests/limits pair at all.
   fetch:
-    requests: {cpu: "250m", memory: "512Mi"}
-    limits: {cpu: "2", memory: "2Gi"}
+    requests: {cpu: "500m", memory: "1536Mi"}
+    limits: {cpu: "4", memory: "6Gi"}
     # WP-57: both bound network/S3-latency-bound worker pools (thread
     # count higher than CPU count is fine and expected), not CPU-bound
     # work - separate from the cpu/memory requests above.
@@ -1581,36 +1589,44 @@ resources:
     redhatConcurrency: 8
     sxaWriteConcurrency: 8
   normalize:
-    requests: {cpu: "1", memory: "2Gi"}
-    limits: {cpu: "4", memory: "8Gi"}
+    requests: {cpu: "2", memory: "6Gi"}
+    limits: {cpu: "8", memory: "24Gi"}
     # ADR-0219: normalize and chunk are one-to-two S3 round-trips per
     # document with pure-Python work in between - same latency-bound
     # rationale as resources.fetch's knobs. The SXA dump renders 314,428
     # documents, where serial execution took these stages hours each.
     concurrency: 16
   chunk:
+    requests: {cpu: "500m", memory: "1536Mi"}
+    limits: {cpu: "2", memory: "6Gi"}
     concurrency: 16
   embed:
-    requests: {cpu: "1", memory: "2Gi"}
-    limits: {cpu: "4", memory: "8Gi"}
+    requests: {cpu: "2", memory: "6Gi"}
+    limits: {cpu: "8", memory: "24Gi"}
     # ADR-0219: in-flight embedding REQUESTS, each already carrying
     # EMBEDDING_BATCH_SIZE chunks - this multiplies against the
     # predictor's own capacity, so it stays deliberately small. Raising
     # it past what embeddings-predictor can serve just queues.
     concurrency: 4
   index:
-    requests: {cpu: "500m", memory: "1Gi"}
-    limits: {cpu: "2", memory: "4Gi"}
+    requests: {cpu: "1", memory: "3Gi"}
+    limits: {cpu: "4", memory: "12Gi"}
     # ADR-0219: bounds index-pgvector's S3 prefetch pool only - the
     # database writes themselves stay serial on one connection.
     readConcurrency: 16
+  validate:
+    requests: {cpu: "500m", memory: "1536Mi"}
+    limits: {cpu: "2", memory: "6Gi"}
+  reconcileAcls:
+    requests: {cpu: "500m", memory: "1536Mi"}
+    limits: {cpu: "2", memory: "6Gi"}
   detectChanges:
+    requests: {cpu: "500m", memory: "1536Mi"}
+    limits: {cpu: "2", memory: "6Gi"}
     # WP-58: bounds the per-document S3 GET pool that rebuilds
     # detect-changes' "current" state (DETECT_CHANGES_READ_CONCURRENCY) -
     # network/S3-latency-bound, same rationale as resources.fetch's
-    # concurrency knobs above. No requests/limits block here (unlike the
-    # stages above) - none existed for this stage before this WP, and
-    # pod-level cpu/memory sizing is out of scope.
+    # concurrency knobs above.
     readConcurrency: 16
 
 networkPolicy:

@@ -128,6 +128,27 @@ SXA_SOURCE_SECRETS = {
 }
 
 
+# WP-067 live verification (2026-08-26) found every stage below ran with
+# no cpu/memory request or limit at all - values.yaml's resources: block
+# existed for some stages but nothing here ever read it (dead config).
+# KFP has no bulk/toYaml-style resources setter, so configure() below
+# applies each of the four set_*_request/set_*_limit calls per task,
+# keyed by stage name.
+RESOURCES = {
+    "fetch-redhat": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
+    "fetch-confluence": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
+    "fetch-salesforce": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
+    "load-sxa-dump": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
+    "detect-changes": {"requests": {{ .Values.resources.detectChanges.requests | toJson }}, "limits": {{ .Values.resources.detectChanges.limits | toJson }}},
+    "normalize": {"requests": {{ .Values.resources.normalize.requests | toJson }}, "limits": {{ .Values.resources.normalize.limits | toJson }}},
+    "chunk": {"requests": {{ .Values.resources.chunk.requests | toJson }}, "limits": {{ .Values.resources.chunk.limits | toJson }}},
+    "embed": {"requests": {{ .Values.resources.embed.requests | toJson }}, "limits": {{ .Values.resources.embed.limits | toJson }}},
+    "index-pgvector": {"requests": {{ .Values.resources.index.requests | toJson }}, "limits": {{ .Values.resources.index.limits | toJson }}},
+    "validate": {"requests": {{ .Values.resources.validate.requests | toJson }}, "limits": {{ .Values.resources.validate.limits | toJson }}},
+    "reconcile-acls": {"requests": {{ .Values.resources.reconcileAcls.requests | toJson }}, "limits": {{ .Values.resources.reconcileAcls.limits | toJson }}},
+}
+
+
 def component(stage: str):
     @dsl.container_component
     def _component():
@@ -139,7 +160,12 @@ def component(stage: str):
     return _component
 
 
-def configure(task, *, domain="tech", confluence=False, postgres=False, embedding=False, source_secret=False):
+def configure(task, *, stage, domain="tech", confluence=False, postgres=False, embedding=False, source_secret=False):
+    resources = RESOURCES[stage]
+    task.set_cpu_request(resources["requests"]["cpu"])
+    task.set_cpu_limit(resources["limits"]["cpu"])
+    task.set_memory_request(resources["requests"]["memory"])
+    task.set_memory_limit(resources["limits"]["memory"])
     kubernetes.use_config_map_as_env(task, config_map_name=CONFIGMAPS[domain], config_map_key_to_env=CONFIG_KEYS)
     kubernetes.use_secret_as_env(
         task,
@@ -201,24 +227,24 @@ FETCH_COMPONENTS = {
 
 @dsl.pipeline(name="{{ .Values.pipeline.name }}", description="{{ .Values.pipeline.description }}")
 def rag_ingestion_pipeline():
-    rh = configure(fetch_redhat())
+    rh = configure(fetch_redhat(), stage="fetch-redhat")
 {{- if $confluenceEnabled }}
-    cf = configure(fetch_confluence(), confluence=True)
-    changes = configure(detect_changes().after(rh, cf))
+    cf = configure(fetch_confluence(), stage="fetch-confluence", confluence=True)
+    changes = configure(detect_changes().after(rh, cf), stage="detect-changes")
 {{- else }}
-    changes = configure(detect_changes().after(rh))
+    changes = configure(detect_changes().after(rh), stage="detect-changes")
 {{- end }}
-    normalized = configure(normalize().after(changes))
-    chunks = configure(chunk().after(normalized))
-    embeddings = configure(embed().after(chunks), embedding=True)
-    indexed = configure(index_pgvector().after(embeddings), postgres=True)
-    validated = configure(validate().after(indexed), postgres=True)
+    normalized = configure(normalize().after(changes), stage="normalize")
+    chunks = configure(chunk().after(normalized), stage="chunk")
+    embeddings = configure(embed().after(chunks), stage="embed", embedding=True)
+    indexed = configure(index_pgvector().after(embeddings), stage="index-pgvector", postgres=True)
+    validated = configure(validate().after(indexed), stage="validate", postgres=True)
     # ADR-0110 (WP-25): after validate, over every indexed Confluence
     # chunk (not just this run's changeset) - needs the same Confluence
     # credential fetch_confluence uses (re-lists live pages) plus
     # postgres (updates/deletes). A no-op for the tech pipeline too if
     # no confluence sources are configured (see stage_reconcile_acls).
-    configure(reconcile_acls().after(validated), confluence=True, postgres=True)
+    configure(reconcile_acls().after(validated), stage="reconcile-acls", confluence=True, postgres=True)
 
 
 {{- range $name, $domain := .Values.domains }}
@@ -232,19 +258,19 @@ def rag_ingestion_pipeline():
 def rag_ingestion_pipeline_{{ $name | replace "-" "_" }}():
     fetches = []
 {{- range $stage := $domain.fetchStages }}
-    fetches.append(configure(FETCH_COMPONENTS["{{ $stage }}"](), domain="{{ $name }}", source_secret=True))
+    fetches.append(configure(FETCH_COMPONENTS["{{ $stage }}"](), stage="{{ $stage }}", domain="{{ $name }}", source_secret=True))
 {{- end }}
-    changes = configure(detect_changes().after(*fetches), domain="{{ $name }}")
-    normalized = configure(normalize().after(changes), domain="{{ $name }}")
-    chunks = configure(chunk().after(normalized), domain="{{ $name }}")
-    embeddings = configure(embed().after(chunks), domain="{{ $name }}", embedding=True)
-    indexed = configure(index_pgvector().after(embeddings), domain="{{ $name }}", postgres=True)
-    validated = configure(validate().after(indexed), domain="{{ $name }}", postgres=True)
+    changes = configure(detect_changes().after(*fetches), stage="detect-changes", domain="{{ $name }}")
+    normalized = configure(normalize().after(changes), stage="normalize", domain="{{ $name }}")
+    chunks = configure(chunk().after(normalized), stage="chunk", domain="{{ $name }}")
+    embeddings = configure(embed().after(chunks), stage="embed", domain="{{ $name }}", embedding=True)
+    indexed = configure(index_pgvector().after(embeddings), stage="index-pgvector", domain="{{ $name }}", postgres=True)
+    validated = configure(validate().after(indexed), stage="validate", domain="{{ $name }}", postgres=True)
     # ADR-0110 (WP-25): a no-op for every domain but knowledge.tech (none
     # of these fetchStages is fetch-confluence today) - wired uniformly
     # so a future domain that DOES gain a confluence source doesn't need
     # a template change to get reconciliation for free.
-    configure(reconcile_acls().after(validated), domain="{{ $name }}", postgres=True)
+    configure(reconcile_acls().after(validated), stage="reconcile-acls", domain="{{ $name }}", postgres=True)
 {{- end }}
 {{- end }}
 
