@@ -83,6 +83,14 @@ tools:
       - consultant
       - board
       - cdp
+      # ADR-0524 clause 4 (WP-085 step 5): OpenShift Lightspeed's read-only
+      # identity. It appears HERE and on confluence.page.read, and on nothing
+      # else in this file - that omission IS the write prohibition, per
+      # ADR-0011's intersection and ADR-0117's "read never implies write".
+      # Before adding this group to any further capability, re-read ADR-0524
+      # clause 4: two of its three enforcement layers are this list and the
+      # /mcp front-door's tools/list, which derives from this list.
+      - lightspeed_readonly
     external_model_policy:
       allow_context: false
 
@@ -101,6 +109,9 @@ tools:
       - consultant
       - board
       - cdp
+      # ADR-0524 clause 4 - see the search_confluence entry above. Deliberately
+      # NOT present on confluence.page.create / confluence.page.update below.
+      - lightspeed_readonly
     external_model_policy:
       allow_context: false
 

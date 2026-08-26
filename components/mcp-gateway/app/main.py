@@ -24,6 +24,7 @@ from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyDecision, PolicyStore, evaluate
+from app import mcp_frontdoor
 from app.telemetry import init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -146,20 +147,28 @@ def _self_scope_denial_reason(
     return None
 
 
-@app.post("/v1/tools/{tool_name}/invoke")
-async def invoke_tool(
+
+async def _authorize_and_invoke(
+    *,
     tool_name: str,
-    request: Request,
-    identity: CallerIdentity = Depends(validate_token),
-    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
-    x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
-    x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
-    x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
+    arguments: Dict[str, Any],
+    identity: CallerIdentity,
+    classification: str,
+    x_zuno_agent: str,
+    x_zuno_task: str,
+    x_zuno_run_id: str = "",
 ) -> Dict[str, Any]:
+    """The complete ADR-0011 authorization + invoke path, shared by both
+    front doors: the REST contract (`POST /v1/tools/{name}/invoke`) and the
+    MCP streamable-HTTP endpoint (`POST /mcp`, ADR-0524).
+
+    Extracted so the MCP front-door is a pure protocol adapter. It must never
+    grow its own policy check - ADR-0036 requires exactly one intersection in
+    this gateway, and two entry points sharing one function is how that stays
+    true as either side evolves.
+    """
     request_id = str(uuid.uuid4())
     started = time.monotonic()
-    classification = x_zuno_data_classification.upper()
-
     with tool_invoke_span(tool_name, classification, run_id=x_zuno_run_id or None) as call:
         # ADR-0116: the binding registry is the single source of known tool
         # names (canonical capability IDs + migration aliases) - an unknown
@@ -170,19 +179,6 @@ async def invoke_tool(
             raise HTTPException(status_code=404, detail=f"unknown tool '{tool_name}'")
         call.capability = binding.capability
         call.binding = binding.backend
-
-        raw_body = await request.body()
-        if raw_body:
-            try:
-                arguments = json.loads(raw_body)
-            except json.JSONDecodeError as exc:
-                call.outcome = "bad_request"
-                raise HTTPException(status_code=400, detail=f"request body is not valid JSON: {exc}") from exc
-        else:
-            arguments = {}
-        if not isinstance(arguments, dict):
-            call.outcome = "bad_request"
-            raise HTTPException(status_code=400, detail="request body must be a JSON object of tool arguments")
 
         decision = evaluate(
             store=policy_store,
@@ -208,7 +204,7 @@ async def invoke_tool(
             x_zuno_task,
             identity.sub,
             identity.groups,
-            x_zuno_data_classification,
+            classification,
             decision.allowed,
             decision.reason,
             request_id,
@@ -289,3 +285,136 @@ async def invoke_tool(
             "external_model_policy": {"allow_context": decision.allow_external_context},
             "result": result,
         }
+
+
+@app.post("/v1/tools/{tool_name}/invoke")
+async def invoke_tool(
+    tool_name: str,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
+    x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
+    x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
+) -> Dict[str, Any]:
+    classification = x_zuno_data_classification.upper()
+
+    raw_body = await request.body()
+    if raw_body:
+        try:
+            arguments = json.loads(raw_body)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"request body is not valid JSON: {exc}") from exc
+    else:
+        arguments = {}
+    if not isinstance(arguments, dict):
+        raise HTTPException(status_code=400, detail="request body must be a JSON object of tool arguments")
+
+    return await _authorize_and_invoke(
+        tool_name=tool_name,
+        arguments=arguments,
+        identity=identity,
+        classification=classification,
+        x_zuno_agent=x_zuno_agent,
+        x_zuno_task=x_zuno_task,
+        x_zuno_run_id=x_zuno_run_id,
+    )
+
+# ADR-0524 clause 3: the standard MCP streamable-HTTP front-door.
+#
+# Same deployment, same process, same authorization path as the REST contract
+# above - the ONLY new thing here is the wire protocol. Adding this endpoint is
+# what lets OpenShift Lightspeed (and any other standard MCP client) consume the
+# gateway without a shim deployment, which ADR-0524's non-goals rule out.
+#
+# Identity note: this endpoint deliberately does NOT invent a caller identity.
+# It requires the same validated token every other route does, and it requires
+# the same X-Zuno-Agent/X-Zuno-Task declaration, because ADR-0011's first two
+# factors are agent_declaration and task_rights. Lightspeed satisfies them with
+# agents/lightspeed/agent.okf.md - a declaration-only OKF bundle with no
+# workload - rather than this endpoint bypassing them.
+@app.post("/mcp")
+async def mcp_frontdoor_endpoint(
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+    x_zuno_data_classification: str = Header(default="C2", alias="X-Zuno-Data-Classification"),
+    x_zuno_agent: str = Header(default="lightspeed", alias="X-Zuno-Agent"),
+    x_zuno_task: str = Header(default="answer-openshift-question", alias="X-Zuno-Task"),
+    x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
+) -> JSONResponse:
+    # The agent/task defaults exist because a standard MCP client cannot be
+    # asked to send Zuno-specific headers - Lightspeed's OLSConfig can only set
+    # ONE header (Authorization). They are a DEFAULT, not an override: any
+    # caller that does send the headers gets its own declaration evaluated, and
+    # the defaults still go through the identical intersection, so they widen
+    # nothing. A token whose groups do not intersect the lightspeed task's tools
+    # is still denied.
+    #
+    # Classification defaults to C2 for the same reason: `confluence` is a C2
+    # domain (policies/data-classification/classification.yaml), and a C1
+    # default would deny every Confluence call for a reason the client could
+    # neither see nor fix.
+    raw = await request.body()
+    try:
+        message = json.loads(raw) if raw else None
+    except json.JSONDecodeError as exc:
+        return JSONResponse(
+            status_code=200,
+            content=mcp_frontdoor.error_response(
+                None, mcp_frontdoor.JsonRpcError(mcp_frontdoor.PARSE_ERROR, f"invalid JSON: {exc}")
+            ),
+        )
+
+    async def _invoke(tool_name: str, arguments: Dict[str, Any]) -> Any:
+        """Bridge the gateway's HTTP-shaped errors onto the exception types
+        mcp_frontdoor.dispatch() maps to MCP tool-level errors."""
+        try:
+            envelope = await _authorize_and_invoke(
+                tool_name=tool_name,
+                arguments=arguments,
+                identity=identity,
+                classification=x_zuno_data_classification.upper(),
+                x_zuno_agent=x_zuno_agent,
+                x_zuno_task=x_zuno_task,
+                x_zuno_run_id=x_zuno_run_id,
+            )
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                raise LookupError(exc.detail) from exc
+            if exc.status_code in (401, 403):
+                raise PermissionError(exc.detail) from exc
+            raise RuntimeError(exc.detail) from exc
+        # Return the tool's own result, not the REST envelope: an MCP client
+        # wants the tool output, and the envelope's routing/telemetry fields are
+        # meaningful only to the Agent Runtime.
+        return envelope.get("result")
+
+    # A JSON-RPC batch is a list. Notifications inside it produce no response,
+    # and a batch of only notifications produces no response body at all.
+    messages = message if isinstance(message, list) else [message]
+    responses = []
+    for msg in messages:
+        try:
+            resp = await mcp_frontdoor.dispatch(
+                msg,
+                policy_store=policy_store,
+                agents=agent_declarations,
+                binding_registry=binding_registry,
+                identity=identity,
+                agent_name=x_zuno_agent,
+                task_name=x_zuno_task,
+                classification=x_zuno_data_classification.upper(),
+                invoke_tool=_invoke,
+            )
+        except mcp_frontdoor.JsonRpcError as exc:
+            resp = mcp_frontdoor.error_response(
+                (msg or {}).get("id") if isinstance(msg, dict) else None, exc
+            )
+        if resp is not None:
+            responses.append(resp)
+
+    if not responses:
+        # Notification-only: MCP/JSON-RPC expects 202 with no body.
+        return JSONResponse(status_code=202, content=None)
+    payload = responses if isinstance(message, list) else responses[0]
+    return JSONResponse(status_code=200, content=payload)

@@ -1,0 +1,14 @@
+{{- if and .Values.lightspeedConfig.enabled .Values.caBundle.enabled }}
+# Empty on purpose: the service-ca operator populates service-ca.crt in
+# response to the annotation. Do not add data here - the operator overwrites it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.caBundle.configMapName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+    argocd.argoproj.io/sync-wave: "-10"
+{{- end }}

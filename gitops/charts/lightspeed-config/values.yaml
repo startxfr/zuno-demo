@@ -1,0 +1,145 @@
+# ADR-0524 / WP-085. Everything here is gated behind lightspeedConfig.enabled
+# so the -d0 Application renders nothing and only -d1 creates the operand,
+# same shape gitops/charts/aap-config uses.
+lightspeedConfig:
+  enabled: false
+
+# The operator's own namespace, created by gitops/charts/lightspeed's
+# `project` subchart in Day 1. OLSConfig is a CLUSTER singleton that must be
+# named "cluster" (the CRD accepts no other name), but the Secrets/ConfigMaps
+# it references must live in the operator's namespace.
+namespace: openshift-lightspeed
+
+olsConfig:
+  # Fixed by the CRD - do not parameterize.
+  name: cluster
+
+  # ADR-0524 clause 1: local inference through MaaS, not through a KServe
+  # predictor Service and not through ai-gateway. `rhoai_vllm` is a real
+  # member of the CRD's provider `type` enum (confirmed 2026-08-26 against
+  # the v1.1.2 bundle CRD, alongside azure_openai/bam/openai/watsonx/
+  # rhelai_vllm/google_vertex/bedrock/fake_provider).
+  provider:
+    name: zuno-maas
+    type: rhoai_vllm
+    # Published MaaS model name, NOT the LLMInferenceService name -
+    # gitops/charts/models/values.yaml publishes qwen36-27b-instruct as
+    # "qwen36-27b-instruct-maas". Getting this wrong produces a 403 from the
+    # MaaSAuthPolicy's OPA map rather than a 404, because the model identity
+    # it authorizes on is derived from the request path.
+    publishedModelName: qwen36-27b-instruct-maas
+    # The name Lightspeed sends as the OpenAI "model" field.
+    modelName: qwen3.6-27b-instruct
+    # In-cluster MaaS gateway root. Same endpoint ai-gateway's maasAdapter
+    # uses (MAAS_GATEWAY_ENDPOINT), path-scoped per model below.
+    gatewayEndpoint: https://maas-default-gateway-istio.openshift-ingress.svc
+    # Serving namespace segment of the MaaS path (/{ns}/{publishedModel}/v1).
+    servingNamespace: zuno-ai-run
+    contextWindowSize: 128000
+    maxTokensForResponse: 2048
+
+  # ADR-0524 clause 2: native OpenShift knowledge, untouched. `rag` stays
+  # empty and `byokRAGOnly` stays FALSE so the operator's RHOKP sidecar keeps
+  # serving official, version-matched OpenShift documentation. Setting
+  # byokRAGOnly: true would disable exactly that. Zuno builds no OpenShift-
+  # documentation ingestion pipeline and no pgvector corpus for it.
+  byokRAGOnly: false
+
+  # ADR-0524 clause 6: leave introspection ON (the CRD's own default) so the
+  # operator-managed openshift-mcp-server can answer questions about live
+  # cluster state, scoped by the querying user's own RBAC.
+  introspectionEnabled: true
+
+  # ADR-0524 clause 4, third layer. `tool_annotations` is the CRD default;
+  # named explicitly so a future edit is a visible decision rather than a
+  # silent inherit. 'never' would remove the approval prompt entirely.
+  toolsApproval:
+    approvalType: tool_annotations
+    approvalTimeout: 600
+
+# ADR-0524 clause 3. One MCP server entry: the EXISTING Zuno MCP Gateway's
+# new /mcp front-door. No dedicated MCP deployment is created for Lightspeed.
+#
+# featureGates MUST contain "MCPServer" or this whole block is inert - all
+# feature gates are off by default on v1.1.2 (CRD enum: MCPServer,
+# ToolFiltering). This is the single easiest way to configure Lightspeed's MCP
+# integration and have it silently do nothing.
+mcp:
+  enabled: true
+  featureGates:
+    - MCPServer
+  server:
+    name: zuno-mcp
+    url: http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp
+    # The CRD default is 5s. mcp-gateway's own call to a downstream MCP server
+    # already allows 40s (DOWNSTREAM_TIMEOUT_SECONDS), so a 5s budget here
+    # would time out on Confluence searches the gateway itself considers
+    # healthy.
+    timeoutSeconds: 60
+
+  # ADR-0524 clause 5. Two identity modes, both delivered by WP-085.
+  #
+  #   serviceIdentity - a dedicated Keycloak client-credentials token carrying
+  #     a read-only group. Works against mcp-gateway's existing auth.py with no
+  #     code change (valueFrom.type: secret).
+  #   perUser        - forwards the console user's own OpenShift token
+  #     (valueFrom.type: client) for mcp-gateway's additive TokenReview branch.
+  #
+  # Only ONE may be active: they both set the Authorization header, and the
+  # CRD has no precedence rule between two entries with the same header name.
+  # templates/checks.yaml fails the render if both or neither are enabled.
+  identityMode: serviceIdentity  # serviceIdentity | perUser
+
+  serviceIdentity:
+    secretName: lightspeed-mcp-token
+    secretKey: token
+    # Seeded by ansible/roles/lightspeed_config/tasks/install.yml before this
+    # Application is applied. If the ExternalSecret sits in SecretSyncedError,
+    # that role step did not run.
+    vaultPath: zuno/lightspeed/mcp-token
+
+# ADR-0524 clause 1, TLS. maas-default-gateway's serving cert is issued by the
+# cluster's openshift-service-serving-signer, which is NOT in the Lightspeed
+# image's default trust store - the same trap ai-gateway's maasAdapter hit
+# live on 2026-08-26, where it surfaced as a generic "Connection error" and a
+# silent fallback rather than a TLS failure.
+#
+# Rendered as our own ConfigMap carrying the service.beta.openshift.io/
+# inject-cabundle annotation, so the service-ca operator fills in service-ca.crt
+# for us. NOT the auto-created "openshift-service-ca.crt" ConfigMap: that one is
+# managed by the cluster and referencing it would make ArgoCD fight the
+# service-ca operator over a resource neither owns.
+caBundle:
+  enabled: true
+  configMapName: lightspeed-maas-ca
+
+# The MaaS credential. See WP-085 step 2's "Open item" - this is the one thing
+# that must be settled against the live cluster before install.
+#
+#   saTokenSecret - a long-lived kubernetes.io/service-account-token Secret.
+#     Preferred IF TokenReview accepts an audience-less legacy token when
+#     AuthPolicy/maas-gateway-auth requests audience
+#     https://kubernetes.default.svc. Needs no new secret material.
+#   apiKey        - a MaaS-issued sk-oai-* key from Vault. Fits
+#     credentialsSecretRef perfectly but needs minting and seeding first.
+#
+# apiKeyEnabled is DELIBERATELY false and gates the ExternalSecret's render,
+# copying gitops/charts/ai-gateway's maasAdapter gate verbatim - and for the
+# same reason it was added there after a live incident on 2026-08-26:
+# rendering an ExternalSecret against an unseeded Vault path leaves it
+# permanently Degraded, and ArgoCD's wave-ordered sync then never reaches the
+# resources behind it, wedging the whole Application.
+credential:
+  mode: saTokenSecret  # saTokenSecret | apiKey
+  secretName: lightspeed-maas-credentials
+  # OLSConfig.spec.llm.providers[].credentialKey. Left empty so the template
+  # derives it from `mode` - the two modes produce Secrets with DIFFERENT key
+  # names and mismatching them yields an empty credential and a 401 from MaaS
+  # that looks like an entitlement problem:
+  #   saTokenSecret -> "token"    (fixed by kubernetes.io/service-account-token)
+  #   apiKey        -> "apitoken" (the CRD's own default)
+  # Set a non-empty value only to override that derivation deliberately.
+  credentialKey: ""
+  serviceAccountName: lightspeed-maas-client
+  apiKeyEnabled: false
+  apiKeyVaultPath: maas/gateway-api-key

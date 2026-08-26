@@ -24,7 +24,14 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # same prerequisites openshift-oauth itself needed to move out of Day 0 for.
 # "aap-config" (WP-073) follows immediately: it registers this repository
 # (Project/Job Template/SSO) inside the AAP instance "aap" just installed.
-DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap aap-config connectivity-link lws jobset kueue openshift-ai aiagent-operator
+# "lightspeed" (ADR-0524/WP-085) sits after "openshift-ai" and before
+# "aiagent-operator": the OpenShift Lightspeed operator has no dependency
+# beyond OLM, which is exactly why only the OPERATOR is here. Its
+# configuration is a separate Day 2 component ("lightspeed-config") - an
+# OLSConfig created in Day 1 would reference a MaaS model and an MCP
+# endpoint that don't exist until Day 2, and would sit Degraded for the
+# whole window while ArgoCD self-healed it back.
+DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap aap-config connectivity-link lws jobset kueue openshift-ai lightspeed aiagent-operator
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aiagent-operator
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
@@ -38,10 +45,15 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # tier). "build" only knows how to build the 5 named image groups (mcp,
 # rag, rag-ingestion, agent, mlops - see
 # ansible/roles/{mcp,rag,rag_ingestion,agent,mlops}_build); "check"/
-# "install" operate on the 9 deployable components, plus "supply-chain"
+# "lightspeed-config" (ADR-0524/WP-085) is deliberately LAST among the
+# deployable components: it needs "models" (the MaaS entitlement for its
+# ServiceAccount), "mcp" (the /mcp front-door plus the NetworkPolicy
+# admitting openshift-lightspeed) and "agents" all already live, plus the
+# Day 1 "lightspeed" operator installed before any of it.
+# "install" operate on the 10 deployable components, plus "supply-chain"
 # (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
 # only a signature-verification gate (ansible/roles/supply_chain).
-DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops supply-chain
+DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops lightspeed-config supply-chain
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
 DAY2_VERBS := check install build uninstall all reinstall
 
@@ -65,13 +77,20 @@ DAY2_VERBS := check install build uninstall all reinstall
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
 DAY3_BACKUP_COMPONENTS := postgresql
-DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS))
+# Components that support "check" but neither test/stresstest nor
+# backup/restore - they contribute only their own precheck.yml
+# (ansible/playbooks/day3_check.yml). ADR-0524/WP-085: "lightspeed" and
+# "lightspeed-config" are two entries, not one, because the component is split
+# across day tiers - checking only the operator would report healthy while the
+# OLSConfig operand is absent, and vice versa.
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
 DAY3_VERBS := test stresstest backup restore check
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -122,6 +141,7 @@ help:
 	  'Day 2 components (build):         $(DAY2_BUILD_COMPONENTS)' \
 	  'Day 3 components (test/stresstest/check): $(DAY3_TEST_COMPONENTS)' \
 	  'Day 3 components (backup/restore):        $(DAY3_BACKUP_COMPONENTS)' \
+	  'Day 3 components (check only):            $(DAY3_CHECK_ONLY_COMPONENTS)' \
 	  'Day 3 report format: text (default) | json | csv - set via REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"'
 
 # ADR-0119: scaffold a new MCP server from the confluence-shaped template
@@ -416,6 +436,9 @@ if [[ -z "$$verb" ]]; then \
     'Components (backup/restore; optional, default: all):' \
     '  $(DAY3_BACKUP_COMPONENTS)' \
     '' \
+    'Day 3 check-only components:' \
+    '  $(DAY3_CHECK_ONLY_COMPONENTS)' \
+    '' \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
@@ -478,5 +501,5 @@ d3: $(if $(DAY_VERB),credentials-check)
 # directly, so e.g. `make d0 check postgresql` needs "check" and
 # "postgresql" to resolve to *something* as Make goals without erroring
 # as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS)):
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)):
 	@:

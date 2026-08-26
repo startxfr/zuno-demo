@@ -51,6 +51,7 @@
       - jobset
       - kueue
       - openshift_ai
+      - lightspeed
       - aiagent_operator
   tasks:
     - name: Resolve cluster API credentials

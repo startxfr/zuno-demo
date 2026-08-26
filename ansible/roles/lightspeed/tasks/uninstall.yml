@@ -1,0 +1,26 @@
+---
+# Reverse of install.yml: delete the no-op d1 Application, then
+# remove_operator.yml (needs the Subscription) before d0's own delete.
+#
+# OLSConfig is NOT deleted here - it belongs to the lightspeed_config role
+# (Day 2), whose uninstall must run first. Removing the operator while its
+# operand still exists strands the OLSConfig with no controller to finalize
+# it. `make d2 uninstall lightspeed-config` before `make d1 uninstall
+# lightspeed`, same ordering aap-config/aap already require.
+- name: "lightspeed | delete the lightspeed GitOps Application (d1, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-lightspeed-d1"
+
+- name: "lightspeed | remove the operator (its owned CRDs then the CSV then the Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ lightspeed_package_name | default('lightspeed-operator') }}"
+    # openshift-lightspeed, its own dedicated namespace (OwnNamespace-only
+    # CSV) - see gitops/apps/lightspeed/application-d0.yaml.
+    operator_namespace: openshift-lightspeed
+
+- name: "lightspeed | delete the lightspeed GitOps Application (d0: the Subscription itself)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-lightspeed-d0"

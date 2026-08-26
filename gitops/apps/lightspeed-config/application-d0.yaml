@@ -1,0 +1,31 @@
+---
+# Placeholder phase - renders nothing (lightspeedConfig.enabled: false). Kept
+# so this component has the same -d0/-d1 shape every other component does, the
+# same convention gitops/apps/aap-config/application-d0.yaml follows.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-lightspeed-config-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-94"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/lightspeed-config
+    helm:
+      releaseName: zuno-lightspeed-config-d0
+      values: |
+        lightspeedConfig:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-lightspeed
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

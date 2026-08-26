@@ -1,0 +1,20 @@
+apiVersion: v2
+name: lightspeed
+description: >-
+  OpenShift Lightspeed operator (OLM Subscription, channel/catalog
+  discovered at Ansible run time - ADR-0048) in its own dedicated
+  namespace with an OwnNamespace-scoped OperatorGroup. ADR-0524: this
+  chart installs the operator ONLY. The OLSConfig operand is deliberately
+  a separate Day 2 component (gitops/charts/lightspeed-config), because it
+  cannot reconcile until MaaS entitlement and the MCP Gateway front-door
+  exist.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
+  - name: project
+    version: "21.3.277"
+    repository: "alias:startx"

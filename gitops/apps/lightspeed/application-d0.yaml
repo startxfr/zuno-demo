@@ -1,0 +1,41 @@
+---
+# OpenShift Lightspeed operator install (namespace + OperatorGroup +
+# Subscription). The OLSConfig operand is NOT here and is not even in this
+# chart - it belongs to the Day 2 "lightspeed-config" component
+# (gitops/apps/lightspeed-config/application-d1.yaml), see ADR-0524 clause 7.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-lightspeed-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-126"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/lightspeed
+    helm:
+      releaseName: zuno-lightspeed-d0
+      values: |
+        project:
+          enabled: true
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-lightspeed
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

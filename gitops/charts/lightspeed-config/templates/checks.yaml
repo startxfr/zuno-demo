@@ -1,0 +1,33 @@
+{{- /*
+Render-time guards. Each of these has a live failure mode that is silent or
+misleading if it slips through, so they fail the render instead.
+*/ -}}
+{{- if .Values.lightspeedConfig.enabled -}}
+
+{{- if not (has .Values.credential.mode (list "saTokenSecret" "apiKey")) -}}
+{{- fail (printf "credential.mode must be \"saTokenSecret\" or \"apiKey\", got %q (WP-085 step 2)" .Values.credential.mode) -}}
+{{- end -}}
+
+{{- if and (eq .Values.credential.mode "apiKey") (not .Values.credential.apiKeyEnabled) -}}
+{{- fail "credential.mode is \"apiKey\" but credential.apiKeyEnabled is false, so no credential Secret would be rendered and OLSConfig would reference a Secret that never appears. Mint and seed a MaaS key at credential.apiKeyVaultPath, then set apiKeyEnabled: true." -}}
+{{- end -}}
+
+{{- if .Values.mcp.enabled -}}
+  {{- if not (has .Values.mcp.identityMode (list "serviceIdentity" "perUser")) -}}
+  {{- fail (printf "mcp.identityMode must be \"serviceIdentity\" or \"perUser\", got %q (ADR-0524 clause 5)" .Values.mcp.identityMode) -}}
+  {{- end -}}
+  {{- if not (has "MCPServer" .Values.mcp.featureGates) -}}
+  {{- fail "mcp.enabled is true but featureGates does not contain \"MCPServer\". On v1.1.2 every feature gate is off by default, so spec.mcpServers would be accepted by the API server and then silently ignored - Lightspeed would answer without ever calling Zuno. Add MCPServer to mcp.featureGates." -}}
+  {{- end -}}
+  {{- if not (hasPrefix "http://" .Values.mcp.server.url) -}}
+    {{- if not (hasPrefix "https://" .Values.mcp.server.url) -}}
+    {{- fail (printf "mcp.server.url must be an HTTP/HTTPS URL - the CRD's MCPServerConfig supports no other transport (got %q)" .Values.mcp.server.url) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if .Values.olsConfig.byokRAGOnly -}}
+{{- fail "olsConfig.byokRAGOnly is true, which disables the operator's RHOKP sidecar and with it ALL official OpenShift documentation retrieval. ADR-0524 clause 2 keeps that knowledge source; since olsConfig.rag is not populated by this chart, enabling this would leave Lightspeed with no documentation corpus at all." -}}
+{{- end -}}
+
+{{- end -}}

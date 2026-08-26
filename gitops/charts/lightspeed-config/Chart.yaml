@@ -1,0 +1,12 @@
+apiVersion: v2
+name: lightspeed-config
+description: >-
+  Wires the already-installed OpenShift Lightspeed operator into the Zuno AI
+  platform (ADR-0524): the OLSConfig singleton, its MaaS-backed rhoai_vllm
+  provider credential, the cluster service-CA trust bundle for that hop, and
+  the credential Lightspeed presents to the Zuno MCP Gateway. Day 2, not
+  Day 1 - every one of those depends on `models`, `mcp` and `keycloak`
+  already being live.
+type: application
+version: 0.1.0
+appVersion: "1.1.2"

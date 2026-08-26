@@ -1,0 +1,51 @@
+---
+# ADR-0524: the OLSConfig operand and everything it references. Day 2, and
+# LAST in Day 2 - it depends on `models` (the MaaS entitlement), `mcp` (the
+# /mcp front-door plus the NetworkPolicy admitting openshift-lightspeed) and
+# `keycloak` (the client-credentials identity) all already being live.
+#
+# Sync-wave -93 puts it after every agent Application (which end at -96), so
+# the root App-of-Apps path orders it the same way Ansible does.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-lightspeed-config-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-93"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/lightspeed-config
+    helm:
+      releaseName: zuno-lightspeed-config-d1
+      values: |
+        lightspeedConfig:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-lightspeed
+  ignoreDifferences:
+    # The service-ca operator populates this ConfigMap's data in response to
+    # the inject-cabundle annotation. Without this, ArgoCD and the operator
+    # fight over it forever and the app never reports Synced.
+    - group: ""
+      kind: ConfigMap
+      name: lightspeed-maas-ca
+      jsonPointers:
+        - /data
+    # Populated by the token controller for a kubernetes.io/service-account-token
+    # Secret; same reasoning.
+    - group: ""
+      kind: Secret
+      name: lightspeed-maas-credentials
+      jsonPointers:
+        - /data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

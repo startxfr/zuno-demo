@@ -1,0 +1,72 @@
+{{- if .Values.lightspeedConfig.enabled }}
+{{- $p := .Values.olsConfig.provider }}
+{{- /* Derive credentialKey from the credential mode unless explicitly overridden. */ -}}
+{{- $credKey := .Values.credential.credentialKey }}
+{{- if not $credKey }}{{ $credKey = ternary "token" "apitoken" (eq .Values.credential.mode "saTokenSecret") }}{{ end }}
+# ADR-0524: the OLSConfig singleton. Cluster-scoped in effect (the CRD accepts
+# only the name "cluster"), so exactly one Application may ever render it.
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: {{ .Values.olsConfig.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  {{- if .Values.mcp.enabled }}
+  # Without this gate the mcpServers block below is silently inert.
+  featureGates:
+{{ toYaml .Values.mcp.featureGates | indent 4 }}
+  {{- end }}
+  llm:
+    providers:
+      - name: {{ $p.name }}
+        type: {{ $p.type }}
+        url: {{ printf "%s/%s/%s/v1" $p.gatewayEndpoint $p.servingNamespace $p.publishedModelName | quote }}
+        credentialsSecretRef:
+          name: {{ .Values.credential.secretName }}
+        credentialKey: {{ $credKey }}
+        models:
+          - name: {{ $p.modelName }}
+            contextWindowSize: {{ $p.contextWindowSize }}
+            parameters:
+              maxTokensForResponse: {{ $p.maxTokensForResponse }}
+  ols:
+    defaultProvider: {{ $p.name }}
+    defaultModel: {{ $p.modelName }}
+    # ADR-0524 clause 2: `rag` deliberately absent and byokRAGOnly false, so
+    # the operator's RHOKP sidecar keeps serving official OpenShift docs.
+    byokRAGOnly: {{ .Values.olsConfig.byokRAGOnly }}
+    # ADR-0524 clause 6: operator-managed openshift-mcp-server stays on.
+    introspectionEnabled: {{ .Values.olsConfig.introspectionEnabled }}
+    toolsApprovalConfig:
+      approvalType: {{ .Values.olsConfig.toolsApproval.approvalType }}
+      approvalTimeout: {{ .Values.olsConfig.toolsApproval.approvalTimeout }}
+    {{- if .Values.caBundle.enabled }}
+    # Trusts the cluster service-CA that signs maas-default-gateway's cert.
+    additionalCAConfigMapRef:
+      name: {{ .Values.caBundle.configMapName }}
+    {{- end }}
+  {{- if .Values.mcp.enabled }}
+  mcpServers:
+    - name: {{ .Values.mcp.server.name }}
+      url: {{ .Values.mcp.server.url | quote }}
+      timeout: {{ .Values.mcp.server.timeoutSeconds }}
+      headers:
+        - name: Authorization
+          valueFrom:
+          {{- if eq .Values.mcp.identityMode "serviceIdentity" }}
+            # Keycloak client-credentials token; validated by mcp-gateway's
+            # existing JWKS path with no code change.
+            type: secret
+            secretRef:
+              name: {{ .Values.mcp.serviceIdentity.secretName }}
+          {{- else }}
+            # The console user's own OpenShift token, for mcp-gateway's
+            # additive TokenReview branch (WP-085 step 4). Requires that
+            # branch to be deployed, or every call 401s.
+            type: client
+          {{- end }}
+  {{- end }}
+{{- end }}

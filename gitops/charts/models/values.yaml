@@ -675,6 +675,30 @@ maas:
             - limit: 1000000
               window: 1h
           priority: 100
+        # ADR-0524 clause 1 (WP-085 step 2): OpenShift Lightspeed's own
+        # identity, entitled to this model only. The subject is a DEDICATED
+        # ServiceAccount created by gitops/charts/lightspeed-config, not
+        # Lightspeed's operand SA - that one is created by the operator at
+        # reconcile time and its name is not knowable before install (the
+        # v1.1.2 bundle CSV declares only lightspeed-operator-controller-
+        # manager), so a purpose-made identity is both the tighter grant and
+        # the only one this file can name up front.
+        #
+        # `user:` not `group:`, same reasoning as the ai-gateway entry above:
+        # a Kubernetes TokenReview identity supports scoping to ONE
+        # ServiceAccount rather than system:serviceaccounts:openshift-lightspeed
+        # (every SA in that namespace, including the operator's own).
+        #
+        # Rate limit sits between a persona tier and ai-gateway's
+        # infrastructure tier: Lightspeed serves interactive console questions
+        # for many users, but it is one assistant, not the platform's whole
+        # aggregate model traffic. Priority 50 for the same reason.
+        - name: qwen36-27b-instruct-lightspeed
+          user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
+          tokenRateLimits:
+            - limit: 200000
+              window: 1h
+          priority: 50
       authPolicy:
         name: qwen36-27b-instruct-entitlement
 

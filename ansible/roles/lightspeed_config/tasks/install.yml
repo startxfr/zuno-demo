@@ -1,0 +1,86 @@
+---
+# ADR-0524 clause 7 (WP-085 steps 2-6): wires the already-installed Lightspeed
+# operator into the Zuno platform. Runs LAST in Day 2 - it needs `models` (the
+# MaaS entitlement for its ServiceAccount), `mcp` (the /mcp front-door and the
+# NetworkPolicy admitting openshift-lightspeed) and `keycloak` (the
+# client-credentials identity) to already be live.
+#
+# The operator itself is Day 1 (ansible/roles/lightspeed). This role fails
+# fast rather than waiting if that half is missing, because every resource
+# below references a CRD only the operator provides.
+- name: "lightspeed-config | verify the OLSConfig CRD exists (Day 1 `lightspeed` must have run)"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: olsconfigs.ols.openshift.io
+  register: _ols_crd
+
+- name: "lightspeed-config | fail if the Lightspeed operator isn't installed yet"
+  ansible.builtin.fail:
+    msg: >-
+      The olsconfigs.ols.openshift.io CRD is absent, so the OpenShift Lightspeed
+      operator is not installed. This is a Day 1 component - run
+      `make d1 install lightspeed` first, then re-run this. (AUTO-FIX:
+      make d1 install lightspeed)
+  when: (_ols_crd.resources | default([]) | length) == 0
+
+# ADR-0524 clause 5, service-identity mode. The Keycloak client-credentials
+# token must exist in Vault BEFORE the Application is applied, or the
+# ExternalSecret lands in SecretSyncedError and ArgoCD's wave-ordered sync
+# never reaches the OLSConfig behind it.
+#
+# NOT automated here yet: minting the token requires the `lightspeed` Keycloak
+# client to exist and a client-credentials grant against it. WP-085 step 4
+# covers that; until it lands this check turns a confusing half-synced
+# Application into an actionable message.
+- name: "lightspeed-config | check the MCP service-identity Secret was seeded"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: "{{ lightspeed_namespace | default('openshift-lightspeed') }}"
+    name: "{{ lightspeed_mcp_secret_name | default('lightspeed-mcp-token') }}"
+  register: _ols_mcp_secret
+  when: (lightspeed_identity_mode | default('serviceIdentity')) == 'serviceIdentity'
+
+- name: "lightspeed-config | warn if the MCP service-identity Secret is missing"
+  ansible.builtin.debug:
+    msg: >-
+      Secret '{{ lightspeed_mcp_secret_name | default('lightspeed-mcp-token') }}'
+      is not present in
+      '{{ lightspeed_namespace | default('openshift-lightspeed') }}' yet. The
+      ExternalSecret rendered below resolves it from Vault path
+      zuno/lightspeed/mcp-token - seed that path (ansible/confidential.yml +
+      `make d0 install vault`) or Lightspeed's MCP calls will 401 against
+      mcp-gateway. The OLSConfig itself still reconciles; only the Zuno
+      knowledge path is affected.
+  when:
+    - (lightspeed_identity_mode | default('serviceIdentity')) == 'serviceIdentity'
+    - (_ols_mcp_secret.resources | default([]) | length) == 0
+
+- name: "lightspeed-config | apply the lightspeed-config GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "lightspeed-config"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-lightspeed-config-d0"
+
+- name: "lightspeed-config | apply the lightspeed-config GitOps Application (d1: OLSConfig)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "lightspeed-config"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-lightspeed-config-d1"
+    gitops_app_extra_helm_values:
+      # Repeated here even though application-d1.yaml sets it -
+      # gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
+      # rather than merging.
+      lightspeedConfig:
+        enabled: true
+      mcp:
+        identityMode: "{{ lightspeed_identity_mode | default('serviceIdentity') }}"
+      credential:
+        mode: "{{ lightspeed_credential_mode | default('saTokenSecret') }}"
+    # The operator rolls out the API server, console plugin, RHOKP sidecar,
+    # its own PostgreSQL and openshift-mcp-server from one CR - comparable to
+    # aap's multi-component operand, so the same generous budget.
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15

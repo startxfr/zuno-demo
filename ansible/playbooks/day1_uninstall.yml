@@ -20,6 +20,7 @@
     zuno_day: d1
     day1_components:
       - aiagent_operator
+      - lightspeed
       - openshift_ai
       - kueue
       - jobset

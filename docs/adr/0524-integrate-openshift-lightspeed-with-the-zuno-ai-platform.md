@@ -115,10 +115,13 @@ Gateway: it serves cluster introspection, the Gateway serves enterprise knowledg
 **7. Split across Day 1 and Day 2, as two components.** The operator (`lightspeed`) installs in
 Day 1 with no dependency beyond OLM. Its configuration (`lightspeed-config`) runs **last in Day
 2**, after `models` (MaaS entitlement), `mcp` (the `/mcp` front-door and the NetworkPolicy
-allowing Lightspeed in) and `agents`. Two Ansible roles, two ArgoCD Applications and **two Helm
-charts** - the same shape `aap`/`aap-config` already uses (ADR-0354, WP-072/WP-073) rather than
-one chart rendered by two Applications, which would put two Applications in conflict over
-`argocd.argoproj.io/tracking-id` for the same rendered resources.
+allowing Lightspeed in) and `agents`. Two Ansible roles and **two Helm charts**, one per
+component - the same shape `aap`/`aap-config` already uses (ADR-0354, WP-072/WP-073). Each chart
+is rendered by the repository's standard **two** Applications, `-d0` (namespace + operator) and
+`-d1` (operand), whose value gates keep their rendered resource sets disjoint; `lightspeed`'s
+`-d1` points at `gitops/charts/noop`, since its operand is `lightspeed-config`'s job in Day 2.
+The split is by component lifecycle and day tier, not by any ArgoCD limitation - `aap` proves one
+chart serves two Applications cleanly.
 
 Tracked by WP-085.
 
@@ -158,8 +161,9 @@ PostgreSQL is operator-managed inside `openshift-lightspeed` and is **not** a PG
 deviation, not an oversight, and it is deliberately excluded from Day 3's pgBackRest
 backup/restore scope - conversation cache is disposable state.
 
-`openshift-lightspeed` is created by the `namespaces` chart alongside `zuno-aap`, and is **not**
-mesh-injected: Lightspeed's Deployments are operator-owned, and injecting a sidecar into them
+`openshift-lightspeed` is created by `gitops/charts/lightspeed`'s own vendored `project`
+subchart, following `lws` and `custom-metrics-autoscaler` - `gitops/charts/namespaces` owns only
+`zuno-*` namespaces, never `openshift-*` operator ones. It is **not** mesh-injected: Lightspeed's Deployments are operator-owned, and injecting a sidecar into them
 would put the platform in the business of patching a Red Hat operand. Reachability into
 `zuno-ai-run` is therefore a NetworkPolicy question only - `mcp-gateway`'s policy today admits
 only `agent-runtime` and `acceptance-gate` pods and must gain a namespace-scoped allow.

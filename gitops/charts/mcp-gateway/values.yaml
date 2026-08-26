@@ -68,3 +68,16 @@ aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 # Domains treated as "internal" by the send_technical_report_email demo
 # handler (comma-separated). Override for the real environment.
 internalEmailDomains: zuno.example.internal
+
+# ADR-0524 clause 3 (WP-085 step 3): lets OpenShift Lightspeed reach this
+# gateway's MCP front-door (/mcp). Default false - the allow is scoped by
+# NAMESPACE rather than by pod label, because Lightspeed's pods are
+# operator-owned and carry no label this chart controls, so it stays opt-in
+# rather than shipping a coarse grant to every cluster.
+#
+# Turned on by the Day 2 `mcp` component only once `lightspeed-config` is
+# actually being deployed. Enabling it without Lightspeed installed is
+# harmless (the namespaceSelector simply matches nothing), but pointless.
+lightspeed:
+  enabled: false
+  namespace: openshift-lightspeed

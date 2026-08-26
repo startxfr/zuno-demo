@@ -1,6 +1,8 @@
 # WP-085: Integrate OpenShift Lightspeed with Zuno inference, knowledge and identity
 
-- **State:** Not started.
+- **State:** Repo work done (steps 1-3, 5, 6 and the service-identity half of
+  step 4). No cluster change made. Live verification pending - see the checklist
+  below, every item of which is still an operator step.
 - **ADRs:** ADR-0524 (Proposed)
 - **Depends on:** ADR-0521/WP-076 (Implemented - MaaS is the local-model transport this reuses),
   ADR-0117 (Implemented - the Confluence MCP server), ADR-0060 (Implemented - Day 1/Day 2/Day 3
@@ -25,15 +27,17 @@ Step 3 and step 4 below close exactly those two gaps.
 
 ## Component and file layout (ADR-0524 clause 7)
 
-Two components, mirroring `aap`/`aap-config` exactly - two roles, two Applications, **two
-charts**. A single shared chart was considered and rejected: two ArgoCD Applications rendering
-one chart contend over `argocd.argoproj.io/tracking-id` for the same resources.
+Two components, mirroring `aap`/`aap-config` exactly - two roles and **two charts**, one per
+component. Each chart is rendered by the repository's standard `-d0`/`-d1` Application pair,
+whose Helm value gates keep the rendered sets disjoint (`aap` does exactly this: `-d0` renders
+namespace+Subscription, `-d1` the operand CR). So the split here is by component lifecycle and
+day tier, **not** because ArgoCD cannot share a chart - it demonstrably can.
 
 | | Day 1 - `lightspeed` | Day 2 - `lightspeed-config` |
 |---|---|---|
 | Role | `ansible/roles/lightspeed/tasks/{install,precheck,uninstall}.yml` | `ansible/roles/lightspeed_config/tasks/{install,precheck,uninstall}.yml` |
 | Chart | `gitops/charts/lightspeed` | `gitops/charts/lightspeed-config` |
-| App | `gitops/apps/lightspeed/application-d{0,1}.yaml` (`zuno-lightspeed-d1`) | `gitops/apps/lightspeed-config/application-d{0,1}.yaml` (`zuno-lightspeed-config-d1`) |
+| Apps | `zuno-lightspeed-d0` (namespace + operator), `zuno-lightspeed-d1` -> `gitops/charts/noop` | `zuno-lightspeed-config-d0` (renders nothing), `zuno-lightspeed-config-d1` (the operand) |
 | Contains | Namespace membership, OperatorGroup, Subscription, CSV wait | `OLSConfig/cluster`, provider Secret, CA ConfigMap, Keycloak client, MaaS entitlement wiring |
 | Depends on | OLM only | `models`, `mcp`, `keycloak` |
 
@@ -59,8 +63,13 @@ Discover catalog and channel from the `PackageManifest` at run time rather than 
 same pattern `ansible/roles/aap/tasks/install.yml` uses (fail loudly if the package is absent).
 Confirmed on this cluster 2026-08-26: package `lightspeed-operator`, catalog `redhat-operators`,
 `defaultChannel: stable`, CSV `lightspeed-operator.v1.1.2`, InstallModes **`OwnNamespace` only**.
-Add `openshift-lightspeed` to `gitops/charts/namespaces/values.yaml` (no `istio-injection` label
-- ADR-0524's operational note). OperatorGroup targets its own namespace.
+`openshift-lightspeed` is rendered by this chart's own vendored startx `project` subchart, the
+`lws`/`custom-metrics-autoscaler` shape - **not** added to `gitops/charts/namespaces/values.yaml`,
+which owns only `zuno-*` namespaces (verified 2026-08-26: `openshift-lws-operator`,
+`openshift-keda` and `openshift-cert-manager` are all absent from it). No `istio-injection` label.
+The OperatorGroup is OwnNamespace-scoped (`target: openshift-lightspeed`) because the CSV supports
+no other install mode - subscribing through a shared AllNamespaces OperatorGroup puts the CSV in
+`Failed`/`UnsupportedOperatorGroup`, the exact failure `lws` documents.
 
 ### Step 2 - Day 2: local inference through MaaS
 
@@ -106,6 +115,23 @@ rendering anything - and `gitops/charts/lightspeed-config` must replicate ai-gat
 Record which one won and why.
 
 ### Step 3 - Day 2: MCP front-door on the existing gateway
+
+**Implementation finding (2026-08-26), resolved: Lightspeed needs an OKF bundle.**
+`app/policy.py`'s `evaluate()` fails closed on a caller that declares no agent and no task
+(`"missing X-Zuno-Agent/X-Zuno-Task declaration"`), then requires that agent to declare the
+requested tool in the named task - ADR-0011's first two factors, made enforced rather than
+aspirational by ADR-0036. Lightspeed declares neither, so every call would have been denied.
+
+The fix is **not** a bypass in the front-door, which would create the second authorization path
+ADR-0036 exists to prevent. It is `agents/lightspeed/agent.okf.md`, a **declaration-only** OKF
+bundle (`status: external-client`) with one task allowing exactly `confluence.page.search` and
+`confluence.page.read`. `agents/cognos` and `agents/soursage` are the existing precedent for a
+bundle with no chart, no Application and no workload; this one is additionally absent from
+`ansible/roles/agents/tasks/install.yml`'s deploy list, so nothing is ever deployed for it.
+
+The result is strictly stronger than the ADR described: a write capability is now denied at the
+*agent-declaration* factor, before policy groups are even consulted, and that denial is one of
+three independent layers rather than the only one.
 
 Add a standard MCP streamable-HTTP endpoint at `/mcp` to `components/mcp-gateway`, in the same
 FastAPI app as `/v1/tools/{tool_name}/invoke`.
@@ -158,12 +184,20 @@ each sufficient on its own.
 - Native OpenShift docs: **write nothing**. Leave `spec.ols.rag[]` empty and `byokRAGOnly` unset
   so the RHOKP sidecar keeps serving them.
 - `spec.ols.introspectionEnabled`: leave at its `true` default (ADR-0524 clause 6).
-- Day 3 `test`: add the Lightspeed API service to
-  `ansible/roles/day3/tasks/platform_health_check.yml`, same shape as the `mcp-gateway`
-  `/healthz`+`/readyz` pair.
-- Day 3 `check`: `ansible/roles/lightspeed/tasks/precheck.yml` and
-  `lightspeed_config/tasks/precheck.yml` assert CSV `Succeeded` and `OLSConfig` conditions
-  healthy respectively; wire both into `ansible/playbooks/day3_check.yml`.
+- Day 3 `test`: **changed during implementation.** The original plan was to add the Lightspeed
+  API Service to `ansible/roles/day3/tasks/platform_health_check.yml` as a `/healthz`+`/readyz`
+  pair. That Service is created by the operator at reconcile time and its name is not derivable
+  from the bundle CSV, so probing it would mean hardcoding a guess that fails for reasons
+  unrelated to Lightspeed's health. Implemented instead as a condition-driven check in
+  `ansible/roles/lightspeed_config/tasks/precheck.yml`, reading `OLSConfig`'s own
+  `status.conditions` - which is what ADR-0524's Operational considerations actually ask for
+  ("condition-driven, not guesswork"). `platform_health_check.yml` is left unchanged.
+- Day 3 `check`: both roles' `precheck.yml` are wired into `ansible/playbooks/day3_check.yml`,
+  and a new `DAY3_CHECK_ONLY_COMPONENTS` Makefile group makes `make d3 check lightspeed` /
+  `make d3 check lightspeed-config` valid targets (they support neither test/stresstest nor
+  backup/restore). The component-filter expression in `day3_check.yml` was generalized off its
+  hardcoded `'postgresql'` literal at the same time, or the two new entries would have been
+  silently unreachable.
 - Observability: the CSV sets `operatorframework.io/cluster-monitoring: true`, so operator
   metrics land in platform monitoring without extra work. Confirm before claiming it.
 - Docs: `docs/platform/` component page and the ADR index row for ADR-0524.

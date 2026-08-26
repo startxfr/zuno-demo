@@ -25,6 +25,7 @@
       - mcp
       - agents
       - mlops
+      - lightspeed_config
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

@@ -1,0 +1,57 @@
+---
+# State detection (never fails). The -d1 Application is the meaningful half;
+# -d0 renders nothing by design.
+- name: "lightspeed-config | check the lightspeed-config Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-lightspeed-config-d1"
+
+- name: "lightspeed-config | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "lightspeed-config | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# ADR-0524's Operational considerations: "verification is condition-driven, not
+# guesswork". The Application being Synced only proves the OLSConfig object was
+# ACCEPTED by the API server - it says nothing about whether the operator could
+# reach the model, mount the CA or start the console plugin.
+#
+# Deliberately NOT an HTTP probe of the Lightspeed API Service (the shape
+# ansible/roles/day3/tasks/platform_health_check.yml uses for the zuno-ai-run
+# services): that Service is created by the operator at reconcile time and its
+# name is not knowable from the bundle CSV, so probing it would mean hardcoding
+# a guess that fails for reasons unrelated to Lightspeed's actual health.
+# status.conditions is the operator's own published contract.
+- name: "lightspeed-config | read the OLSConfig singleton's conditions"
+  kubernetes.core.k8s_info:
+    api_version: ols.openshift.io/v1alpha1
+    kind: OLSConfig
+    name: cluster
+  register: _ols_cr
+  failed_when: false
+
+- name: "lightspeed-config | report OLSConfig readiness"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'OLSConfig/cluster absent - lightspeed-config is not installed.'
+         if (_ols_cr.resources | default([]) | length) == 0
+         else (_ols_cr.resources[0].status.conditions | default([])
+               | map(attribute='type') | list | join(', ')
+               | default('no conditions published yet', true)) }}
+
+# Not fatal: `make d3 check` reports state, it does not gate. A False condition
+# here is the actionable signal - the most common causes, in order, are an
+# unseeded MaaS credential (WP-085 step 2), a missing CA bundle on the MaaS hop,
+# and a MaaSAuthPolicy that does not list this ServiceAccount.
+- name: "lightspeed-config | warn when any OLSConfig condition is not True"
+  ansible.builtin.debug:
+    msg: >-
+      One or more OLSConfig conditions are not True. Check
+      `oc get olsconfig cluster -o jsonpath='{.status.conditions}'` and the
+      lightspeed-operator-controller-manager logs in openshift-lightspeed.
+  when:
+    - (_ols_cr.resources | default([]) | length) > 0
+    - (_ols_cr.resources[0].status.conditions | default([])
+       | rejectattr('status', 'equalto', 'True') | list | length) > 0

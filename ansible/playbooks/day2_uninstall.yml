@@ -12,6 +12,7 @@
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d2
     day2_components:
+      - lightspeed_config
       - mlops
       - agents
       - mcp

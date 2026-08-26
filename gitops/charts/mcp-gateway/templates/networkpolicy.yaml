@@ -1,5 +1,6 @@
 # Precise ingress allow-list, not a namespace-wide baseline: only Agent
-# Runtime and the acceptance-gate test Job may call this service.
+# Runtime, the acceptance-gate test Job and (optionally) OpenShift Lightspeed
+# may call this service.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -26,3 +27,24 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+{{- if .Values.lightspeed.enabled }}
+    # ADR-0524 clause 3: OpenShift Lightspeed reaching the /mcp front-door.
+    # namespaceSelector, not podSelector: Lightspeed's pods are operator-owned
+    # and carry no label this chart controls, so the grant is scoped by
+    # namespace instead - deliberately the coarser of the two, and the reason
+    # this stays gated rather than always-on.
+    #
+    # This works without any mesh change because zuno-ai-run has no
+    # PeerAuthentication forcing STRICT mTLS (verified live 2026-08-26: `oc get
+    # peerauthentication -A` returns nothing), so a non-injected client is
+    # accepted. If a STRICT PeerAuthentication is ever introduced, this allow
+    # stops being sufficient and Lightspeed needs a different path - it cannot
+    # simply be sidecar-injected, see gitops/charts/lightspeed/values.yaml.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.lightspeed.namespace }}
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

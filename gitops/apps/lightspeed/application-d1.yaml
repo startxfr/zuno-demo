@@ -1,0 +1,30 @@
+---
+# No operand is created by the "lightspeed" component: OLSConfig is the Day 2
+# "lightspeed-config" component's job (ADR-0524 clause 7 - an OLSConfig created
+# before MaaS entitlement and the MCP Gateway front-door exist sits Degraded for
+# the whole Day 2 window). This Application exists only to keep the -d1 object
+# present and Synced, same convention gitops/apps/lws/application-d1.yaml uses.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-lightspeed-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-125"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+    helm:
+      releaseName: zuno-lightspeed-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-lightspeed
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -1,0 +1,80 @@
+# project.enabled renders the dedicated Namespace, via the vendored startx
+# `project` chart; operator.enabled renders the OperatorGroup/Subscription,
+# via the vendored startx `operator` chart. Both default false so templates
+# render nothing unless an Application explicitly turns them on.
+#
+# openshift-lightspeed is created HERE rather than in
+# gitops/charts/namespaces: that chart owns only the zuno-* namespaces.
+# Every openshift-* operator namespace in this repo (openshift-lws-operator,
+# openshift-keda, openshift-cert-manager) is created by its own component's
+# chart, same as this one.
+#
+# There is no operand CR in this chart. OLSConfig is a Day 2 concern
+# (gitops/charts/lightspeed-config, ADR-0524 clause 7): an OLSConfig created
+# before its model provider and MCP endpoint exist sits Degraded for the
+# whole Day 2 window. zuno-lightspeed-d1 points at gitops/charts/noop
+# instead, same convention gitops/apps/lws/application-d1.yaml uses.
+#
+# Package name/default channel confirmed live against this cluster's
+# redhat-operators catalog on 2026-08-26: "lightspeed-operator",
+# defaultChannel "stable", currentCSV "lightspeed-operator.v1.1.2". Still
+# discovered from the PackageManifest at run time rather than hardcoded
+# (ADR-0048) - ansible/roles/lightspeed/tasks/install.yml fails with a
+# clear diagnostic listing published channels if the catalog changes.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: lightspeed
+    app: lightspeed
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook
+    type: namespace
+    name: openshift-lightspeed
+    display_name: Zuno OpenShift Lightspeed
+    description: "OpenShift Lightspeed operator and operands, configured by Zuno."
+    requester: zuno
+    # Deliberately NOT istio-injection: enabled. Lightspeed's Deployments are
+    # operator-owned; injecting a sidecar into them would mean patching a Red
+    # Hat operand on every reconcile. Reachability into zuno-ai-run is handled
+    # as a NetworkPolicy question instead (gitops/charts/mcp-gateway), which
+    # works because zuno-ai-run has no PeerAuthentication forcing STRICT mTLS -
+    # verified live 2026-08-26, `oc get peerauthentication -A` is empty.
+
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: lightspeed
+    app: lightspeed
+  subscription:
+    enabled: true
+    name: lightspeed-operator
+    namespace: openshift-lightspeed
+    operator:
+      # Must be set explicitly, same name as subscription.name: the vendored
+      # `operator` chart defaults this to "codeready-workspaces", silently
+      # suppressing the fallback to subscription.name.
+      name: lightspeed-operator
+      channel: ""
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: lightspeed-operator-group
+    namespace: openshift-lightspeed
+    # OwnNamespace-scoped. CONFIRMED live 2026-08-26 against the
+    # PackageManifest's own installModes: lightspeed-operator.v1.1.2 supports
+    # OwnNamespace ONLY - SingleNamespace, MultiNamespace and AllNamespaces are
+    # all false. Subscribing through the shared openshift-operators namespace's
+    # implicit AllNamespaces OperatorGroup would put the CSV into Failed
+    # (UnsupportedOperatorGroup), the exact failure gitops/charts/lws
+    # documents for leader-worker-set.
+    target: openshift-lightspeed

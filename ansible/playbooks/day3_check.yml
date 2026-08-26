@@ -19,6 +19,12 @@
   vars:
     day3_precheck_components:
       - postgresql
+      # ADR-0524 / WP-085 step 6. Two entries because the component is split
+      # across day tiers: `lightspeed` checks the operator (Day 1), and
+      # `lightspeed_config` checks the OLSConfig operand (Day 2). Checking only
+      # one would report healthy while the other half is absent.
+      - lightspeed
+      - lightspeed_config
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -45,8 +51,11 @@
     - name: Resolve requested Day 3 precheck component name(s)
       ansible.builtin.set_fact:
         selected_precheck_components: >-
-          {{ day3_precheck_components if target_component | default('all') in ['all', 'postgresql']
-             else [] }}
+          {{ day3_precheck_components
+             if target_component | default('all') == 'all'
+             else ([target_component | replace('-', '_')]
+                   if (target_component | replace('-', '_')) in day3_precheck_components
+                   else []) }}
 
     - name: Generate the state-report file
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
