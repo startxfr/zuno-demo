@@ -954,6 +954,8 @@ def test_stage_detect_changes_classifies_new_changed_deleted_unchanged():
         "doc-unchanged", "same-sha", "https://docs.test/unchanged"
     )
 
+    original_manifest = dict(store.json[f"{config.manifest_prefix}/manifest.json"])
+
     stage_detect_changes(config, store)
 
     changeset = store.json[f"{config.manifest_prefix}/changeset.json"]
@@ -962,8 +964,12 @@ def test_stage_detect_changes_classifies_new_changed_deleted_unchanged():
     assert changeset["deleted"] == ["doc-deleted"]
     assert changeset["deleted_urls"] == ["https://docs.test/deleted"]
     assert changeset["unchanged"] == ["doc-unchanged"]
-    manifest = store.json[f"{config.manifest_prefix}/manifest.json"]
-    assert set(manifest) == {"doc-new", "doc-changed", "doc-unchanged"}
+    assert set(changeset["current_new_changed"]) == {"doc-new", "doc-changed"}
+    assert changeset["current_new_changed"]["doc-new"] == {"sha256": "new-sha", "url": "https://docs.test/new"}
+    # WP-067 (2026-08-26): detect-changes must not touch manifest.json itself
+    # any more - only stage_validate does, once indexing is confirmed. A
+    # downstream-stage failure must never leave the manifest poisoned.
+    assert store.json[f"{config.manifest_prefix}/manifest.json"] == original_manifest
 
 
 def test_stage_detect_changes_reads_raw_records_concurrently():
@@ -982,8 +988,8 @@ def test_stage_detect_changes_reads_raw_records_concurrently():
     assert sorted(changeset["new"]) == doc_ids
     assert changeset["changed"] == []
     assert changeset["deleted"] == []
-    manifest = store.json[f"{config.manifest_prefix}/manifest.json"]
-    assert set(manifest) == set(doc_ids)
+    assert set(changeset["current_new_changed"]) == set(doc_ids)
+    assert f"{config.manifest_prefix}/manifest.json" not in store.json
 
 
 class _FakeValidateCursor:
@@ -1012,6 +1018,7 @@ def _validate_store_with(metadata: dict) -> FakeStore:
     store = FakeStore()
     store.json["manifests/changeset.json"] = {
         "new": ["doc1"], "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+        "current_new_changed": {"doc1": {"sha256": "doc1-sha", "url": "https://example.test/1"}},
     }
     store.json["normalized/doc1.chunks.json"] = {
         "doc_id": "doc1", "url": "https://example.test/1", "title": "Doc", "metadata": metadata,
@@ -1048,6 +1055,51 @@ def test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement():
     store = _validate_store_with({"domain": "knowledge.sxa-legacy"})  # missing all three, exempt
     with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
         stage_validate(config, store)  # must not raise
+
+
+def test_stage_validate_advances_manifest_only_after_confirming_indexed_rows():
+    """WP-067 (2026-08-26): manifest.json must reflect reality - a document
+    only earns a manifest entry once validate has confirmed (via the
+    Postgres COUNT check) that it actually has indexed rows. Also confirms
+    a deleted doc_id is dropped from the carried-forward manifest."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _validate_store_with({
+        "domain": "knowledge.tech",
+        "source_modified_at": "2026-08-01T00:00:00Z",
+        "indexed_at": "2026-08-15T00:00:00Z",
+        "stale_after": "2026-08-22T00:00:00Z",
+    })
+    store.json["manifests/manifest.json"] = {
+        "doc0": {"sha256": "doc0-sha", "url": "https://example.test/0"},
+        "doc-gone": {"sha256": "gone-sha", "url": "https://example.test/gone"},
+    }
+    store.json["manifests/changeset.json"]["deleted"] = ["doc-gone"]
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
+        stage_validate(config, store)  # must not raise
+
+    manifest = store.json["manifests/manifest.json"]
+    assert manifest["doc1"] == {"sha256": "doc1-sha", "url": "https://example.test/1"}
+    assert manifest["doc0"] == {"sha256": "doc0-sha", "url": "https://example.test/0"}
+    assert "doc-gone" not in manifest
+
+
+def test_stage_validate_does_not_advance_manifest_on_failure():
+    """The self-healing half of the WP-067 fix: if validation fails, the
+    manifest must stay exactly as it was, so the next run's detect-changes
+    retries these same documents as new/changed instead of skipping them."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _validate_store_with({"domain": "knowledge.tech"})  # missing all three freshness fields
+    store.json["manifests/manifest.json"] = {"doc0": {"sha256": "doc0-sha", "url": "https://example.test/0"}}
+    original_manifest = dict(store.json["manifests/manifest.json"])
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
+        try:
+            stage_validate(config, store)
+            raise AssertionError("expected SystemExit")
+        except SystemExit:
+            pass
+
+    assert store.json["manifests/manifest.json"] == original_manifest
+    assert "doc1" not in store.json["manifests/manifest.json"]
 
 
 # --- WP-24 write-path invariant ---------------------------------------------
@@ -1127,9 +1179,13 @@ TESTS = [
     test_normalize_computes_indexed_at_and_stale_after_from_the_duration_spec,
     test_normalize_omits_stale_after_for_sxa_legacy_regardless_of_spec,
     test_normalize_omits_stale_after_when_no_duration_is_configured,
+    test_stage_detect_changes_classifies_new_changed_deleted_unchanged,
+    test_stage_detect_changes_reads_raw_records_concurrently,
     test_stage_validate_fails_closed_on_an_operational_chunk_missing_freshness_metadata,
     test_stage_validate_passes_a_complete_operational_chunk,
     test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement,
+    test_stage_validate_advances_manifest_only_after_confirming_indexed_rows,
+    test_stage_validate_does_not_advance_manifest_on_failure,
     test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system,
     test_embed_batch_asks_the_server_to_truncate_oversized_chunks,
 ]

@@ -7,12 +7,16 @@ round-trips its state through S3 - KFP runs each stage in its own pod, so there 
 no shared local disk between them:
 
     fetch-* / load-sxa-dump        -> <rawPrefix>/<doc_id>.json   (source adapters)
-    detect-changes                 -> <manifestPrefix>/{manifest,changeset}.json
+    detect-changes                 -> <manifestPrefix>/changeset.json (manifest.json is read, not written, here)
     normalize                      -> <normalizedPrefix>/<doc_id>.json
     chunk                          -> <normalizedPrefix>/<doc_id>.chunks.json
     embed                          -> (same file, chunks gain an "embedding" key)
     index-pgvector                 -> document_embeddings rows (data/rag/schema/004_rag_chunking.sql)
-    validate                       -> exits non-zero if anything index-pgvector touched is incomplete
+    validate                       -> exits non-zero if anything index-pgvector touched is incomplete;
+                                       only on success does it write <manifestPrefix>/manifest.json,
+                                       since that's the first point a document is confirmed durably
+                                       indexed (see the WP-067 live-verification note on
+                                       stage_detect_changes below for why this isn't done earlier)
 
 ADR-0204 (WP-22): the fetch stages are implementations of one source-adapter
 interface (SOURCE_ADAPTERS below), each bound to exactly one logical knowledge
@@ -1673,16 +1677,28 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
 
     unchanged_ids = [doc_id for doc_id in current if doc_id not in new_ids and doc_id not in changed_ids]
 
+    # WP-067 live verification (2026-08-26) caught a real bug here: this
+    # stage used to write manifest.json unconditionally, right after
+    # hashing the raw docs and BEFORE normalize/chunk/embed/index-pgvector
+    # (each a separate KFP pod) ever ran. When one of those later stages
+    # failed mid-pipeline, the manifest was already overwritten to mark
+    # those documents "seen" - every subsequent run then saw 0 new/changed
+    # and silently skipped them forever, even though nothing had actually
+    # been indexed (knowledge.sxa sat at 0 rows in document_embeddings
+    # despite several prior runs reporting an overall SUCCEEDED state).
+    # manifest.json is now only written by stage_validate, once it has
+    # confirmed each touched document actually has indexed rows - see the
+    # "current_new_changed" carry-through below.
     changeset = {
         "new": new_ids,
         "changed": changed_ids,
         "deleted": deleted_ids,
         "deleted_urls": deleted_urls,
         "unchanged": unchanged_ids,
+        "current_new_changed": {doc_id: current[doc_id] for doc_id in new_ids + changed_ids},
         "generated_at": _utcnow_iso(),
     }
     store.put_json(f"{config.manifest_prefix}/changeset.json", changeset)
-    store.put_json(manifest_key, current)
     logger.info(
         "detect-changes: %d new, %d changed, %d deleted, %d unchanged",
         len(new_ids), len(changed_ids), len(deleted_ids), len(unchanged_ids),
@@ -2164,6 +2180,19 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
             logger.error("validate: %s", failure)
         raise SystemExit(f"validate: {len(failures)} document(s) failed validation")
     logger.info("validate: all touched documents indexed successfully")
+
+    # Only now - after every new/changed document has been confirmed to
+    # actually have indexed rows above - is it safe to advance manifest.json
+    # (the state stage_detect_changes diffs future runs against). Writing it
+    # any earlier let a downstream failure (chunk/embed/index-pgvector, each
+    # a separate pod) silently and permanently mark unindexed documents as
+    # "already seen".
+    manifest_key = f"{config.manifest_prefix}/manifest.json"
+    manifest = store.get_json(manifest_key) or {}
+    for doc_id in changeset.get("deleted", []):
+        manifest.pop(doc_id, None)
+    manifest.update(changeset.get("current_new_changed", {}))
+    store.put_json(manifest_key, manifest)
 
 
 # --------------------------------------------------------------------------
