@@ -164,7 +164,7 @@
             "path": "/sales",
             "attributes": {
                 "description": [
-                    "Sales business role \u2014 grants sales-db and web-search tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
+                    "Sales business role \u2014 grants web-search tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
                 ]
             },
             "subGroups": [{
@@ -300,7 +300,7 @@
             "path": "/adv",
             "attributes": {
                 "description": [
-                    "Sales administration (ADV) business role \u2014 grants sales-db and web-search tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
+                    "Sales administration (ADV) business role \u2014 grants web-search tool rights inside authorized agents (ADR-0040); does not by itself grant any frontend access"
                 ]
             }
         },
