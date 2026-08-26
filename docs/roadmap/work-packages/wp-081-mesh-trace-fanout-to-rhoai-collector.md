@@ -1,6 +1,6 @@
 # WP-081: Fan mesh traces out to RHOAI's collector
 
-- **State:** In progress (pushed, awaiting live verification).
+- **State:** Done (live-verified 2026-08-26).
 - **ADRs:** ADR-0523 (To be implemented)
 - **Depends on:** WP-079 (RHOAI traces stack live), WP-080 (diagnosed the zero-traces root causes)
 - **Related:** WP-082 (workload-level path, independent), ADR-0029/ADR-0413 (the zuno-monitoring
@@ -83,19 +83,41 @@ its Instrumentation endpoint targets the platform collector (which fans out here
 - so both Tempo stacks receive the workload spans. reconcile.yml keeps a deliberate-non-action
 comment so nobody re-attempts the two reverted fixes.
 
+## Second live finding: RHOAI's TempoStack starves the gateway's authz sidecar
+
+Even with the gateway-direct design, first real load produced a cascade, diagnosed live: the
+proportional split of TempoStack's `resources.total` (2Gi/2cpu per WP-079) hands the gateway's
+`opa-openshift` sidecar ~2% - **40m CPU / 41Mi**. It survived WP-080's idle verification for a
+day, then died (exit 137, liveness 1s-timeout kills) within 5 minutes of WP-081's fan-out going
+live: the collector's retry backlog hammered the gateway, OPA saturated, the gateway went
+unready, the EndpointSlice flipped `ready: false`, and every client's VIP path lost its
+endpoints - meshed pods saw TLS resets from their own Envoy (empty upstream cluster), plain
+pods saw gRPC deadlines, while `oc get pods` still showed `2/2 Running` on a stale look.
+Debug method that cracked it: TLS to the gateway **pod IP** succeeded while the VIP failed →
+endpoints, not the gateway. Fixes, both in reconcile.yml's TempoStack task: `resources.total`
+raised to 4cpu/4Gi (OPA → 80m/82Mi; more would breach `zuno-platform-quota` limits.cpu) plus a
+`spec.template.gateway.component.resources` override (500m/256Mi) for the main gateway
+container - the override does NOT reach the opa sidecar, only the total does. One-time
+recovery: deleted the `zuno-otel-collector` pod to drop its in-memory retry backlog so OPA
+could come up against near-zero load.
+
 ## Verification checklist
 
-1. ⬜ `oc get opentelemetrycollector zuno-otel-collector -n zuno-monitoring -o yaml` shows the
-   `otlp/rhoai` exporter in the `traces` pipeline; new collector pod logs clean (no export
-   errors against `data-science-collector-collector:4317`).
-2. ⬜ Trigger a real embedding call (`oc exec deploy/rag-service -n zuno-data` → POST
-   `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings`), then search RHOAI's Tempo
-   (`tempo-data-science-tempostack-gateway` route,
-   `/api/traces/v1/redhat-ods-monitoring/tempo/api/search`, OpenShift bearer token): non-empty
-   `traces` array with Envoy/istio-proxy-originated spans.
-3. ⬜ Regression: the same call still produces a trace in `zuno-monitoring`'s Tempo (existing
-   Grafana path intact).
+1. ✅ `oc get opentelemetrycollector zuno-otel-collector -n zuno-monitoring -o yaml` shows the
+   `otlp/rhoai` exporter (gateway:8090 + bearertokenauth) in the `traces` pipeline;
+   collector logs clean - zero `Exporting failed` over the final observation minute.
+2. ✅ Real embedding call (`oc exec deploy/rag-service -n zuno-data` → POST
+   `http://embeddings-predictor.zuno-ai-run.svc:8080/v1/embeddings`, HTTP 200) → RHOAI Tempo
+   search (`/api/traces/v1/redhat-ods-monitoring/tempo/api/search`, bearer token) returns a
+   non-empty `traces` array: 20 traces including Envoy-originated spans (comage-bff, tekos-bff,
+   advantage-bff, postgres sidecars) and app spans (agent-bff `bff_request`); filtered search
+   `tags=service.name=embeddings-predictor.zuno-ai-run` → 10 traces
+   (`isvc.embeddings-predictor.zuno-ai-run`).
+3. ✅ Regression: same filtered search against `zuno-monitoring`'s Tempo
+   (`tempo-tempo:3200/api/search`) still returns embeddings traces - existing Grafana path
+   intact.
 
 ## Status updates
 
-_None yet._
+- WP-081 → Done (live-verified 2026-08-26). ADR-0523 stays `To be implemented` until WP-082's
+  workload-level path is also live.
