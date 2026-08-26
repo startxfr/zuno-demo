@@ -1,6 +1,6 @@
 # WP-081: Fan mesh traces out to RHOAI's collector
 
-- **State:** Not started.
+- **State:** In progress (pushed, awaiting live verification).
 - **ADRs:** ADR-0523 (To be implemented)
 - **Depends on:** WP-079 (RHOAI traces stack live), WP-080 (diagnosed the zero-traces root causes)
 - **Related:** WP-082 (workload-level path, independent), ADR-0029/ADR-0413 (the zuno-monitoring
@@ -26,7 +26,15 @@ pattern and leaves the proven path byte-for-byte identical.
 
 ## What changed
 
-_To be filled during implementation._
+- `gitops/charts/observability/templates/opentelemetrycollector.yaml`: new `otlp/rhoai`
+  exporter (`data-science-collector-collector.redhat-ods-monitoring.svc.cluster.local:4317`,
+  `tls.insecure` - plaintext OTLP gRPC receiver, verified live) appended to the `traces`
+  pipeline's exporters, both gated on `collector.rhoaiTraceExport.enabled`. Metrics pipeline
+  deliberately untouched (RHOAI's metrics side is Prometheus-scrape-shaped, not OTLP-push).
+- `gitops/charts/observability/values.yaml`: `collector.rhoaiTraceExport.enabled: false`
+  (chart default false, matching the chart's all-default-false convention).
+- `gitops/apps/observability/application-d1.yaml`: enables it inline next to
+  `collector.enabled`. `helm template` verified: gate off renders byte-identical to before.
 
 ## Verification checklist
 

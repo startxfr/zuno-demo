@@ -52,6 +52,12 @@ operator:
 
 collector:
   enabled: false
+  # ADR-0523 (WP-081): fan a copy of the traces pipeline out to RHOAI's
+  # monitoring-stack collector in redhat-ods-monitoring. Lives here rather
+  # than in the mesh because Istio's Telemetry API honors only a single
+  # tracing provider per rule.
+  rhoaiTraceExport:
+    enabled: false
 
 # ADR-0102 (roadmap WP-12): the SLO burn-rate alerting rules
 # (docs/platform/slo.md, templates/prometheusrule-slo.yaml). Schema-

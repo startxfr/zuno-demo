@@ -42,12 +42,23 @@ spec:
       # but does not itself perform.
       prometheus:
         endpoint: 0.0.0.0:8889
+      {{- if .Values.collector.rhoaiTraceExport.enabled }}
+      # ADR-0523 (WP-081): RHOAI's monitoring-stack collector. NOTE the
+      # "-collector" suffix: the bare data-science-collector Service does
+      # NOT exist (RHOAI 3.5.0-ea.2's own Instrumentation CR names it
+      # wrong). Plaintext OTLP receiver; RHOAI's collector adds the
+      # bearer-token auth and X-Scope-OrgID its Tempo gateway requires.
+      otlp/rhoai:
+        endpoint: data-science-collector-collector.redhat-ods-monitoring.svc.cluster.local:4317
+        tls:
+          insecure: true
+      {{- end }}
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [debug, otlp/tempo]
+          exporters: [debug, otlp/tempo{{- if .Values.collector.rhoaiTraceExport.enabled }}, otlp/rhoai{{- end }}]
         metrics:
           receivers: [otlp]
           processors: [batch]
