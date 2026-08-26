@@ -155,15 +155,25 @@ dataScienceCluster:
       sparkoperator:
         managementState: Managed
       kserve:
+        # modelCache is Removed (the CRD's own default). It was Managed, but
+        # nothing ever used it: no LocalModelCache/LocalModelNode CR was ever
+        # created, /var/lib/kserve stayed at 0 bytes, and all served models
+        # pull from S3 into an emptyDir (ADR-0521). Left on, it costs a
+        # permanent reconcile loop: the RHOAI operator re-applies
+        # kserve-localmodelnode-pv without a claimRef while the kube PV binder
+        # re-binds it, ~35 writes/min on one object with a third of them 409ing,
+        # continuously since the PV was created. Re-enabling means restoring
+        # cacheSize/nodeSelector below AND creating the LocalModelCache CRs that
+        # actually populate it - the loop is upstream behaviour and would return.
         modelCache:
-          managementState: Managed
-          cacheSize: "140Gi"
-          nodeSelector:
-            matchExpressions:
-              - values:
-                  - 'true'
-                key: nvidia.com/gpu.present
-                operator: In
+          managementState: Removed
+          # cacheSize: "140Gi"
+          # nodeSelector:
+          #   matchExpressions:
+          #     - values:
+          #         - 'true'
+          #       key: nvidia.com/gpu.present
+          #       operator: In
         modelsAsService:
           managementState: Managed
         nim:
