@@ -1,25 +1,16 @@
-# WP-067: Weekly, already-anonymized SXA corpus as a new RAG domain (promotes ADR-0217)
+# WP-067: Weekly SXA corpus as a new RAG domain (promotes ADR-0217)
 
-- **State:** Repo work merged (2026-08-21 - Part A complete: `knowledge.sxa`
-  domain/policy/binding wiring, `fetch-sxa` source adapter (pure-Python
-  mysqldump parsing, no MariaDB/SQL engine), weekly schedule, `rag-sxa`
-  database wiring across postgresql/rag-ingestion/rag-service charts,
-  agent access grants for Comage/Advantage/Finage, a declared-but-inert
-  grant for Cognos, and fixture-driven tests - all passing. Part B
-  live-verified 2026-08-23: Vault seeded (`rag-sxa-corpus-s3`,
-  `rag-postgres-sxa` ExternalSecrets synced), `rag-sxa` Postgres database
-  created, `domains.sxa.enabled: true` synced in both `rag-ingestion` and
-  `rag-service`, `compile_pipeline_version.yml`'s domain loop includes
-  `sxa` and a `PipelineVersion` (`v0-3-0-sxa`) exists, and an ingestion
-  workflow (`rag-corpus-ingestion-sxa-*`) is running against the live
-  cluster (a prior attempt errored 42h before this check; the current
-  run's outcome was still pending as of this check). **Amended
-  2026-08-23**: `audit_pii_patterns()` removed entirely (see ADR-0217's
-  Amendment section) - no PII scanning of any kind now, matching
-  ADR-0216/WP-065's own amendment. Still open: confirm the in-flight run
-  completes, live-verify retrieval by role, confirm the weekly schedule
-  reconciles, re-run for idempotency.
-- **ADRs:** ADR-0217 (To be implemented -> Partially implemented, amended
+- **State:** **Abandoned 2026-08-26** — superseded by ADR-0219/WP-084. Part A
+  merged 2026-08-21 and Part B was live-verified 2026-08-23, but the domain
+  it created (`knowledge.sxa`) duplicated `knowledge.sxa-legacy` over the
+  same bucket and the same bytes, so ADR-0219 retired it and kept one domain.
+  Its real contribution survives: the pure-Python mysqldump parser it built
+  for `fetch-sxa` is now `load-sxa-dump`'s implementation, and the access it
+  granted Advantage and Finage was preserved by widening
+  `knowledge.sxa-legacy`'s `allowed_groups`. Retained as a historical record;
+  do not execute this brief.
+- **Superseded by:** [WP-084](wp-084-retire-the-sxa-mcp-path-and-second-rag-domain.md)
+- **ADRs:** ADR-0217 (Superseded by ADR-0219) (To be implemented -> Partially implemented, amended
   2026-08-23); related to but does not modify ADR-0216/WP-065
 - **Depends on:** none (independent of WP-065/WP-23's own open operator work)
 - **Blocks:** nothing - `knowledge.sxa-legacy` and its tests are untouched
@@ -33,7 +24,7 @@
 ## Goal
 
 Give Comage, Advantage, and Finage weekly-refreshed RAG access to an
-already-anonymized SXA commercial corpus (`sxa.schema.sql` + `sxa.data.sql`,
+SXA commercial corpus (`sxa.schema.sql` + `sxa.data.sql`,
 mysqldump format), without building or depending on a MariaDB import or any
 new MCP tool - RAG-only, distinct from `knowledge.sxa-legacy`
 (ADR-0216/WP-065).
@@ -42,7 +33,7 @@ new MCP tool - RAG-only, distinct from `knowledge.sxa-legacy`
 
 Primary: [docs/adr/0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md](../../adr/0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) -
 read all 5 Decision clauses and the Security considerations section (the
-"trust the upstream anonymization claim" posture is a named, explicit
+"trust the source as-is" posture is a named, explicit
 trade-off, not an oversight).
 
 Related: ADR-0216/WP-065 (the related-but-distinct MariaDB-backed effort -

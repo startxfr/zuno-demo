@@ -39,9 +39,9 @@ against a live deployment, not re-derivable from the repo alone),
 |---|---|---|
 | Every `zuno-ai-run` workload has its own precise, least-privilege NetworkPolicy (no namespace-wide same-namespace trust) | `enforced-in-ci` | `check_workload_hardening.py`'s `check_networkpolicies`, one call per workload chart |
 | Platform namespaces (`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-monitoring`, `zuno-ai-platform`, `zuno-ai-build`, `zuno-mesh`) get a default-deny-other-namespaces baseline with explicit allow-lists | `enforced-in-ci` | `gitops/charts/namespaces/templates/networkpolicy-platform.yaml` |
-| `zuno-ai-run` is excluded from the platform baseline (a namespace-wide same-namespace allow would defeat per-workload isolation, e.g. `mcp-sales-db`) | `enforced-in-ci` (2026-08-14) | `skipNetworkPolicy: true` on the `zuno-ai-run` entry in `gitops/charts/namespaces/values.yaml`, confirmed via `helm template --set policy.enabled=true` |
+| `zuno-ai-run` is excluded from the platform baseline (a namespace-wide same-namespace allow would defeat per-workload isolation, e.g. `mcp-confluence`) | `enforced-in-ci` (2026-08-14) | `skipNetworkPolicy: true` on the `zuno-ai-run` entry in `gitops/charts/namespaces/values.yaml`, confirmed via `helm template --set policy.enabled=true` |
 | MCP servers require a workload-identity token in addition to NetworkPolicy | `enforced-in-ci` (tested) | `X-Zuno-Gateway-Token` middleware, every `components/mcp-servers/*/server.py` (ADR-0037); each server's `tests/test_mcp_protocol.py` |
-| Deployed NetworkPolicies actually block traffic as rendered (not just as authored) | `enforced-on-cluster` (2026-08-16) | verified live on demo222 in both directions: mcp-gateway (allow-listed) → sales-db-mcp:8000 returns 200; tekos-frontend (not allow-listed) → the same endpoint is dropped (curl exit 28 timeout) |
+| Deployed NetworkPolicies actually block traffic as rendered (not just as authored) | `enforced-on-cluster` (2026-08-16) | verified live on demo222 in both directions: mcp-gateway (allow-listed) → sales-db-mcp:8000 returns 200; tekos-frontend (not allow-listed) → the same endpoint is dropped (curl exit 28 timeout). The probed workload was retired by ADR-0219 (2026-08-26); the evidence stands as the dated record of that verification, and `mcp-confluence` now carries the identical policy shape |
 
 ## Data
 

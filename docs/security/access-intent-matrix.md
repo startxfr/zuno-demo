@@ -46,7 +46,7 @@ group and a business role for any capability below to actually resolve.
 |---|---|---|---|---|---|---|
 | `knowledge.tech` | ✓ | ✓ | – | – | ✓ | – |
 | `knowledge.sales` | – | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `knowledge.sxa-legacy` | – | – | ✓ | – | ✓ | – |
+| `knowledge.sxa-legacy` | – | – | ✓ | ✓ | ✓ | ✓ |
 | `knowledge.adv` | – | ✓ | – | ✓ | ✓ | ✓ |
 | `knowledge.project` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
@@ -63,7 +63,6 @@ alone was never meant to be restrictive here.
 | Drive (`drive.document.*`) | RW | R/W² | – | – | RW¹ | – |
 | Gmail (`gmail.message.read`) | R | R | – | – | R¹ | – |
 | Jira | – | – | – | – | – | – |
-| Salesforce (`sxa.*`, legacy) | ² | – | ✓³ | ✓³ | ✓³ | – |
 | Workday self (`workday.profile.self.*`) | RW | R | – | – | – | – |
 | Workday any (`workday.profile.any.read`) | – | R | – | – | – | – |
 | Calendar/Meet | – | – | – | – | – | – |
@@ -75,12 +74,15 @@ one `allowed_groups` list (no narrower write-specific role exists yet in
 this demo's threat model) - `cdp` reads and writes exactly like
 `consultant` today; a future WP could split Drive into `self`/`any`-style
 scoped capabilities the way Workday already is, if a real need arises.
-³ `sxa.*` (legacy SXA data via `sales-db`) predates this WP (ADR-0206) -
-`get_customer`/`list_open_opportunities`/`get_quote` grant `[sales, adv,
-board]`; `aggregate_revenue_by_year`/`lookup_record` grant `[sales,
-board]` only. No live Salesforce capability exists yet (`sales.*`
-namespace reserved for WP-33). `consultant`'s "–" here is intentional:
-technical consultants have no commercial-data access by design.
+³ ADR-0219 (2026-08-26) removed the `sxa.*` capability row that used to sit
+here: legacy SXA has no deterministic tool path any more, only retrieval over
+`knowledge.sxa-legacy` above. That domain's row widened from `[sales, board]`
+to `[sales, board, adv, finance]` in the same decision - the union of what it
+and the retired `knowledge.sxa` domain granted, so no agent lost reach. This
+amends ADR-0340's own table, which marked `adv`/`finance` excluded here.
+`consultant` and `cdp` stay "–": technical consultants have no
+commercial-data access by design, and no need was stated for `cdp`. The
+`sales.*` namespace remains reserved for a live Salesforce server (WP-33).
 
 Workday has no live backend yet (`platform/bindings/tools/tool-bindings.yaml`'s
 three `workday.profile.*` bindings are `auth_mode: provider-delegated`

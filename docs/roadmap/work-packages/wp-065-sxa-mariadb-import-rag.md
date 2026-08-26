@@ -1,21 +1,16 @@
-# WP-065: Real SXA content via S3 → MariaDB, served through MCP and anonymized RAG (promotes ADR-0216)
+# WP-065: Real SXA content via S3 → MariaDB, served through MCP and RAG (promotes ADR-0216)
 
-- **State:** Repo work merged (2026-08-21 - Part A complete). **Amended
-  2026-08-23** (see ADR-0216's Amendment section): no separate raw dump
-  exists, so this WP reuses ADR-0217/WP-067's already-anonymized
-  `zuno-demo-sxa-corpus` bucket instead of a dedicated one, and the
-  `sxa_anonymize.py` redaction step is removed entirely (both MCP and RAG
-  now serve/index SXA content as-is). Amendment repo work merged
-  2026-08-23: two-key (`schema.sql`+`data.sql`) fetch in `load-sxa-dump`,
-  `sxa_anonymize.py` deleted, `sales-db` chart wired for
-  `SXA_DB_ENGINE=mariadb` (server.py already supported it; the chart never
-  turned it on), `rag-service`'s `sxa-legacy` domain flipped `enabled:
-  true`, `domains.sxa-legacy.enabled: true` in rag-ingestion. Live
-  steps (image rebuild, deploy, on-demand pipeline run, verification)
-  still open.
-- **ADRs:** ADR-0216 (To be implemented -> Partially implemented -> Implemented, amended 2026-08-23); supersedes ADR-0016's live-target clause
-- **Depends on:** WP-23 (repo work merged — policy/tooling/metadata-separation this WP extends)
-- **Blocks:** WP-23's remaining "real snapshot load" operator action, which now targets this WP instead
+- **State:** **Abandoned 2026-08-26** — superseded by ADR-0219/WP-084. Part A
+  merged 2026-08-21 and the 2026-08-23 amendment merged, but Part B's live
+  steps never ran, and the decision they were promoting has been withdrawn:
+  SXA is a closed pre-2021 record served through retrieval only, so the
+  MariaDB structured store and the `sales-db` MCP tool surface this WP built
+  are deleted rather than completed. The `load-sxa-dump` stage survives,
+  reimplemented without MariaDB. Retained as a historical record of what was
+  built and why it was dropped; do not execute this brief.
+- **ADRs:** ADR-0216 (Superseded by ADR-0219)
+- **Superseded by:** [WP-084](wp-084-retire-the-sxa-mcp-path-and-second-rag-domain.md)
+- **Depends on:** WP-23 (repo work merged — policy/tooling/metadata-separation this WP extended)
 - **Estimated files touched:** ~12 (Part A) + ~10 (2026-08-23 amendment)
 
 > Execute this brief as a standalone task from the repository root. Read
@@ -27,7 +22,7 @@
 Give `knowledge.sxa-legacy` real data for the first time: import a real
 mysqldump-format SXA dump (S3-hosted, new dedicated bucket) natively into
 a new MariaDB database, serve exact lookups through the existing
-`sales-db` MCP server (engine-select mode), and serve anonymized semantic
+`sales-db` MCP server (engine-select mode), and serve semantic
 chunks through the existing RAG pipeline — replacing the current
 raw-DDL-chunking placeholder.
 
@@ -35,7 +30,7 @@ raw-DDL-chunking placeholder.
 
 Primary: [docs/adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md](../../adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) —
 read all 5 Decision clauses and the Security considerations section (the
-anonymization gate is a named operator review, not implicit).
+content gate is a named operator review, not implicit).
 
 Related: ADR-0016 (superseded, live-target clause only — Postgres fixture
 path stays), ADR-0206 (sales/SXA domain separation this extends), ADR-0017
@@ -55,7 +50,7 @@ local-only — unchanged, not relaxed).
   rag_ingestion.py:906-995` (`load-sxa-dump`'s current placeholder
   implementation, to be replaced); `components/mcp-servers/sales-db/
   server.py` in full (the tool set and access-control pattern to extend,
-  not rewrite); `data/sxa/schema/001_init.sql` (the schema the anonymization
+  not rewrite); `data/sxa/schema/001_init.sql` (the schema the redaction
   column-map must cover completely).
 
 ## Repo changes (step by step)
@@ -64,7 +59,7 @@ local-only — unchanged, not relaxed).
 
 Historical record of the 2026-08-21 merge. Items 2, 4 and 5 were
 superseded by the 2026-08-23 amendment (reused bucket instead of a
-dedicated one; no anonymization module at all) — see ADR-0216's Amendment
+dedicated one; no redaction module at all) — see ADR-0216's Amendment
 section and this file's State line above for what actually shipped.
 
 1. **MariaDB database wiring**: `gitops/charts/mariadb/templates/database-sxa.yaml`
@@ -162,7 +157,7 @@ See Part B above — live cluster steps (build, deploy, trigger, verify).
   gitops/charts/mariadb/, gitops/charts/mcp-sales-db/,
   components/rag-ingestion/src/rag_ingestion.py.`; index row
   `Implemented`; tracker → `Done`; MEMORY.md dated bullet noting the
-  2026-08-23 amendment (reused bucket, no anonymization); WP-23's brief
+  2026-08-23 amendment (reused bucket, no redaction); WP-23's brief
   updated to reflect its operator action was discharged here.
 
 ## Out of scope / deferred
@@ -176,4 +171,4 @@ See Part B above — live cluster steps (build, deploy, trigger, verify).
 - A genuinely separate raw dump / dedicated bucket for this domain — the
   2026-08-23 amendment reuses WP-067's corpus instead; revisit only if a
   real raw dump becomes available and the operator wants to restore
-  ADR-0216's original real-value/anonymized-RAG split.
+  ADR-0216's original real-value/redacted-RAG split.

@@ -11,6 +11,22 @@ The repository already migrates the historical SXA SQL schema into PostgreSQL an
 
 Mixing Salesforce and SXA rows in one undifferentiated `sales` corpus would blur authority, freshness and lineage. Conversely, vectorizing the legacy dump alone would lose the precision of structured SQL for exact counts/aggregations and schema exploration.
 
+## Status update (2026-08-26)
+
+[ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) withdraws the
+deterministic half of this ADR's two-way SXA access model. SXA is the
+company's closed pre-2021 record, so there is no live store for exact
+structured queries to be authoritative against: the five `sxa.*`
+capabilities and the `sales-db` MCP server behind them are deleted, and
+legacy SXA is reachable through `knowledge.sxa-legacy` retrieval only.
+
+The separation this ADR exists for is unchanged and still enforced: current
+Salesforce knowledge and legacy SXA knowledge never serve each other's
+content, in either direction, and the `sales.*` capability namespace stays
+reserved for a real live-Salesforce server. ADR-0219 also widened
+`knowledge.sxa-legacy`'s `allowed_groups` to `[sales, board, adv, finance]`,
+absorbing what the retired `knowledge.sxa` domain had granted.
+
 ## Decision
 
 Treat the two commercial sources as separate logical domains and authority levels:

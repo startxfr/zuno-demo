@@ -38,6 +38,9 @@
   not the recurring-cadence/live-credential automation this WP's
   Operator-pending state still tracks. That automation blocks nothing
   downstream today.)
+- **Note (2026-08-26):** `load-sxa-dump` survives ADR-0219 but no longer
+  imports into MariaDB - it parses the S3 dump in pure Python. Its stage name,
+  domain binding and cadence are unchanged.
 - **Estimated files touched:** ~10
 
 > Execute this brief as a standalone task from the repository root.

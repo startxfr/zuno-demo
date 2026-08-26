@@ -177,7 +177,7 @@ A shared Google Workspace MCP server uses delegated end-user OAuth2.
 
 ## 10. SXA commercial database - source-derived schema memory
 
-The provided source is a legacy phpMyAdmin schema dump for MySQL 5.0.95. It is a schema reference, not the PostgreSQL target implementation. The demo must provide a PostgreSQL migration/bootstrap path and load the separate approved demo data dump.
+The provided source is a legacy phpMyAdmin schema dump for MySQL 5.0.95. It is a schema reference for reading the corpus, not a target implementation: ADR-0219 (2026-08-26) settled that SXA is the company's closed pre-2021 record, served through retrieval only. `load-sxa-dump` parses the S3 `schema.sql`/`data.sql` pair in pure Python and writes one document per row into the `knowledge.sxa-legacy` pgvector index. There is no PostgreSQL or MariaDB SXA database anywhere in the platform.
 
 ### Core commercial flow
 
@@ -277,17 +277,22 @@ The source schema contains MySQL-specific and legacy constructs that require exp
 - legacy timestamp/default behavior;
 - implicit logical relationships that are indexed but not necessarily represented as foreign keys.
 
-The PostgreSQL target migration should preserve the business semantics, introduce explicit constraints where safe, map identity to Keycloak, and support controlled demo writes.
+The section below records the source's business semantics because they are how the corpus reads, not because anything migrates them. Should a live commercial store ever be needed, it would be a new decision against a real system - ADR-0206 reserves the `sales.*` capability namespace for exactly that.
 
 ## 11. Sales database access policies
 
-- Comage normally sees deals for the authenticated sales owner; `sales_admin` may see all permitted sales records.
-- Advantage sees business at client-PO-received / administration states and later.
-- Finage sees billable (`A facturer`) and invoiced states.
-- Comage, Advantage and Finage may perform controlled writes, at minimum approved state transitions.
-- SQL tools should be deterministic where possible and stored with the GitOps agent definition.
-- Arbitrary model-generated writes are not trusted. The AI platform validates tool, operation, user authorization, business rule and state transition before execution.
-- The repository contains no real SXA data. Only anonymized/synthetic fixtures may be committed.
+**ADR-0219 (2026-08-26) made this section read-only.** SXA has no tool path
+and no writes: `knowledge.sxa-legacy` retrieval is the only access, gated by
+`allowed_groups: [sales, board, adv, finance]` and `min_classification: C3`.
+The role intents below are retained because they describe what each agent is
+*asking about*, not a permission model that a SQL tool still enforces.
+
+- Comage asks about deals for the authenticated sales owner; `sales_admin` about all permitted sales records.
+- Advantage asks about business at client-PO-received / administration states and later.
+- Finage asks about billable (`A facturer`) and invoiced states.
+- No controlled writes exist. There is no SQL tool, deterministic or otherwise - a frozen pre-2021 record has nothing to write to. Arbitrary model-generated writes were never trusted and are now structurally impossible on this path.
+- Any figure an agent reports from this domain is retrieved and must be attributed, never presented as a computed aggregate.
+- The repository contains no SXA data of any kind. `data/sxa/` was deleted with the structured stores; the dump lives only in S3 (ADR-0025).
 
 ## 12. Evaluation and observability
 
@@ -314,6 +319,7 @@ Execution conventions (established 2026-08-14, extended by the OKF stream 2026-0
 - Work is decomposed into self-contained work-package briefs under `docs/roadmap/work-packages/` (v0.1-v0.3, tracked in `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`) and `docs/roadmap/okf-roadmap.md` (OKF stream, WP-43+, 05xx ADR band), each written for standalone execution by a lower-capability model.
 - WP state machine: `Not started -> Repo work in review -> Repo work merged -> Operator pending -> Done`.
 - ADR status strings live only in `docs/adr/README.md` and ADR bodies (checked by `platform/docs/check_docs.py`); the roadmap tracks WP state only. Stub ADRs are promoted to full files before implementation (Step 0 of their brief).
+- ADRs are immutable decision records, with one recorded exception: ADR-0219 (2026-08-26) renamed ADR-0216's and ADR-0217's **files** and rewrote their titles/bodies, because those titles asserted the content was anonymized when `sxa_anonymize.py` had been deleted three days earlier and no path anonymized anything. Renaming an ADR file means updating its `docs/adr/README.md` link (the index regex matches the exact filename) and every cross-reference. Do this only when a title states something factually untrue, never to tidy wording.
 - Every brief separates model-executable repo changes from operator/cluster steps.
 - Sessions commit one WP at a time and ask the user before attempting any live/cluster validation step.
 - OKF-stream-specific: cross-repo single-writer clause (`zuno-demo` stays authoritative, `zuno-okf` is a mirror, from WP-48/WP-50); ADR `Target` header values `OKF v0.1|v0.2|v0.3`; quota precedence project -> user -> group (ADR-0511); `project_required` tasks verify a Salesforce project binding fail-closed before any action (ADR-0512).
@@ -363,8 +369,8 @@ not here.
   federation (ADR-0014), and the policy-intersection files
   `policies/tools/tool-policy.yaml` +
   `policies/data-classification/classification.yaml`.
-- **Data**: from-scratch PostgreSQL-native SXA schema (`data/sxa/schema/`,
-  §10), synthetic fixtures, sales-db MCP server.
+- **Data**: PostgreSQL + pgvector per knowledge domain. SXA is a read-only
+  pre-2021 RAG corpus (`knowledge.sxa-legacy`), not a database (ADR-0219).
 - **AI/model layer**: local Qwen3.6-27B (FP8) serving; AI Inference
   Gateway (`components/ai-gateway`, ADR-0009) owns provider
   routing/fallback/classification-eligibility (§6) behind an
@@ -409,10 +415,10 @@ not here.
   upstream Vault chart) get a documented partial treatment instead of
   guessed CRD fields. `zuno-auth`/`zuno-data`/`zuno-telemetry` get a
   namespace-level default-deny NetworkPolicy baseline; `zuno-ai-run` gets
-  one precise per-workload NetworkPolicy instead (ADR-0037 requires
-  `sales-db-mcp` to reject same-namespace neighbors too). `sales-db-mcp`
-  also validates a shared `X-Zuno-Gateway-Token` workload-identity secret
-  independent of the network boundary.
+  one precise per-workload NetworkPolicy instead (ADR-0037 requires each MCP
+  server, e.g. `confluence-mcp`, to reject same-namespace neighbors too).
+  Each server also validates a shared `X-Zuno-Gateway-Token` workload-identity
+  secret independent of the network boundary.
   `platform/security/check_workload_hardening.py` statically verifies the
   whole baseline against every chart's rendered manifests (no live
   cluster needed).
@@ -678,6 +684,26 @@ not here.
   pending a live OGX-backed corpus proof.
 
 ### Dated entries (roadmap work packages, v0.2) — current status per ADR
+
+- **ADR-0219 (WP-084)**: SXA as a RAG-only historical corpus — **Implemented
+  / repo work merged 2026-08-26**, operator steps open. Supersedes ADR-0216
+  and ADR-0217 in full (both `Abandoned` as WP-065/WP-067) and ADR-0016 in
+  full. SXA is the company's pre-2021 commercial record with no live system
+  behind it, so the deterministic MCP path had nothing to be authoritative
+  about, and the two RAG domains were reading the same bytes from the same
+  bucket. `knowledge.sxa-legacy` survives alone, widened to
+  `[sales, board, adv, finance]` (the union of both domains' grants, so no
+  agent lost reach — this amends ADR-0340's access-intent row and retires
+  WP-35's Advantage negative test, which now guards `knowledge.sales`).
+  `load-sxa-dump` keeps its name and parses the S3 dump in pure Python.
+  Deleted: the five `sxa.*` capabilities, `sales-db`, the `sql-schema` Day-2
+  component, `data/sxa/`, the MariaDB `sxa` database, `knowledge.sxa`.
+  Two things worth remembering: deleting a tool binding turns its probes from
+  403 into **404** (the gateway resolves bindings before policy), which
+  silently broke ten negative scenarios across six agents including three
+  unrelated to SXA; and the uninstall tasks were **kept** as retired-resource
+  cleanup rather than deleted, so `make d2 uninstall` still reclaims the
+  orphans on clusters installed before this landed.
 
 - **ADR-0354 (WP-072/WP-073)**: Ansible Automation Platform. WP-072
   (`aap`) and WP-073 (`aap-config`) are both `Done`, live-verified on
