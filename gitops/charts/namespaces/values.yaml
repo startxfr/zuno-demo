@@ -453,10 +453,25 @@ platformNamespaces:
 # workergpu node's idle full GPU); ADR-0414 retires it now that
 # gpt-oss-20b runs on a mig-1g.24gb slice instead - back to zero
 # exceptions, matching ADR-0351's original rule.
+#
+# Surge headroom (2026-08-26): the counts are workload-count + 1 per
+# profile, NOT the strict one-slice-per-workload of the paragraph above.
+# Sized at exactly 2 and 1, this quota made every rolling update
+# impossible by construction: the KServe Deployments are RollingUpdate
+# with maxUnavailable 0, so a new revision's pod must be admitted while
+# the outgoing one still holds its slice - and admission refused it
+# ("exceeded quota: requested: requests.nvidia.com/mig-1g.24gb=1, used:
+# 2, limited: 2"), leaving the embeddings InferenceService stuck
+# PredictorReady=False/FailedCreate with a perfectly healthy pod running.
+# The surge slot is a ceiling, not a reservation: it costs nothing while
+# no rollout is in flight. The 2g.48gb surge slot only becomes physically
+# schedulable once a second all-balanced GPU node exists (Option HA,
+# gitops/charts/machines' zuno-gpu-c); until then a qwen rollout waits on
+# the scheduler rather than being refused at admission.
 openshiftAi:
   namespace: zuno-ai-run
   gpuQuota:
     resources:
-      nvidia.com/mig-1g.24gb: "2"
-      nvidia.com/mig-2g.48gb: "1"
+      nvidia.com/mig-1g.24gb: "3"
+      nvidia.com/mig-2g.48gb: "2"
       nvidia.com/gpu: "0"

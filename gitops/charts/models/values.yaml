@@ -82,10 +82,18 @@ image:
 # raw payload. Preventive sizing, not an observed OOM; the g7e.4xlarge
 # node (128GiB) has ample headroom over the three co-resident
 # predictors' combined limits.
+# Requests right-sized from measured load (2026-08-26): peak 1.00 core /
+# 10.1GiB working set over a 24h window that includes the 11h47 MMLU
+# LMEvalJob driving this predictor continuously - the previous 4 CPU /
+# 24Gi reserved ~4x the observed ceiling and was the single biggest
+# contributor to node A sitting at 88% cpu-requests with only two model
+# pods on it, which is what left gpt-oss-20b unschedulable. Limits are
+# deliberately NOT lowered: they cover the safetensors load spike, while
+# requests only govern scheduling.
 resources:
   requests:
-    cpu: "4"
-    memory: 24Gi
+    cpu: "2"
+    memory: 16Gi
     nvidia.com/mig-2g.48gb: "1"
   limits:
     cpu: "8"
@@ -304,14 +312,20 @@ embeddingModel:
   # ADR-0351: a 1g.24gb MIG slice - same 24GB a whole L4 gave the
   # embedding model before, now co-resident on the shared permanent GPU
   # node.
+  # Right-sized UP from measured load (2026-08-26), unlike the two chat
+  # models: peak 0.62 core / 5.57GiB working set over 24h. The 6Gi limit
+  # sat only 7% above that observed ceiling - one ingestion burst away
+  # from repeating the exit-137 documented just above - and the 3Gi
+  # request understated the steady state by ~2x, so the scheduler was
+  # placing this pod on false premises. 6Gi/8Gi restores real margin.
   resources:
     requests:
-      cpu: "500m"
-      memory: 3Gi
+      cpu: "750m"
+      memory: 6Gi
       nvidia.com/mig-1g.24gb: "1"
     limits:
-      cpu: "1"
-      memory: 6Gi
+      cpu: "2"
+      memory: 8Gi
       nvidia.com/mig-1g.24gb: "1"
   minReplicas: 1
   maxReplicas: 1
@@ -473,10 +487,16 @@ gptOssModel:
   # workload (proven to fit alongside the other Card A co-resident
   # predictors on the g7e.4xlarge managed node), not the old workergpu
   # node's headroom - that node and its sizing rationale no longer apply.
+  # Requests right-sized from measured load (2026-08-26): peak 0.97 core /
+  # 4.0GiB working set over 24h, measured across this model's prior
+  # revisions. The 4 CPU request is precisely what made this pod
+  # unschedulable ("Insufficient cpu") on the only node advertising a
+  # mig-1g.24gb slice, while that slice sat idle at 64MiB - the pod was
+  # blocked on CPU, never on GPU. Limits unchanged.
   resources:
     requests:
-      cpu: "4"
-      memory: 16Gi
+      cpu: "2"
+      memory: 8Gi
       nvidia.com/mig-1g.24gb: "1"
     limits:
       cpu: "8"
