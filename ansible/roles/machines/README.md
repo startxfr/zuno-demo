@@ -3,12 +3,16 @@
 Applies the `gitops/apps/machines` ArgoCD Application (ADR-0351), whose
 chart (`gitops/charts/machines`, a vendored startx `cluster-machine`
 wrapper) creates the cluster's GPU capacity: the permanent MIG-partitioned
-inference MachineSet (`zuno-gpu-a`, g7e.4xlarge, replicas 1), the manual
-AZ-failover MachineSet (`zuno-gpu-c`, replicas 0), the scale-from-zero
-burst-training MachineSet (`zuno-gpu-burst-a`, tainted, MachineAutoscaler
-min 0/max 1) and the `ClusterAutoscaler` singleton. A Day 0 component
+inference MachineSets (`zuno-gpu-a` in eu-west-2a and, since WP-083,
+`zuno-gpu-c` in eu-west-2c - both g7e.4xlarge at replicas 1, both
+`all-balanced`, symmetric so either survives the loss of the other), the
+scale-from-zero burst-training MachineSet (`zuno-gpu-burst-a`, tainted,
+MachineAutoscaler min 0/max 1) and the `ClusterAutoscaler` singleton. Note
+the Application sets `ignoreDifferences` on MachineSet `/spec/replicas`, so
+replica counts in `values.yaml` are never pushed to live objects - changing
+one takes an `oc scale`. A Day 0 component
 (ADR-0056) - `install.yml` applies both Application halves then waits for
-`zuno-gpu-a` to have its machine available (first boot of a g7e node is
+the GPU machinesets to have their machines available (first boot of a g7e node is
 ~8 min; the NVIDIA driver build on top of it is `nvidia_gpu`'s wait, not
 this role's).
 

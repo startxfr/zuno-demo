@@ -5,6 +5,16 @@
 - **Date:** 2026-08-17
 - **Decision owners:** Zuno Demo architecture team
 
+> **Amended in place 2026-08-26 (WP-083).** This record was edited rather
+> than superseded, by explicit operator decision. That departs from the
+> immutability rule this repo states in [README.md](README.md) ("ADRs are
+> immutable decision records ... a new ADR supersedes the previous record
+> instead of rewriting history"), and the departure is recorded here rather
+> than left implicit. Amended parts: the Context goal, decisions 5 and 7,
+> and the cost analysis. Each carries an inline `**Amended 2026-08-26:**`
+> note quoting what the original text said, so the superseded reasoning is
+> still readable. Nothing else was rewritten.
+
 ## Context
 
 The demo222 cluster reached a topology where every GPU decision made for
@@ -36,6 +46,15 @@ the earlier 3x-L4 era stopped matching reality at once:
 The operator's goals: share the 96GB GPU across **all** GPU workloads
 (inference and training), keep exactly one permanent GPU node, and add a
 second node only for AZ failure or punctual training bursts - cost first.
+
+> **Amended 2026-08-26 (WP-083):** the "exactly one permanent GPU node"
+> goal no longer holds. It was never actually met in practice - the IPI
+> `workergpu` node ran at replicas 1 throughout (decision 7 assumed zero),
+> so the cluster always had two permanent GPU nodes; the second was simply
+> idle at 0% GPU utilisation rather than useful. WP-083 makes the second
+> node deliberate and useful instead of accidental and wasted. The
+> cost-first framing survives: see the amended cost analysis below, where
+> the real delta is one instance size step, not a second node.
 
 ## Decision
 
@@ -96,6 +115,29 @@ second node only for AZ failure or punctual training bursts - cost first.
    that `oc scale machineset zuno-gpu-c --replicas=1` plus the qwen PVC
    recreation (zone-bound storage) is the documented recovery path
    (`gitops/charts/machines/README.md`).
+
+   > **Amended 2026-08-26 (WP-083): `zuno-gpu-c` runs at replicas 1 as the
+   > second permanent inference node.** The original text above ("sits at
+   > replicas 0 ... `oc scale machineset zuno-gpu-c --replicas=1` ... is the
+   > documented recovery path") described a design that could not work, for
+   > the reason this same decision states two sentences earlier: the
+   > ClusterAutoscaler only sees plain `nvidia.com/gpu`, never
+   > `nvidia.com/mig-*`. A Pending MIG-slice pod could therefore never have
+   > summoned this MachineSet, and nothing else would have noticed zone a
+   > was gone. A standby that only a human can trigger, during an outage,
+   > is not failover capacity - a second MIG node has to be standing
+   > *before* it is needed. It now is, in `eu-west-2c`, and the two
+   > inference nodes are symmetric `all-balanced` g7e.4xlarge: either one
+   > alone holds all three model workloads (1x `2g.48gb` + 2x `1g.24gb`
+   > = 3/3 slices), which is what makes single-node loss survivable.
+   >
+   > Two parts of the original recovery path are also obsolete: the qwen
+   > model PVC no longer exists (ADR-0521 made every served model S3-only),
+   > and `oc scale` is still required to change replicas - not because it
+   > is a runbook, but because `gitops/apps/machines/application-d0.yaml`
+   > sets `ignoreDifferences` on MachineSet `/spec/replicas`, so a value
+   > committed to `values.yaml` is deliberately never pushed to the live
+   > object. Git and cluster can silently diverge on replicas by design.
 6. **The ClusterPolicy MIG strategy is an ansible overlay, not a Git
    manifest.** ADR-0312/ADR-0047's discovery design stands: the spec is
    still read from the installed CSV's `alm-examples` at deploy time;
@@ -107,6 +149,28 @@ second node only for AZ failure or punctual training bursts - cost first.
    replicas 0**, unmanaged by this repo: installer-native artifacts,
    harmless at zero, and a manual escape hatch if the `machines` chart
    ever has to be torn down.
+
+   > **Amended 2026-08-26 (WP-083): this decision is restored, not
+   > reversed.** The live cluster had drifted from it -
+   > `demo222-kpkqk-workergpu-eu-west-2a` was running at replicas 1, first
+   > because ADR-0412 deliberately borrowed its idle full GPU for
+   > gpt-oss-20b, then still after ADR-0414 retired that exception. The
+   > result was a `g7e.2xlarge` billed 24/7 whose entire 96GB RTX PRO 6000
+   > sat at 0% utilisation and 0 MiB allocated: unusable for MIG workloads
+   > because, being outside `gitops/charts/machines`, no
+   > `nvidia.com/mig.config` label can be pushed to it declaratively, and
+   > any partition applied by hand would be lost on node replacement.
+   > WP-083 scales it back to 0 and moves that capacity to `zuno-gpu-c`
+   > (decision 5). The machinesets stay declared at zero, so the escape
+   > hatch this decision describes - which `ansible/roles/machines/README.md`
+   > depends on for the chart-teardown path - is intact and is now actually
+   > true rather than aspirational.
+   >
+   > Note this overtakes ADR-0414's header claim to amend decision 7
+   > ("the unmanaged IPI workergpu machinesets no longer stay unmanaged").
+   > ADR-0414 is still `Proposed` and proposed adopting the node into
+   > `machines` management; WP-083 retires it instead. See ADR-0414's own
+   > amendment note.
 
 ### Cost analysis (us-east-1 on-demand, indicative)
 
@@ -120,6 +184,28 @@ second node only for AZ failure or punctual training bursts - cost first.
 One partitioned node runs what previously needed three L4 nodes; the only
 standing cost increase is the 2xlarge->4xlarge step, and training/failover
 capacity bills only when actually used.
+
+> **Amended 2026-08-26 (WP-083).** Two rows above are wrong as written.
+> "Second permanent GPU node (avoided) | **~2,450+ avoided**" was never
+> avoided - the IPI `workergpu` `g7e.2xlarge` was billed at that rate the
+> whole time (decision 7's amendment), so the saving was booked against a
+> node that was in fact running. "Failover g7e.4xlarge (replicas 0) | 0"
+> now bills, because that node is `zuno-gpu-c` at replicas 1.
+>
+> The correct standing cost of WP-083 is a swap, not an addition:
+>
+> | Item | $/h | $/month (~730h) |
+> |---|---|---|
+> | `zuno-gpu-c` g7e.4xlarge, replicas 1 (was 0) | ~4.00 | ~2,920 |
+> | IPI `workergpu` g7e.2xlarge, replicas 0 (was 1) | -3.36 | -~2,450 |
+> | **Net delta** | **~+0.64** | **~+467** |
+>
+> ~$467/month buys: the second 96GB card moving from 0% to serving
+> gpt-oss-20b, AZ redundancy (2a + 2c, where both GPU nodes previously sat
+> in 2a), declarative MIG management, and a vCPU/VRAM ratio that can
+> actually drive a 3-slice partition - the `g7e.2xlarge` had ~4.5 cores
+> free for 3 slices, so one model pod fit and 96GB was bought to use 24GB.
+> Same indicative us-east-1 on-demand basis as the table above.
 
 ### Relationship to ADR-0211
 

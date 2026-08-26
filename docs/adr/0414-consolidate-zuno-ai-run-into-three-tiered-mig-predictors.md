@@ -5,7 +5,25 @@
 - **Date:** 2026-08-20
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) (its full-GPU exception)
-- **Amends:** [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) decision 7 (the unmanaged IPI workergpu machinesets no longer stay unmanaged)
+- **Amends:** [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) decision 7 — ~~the unmanaged IPI workergpu machinesets no longer stay unmanaged~~ **withdrawn 2026-08-26, see below**
+
+> **Amended 2026-08-26 (WP-083): this record's claim on ADR-0351 decision 7
+> is withdrawn.** This ADR is still `Proposed` and its Card B adoption was
+> never implemented. WP-083 reached the same goal - a second
+> MIG-`all-balanced` card - by the opposite route: instead of adopting the
+> IPI `demo222-kpkqk-workergpu-eu-west-2a` machineset into
+> `gitops/charts/machines`, it scales that machineset back to 0 and stands
+> up `zuno-gpu-c` (already declared in the chart, `eu-west-2c`) at replicas
+> 1. Adoption was the weaker option on three counts: the IPI node is a
+> `g7e.2xlarge` whose 8 vCPU cannot drive a 3-slice partition, it sits in
+> `eu-west-2a` alongside `zuno-gpu-a` so it adds no AZ redundancy, and
+> adopting an installer-native machineset would have consumed ADR-0351
+> decision 7's documented teardown escape hatch. ADR-0351 decision 7 is
+> therefore restored rather than amended, and this line no longer applies.
+>
+> The tiering table below is separately obsolete: ADR-0518 replaced the
+> model set (`qwen3.6-27b-instruct`, `qwen3-embedding-0.6b`,
+> `gpt-oss-20b`), so the Qwen3-32B/Qwen3-8B tiers were never built.
 
 ## Context
 
@@ -67,6 +85,12 @@ Physical layout:
 - **Card B** is adopted into `gitops/charts/machines` management for the
   first time and gets `all-balanced` applied. Tier 2 takes its `2g.48gb`
   slot. Both `1g.24gb` slots go free.
+
+  > **Amended 2026-08-26 (WP-083): not adopted - retired.** Card B is the
+  > IPI `demo222-kpkqk-workergpu-eu-west-2a` node; WP-083 scales it to 0
+  > and provides the second `all-balanced` card from `zuno-gpu-c`
+  > (`g7e.4xlarge`, `eu-west-2c`) instead. See the withdrawal note at the
+  > top of this record for why adoption was the weaker option.
 
 Net: three `1g.24gb`-equivalent quarter-slices free across the cluster
 after this lands. Because Card A's profile never changes — only which

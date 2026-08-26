@@ -12,7 +12,7 @@ false in `values.yaml`; `-d1` is a `noop` placeholder.
 | Object | Purpose |
 |---|---|
 | MachineSet `zuno-gpu-a` (replicas 1) | Permanent inference node: g7e.4xlarge, eu-west-2a, MIG `all-balanced` (2x 24GB + 1x 48GB slices) |
-| MachineSet `zuno-gpu-c` (replicas 0) | AZ-failover twin in eu-west-2c, same MIG label, scaled by hand (runbook below) |
+| MachineSet `zuno-gpu-c` (replicas 1) | Second permanent inference node: g7e.4xlarge, eu-west-2c, MIG `all-balanced` - symmetric with `zuno-gpu-a` (WP-083; replicas set by hand, see below) |
 | MachineSet `zuno-gpu-burst-a` (replicas 0) | Burst training node: g7e.2xlarge, MIG disabled (whole 96GB `nvidia.com/gpu`), tainted `zuno.io/gpu-burst=true:NoSchedule` |
 | MachineAutoscaler `zuno-gpu-burst-a` (min 0 / max 1) | Scale-from-zero for the burst set |
 | ClusterAutoscaler `default` | Cluster singleton; scale-down enabled (`unneededTime: 10m`) so the burst node disappears after training |
@@ -49,19 +49,56 @@ burst-taint toleration for the NVIDIA daemonsets) comes from
   `RespectIgnoreDifferences=true`, otherwise selfHeal would revert both the
   autoscaler's burst scale-up and the failover runbook's manual scale.
 
-## AZ-failover runbook (zone a lost)
+## Losing a GPU node (WP-083: no runbook needed)
 
-1. `oc scale machineset zuno-gpu-c -n openshift-machine-api --replicas=1`
-   (~8 min: boot + NVIDIA driver build + MIG partition; the node comes up
-   with the same `all-balanced` slices).
-2. The embeddings and MaaS pods reschedule on their own. The qwen chat
-   predictor's model PVC is zone-bound to eu-west-2a (gp3-csi is single-AZ):
-   delete the `qwen36-27b-instruct-model-download` Job and the
-   `qwen36-27b-instruct-model` PVC, then sync `zuno-models-d1` - the Job
-   reruns on the new node and the PVC rebinds in eu-west-2c (~15GB
-   re-download).
-3. Fail back by reversing: scale `zuno-gpu-a` back to 1 once zone a
-   returns, drain-wait, scale `zuno-gpu-c` to 0, recreate the PVC in a.
+Both inference nodes are permanent and symmetric, so node loss needs no
+manual step. Either `all-balanced` card alone holds the full model set -
+1x `2g.48gb` + 2x `1g.24gb`, exactly 96GB - so the survivor absorbs the
+three predictors on its own and the pods reschedule unaided.
+
+This replaces the AZ-failover runbook that lived here. That runbook could
+never have worked as written: it assumed a Pending MIG-slice pod would
+signal the outage, but the ClusterAutoscaler only sees plain
+`nvidia.com/gpu` (see Design constraints above), so nothing would have
+raised the alarm - a human had to notice first. Its step 2 is separately
+obsolete: ADR-0521 made every served model S3-only, so there is no
+zone-bound qwen PVC to recreate.
+
+What is worth knowing in a degraded state: with all three models on one
+node, all three slices are taken, so no rolling update can schedule until
+the second node returns. A config push during an outage will sit Pending.
+
+### Changing replicas
+
+`gitops/apps/machines/application-d0.yaml` sets `ignoreDifferences` on
+MachineSet `/spec/replicas` with `RespectIgnoreDifferences=true`, so a
+replica count committed in `values.yaml` is **deliberately never pushed**
+to the live object - Git and cluster diverge on that field by design, which
+is what lets the ClusterAutoscaler own the burst set. Changing a count for
+real always takes a live command:
+
+```
+oc scale machineset <name> -n openshift-machine-api --replicas=<n>
+```
+
+A new node takes ~8-10 min (EC2 boot + ignition + NVIDIA driver build)
+before it advertises its MIG slices.
+
+### Decommissioning a node
+
+`oc adm drain` on its own can hang forever - any single-replica Deployment
+with `minAvailable: 1` reports `disruptionsAllowed: 0` and the eviction API
+will wait on it indefinitely. Check first:
+
+```
+oc get pdb -A -o custom-columns=\
+NS:.metadata.namespace,NAME:.metadata.name,ALLOWED:.status.disruptionsAllowed
+```
+
+Cordon, then delete the blocking pods and any StatefulSet singletons one at
+a time (a cordoned node makes them reschedule elsewhere), then drain. Watch
+for `gp3-csi` volumes: they are single-AZ, so their pods can only land on
+another node in the same zone.
 
 ## Retired predecessors
 
@@ -75,3 +112,9 @@ MachineConfig(Pool)s had their finalizers stripped first - cascade-deleting
 those would have deleted the live `worker` MachineConfigPool). The IPI
 `demo222-kpkqk-workergpu-*` machinesets stay live at replicas 0 as an
 installer-native escape hatch, deliberately unmanaged by this chart.
+
+WP-083 note (2026-08-26): that was aspirational for a while.
+`demo222-kpkqk-workergpu-eu-west-2a` had been running at replicas 1 since
+ADR-0412 borrowed its idle full GPU, and stayed up after ADR-0414 retired
+that exception - a g7e.2xlarge billed 24/7 whose whole 96GB card sat at 0%
+utilisation. It is back at 0, and the escape hatch is real again.
