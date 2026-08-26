@@ -109,7 +109,13 @@ cluster-ods:
           storage:
             backend: s3
             secret: rhoai-traces-s3-credentials
-            retention: 48h
+            # metav1.Duration - MUST be the canonical normalized form
+            # ("48h" round-trips to "48h0m0s" in the stored CR), or ArgoCD
+            # sees permanent OutOfSync drift on DSCInitialization and every
+            # `make d1 install/reconcile openshift-ai` app-wait times out
+            # (bit WP-081's reconcile run live, 2026-08-26; latent since
+            # WP-079 introduced the value).
+            retention: 48h0m0s
 
   # Superseded by the top-level dataScienceCluster key below, rendered by this
   # chart's own templates/datasciencecluster.yaml instead (see that file for
