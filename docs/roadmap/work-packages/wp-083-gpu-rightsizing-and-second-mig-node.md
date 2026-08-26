@@ -1,7 +1,7 @@
 # WP-083: GPU right-sizing and a second permanent MIG node
 
-- **State:** Repo work in review (right-sizing, quota and machines changes committed; every
-  operator action below still pending).
+- **State:** Done (live-verified 2026-08-26). Every operator action below was executed and
+  checked; the IPI GPU node is decommissioned.
 - **ADRs:** ADR-0351 (amended in place 2026-08-26 — decisions 5 and 7 and the cost analysis),
   ADR-0414 (its claim on ADR-0351 decision 7 withdrawn)
 - **Depends on:** WP-082 (identified and deferred both defects this WP fixes), WP-076/ADR-0521
@@ -168,14 +168,18 @@ Ordered; each gates the next.
   the MIG assertion sees both nodes at 2x`1g.24gb`+1x`2g.48gb`, and `zuno-gpu-burst-a` at 0 is
   correctly excluded. `install.yml` had the identical blind spot and was generalised with it.
 - ✅ 2 GPU nodes, AZ **2a and 2c**, each 2x `mig-1g.24gb` + 1x `mig-2g.48gb`
-- ⬜ `PreferNoSchedule` present on both GPU nodes
-- ⬜ MachineSets: `zuno-gpu-a`=1, `zuno-gpu-c`=1, `zuno-gpu-burst-a`=0, `workergpu`=0
-- ⬜ `make d3 test platform` green after the drain
-- ⬜ AZ-2a-pinned StatefulSets `Running` after relocation
-- ⬜ Short load test on both chat models — the only check with no evidence yet. The new requests
-  come from 5-minute `rate` peaks, which smooth sub-5-minute spikes. Limits are unchanged, so
-  the risk is transient throttling rather than OOM, but it should be confirmed rather than
-  assumed.
+- ✅ `PreferNoSchedule` present on both GPU nodes
+- ✅ MachineSets: `zuno-gpu-a`=1, `zuno-gpu-c`=1, `zuno-gpu-burst-a`=0, `workergpu`=0
+- ✅ `make d3 test platform` green after the drain — 8/8 PASS (agent-runtime, ai-gateway,
+  mcp-gateway, rag-service; healthz + readyz each)
+- ✅ AZ-2a-pinned StatefulSets `Running` after relocation, all on master-0. Keycloak answered
+  HTTP 200 in 0.22s after the Redis move; 89/89 ExternalSecrets `SecretSynced` after Vault's
+- ✅ Short load test on both chat models. Three consecutive warm 200-token completions on
+  qwen3.6-27b: 11.0/11.1/11.1s, a steady 18 tok/s. **CPU measured during the load: `main` at
+  11m on qwen and 89m on gpt-oss, against a 2000m request** — three orders of magnitude of
+  headroom, and well under even the 1.00-core 24h peak the sizing was derived from. RAM 10.2GiB
+  against 16Gi requested, matching the measured peak exactly. gpt-oss's first call was 1.15s;
+  qwen's was 86.6s cold, which is `--enforce-eager` warm-up, not a sizing problem.
 
 ## Out of scope
 
@@ -190,5 +194,26 @@ Ordered; each gates the next.
 
 ## Status updates
 
-_To be filled at close-out: ADR-0351 body status + `docs/adr/README.md` index row + this
-section + `MEMORY.md`, then `python3 platform/docs/check_docs.py`._
+- WP-083 → **Done** (live-verified 2026-08-26).
+- ADR-0351 → `Implemented (2026-08-26; amended same day by WP-083 - two permanent MIG nodes,
+  see decisions 5 and 7)`; `docs/adr/README.md` index row updated to match.
+- ADR-0414 stays `Proposed`. Its tiering decision was never built (ADR-0518 replaced the model
+  set) and its claim on ADR-0351 decision 7 is withdrawn in its own record.
+- `MEMORY.md` updated: the GPU capacity paragraph described one permanent node plus a
+  replicas-0 failover MachineSet, which is no longer true.
+- `python3 platform/docs/check_docs.py` passes.
+
+### What the live run changed about the plan
+
+Two things the plan got wrong, both worth carrying forward:
+
+1. **Phase 1's success criterion could not be met on its own.** Right-sizing only takes effect
+   when a pod is *replaced*, and qwen could not be replaced without a second `2g.48gb` slice —
+   so it kept its old 4-core reservation, which was precisely what blocked gpt-oss. Phase 1
+   depended on Phase 3. The chart comment written in `4be71ce` predicted this and the plan
+   still sequenced around it.
+2. **Ephemeral storage was never sized.** See the live finding above. CPU, RAM and VRAM were
+   all modelled; disk was the one that actually broke.
+
+Service continuity held throughout: qwen and embeddings never stopped serving, and gpt-oss went
+from permanently `Pending` to serving.

@@ -17,12 +17,20 @@ The MVP target is seven days with two contributors. Documentation and architectu
 - OpenShift Container Platform 4.22, AWS IPI.
 - Red Hat OpenShift AI 3.5 EA2.
 - Internet-connected cluster.
-- Two CPU worker nodes; GPU capacity per ADR-0351: one permanent
-  g7e.4xlarge node (NVIDIA RTX PRO 6000 Blackwell 96GB, MIG-partitioned
-  `all-balanced` = 2x 1g.24gb + 1x 2g.48gb slices for the three inference
-  workloads) plus a scale-from-zero tainted burst node (whole GPU, for
-  training) and a replicas-0 AZ-failover MachineSet - all managed by
-  `gitops/charts/machines`.
+- Two CPU worker nodes; GPU capacity per ADR-0351 as amended by WP-083:
+  TWO permanent g7e.4xlarge nodes (NVIDIA RTX PRO 6000 Blackwell 96GB
+  each, both MIG-partitioned `all-balanced` = 2x 1g.24gb + 1x 2g.48gb),
+  `zuno-gpu-a` in eu-west-2a and `zuno-gpu-c` in eu-west-2c. They are
+  symmetric on purpose: either one alone holds all three inference
+  workloads, which is what makes the loss of a GPU node survivable - the
+  earlier replicas-0 AZ-failover design could not work, because the
+  ClusterAutoscaler never sees `nvidia.com/mig-*` capacity and so could
+  never have been triggered by a Pending MIG-slice pod. Both carry
+  `nvidia.com/gpu=true:PreferNoSchedule` (soft - it stops platform pods
+  creeping back, it does not dedicate the nodes). Plus a scale-from-zero
+  tainted burst node (whole GPU, for training) - all managed by
+  `gitops/charts/machines`. The installer's IPI `workergpu` machineset is
+  back at replicas 0, as ADR-0351 decision 7 always intended.
 - NVIDIA GPU Operator deployed as a prerequisite (ClusterPolicy
   `mig.strategy: mixed` via ansible overlay, ADR-0351).
 - OpenShift AI Operator and required dependencies deployed as prerequisites.

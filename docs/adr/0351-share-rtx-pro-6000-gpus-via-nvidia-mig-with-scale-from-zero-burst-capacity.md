@@ -1,6 +1,6 @@
 # ADR-0351: Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity
 
-- **Status:** To be implemented (manifests merged 2026-08-17; live rollout pending)
+- **Status:** Implemented (2026-08-26; amended same day by WP-083 - two permanent MIG nodes, see decisions 5 and 7)
 - **Target:** v0.3
 - **Date:** 2026-08-17
 - **Decision owners:** Zuno Demo architecture team

@@ -169,7 +169,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0347](0347-trust-the-vault-pki-root-for-the-oauth-openid-idp.md) | v0.1 | Implemented | Trust the Vault PKI root for the OAuth OpenID IDP |
 | [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) | v0.1 | Implemented | Restructure demo personas, ocp-* cluster-access groups and two new agents |
 | [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Implemented | Provide an AIAgent Kubernetes CRD and operator |
-| [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | To be implemented (manifests merged 2026-08-17; live rollout pending) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
+| [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | Implemented (2026-08-26; amended same day by WP-083 - two permanent MIG nodes, see decisions 5 and 7) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | v0.3 | Proposed | Expose AAP audits to agents through an mcp-aap server |
