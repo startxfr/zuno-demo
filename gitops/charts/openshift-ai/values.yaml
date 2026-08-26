@@ -109,12 +109,23 @@ cluster-ods:
           storage:
             backend: s3
             secret: rhoai-traces-s3-credentials
-            # metav1.Duration - MUST be the canonical normalized form
-            # ("48h" round-trips to "48h0m0s" in the stored CR), or ArgoCD
-            # sees permanent OutOfSync drift on DSCInitialization and every
-            # `make d1 install/reconcile openshift-ai` app-wait times out
-            # (bit WP-081's reconcile run live, 2026-08-26; latent since
-            # WP-079 introduced the value).
+            # MUST stay in canonical Go duration form: "48h" round-trips to
+            # "48h0m0s" in the stored CR, ArgoCD then sees permanent OutOfSync
+            # drift on DSCInitialization, and every `make d1 install/reconcile
+            # openshift-ai` app-wait times out (bit WP-081 live 2026-08-26;
+            # latent since WP-079 introduced the value).
+            # The mechanism is NOT API-server normalization - it is the CRD
+            # conversion webhook: this chart renders dscinitialization v1
+            # while v2 is the storage version, so every write round-trips
+            # v1 -> operator Go structs -> v2, canonicalizing whatever is a
+            # metav1.Duration in Go. Control experiment two keys up:
+            # metrics.storage.retention "15d" crosses the same webhook
+            # untouched because it is a plain Go string - so do NOT
+            # "canonicalize" that one (MonitoringStack.spec.retention even
+            # carries a pattern regex that would reject "360h0m0s").
+            # `oc explain` prints <string> for both and cannot tell them
+            # apart; when in doubt compare the live CR against the chart, or
+            # run platform/gitops/argocd_drift.py against the Application.
             retention: 48h0m0s
 
   # Superseded by the top-level dataScienceCluster key below, rendered by this

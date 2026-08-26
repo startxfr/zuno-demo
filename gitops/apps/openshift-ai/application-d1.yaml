@@ -54,6 +54,21 @@ spec:
       kind: DataScienceCluster
       jsonPointers:
         - /spec
+    # ADR-0523/WP-081: belt-and-braces on top of the canonicalized value in
+    # gitops/charts/openshift-ai/values.yaml. DSCInitialization is rendered as
+    # v1 while v2 is the storage version, so its metav1.Duration fields come
+    # back canonicalized through the conversion webhook ("48h" -> "48h0m0s")
+    # and ArgoCD reports permanent drift, timing out every install/reconcile
+    # app-wait. Deliberately ONE pointer, not /spec like the entry above: a
+    # blanket ignore here would blind us to real drift across the whole
+    # monitoring spec. NOTE application-d0.yaml carries a /spec ignore for
+    # this same kind, but d0 sets DSCInitialization.enabled: false - the guard
+    # was written for the Application that does not render the resource and
+    # omitted from the one that does, which is how this reached the cluster.
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+      jsonPointers:
+        - /spec/monitoring/traces/storage/retention
   syncPolicy:
     automated:
       prune: true

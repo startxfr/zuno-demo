@@ -153,7 +153,13 @@ credentials:
 # templates/externalsecret-backup-s3.yaml.
 backups:
   schedule: "0 */6 * * *"
-  maxRetention: 168h
+  # Pre-canonicalized Go duration form on purpose: maxRetention is a
+  # metav1.Duration, so if this CRD ever gains a conversion webhook (or the
+  # operator defaults the field back), "168h" would round-trip as "168h0m0s"
+  # and ArgoCD would report permanent drift - the ADR-0523/WP-081 trap. Today
+  # mariadbs is single-version with no conversion webhook and this block is
+  # gated behind s3.enabled, so this is insurance, not a live fix.
+  maxRetention: 168h0m0s
   compression: gzip
   s3:
     enabled: false

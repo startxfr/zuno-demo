@@ -98,15 +98,49 @@
          | list }}
   when: (_diag_app.resources | default([]) | length) > 0
 
+# An OutOfSync resource carries no *health* message (OutOfSync is a sync
+# state, not a health state), so the per-resource finding below reported an
+# empty cause exactly when a field-level diff was the one thing needed - a
+# 48h -> 48h0m0s canonicalization on DSCInitialization cost ~40 minutes to
+# find that way (ADR-0523/WP-081). Ask ArgoCD which fields actually differ.
+# Stays inside this file's read-only/never-fail contract: the helper exits 0
+# printing nothing on every failure path, and failed_when pins that shut.
+- name: "diagnose | resolve the field-level drift behind OutOfSync resources"
+  ansible.builtin.command:
+    cmd: "python3 {{ zuno_repo_root }}/platform/gitops/argocd_drift.py {{ gitops_app_name }}"
+  register: _diag_drift
+  changed_when: false
+  failed_when: false
+  when:
+    - (_diag_app.resources | default([]) | length) > 0
+    - (_diag_blocked_resources | default([]))
+      | selectattr('status', 'defined') | selectattr('status', 'eq', 'OutOfSync')
+      | list | length > 0
+
 - name: "diagnose | record per-resource blocked entries"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
   vars:
+    # Health message first (a Degraded resource explains itself), then the
+    # field-level drift for this specific resource, then the old fallback.
+    _diag_resource_drift: >-
+      {{ (_diag_drift.stdout_lines | default([]))
+         | select('search', '^' ~ (blocked.kind | default('?')) ~ '/' ~ (blocked.name | default('?')) ~ ' ')
+         | list | join('; ') }}
     blocked_finding:
       component: "{{ _diag_component }}"
       resource: "{{ blocked.kind | default('?') }}/{{ blocked.name | default('?') }} ({{ blocked.namespace | default('cluster-scoped') }})"
       state: "sync={{ blocked.status | default('n/a') }}, health={{ blocked.health.status | default('n/a') }}"
-      cause: "{{ blocked.health.message | default('no health message reported') }}"
-      solution: "Inspect with `oc get {{ blocked.kind | default('?') | lower }} {{ blocked.name | default('?') }}{{ (' -n ' + blocked.namespace) if blocked.namespace is defined else '' }}`; usually fixed by a re-sync/re-apply"
+      cause: >-
+        {{ blocked.health.message | default('', true)
+           or _diag_resource_drift
+           or 'no health message reported' }}
+      # A field-level mismatch survives any number of re-syncs (the cluster
+      # rewrites the value every time), so pointing at "re-sync" there would
+      # send the operator in circles - name the git-side fix instead.
+      solution: >-
+        {{ ('Reconcile git with the cluster for the field(s) above: canonicalize the value in the chart, or add a narrow ignoreDifferences entry to the Application. Re-syncing alone will NOT clear it. Full diff: `python3 platform/gitops/argocd_drift.py ' ~ gitops_app_name ~ '`')
+           if _diag_resource_drift
+           else ('Inspect with `oc get ' ~ (blocked.kind | default('?') | lower) ~ ' ' ~ (blocked.name | default('?')) ~ ((' -n ' ~ blocked.namespace) if blocked.namespace is defined else '') ~ '`; usually fixed by a re-sync/re-apply') }}
       auto_fix: "{{ _diag_fix_cmd }}"
   loop: "{{ (_diag_blocked_resources | default([]) | unique)[:10] }}"
   loop_control:

@@ -14,7 +14,7 @@
 # repository yet (ADR-0321's Operational considerations call this out
 # explicitly as required "before distributed training or queued model
 # workloads are enabled").
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor
 metadata:
   name: {{ .Values.queueResources.resourceFlavorName }}
@@ -22,7 +22,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "21"
 spec: {}
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
   name: {{ .Values.queueResources.clusterQueueName }}
@@ -40,7 +40,7 @@ spec:
             - name: "memory"
               nominalQuota: {{ .Values.queueResources.memoryQuota | quote }}
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
   name: {{ .Values.queueResources.localQueueName }}
