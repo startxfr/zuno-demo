@@ -1626,13 +1626,24 @@ resources:
     requests: {cpu: "500m", memory: "1536Mi"}
     limits: {cpu: "2", memory: "6Gi"}
   detectChanges:
-    requests: {cpu: "500m", memory: "1536Mi"}
-    limits: {cpu: "2", memory: "6Gi"}
+    requests: {cpu: "1", memory: "3Gi"}
+    # WP-084 (2026-08-26): sized up to match `normalize`. This stage does
+    # one S3 GET per document over the WHOLE corpus - the same shape and
+    # scale of work as normalize - but had been sized like the small
+    # fixed-cost stages (validate, reconcileAcls). On the 310,537-document
+    # SXA dump that cost ~108 min: measured 48 docs/s using 982m of its
+    # 2-CPU limit, i.e. latency-bound at 16 workers rather than CPU-bound.
+    # The 2026-08-26 run was terminated at 110 min, ~2 min from finishing.
+    limits: {cpu: "8", memory: "24Gi"}
     # WP-58: bounds the per-document S3 GET pool that rebuilds
     # detect-changes' "current" state (DETECT_CHANGES_READ_CONCURRENCY) -
     # network/S3-latency-bound, same rationale as resources.fetch's
     # concurrency knobs above.
-    readConcurrency: 16
+    # WP-084: 16 -> 64. At ~330ms per GET this projects ~194 docs/s (~27
+    # min for the SXA dump) drawing ~4 CPU, which is why the limit above
+    # is 8 and not 4 - 64 workers must not be throttled back into the same
+    # latency wall they are meant to hide.
+    readConcurrency: 64
 
 networkPolicy:
   enabled: true
