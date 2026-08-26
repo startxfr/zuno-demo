@@ -12,7 +12,7 @@ zuno:
   allowed_knowledge:
     - knowledge.adv
     - knowledge.project
-    - knowledge.sxa
+    - knowledge.sxa-legacy
 ---
 
 # Answer a project or bid question
@@ -34,17 +34,17 @@ that used to fill `knowledge.adv`, so this task is indexed-read only -
 (ADR-0326).
 
 ADR-0326's signature proof for this slice: `allowed_knowledge` above
-never includes Comage's own current-sales knowledge domain or
-`knowledge.sxa-legacy`, and `allowed_tools` never includes any
-live-CRM/legacy-SXA MCP capability - Advantage proves the cross-domain
-authorization boundary by explicit omission, not by a runtime filter. Any
-cross-domain commercial access this agent might need in a future
-iteration must be added here explicitly and policy-controlled, never
-inherited from Comage.
+never includes Comage's own current-sales knowledge domain
+(`knowledge.sales`), and `allowed_tools` never includes any live-CRM MCP
+capability - Advantage proves the cross-domain authorization boundary by
+explicit omission, not by a runtime filter. Any further cross-domain
+commercial access this agent might need must be added here explicitly and
+policy-controlled, never inherited from Comage.
 
-`knowledge.sxa` (ADR-0217/WP-067) is the one exception, added deliberately:
-a weekly, already-anonymized commercial corpus distinct from
-`knowledge.sxa-legacy` - opened to Advantage from the start, unlike
-`knowledge.sxa-legacy`'s sales/board-only restriction (WP-35's negative
-test for Advantage against `knowledge.sxa-legacy` specifically is
-unaffected by this grant).
+`knowledge.sxa-legacy` is the one deliberate exception. ADR-0217 first
+granted Advantage legacy commercial access through a separate second SXA
+domain; ADR-0219 retired that duplicate and widened
+`knowledge.sxa-legacy`'s `allowed_groups` to include `adv`, so the same
+grant now names the surviving domain. The boundary that still holds - and
+that WP-35's negative test now asserts - is `knowledge.sales`, which
+continues to exclude `adv`.

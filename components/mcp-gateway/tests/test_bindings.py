@@ -78,27 +78,23 @@ def test_unknown_name_fails_closed() -> None:
     assert len(problems) == 1
 
 
-def test_sxa_legacy_capabilities_never_share_the_sales_namespace() -> None:
+def test_the_sales_namespace_stays_vacant() -> None:
     """ADR-0206 (WP-23) write-path guard, binding-registry level: the
-    `sales-db` server's data is legacy SXA, not current Salesforce, and a
-    future real Salesforce write capability (WP-33) must never resolve to
-    it. Proven two ways: (1) every capability this legacy server backs is
-    namespaced `sxa.*`, never `sales.*` - the namespace stays fully vacant
-    until WP-33 defines it against a different backend; (2) resolving any
-    `sales.*` name today (including one that would be a natural write
-    capability name) fails closed rather than silently matching a sxa.*
-    entry or an alias."""
+    `sales.*` namespace is reserved for the real live Salesforce
+    capabilities WP-33 will define, and nothing may squat it in the
+    meantime. ADR-0219 deleted the `sxa.*` capabilities and the `sales-db`
+    server this guard was originally written against - it used to prove
+    that legacy SXA content could never be reached through a `sales.*`
+    name - but the reservation it protects outlives them: resolving any
+    `sales.*` name today, including natural write-capability names, must
+    fail closed rather than silently matching some other entry or alias."""
     registry = BindingRegistry(path=REAL_BINDINGS_PATH)
     assert registry.loaded, registry.load_error
 
-    sxa_capabilities = [c for c in registry.capabilities() if c.startswith("sxa.")]
-    assert sxa_capabilities, "expected at least one sxa.* capability"
-    for capability in sxa_capabilities:
-        binding = registry.resolve(capability)
-        assert binding.backend == "sales-db", (
-            f"{capability} unexpectedly bound to backend '{binding.backend}', "
-            "not the legacy sales-db server"
-        )
+    assert not [c for c in registry.capabilities() if c.startswith("sxa.")], (
+        "ADR-0219 removed every sxa.* capability; SXA is served through "
+        "knowledge.sxa-legacy retrieval only, with no MCP backend"
+    )
 
     for probe in ("sales.customer.read", "sales.opportunity.write", "sales.opportunity.create"):
         assert registry.resolve(probe) is None, (
@@ -329,7 +325,7 @@ TESTS = [
     test_real_registry_loads_and_aliases_resolve,
     test_real_policy_names_are_fully_covered,
     test_unknown_name_fails_closed,
-    test_sxa_legacy_capabilities_never_share_the_sales_namespace,
+    test_the_sales_namespace_stays_vacant,
     test_duplicate_capability_rejected_at_load,
     test_malformed_entries_rejected_at_load,
     test_binding_without_auth_mode_fails_to_load,

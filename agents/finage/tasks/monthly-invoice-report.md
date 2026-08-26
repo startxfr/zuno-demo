@@ -4,20 +4,28 @@ type: task
 title: Produce the monthly invoicing report
 zuno:
   allowed_tools:
-    - sxa.aggregate.revenue-by-year
-    - sxa.record.lookup
     - salesforce.opportunity.read
   allowed_knowledge:
     - knowledge.project
+    - knowledge.sxa-legacy
   project_required: true
 ---
 
 # Produce the monthly invoicing report
 
 Produce the monthly invoicing report (MEMORY.md section 9: revenue,
-outstanding amounts, delay and forecast), drawing on the deterministic
-legacy SXA revenue aggregation and record-lookup capabilities (WP-23) -
-an exact number, never a RAG-approximated one (ADR-0017).
+outstanding amounts, delay and forecast) over the `knowledge.sxa-legacy`
+historical corpus.
+
+**Retrieval only; figures are historical and must be attributed
+(ADR-0219).** This task was built on `sxa.aggregate.revenue-by-year` and
+`sxa.record.lookup`, whose whole point was an exact number rather than a
+RAG-approximated one (ADR-0017). Those capabilities are gone: SXA is the
+company's closed pre-2021 record, and a frozen corpus has no store of
+record for an aggregation tool to compute against. Every figure this task
+reports is now read out of retrieved records and must be attributed to
+them. It must not present a summed or derived total as an authoritative
+aggregate, and it must not imply the numbers describe the current period.
 
 `zuno.project_required: true` (ADR-0512/WP-55): this report only makes
 sense for one client engagement, so Agent Runtime refuses to execute it

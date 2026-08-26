@@ -188,50 +188,6 @@ domains:
       required: true
       description: SHA-256 checksum of the source dump file this row came from.
 
-  sxa:
-    # ADR-0217/WP-067: same relational-model taxonomy as sxa-legacy below -
-    # a distinct domain, not a variant schema.
-    - name: schema
-      type: string
-      required: false
-    - name: table
-      type: string
-      required: false
-    - name: column
-      type: string
-      required: false
-    - name: relationship
-      type: string
-      required: false
-    - name: record_type
-      type: string
-      required: false
-    - name: date
-      type: string
-      format: date
-      required: false
-    - name: customer
-      type: string
-      required: false
-    - name: project
-      type: string
-      required: false
-    - name: snapshot_id
-      type: string
-      required: true
-      description: >-
-        Identifies the weekly corpus snapshot this row was parsed from
-        (checksum-derived when the operator doesn't supply one, same
-        fallback as knowledge.sxa-legacy's).
-    - name: import_timestamp
-      type: string
-      format: date-time
-      required: true
-    - name: checksum
-      type: string
-      required: true
-      description: SHA-256 checksum of the source data file this row came from.
-
   adv:
     - name: project_type
       type: string

@@ -177,81 +177,15 @@ tools:
       - adv
       - finance
 
-  # ADR-0326 (WP-36): `finance` added to every sxa.* row below - Finage's
-  # invoicing/billing persona plausibly maps to the same legacy
-  # facture/facture_produit-derived tables this server already exposes
-  # (D10: no new knowledge/tool domain invented for Finage, reusing
-  # knowledge.sxa-legacy and these deterministic capabilities instead -
-  # documented as a gap, not a real Finage-specific billing system).
-  - tool: get_customer
-    capability: sxa.customer.read
-    mcp_server: sales-db
-    min_classification: C2
-    allowed_groups:
-      - sales
-      - adv
-      - board
-      - finance
-
-  - tool: list_open_opportunities
-    capability: sxa.opportunity.search
-    mcp_server: sales-db
-    min_classification: C2
-    allowed_groups:
-      - sales
-      - adv
-      - board
-      - finance
-
-  - tool: get_quote
-    capability: sxa.quote.read
-    mcp_server: sales-db
-    min_classification: C2
-    allowed_groups:
-      - sales
-      - adv
-      - board
-      - finance
-
-  # ADR-0206 (WP-23): deterministic structured queries over the FULL legacy
-  # SXA dataset - historical commercial data is C3 by default (until the
-  # field-level review the WP-23 brief schedules says otherwise), and
-  # narrower than the per-record reads above: Sales + Direction only
-  # ("Direction" maps to the existing `board` Keycloak group - no separate
-  # `direction` group exists in the realm, same mapping
-  # policies/knowledge/knowledge-policy.yaml documents).
-  - tool: aggregate_revenue_by_year
-    capability: sxa.aggregate.revenue-by-year
-    mcp_server: sales-db
-    min_classification: C3
-    allowed_groups:
-      - sales
-      - board
-      # ADR-0326 (WP-36): Finage's own monthly invoicing/revenue report
-      # (MEMORY.md section 9: "revenue, outstanding amounts, delay and
-      # forecast") is the direct use case for this deterministic
-      # aggregation - narrower than the per-record sxa.* rows above (no
-      # `adv`), matching this row's existing "Sales + Direction only"
-      # intent extended to finance.
-      - finance
-
-  - tool: lookup_record
-    capability: sxa.record.lookup
-    mcp_server: sales-db
-    min_classification: C3
-    allowed_groups:
-      - sales
-      - board
-      - finance
-
   # ADR-0326/ADR-0206 (WP-33): live Salesforce (components/mcp-servers/
-  # salesforce) - the current-data counterpart to the sxa.* legacy reads
-  # above. Deliberately narrower than sxa.* (`sales`/`board` only, no
-  # `adv`): ADR-0326's Advantage bullet requires any cross-domain
-  # commercial access to be "explicitly declared... rather than inherited
-  # from Comage" - Advantage may get explicit legacy SXA access later
-  # (matching the sxa.* rows), but never implicit current-Salesforce
-  # access through this entry. C2 matches `sales-data` in
+  # salesforce). ADR-0219 retired the deterministic sxa.* capabilities this
+  # row was once contrasted against, so this is now the only structured
+  # commercial-data path; legacy SXA is reachable through
+  # `knowledge.sxa-legacy` retrieval only. `sales`/`board` only, no `adv`:
+  # ADR-0326's Advantage bullet requires any cross-domain commercial access
+  # to be "explicitly declared... rather than inherited from Comage", and
+  # Advantage's legacy access is granted on the knowledge domain, never
+  # implicitly on current Salesforce through this entry. C2 matches `sales-data` in
   # policies/data-classification/classification.yaml (knowledge.sales's
   # own default_by_source_type). No `external_model_policy.allow_context:
   # false` here (unlike Confluence's ADR-0035 entry): that restriction is

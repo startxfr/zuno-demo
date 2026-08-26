@@ -57,11 +57,13 @@ onboarding Cognos later is primarily a `status: active` flip plus real
 task implementation through the ADR-0307 template workflow
 (`platform/templates/agent/`), not a redesign.
 
-`tasks/review-historical-commercial-data.md` (ADR-0217/WP-067) is this
-bundle's first real (non-`coming-soon`) task - its `allowed_knowledge:
-[knowledge.sxa]` grant is declared and policy-backed but inert while
-`status` stays `placeholder` (see that task file's own note and
-`NEXT_STEPS.md`).
+`tasks/review-historical-commercial-data.md` is this bundle's first real
+(non-`coming-soon`) task - its `allowed_knowledge: [knowledge.sxa-legacy]`
+grant is declared and policy-backed but inert while `status` stays
+`placeholder` (see that task file's own note and `NEXT_STEPS.md`). It
+originally named ADR-0217's second SXA domain; ADR-0219 retired it and the
+grant moved to the surviving `knowledge.sxa-legacy`, which also lists
+`board`, so it remained valid without a policy edit.
 
 <!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; regenerate with: python3 platform/okf/generate_authorization_matrix.py -->
 
@@ -71,7 +73,7 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
-| `review-historical-commercial-data` | `knowledge.sxa` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa` |
+| `review-historical-commercial-data` | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
 
 ### Model routing
 

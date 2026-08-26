@@ -37,14 +37,30 @@ def test_tekos_loads_from_the_real_bundle() -> None:
     assert tekos.status == "active"
     assert tekos.preferred_classification == "C1"
     assert tekos.rag_top_k == 5
-    assert set(tekos.declared_tools()) == {"search_confluence", "web_search", "list_drive_files"}
+    # WP-059 added the git.repository.* reads and ADR-0516 added
+    # diagram.generation.create; this assertion had not been updated for
+    # either until 2026-08-26.
+    assert set(tekos.declared_tools()) == {
+        "search_confluence",
+        "web_search",
+        "list_drive_files",
+        "git.repository.read",
+        "git.repository.list",
+        "diagram.generation.create",
+    }
     # ADR-0203: declared_knowledge() is the union of every task's own
     # allowed_knowledge, mirroring declared_tools() exactly - there is no
     # separate agent-level field.
     assert set(tekos.declared_knowledge()) == {"knowledge.tech", "knowledge.project"}
 
     task = tekos.tasks["answer-technical-question"]
-    assert task.allowed_tools == ["search_confluence", "web_search"]
+    assert task.allowed_tools == [
+        "search_confluence",
+        "web_search",
+        "git.repository.read",
+        "git.repository.list",
+        "diagram.generation.create",
+    ]
     # ADR-0209 (WP-28): knowledge.project added alongside knowledge.tech -
     # the task can retrieve project memory too, gated per-turn on an
     # actual project_id being present (app/graph/nodes.py:retrieve_node).
@@ -54,11 +70,11 @@ def test_tekos_loads_from_the_real_bundle() -> None:
 
 def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
     """Arkos, Comage, Advantage and Finage all have real task bundles and
-    graph shapes merged (WP-31/WP-33/WP-35/WP-36), but `status`
-    deliberately stays `placeholder` for each until the operator confirms
-    its own live acceptance gate passes (each WP's own Status-updates
-    section) - they legitimately DO declare real tools while still
-    reporting placeholder status. Finage completes the four-agent
+    graph shapes merged (WP-31/WP-33/WP-35/WP-36). Arkos and Comage have
+    since passed their live acceptance gates and are `active`; Advantage
+    and Finage stay `placeholder` until the operator confirms each one
+    (each WP's own Status-updates section) - they legitimately DO declare
+    real tools while still reporting placeholder status. Finage completes the four-agent
     generalization (ADR-0326): every non-Tekos agent now has a real
     bundle, so there is no longer a "still-genuinely-placeholder, declares
     no tools" case left to test."""
@@ -66,23 +82,28 @@ def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
 
     arkos = registry.get("arkos")
     assert arkos is not None
-    assert arkos.status == "placeholder"
+    assert arkos.status == "active"
     assert arkos.declared_tools() == [
         "confluence.page.read",
         "confluence.page.search",
-        "drive.document.create",
-        "drive.document.update",
+        "git.repository.read",
+        "git.repository.list",
+        "git.repository.private.read",
+        "git.repository.private.list",
+        "git.file.write",
+        "git.repository.create",
+        "diagram.generation.create",
     ]
 
     comage = registry.get("comage")
     assert comage is not None
-    assert comage.status == "placeholder"
+    assert comage.status == "active"
     assert comage.declared_tools() == [
         "salesforce.opportunity.read",
         "web_search",
+        "image.generation.create",
+        "diagram.generation.create",
         "salesforce.opportunity.update",
-        "sxa.opportunity.search",
-        "sxa.aggregate.revenue-by-year",
         "list_drive_files",
         "read_gmail",
     ]
@@ -92,6 +113,7 @@ def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
     assert advantage.status == "placeholder"
     assert advantage.declared_tools() == [
         "web_search",
+        "image.generation.create",
         "list_drive_files",
         "read_gmail",
     ]
@@ -101,10 +123,7 @@ def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
     assert finage.status == "placeholder"
     assert finage.declared_tools() == [
         "web_search",
-        "sxa.customer.read",
-        "sxa.quote.read",
-        "sxa.aggregate.revenue-by-year",
-        "sxa.record.lookup",
+        "salesforce.opportunity.read",
         "list_drive_files",
         "read_gmail",
     ]

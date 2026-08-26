@@ -71,13 +71,6 @@ bindings:
       credential_env_prefix: RAGSXALEGACY
     ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.sxa-legacy"
 
-  - domain: knowledge.sxa
-    database:
-      name: rag-sxa
-      schema: rag
-      credential_env_prefix: RAGSXA
-    ingestion_config_ref: "gitops/charts/rag-ingestion/values.yaml#domains.sxa"
-
   - domain: knowledge.adv
     database:
       name: rag-adv

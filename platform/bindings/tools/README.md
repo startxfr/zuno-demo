@@ -19,7 +19,7 @@ Rules (from ADR-0116):
 - Changing the physical server behind a capability is a change to this file
   (plus deployment config) only - agent definitions and runtime code stay
   untouched.
-- Legacy tool names (`search_confluence`, `get_customer`, ...) are explicit
+- Legacy tool names (`search_confluence`, `read_gmail`, ...) are explicit
   `aliases` during migration; new agent contracts use canonical IDs.
 
 The file ships inside the mcp-gateway image (repo-root build context, see
@@ -42,7 +42,7 @@ Every entry declares a required `auth_mode` field, one of:
   gateway's own policy-intersection decision (`policy.evaluate()`) has
   already evaluated the specific calling subject before this credential is
   ever used — there is no separate per-call gate beyond that. Every
-  streamable-HTTP binding here (`sxa.*`, `confluence.page.*`) and the
+  streamable-HTTP binding here (`confluence.page.*`) and the
   remaining in-process ones (`web.page.search`, `email.report.send`) use
   this mode.
 - **`provider-delegated`** — reserved for a future on-behalf-of delegation

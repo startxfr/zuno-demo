@@ -19,12 +19,12 @@ someone chooses to build Cognos, per WP-43's own scope). Statuses:
    `cognos-entitlement-only-user-01` fixture exists yet - add it with
    the first real task (it only matters once there is a tool boundary
    to prove).
-3. **Add policy entries** - PARTIALLY DONE (2026-08-21, ADR-0217/WP-067):
-   `tasks/review-historical-commercial-data.md` declares
-   `allowed_knowledge: [knowledge.sxa]`; `board` was already present in
-   that domain's `allowed_groups` (`policies/knowledge/
-   knowledge-policy.yaml`), so no policy edit was needed for this one
-   grant. `tasks/coming-soon.md` still declares `allowed_tools: []` and
+3. **Add policy entries** - PARTIALLY DONE (2026-08-21; domain repointed
+   2026-08-26 by ADR-0219): `tasks/review-historical-commercial-data.md`
+   declares `allowed_knowledge: [knowledge.sxa-legacy]`; `board` is present
+   in that domain's `allowed_groups` (`policies/knowledge/
+   knowledge-policy.yaml`), so no policy edit was needed for this grant
+   before or after the repoint. `tasks/coming-soon.md` still declares `allowed_tools: []` and
    no knowledge domains - still nothing to grant there. Remaining tools/
    domains from the intended build (ADR-0349 §6) still need this same
    step when their real tasks are authored.

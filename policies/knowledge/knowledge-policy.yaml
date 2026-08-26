@@ -90,24 +90,18 @@ domains:
     min_classification: C2
 
   knowledge.sxa-legacy:
-    # WP-23 (ADR-0206) narrows this further with deterministic query
-    # capabilities and snapshot discipline. "Direction" (ADR-0206's stated
-    # business role) maps to the existing `board` Keycloak group - no
-    # separate `direction` group exists in the realm. ADR-0340's table
-    # marks cdp/finance "-" here (deliberately excluded, unlike the
-    # "policy-defined" cells above) - legacy commercial data stays
-    # narrower than the live knowledge.sales domain.
-    allowed_groups:
-      - sales
-      - board
-    min_classification: C3
-
-  knowledge.sxa:
-    # ADR-0217/WP-067: a distinct domain from knowledge.sxa-legacy above -
-    # an already-anonymized weekly export, deliberately opened to all four
-    # of Comage/Cognos/Advantage/Finage's business roles (unlike
-    # sxa-legacy's narrower sales/board-only posture, which stays
-    # unchanged). cdp is not listed: no stated need, unlike the
+    # The company's pre-2021 commercial record, served through retrieval
+    # only (ADR-0219). "Direction" (ADR-0206's stated business role) maps to
+    # the existing `board` Keycloak group - no separate `direction` group
+    # exists in the realm.
+    #
+    # ADR-0219 widened this from sales/board to all four of
+    # Comage/Cognos/Advantage/Finage's business roles. That is not a
+    # loosening: it is the union of what this domain and the duplicate
+    # ADR-0217 domain granted, adopted so that retiring that duplicate
+    # costs no agent the reach ADR-0217 had already given it. ADR-0340's
+    # table marked cdp/finance "-" on this row; ADR-0219 amends it for
+    # `finance` and `adv`. `cdp` stays excluded - no stated need, unlike the
     # "policy-defined" cells ADR-0340 calls out for knowledge.sales/adv.
     allowed_groups:
       - sales

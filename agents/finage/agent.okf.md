@@ -17,7 +17,7 @@ freshness:
   last_reviewed: "2026-08-05"
 sources:
   - "knowledge.project"
-  - "sales-db (legacy SXA, deterministic queries only, WP-23)"
+  - "knowledge.sxa-legacy (pre-2021 commercial record, retrieval only, ADR-0219)"
 zuno:
   name: finage
   status: placeholder
@@ -80,15 +80,17 @@ integration.
 
 **Documented gap (WP-36's own brief anticipates this)**: no
 finance-specific RAG knowledge domain exists in this repository. Rather
-than inventing one, Finage's tasks declare only `knowledge.project`
-(cross-agent project memory) for retrieval, plus the deterministic
-`sxa.*` capabilities (`sxa.customer.read`, `sxa.quote.read`,
-`sxa.aggregate.revenue-by-year`, `sxa.record.lookup`) already exposed by
-`components/mcp-servers/sales-db` (WP-23) for exact billing/revenue
-numbers - `policies/knowledge/knowledge-policy.yaml`'s own
-`knowledge.sxa-legacy` entry deliberately excludes `finance` from its
-`allowed_groups` (ADR-0340's access-intent table, WP-32), so this gap is
-a real, pre-existing policy boundary honored here, not overridden.
+than inventing one, Finage's tasks declare `knowledge.project` (cross-agent
+project memory) and `knowledge.sxa-legacy` (the pre-2021 commercial record)
+for retrieval. ADR-0219 widened that domain's `allowed_groups` to include
+`finance`, so the boundary WP-36 originally had to honor no longer applies.
+
+What remains open, and is now the sharper gap, is the *deterministic* side:
+Finage has no exact-figure capability at all. It was built on the `sxa.*`
+capabilities that ADR-0219 removed, and they are not coming back through
+this route - SXA is a closed pre-2021 record with no live billing system
+behind it, so nothing here can be authoritative about a current invoice.
+Every number Finage reports is retrieved and attributed, never computed.
 
 **ADR-0326's signature proof for this slice**: no task above ever
 declares the current-sales or ADV/project-delivery knowledge domains in
@@ -105,7 +107,7 @@ just `[knowledge.project]`.
 Access group is `agent_finage` (ADR-0040 entitlement dimension,
 orthogonal to the `finance` business role that governs tool/data
 permissions inside Finage once active - see
-`policies/tools/tool-policy.yaml`'s `sxa.*`/Drive/Gmail entries).
+`policies/tools/tool-policy.yaml`'s Drive/Gmail entries).
 
 <!-- BEGIN GENERATED AUTHORIZATION MATRIX (ADR-0503) - do not edit; regenerate with: python3 platform/okf/generate_authorization_matrix.py -->
 
@@ -117,15 +119,13 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 |---|---|---|---|---|---|---|---|---|
 | `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `web_search` |
 | `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
-| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `knowledge.sxa` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa` |
-| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `sxa.customer.read` | tool | `sxa.customer.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_customer` |
-| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `sxa.quote.read` | tool | `sxa.quote.read` @ sales-db | C2 | sales, adv, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `get_quote` |
+| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
 | `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `salesforce.opportunity.read` | tool | `salesforce.opportunity.read` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.read` |
 | `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
-| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `sxa.aggregate.revenue-by-year` | tool | `sxa.aggregate.revenue-by-year` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `aggregate_revenue_by_year` |
-| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `sxa.record.lookup` | tool | `sxa.record.lookup` @ sales-db | C3 | sales, board, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `lookup_record` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
 | `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `salesforce.opportunity.read` | tool | `salesforce.opportunity.read` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.read` |
 | `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
 | `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
 | `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
 

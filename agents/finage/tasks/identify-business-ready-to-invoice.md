@@ -4,20 +4,29 @@ type: task
 title: Identify business ready to invoice
 zuno:
   allowed_tools:
-    - sxa.customer.read
-    - sxa.quote.read
     - salesforce.opportunity.read
   allowed_knowledge:
     - knowledge.project
+    - knowledge.sxa-legacy
   project_required: true
 ---
 
 # Identify business ready to invoice
 
 Identify business that has reached the `A facturer`/billable state and
-later (MEMORY.md section 9), drawing on the deterministic legacy SXA
-customer/quote lookups (WP-23) - never a fuzzy RAG retrieval, since exact
-billing state must never be something a chunk approximates (ADR-0017).
+later (MEMORY.md section 9), by retrieving the relevant customer and quote
+records from the `knowledge.sxa-legacy` historical corpus.
+
+**Retrieval only, and billing state is historical, not current
+(ADR-0219).** This task was built on the deterministic `sxa.customer.read`/
+`sxa.quote.read` lookups, on the reasoning that exact billing state must
+never be something a chunk approximates (ADR-0017). Those capabilities are
+gone, and the reasoning no longer applies the way it did: SXA is the
+company's closed pre-2021 record, so there is no live billing system for a
+deterministic tool to be exact *about*. What this task now reports is the
+billing state as it stood in that historical record, attributed to the
+records it came from - never presented as the current state of an
+outstanding invoice.
 
 `zuno.project_required: true` (ADR-0512/WP-55): this task only makes
 sense inside one client engagement, so Agent Runtime refuses to execute
