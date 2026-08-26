@@ -125,9 +125,21 @@ because their charts are gone:
    is the specific failure mode a *declared-but-missing* database causes.
    `rag-sxa-legacy` was left untouched.
 
-3. `vault kv delete zuno/sxa/mariadb-db` and `zuno/rag-sxa/postgresql-app`.
-   Orphaned seeds: no ExternalSecret consumes either path any more, so they
-   are inert rather than harmful, and this is housekeeping.
+3. ~~`vault kv delete zuno/sxa/mariadb-db` and
+   `zuno/rag-sxa/postgresql-app`.~~ **DONE 2026-08-26.** Both prefixes held
+   exactly one secret each and nothing else, so removing them stranded
+   nothing. Verified before and after that the two neighbours which must
+   survive were untouched: `zuno/sxa-corpus/s3` (the dump's S3 credentials,
+   still consumed by `load-sxa-dump`) and `zuno/rag-sxa-legacy/postgresql-app`
+   (the surviving domain). Afterwards `zuno/sxa` and `zuno/rag-sxa` list
+   empty.
+
+   Executed as `vault kv metadata delete`, **not** the `vault kv delete` this
+   step originally specified. On KV v2 a plain `kv delete` only writes a
+   deletion marker and leaves the prior version recoverable - for credentials
+   to databases that no longer exist, leaving a recoverable copy is the wrong
+   outcome. `metadata delete` removes every version permanently, so this is
+   irreversible by design rather than by accident.
 
 4. ~~Re-apply the Keycloak realm.~~ **DONE 2026-08-26.** `KeycloakRealmImport`
    is create-only — it has no update path for an already-existing group's
@@ -267,6 +279,10 @@ Then, once deployed:
   is a no-op (MariaDB never held `sxa`); step 2 is the only real deletion and
   the database it removes is empty; step 4's repo prerequisite was missing and
   landed in `de1524e`.
+- 2026-08-26: step 3 executed (both Vault seeds purged with `kv metadata
+  delete`; `sxa-corpus/s3` and `rag-sxa-legacy/postgresql-app` verified
+  intact). Steps 1-5 and 6b are now closed; only the step 6 run and the
+  step 7/8 verification remain.
 - 2026-08-26: step 6b executed and verified in-pod; the ADR-0219 policy plane
   is now live. Uncovered an ordering hazard in `agent_build` (image built and
   rolled before the OKF re-signing Job runs, against a 1h-refresh secret),
