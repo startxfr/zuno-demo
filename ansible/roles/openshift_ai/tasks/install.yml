@@ -231,3 +231,12 @@
           60x20s. Its False conditions and missing ADR-0343 prerequisites
           were recorded and are summarized at the end of the run. Auto-fix:
           `make d1 reconcile openshift-ai`.
+
+# Last, because RHOAI's monitoring service only generates the TempoStack once
+# the DSCI/DSC above are accepted. Shared with reconcile.yml: until 2026-08-26
+# this remediation existed ONLY on the reconcile path, so a fresh install came
+# up with RHOAI's starving defaults and a trace pipeline that looked healthy
+# (`oc get pods` 2/2) while dropping every span - see the shared file for the
+# full incident.
+- name: "openshift_ai | right-size the RHOAI-generated TempoStack"
+  ansible.builtin.include_tasks: right_size_monitoring_stack.yml

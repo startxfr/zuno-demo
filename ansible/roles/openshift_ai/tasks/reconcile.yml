@@ -13,7 +13,8 @@
 #     cluster-monitoring-config)
 #   - verify the maas-db-config Secret and re-wait for the
 #     DataScienceCluster, recording findings instead of raw errors
-#   - right-size the RHOAI-generated TempoStack (ADR-0522)
+#   - right-size the RHOAI-generated TempoStack (ADR-0522/ADR-0523), via
+#     right_size_monitoring_stack.yml - shared with install.yml
 # Optional, default OFF (side-effect safety): delete CrashLoopBackOff pods
 # in redhat-ods-applications with -e openshift_ai_reconcile_restart_pods=true.
 - name: "openshift_ai | reconcile: discover the operator channel (ADR-0048)"
@@ -274,76 +275,12 @@
   loop_control:
     label: "{{ item }}"
 
-# --- TempoStack resources.total right-sizing (ADR-0522/WP-079 live incident,
-# 2026-08-26): RHOAI's monitoring service hardcodes the TempoStack it
-# generates from DSCInitialization.spec.monitoring.traces to
-# spec.resources.total = 1cpu/256Mi limits, 100m/256Mi requests - nothing to
-# do with anything this repo configures (DSCInitialization exposes no
-# resources field under monitoring.traces at all). The Tempo Operator then
-# proportionally splits that 256Mi across all 7 containers (distributor/
-# ingester/querier/query-frontend/compactor/gateway/gateway-opa), leaving
-# query-frontend with a ~5MB memory limit - every component OOMKilled or
-# CrashLoopBackOff on first reconcile. Confirmed live: patching
-# spec.resources.total directly is NOT reverted by RHOAI's own reconciler
-# (held steady >3.5 minutes of observation) - not a fight against another
-# controller, just a value RHOAI itself never revisits after creating the CR.
-# Re-applied every reconcile so it's also self-healing if the CR is ever
-# recreated from scratch (uninstall/reinstall, fresh redeploy) - same
-# state-restoring, idempotent shape as every other remediation in this file.
-- name: "openshift_ai | reconcile: look up the RHOAI-generated TempoStack"
-  kubernetes.core.k8s_info:
-    api_version: tempo.grafana.com/v1alpha1
-    kind: TempoStack
-    name: data-science-tempostack
-    namespace: redhat-ods-monitoring
-  register: _openshift_ai_tempostack
-
-- name: "openshift_ai | reconcile: right-size TempoStack.spec.resources.total (RHOAI's own 256Mi/1cpu default OOMKills every component)"
-  kubernetes.core.k8s:
-    state: patched
-    api_version: tempo.grafana.com/v1alpha1
-    kind: TempoStack
-    name: data-science-tempostack
-    namespace: redhat-ods-monitoring
-    definition:
-      spec:
-        # 2->4 cpu / 2Gi->4Gi on 2026-08-26 (ADR-0523/WP-081): the split
-        # hands the gateway's opa-openshift authz sidecar ~2% of the total
-        # (was 40m/41Mi) - too little to answer its 1s-timeout probes under
-        # real trace-write load, so it was liveness-killed (exit 137) in a
-        # loop once WP-081's fan-out went live, un-readying the gateway.
-        # 4cpu/4Gi doubles opa to ~80m/82Mi; higher would break the
-        # namespace's zuno-platform-quota limits.cpu (14, ~10.6 used).
-        resources:
-          total:
-            limits:
-              cpu: "4"
-              memory: 4Gi
-            requests:
-              cpu: "1"
-              memory: 1536Mi
-        # ADR-0523/WP-081 live incident, 2026-08-26: the proportional split
-        # of the 2Gi total hands the gateway's opa-openshift sidecar ~41Mi/
-        # 40m - enough to pass WP-080's idle verification, but the sidecar
-        # was OOM/liveness-killed (exit 137) ~35min after a rollout, taking
-        # gateway readiness with it: the EndpointSlice flips ready=false,
-        # every client's VIP path to the gateway loses its endpoints, and
-        # trace writes fail as resets (meshed pods)/deadlines (plain pods)
-        # while `oc get pods` still shows 2/2 Running on a stale look.
-        # Per-component override (documented to beat the total-derived
-        # split) keeps the gateway - the one component every trace write
-        # and read funnels through - out of the starvation pool.
-        template:
-          gateway:
-            component:
-              resources:
-                limits:
-                  cpu: 500m
-                  memory: 256Mi
-                requests:
-                  cpu: 50m
-                  memory: 128Mi
-  when: (_openshift_ai_tempostack.resources | default([]) | length) > 0
+# --- TempoStack right-sizing: shared with install.yml so a FRESH install
+# gets it too (it lived only here until 2026-08-26, so a new cluster came up
+# with RHOAI's starving defaults and a silently dead trace pipeline). All the
+# rationale lives in the shared file.
+- name: "openshift_ai | reconcile: right-size the RHOAI-generated TempoStack"
+  ansible.builtin.include_tasks: right_size_monitoring_stack.yml
 
 # --- NO remediation for RHOAI's broken collector->Tempo hop (ADR-0523/
 # WP-081 live incident, 2026-08-26; deliberate non-action, recorded so

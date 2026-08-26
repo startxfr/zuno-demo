@@ -169,6 +169,92 @@
     - "'path_parts[0]' in (_oai_diag_maas_authpolicy.resources | default([]) | to_json)"
     - blocked_findings is defined
 
+# --- Tempo gateway authz-sidecar starvation tripwire (ADR-0523/WP-081) -----
+# The trace pipeline's single most deceptive failure mode. RHOAI's TempoStack
+# proportional split sizes the gateway's opa-openshift sidecar off
+# spec.resources.total; at RHOAI's own defaults that is ~40m/41Mi, which
+# survives idle but gets liveness-killed in a loop under real trace-write
+# load. When it dies the gateway goes unready, its EndpointSlice flips
+# ready=false, and every client loses the Service VIP path - trace writes then
+# fail as TLS resets (meshed callers) or gRPC deadlines (plain ones) while a
+# casual `oc get pods` can still show 2/2 Running. Nothing else in this repo
+# would notice: the collector keeps accepting spans and drops them on export.
+# Sized by right_size_monitoring_stack.yml, so this is the tripwire that says
+# the remediation was reverted, never applied (a cluster installed before it
+# was shared with install.yml), or is no longer enough.
+- name: "openshift_ai | precheck: look up the Tempo gateway pods"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: redhat-ods-monitoring
+    label_selectors:
+      - app.kubernetes.io/component=gateway
+      - app.kubernetes.io/instance=data-science-tempostack
+  register: _oai_tempo_gateway_pods
+
+- name: "openshift_ai | precheck: measure gateway readiness and the opa sidecar's memory limit"
+  ansible.builtin.set_fact:
+    # Ready only when EVERY container is ready: the pod sits at 1/2 for the
+    # whole outage, which a coarse phase==Running check misses entirely.
+    # Terminating pods are skipped so a routine rollout never trips this.
+    _oai_tempo_gateway_unready: >-
+      {%- set unready = [] -%}
+      {%- for p in (_oai_tempo_gateway_pods.resources | default([])) -%}
+        {%- if p.metadata.deletionTimestamp is not defined -%}
+          {%- if ((p.status.containerStatuses | default([])) | rejectattr('ready') | list | length) > 0 -%}
+            {%- set _ = unready.append(p.metadata.name) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ unready }}
+    # Kubernetes hands this back in whatever form the operator wrote it, and
+    # the Tempo Operator's proportional split emits raw bytes ("85899344"),
+    # not "82Mi" - parsing only the Mi suffix would read that as 85 million
+    # MiB and pass a starved sidecar.
+    _oai_tempo_opa_limit_mb: >-
+      {%- set limits = [] -%}
+      {%- for p in (_oai_tempo_gateway_pods.resources | default([])) -%}
+        {%- if p.metadata.deletionTimestamp is not defined -%}
+          {%- for c in (p.spec.containers | default([])) -%}
+            {%- if 'opa' in c.name -%}
+              {%- set raw = ((c.resources | default({})).get('limits', {})).get('memory', '0') | string -%}
+              {%- if raw.endswith('Gi') -%}
+                {%- set _ = limits.append((raw[:-2] | int) * 1024) -%}
+              {%- elif raw.endswith('Mi') -%}
+                {%- set _ = limits.append(raw[:-2] | int) -%}
+              {%- elif raw.endswith('G') -%}
+                {%- set _ = limits.append(((raw[:-1] | int) * 1000000000 // 1048576)) -%}
+              {%- elif raw.endswith('M') -%}
+                {%- set _ = limits.append(((raw[:-1] | int) * 1000000 // 1048576)) -%}
+              {%- else -%}
+                {%- set _ = limits.append((raw | int) // 1048576) -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ limits | max | default(0, true) }}
+
+- name: "openshift_ai | precheck: record the starved/unready Tempo gateway"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Deployment/tempo-data-science-tempostack-gateway (redhat-ods-monitoring)"
+      state: >-
+        {{ 'opa sidecar memory limit ' ~ (_oai_tempo_opa_limit_mb | int) ~ 'Mi (below the '
+           ~ (openshift_ai_tempo_opa_min_memory_mb | default(64) | int) ~ 'Mi floor)'
+           if (_oai_tempo_opa_limit_mb | int) < (openshift_ai_tempo_opa_min_memory_mb | default(64) | int)
+           else 'gateway pod has a container that is not ready' }}
+      cause: "ADR-0523/WP-081 - RHOAI's TempoStack splits spec.resources.total across all 7 containers, starving the opa-openshift authz sidecar until it is liveness-killed under trace-write load; the gateway then goes unready, its EndpointSlice drops, and EVERY trace write to RHOAI's Tempo fails (TLS resets from meshed callers, gRPC deadlines from plain ones) while the pod can still look Running"
+      solution: "Re-apply the sizing (spec.resources.total plus the gateway component override) with the auto-fix below; if it is already applied and the sidecar is still starved, raise openshift_ai_tempostack_memory_limit - note the namespace's zuno-platform-quota limits.cpu ceiling"
+      auto_fix: "make d1 reconcile openshift-ai"
+  when:
+    - (_oai_tempo_gateway_pods.resources | default([]) | length) > 0
+    - (_oai_tempo_opa_limit_mb | int) < (openshift_ai_tempo_opa_min_memory_mb | default(64) | int)
+      or (_oai_tempo_gateway_unready | default([]) | length) > 0
+    - blocked_findings is defined
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

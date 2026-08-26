@@ -1,0 +1,96 @@
+---
+# Right-sizes the TempoStack RHOAI generates for its own monitoring stack.
+# Included by BOTH install.yml (after the DataScienceCluster is Ready - the
+# first point at which RHOAI's monitoring service has created the CR) and
+# reconcile.yml, because the defaults RHOAI ships make the trace pipeline
+# unusable and nothing in this repo can express the fix declaratively:
+# DSCInitialization.spec.monitoring.traces has no resources field at all
+# (verified with `oc explain`: only exporters/sampleRatio/storage/tls), and
+# the TempoStack is owned by RHOAI's Monitoring/default-monitoring, so it
+# cannot be GitOps-managed either.
+#
+# Contract, mirroring diagnose.yml: patch-only and never fails on its own -
+# it records nothing and decides nothing, so install.yml can keep its
+# record-then-fail shape while reconcile.yml records and continues. Task
+# names use a neutral "monitoring:" prefix because the two callers use
+# different ones. Idempotent and re-applied every run, so it is also
+# self-healing if the CR is ever recreated (uninstall/reinstall, fresh
+# redeploy) - the same state-restoring shape as every other remediation.
+#
+# Two separate incidents are encoded here; both are RHOAI defaults, not
+# anything this repo configures:
+#
+# 1. ADR-0522/WP-079: RHOAI hardcodes the generated TempoStack to
+#    spec.resources.total = 1cpu/256Mi limits, 100m/256Mi requests. The Tempo
+#    Operator then proportionally splits that across all 7 containers
+#    (distributor/ingester/querier/query-frontend/compactor/gateway/
+#    gateway-opa), leaving query-frontend a ~5MB memory limit - every
+#    component OOMKilled or CrashLoopBackOff on first reconcile. Confirmed
+#    live that patching spec.resources.total is NOT reverted by RHOAI's own
+#    reconciler: it is a value RHOAI never revisits after creating the CR.
+#
+# 2. ADR-0523/WP-081: even at 2Gi the same proportional split hands the
+#    gateway's opa-openshift authz sidecar ~40m/41Mi. That passed WP-080's
+#    idle verification for a day, then was liveness-killed (exit 137, 1s
+#    probe timeout) in a loop within minutes of real trace-write load once
+#    WP-081's fan-out went live. The failure is deceptive: the gateway goes
+#    unready, its EndpointSlice flips ready=false, every client's VIP path
+#    loses its endpoints, and trace writes fail as TLS resets (meshed pods)
+#    or gRPC deadlines (plain pods) while `oc get pods` still shows 2/2
+#    Running on a stale look. Debug shortcut if it ever recurs: TLS to the
+#    gateway POD IP succeeds while the Service VIP fails => endpoints, not
+#    the gateway process.
+- name: "openshift_ai | monitoring: wait for the RHOAI-generated TempoStack to exist"
+  kubernetes.core.k8s_info:
+    api_version: tempo.grafana.com/v1alpha1
+    kind: TempoStack
+    name: data-science-tempostack
+    namespace: redhat-ods-monitoring
+  register: _openshift_ai_tempostack
+  # RHOAI's monitoring service creates this asynchronously after the DSCI is
+  # accepted, so at install time a bare lookup returns nothing and the patch
+  # below would silently no-op - the whole reason this file is shared with
+  # install.yml. Bounded and never fatal: on timeout the patch simply skips
+  # and `make d1 reconcile openshift-ai` re-applies it later.
+  until: (_openshift_ai_tempostack.resources | default([]) | length) > 0
+  retries: "{{ openshift_ai_tempostack_wait_retries | default(30) }}"
+  delay: "{{ openshift_ai_tempostack_wait_delay | default(10) }}"
+  failed_when: false
+
+- name: "openshift_ai | monitoring: right-size the TempoStack (RHOAI's own defaults starve every component, gateway authz sidecar first)"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: tempo.grafana.com/v1alpha1
+    kind: TempoStack
+    name: data-science-tempostack
+    namespace: redhat-ods-monitoring
+    definition:
+      spec:
+        # 4cpu/4Gi doubles the opa sidecar to ~80m/82Mi (measured live).
+        # Raising it further would breach the namespace's zuno-platform-quota
+        # limits.cpu (14, ~10.6 already used), so this is the ceiling until
+        # that quota grows.
+        resources:
+          total:
+            limits:
+              cpu: "{{ openshift_ai_tempostack_cpu_limit | default('4') }}"
+              memory: "{{ openshift_ai_tempostack_memory_limit | default('4Gi') }}"
+            requests:
+              cpu: "{{ openshift_ai_tempostack_cpu_request | default('1') }}"
+              memory: "{{ openshift_ai_tempostack_memory_request | default('1536Mi') }}"
+        # Per-component override (documented to beat the total-derived split)
+        # keeps the gateway - the one component every trace write and read
+        # funnels through - out of the starvation pool. NOTE this reaches the
+        # main gateway container only; the opa sidecar is sized purely by the
+        # total above, which is why both settings are needed.
+        template:
+          gateway:
+            component:
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+  when: (_openshift_ai_tempostack.resources | default([]) | length) > 0
