@@ -87,6 +87,39 @@ symmetry is the point of the g7e.2xlarge → g7e.4xlarge step; qwen36-27b could 
 the 2xlarge under load. Net standing cost is **~+467 $/month**, not the ~2,450 a second node
 implies, because the node being retired is half the size of the one replacing it.
 
+## Live finding: ephemeral storage, not CPU/RAM/VRAM, is what broke first
+
+This WP sized CPU, memory and VRAM and never looked at disk. `zuno-gpu-c`'s
+first boot hit the gap immediately.
+
+Model weights land in an **emptyDir**, so they are ephemeral-storage on the
+node's root volume - the same 150GB that holds RHCOS and the unpacked
+container images. On a fresh node every model arrives at once, and during a
+KServe `RollingUpdate` each exists twice (the outgoing pod keeps its copy
+while the incoming one downloads). Measured on gpu-c: qwen3.6-27b 28.8GB +
+gpt-oss-20b 12.8GB x2 pods + the vLLM image unpacking from a 17.7GB pull,
+peaking at **~136GB of 149GB** against a kubelet eviction threshold of
+~24GB free.
+
+Consequences, all observed: the qwen pod was `Evicted` mid-init and left as
+`Init:Error`, the node took a `node.kubernetes.io/disk-pressure:NoSchedule`
+taint, and qwen's replacement pod went Pending against
+`1 node(s) had untolerated taint(s)` - the rollout stalled on a node that
+had a free `2g.48gb` slice the whole time.
+
+It self-healed: evicted pods released their storage, usage fell to **54.5GB
+of 149GB**, the kubelet cleared the condition after its transition period,
+the taint went away and qwen completed onto gpu-c. No service interruption
+at any point - qwen and embeddings kept serving from node A throughout.
+
+Fix: `blockDevices.volumeSize` 150 -> 250 on both permanent inference nodes.
+Steady state never needed it (54.5GB used); the transient and the failover
+case do - one node holding all three models plus rollout duplicates is
+exactly the scenario the second node exists to survive. gp3 capacity is
+negligible against a g7e.4xlarge. Block device changes apply only to NEW
+machines, so the running nodes keep 150GB until replaced; that is acceptable
+because the steady-state figure has a wide margin.
+
 ## Deviations from repo convention (deliberate, operator-approved)
 
 1. **ADR-0351 was amended in place, not superseded.** `docs/adr/README.md` states ADRs are
@@ -127,12 +160,14 @@ Ordered; each gates the next.
 
 ## Verification checklist
 
-- ⬜ 3 models `Running`, none `Pending`
-- ⬜ `embeddings` InferenceService `READY=True`, quota `FailedCreate` gone
+- ✅ 3 models `Running`, none `Pending` (2026-08-26)
+- ✅ `embeddings` InferenceService `READY=True`, quota `FailedCreate` gone
 - ⬜ `make d2 check models` passes
-- ⬜ `make d0 check machines` passes **and** covers `zuno-gpu-c` (precheck generalised — it
-  hardcoded `zuno-gpu-a`)
-- ⬜ 2 GPU nodes, AZ **2a and 2c**, each 2x `mig-1g.24gb` + 1x `mig-2g.48gb`
+- ✅ `make d0 check machines` passes **and** covers `zuno-gpu-c` (precheck generalised — it
+  hardcoded `zuno-gpu-a`). Verified non-vacuous: the selector returns both machinesets at 1/1,
+  the MIG assertion sees both nodes at 2x`1g.24gb`+1x`2g.48gb`, and `zuno-gpu-burst-a` at 0 is
+  correctly excluded. `install.yml` had the identical blind spot and was generalised with it.
+- ✅ 2 GPU nodes, AZ **2a and 2c**, each 2x `mig-1g.24gb` + 1x `mig-2g.48gb`
 - ⬜ `PreferNoSchedule` present on both GPU nodes
 - ⬜ MachineSets: `zuno-gpu-a`=1, `zuno-gpu-c`=1, `zuno-gpu-burst-a`=0, `workergpu`=0
 - ⬜ `make d3 test platform` green after the drain

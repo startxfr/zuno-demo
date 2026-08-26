@@ -68,6 +68,24 @@ cluster-machine:
       # the qwen model PVC (gp3-csi, RWO, single-AZ) is zone-bound where
       # its download Job runs - keeping the permanent node in "a" keeps
       # that PVC valid.
+      # volumeSize 250 (was 150) on both permanent inference nodes, WP-083.
+      # 150GB is ample in steady state - a node serving qwen3.6-27b (28.8GB)
+      # plus gpt-oss-20b (12.8GB) measured 54.5GB used of 149GB. It is the
+      # TRANSIENTS that overrun it, and they were hit for real on
+      # zuno-gpu-c's first boot: every model landed at once, each briefly
+      # existing twice (KServe RollingUpdate keeps the outgoing pod while
+      # the incoming one downloads), on top of the vLLM image unpacking
+      # from a 17.7GB pull. Peak was ~136GB of 149GB, which crossed the
+      # kubelet's ~24GB eviction threshold: the qwen pod was Evicted mid-init,
+      # the node took a node.kubernetes.io/disk-pressure:NoSchedule taint,
+      # and the rollout stalled until the pressure cleared on its own.
+      # Model weights land in an emptyDir, so they are ephemeral-storage,
+      # not a PVC - there is no other budget they draw from. The failover
+      # case is the sizing case: one node holding all three models plus
+      # their rollout duplicates. gp3 capacity is negligible next to a
+      # g7e.4xlarge, so this is bought cheaply.
+      # NOTE: block device changes only apply to NEW machines. The running
+      # nodes keep their 150GB until replaced.
       - name: zuno-gpu-a
         az: a
         type: worker
@@ -80,7 +98,7 @@ cluster-machine:
           - ebs:
               encrypted: true
               iops: 0
-              volumeSize: 150
+              volumeSize: 250
               volumeType: gp3
         replicas: 1
         # nvidia-mig-manager watches this label and partitions the GPU at
@@ -142,7 +160,7 @@ cluster-machine:
           - ebs:
               encrypted: true
               iops: 0
-              volumeSize: 150
+              volumeSize: 250
               volumeType: gp3
         replicas: 1
         additionnalsLabels: |-
