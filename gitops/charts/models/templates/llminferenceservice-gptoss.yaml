@@ -102,7 +102,19 @@ spec:
       refs:
         - name: {{ .Values.gptOssModel.llmInferenceService.routerGateway.name }}
           namespace: {{ .Values.gptOssModel.llmInferenceService.routerGateway.namespace }}
-    route: {}
+    # Was `route: {}` (controller-generated spec). Now supplied explicitly
+    # solely to make the rule names unique per model - see
+    # templates/_llmisvc-route.tpl for the shared-gateway EPP-override
+    # collision (empty-body incident) this works around.
+    route:
+      http:
+        spec:
+          {{- include "models.llmisvcRouteSpec" (dict
+                "name" .Values.gptOssModel.inferenceServiceName
+                "namespace" .Values.namespace
+                "publishedModel" .Values.gptOssModel.servedModelName
+                "gatewayName" .Values.gptOssModel.llmInferenceService.routerGateway.name
+                "gatewayNamespace" .Values.gptOssModel.llmInferenceService.routerGateway.namespace) | nindent 10 }}
     # scheduler: {} is not optional - the controller's own defaulting
     # always adds it to a gateway-enabled LLMInferenceService regardless
     # of what this manifest sends. annotations here land on the generated

@@ -136,7 +136,22 @@ spec:
       refs:
         - name: {{ .Values.llmInferenceService.routerGateway.name }}
           namespace: {{ .Values.llmInferenceService.routerGateway.namespace }}
-    route: {}
+    # Was `route: {}` (controller-generated spec). Now supplied explicitly
+    # solely to make the rule names unique per model - see
+    # templates/_llmisvc-route.tpl for the shared-gateway EPP-override
+    # collision (empty-body incident) this works around. publishedModel is
+    # servedModelName (qwen3.6-27b-instruct, dots), NOT this resource's
+    # k8s name - the X-Gateway-Model-Name value the controller would
+    # generate derives from spec.model.name.
+    route:
+      http:
+        spec:
+          {{- include "models.llmisvcRouteSpec" (dict
+                "name" .Values.inferenceServiceName
+                "namespace" .Values.namespace
+                "publishedModel" .Values.servedModelName
+                "gatewayName" .Values.llmInferenceService.routerGateway.name
+                "gatewayNamespace" .Values.llmInferenceService.routerGateway.namespace) | nindent 10 }}
     # scheduler: {} is not optional - the controller's own defaulting
     # always adds it to a gateway-enabled LLMInferenceService regardless of
     # what this manifest sends. excludeInboundPorts is mandatory, not
