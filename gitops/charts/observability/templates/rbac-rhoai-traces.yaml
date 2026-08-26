@@ -1,0 +1,43 @@
+{{- if and .Values.collector.enabled .Values.collector.rhoaiTraceExport.enabled }}
+# ADR-0523 (WP-081): write access to RHOAI's Tempo gateway for the
+# collector's otlp/rhoai exporter. The gateway (TempoStack tenants.mode:
+# openshift, single tenant redhat-ods-monitoring) authorizes each write
+# with a SubjectAccessReview against exactly this rule shape - the
+# documented Tempo Operator "traces-write" ClusterRole with the tenant
+# name as the resource. Nothing else in the cluster holds this grant
+# (verified live 2026-08-26 - not even RHOAI's own collector SA, which
+# never gets far enough to need it, see opentelemetrycollector.yaml's
+# otlp/rhoai comment).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-rhoai-tempo-traces-write
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+rules:
+  - apiGroups: [tempo.grafana.com]
+    resources: [redhat-ods-monitoring]
+    resourceNames: [traces]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zuno-rhoai-tempo-traces-write
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zuno-rhoai-tempo-traces-write
+subjects:
+  # The OTel operator derives "<name>-collector" for the SA it creates
+  # for templates/opentelemetrycollector.yaml (verified live).
+  - kind: ServiceAccount
+    name: zuno-otel-collector-collector
+    namespace: zuno-monitoring
+{{- end }}

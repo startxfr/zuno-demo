@@ -33,6 +33,14 @@ how (or whether) the two stacks connect. Two live findings constrain the mechani
   `data-science-collector-collector` Service exists (verified live, twice). Referencing RHOAI's
   CR from pod annotations would inject a dead exporter endpoint; the CR is controller-owned, so
   patching it in place would be reconciled away.
+- **RHOAI's collector cannot deliver to its own Tempo either** (found during WP-081's live
+  verification): its `otlp/tempo` exporter dials the Tempo gateway on 4317, a port the Tempo
+  Operator never exposes on the gateway Service (OTLP gRPC is `grpc-public=8090`) - every
+  received batch dies in an i/o-timeout retry loop. Both in-place fixes are operator-reverted
+  within seconds (the Monitoring controller re-renders the collector config; the Tempo Operator
+  strips extra gateway Service ports), and no ServiceAccount in the cluster holds the
+  openshift-tenancy write grant the gateway SARs against. Routing anything through RHOAI's
+  collector is therefore a dead end on this build - full trail in WP-081.
 
 ## Decision
 
@@ -42,16 +50,21 @@ enumerated). Two independent, composable paths:
 
 - **Mesh-level fan-out (WP-081):** Envoy keeps its single `otel-tracing` provider pointed at
   `zuno-otel-collector`; that collector's `traces` pipeline gains a second exporter,
-  `otlp/rhoai`, forwarding a copy of every span to
-  `data-science-collector-collector.redhat-ods-monitoring.svc.cluster.local:4317` (plaintext
-  OTLP gRPC; RHOAI's collector adds bearer-token auth and `X-Scope-OrgID` toward its Tempo).
-  The service-mesh chart and `Istio` CR are untouched, so the Grafana/zuno-Tempo path
-  ([ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md),
+  `otlp/rhoai`, forwarding a copy of every span straight to RHOAI's Tempo **gateway**
+  (`tempo-data-science-tempostack-gateway...:8090`) using the documented RHOSDT pattern -
+  `bearertokenauth` with the collector's own ServiceAccount token, `X-Scope-OrgID:
+  redhat-ods-monitoring`, service-ca TLS - plus a repo-owned `zuno-rhoai-tempo-traces-write`
+  ClusterRole/Binding for the tenant write (nothing else in the cluster holds it). RHOAI's
+  broken collector is bypassed, and everything involved is repo-owned, so no RHOAI operator can
+  revert it. The service-mesh chart and `Istio` CR are untouched, so the Grafana/zuno-Tempo
+  path ([ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md),
   [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md)) cannot regress.
 - **Workload-level auto-instrumentation (WP-082):** a repo-owned `Instrumentation` CR
-  (`zuno-models-instrumentation`, `zuno-ai-run`) with the **corrected** collector endpoint,
-  referenced via `instrumentation.opentelemetry.io/inject-sdk` annotations on all three model
-  workloads. `inject-sdk` (env-only injection) rather than `inject-python`: the RH vLLM image
+  (`zuno-models-instrumentation`, `zuno-ai-run`) pointing at the **platform** collector
+  (`zuno-otel-collector-collector.zuno-monitoring:4317`) - whose WP-081 fan-out carries the
+  spans on to RHOAI's Tempo with the gateway auth an in-process SDK cannot do, and both Tempo
+  stacks get the workload spans - referenced via `instrumentation.opentelemetry.io/inject-sdk`
+  annotations on all three model workloads. `inject-sdk` (env-only injection) rather than `inject-python`: the RH vLLM image
   already ships opentelemetry-sdk 1.43.0 + `opentelemetry-semantic-conventions-ai` (verified in
   the running pod), and a `PYTHONPATH` sitecustomize carrying the operator's older SDK is an
   avoidable risk on GPU pods. vLLM's native tracing is activated by its `--otlp-traces-endpoint`
@@ -59,9 +72,9 @@ enumerated). Two independent, composable paths:
   injected env, since the webhook's `failurePolicy: Ignore` means injection may silently skip
   and model startup must not depend on it.
 
-In-process spans export directly to RHOAI's collector (not via `zuno-otel-collector`), keeping
-the two work packages independently deployable and verifiable; W3C trace-context propagation
-still correlates mesh and workload spans across both Tempos.
+All application-originated spans (Envoy and in-process alike) therefore reach RHOAI's Tempo
+through the single authenticated `otlp/rhoai` egress in `zuno-otel-collector`; W3C
+trace-context propagation correlates mesh and workload spans across both Tempos.
 
 ## Operational considerations
 

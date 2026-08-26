@@ -12,6 +12,16 @@ spec:
   mode: deployment
   priorityClassName: zuno-platform-important
   config:
+    {{- if .Values.collector.rhoaiTraceExport.enabled }}
+    extensions:
+      # ADR-0523 (WP-081): authenticates otlp/rhoai below against RHOAI's
+      # Tempo gateway with this pod's own ServiceAccount token - the
+      # documented RHOSDT "forward to a TempoStack gateway" pattern. The
+      # matching tenant-write ClusterRole/Binding is
+      # templates/rbac-rhoai-traces.yaml.
+      bearertokenauth/rhoai:
+        filename: /var/run/secrets/kubernetes.io/serviceaccount/token
+    {{- end }}
     receivers:
       otlp:
         protocols:
@@ -43,17 +53,32 @@ spec:
       prometheus:
         endpoint: 0.0.0.0:8889
       {{- if .Values.collector.rhoaiTraceExport.enabled }}
-      # ADR-0523 (WP-081): RHOAI's monitoring-stack collector. NOTE the
-      # "-collector" suffix: the bare data-science-collector Service does
-      # NOT exist (RHOAI 3.5.0-ea.2's own Instrumentation CR names it
-      # wrong). Plaintext OTLP receiver; RHOAI's collector adds the
-      # bearer-token auth and X-Scope-OrgID its Tempo gateway requires.
+      # ADR-0523 (WP-081): straight to RHOAI's Tempo GATEWAY, deliberately
+      # NOT via RHOAI's own data-science-collector - that collector's
+      # otlp/tempo exporter dials gateway:4317, a port the Tempo Operator
+      # never exposes on the gateway Service (only grpc-public=8090), so
+      # everything routed through it dies in retry_sender ("dial tcp ...
+      # :4317: i/o timeout", confirmed live). Both obvious remediations
+      # are operator-reverted within seconds (the Monitoring controller
+      # re-renders the collector config; the Tempo Operator strips extra
+      # gateway Service ports) - see ansible/roles/openshift_ai/tasks/
+      # reconcile.yml's Tempo comment for the incident trail. 8090 is the
+      # gateway's OTLP gRPC port; service-ca serving cert matches the
+      # Service hostname; tenant is the TempoStack's single
+      # openshift-mode tenant.
       otlp/rhoai:
-        endpoint: data-science-collector-collector.redhat-ods-monitoring.svc.cluster.local:4317
+        endpoint: tempo-data-science-tempostack-gateway.redhat-ods-monitoring.svc.cluster.local:8090
+        auth:
+          authenticator: bearertokenauth/rhoai
+        headers:
+          X-Scope-OrgID: redhat-ods-monitoring
         tls:
-          insecure: true
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
       {{- end }}
     service:
+      {{- if .Values.collector.rhoaiTraceExport.enabled }}
+      extensions: [bearertokenauth/rhoai]
+      {{- end }}
       pipelines:
         traces:
           receivers: [otlp]

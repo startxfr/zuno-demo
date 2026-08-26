@@ -1,6 +1,8 @@
 ---
-# Auto-remediation for blocked openshift-ai resources (`make d0 reconcile
-# openshift-ai`). Only idempotent, ADR-documented, state-restoring actions:
+# Auto-remediation for blocked openshift-ai resources (`make d1 reconcile
+# openshift-ai` - openshift-ai is a DAY1_RUN component; the d0 form this
+# header used to claim doesn't exist and fails, verified live 2026-08-26).
+# Only idempotent, ADR-documented, state-restoring actions:
 #   - approve the pending InstallPlan, but ONLY when it targets the pinned
 #     startingCSV (preserves the Manual-approval pin - never approves drift)
 #   - re-copy istio-ca-root-cert into openshift-ingress
@@ -11,6 +13,7 @@
 #     cluster-monitoring-config)
 #   - verify the maas-db-config Secret and re-wait for the
 #     DataScienceCluster, recording findings instead of raw errors
+#   - right-size the RHOAI-generated TempoStack (ADR-0522)
 # Optional, default OFF (side-effect safety): delete CrashLoopBackOff pods
 # in redhat-ods-applications with -e openshift_ai_reconcile_restart_pods=true.
 - name: "openshift_ai | reconcile: discover the operator channel (ADR-0048)"
@@ -313,6 +316,25 @@
               cpu: 500m
               memory: 1Gi
   when: (_openshift_ai_tempostack.resources | default([]) | length) > 0
+
+# --- NO remediation for RHOAI's broken collector->Tempo hop (ADR-0523/
+# WP-081 live incident, 2026-08-26; deliberate non-action, recorded so
+# nobody re-attempts it): RHOAI's data-science-collector exports to
+# tempo-data-science-tempostack-gateway:4317, but the Tempo Operator only
+# exposes grpc-public=8090/8081/8080 on that Service (4317 lives solely on
+# the distributor, whose NetworkPolicy admits only gateway pods) - every
+# trace batch dies in retry_sender with "dial tcp <gateway-ip>:4317: i/o
+# timeout"; RHOAI 3.5.0-ea.2's trace pipeline can never have worked
+# end-to-end. BOTH obvious in-place fixes are operator-fought and revert
+# within seconds, verified live: patching the OpenTelemetryCollector's
+# exporter endpoint to :8090 (the Monitoring controller re-renders
+# spec.config - unlike the TempoStack resources.total above, which it
+# never revisits), and appending a 4317->grpc-public port to the gateway
+# Service (the Tempo Operator strips it). The platform therefore exports
+# traces to RHOAI's Tempo directly through the gateway with proper
+# bearer/tenant auth from zuno-otel-collector instead - see
+# gitops/charts/observability/templates/opentelemetrycollector.yaml
+# (otlp/rhoai) and rbac-rhoai-traces.yaml, and ADR-0523.
 
 # --- Optional pod restart (default OFF: side-effect safety - Deployments
 # recreate deleted pods, but reconcile stays state-restoring-only unless the
