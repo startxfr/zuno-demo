@@ -127,11 +127,27 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
     along as a request header to MaaS itself - so MaaS-side usage/token
     metrics can be joined to this same Zuno request trace, not just
     ai-gateway's own span.
+
+    ADR-0521 (WP-076) step 4: `cfg.get("endpoint")` takes priority over the
+    module-level MAAS_GATEWAY_ENDPOINT default. Live-verified against the
+    real cluster (2026-08-26): the only proven-working MaaS route for a
+    local model is the PATH-PREFIXED form -
+    "<maas-gateway>/<namespace>/<model>/v1" (KServe's auto-generated
+    HTTPRoute, `ipp-pre`'s ext_proc filter copies the request body's
+    `model` field into the X-Gateway-Model-Name header the AuthPolicy's
+    OPA rules key on) - which is necessarily per-model, not a single
+    shared endpoint every via_maas provider could point at. The header-
+    gated form documented in earlier ADR-0201 notes 403s on authorization
+    even though it routes correctly - see gitops/charts/models/values.yaml
+    maas.models[].endpointOverride's comment for the full identity-
+    mismatch history this sidesteps.
     """
-    if not MAAS_GATEWAY_ENDPOINT:
+    endpoint = cfg.get("endpoint") or MAAS_GATEWAY_ENDPOINT
+    if not endpoint:
         raise MaasAdapterError(
-            "MAAS_ADAPTER_ENABLED is true but MAAS_GATEWAY_ENDPOINT is not set - "
-            "the MaaS adapter has nothing to point at"
+            "MAAS_ADAPTER_ENABLED is true but neither this provider's own "
+            "endpoint nor MAAS_GATEWAY_ENDPOINT is set - the MaaS adapter "
+            "has nothing to point at"
         )
 
     from langchain_openai import ChatOpenAI
@@ -139,7 +155,7 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
     default_headers = {"X-Zuno-Request-Id": request_id} if request_id else None
 
     return ChatOpenAI(
-        base_url=MAAS_GATEWAY_ENDPOINT,
+        base_url=endpoint,
         api_key=_maas_bearer_token(),
         model=cfg.get("maas_model_ref", cfg.get("model")),
         temperature=cfg.get("temperature", 0.2),

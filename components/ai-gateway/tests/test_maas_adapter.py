@@ -125,6 +125,27 @@ def test_bearer_token_prefers_sa_token_when_present() -> None:
         os.unlink(token_path)
 
 
+def test_chat_model_via_maas_prefers_per_provider_endpoint() -> None:
+    """ADR-0521 (WP-076) step 4: a provider-routing.yaml entry's own
+    `endpoint` wins over the global MAAS_GATEWAY_ENDPOINT - required since
+    the only proven-working MaaS route is path-prefixed per model
+    (.../<namespace>/<model>/v1), not a single shared endpoint every
+    via_maas provider could point at."""
+    _reset_adapter_env(MAAS_ADAPTER_ENABLED="true", MAAS_GATEWAY_ENDPOINT="http://maas.example/global/v1")
+    with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
+        maas_adapter.chat_model_via_maas({"endpoint": "http://maas.example/zuno-ai-run/gpt-oss-20b/v1", "model": "gpt-oss-20b"})
+    (_, kwargs) = chat_openai.call_args
+    assert kwargs["base_url"] == "http://maas.example/zuno-ai-run/gpt-oss-20b/v1"
+
+
+def test_chat_model_via_maas_falls_back_to_global_endpoint() -> None:
+    _reset_adapter_env(MAAS_ADAPTER_ENABLED="true", MAAS_GATEWAY_ENDPOINT="http://maas.example/global/v1")
+    with mock.patch("langchain_openai.ChatOpenAI") as chat_openai:
+        maas_adapter.chat_model_via_maas({"model": "gpt-oss-20b"})
+    (_, kwargs) = chat_openai.call_args
+    assert kwargs["base_url"] == "http://maas.example/global/v1"
+
+
 def test_maas_adapter_never_widens_c3_local_only_eligibility() -> None:
     """Security-negative: with the adapter globally enabled, a C3/local-only
     request's candidate set is unchanged - still exactly the local
@@ -189,6 +210,8 @@ TESTS = [
     test_bearer_token_falls_back_to_api_key_when_no_sa_token_path,
     test_bearer_token_falls_back_when_sa_token_path_does_not_exist,
     test_bearer_token_prefers_sa_token_when_present,
+    test_chat_model_via_maas_prefers_per_provider_endpoint,
+    test_chat_model_via_maas_falls_back_to_global_endpoint,
     test_maas_adapter_never_widens_c3_local_only_eligibility,
     test_external_egress_stays_blocked_even_when_adapter_and_provider_both_opt_in,
     test_external_egress_opt_in_only_affects_non_local_candidates,

@@ -26,13 +26,28 @@
 # this list (top to bottom); the local models are always tried first when
 # eligible, matching MEMORY.md section 6's "local model plus approved
 # external provider fallback order: OpenAI, Gemini, Anthropic, Mistral".
-# Since ADR-0412 there are TWO local providers: `local` (qwen, the
-# default) then `local-gpt-oss` (the reasoning-preferred second local and
-# C3's first-ever fallback). A per-(agent,task) `preferences:` entry in
-# policies/model-routing/model-routing-policy.yaml may REORDER the
-# candidates that survive eligibility/local-only filtering (e.g. putting
-# local-gpt-oss first for reflexional tasks) - reorder only, it can never
-# add a provider this list's `eligible_for` filtered out.
+# Since ADR-0412 there are TWO local models: `local` (qwen, the default)
+# and gpt-oss-20b, the reasoning-preferred second local and C3's
+# first-ever fallback. ADR-0521 (WP-076) step 4: gpt-oss-20b now has TWO
+# candidate entries - `local-gpt-oss-maas` (via_maas: true, tried first)
+# and `local-gpt-oss` (direct, unchanged) - so "MaaS unreachable -> same
+# model still answers directly" is a config outcome of this file's own
+# fallback order, no new code (ADR-0521 item 6). qwen has no MaaS entry
+# yet: a live, reproducible bug routes qwen's MaaS-path responses to an
+# empty body (auth/routing/subscription all pass; something between vLLM
+# and the client drops it) - `local` stays direct-only until that's
+# root-caused.
+# A per-(agent,task) `preferences:` entry in policies/model-routing/
+# model-routing-policy.yaml may REORDER the candidates that survive
+# eligibility/local-only filtering (e.g. putting the gpt-oss pair first
+# for reflexional tasks) - reorder only, it can never add a provider this
+# list's `eligible_for` filtered out. Every `prefer`/`preferred` entry
+# that names `local-gpt-oss` lists `local-gpt-oss-maas` immediately before
+# it - required, not cosmetic: _apply_preference's "unlisted survivors
+# follow in provider-routing.yaml order" rule would otherwise strand
+# local-gpt-oss-maas wherever the reordered list's unlisted tail lands,
+# breaking "MaaS-preferred, same-model-direct-fallback" for any task with
+# an explicit preference.
 #
 # `serves_adapters` (optional, default false; ADR-0303): marks the ONE
 # local provider whose vLLM runtime registers gitops/charts/models'
@@ -45,18 +60,24 @@
 # read from at runtime (populated by an ExternalSecret -- see
 # ansible/roles/vault/tasks/install.yml -- never a literal value here).
 #
-# `via_maas` (optional, default false; ADR-0114): opts this provider into
-# the OpenShift AI MaaS adapter prototype (components/ai-gateway/app/
+# `via_maas` (optional, default false; ADR-0114/ADR-0521): opts this
+# provider into the MaaS adapter (components/ai-gateway/app/
 # maas_adapter.py) instead of this gateway's direct client, when the
 # gateway's own MAAS_ADAPTER_ENABLED switch is also on (chart value
-# `maasAdapter.enabled`, default false - this file alone never turns the
-# adapter on). Classification eligibility above is evaluated identically
-# either way; `via_maas` changes transport, never eligibility. No entry
-# below sets it yet - the prototype ships disabled until the operator
-# comparison in docs/roadmap/evidence/adr-0114-maas-coverage.md concludes.
+# `maasAdapter.enabled`, true since WP-076 step 4). Classification
+# eligibility above is evaluated identically either way; `via_maas`
+# changes transport, never eligibility.
+# `endpoint` on a via_maas entry means the MaaS gateway's own path-
+# prefixed URL, not the direct Service - live-verified (2026-08-26) that
+# this is REQUIRED per model ("<gateway>/<namespace>/<model>/v1"), not a
+# single shared MaaS endpoint; see maas_adapter.py's chat_model_via_maas
+# comment for why.
 # `maas_model_ref` (optional): overrides `model` for the MaaS-published
-# model reference name, when it differs from the serving runtime's own
-# internal model name.
+# model reference name (the identity gitops/charts/models's
+# maas.models[].publishedName publishes, e.g.
+# "zuno-ai-run/gpt-oss-20b-maas"), when it differs from the serving
+# runtime's own internal model name - it always does here, since MaaS
+# publishes under its own MaaSModelRef name, not the LLMInferenceService's.
 #
 # `cache_enabled` (optional, default false; ADR-0104): opts this provider
 # into the semantic cache (components/ai-gateway/app/semantic_cache.py)
@@ -101,6 +122,29 @@ providers:
   # cert's issuer is the cluster's own openshift-service-serving-signer CA
   # (verified live), which app/providers.py's local-candidate client trusts
   # via LOCAL_GPT_OSS_CA_BUNDLE (gitops/charts/ai-gateway's deployment.yaml).
+  #
+  # ADR-0521 (WP-076) step 4: MaaS-preferred sibling, tried first (declared
+  # before local-gpt-oss below; RoutingTable.candidates_for() preserves
+  # this file's order for any (agent, task) with no explicit preference).
+  # Live-verified end-to-end (2026-08-26) via the path-prefixed route -
+  # endpoint carries the namespace/model path segment, maas_model_ref
+  # carries the MaaSModelRef identity the request body's `model` field
+  # must use for ipp-pre's ext_proc filter to derive the right
+  # X-Gateway-Model-Name for OPA authorization. Auth is
+  # system:serviceaccount:zuno-ai-run:ai-gateway via its own SA token
+  # (WP-076 step 3, MAAS_SA_TOKEN_PATH) - see gitops/charts/models's
+  # maas.models[].subscriptions[] "-ai-gateway" entries for the
+  # MaaSSubscription/MaaSAuthPolicy grant this depends on.
+  - name: local-gpt-oss-maas
+    kind: local
+    model: gpt-oss-20b
+    via_maas: true
+    maas_model_ref: zuno-ai-run/gpt-oss-20b-maas
+    endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+
   - name: local-gpt-oss
     kind: local
     model: gpt-oss-20b
