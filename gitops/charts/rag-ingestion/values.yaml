@@ -1434,7 +1434,16 @@ pipeline:
   # once from a stale rendered ConfigMap (ArgoCD hadn't synced yet) before
   # this fix landed, so it's permanently stuck without resources - same
   # immutability rule as above forces yet another new version name here.
-  version: v0-5-0
+  # v0-6-0 (WP-084): re-sizes detect-changes from cpu:2/6Gi to cpu:8/24Gi
+  # and its read pool 16 -> 64. The stage does one S3 GET per document over
+  # the whole corpus but had been sized like the fixed-cost stages, making
+  # it the SXA run's bottleneck at ~108 min for 310,537 documents.
+  # Re-applying v0-5-0 with the new RESOURCES dict is rejected by the
+  # admission webhook ("Pipeline spec is immutable") - and the role treats
+  # that rejection as non-fatal, so the play still reports failed=0 while
+  # silently keeping the old spec. Always confirm the compiled version
+  # actually changed rather than trusting the play's exit code.
+  version: v0-6-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
