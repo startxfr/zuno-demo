@@ -21,7 +21,9 @@ from rag_ingestion import (  # noqa: E402
     _parse_duration_spec,
     _parse_http_last_modified,
     _run_source_adapter,
+    stage_chunk,
     stage_detect_changes,
+    stage_embed,
     stage_normalize,
     stage_validate,
 )
@@ -1175,3 +1177,131 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# --- ADR-0219: embed batches ACROSS documents, not within one ---------------
+
+
+def _single_chunk_store(doc_ids):
+    """A store whose documents each hold exactly one chunk - the SXA-dump
+    shape (one document per table row, well under the chunk budget)."""
+    store = FakeStore()
+    store.json["manifests/changeset.json"] = {
+        "new": list(doc_ids), "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+    }
+    for doc_id in doc_ids:
+        store.json[f"normalized/{doc_id}.chunks.json"] = {
+            "doc_id": doc_id,
+            "url": f"sxa-dump://contact/{doc_id}",
+            "title": f"SXA contact #{doc_id}",
+            "metadata": {"domain": "knowledge.sxa-legacy"},
+            "chunks": [{"chunk_index": 0, "text": f"row {doc_id}"}],
+        }
+    return store
+
+
+def test_embed_pools_single_chunk_documents_into_full_batches():
+    """Before ADR-0219 the batching loop lived inside one document, so a corpus
+    of single-chunk documents produced one request per document however large
+    EMBEDDING_BATCH_SIZE was."""
+    doc_ids = [f"d{i}" for i in range(10)]
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa-legacy", EMBEDDING_BATCH_SIZE="4",
+        EMBED_CONCURRENCY="1", EMBEDDING_DIMENSIONS="3",
+    )
+    store = _single_chunk_store(doc_ids)
+    seen_batches = []
+
+    def fake_embed_batch(texts, cfg):
+        seen_batches.append(len(texts))
+        return [[0.1, 0.2, 0.3] for _ in texts]
+
+    with mock.patch.object(rag_ingestion, "_embed_batch", fake_embed_batch):
+        stage_embed(config, store)
+
+    # 10 single-chunk documents at batch size 4 -> 4 + 4 + 2, not ten 1s.
+    assert seen_batches == [4, 4, 2], seen_batches
+    for doc_id in doc_ids:
+        chunk = store.json[f"normalized/{doc_id}.chunks.json"]["chunks"][0]
+        assert chunk["embedding"] == [0.1, 0.2, 0.3]
+
+
+def test_embed_writes_back_every_document_and_survives_a_failed_batch():
+    """A failed batch must not abort the stage or lose the other documents -
+    the chunks it covered simply stay unembedded for stage_validate to catch."""
+    doc_ids = [f"d{i}" for i in range(6)]
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa-legacy", EMBEDDING_BATCH_SIZE="2",
+        EMBED_CONCURRENCY="1", EMBEDDING_DIMENSIONS="3",
+    )
+    store = _single_chunk_store(doc_ids)
+    calls = {"n": 0}
+
+    def flaky_embed_batch(texts, cfg):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise rag_ingestion.requests.RequestException("predictor 503")
+        return [[0.1, 0.2, 0.3] for _ in texts]
+
+    with mock.patch.object(rag_ingestion, "_embed_batch", flaky_embed_batch):
+        stage_embed(config, store)
+
+    embedded = [
+        doc_id for doc_id in doc_ids
+        if "embedding" in store.json[f"normalized/{doc_id}.chunks.json"]["chunks"][0]
+    ]
+    # Every record is still written back; only the failed batch's two are bare.
+    assert len(embedded) == 4, embedded
+    assert all(f"normalized/{d}.chunks.json" in store.json for d in doc_ids)
+
+
+def test_embed_still_batches_within_a_long_multi_chunk_document():
+    """The knowledge.tech shape must be unaffected: one long document whose
+    chunk count exceeds the batch size is still split into several requests."""
+    config = _config(
+        INGESTION_DOMAIN="knowledge.tech", EMBEDDING_BATCH_SIZE="4",
+        EMBED_CONCURRENCY="1", EMBEDDING_DIMENSIONS="3",
+    )
+    store = FakeStore()
+    store.json["manifests/changeset.json"] = {
+        "new": ["long"], "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+    }
+    store.json["normalized/long.chunks.json"] = {
+        "doc_id": "long", "url": "https://docs.test/long", "title": "Long doc",
+        "metadata": {"domain": "knowledge.tech"},
+        "chunks": [{"chunk_index": i, "text": f"part {i}"} for i in range(9)],
+    }
+    seen_batches = []
+
+    def fake_embed_batch(texts, cfg):
+        seen_batches.append(len(texts))
+        return [[0.1, 0.2, 0.3] for _ in texts]
+
+    with mock.patch.object(rag_ingestion, "_embed_batch", fake_embed_batch):
+        stage_embed(config, store)
+
+    assert seen_batches == [4, 4, 1], seen_batches
+    chunks = store.json["normalized/long.chunks.json"]["chunks"]
+    assert all("embedding" in c for c in chunks)
+
+
+def test_chunk_stage_processes_every_document_under_concurrency():
+    """stage_chunk gained a worker pool - every document must still be
+    chunked exactly once and the totals must still add up."""
+    doc_ids = [f"d{i}" for i in range(50)]
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy", CHUNK_CONCURRENCY="8")
+    store = FakeStore()
+    store.json["manifests/changeset.json"] = {
+        "new": list(doc_ids), "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+    }
+    for doc_id in doc_ids:
+        store.json[f"normalized/{doc_id}.json"] = {
+            "doc_id": doc_id, "url": f"sxa-dump://contact/{doc_id}",
+            "title": f"SXA contact #{doc_id}", "text": f"id_cont: {doc_id} | nom_cont: Test",
+            "metadata": {"domain": "knowledge.sxa-legacy"},
+        }
+    stage_chunk(config, store)
+    for doc_id in doc_ids:
+        record = store.json[f"normalized/{doc_id}.chunks.json"]
+        assert record["chunks"], doc_id
+        assert record["url"] == f"sxa-dump://contact/{doc_id}"

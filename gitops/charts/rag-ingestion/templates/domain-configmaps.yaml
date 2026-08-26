@@ -91,6 +91,12 @@ data:
   FETCH_SXA_WRITE_CONCURRENCY: {{ $root.Values.resources.fetch.sxaWriteConcurrency | quote }}
   # WP-58: same rationale, detect-changes' per-document S3 read pool.
   DETECT_CHANGES_READ_CONCURRENCY: {{ $root.Values.resources.detectChanges.readConcurrency | quote }}
+  # ADR-0219: normalize/chunk/embed/index-pgvector worker pools - same
+  # every-domain requirement as the keys above.
+  NORMALIZE_CONCURRENCY: {{ $root.Values.resources.normalize.concurrency | quote }}
+  CHUNK_CONCURRENCY: {{ $root.Values.resources.chunk.concurrency | quote }}
+  EMBED_CONCURRENCY: {{ $root.Values.resources.embed.concurrency | quote }}
+  INDEX_READ_CONCURRENCY: {{ $root.Values.resources.index.readConcurrency | quote }}
 ---
 {{- end }}
 {{- end }}

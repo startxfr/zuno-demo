@@ -247,6 +247,19 @@ class IngestionConfig:
     # per-row S3-write pool in _fetch_sxa.
     fetch_redhat_concurrency: int
     fetch_sxa_write_concurrency: int
+    # ADR-0219 (2026-08-26): the same treatment for the four stages that
+    # were still strictly serial. The SXA dump renders one document per
+    # table row - 314,428 of them, measured live - and at one-to-two S3
+    # round-trips per document each of these stages took hours, so no full
+    # run ever survived long enough to index anything. Same rationale as the two knobs above:
+    # S3-latency-bound, not CPU-bound, so worker counts above the CPU count
+    # are expected. embed_concurrency bounds in-flight embedding REQUESTS
+    # (each already carrying embedding_batch_size chunks), so it multiplies
+    # against the predictor's own capacity - keep it modest.
+    normalize_concurrency: int
+    chunk_concurrency: int
+    embed_concurrency: int
+    index_read_concurrency: int
 
     # WP-58: bounds the per-document S3 GET pool that rebuilds
     # detect-changes' "current" state (network/S3-latency-bound work,
@@ -355,6 +368,10 @@ def load_config() -> IngestionConfig:
         fetch_redhat_concurrency=_env_int("FETCH_REDHAT_CONCURRENCY", 8),
         fetch_sxa_write_concurrency=_env_int("FETCH_SXA_WRITE_CONCURRENCY", 8),
         detect_changes_read_concurrency=_env_int("DETECT_CHANGES_READ_CONCURRENCY", 16),
+        normalize_concurrency=_env_int("NORMALIZE_CONCURRENCY", 16),
+        chunk_concurrency=_env_int("CHUNK_CONCURRENCY", 16),
+        embed_concurrency=_env_int("EMBED_CONCURRENCY", 4),
+        index_read_concurrency=_env_int("INDEX_READ_CONCURRENCY", 16),
     )
 
 
@@ -1668,81 +1685,103 @@ def _normalize_html(html: str, *, preserve_code_blocks: bool, preserve_tables: b
     return title, text
 
 
+def _normalize_one(doc_id: str, config: IngestionConfig, store: CorpusStore) -> bool:
+    """Normalize a single raw document and write it to <normalized_prefix>/.
+
+    ADR-0219: split out of stage_normalize so the per-document work (one S3
+    GET, pure-Python cleanup, one S3 PUT) can run on a worker thread. Every
+    value it touches is either read-only shared config or local to this
+    call, so there is no cross-document state to guard. Returns True when a
+    normalized document was written.
+    """
+    raw = store.get_json(f"{config.raw_prefix}/{doc_id}.json")
+    if not raw:
+        logger.warning("normalize: raw document %s missing, skipping", doc_id)
+        return False
+    if raw.get("raw_html") is not None:
+        title, text = _normalize_html(
+            raw["raw_html"],
+            preserve_code_blocks=config.chunk_preserve_code_blocks,
+            preserve_tables=config.chunk_preserve_tables,
+        )
+    else:
+        # Structured-source adapters (salesforce/sxa-dump) emit
+        # ready text, not HTML - nothing to clean up.
+        title, text = raw.get("title") or "", raw.get("text") or ""
+    if not text.strip():
+        logger.warning("normalize: %s produced no text after cleanup, skipping", raw["url"])
+        return False
+    domain = raw.get("domain") or config.domain
+    # ADR-0205/WP-24: distinct fields, not the old conflated
+    # `last_modified` - source_modified_at is the SOURCE's own
+    # modification signal when the adapter captured one (Confluence's
+    # history.lastUpdated.when, Salesforce's LastModifiedDate, or a
+    # best-effort HTTP Last-Modified header for product docs - see
+    # _fetch_redhat); when a source genuinely exposes none,
+    # `fetched_at` is the best available lower bound,
+    # not an invented value. indexed_at is always this pipeline's own
+    # clock at normalize time, independent of whatever the source
+    # reported - the two are only ever equal by coincidence now.
+    indexed_at_dt = datetime.now(timezone.utc)
+    indexed_at = indexed_at_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    metadata = {
+        # ADR-0202/ADR-0204: records written before the domain field
+        # existed are knowledge.tech by construction - the only domain
+        # this pipeline ever served (same default rag-service applies).
+        "domain": domain,
+        "product": raw.get("product"),
+        "version": raw.get("version"),
+        "language": _normalize_language(raw.get("language")),
+        "source_type": raw.get("source_type"),
+        "classification": raw.get("classification", "C1"),
+        "acl_groups": raw.get("acl_groups") or [],
+        "source_modified_at": raw.get("last_modified") or raw.get("fetched_at"),
+        "indexed_at": indexed_at,
+        "provenance": raw.get("provenance") or raw.get("url"),
+    }
+    # ADR-0205/WP-24: derived from this run's domain freshness
+    # objective (STALE_AFTER, mirroring knowledge/<domain>/domain.yaml)
+    # - omitted entirely (never set to a fake value) when the domain
+    # has no configured window, e.g. knowledge.sxa-legacy's on-demand
+    # objective (_IMMUTABLE_LEGACY_DOMAINS).
+    stale_duration = _parse_duration_spec(config.stale_after_spec)
+    if domain not in _IMMUTABLE_LEGACY_DOMAINS and stale_duration is not None:
+        metadata["stale_after"] = (indexed_at_dt + stale_duration).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if raw.get("technology"):
+        metadata["technology"] = raw["technology"]
+    # Per-domain metadata extensions (ADR-0202's metadata-schema.yaml)
+    # ride through under their domain's own key.
+    for extension_key in ("sales", "adv", "sxa"):
+        if raw.get(extension_key):
+            metadata[extension_key] = raw[extension_key]
+    record = {
+        "doc_id": doc_id,
+        "url": raw["url"],
+        "title": raw.get("title") or title,
+        "text": text,
+        "metadata": metadata,
+    }
+    store.put_json(f"{config.normalized_prefix}/{doc_id}.json", record)
+    return True
+
+
 def stage_normalize(config: IngestionConfig, store: CorpusStore) -> None:
     changeset = _load_changeset(config, store, "normalize")
     if not changeset:
         return
+    doc_ids = changeset["new"] + changeset["changed"]
     normalized = 0
-    for doc_id in changeset["new"] + changeset["changed"]:
-        raw = store.get_json(f"{config.raw_prefix}/{doc_id}.json")
-        if not raw:
-            logger.warning("normalize: raw document %s missing, skipping", doc_id)
-            continue
-        if raw.get("raw_html") is not None:
-            title, text = _normalize_html(
-                raw["raw_html"],
-                preserve_code_blocks=config.chunk_preserve_code_blocks,
-                preserve_tables=config.chunk_preserve_tables,
-            )
-        else:
-            # Structured-source adapters (salesforce/sxa-dump) emit
-            # ready text, not HTML - nothing to clean up.
-            title, text = raw.get("title") or "", raw.get("text") or ""
-        if not text.strip():
-            logger.warning("normalize: %s produced no text after cleanup, skipping", raw["url"])
-            continue
-        domain = raw.get("domain") or config.domain
-        # ADR-0205/WP-24: distinct fields, not the old conflated
-        # `last_modified` - source_modified_at is the SOURCE's own
-        # modification signal when the adapter captured one (Confluence's
-        # history.lastUpdated.when, Salesforce's LastModifiedDate, or a
-        # best-effort HTTP Last-Modified header for product docs - see
-        # _fetch_redhat); when a source genuinely exposes none,
-        # `fetched_at` is the best available lower bound,
-        # not an invented value. indexed_at is always this pipeline's own
-        # clock at normalize time, independent of whatever the source
-        # reported - the two are only ever equal by coincidence now.
-        indexed_at_dt = datetime.now(timezone.utc)
-        indexed_at = indexed_at_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        metadata = {
-            # ADR-0202/ADR-0204: records written before the domain field
-            # existed are knowledge.tech by construction - the only domain
-            # this pipeline ever served (same default rag-service applies).
-            "domain": domain,
-            "product": raw.get("product"),
-            "version": raw.get("version"),
-            "language": _normalize_language(raw.get("language")),
-            "source_type": raw.get("source_type"),
-            "classification": raw.get("classification", "C1"),
-            "acl_groups": raw.get("acl_groups") or [],
-            "source_modified_at": raw.get("last_modified") or raw.get("fetched_at"),
-            "indexed_at": indexed_at,
-            "provenance": raw.get("provenance") or raw.get("url"),
-        }
-        # ADR-0205/WP-24: derived from this run's domain freshness
-        # objective (STALE_AFTER, mirroring knowledge/<domain>/domain.yaml)
-        # - omitted entirely (never set to a fake value) when the domain
-        # has no configured window, e.g. knowledge.sxa-legacy's on-demand
-        # objective (_IMMUTABLE_LEGACY_DOMAINS).
-        stale_duration = _parse_duration_spec(config.stale_after_spec)
-        if domain not in _IMMUTABLE_LEGACY_DOMAINS and stale_duration is not None:
-            metadata["stale_after"] = (indexed_at_dt + stale_duration).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if raw.get("technology"):
-            metadata["technology"] = raw["technology"]
-        # Per-domain metadata extensions (ADR-0202's metadata-schema.yaml)
-        # ride through under their domain's own key.
-        for extension_key in ("sales", "adv", "sxa"):
-            if raw.get(extension_key):
-                metadata[extension_key] = raw[extension_key]
-        record = {
-            "doc_id": doc_id,
-            "url": raw["url"],
-            "title": raw.get("title") or title,
-            "text": text,
-            "metadata": metadata,
-        }
-        store.put_json(f"{config.normalized_prefix}/{doc_id}.json", record)
-        normalized += 1
+    # ADR-0219: one GET + one PUT per document, S3-latency-bound exactly like
+    # stage_detect_changes' read pool. pool.map preserves order and the
+    # counter is folded back on this thread, so nothing is shared mutably.
+    with ThreadPoolExecutor(max_workers=max(1, config.normalize_concurrency)) as pool:
+        for position, written in enumerate(
+            pool.map(lambda doc_id: _normalize_one(doc_id, config, store), doc_ids), start=1
+        ):
+            if written:
+                normalized += 1
+            if position % 10000 == 0:
+                logger.info("normalize: %d/%d documents processed", position, len(doc_ids))
     logger.info("normalize: wrote %d normalized documents", normalized)
 
 
@@ -1853,6 +1892,35 @@ def _chunk_text(text: str, *, max_tokens: int, overlap_tokens: int, encoder) -> 
     return chunks or [text]
 
 
+def _chunk_one(doc_id: str, config: IngestionConfig, store: CorpusStore, encoder) -> int:
+    """Chunk a single normalized document. Returns the chunk count written.
+
+    ADR-0219: split out of stage_chunk for the same reason as _normalize_one.
+    `encoder` is a tiktoken Encoding, whose encode() is safe to call from
+    several threads, so one encoder is shared across the pool rather than
+    rebuilt (and re-downloaded) per document.
+    """
+    doc = store.get_json(f"{config.normalized_prefix}/{doc_id}.json")
+    if not doc:
+        logger.warning("chunk: normalized document %s missing, skipping", doc_id)
+        return 0
+    pieces = _chunk_text(
+        doc["text"],
+        max_tokens=config.chunk_max_tokens,
+        overlap_tokens=config.chunk_overlap_tokens,
+        encoder=encoder,
+    )
+    record = {
+        "doc_id": doc_id,
+        "url": doc["url"],
+        "title": doc["title"],
+        "metadata": doc["metadata"],
+        "chunks": [{"chunk_index": i, "text": piece} for i, piece in enumerate(pieces)],
+    }
+    store.put_json(f"{config.normalized_prefix}/{doc_id}.chunks.json", record)
+    return len(record["chunks"])
+
+
 def stage_chunk(config: IngestionConfig, store: CorpusStore) -> None:
     changeset = _load_changeset(config, store, "chunk")
     if not changeset:
@@ -1860,26 +1928,13 @@ def stage_chunk(config: IngestionConfig, store: CorpusStore) -> None:
     encoder = _get_token_encoder()
     doc_ids = changeset["new"] + changeset["changed"]
     total_chunks = 0
-    for doc_id in doc_ids:
-        doc = store.get_json(f"{config.normalized_prefix}/{doc_id}.json")
-        if not doc:
-            logger.warning("chunk: normalized document %s missing, skipping", doc_id)
-            continue
-        pieces = _chunk_text(
-            doc["text"],
-            max_tokens=config.chunk_max_tokens,
-            overlap_tokens=config.chunk_overlap_tokens,
-            encoder=encoder,
-        )
-        record = {
-            "doc_id": doc_id,
-            "url": doc["url"],
-            "title": doc["title"],
-            "metadata": doc["metadata"],
-            "chunks": [{"chunk_index": i, "text": piece} for i, piece in enumerate(pieces)],
-        }
-        store.put_json(f"{config.normalized_prefix}/{doc_id}.chunks.json", record)
-        total_chunks += len(record["chunks"])
+    with ThreadPoolExecutor(max_workers=max(1, config.chunk_concurrency)) as pool:
+        for position, count in enumerate(
+            pool.map(lambda doc_id: _chunk_one(doc_id, config, store, encoder), doc_ids), start=1
+        ):
+            total_chunks += count
+            if position % 10000 == 0:
+                logger.info("chunk: %d/%d documents processed", position, len(doc_ids))
     logger.info("chunk: split %d documents into %d chunks", len(doc_ids), total_chunks)
 
 
@@ -1914,40 +1969,92 @@ def _embed_batch(texts: list, config: IngestionConfig) -> list:
 
 
 def stage_embed(config: IngestionConfig, store: CorpusStore) -> None:
+    """Embed every chunk of this run's changeset.
+
+    ADR-0219 (2026-08-26): batching used to happen strictly WITHIN one
+    document - `for start in range(0, len(chunks), embedding_batch_size)`
+    over a single record. That is fine for knowledge.tech, whose documents
+    are long product pages that chunk many times over, but the SXA dump
+    renders one document per table row averaging ~1.2 KB against a
+    320-token budget, so virtually every document is a SINGLE chunk. The
+    effect was that EMBEDDING_BATCH_SIZE=64 sent 314,428 requests of one
+    chunk each, and the stage could never finish. Chunks are now pooled ACROSS
+    documents into genuinely full batches, and several batches are in
+    flight at once, while the per-document write-back and the failure
+    semantics (a failed batch logs and leaves its chunks unembedded for
+    stage_validate to catch) are unchanged.
+    """
     changeset = _load_changeset(config, store, "embed")
     if not changeset:
         return
     doc_ids = changeset["new"] + changeset["changed"]
+    batch_size = max(1, config.embedding_batch_size)
+    workers = max(1, config.embed_concurrency)
+    # Documents are read, embedded and written back one window at a time so
+    # peak memory stays bounded: a full window of embedded chunks is held at
+    # once, and a 1024-dimension vector costs ~32 KB as Python floats.
+    window_size = max(batch_size * workers * 4, 128)
     embedded_docs = 0
     embedded_chunks = 0
-    for doc_id in doc_ids:
-        record = store.get_json(f"{config.normalized_prefix}/{doc_id}.chunks.json")
-        if not record:
-            logger.warning("embed: chunk document %s missing, skipping", doc_id)
-            continue
-        chunks = record["chunks"]
-        for start in range(0, len(chunks), config.embedding_batch_size):
-            batch = chunks[start:start + config.embedding_batch_size]
-            texts = [c["text"] for c in batch]
-            try:
-                vectors = _embed_batch(texts, config)
-            except requests.RequestException as exc:
-                logger.error(
-                    "embed: request failed for %s chunks %d-%d: %s",
-                    doc_id, start, start + len(batch), exc,
-                )
-                continue
-            for chunk, vector in zip(batch, vectors):
-                if len(vector) != config.embedding_dimensions:
-                    logger.error(
-                        "embed: dimension mismatch for %s chunk %d (got %d, expected %d)",
-                        doc_id, chunk["chunk_index"], len(vector), config.embedding_dimensions,
-                    )
+
+    def _embed_one_batch(batch):
+        """batch is a list of (record, chunk). Returns (batch, vectors|None)."""
+        try:
+            return batch, _embed_batch([chunk["text"] for _, chunk in batch], config)
+        except requests.RequestException as exc:
+            logger.error(
+                "embed: request failed for %d chunk(s) starting at %s chunk %d: %s",
+                len(batch), batch[0][0]["url"], batch[0][1]["chunk_index"], exc,
+            )
+            return batch, None
+
+    with ThreadPoolExecutor(max_workers=max(1, config.index_read_concurrency)) as io_pool, \
+            ThreadPoolExecutor(max_workers=workers) as embed_pool:
+        for offset in range(0, len(doc_ids), window_size):
+            window = doc_ids[offset:offset + window_size]
+            records = []
+            for doc_id, record in zip(
+                window,
+                io_pool.map(
+                    lambda d: store.get_json(f"{config.normalized_prefix}/{d}.chunks.json"), window
+                ),
+            ):
+                if not record:
+                    logger.warning("embed: chunk document %s missing, skipping", doc_id)
                     continue
-                chunk["embedding"] = vector
-                embedded_chunks += 1
-        store.put_json(f"{config.normalized_prefix}/{doc_id}.chunks.json", record)
-        embedded_docs += 1
+                records.append(record)
+
+            pending = [(record, chunk) for record in records for chunk in record["chunks"]]
+            batches = [pending[i:i + batch_size] for i in range(0, len(pending), batch_size)]
+            for batch, vectors in embed_pool.map(_embed_one_batch, batches):
+                if vectors is None:
+                    continue
+                for (record, chunk), vector in zip(batch, vectors):
+                    if len(vector) != config.embedding_dimensions:
+                        logger.error(
+                            "embed: dimension mismatch for %s chunk %d (got %d, expected %d)",
+                            record["url"], chunk["chunk_index"],
+                            len(vector), config.embedding_dimensions,
+                        )
+                        continue
+                    chunk["embedding"] = vector
+                    embedded_chunks += 1
+
+            # Write back only after every batch in this window has been
+            # applied, so a record is never persisted half-embedded.
+            list(
+                io_pool.map(
+                    lambda r: store.put_json(
+                        f"{config.normalized_prefix}/{r['doc_id']}.chunks.json", r
+                    ),
+                    records,
+                )
+            )
+            embedded_docs += len(records)
+            logger.info(
+                "embed: %d/%d documents processed, %d chunks embedded so far",
+                min(offset + window_size, len(doc_ids)), len(doc_ids), embedded_chunks,
+            )
     logger.info("embed: embedded %d chunks across %d documents", embedded_chunks, embedded_docs)
 
 
@@ -1975,55 +2082,71 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
     conn = _pg_connect(config)
     indexed = 0
     deleted = 0
+    # ADR-0219: the S3 GET below used to sit INSIDE the per-document database
+    # loop, so every document cost a serial round-trip to S3 before a single
+    # row could be written. Each window's records are now prefetched
+    # concurrently and the database loop consumes them from memory - which
+    # also means the open transaction no longer interleaves with S3 latency
+    # at all.
+    window_size = max(1, config.index_read_concurrency) * 64
     try:
-        with conn.cursor() as cur:
+        with conn.cursor() as cur, ThreadPoolExecutor(
+            max_workers=max(1, config.index_read_concurrency)
+        ) as io_pool:
             doc_ids = changeset["new"] + changeset["changed"]
-            for position, doc_id in enumerate(doc_ids, start=1):
-                record = store.get_json(f"{config.normalized_prefix}/{doc_id}.chunks.json")
-                if not record:
-                    logger.warning("index-pgvector: chunk document %s missing, skipping", doc_id)
-                    continue
-                for chunk in record["chunks"]:
-                    if "embedding" not in chunk:
-                        logger.warning(
-                            "index-pgvector: %s chunk %d has no embedding, skipping",
-                            record["url"], chunk["chunk_index"],
-                        )
+            position = 0
+            for offset in range(0, len(doc_ids), window_size):
+                window = doc_ids[offset:offset + window_size]
+                fetched = io_pool.map(
+                    lambda d: store.get_json(f"{config.normalized_prefix}/{d}.chunks.json"), window
+                )
+                for doc_id, record in zip(window, fetched):
+                    position += 1
+                    if not record:
+                        logger.warning("index-pgvector: chunk document %s missing, skipping", doc_id)
                         continue
-                    metadata = dict(record["metadata"])
-                    metadata["chunk_index"] = chunk["chunk_index"]
-                    cur.execute(
-                        """
-                        INSERT INTO document_embeddings (source, chunk_index, title, content, embedding, metadata)
-                        VALUES (%s, %s, %s, %s, %s, %s::jsonb)
-                        ON CONFLICT (source, chunk_index) DO UPDATE SET
-                            title = EXCLUDED.title,
-                            content = EXCLUDED.content,
-                            embedding = EXCLUDED.embedding,
-                            metadata = EXCLUDED.metadata,
-                            updated_at = now()
-                        """,
-                        (
-                            record["url"],
-                            chunk["chunk_index"],
-                            record["title"],
-                            chunk["text"],
-                            chunk["embedding"],
-                            json.dumps(metadata),
-                        ),
-                    )
-                    indexed += 1
-                # Commit per document, not per run: the S3 get_json above can
-                # stall and a Patroni failover can kill the connection - a
-                # single run-wide transaction loses every upserted row each
-                # time either happens. The upsert makes partial progress
-                # safe to re-run.
+                    for chunk in record["chunks"]:
+                        if "embedding" not in chunk:
+                            logger.warning(
+                                "index-pgvector: %s chunk %d has no embedding, skipping",
+                                record["url"], chunk["chunk_index"],
+                            )
+                            continue
+                        metadata = dict(record["metadata"])
+                        metadata["chunk_index"] = chunk["chunk_index"]
+                        cur.execute(
+                            """
+                            INSERT INTO document_embeddings (source, chunk_index, title, content, embedding, metadata)
+                            VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                            ON CONFLICT (source, chunk_index) DO UPDATE SET
+                                title = EXCLUDED.title,
+                                content = EXCLUDED.content,
+                                embedding = EXCLUDED.embedding,
+                                metadata = EXCLUDED.metadata,
+                                updated_at = now()
+                            """,
+                            (
+                                record["url"],
+                                chunk["chunk_index"],
+                                record["title"],
+                                chunk["text"],
+                                chunk["embedding"],
+                                json.dumps(metadata),
+                            ),
+                        )
+                        indexed += 1
+                # Commit per window, not per run and no longer per document.
+                # Per-run was never safe (a Patroni failover mid-run lost
+                # every upserted row); per-document cost one commit
+                # round-trip per row, which on a 314,428-document domain
+                # dominated the stage. A window bounds what a failover can
+                # lose to the documents prefetched above, and the upsert
+                # keeps partial progress safe to re-run either way.
                 conn.commit()
-                if position % 100 == 0:
-                    logger.info(
-                        "index-pgvector: %d/%d documents processed, %d chunk rows so far",
-                        position, len(doc_ids), indexed,
-                    )
+                logger.info(
+                    "index-pgvector: %d/%d documents processed, %d chunk rows so far",
+                    position, len(doc_ids), indexed,
+                )
 
             for url in changeset.get("deleted_urls", []):
                 cur.execute("DELETE FROM document_embeddings WHERE source = %s", (url,))

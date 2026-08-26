@@ -1425,7 +1425,11 @@ pipeline:
   name: rag-corpus-ingestion
   # v0-3-0: forwards STALE_AFTER into stage pods (CONFIG_KEYS fix) - v0-2-0
   # compiled without it and every chunk failed WP-24 freshness validation.
-  version: v0-3-0
+  # v0-4-0 (ADR-0219): forwards the normalize/chunk/embed/index concurrency
+  # knobs. A PipelineVersion object is immutable, so any CONFIG_KEYS change
+  # needs a new version name here - re-applying v0-3-0 with a changed spec
+  # is rejected with "Pipeline spec is immutable".
+  version: v0-4-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
@@ -1642,12 +1646,27 @@ resources:
   normalize:
     requests: {cpu: "1", memory: "2Gi"}
     limits: {cpu: "4", memory: "8Gi"}
+    # ADR-0219: normalize and chunk are one-to-two S3 round-trips per
+    # document with pure-Python work in between - same latency-bound
+    # rationale as resources.fetch's knobs. The SXA dump renders 314,428
+    # documents, where serial execution took these stages hours each.
+    concurrency: 16
+  chunk:
+    concurrency: 16
   embed:
     requests: {cpu: "1", memory: "2Gi"}
     limits: {cpu: "4", memory: "8Gi"}
+    # ADR-0219: in-flight embedding REQUESTS, each already carrying
+    # EMBEDDING_BATCH_SIZE chunks - this multiplies against the
+    # predictor's own capacity, so it stays deliberately small. Raising
+    # it past what embeddings-predictor can serve just queues.
+    concurrency: 4
   index:
     requests: {cpu: "500m", memory: "1Gi"}
     limits: {cpu: "2", memory: "4Gi"}
+    # ADR-0219: bounds index-pgvector's S3 prefetch pool only - the
+    # database writes themselves stay serial on one connection.
+    readConcurrency: 16
   detectChanges:
     # WP-58: bounds the per-document S3 GET pool that rebuilds
     # detect-changes' "current" state (DETECT_CHANGES_READ_CONCURRENCY) -
