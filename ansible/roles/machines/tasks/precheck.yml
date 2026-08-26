@@ -14,13 +14,68 @@
   vars:
     gitops_app_name: "zuno-machines-d1"
 
-- name: "machines | look up the permanent GPU MachineSet"
+# WP-083: selected by label, not by name. This used to look up zuno-gpu-a
+# alone, which silently stopped covering the GPU fleet the moment a second
+# permanent inference node existed (zuno-gpu-c, eu-west-2c) - the whole
+# point of that node is that either one alone can carry every model, and a
+# check that never looks at it can never prove the pair is symmetric.
+# `machine.startx.io/group=gpu` selects exactly the permanent inference
+# sets: it excludes zuno-gpu-burst-a (group gpu-burst), whose replicas
+# legitimately flap 0<->1 around training runs and would make this check
+# flap with them, and the IPI demo222-kpkqk-* sets, which carry no group
+# label and are not this chart's to assert on.
+- name: "machines | look up the permanent GPU MachineSets"
   kubernetes.core.k8s_info:
     api_version: machine.openshift.io/v1beta1
     kind: MachineSet
     namespace: openshift-machine-api
-    name: zuno-gpu-a
-  register: _machines_gpu_a_lookup
+    label_selectors:
+      - "machine.startx.io/group=gpu"
+  register: _machines_gpu_lookup
+
+# Summed rather than compared set-by-set: availableReplicas never exceeds
+# spec.replicas, so equal totals can only mean every set is satisfied.
+# status.availableReplicas is absent (not 0) on a set that has never had a
+# machine, hence the default.
+- name: "machines | compute GPU MachineSet availability"
+  ansible.builtin.set_fact:
+    _machines_gpu_desired: >-
+      {{ _machines_gpu_lookup.resources | default([])
+         | map(attribute='spec.replicas') | map('int') | sum }}
+    _machines_gpu_available: >-
+      {{ _machines_gpu_lookup.resources | default([])
+         | map(attribute='status.availableReplicas', default=0)
+         | map('int') | sum }}
+
+# Nothing else in this repo verifies that a node actually came up
+# partitioned - the mig-manager acts on the nvidia.com/mig.config label at
+# first boot, and a node that boots unpartitioned advertises no
+# nvidia.com/mig-* capacity at all, so every model pod stays Pending with
+# no MachineSet-level symptom. `in` tests dict keys here; selectattr is
+# deliberately avoided because it would read "nvidia.com/mig-2g.48gb" as a
+# dotted attribute path rather than a literal key.
+- name: "machines | reset the MIG capacity accumulator"
+  ansible.builtin.set_fact:
+    _machines_mig_ok: []
+
+- name: "machines | look up the MIG-partitioned GPU nodes"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    label_selectors:
+      - "nvidia.com/mig.config=all-balanced"
+  register: _machines_mig_nodes
+
+- name: "machines | check each partitioned node advertises both slice profiles"
+  ansible.builtin.set_fact:
+    _machines_mig_ok: >-
+      {{ _machines_mig_ok + [
+           ('nvidia.com/mig-1g.24gb' in (item.status.allocatable | default({})))
+           and ('nvidia.com/mig-2g.48gb' in (item.status.allocatable | default({})))
+         ] }}
+  loop: "{{ _machines_mig_nodes.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
 
 - name: "machines | compute install state"
   ansible.builtin.set_fact:
@@ -28,9 +83,11 @@
       {{
         _machines_d0_installed
         and _state_check_result
-        and (_machines_gpu_a_lookup.resources | default([]) | length) > 0
-        and (_machines_gpu_a_lookup.resources[0].status.availableReplicas | default(0)) ==
-            (_machines_gpu_a_lookup.resources[0].spec.replicas | default(-1))
+        and (_machines_gpu_lookup.resources | default([]) | length) > 0
+        and (_machines_gpu_desired | int) > 0
+        and (_machines_gpu_available | int) == (_machines_gpu_desired | int)
+        and (_machines_mig_nodes.resources | default([]) | length) > 0
+        and false not in _machines_mig_ok
       }}
 
 - name: "machines | record install state"
