@@ -40,7 +40,7 @@ new MCP tool - RAG-only, distinct from `knowledge.sxa-legacy`
 
 ## ADR references
 
-Primary: [docs/adr/0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md](../../adr/0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md) -
+Primary: [docs/adr/0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md](../../adr/0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) -
 read all 5 Decision clauses and the Security considerations section (the
 "trust the upstream anonymization claim" posture is a named, explicit
 trade-off, not an oversight).

@@ -33,7 +33,7 @@ raw-DDL-chunking placeholder.
 
 ## ADR references
 
-Primary: [docs/adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md](../../adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-anonymized-rag.md) —
+Primary: [docs/adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md](../../adr/0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) —
 read all 5 Decision clauses and the Security considerations section (the
 anonymization gate is a named operator review, not implicit).
 

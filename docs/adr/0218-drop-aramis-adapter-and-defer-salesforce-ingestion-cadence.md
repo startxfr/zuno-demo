@@ -50,4 +50,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0202](0202-introduce-logical-knowledge-domains.md)
 - [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
 - [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
-- [ADR-0217](0217-ingest-weekly-anonymized-sxa-corpus-as-a-new-rag-domain.md) - nearest precedent for a partial-supersede note
+- [ADR-0217](0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) - nearest precedent for a partial-supersede note
