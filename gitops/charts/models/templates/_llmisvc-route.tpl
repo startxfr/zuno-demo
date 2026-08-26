@@ -29,9 +29,43 @@ the 0s timeouts and trailing-slash match variants) EXCEPT every rule name
 is prefixed with the model's own name, making them unique per model on
 the shared gateway.
 
+SECOND deliberate deviation (same incident, second root cause): every
+rule's backendRef is the plain workload Service, NOT the InferencePool
+the controller would generate. Fixing the name collision alone restored
+gpt-oss-20b (8/8 full bodies) but NOT qwen (1/8, then 0/8 with a fresh,
+correctly-wired EPP): even a model's OWN endpoint-picker drops response
+bodies whenever its response-headers reply reaches Envoy BEFORE the
+response body has propagated into the EPP's filter position. Envoy's
+ext_proc then takes the buffered-chunk-after-headers-response path,
+forwards the chunk to the EPP and CONTINUES WITHOUT AWAITING the echo
+(observed in ext_proc trace: "Sending a chunk of buffered data" ->
+"Continuing processing" -> onDestroy, vs the healthy "Sending body data
+... without_waiting_for_header_response" -> "Received response body
+response" -> inject) - in FULL_DUPLEX_STREAMED the server owns the body,
+so the client gets 200 + headers + nothing. Which side of the race a
+request lands on is decided by the gateway<->EPP RTT: qwen's EPP pod is
+co-located with the gateway pod (sub-ms reply, loses always - confirmed
+0/8 immediately after a clean EPP pod restart on the same node), gpt-oss's
+sits on another node (reply arrives after the body, wins always). An
+upstream Envoy/llm-d bug, not a Zuno config error.
+
+A Service backend generates no per-route EPP ext_proc override at all, so
+no response-path ext_proc filter exists to lose the race - proven 6/6
+reliable on the controller's own catch-all rules (Service-backed) while
+the InferencePool rules were 0/6, same listener. Nothing else changes:
+Kuadrant auth + TokenRateLimitPolicy target the HTTPRoute/gateway (not
+the backend kind) and the ipp usage-metering ext_proc chain is
+listener-level - all stay active. What is genuinely given up is llm-d
+load-aware endpoint picking, which is worth exactly nothing at
+replicas: 1 (both models, MIG-constrained). The controller still deploys
+the scheduler/EPP (its defaulting always adds it) - it just serves no
+route. Revisit when a model goes multi-replica or RHOAI fixes the race;
+the interim alternative documented in the WP-076 evidence doc is
+scheduler anti-affinity against the gateway's node (keeps the EPP in the
+path but makes it always lose the race - fragile, latency-dependent).
+
 Parameters (dict):
-  name           - LLMInferenceService name; also the path segment, the
-                   InferencePool name prefix (<name>-inference-pool) and
+  name           - LLMInferenceService name; also the path segment and
                    the workload Service prefix (<name>-kserve-workload-svc)
   namespace      - model namespace (path segment + publishers/<ns>/...)
   publishedModel - spec.model.name, NOT the k8s resource name (qwen's is
@@ -62,9 +96,9 @@ rules:
             type: ReplacePrefixMatch
             replacePrefixMatch: /v1/{{ $ep }}
     backendRefs:
-      - group: inference.networking.k8s.io
-        kind: InferencePool
-        name: {{ $root.name }}-inference-pool
+      - group: ""
+        kind: Service
+        name: {{ $root.name }}-kserve-workload-svc
         port: 8000
         weight: 1
     timeouts:
@@ -87,9 +121,9 @@ rules:
           type: Exact
           value: /v1/{{ $ep }}/
     backendRefs:
-      - group: inference.networking.k8s.io
-        kind: InferencePool
-        name: {{ $root.name }}-inference-pool
+      - group: ""
+        kind: Service
+        name: {{ $root.name }}-kserve-workload-svc
         port: 8000
         weight: 1
     timeouts:
