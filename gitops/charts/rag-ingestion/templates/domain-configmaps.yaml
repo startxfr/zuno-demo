@@ -33,29 +33,13 @@ data:
   # (default "" when $domain.sxaDump is unset) - pipeline.py.tpl's
   # CONFIG_KEYS requires every one of these keys to exist in every
   # domain's ConfigMap regardless of that domain's source type (confirmed
-  # live 2026-08-21: gating these behind `if $domain.sxaDump` broke the
-  # sxa domain's pod with CreateContainerConfigError, since sxa has
-  # sxaCorpus, not sxaDump - see the sxaCorpus block below for the mirror
-  # bug that caused the same failure).
+  # live 2026-08-21: gating these behind `if $domain.sxaDump` broke a
+  # domain's pod with CreateContainerConfigError). Keep this block and
+  # pipeline.py.tpl's CONFIG_KEYS in lockstep.
   SXA_S3_ENDPOINT: {{ (ternary (($domain.sxaDump).s3).endpoint (printf "https://s3.%s.amazonaws.com" (($domain.sxaDump).s3).region) (ne (($domain.sxaDump).s3).endpoint "")) | default "" | quote }}
   SXA_S3_BUCKET: {{ (($domain.sxaDump).s3).bucket | default "" | quote }}
   SXA_S3_REGION: {{ (($domain.sxaDump).s3).region | default "" | quote }}
   SXA_S3_PATH_STYLE: {{ (($domain.sxaDump).s3).pathStyle | default "" | quote }}
-  SXA_MARIADB_HOST: {{ (($domain.sxaDump).mariadb).host | default "" | quote }}
-  SXA_MARIADB_PORT: {{ (($domain.sxaDump).mariadb).port | default "" | quote }}
-  SXA_MARIADB_USER: {{ (($domain.sxaDump).mariadb).username | default "" | quote }}
-  SXA_MARIADB_DATABASE: {{ (($domain.sxaDump).mariadb).database | default "" | quote }}
-  # ADR-0217/WP-067: fetch-sxa's own dedicated bucket - distinct from both
-  # S3_BUCKET (shared corpus) and SXA_S3_BUCKET (sxa-legacy's MariaDB-import
-  # bucket) above. Always rendered for the same reason as the sxaDump block
-  # above.
-  SXA_CORPUS_SCHEMA_S3_KEY: {{ ($domain.sxaCorpus).schemaS3Key | default "" | quote }}
-  SXA_CORPUS_DATA_S3_KEY: {{ ($domain.sxaCorpus).dataS3Key | default "" | quote }}
-  SXA_CORPUS_SNAPSHOT_ID: {{ ($domain.sxaCorpus).snapshotId | default "" | quote }}
-  SXA_CORPUS_S3_ENDPOINT: {{ (ternary (($domain.sxaCorpus).s3).endpoint (printf "https://s3.%s.amazonaws.com" (($domain.sxaCorpus).s3).region) (ne (($domain.sxaCorpus).s3).endpoint "")) | default "" | quote }}
-  SXA_CORPUS_S3_BUCKET: {{ (($domain.sxaCorpus).s3).bucket | default "" | quote }}
-  SXA_CORPUS_S3_REGION: {{ (($domain.sxaCorpus).s3).region | default "" | quote }}
-  SXA_CORPUS_S3_PATH_STYLE: {{ (($domain.sxaCorpus).s3).pathStyle | default "" | quote }}
   S3_ENDPOINT: {{ include "rag-ingestion.s3Endpoint" $root | quote }}
   S3_BUCKET: {{ $root.Values.s3.bucket | quote }}
   S3_REGION: {{ $root.Values.s3.region | quote }}

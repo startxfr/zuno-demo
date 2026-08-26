@@ -119,17 +119,6 @@ knowledgeDomains:
     vaultPath: rag-sxa-legacy/postgresql-app
     secretName: rag-service-db-ragsxalegacy
     seed: false
-  # knowledge.sxa (ADR-0217/WP-067) - distinct from sxa-legacy above.
-  # Enabled 2026-08-21 (Part B): Vault credential and rag-sxa database
-  # provisioned by the operator.
-  - domain: sxa
-    enabled: true
-    database: rag-sxa
-    schema: rag
-    envPrefix: RAGSXA
-    vaultPath: rag-sxa/postgresql-app
-    secretName: rag-service-db-ragsxa
-    seed: false
   - domain: adv
     enabled: false
     database: rag-adv

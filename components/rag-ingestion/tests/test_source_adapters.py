@@ -87,7 +87,6 @@ def test_every_fetch_stage_has_an_adapter_bound_to_one_domain():
         "fetch-confluence": "knowledge.tech",
         "fetch-salesforce": "knowledge.sales",
         "load-sxa-dump": "knowledge.sxa-legacy",
-        "fetch-sxa": "knowledge.sxa",
     }
     assert {s: a.domain for s, a in SOURCE_ADAPTERS.items()} == expected
     for stage in expected:
@@ -383,248 +382,9 @@ def test_fetch_salesforce_without_credentials_fails_closed():
         assert "SALESFORCE_INSTANCE_URL" in str(exc)
 
 
-# --- load-sxa-dump (knowledge.sxa-legacy, ADR-0216/WP-065) ------------------
+# --- load-sxa-dump (knowledge.sxa-legacy, ADR-0219) --------------------------
 
-
-_SXA_DUMP = """-- MySQL dump 10.11
--- Host: localhost    Database: sxa
-
--- Table structure for table `affaire`
-CREATE TABLE `affaire` (
-  `id` int(11) NOT NULL,
-  `titre` varchar(255)
-);
-INSERT INTO `affaire` VALUES (1,'Contrat A'),(2,'Contrat B');
-
--- Table structure for table `devis`
-CREATE TABLE `devis` (
-  `id` int(11) NOT NULL
-);
-INSERT INTO `devis` VALUES (10),(11);
-"""
-
-
-class FakeMariaDBCursor:
-    """Test double for pymysql's DictCursor - real enough to prove
-    _load_sxa_dump's import/extraction flow without a live MariaDB.
-    SHOW TABLES / SELECT * FROM <table> are served from the connection's
-    pre-seeded fixture rows rather than actually interpreting the
-    executed SQL - _import_sxa_dump_native's own statement-splitting is
-    exercised separately (test_split_sql_statements_*)."""
-
-    def __init__(self, conn):
-        self._conn = conn
-        self._result: list = []
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def execute(self, sql):
-        self._conn.executed.append(sql)
-        if self._conn.fail_on_substring and self._conn.fail_on_substring in sql:
-            import pymysql
-            raise pymysql.err.IntegrityError(1062, "Duplicate entry 'x' for key 'PRIMARY'")
-        stripped = sql.strip()
-        if stripped.upper() == "SHOW TABLES":
-            self._result = [{"Tables_in_sxa": t} for t in self._conn.tables]
-        elif stripped.upper().startswith("SELECT * FROM"):
-            table = stripped.split("`")[1]
-            self._result = self._conn.rows.get(table, [])
-        else:
-            self._result = []
-
-    def fetchall(self):
-        return self._result
-
-
-class FakeMariaDBConnection:
-    def __init__(self, tables, rows, fail_on_substring=None):
-        self.tables = tables  # SHOW TABLES order
-        self.rows = rows  # table -> list of dict rows
-        self.executed: list = []
-        self.committed = False
-        self.closed = False
-        # When set, any executed statement containing this substring raises
-        # pymysql.err.IntegrityError instead of being recorded as applied.
-        self.fail_on_substring = fail_on_substring
-
-    def cursor(self):
-        return FakeMariaDBCursor(self)
-
-    def commit(self):
-        self.committed = True
-
-    def close(self):
-        self.closed = True
-
-
-def test_load_sxa_dump_natively_imports_and_writes_one_record_per_row():
-    config = _config(
-        INGESTION_DOMAIN="knowledge.sxa-legacy",
-        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
-        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
-        SXA_SNAPSHOT_ID="2026-08",
-        SXA_S3_BUCKET="sxa-bucket",
-    )
-    store = FakeStore()
-    fake_conn = FakeMariaDBConnection(
-        tables=["customers"],
-        rows={"customers": [{"id": 1, "name": "Acme Corp", "phone": "0102030405"}]},
-    )
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=_SXA_DUMP.encode("utf-8")), \
-         mock.patch.object(rag_ingestion, "_mariadb_connect", return_value=fake_conn):
-        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
-
-    # The dump's own CREATE TABLE/INSERT statements were actually executed
-    # against the connection (native import, no schema translation).
-    assert any("CREATE TABLE `affaire`" in s for s in fake_conn.executed)
-    assert any("INSERT INTO `affaire`" in s for s in fake_conn.executed)
-    assert fake_conn.committed
-    assert fake_conn.closed
-
-    records = list(store.json.values())
-    assert len(records) == 1
-    record = records[0]
-    assert record["domain"] == "knowledge.sxa-legacy"
-    assert record["classification"] == "C3"
-    assert record["source_type"] == "sxa-mariadb"
-    assert record["acl_groups"] == []
-    assert record["sxa"]["snapshot_id"] == "2026-08"
-    assert record["sxa"]["table"] == "customers"
-    assert len(record["sxa"]["snapshot_checksum"]) == 64
-    assert record["sxa"]["imported_at"]
-    # 2026-08-23 amendment: no anonymization transform - content reaches
-    # the embedded record exactly as imported.
-    assert "Acme Corp" in record["text"]
-    assert "0102030405" in record["text"]
-
-
-def test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent():
-    config = _config(
-        INGESTION_DOMAIN="knowledge.sxa-legacy",
-        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
-        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
-        SXA_S3_BUCKET="sxa-bucket",
-    )
-    store = FakeStore()
-    rows = {"customers": [{"id": 1, "name": "Acme Corp"}]}
-
-    def _new_conn(*_args, **_kwargs):
-        return FakeMariaDBConnection(tables=["customers"], rows=rows)
-
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=_SXA_DUMP.encode("utf-8")), \
-         mock.patch.object(rag_ingestion, "_mariadb_connect", side_effect=_new_conn):
-        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
-        first = {k: dict(v) for k, v in store.json.items()}
-        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
-    # Same keys, same content sha256s: detect-changes will see every doc
-    # as unchanged, so re-running the same snapshot re-indexes nothing.
-    assert set(store.json) == set(first)
-    for key, record in store.json.items():
-        assert record["sha256"] == first[key]["sha256"]
-
-
-def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
-    config = _config(
-        INGESTION_DOMAIN="knowledge.sxa-legacy",
-        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
-        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
-        SXA_S3_BUCKET="sxa-bucket",
-    )
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=b"SELECT 1; -- no table sections"):
-        try:
-            _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, FakeStore())
-            raise AssertionError("expected SystemExit for non-dump content")
-        except SystemExit as exc:
-            assert "refusing to import" in str(exc)
-    config2 = _config(INGESTION_DOMAIN="knowledge.sxa-legacy")
-    try:
-        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config2, FakeStore())
-        raise AssertionError("expected SystemExit for missing key")
-    except SystemExit as exc:
-        assert "SXA_DUMP_SCHEMA_S3_KEY" in str(exc)
-
-
-def test_import_sxa_dump_native_skips_create_view_statements():
-    # Confirmed live 2026-08-23: this phpMyAdmin-style dump's views are
-    # hardcoded to their original source database name ("PROD_sxa"),
-    # which this MariaDB user has no grant on ("CREATE VIEW command
-    # denied") - _import_sxa_dump_native must skip them rather than fail
-    # the whole import, since _load_sxa_dump only ever reads base tables.
-    dump = (
-        "CREATE TABLE `commande` (`id` int);\n"
-        "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER "
-        "VIEW `PROD_sxa`.`EXTRACT_SALES_202x` AS select `PROD_sxa`.`commande`.`id` "
-        "AS `id` from `PROD_sxa`.`commande`;\n"
-        "INSERT INTO `commande` VALUES (1);"
-    )
-    fake_conn = FakeMariaDBConnection(tables=["commande"], rows={"commande": [{"id": 1}]})
-    rag_ingestion._import_sxa_dump_native(fake_conn, dump)
-    assert not any("VIEW" in s.upper() for s in fake_conn.executed)
-    assert any("CREATE TABLE `commande`" in s for s in fake_conn.executed)
-    assert any("INSERT INTO `commande`" in s for s in fake_conn.executed)
-    assert fake_conn.committed
-
-
-def test_import_sxa_dump_native_drops_each_table_before_recreating_it():
-    # Confirmed live 2026-08-23: this dump uses "CREATE TABLE IF NOT
-    # EXISTS" throughout, never "DROP TABLE IF EXISTS" - a re-run (new
-    # snapshot, or a retry after a mid-import failure) would otherwise
-    # leave CREATE TABLE as a no-op against an already-populated table,
-    # so its INSERTs collide with leftover rows on the primary key.
-    dump = "CREATE TABLE IF NOT EXISTS `commande` (`id` int);\nINSERT INTO `commande` VALUES (1);"
-    fake_conn = FakeMariaDBConnection(tables=["commande"], rows={"commande": [{"id": 1}]})
-    rag_ingestion._import_sxa_dump_native(fake_conn, dump)
-    drop_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("DROP TABLE IF EXISTS `COMMANDE`"))
-    create_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("CREATE TABLE"))
-    insert_idx = next(i for i, s in enumerate(fake_conn.executed) if s.upper().startswith("INSERT"))
-    assert drop_idx < create_idx < insert_idx
-
-
-def test_import_sxa_dump_native_skips_a_duplicate_key_statement_and_continues():
-    # Confirmed live 2026-08-23: this legacy production export has
-    # genuine primary-key collisions in a few peripheral tables (e.g.
-    # user_droits) even against a freshly dropped-and-recreated table -
-    # a real data-quality issue, not stale state. One bad statement must
-    # not abort the rest of the import (core business tables come after
-    # it in the dump).
-    dump = (
-        "CREATE TABLE `user_droits` (`login` varchar(20));\n"
-        "INSERT INTO `user_droits` VALUES ('dup');\n"
-        "CREATE TABLE `commande` (`id` int);\n"
-        "INSERT INTO `commande` VALUES (1);"
-    )
-    fake_conn = FakeMariaDBConnection(
-        tables=["user_droits", "commande"],
-        rows={"user_droits": [], "commande": [{"id": 1}]},
-        fail_on_substring="INSERT INTO `user_droits`",
-    )
-    rag_ingestion._import_sxa_dump_native(fake_conn, dump)
-    assert any("CREATE TABLE `commande`" in s for s in fake_conn.executed)
-    assert any("INSERT INTO `commande`" in s for s in fake_conn.executed)
-    assert fake_conn.committed
-
-
-def test_split_sql_statements_handles_semicolons_inside_quoted_values():
-    dump = "INSERT INTO `t` VALUES (1,'a;b'),(2,\"c;d\");\nCREATE TABLE `u` (`id` int);"
-    statements = rag_ingestion._split_sql_statements(dump)
-    assert statements == [
-        "INSERT INTO `t` VALUES (1,'a;b'),(2,\"c;d\")",
-        "CREATE TABLE `u` (`id` int)",
-    ]
-
-
-def test_split_sql_statements_skips_comment_only_lines():
-    dump = "-- just a comment\nSELECT 1;"
-    assert rag_ingestion._split_sql_statements(dump) == ["SELECT 1"]
-
-
-# --- fetch-sxa (knowledge.sxa, ADR-0217) -------------------------------------
-
-_SXA_CORPUS_SCHEMA = """
+_SXA_SCHEMA = """
 CREATE TABLE `customers` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
@@ -635,82 +395,89 @@ CREATE TABLE `customers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
-_SXA_CORPUS_DATA = (
+_SXA_DATA = (
     "INSERT INTO `customers` VALUES "
     "(1,'Acme, Inc.',1234.50,'Note with a comma, and a \\'quote\\''),"
     "(2,'Beta Corp',NULL,NULL);"
 )
 
 
+def _sxa_config(**overrides):
+    base = dict(
+        INGESTION_DOMAIN="knowledge.sxa-legacy",
+        SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
+        SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
+        SXA_S3_BUCKET="zuno-demo-sxa-corpus",
+    )
+    base.update(overrides)
+    return _config(**base)
+
+
+def _fake_dump_fetch(_config, key):
+    if key.endswith("schema.sql"):
+        return _SXA_SCHEMA.encode("utf-8")
+    return _SXA_DATA.encode("utf-8")
+
+
+def test_split_sql_statements_handles_semicolons_inside_quoted_values():
+    dump = "INSERT INTO `t` VALUES (1,'a;b'); INSERT INTO `t` VALUES (2,'c')"
+    statements = rag_ingestion._split_sql_statements(dump)
+    assert len(statements) == 2
+    assert "a;b" in statements[0]
+
+
+def test_split_sql_statements_skips_comment_only_lines():
+    dump = "-- just a comment\nSELECT 1;"
+    assert rag_ingestion._split_sql_statements(dump) == ["SELECT 1"]
+
+
 def test_parse_create_table_columns_skips_constraints_keeps_declared_order():
-    columns = rag_ingestion._parse_create_table_columns(_SXA_CORPUS_SCHEMA)
+    columns = rag_ingestion._parse_create_table_columns(_SXA_SCHEMA)
     assert columns == {"customers": ["id", "name", "revenue", "notes"]}
 
 
 def test_parse_insert_rows_handles_quoted_commas_escaped_quotes_and_null():
-    columns = rag_ingestion._parse_create_table_columns(_SXA_CORPUS_SCHEMA)
-    rows = list(rag_ingestion._parse_insert_rows(_SXA_CORPUS_DATA, columns))
+    columns = rag_ingestion._parse_create_table_columns(_SXA_SCHEMA)
+    rows = list(rag_ingestion._parse_insert_rows(_SXA_DATA, columns))
     assert [r for _, r in rows] == [
         {"id": 1, "name": "Acme, Inc.", "revenue": 1234.5, "notes": "Note with a comma, and a 'quote'"},
         {"id": 2, "name": "Beta Corp", "revenue": None, "notes": None},
     ]
 
 
-def test_fetch_sxa_writes_one_record_per_row_without_any_sql_engine():
-    config = _config(
-        INGESTION_DOMAIN="knowledge.sxa",
-        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
-        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
-        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
-    )
+def test_load_sxa_dump_writes_one_record_per_row_without_any_sql_engine():
+    """ADR-0219: no database engine, ephemeral or persistent. The record
+    shape must match knowledge/sxa-legacy/domain.yaml's declared source
+    class - ADR-0216's MariaDB implementation emitted sxa-mariadb://,
+    which never did."""
+    config = _sxa_config()
     store = FakeStore()
 
-    def fake_fetch(_config, key):
-        if key.endswith("schema.sql"):
-            return _SXA_CORPUS_SCHEMA.encode("utf-8")
-        return _SXA_CORPUS_DATA.encode("utf-8")
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", side_effect=_fake_dump_fetch):
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
 
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
-
-    # WP-57: store.json also carries the dump-checksum short-circuit
-    # marker (manifests/sxa-dump-checksum.json) alongside the raw/
-    # records - filter to raw/ the same way detect-changes itself does.
     records = [v for k, v in store.json.items() if k.startswith(f"{config.raw_prefix}/")]
     assert len(records) == 2
     (record,) = [r for r in records if "customers/1" in r["url"]]
-    assert record["domain"] == "knowledge.sxa"
+    assert record["url"] == "sxa-dump://customers/1"
+    assert record["domain"] == "knowledge.sxa-legacy"
+    assert record["source_type"] == "sxa-dump"
     assert record["classification"] == "C3"
-    assert record["source_type"] == "sxa-corpus"
     assert record["sxa"]["table"] == "customers"
-    assert len(record["sxa"]["checksum"]) == 64
-    # Not redacted (ADR-0217 trusts the upstream anonymization claim) -
-    # unlike load-sxa-dump, real-shaped values pass through as-is.
+    assert len(record["sxa"]["snapshot_checksum"]) == 64
+    # No transform of any kind (ADR-0219): values reach the index as-is,
+    # with allowed_groups + C3 as the only safeguard.
     assert "Acme" in record["text"]
 
 
-def test_fetch_sxa_reimport_of_same_export_is_idempotent():
-    config = _config(
-        INGESTION_DOMAIN="knowledge.sxa",
-        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
-        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
-        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
-    )
+def test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent():
+    config = _sxa_config()
     store = FakeStore()
 
-    def fake_fetch(_config, key):
-        if key.endswith("schema.sql"):
-            return _SXA_CORPUS_SCHEMA.encode("utf-8")
-        return _SXA_CORPUS_DATA.encode("utf-8")
-
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", side_effect=_fake_dump_fetch):
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
         first = {k: dict(v) for k, v in store.json.items()}
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, store)
-    # WP-57: the second run's dump checksum matches the first's, so it
-    # short-circuits before writing anything - a stronger idempotency
-    # than "re-computes the same bytes" (raw/ is never even touched the
-    # second time). Excludes the checksum marker itself (no sha256 field).
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, store)
     assert set(store.json) == set(first)
     for key, record in store.json.items():
         if key == f"{config.manifest_prefix}/sxa-dump-checksum.json":
@@ -718,56 +485,40 @@ def test_fetch_sxa_reimport_of_same_export_is_idempotent():
         assert record["sha256"] == first[key]["sha256"]
 
 
-def test_fetch_sxa_short_circuits_when_dump_checksum_is_unchanged():
-    """WP-57: a second run against a byte-identical dump must skip the
-    parse loop entirely (not just happen to reproduce the same output) -
-    asserted directly on _fetch_sxa's return value and by proving
-    _parse_insert_rows is never called the second time."""
-    config = _config(
-        INGESTION_DOMAIN="knowledge.sxa",
-        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
-        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
-        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
-    )
+def test_load_sxa_dump_short_circuits_when_dump_checksum_is_unchanged():
+    """WP-57's short-circuit, carried over to this stage by ADR-0219: a
+    second run against a byte-identical dump must skip the parse loop
+    entirely, not merely reproduce the same output."""
+    config = _sxa_config()
     store = FakeStore()
 
-    def fake_fetch(_config, key):
-        if key.endswith("schema.sql"):
-            return _SXA_CORPUS_SCHEMA.encode("utf-8")
-        return _SXA_CORPUS_DATA.encode("utf-8")
-
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", side_effect=fake_fetch):
-        first_written = rag_ingestion._fetch_sxa(config, store)
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", side_effect=_fake_dump_fetch):
+        first_written = rag_ingestion._load_sxa_dump(config, store)
         assert first_written == 2
 
         with mock.patch.object(
             rag_ingestion, "_parse_insert_rows", wraps=rag_ingestion._parse_insert_rows
         ) as spy:
-            second_written = rag_ingestion._fetch_sxa(config, store)
+            second_written = rag_ingestion._load_sxa_dump(config, store)
             spy.assert_not_called()
     assert second_written == 0
 
 
-def test_fetch_sxa_refuses_non_schema_content_and_missing_keys():
-    config = _config(INGESTION_DOMAIN="knowledge.sxa", SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket")
+def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy", SXA_S3_BUCKET="zuno-demo-sxa-corpus")
     try:
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config, FakeStore())
+        _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, FakeStore())
         raise AssertionError("expected SystemExit for missing keys")
     except SystemExit as exc:
-        assert "SXA_CORPUS_SCHEMA_S3_KEY" in str(exc)
+        assert "SXA_DUMP_SCHEMA_S3_KEY" in str(exc)
 
-    config2 = _config(
-        INGESTION_DOMAIN="knowledge.sxa",
-        SXA_CORPUS_SCHEMA_S3_KEY="sxa_data/sxa.schema.sql",
-        SXA_CORPUS_DATA_S3_KEY="sxa_data/sxa.data.sql",
-        SXA_CORPUS_S3_BUCKET="sxa-corpus-bucket",
-    )
-    with mock.patch.object(rag_ingestion, "_fetch_sxa_corpus_bytes", return_value=b"not a schema file"):
+    with mock.patch.object(rag_ingestion, "_fetch_sxa_dump_bytes", return_value=b"not a schema file"):
         try:
-            _run_source_adapter(SOURCE_ADAPTERS["fetch-sxa"], config2, FakeStore())
+            _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], _sxa_config(), FakeStore())
             raise AssertionError("expected SystemExit for non-schema content")
         except SystemExit as exc:
             assert "refusing to parse" in str(exc)
+
 
 
 # --- normalize carries domain/technology/extensions -------------------------
@@ -1130,19 +881,14 @@ TESTS = [
     test_fetch_confluence_resolves_a_shared_directory_scope_only_once,
     test_fetch_salesforce_writes_sales_metadata_from_fixture_records,
     test_fetch_salesforce_without_credentials_fails_closed,
-    test_load_sxa_dump_natively_imports_and_writes_one_record_per_row,
-    test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
-    test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
-    test_import_sxa_dump_native_skips_create_view_statements,
-    test_import_sxa_dump_native_drops_each_table_before_recreating_it,
-    test_import_sxa_dump_native_skips_a_duplicate_key_statement_and_continues,
     test_split_sql_statements_handles_semicolons_inside_quoted_values,
     test_split_sql_statements_skips_comment_only_lines,
     test_parse_create_table_columns_skips_constraints_keeps_declared_order,
     test_parse_insert_rows_handles_quoted_commas_escaped_quotes_and_null,
-    test_fetch_sxa_writes_one_record_per_row_without_any_sql_engine,
-    test_fetch_sxa_reimport_of_same_export_is_idempotent,
-    test_fetch_sxa_refuses_non_schema_content_and_missing_keys,
+    test_load_sxa_dump_writes_one_record_per_row_without_any_sql_engine,
+    test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
+    test_load_sxa_dump_short_circuits_when_dump_checksum_is_unchanged,
+    test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
     test_normalize_carries_domain_technology_and_extensions_into_metadata,
     test_normalize_defaults_missing_domain_to_the_run_domain,
     test_parse_duration_spec_supports_days_hours_minutes_and_none,

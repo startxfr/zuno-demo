@@ -21,10 +21,9 @@ no shared local disk between them:
 ADR-0204 (WP-22): the fetch stages are implementations of one source-adapter
 interface (SOURCE_ADAPTERS below), each bound to exactly one logical knowledge
 domain: fetch-redhat + fetch-confluence -> knowledge.tech, fetch-salesforce ->
-knowledge.sales, load-sxa-dump -> knowledge.sxa-legacy, fetch-sxa ->
-knowledge.sxa (ADR-0217: a distinct,
-already-anonymized weekly SXA source - no MariaDB, no MCP tools, unlike
-load-sxa-dump). A pipeline run targets one domain (--domain /
+knowledge.sales, load-sxa-dump -> knowledge.sxa-legacy (ADR-0219: the
+company's pre-2021 commercial record, parsed straight from S3 - no database
+engine, no MCP tools). A pipeline run targets one domain (--domain /
 INGESTION_DOMAIN): running a fetch stage against the wrong domain aborts
 before writing anything (fail closed - the per-domain databases of ADR-0204
 must never receive another domain's records), and every raw record is stamped
@@ -59,7 +58,6 @@ STAGES = (
     "fetch-confluence",
     "fetch-salesforce",
     "load-sxa-dump",
-    "fetch-sxa",
     "detect-changes",
     "normalize",
     "chunk",
@@ -150,14 +148,10 @@ class IngestionConfig:
     salesforce_instance_url: Optional[str]
     salesforce_token: Optional[str]
 
-    # load-sxa-dump reads the operator-supplied, approved snapshot from its
-    # own dedicated bucket (ADR-0025: no dump ever lives in git; ADR-0216:
-    # a separate bucket from s3_bucket above, which holds unrelated corpus
-    # content). Split schema/data key pair (2026-08-23 amendment): this
-    # domain now reuses ADR-0217's already-anonymized corpus bucket (no
-    # separate raw dump exists), which ships as a schema.sql/data.sql pair
-    # rather than one combined mysqldump - same shape as sxa_corpus_*
-    # below.
+    # load-sxa-dump reads the operator-supplied, approved snapshot from the
+    # SXA corpus bucket (ADR-0025: no dump ever lives in git; a separate
+    # bucket from s3_bucket above, which holds unrelated corpus content).
+    # It ships as a schema.sql/data.sql key pair, both named below.
     sxa_dump_schema_s3_key: Optional[str]
     sxa_dump_data_s3_key: Optional[str]
     sxa_snapshot_id: Optional[str]
@@ -173,25 +167,7 @@ class IngestionConfig:
     # separate from pg_host/pg_database above, which stays the
     # local-dev/CI fixture path (ADR-0016, superseded for the live target
     # only).
-    sxa_mariadb_host: str
-    sxa_mariadb_port: int
-    sxa_mariadb_user: Optional[str]
-    sxa_mariadb_password: Optional[str]
-    sxa_mariadb_database: str
 
-    # ADR-0217 (WP-067): fetch-sxa's own dedicated bucket - a distinct
-    # source from sxa_dump_schema_s3_key/sxa_dump_data_s3_key/sxa_mariadb_*
-    # above (knowledge.sxa-legacy). No MariaDB fields: this domain is
-    # RAG-only, no live query target.
-    sxa_corpus_schema_s3_key: Optional[str]
-    sxa_corpus_data_s3_key: Optional[str]
-    sxa_corpus_snapshot_id: Optional[str]
-    sxa_corpus_s3_endpoint: str
-    sxa_corpus_s3_bucket: str
-    sxa_corpus_s3_region: str
-    sxa_corpus_s3_path_style: bool
-    sxa_corpus_aws_access_key_id: Optional[str]
-    sxa_corpus_aws_secret_access_key: Optional[str]
 
     # ADR-0205/WP-24: this run's domain's freshness objective, realized as
     # a duration spec ("7d"/"4h"/"5m"/"none") - see _parse_duration_spec.
@@ -244,7 +220,7 @@ class IngestionConfig:
     # operator can tune per-cluster network conditions without a code
     # change. fetch_redhat_concurrency bounds the per-source page-fetch
     # pool in _fetch_redhat; fetch_sxa_write_concurrency bounds the
-    # per-row S3-write pool in _fetch_sxa.
+    # per-row S3-write pool in _load_sxa_dump.
     fetch_redhat_concurrency: int
     fetch_sxa_write_concurrency: int
     # ADR-0219 (2026-08-26): the same treatment for the four stages that
@@ -263,10 +239,9 @@ class IngestionConfig:
 
     # WP-58: bounds the per-document S3 GET pool that rebuilds
     # detect-changes' "current" state (network/S3-latency-bound work,
-    # same rationale as the two fields above - a live sxa run's
-    # raw-sxa/ prefix held 314,428 objects, exposing the previously
-    # sequential read loop as the pipeline's next bottleneck once
-    # fetch-sxa stopped masking it).
+    # same rationale as the two fields above - a live SXA run's
+    # raw prefix held 314,428 objects, exposing the previously
+    # sequential read loop as the pipeline's next bottleneck).
     detect_changes_read_concurrency: int
 
 
@@ -318,20 +293,6 @@ def load_config() -> IngestionConfig:
         sxa_s3_path_style=_env_bool("SXA_S3_PATH_STYLE", False),
         sxa_aws_access_key_id=os.environ.get("SXA_AWS_ACCESS_KEY_ID"),
         sxa_aws_secret_access_key=os.environ.get("SXA_AWS_SECRET_ACCESS_KEY"),
-        sxa_mariadb_host=os.environ.get("SXA_MARIADB_HOST", ""),
-        sxa_mariadb_port=_env_int("SXA_MARIADB_PORT", 3306),
-        sxa_mariadb_user=os.environ.get("SXA_MARIADB_USER"),
-        sxa_mariadb_password=os.environ.get("SXA_MARIADB_PASSWORD"),
-        sxa_mariadb_database=os.environ.get("SXA_MARIADB_DATABASE", ""),
-        sxa_corpus_schema_s3_key=os.environ.get("SXA_CORPUS_SCHEMA_S3_KEY"),
-        sxa_corpus_data_s3_key=os.environ.get("SXA_CORPUS_DATA_S3_KEY"),
-        sxa_corpus_snapshot_id=os.environ.get("SXA_CORPUS_SNAPSHOT_ID"),
-        sxa_corpus_s3_endpoint=os.environ.get("SXA_CORPUS_S3_ENDPOINT", ""),
-        sxa_corpus_s3_bucket=os.environ.get("SXA_CORPUS_S3_BUCKET", ""),
-        sxa_corpus_s3_region=os.environ.get("SXA_CORPUS_S3_REGION", ""),
-        sxa_corpus_s3_path_style=_env_bool("SXA_CORPUS_S3_PATH_STYLE", False),
-        sxa_corpus_aws_access_key_id=os.environ.get("SXA_CORPUS_AWS_ACCESS_KEY_ID"),
-        sxa_corpus_aws_secret_access_key=os.environ.get("SXA_CORPUS_AWS_SECRET_ACCESS_KEY"),
         stale_after_spec=os.environ.get("STALE_AFTER"),
         s3_endpoint=os.environ.get("S3_ENDPOINT", ""),
         s3_bucket=_env("S3_BUCKET", required=True),
@@ -989,14 +950,13 @@ def _fetch_salesforce(config: IngestionConfig, store: CorpusStore) -> int:
 # --------------------------------------------------------------------------
 
 
-def _fetch_sxa_dump_bytes(config: IngestionConfig) -> Optional[bytes]:
-    """Fetches the real dump from its own dedicated S3 bucket (ADR-0216) -
-    a separate client from CorpusStore, which is bound to the shared
-    corpus bucket and unrelated content. Split schema/data key pair
-    (2026-08-23 amendment): this domain reuses ADR-0217's corpus bucket,
-    which ships as schema.sql + data.sql rather than one combined
-    mysqldump - fetches both and concatenates (schema first, so its
-    CREATE TABLE statements run before data.sql's INSERTs)."""
+def _fetch_sxa_dump_bytes(config: IngestionConfig, key: str) -> Optional[bytes]:
+    """Fetches one object of the SXA dump from its S3 bucket - a separate
+    client from CorpusStore, which is bound to the shared corpus bucket and
+    unrelated content. The dump ships as a schema.sql + data.sql pair, and
+    ADR-0219's parse needs them separately (column order comes from the
+    schema, rows from the data), so this fetches one key per call rather
+    than concatenating."""
     from botocore.config import Config as BotoClientConfig
 
     client_kwargs: dict = {
@@ -1013,35 +973,14 @@ def _fetch_sxa_dump_bytes(config: IngestionConfig) -> Optional[bytes]:
     if config.sxa_s3_endpoint:
         client_kwargs["endpoint_url"] = config.sxa_s3_endpoint
     client = boto3.client("s3", **client_kwargs)
-    parts = []
-    for key in (config.sxa_dump_schema_s3_key, config.sxa_dump_data_s3_key):
-        try:
-            resp = client.get_object(Bucket=config.sxa_s3_bucket, Key=key)
-        except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code")
-            if code in ("NoSuchKey", "404"):
-                return None
-            raise
-        parts.append(resp["Body"].read())
-    return b"\n".join(parts)
-
-
-def _mariadb_connect(config: IngestionConfig):
-    """ADR-0216: the live import/query target. A thin wrapper so tests can
-    mock this one call rather than the whole pymysql API."""
-    import pymysql
-    import pymysql.cursors
-
-    return pymysql.connect(
-        host=config.sxa_mariadb_host,
-        port=config.sxa_mariadb_port,
-        user=config.sxa_mariadb_user,
-        password=config.sxa_mariadb_password,
-        database=config.sxa_mariadb_database,
-        charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=10,
-    )
+    try:
+        resp = client.get_object(Bucket=config.sxa_s3_bucket, Key=key)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404"):
+            return None
+        raise
+    return resp["Body"].read()
 
 
 def _split_sql_statements(dump_text: str) -> list:
@@ -1059,7 +998,7 @@ def _split_sql_statements(dump_text: str) -> list:
 
     WP-57: delegates the actual splitting to sqlparse.split() (a compiled
     tokenizer) instead of a pure-Python char-by-char state machine, which
-    was the dominant cost of fetch-sxa on large dumps. sqlparse.split()
+    was the dominant cost of load-sxa-dump on large dumps. sqlparse.split()
     KEEPS the trailing `;` on each statement (verified empirically) -
     _INSERT_RE's `values` group (`(?P<values>.+)$`, re.DOTALL) would
     otherwise absorb it into the last value, so stripping it here is a
@@ -1070,162 +1009,124 @@ def _split_sql_statements(dump_text: str) -> list:
     return [s for s in statements if s]
 
 
-_CREATE_VIEW_RE = re.compile(
-    r"^CREATE\s+(?:ALGORITHM=\S+\s+)?(?:DEFINER=\S+\s+)?(?:SQL\s+SECURITY\s+\S+\s+)?VIEW\b",
-    re.IGNORECASE,
-)
-_CREATE_TABLE_NAME_RE = re.compile(
-    r"^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(?P<table>\w+)`?",
-    re.IGNORECASE,
-)
-
-
-def _import_sxa_dump_native(conn, dump_text: str) -> None:
-    """Executes the real mysqldump SQL directly against MariaDB - no
-    schema re-derivation (ADR-0216: the dump's own format is already
-    MySQL-native, unlike ADR-0016's superseded Postgres-translation
-    path). CREATE VIEW statements are skipped: confirmed live 2026-08-23,
-    this phpMyAdmin-style export's views are hardcoded to their original
-    source database name (`` `PROD_sxa`.`view_name` ``, embedded in every
-    column reference too), which our own `sxa` database's user has no
-    grant on and which doesn't exist here at all - "CREATE VIEW command
-    denied". _load_sxa_dump only ever reads base tables via SHOW
-    TABLES/SELECT *, so the views (and their harmless
-    CREATE-TABLE-IF-NOT-EXISTS stand-in placeholders, which still import
-    fine as empty, always-skipped tables) are simply not needed.
-
-    Every CREATE TABLE statement gets an explicit `DROP TABLE IF EXISTS`
-    right before it, regardless of whether the dump itself has one:
-    confirmed live 2026-08-23, this phpMyAdmin export uses `CREATE TABLE
-    IF NOT EXISTS` throughout (no `DROP TABLE IF EXISTS` anywhere) - a
-    re-run (new snapshot, or a retry after a mid-import failure like the
-    view-statement one above) would otherwise leave CREATE TABLE as a
-    silent no-op against already-populated tables, so the following
-    INSERTs collide on primary keys instead of re-importing cleanly. This
-    is what _load_sxa_dump's own idempotency claim already assumed the
-    dump would provide.
-
-    A duplicate-key IntegrityError on any single statement is logged and
-    skipped rather than aborting the whole import: confirmed live
-    2026-08-23, this legacy production export has genuine primary-key
-    collisions in a few peripheral permission/config tables (e.g.
-    user_droits' (login, droit) pair repeated - real production data debt
-    a strict constraint here was never enforced against upstream), even
-    against a freshly dropped-and-recreated table. Failing the entire
-    import over one bad statement would also lose every core business
-    table (commande/devis/entreprise/contact/affaire/...) that comes
-    after it in the dump, which matters far more than a handful of stale
-    permission rows."""
-    import pymysql
-
-    with conn.cursor() as cur:
-        for statement in _split_sql_statements(dump_text):
-            if _CREATE_VIEW_RE.match(statement):
-                continue
-            create_table_match = _CREATE_TABLE_NAME_RE.match(statement)
-            if create_table_match:
-                cur.execute(f"DROP TABLE IF EXISTS `{create_table_match.group('table')}`")
-            try:
-                cur.execute(statement)
-            except pymysql.err.IntegrityError as exc:
-                logger.warning(
-                    "load-sxa-dump: skipping a statement that violated a "
-                    "constraint (%s): %s...",
-                    exc, statement[:120],
-                )
-    conn.commit()
 
 
 def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
-    """ADR-0216 (WP-065): real per-record content, replacing the previous
-    raw-DDL-chunk placeholder (never exercised against a real dump because
-    none ever existed). Fetches the dump (schema.sql + data.sql pair) from
-    its own dedicated S3 bucket, imports it NATIVELY into MariaDB (no
-    schema translation), then extracts real per-record text from every
-    imported table and emits one raw record per row - untouched, same as
-    what the access-controlled sales-db MCP path serves (2026-08-23
-    amendment: the operator-supplied content is trusted as-is, whatever
-    its actual anonymization state; no transform happens here). Idempotent
-    per snapshot id: re-running the same snapshot re-imports identical
-    data, so records come out byte-identical (detect-changes sees
-    unchanged sha256s) and a new snapshot version replaces content under
-    the same identity with new snapshot metadata - the same discipline
-    ADR-0206 already required."""
+    """ADR-0219: the company's pre-2021 commercial record, parsed straight
+    out of S3 into one raw record per dumped table row.
+
+    No database engine is involved, ephemeral or persistent. ADR-0216
+    originally imported this dump into a live MariaDB `sxa` database so a
+    deterministic MCP tool surface could query it; ADR-0219 retired that
+    whole path (SXA is a closed historical record, not a live system, so
+    there was nothing for an exact-figure tool to be authoritative about)
+    and adopted ADR-0217's reasoning instead: mysqldump output is
+    machine-generated and well-formed, so `_parse_create_table_columns` +
+    `_parse_insert_rows` are sufficient without a database round-trip.
+
+    Content is emitted exactly as it arrives from S3 - no transform, no
+    scanning. `min_classification: C3` plus `knowledge.sxa-legacy`'s
+    `allowed_groups` are the safeguard.
+
+    Idempotent per snapshot: a re-run against a byte-identical dump
+    produces byte-identical records, so detect-changes sees unchanged
+    sha256s, and the checksum short-circuit below skips the parse entirely.
+    """
     if not config.sxa_dump_schema_s3_key or not config.sxa_dump_data_s3_key:
         raise SystemExit(
             "load-sxa-dump: SXA_DUMP_SCHEMA_S3_KEY/SXA_DUMP_DATA_S3_KEY not set - "
-            "upload the approved snapshot to the dedicated SXA bucket and point "
-            "this at it"
+            "upload the approved snapshot to the SXA bucket and point this at it"
         )
-    raw_bytes = _fetch_sxa_dump_bytes(config)
-    if raw_bytes is None:
+    schema_bytes = _fetch_sxa_dump_bytes(config, config.sxa_dump_schema_s3_key)
+    if schema_bytes is None:
         raise SystemExit(
             f"load-sxa-dump: no object at s3://{config.sxa_s3_bucket}/"
-            f"{{{config.sxa_dump_schema_s3_key},{config.sxa_dump_data_s3_key}}}"
+            f"{config.sxa_dump_schema_s3_key}"
         )
-    dump_text = raw_bytes.decode("utf-8", errors="replace")
-    checksum = hashlib.sha256(raw_bytes).hexdigest()
+    data_bytes = _fetch_sxa_dump_bytes(config, config.sxa_dump_data_s3_key)
+    if data_bytes is None:
+        raise SystemExit(
+            f"load-sxa-dump: no object at s3://{config.sxa_s3_bucket}/"
+            f"{config.sxa_dump_data_s3_key}"
+        )
+    checksum = hashlib.sha256(schema_bytes + b"\n" + data_bytes).hexdigest()
+
+    # WP-57's short-circuit: skip the parse (thousands of rows) when this
+    # exact dump byte-for-byte matches the last run's. Safe because nothing
+    # purges raw/<domain>/ between runs, so the prior run's records stay in
+    # place and detect-changes still finds them.
+    checksum_key = f"{config.manifest_prefix}/sxa-dump-checksum.json"
+    previous = store.get_json(checksum_key)
+    if previous and previous.get("checksum") == checksum:
+        logger.info(
+            "load-sxa-dump: dump unchanged since last run (checksum %s) - skipping re-parse",
+            checksum[:16],
+        )
+        return 0
+
+    schema_text = schema_bytes.decode("utf-8", errors="replace")
+    data_text = data_bytes.decode("utf-8", errors="replace")
     snapshot_id = config.sxa_snapshot_id or f"sha256-{checksum[:16]}"
     imported_at = _utcnow_iso()
 
-    if not re.search(r"CREATE TABLE", dump_text, re.IGNORECASE):
+    if "CREATE TABLE" not in schema_text.upper():
         raise SystemExit(
-            "load-sxa-dump: no CREATE TABLE statement found - "
-            "not a SQL schema export, refusing to import an unvalidated shape"
+            "load-sxa-dump: no CREATE TABLE statement found in the schema export - "
+            "not a mysqldump-style schema, refusing to parse an unvalidated shape"
         )
 
-    conn = _mariadb_connect(config)
-    try:
-        _import_sxa_dump_native(conn, dump_text)
-        written = 0
-        with conn.cursor() as cur:
-            cur.execute("SHOW TABLES")
-            tables = [next(iter(row.values())) for row in cur.fetchall()]
-        for table in tables:
-            with conn.cursor() as cur:
-                cur.execute(f"SELECT * FROM `{table}`")
-                rows = cur.fetchall()
-            for row in rows:
-                text = _render_record_text(row)
-                if not text.strip():
-                    continue
-                row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
-                record_url = f"sxa-mariadb://{table}/{row_id}"
-                doc_id = doc_id_for(record_url)
-                record = {
-                    "doc_id": doc_id,
-                    "url": record_url,
-                    "title": f"SXA {table} #{row_id}",
-                    "text": text,
-                    "domain": "knowledge.sxa-legacy",
-                    "product": None,
-                    "version": None,
-                    "language": "fr",
-                    "source_type": "sxa-mariadb",
-                    # Historical commercial data: C3 by default (ADR-0206) until the
-                    # field-level review WP-23 records says otherwise.
-                    "classification": "C3",
-                    "acl_groups": [],
-                    "fetched_at": imported_at,
-                    "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                    "provenance": f"sxa MariaDB import snapshot {snapshot_id}",
-                    # ADR-0206 snapshot discipline + ADR-0202 sxa-legacy extensions.
-                    "sxa": {
-                        "snapshot_id": snapshot_id,
-                        "imported_at": imported_at,
-                        "snapshot_checksum": checksum,
-                        "table": table,
-                    },
-                }
-                store.put_json(f"{config.raw_prefix}/{doc_id}.json", record)
-                written += 1
-    finally:
-        conn.close()
-    return written
+    columns_by_table = _parse_create_table_columns(schema_text)
+    records = []
+    for table, row in _parse_insert_rows(data_text, columns_by_table):
+        text = _render_record_text(row)
+        if not text.strip():
+            continue
+        row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
+        # sxa-dump:// matches knowledge/sxa-legacy/domain.yaml's declared
+        # source class. ADR-0216's implementation emitted sxa-mariadb://,
+        # which never matched the descriptor - corrected here (ADR-0219).
+        record_url = f"sxa-dump://{table}/{row_id}"
+        doc_id = doc_id_for(record_url)
+        records.append({
+            "doc_id": doc_id,
+            "url": record_url,
+            "title": f"SXA {table} #{row_id}",
+            "text": text,
+            "domain": "knowledge.sxa-legacy",
+            "product": None,
+            "version": None,
+            "language": "fr",
+            "source_type": "sxa-dump",
+            # Historical commercial data: C3 by default (ADR-0206) until the
+            # field-level review WP-23 records says otherwise.
+            "classification": "C3",
+            "acl_groups": [],
+            "fetched_at": imported_at,
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "provenance": f"sxa dump snapshot {snapshot_id}",
+            # ADR-0206 snapshot discipline + ADR-0202 sxa-legacy extensions.
+            "sxa": {
+                "snapshot_id": snapshot_id,
+                "imported_at": imported_at,
+                "snapshot_checksum": checksum,
+                "table": table,
+            },
+        })
+
+    # WP-57: one synchronous put_object per row is thousands of sequential
+    # round-trips; this stage is S3-latency-bound, not CPU-bound.
+    if records:
+        with ThreadPoolExecutor(max_workers=max(1, config.fetch_sxa_write_concurrency)) as pool:
+            list(pool.map(
+                lambda r: store.put_json(f"{config.raw_prefix}/{r['doc_id']}.json", r),
+                records,
+            ))
+    store.put_json(checksum_key, {"checksum": checksum, "fetched_at": imported_at})
+    return len(records)
 
 
 # --------------------------------------------------------------------------
-# fetch-sxa (knowledge.sxa)
+# SQL-dump parsing helpers (shared by load-sxa-dump)
 # --------------------------------------------------------------------------
 
 _CREATE_TABLE_RE = re.compile(
@@ -1410,7 +1311,7 @@ def _parse_insert_rows(data_text: str, columns_by_table: Dict[str, list]):
             columns = columns_by_table.get(table)
         if not columns:
             logger.warning(
-                "fetch-sxa: no column order known for table %s (missing from "
+                "load-sxa-dump: no column order known for table %s (missing from "
                 "schema and INSERT has no explicit column list) - skipping its rows",
                 table,
             )
@@ -1419,143 +1320,11 @@ def _parse_insert_rows(data_text: str, columns_by_table: Dict[str, list]):
             tokens = _split_top_level(row_text, ",")
             if len(tokens) != len(columns):
                 logger.warning(
-                    "fetch-sxa: row in table %s has %d values but %d known columns - skipping",
+                    "load-sxa-dump: row in table %s has %d values but %d known columns - skipping",
                     table, len(tokens), len(columns),
                 )
                 continue
             yield table, {col: _convert_sql_literal(tok) for col, tok in zip(columns, tokens)}
-
-
-def _fetch_sxa_corpus_bytes(config: IngestionConfig, key: str) -> Optional[bytes]:
-    """Fetches one object from fetch-sxa's own dedicated bucket (ADR-0217) -
-    a separate client from CorpusStore, same pattern as
-    _fetch_sxa_dump_bytes's separate client for sxa-legacy's own dedicated
-    bucket. Distinct buckets: this source's provenance/trust model is not
-    shared with sxa-legacy's."""
-    from botocore.config import Config as BotoClientConfig
-
-    client_kwargs: dict = {
-        "region_name": config.sxa_corpus_s3_region or None,
-        "aws_access_key_id": config.sxa_corpus_aws_access_key_id,
-        "aws_secret_access_key": config.sxa_corpus_aws_secret_access_key,
-        "config": BotoClientConfig(
-            s3={"addressing_style": "path" if config.sxa_corpus_s3_path_style else "auto"},
-            connect_timeout=10,
-            read_timeout=60,
-            retries={"max_attempts": 4, "mode": "standard"},
-        ),
-    }
-    if config.sxa_corpus_s3_endpoint:
-        client_kwargs["endpoint_url"] = config.sxa_corpus_s3_endpoint
-    client = boto3.client("s3", **client_kwargs)
-    try:
-        resp = client.get_object(Bucket=config.sxa_corpus_s3_bucket, Key=key)
-    except ClientError as exc:
-        code = exc.response.get("Error", {}).get("Code")
-        if code in ("NoSuchKey", "404"):
-            return None
-        raise
-    return resp["Body"].read()
-
-
-def _fetch_sxa(config: IngestionConfig, store: CorpusStore) -> int:
-    """ADR-0217 (WP-067): a weekly, already-anonymized SXA corpus export -
-    distinct from load-sxa-dump/knowledge.sxa-legacy above. Parses
-    schema.sql + data.sql directly in Python (no MariaDB, no SQL engine at
-    all: mysqldump output is machine-generated and well-formed, the same
-    assumption _split_sql_statements already relies on elsewhere in this
-    file) and emits one raw, untouched record per row - the operator's
-    content is trusted as-is (2026-08-23 amendment: no PII scanning
-    either). Idempotent per snapshot id, same discipline as
-    load-sxa-dump: a re-run against byte-identical schema/data produces
-    byte-identical records (detect-changes sees unchanged sha256s)."""
-    if not config.sxa_corpus_schema_s3_key or not config.sxa_corpus_data_s3_key:
-        raise SystemExit(
-            "fetch-sxa: SXA_CORPUS_SCHEMA_S3_KEY/SXA_CORPUS_DATA_S3_KEY not set - "
-            "upload the approved weekly export to the dedicated SXA corpus "
-            "bucket and point this at it"
-        )
-    schema_bytes = _fetch_sxa_corpus_bytes(config, config.sxa_corpus_schema_s3_key)
-    if schema_bytes is None:
-        raise SystemExit(
-            f"fetch-sxa: no object at s3://{config.sxa_corpus_s3_bucket}/{config.sxa_corpus_schema_s3_key}"
-        )
-    data_bytes = _fetch_sxa_corpus_bytes(config, config.sxa_corpus_data_s3_key)
-    if data_bytes is None:
-        raise SystemExit(
-            f"fetch-sxa: no object at s3://{config.sxa_corpus_s3_bucket}/{config.sxa_corpus_data_s3_key}"
-        )
-    checksum = hashlib.sha256(schema_bytes + b"\n" + data_bytes).hexdigest()
-
-    # WP-57: short-circuit before the (previously dominant) parse cost -
-    # _split_sql_statements/_parse_insert_rows over thousands of rows -
-    # when this exact dump byte-for-byte matches the last run's. Safe:
-    # nothing ever purges raw/<domain>/ between runs (verified), so the
-    # existing raw-sxa/<doc_id>.json records from that prior run stay in
-    # place and detect-changes still finds them.
-    checksum_key = f"{config.manifest_prefix}/sxa-dump-checksum.json"
-    previous_checksum = store.get_json(checksum_key)
-    if previous_checksum and previous_checksum.get("checksum") == checksum:
-        logger.info(
-            "fetch-sxa: dump unchanged since last run (checksum %s) - skipping re-parse",
-            checksum[:16],
-        )
-        return 0
-
-    schema_text = schema_bytes.decode("utf-8", errors="replace")
-    data_text = data_bytes.decode("utf-8", errors="replace")
-    snapshot_id = config.sxa_corpus_snapshot_id or f"sha256-{checksum[:16]}"
-    fetched_at = _utcnow_iso()
-
-    if "CREATE TABLE" not in schema_text.upper():
-        raise SystemExit(
-            "fetch-sxa: no CREATE TABLE statements found in schema.sql - "
-            "not a mysqldump-style schema export, refusing to parse an unvalidated shape"
-        )
-
-    columns_by_table = _parse_create_table_columns(schema_text)
-    records = []
-    for table, row in _parse_insert_rows(data_text, columns_by_table):
-        text = _render_record_text(row)
-        if not text.strip():
-            continue
-        row_id = row.get("id", hashlib.sha256(repr(sorted(row.items())).encode()).hexdigest()[:12])
-        record_url = f"sxa-corpus://{table}/{row_id}"
-        doc_id = doc_id_for(record_url)
-        records.append({
-            "doc_id": doc_id,
-            "url": record_url,
-            "title": f"SXA {table} #{row_id}",
-            "text": text,
-            "domain": "knowledge.sxa",
-            "product": None,
-            "version": None,
-            "language": "fr",
-            "source_type": "sxa-corpus",
-            "classification": "C3",
-            "acl_groups": [],
-            "fetched_at": fetched_at,
-            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            "provenance": f"sxa corpus weekly export snapshot {snapshot_id}",
-            "sxa": {
-                "snapshot_id": snapshot_id,
-                "import_timestamp": fetched_at,
-                "checksum": checksum,
-                "table": table,
-            },
-        })
-
-    # WP-57: parallel S3 writes - one synchronous put_object per row (up
-    # to thousands of sequential network round-trips) was the other
-    # dominant cost of this stage.
-    if records:
-        with ThreadPoolExecutor(max_workers=max(1, config.fetch_sxa_write_concurrency)) as pool:
-            list(pool.map(
-                lambda r: store.put_json(f"{config.raw_prefix}/{r['doc_id']}.json", r),
-                records,
-            ))
-    store.put_json(checksum_key, {"checksum": checksum, "fetched_at": fetched_at})
-    return len(records)
 
 
 # --------------------------------------------------------------------------
@@ -1569,7 +1338,6 @@ SOURCE_ADAPTERS = {
         SourceAdapter("fetch-confluence", "knowledge.tech", _fetch_confluence),
         SourceAdapter("fetch-salesforce", "knowledge.sales", _fetch_salesforce),
         SourceAdapter("load-sxa-dump", "knowledge.sxa-legacy", _load_sxa_dump),
-        SourceAdapter("fetch-sxa", "knowledge.sxa", _fetch_sxa),
     )
 }
 
@@ -1621,7 +1389,7 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
     # failed mid-pipeline, the manifest was already overwritten to mark
     # those documents "seen" - every subsequent run then saw 0 new/changed
     # and silently skipped them forever, even though nothing had actually
-    # been indexed (knowledge.sxa sat at 0 rows in document_embeddings
+    # been indexed (the domain sat at 0 rows in document_embeddings
     # despite several prior runs reporting an overall SUCCEEDED state).
     # manifest.json is now only written by stage_validate, once it has
     # confirmed each touched document actually has indexed rows - see the

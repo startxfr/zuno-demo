@@ -1498,12 +1498,11 @@ domains:
     # freshness.operation_classes.semantic-read.max_staleness.
     staleAfter: 4h
   sxa-legacy:
-    # Enabled 2026-08-23 (amended Part B): no separate raw dump exists, so
-    # this domain reuses ADR-0217/WP-067's already-anonymized corpus
-    # bucket/content below instead of a dedicated raw-dump bucket - an
-    # explicit operator decision recorded in ADR-0216's amendment. The
-    # MariaDB import + sales-db MCP path therefore serves the same
-    # as-is content RAG does, not genuinely real/unredacted values.
+    # ADR-0219: the company's pre-2021 commercial record, and the only SXA
+    # domain. load-sxa-dump parses the schema.sql/data.sql pair straight
+    # out of the bucket below - no database engine, no MCP tools. Content
+    # is indexed exactly as it arrives; allowed_groups + C3 are the
+    # safeguard.
     enabled: true
     fetchStages: [load-sxa-dump]
     postgres:
@@ -1540,19 +1539,6 @@ domains:
           remoteKey: "sxa-corpus/s3"
           accessKeyProperty: accessKeyId
           secretKeyProperty: secretAccessKey
-      # ADR-0216/WP-065: the MariaDB database the dump imports into
-      # natively (gitops/charts/mariadb's sxaDatabase) - separate from the
-      # postgres block above, which stays the local-dev/CI fixture path
-      # (ADR-0016, superseded for the live target only).
-      mariadb:
-        host: "mariadb.zuno-data.svc.cluster.local"
-        port: 3306
-        username: sxa
-        database: sxa
-        secretName: rag-sxa-mariadb
-        externalSecret:
-          remoteKey: "sxa/mariadb-db"
-          passwordProperty: password
     # ADR-0105: immutable legacy source - on-demand only, never scheduled.
     # Manual refresh: make d1 install rag-ingestion (see README).
     schedule:
@@ -1561,55 +1547,6 @@ domains:
     # exempt_from_freshness_enforcement - never compute a stale_after for
     # this domain's chunks.
     staleAfter: none
-  sxa:
-    # ADR-0217/WP-067: a distinct domain from sxa-legacy above - an
-    # already-anonymized weekly corpus export (schema.sql + data.sql, no
-    # MariaDB import, no MCP tools), parsed directly by fetch-sxa.
-    # Enabled 2026-08-21 (Part B): dedicated bucket live, rag-sxa database
-    # and Vault credentials provisioned.
-    enabled: true
-    fetchStages: [fetch-sxa]
-    postgres:
-      database: rag-sxa
-      schema: rag
-      secretName: rag-postgres-sxa
-      externalSecret:
-        remoteKey: "rag-sxa/postgresql-app"
-        usernameProperty: username
-        passwordProperty: password
-    sxaCorpus:
-      # Operator-supplied: the approved weekly export's keys in the
-      # dedicated bucket below and an optional explicit snapshot id
-      # (falls back to a checksum-derived one, same as sxaDump.snapshotId
-      # above).
-      schemaS3Key: "sxa.schema.sql"
-      dataS3Key: "sxa.data.sql"
-      snapshotId: ""
-      # A dedicated bucket, separate from s3.bucket above (shared corpus
-      # content) and from sxa-legacy's own dedicated sxaDump bucket -
-      # this source has its own provenance/trust model (ADR-0217) and
-      # should not share infrastructure with either. Created 2026-08-21,
-      # IAM access scoped to only this bucket (zuno-sxa-corpus-s3 user).
-      s3:
-        type: aws
-        endpoint: ""
-        bucket: "zuno-demo-sxa-corpus"
-        region: "eu-west-2"
-        pathStyle: false
-        secretName: rag-sxa-corpus-s3
-        externalSecret:
-          remoteKey: "sxa-corpus/s3"
-          accessKeyProperty: accessKeyId
-          secretKeyProperty: secretAccessKey
-    # ADR-0217: a real weekly cadence, unlike sxa-legacy's on-demand-only
-    # schedule - this source is an operator-refreshed weekly export.
-    schedule:
-      enabled: true
-      cron: "0 0 4 * * 0"
-      timezone: Europe/Paris
-    # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/sxa/domain.yaml's
-    # freshness.operation_classes.semantic-read.max_staleness.
-    staleAfter: 7d
 
 # Runtime image is built imperatively by the day1-build Ansible role
 # (ansible/roles/rag_ingestion_build, ansible/tasks/apply_openshift_build.yml)
@@ -1639,7 +1576,7 @@ resources:
     # count higher than CPU count is fine and expected), not CPU-bound
     # work - separate from the cpu/memory requests above.
     # redhatConcurrency: fetch-redhat's per-source page-fetch pool
-    # (FETCH_REDHAT_CONCURRENCY). sxaWriteConcurrency: fetch-sxa's
+    # (FETCH_REDHAT_CONCURRENCY). sxaWriteConcurrency: load-sxa-dump's
     # per-row S3-write pool (FETCH_SXA_WRITE_CONCURRENCY).
     redhatConcurrency: 8
     sxaWriteConcurrency: 8

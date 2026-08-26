@@ -31,17 +31,6 @@ CONFIG_KEYS = {
     "SXA_S3_BUCKET": "SXA_S3_BUCKET",
     "SXA_S3_REGION": "SXA_S3_REGION",
     "SXA_S3_PATH_STYLE": "SXA_S3_PATH_STYLE",
-    "SXA_MARIADB_HOST": "SXA_MARIADB_HOST",
-    "SXA_MARIADB_PORT": "SXA_MARIADB_PORT",
-    "SXA_MARIADB_USER": "SXA_MARIADB_USER",
-    "SXA_MARIADB_DATABASE": "SXA_MARIADB_DATABASE",
-    "SXA_CORPUS_SCHEMA_S3_KEY": "SXA_CORPUS_SCHEMA_S3_KEY",
-    "SXA_CORPUS_DATA_S3_KEY": "SXA_CORPUS_DATA_S3_KEY",
-    "SXA_CORPUS_SNAPSHOT_ID": "SXA_CORPUS_SNAPSHOT_ID",
-    "SXA_CORPUS_S3_ENDPOINT": "SXA_CORPUS_S3_ENDPOINT",
-    "SXA_CORPUS_S3_BUCKET": "SXA_CORPUS_S3_BUCKET",
-    "SXA_CORPUS_S3_REGION": "SXA_CORPUS_S3_REGION",
-    "SXA_CORPUS_S3_PATH_STYLE": "SXA_CORPUS_S3_PATH_STYLE",
     "S3_ENDPOINT": "S3_ENDPOINT",
     "S3_BUCKET": "S3_BUCKET",
     "S3_REGION": "S3_REGION",
@@ -117,19 +106,14 @@ SOURCE_SECRETS = {
         {"SALESFORCE_INSTANCE_URL": "SALESFORCE_INSTANCE_URL", "SALESFORCE_TOKEN": "SALESFORCE_TOKEN"},
     ),
 {{- end }}
-{{- if and $domain.enabled $domain.sxaCorpus }}
-    "{{ $name }}": (
-        "{{ $domain.sxaCorpus.s3.secretName }}",
-        {"SXA_CORPUS_AWS_ACCESS_KEY_ID": "SXA_CORPUS_AWS_ACCESS_KEY_ID", "SXA_CORPUS_AWS_SECRET_ACCESS_KEY": "SXA_CORPUS_AWS_SECRET_ACCESS_KEY"},
-    ),
-{{- end }}
 {{- end }}
 }
 
-# ADR-0216/WP-065: load-sxa-dump needs TWO extra secrets (the dedicated
-# SXA S3 bucket credentials AND the MariaDB import target's password) -
-# SOURCE_SECRETS above only carries one per domain, so this is a separate,
-# additive map rather than a restructure of that existing one.
+# load-sxa-dump needs its own S3 credentials, for the dedicated SXA bucket
+# rather than the shared corpus one. Kept as a separate, additive map (a
+# list per domain) rather than folded into SOURCE_SECRETS above, which
+# carries at most one secret per domain. ADR-0219 removed the second entry
+# that used to sit here, the MariaDB import target's password.
 SXA_SOURCE_SECRETS = {
 {{- range $name, $domain := .Values.domains }}
 {{- if and $domain.enabled $domain.sxaDump }}
@@ -137,10 +121,6 @@ SXA_SOURCE_SECRETS = {
         (
             "{{ $domain.sxaDump.s3.secretName }}",
             {"SXA_AWS_ACCESS_KEY_ID": "SXA_AWS_ACCESS_KEY_ID", "SXA_AWS_SECRET_ACCESS_KEY": "SXA_AWS_SECRET_ACCESS_KEY"},
-        ),
-        (
-            "{{ $domain.sxaDump.mariadb.secretName }}",
-            {"SXA_MARIADB_PASSWORD": "SXA_MARIADB_PASSWORD"},
         ),
     ],
 {{- end }}
@@ -203,7 +183,6 @@ fetch_redhat = component("fetch-redhat")
 fetch_confluence = component("fetch-confluence")
 fetch_salesforce = component("fetch-salesforce")
 load_sxa_dump = component("load-sxa-dump")
-fetch_sxa = component("fetch-sxa")
 detect_changes = component("detect-changes")
 normalize = component("normalize")
 chunk = component("chunk")
@@ -217,7 +196,6 @@ FETCH_COMPONENTS = {
     "fetch-confluence": fetch_confluence,
     "fetch-salesforce": fetch_salesforce,
     "load-sxa-dump": load_sxa_dump,
-    "fetch-sxa": fetch_sxa,
 }
 
 

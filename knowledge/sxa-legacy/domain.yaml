@@ -8,12 +8,14 @@
 id: knowledge.sxa-legacy
 title: Legacy SXA historical knowledge
 description: >-
-  Historical schema/data imported from an approved legacy SXA SQL dump
-  snapshot (ADR-0016, ADR-0025). Immutable between imports: a re-import
-  creates a new versioned snapshot rather than mutating indexed content in
-  place. Distinct from `knowledge.sales`, which never serves this domain's
-  content and vice versa (ADR-0206). Restricted to Sales and Direction
-  business roles by default (policies/knowledge/knowledge-policy.yaml).
+  The company's commercial record from before 2021, parsed from an approved
+  SQL dump snapshot and served through retrieval only - there is no live SXA
+  system behind it and no deterministic query path (ADR-0219). Immutable
+  between imports: a re-import creates a new versioned snapshot rather than
+  mutating indexed content in place. Distinct from `knowledge.sales`, which
+  never serves this domain's content and vice versa (ADR-0206). Open to the
+  Sales, Direction, ADV and Finance business roles
+  (policies/knowledge/knowledge-policy.yaml).
 
 taxonomy:
   source_classes:
@@ -59,7 +61,7 @@ exempt_from_freshness_enforcement: true   # immutable source (WP-24 / ADR-0205)
 policy_ref: policies/knowledge/knowledge-policy.yaml
 
 related_adrs:
-  - ADR-0016   # migrate the legacy SXA schema to PostgreSQL
   - ADR-0025   # keep sensitive/real commercial data outside the public repo
-  - ADR-0206   # separate current Salesforce knowledge from legacy SXA
   - ADR-0204   # multi-domain RAG platform generalization (WP-21)
+  - ADR-0206   # separate current Salesforce knowledge from legacy SXA
+  - ADR-0219   # serve SXA only as a pre-2021 historical RAG corpus

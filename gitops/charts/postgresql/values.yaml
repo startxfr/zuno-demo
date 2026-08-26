@@ -219,14 +219,6 @@ ragAdvDatabase:
   owner: ragadv
   vaultPath: rag-adv/postgresql-app
 
-# knowledge.sxa's database (ADR-0217/WP-067) - distinct from
-# ragSxaLegacyDatabase above (knowledge.sxa-legacy, ADR-0216). Same "bring
-# your own password" mechanism and constraints as the other ragXxxDatabase
-# entries.
-ragSxaDatabase:
-  name: rag-sxa
-  owner: ragsxa
-  vaultPath: rag-sxa/postgresql-app
 
 # knowledge.project's database (ADR-0209, WP-28) - the fifth
 # ADR-0204-pattern domain database, same "bring your own password"

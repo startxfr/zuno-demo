@@ -188,7 +188,6 @@ spec:
   # templates/externalsecret-ragsales.yaml /
   # templates/externalsecret-ragsxalegacy.yaml /
   # templates/externalsecret-ragadv.yaml /
-  # templates/externalsecret-ragsxa.yaml /
   # templates/externalsecret-ragproject.yaml /
   # templates/externalsecret-conversations.yaml
   # ("bring your own password") rather than generating its own.
@@ -232,9 +231,6 @@ spec:
     - name: {{ .Values.ragAdvDatabase.owner }}
       databases:
         - {{ .Values.ragAdvDatabase.name }}
-    - name: {{ .Values.ragSxaDatabase.owner }}
-      databases:
-        - {{ .Values.ragSxaDatabase.name }}
     - name: {{ .Values.ragProjectDatabase.owner }}
       databases:
         - {{ .Values.ragProjectDatabase.name }}

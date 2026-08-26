@@ -75,7 +75,7 @@
           "fetchStages": {
             "type": "array",
             "minItems": 1,
-            "items": {"enum": ["fetch-redhat", "fetch-confluence", "fetch-salesforce", "load-sxa-dump", "fetch-sxa"]}
+            "items": {"enum": ["fetch-redhat", "fetch-confluence", "fetch-salesforce", "load-sxa-dump"]}
           },
           "postgres": {
             "type": "object",

@@ -48,7 +48,6 @@ data:
       (dict "name" .Values.ragSalesDatabase.name "owner" .Values.ragSalesDatabase.owner)
       (dict "name" .Values.ragSxaLegacyDatabase.name "owner" .Values.ragSxaLegacyDatabase.owner)
       (dict "name" .Values.ragAdvDatabase.name "owner" .Values.ragAdvDatabase.owner)
-      (dict "name" .Values.ragSxaDatabase.name "owner" .Values.ragSxaDatabase.owner)
       (dict "name" .Values.ragProjectDatabase.name "owner" .Values.ragProjectDatabase.owner)
       (dict "name" .Values.conversationsDatabase.name "owner" .Values.conversationsDatabase.owner)
       (dict "name" .Values.aapDatabase.name "owner" .Values.aapDatabase.owner)

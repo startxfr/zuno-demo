@@ -29,7 +29,7 @@
 # 2026-08-23 once WP-065's amended Part B flipped it to enabled: true.
 - name: "rag_ingestion | set the list of pipeline compile targets"
   ansible.builtin.set_fact:
-    _rag_ingestion_compile_targets: ["tech", "sxa", "sxa-legacy"]
+    _rag_ingestion_compile_targets: ["tech", "sxa-legacy"]
 
 - name: "rag_ingestion | ensure the compiler venv (kfp SDK) exists"
   ansible.builtin.pip:
