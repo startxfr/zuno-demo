@@ -1380,7 +1380,8 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
     else:
         deleted_ids, deleted_urls = [], []
 
-    unchanged_ids = [doc_id for doc_id in current if doc_id not in new_ids and doc_id not in changed_ids]
+    new_and_changed_ids = set(new_ids) | set(changed_ids)
+    unchanged_ids = [doc_id for doc_id in current if doc_id not in new_and_changed_ids]
 
     # WP-067 live verification (2026-08-26) caught a real bug here: this
     # stage used to write manifest.json unconditionally, right after
