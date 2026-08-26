@@ -74,6 +74,20 @@ events, neither a cluster drift issue:
    Raised to `requests: 2 cpu / 6Gi`, `limits: 4 cpu / 10Gi` (limits.cpu kept at 4 — an explicit
    choice, not auto-derived).
 
+## Second correction (2026-08-26, same day): limits.cpu exhausted again
+
+The first quota bump above was still wrong once the full stack actually existed:
+`limits.cpu: used: 3970m` out of `4` blocked Tempo's `compactor`/`gateway` Deployments from ever
+creating a pod (`FailedCreate ... exceeded quota`), and the `prometheus`/`alertmanager`/`perses`
+StatefulSets showed 0 pods created. Computed the real need directly from every workload's
+declared pod-spec resources in the namespace (`oc get statefulset,deployment -n
+redhat-ods-monitoring -o json`, summed per-container × replica count, with the namespace's own
+`LimitRange` defaults — `defaultRequest: cpu=100m`, `default: cpu=1` — applied to containers that
+don't set their own value, e.g. Perses, the OTel target-allocator, Thanos-querier): **~1338m**
+effective `requests.cpu`, **~9220m** effective `limits.cpu` across the whole namespace. Set with
+headroom above a +40% margin on that measurement: `requests: { cpu: "4", memory: "15Gi" }`,
+`limits: { cpu: "14", memory: "40Gi" }`.
+
 ## Verification checklist (operator step — ask before running)
 
 1. Create the `zuno-demo-rhoai-traces` S3 bucket and a bucket-scoped IAM user (never the

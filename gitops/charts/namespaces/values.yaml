@@ -424,14 +424,16 @@ platformNamespaces:
     allowApiServerWebhooks: false
     extraLabels:
       zuno.io/managed: "true"
-    # ADR-0522/WP-078/WP-079: raised from 500m/1Gi requests, 4/8Gi limits -
-    # exhausted live during the first metrics+traces reconcile (410m/916Mi
-    # already used by the OTel collector/proxies/thanos-querier alone),
-    # FailedCreate-blocking Prometheus, Alertmanager, Perses, the
-    # collector's target-allocator and the full multi-component TempoStack.
+    # ADR-0522/WP-078/WP-079: second pass, raised again after the first bump
+    # (2/6Gi requests, 4/10Gi limits) still exhausted limits.cpu live
+    # (used: 3970m/4) once the full stack existed - summing every workload's
+    # declared/LimitRange-defaulted per-container cpu x replica count in this
+    # namespace gives ~1338m effective requests.cpu and ~9220m effective
+    # limits.cpu; current values are set with headroom above a +40% margin
+    # on that live-measured total.
     resourceQuota:
-      requests: { cpu: "2", memory: "6Gi" }
-      limits: { cpu: "4", memory: "10Gi" }
+      requests: { cpu: "4", memory: "15Gi" }
+      limits: { cpu: "14", memory: "40Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "2Gi" }
