@@ -1574,7 +1574,7 @@
         {
             "clientId": "zuno-admin-api",
             "name": "agent-bff Keycloak Admin API client (ADR-0213/ADR-0527/ADR-0530)",
-            "description": "Confidential client-credentials client backing GET /api/colleagues and GET /api/groups. Never a login client - no browser flow, no redirect URI. Its service account holds view-users/query-users/query-groups on realm-management and nothing else; manage-users is deliberately withheld.",
+            "description": "Confidential client-credentials client backing GET /api/colleagues and GET /api/groups (ADR-0530). Not a login client. Its service account holds only view-users/query-users/query-groups; never manage-users.",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,

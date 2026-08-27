@@ -88,6 +88,28 @@ def test_the_realm_file_is_valid_json_and_declares_the_admin_client() -> None:
     assert client.get("redirectUris") == []
 
 
+def test_client_text_fields_fit_keycloak_s_columns() -> None:
+    """Keycloak stores CLIENT.DESCRIPTION and CLIENT.NAME as varchar(255).
+    Overrun it and the Admin API answers a bare `[unknown_error]`, with the
+    real cause - "value too long for type character varying(255)" - visible
+    only in the Keycloak server log.
+
+    Not hypothetical. On 2026-08-27 at 23:30Z the first live reconcile
+    updated all ten existing clients, then failed creating zuno-admin-api on a
+    283-character description. The Job burned its whole backoffLimit while the
+    diagnosis sat in a log nobody was tailing. Cheap to assert here, expensive
+    to find there.
+    """
+    realm = _load_realm()
+    over = []
+    for c in realm["clients"]:
+        for field in ("description", "name"):
+            value = c.get(field) or ""
+            if len(value) > 255:
+                over.append(f"{c['clientId']}.{field} is {len(value)} chars")
+    assert not over, "Keycloak stores these as varchar(255): " + "; ".join(over)
+
+
 def test_no_service_account_may_write_to_the_realm() -> None:
     """The check that matters most here, and the one a rendering error would
     never reveal: least privilege on every service account, not just today's."""
@@ -267,6 +289,7 @@ def test_agent_charts_reference_the_admin_secret_optionally() -> None:
 
 TESTS = [
     test_the_realm_file_is_valid_json_and_declares_the_admin_client,
+    test_client_text_fields_fit_keycloak_s_columns,
     test_no_service_account_may_write_to_the_realm,
     test_every_service_account_entry_matches_a_real_client,
     test_the_reconcile_configmap_substitutes_the_cluster_domain,
