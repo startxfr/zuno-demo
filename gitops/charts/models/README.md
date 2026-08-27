@@ -26,6 +26,42 @@ Fails with a diagnostic (listing found templates) rather than silently
 deploying the `values.yaml` fallback; bypass discovery entirely with
 `-e models_vllm_image_override=<registry>/<image>:<tag>`.
 
+## Four served models, one file set each (ADR-0526)
+
+This chart is per-model by design - there is no `models: []` list to append
+to. Each served model owns an `llminferenceservice-<m>.yaml`, an
+`s3-serving-credentials-<m>.yaml` (its own `ExternalSecret` + `<name>-s3`
+`ServiceAccount`; that file's own comment records why the SA is not
+shared), a `networkpolicy-<m>.yaml`, a values block, and a
+`maas.models[]` entry.
+
+| Model | `servedModelName` | ISVC / values block | Slice |
+|---|---|---|---|
+| chat | `qwen3.6-27b-instruct` | `qwen36-27b-instruct` / top-level | `mig-2g.48gb` |
+| reasoning | `gpt-oss-20b` | `gpt-oss-20b` / `gptOssModel` | `mig-1g.24gb` |
+| urban-register variant | `qwen3.5-9b-wesh` | `qwen35-9b-wesh` / `weshModel` | `mig-2g.48gb` |
+| that variant's base | `qwen3.5-9b` | `qwen35-9b` / `qwen35Model` | `mig-1g.24gb` |
+
+The last two arrive with ADR-0526/WP-087: a LoRA fine-tune of
+`Qwen/Qwen3.5-9B` on a French urban-register corpus, merged into a
+standalone bf16 checkpoint by `components/mlops`'s `merge-export` stage
+and uploaded to the exact `modelsS3` prefix `spec.model.uri` reads. The
+base is served alongside it purely so the variant can be compared against
+the model it came from. Together they take the last free MIG slices:
+`zuno-ai-run`'s GPU quota reaches 3/3 and 2/2 - saturated, not exceeded.
+
+Two things about a new model's file set are load-bearing and neither is
+caught by CI:
+
+- **The NetworkPolicy must admit `maas-default-gateway`**, not just
+  ai-gateway and rag-service. Without it MaaS requests 504 at the outer
+  HAProxy *after* auth, subscription selection and rate limiting have all
+  passed. `platform/security/check_workload_hardening.py` only asserts
+  that this chart renders at least one NetworkPolicy.
+- **`--served-model-name` must repeat all three names**, because KServe's
+  launcher emits its own pair before these chart args and vLLM's argparse
+  keeps only the last occurrence of the flag.
+
 ## RawDeployment, not Serverless
 
 The chat model (`templates/llminferenceservice-qwen.yaml`, ADR-0521) and

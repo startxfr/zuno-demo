@@ -1,0 +1,133 @@
+{{- /*
+ADR-0526 (WP-087): qwen3.5-9b-wesh - the French urban-register variant,
+a rank-8 LoRA fine-tune of Qwen/Qwen3.5-9B MERGED back into a standalone
+bf16 checkpoint (decision 1) and served here as an ordinary model.
+
+Why a whole LLMInferenceService rather than vLLM's --lora-modules on the
+existing runtime: decision 4 reverses ADR-0301's recorded rejection of
+"a second InferenceService per adapter" on the grounds that the premise
+changed. That rejection assumed many adapters over one base, where an
+extra deployment buys nothing. Here the extra deployment IS the
+requirement - a distinct, routable model id and node-level isolation from
+the base, so both serve concurrently and are comparable. --lora-modules
+gives neither: it exposes the adapter from the base's own process, which
+makes routing and per-model telemetry ambiguous. This is also NOT the
+full fine-tuning ADR-0301 rejected: training stays adapter-scale, only
+the serving artifact is a full checkpoint.
+
+Its S3 uri is the exact prefix components/mlops's merge-export stage
+uploads to, so promotion is a values change here and nothing else - the
+pipeline never writes this file (ADR-0302 decision 7).
+
+Shape is llminferenceservice-gptoss.yaml's, unchanged: the same
+$...Maas lookup by backendInferenceServiceName, the same soft
+anti-affinity, the same _llmisvc-route.tpl include, the same repeated
+--served-model-name triple.
+*/ -}}
+{{- $weshMaas := "" }}
+{{- range .Values.maas.models }}
+{{- if eq .backendInferenceServiceName $.Values.weshModel.inferenceServiceName }}
+{{- $weshMaas = . }}
+{{- end }}
+{{- end }}
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.weshModel.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  {{- if .Values.weshModel.llmInferenceService.podAnnotations }}
+  annotations:
+    {{- toYaml .Values.weshModel.llmInferenceService.podAnnotations | nindent 4 }}
+  {{- end }}
+  baseRefs:
+    - name: {{ .Values.weshModel.llmInferenceService.baseRef }}
+  model:
+    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.weshModel.servedModelName }}/"
+    name: {{ .Values.weshModel.servedModelName | quote }}
+  replicas: {{ .Values.weshModel.minReplicas }}
+  template:
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    {{- if .Values.spreadAcrossGpuNodes }}
+    # Reused EXACTLY as-is (WP-086). Node separation for this model is
+    # guaranteed by slice availability - it takes the only free
+    # mig-2g.48gb - not by this term. Do not promote it to `required`:
+    # ADR-0351 decision 1 and WP-086 both chose packing onto a survivor
+    # over leaving a pod Pending, and ADR-0526 decision 5 restates it.
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  kserve.io/component: workload
+    {{- end }}
+    serviceAccountName: {{ .Values.weshModel.llmInferenceService.serviceAccountName }}
+    containers:
+      - name: main
+        args:
+          - --max-model-len={{ .Values.weshModel.maxModelLen }}
+          # Same three as llminferenceservice-qwen.yaml, and for the same
+          # reasons: --enforce-eager works around a MIG/NVML CUDA-graph
+          # crash on this vLLM build (ADR-0518), and the parsers are the
+          # Qwen3.x family's own XML/hybrid-thinking formats - this model
+          # is a fine-tune of Qwen3.5-9B, same family.
+          #
+          # The tool-call parser is NOT optional here. ADR-0526 decision 7
+          # routes Comage to this model FIRST on all four of its tasks,
+          # and two of them (check-deal-status, check-my-drive-and-mail)
+          # are tool-calling turns. Without a parser tool use breaks
+          # silently - a 200 with no tool call, not an error. Comage's own
+          # chat_triggers_tool acceptance scenario is what catches it.
+          #
+          # UNVERIFIED against a live cluster: confirm qwen3_xml/qwen3 are
+          # accepted by the resolved vLLM image's --help, and that tool
+          # calling still works AFTER the fine-tune (register adaptation
+          # can perturb structured output; the acceptance gate is the
+          # check, per ADR-0526 decision 8's substance half).
+          - --enforce-eager
+          - --enable-auto-tool-choice
+          - --tool-call-parser=qwen3_xml
+          - --reasoning-parser=qwen3
+          {{- if .Values.tracing.enabled }}
+          # ADR-0523 (WP-082): same native vLLM OTel activation as the
+          # other two model workloads - see llminferenceservice-qwen.yaml.
+          - --otlp-traces-endpoint={{ .Values.tracing.exporterEndpoint }}
+          {{- end }}
+          {{- if and .Values.maas.enabled $weshMaas }}
+          # REPEAT, never append - see llminferenceservice-gptoss.yaml for
+          # the full rationale: KServe's generated launcher emits its own
+          # --served-model-name pair BEFORE these chart args ($@), and
+          # vLLM's argparse keeps only the LAST occurrence of the flag.
+          # Verify after rollout: /v1/models must list all three names.
+          - --served-model-name
+          - {{ .Values.weshModel.servedModelName | quote }}
+          - "publishers/{{ .Values.namespace }}/models/{{ .Values.weshModel.inferenceServiceName }}"
+          - "{{ .Values.namespace }}/{{ $weshMaas.publishedName }}"
+          {{- end }}
+        resources:
+          {{- toYaml .Values.weshModel.resources | nindent 10 }}
+  router:
+    gateway:
+      refs:
+        - name: {{ .Values.weshModel.llmInferenceService.routerGateway.name }}
+          namespace: {{ .Values.weshModel.llmInferenceService.routerGateway.namespace }}
+    route:
+      http:
+        spec:
+          {{- include "models.llmisvcRouteSpec" (dict
+                "name" .Values.weshModel.inferenceServiceName
+                "namespace" .Values.namespace
+                "publishedModel" .Values.weshModel.servedModelName
+                "gatewayName" .Values.weshModel.llmInferenceService.routerGateway.name
+                "gatewayNamespace" .Values.weshModel.llmInferenceService.routerGateway.namespace) | nindent 10 }}
+    scheduler:
+      annotations:
+        {{- toYaml .Values.weshModel.llmInferenceService.schedulerAnnotations | nindent 8 }}

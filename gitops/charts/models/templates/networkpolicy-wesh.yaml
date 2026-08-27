@@ -1,0 +1,54 @@
+# ADR-0526 (WP-087): ingress policy for qwen3.5-9b-wesh's workload pod.
+# An LLMInferenceService workload carries app.kubernetes.io/name +
+# kserve.io/component labels (not serving.kserve.io/inferenceservice) and
+# serves its OpenAI-compatible API on 8000, not 8080.
+#
+# THREE callers, and the third is the one that is easy to forget:
+# ai-gateway (this model's direct `local-*` provider entry), rag-service
+# (kept for symmetry with the other model policies - this chart cannot
+# know which role an instance plays), and maas-default-gateway. Omitting
+# the gateway peer does NOT fail loudly: the MaaS data path routes
+# gateway -> (EPP-selected) workload pod :8000 directly, so the request
+# 504s at the outer HAProxy AFTER auth, subscription selection and the
+# rate-limit policy have all passed. Worth stating twice because CI will
+# not catch it either - platform/security/check_workload_hardening.py
+# only asserts that this chart renders at least one NetworkPolicy, never
+# that each model has its own.
+# Metrics scraping needs no allowance here; RHOAI's own controller
+# scrapes independently (see templates/servicemonitor-vllm.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.weshModel.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.weshModel.inferenceServiceName }}
+      kserve.io/component: workload
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ai-gateway
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-data
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rag-service
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: maas-default-gateway
+      ports:
+        - protocol: TCP
+          port: 8000

@@ -1,0 +1,114 @@
+{{- /*
+ADR-0526 (WP-087) decision 2: qwen3.5-9b - the UNMODIFIED base that
+qwen3.5-9b-wesh was fine-tuned from, served alongside it so the variant is
+compared against its own base rather than against a different model. Same
+weights ADR-0518 decision 3 already staged as this platform's training
+base; nothing in this chart modifies them.
+
+THE 24GB SLICE IS THE CONSTRAINT. 19.3GB of bf16 weights leaves roughly
+4GB. KV is not the pressure - only 8 of 32 layers are full_attention
+(num_key_value_heads: 4, head_dim: 256 => ~32KB/token) and the other 24
+linear_attention layers hold a constant-size state, so even a full 32768
+context would cost about 1GB. The pressure is activation and CUDA-graph
+workspace. Three settings work together against it and none is
+individually sufficient: a reduced --max-model-len, a raised
+--gpu-memory-utilization, and --enforce-eager (no graph capture at all -
+the largest single lever, and required on this vLLM build regardless for
+the MIG/NVML crash ADR-0518 documents). All three are values-driven; see
+values.yaml's qwen35Model block before changing any of them.
+
+KNOWN RISK, UNVERIFIED. Qwen3.5-9B is a BASE model, not an instruct one,
+so it may ship without a chat template - in which case vLLM's
+/v1/chat/completions returns 400 rather than serving. That is tolerable
+where this model sits (no agent prefers it; it is at the tail of every
+resolved chain, reached only after six other providers have failed) but
+it must be confirmed on the live pod's /v1/models and a real chat call
+before treating this as a working fallback. The variant does not share
+the risk: its merged checkpoint carries the tokenizer the mlops pipeline
+rendered the training corpus with, chat template included.
+*/ -}}
+{{- $qwen35Maas := "" }}
+{{- range .Values.maas.models }}
+{{- if eq .backendInferenceServiceName $.Values.qwen35Model.inferenceServiceName }}
+{{- $qwen35Maas = . }}
+{{- end }}
+{{- end }}
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.qwen35Model.inferenceServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  {{- if .Values.qwen35Model.llmInferenceService.podAnnotations }}
+  annotations:
+    {{- toYaml .Values.qwen35Model.llmInferenceService.podAnnotations | nindent 4 }}
+  {{- end }}
+  baseRefs:
+    - name: {{ .Values.qwen35Model.llmInferenceService.baseRef }}
+  model:
+    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.qwen35Model.servedModelName }}/"
+    name: {{ .Values.qwen35Model.servedModelName | quote }}
+  replicas: {{ .Values.qwen35Model.minReplicas }}
+  template:
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    {{- if .Values.spreadAcrossGpuNodes }}
+    # Soft, unchanged (WP-086 / ADR-0351 decision 1). This model lands on
+    # the other node because it takes the only free mig-1g.24gb slice
+    # there, not because of this term - see llminferenceservice-wesh.yaml.
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  kserve.io/component: workload
+    {{- end }}
+    serviceAccountName: {{ .Values.qwen35Model.llmInferenceService.serviceAccountName }}
+    containers:
+      - name: main
+        args:
+          # Reduced well below the 32768 the 48GB models use - see this
+          # file's header comment for the memory arithmetic.
+          - --max-model-len={{ .Values.qwen35Model.maxModelLen }}
+          - --gpu-memory-utilization={{ .Values.qwen35Model.gpuMemoryUtilization }}
+          - --max-num-seqs={{ .Values.qwen35Model.maxNumSeqs }}
+          - --enforce-eager
+          - --enable-auto-tool-choice
+          - --tool-call-parser=qwen3_xml
+          - --reasoning-parser=qwen3
+          {{- if .Values.tracing.enabled }}
+          - --otlp-traces-endpoint={{ .Values.tracing.exporterEndpoint }}
+          {{- end }}
+          {{- if and .Values.maas.enabled $qwen35Maas }}
+          # REPEAT, never append - see llminferenceservice-gptoss.yaml.
+          - --served-model-name
+          - {{ .Values.qwen35Model.servedModelName | quote }}
+          - "publishers/{{ .Values.namespace }}/models/{{ .Values.qwen35Model.inferenceServiceName }}"
+          - "{{ .Values.namespace }}/{{ $qwen35Maas.publishedName }}"
+          {{- end }}
+        resources:
+          {{- toYaml .Values.qwen35Model.resources | nindent 10 }}
+  router:
+    gateway:
+      refs:
+        - name: {{ .Values.qwen35Model.llmInferenceService.routerGateway.name }}
+          namespace: {{ .Values.qwen35Model.llmInferenceService.routerGateway.namespace }}
+    route:
+      http:
+        spec:
+          {{- include "models.llmisvcRouteSpec" (dict
+                "name" .Values.qwen35Model.inferenceServiceName
+                "namespace" .Values.namespace
+                "publishedModel" .Values.qwen35Model.servedModelName
+                "gatewayName" .Values.qwen35Model.llmInferenceService.routerGateway.name
+                "gatewayNamespace" .Values.qwen35Model.llmInferenceService.routerGateway.namespace) | nindent 10 }}
+    scheduler:
+      annotations:
+        {{- toYaml .Values.qwen35Model.llmInferenceService.schedulerAnnotations | nindent 8 }}

@@ -516,6 +516,150 @@ gptOssModel:
   minReplicas: 1
   maxReplicas: 1
 
+# ADR-0526 (WP-087): the French urban-register variant, and the SAME
+# unmodified base it was fine-tuned from, served side by side.
+#
+# Both are ordinary standalone checkpoints served as their own
+# LLMInferenceService (ADR-0526 decision 4). That decision deliberately
+# REVERSES the rejection ADR-0301's "Alternatives considered" recorded
+# against "a second InferenceService per adapter". That rejection was
+# right for its own premise - many adapters over one base, where an extra
+# deployment buys nothing. Here the extra deployment IS the requirement:
+# a distinct routable model id, and node-level isolation from the base,
+# so the two serve concurrently and are directly comparable. vLLM's
+# --lora-modules gives neither (it exposes the adapter from the base's own
+# process). loraAdapters above therefore stays [], and neither model sets
+# serves_adapters in platform/ai-gateway/provider-routing.yaml.
+#
+# PLACEMENT. Nothing here pins a node, and nothing should: the two
+# permanent MIG nodes advertise 2x mig-1g.24gb + 1x mig-2g.48gb each, and
+# with qwen36-27b-instruct holding the 2g.48gb on ip-10-18-15-25 and
+# gpt-oss-20b + embeddings holding two 1g.24gb slices on ip-10-18-67-65,
+# SLICE AVAILABILITY alone puts the variant on ip-10-18-67-65's free
+# 2g.48gb and the base on ip-10-18-15-25's free 1g.24gb. The soft
+# spreadAcrossGpuNodes anti-affinity is reused exactly as-is; converting
+# any term to `required` would contradict ADR-0351 decision 1 and WP-086,
+# which both chose packing onto a survivor over leaving a pod Pending.
+#
+# QUOTA. These two consume the LAST free slices: zuno-ai-run's GPU
+# ResourceQuota goes to 3/3 on mig-1g.24gb and 2/2 on mig-2g.48gb. It does
+# NOT need raising, but it becomes exactly saturated - the next GPU
+# workload needs a quota change plus capacity, or an existing model
+# retired. ADR-0526's Consequences also records what this gives up:
+# ADR-0351 decision 5's "either node alone holds all three model
+# workloads" survivability property no longer holds at five workloads
+# across six slices. Accepted, not overlooked.
+weshModel:
+  inferenceServiceName: qwen35-9b-wesh
+  # ADR-0518 decision 1's naming split, applied unchanged: dots are
+  # stripped from the Kubernetes object name, NEVER from the served model
+  # id. This is also the S3 directory name under modelsS3
+  # (<prefix>/<servedModelName>/) - the exact prefix components/mlops's
+  # merge-export stage uploads the merged bf16 checkpoint to.
+  servedModelName: qwen3.5-9b-wesh
+  # The variant carries all of Comage's traffic and sits in the larger
+  # 48GB slice, so it keeps the same 32768 the other 48GB model uses.
+  maxModelLen: 32768
+  llmInferenceService:
+    # Same Gateway as every other model here - see gptOssModel's own
+    # routerGateway block for the full (expensive) history of why this
+    # must be maas-default-gateway and cannot be anything else.
+    routerGateway:
+      name: maas-default-gateway
+      namespace: openshift-ingress
+      manage: false
+    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    serviceAccountName: qwen35-9b-wesh-s3
+    # Same EPP-port sidecar exclusion every LLMInferenceService here needs
+    # (ADR-0201/WP-27) - see gptOssModel's schedulerAnnotations comment.
+    schedulerAnnotations:
+      traffic.sidecar.istio.io/excludeInboundPorts: "9002"
+    podAnnotations:
+      # Same sidecar sizing the other two model workloads carry - qwen's
+      # istio-proxy was repeatedly OOMKilled on the 256Mi cluster default
+      # (ADR-0521/WP-076); applied here preventively for the same reason
+      # it was applied preventively to gpt-oss-20b.
+      sidecar.istio.io/proxyMemory: "160Mi"
+      sidecar.istio.io/proxyMemoryLimit: "512Mi"
+      sidecar.istio.io/proxyCPU: "50m"
+      sidecar.istio.io/proxyCPULimit: "500m"
+      instrumentation.opentelemetry.io/inject-sdk: "zuno-models-instrumentation"
+      instrumentation.opentelemetry.io/container-names: "main"
+  # Sized like the other 2g.48gb workload (qwen36-27b-instruct): a 9B bf16
+  # checkpoint is materially smaller than a 27B FP8 one, so this is
+  # headroom, not a tight fit.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+      nvidia.com/mig-2g.48gb: "1"
+    limits:
+      cpu: "8"
+      memory: 24Gi
+      nvidia.com/mig-2g.48gb: "1"
+  minReplicas: 1
+  maxReplicas: 1
+
+# ADR-0526 decision 2: the UNMODIFIED Qwen3.5-9B base (ADR-0518 decision
+# 3's training base, already staged in S3), served so the variant can be
+# compared against the model it came from rather than against a different
+# model. No agent prefers it.
+#
+# THIS IS THE TIGHT CASE and the numbers matter. 19.3GB of bf16 weights in
+# a 24GB slice leaves roughly 4GB for everything else. Its KV cache is
+# unusually cheap for its size - only 8 of 32 layers are full_attention
+# (num_key_value_heads: 4, head_dim: 256 => ~32KB/token), and the other 24
+# linear_attention layers hold a constant-size state - so a 32768 context
+# would cost only ~1GB of KV. The pressure is activation//CUDA-graph
+# workspace, not KV, which is why --max-model-len is reduced AND
+# --gpu-memory-utilization raised AND --enforce-eager kept (no CUDA-graph
+# capture is the single largest lever here, and it is required on this
+# vLLM build anyway for the MIG/NVML crash). Low concurrency by design:
+# this model exists for comparison, not for load.
+qwen35Model:
+  inferenceServiceName: qwen35-9b
+  servedModelName: qwen3.5-9b
+  # Deliberately BELOW the 32768 the 48GB models use - see the block
+  # comment above. Raising this is the first thing to suspect if the pod
+  # OOMs or vLLM fails to allocate its KV pool at startup.
+  maxModelLen: 8192
+  # Fraction of the 24GB slice vLLM may claim. High on purpose, for the
+  # same reason maxModelLen is low.
+  gpuMemoryUtilization: "0.95"
+  # Bounds concurrent sequences so the activation working set stays inside
+  # what is left after the weights.
+  maxNumSeqs: 4
+  llmInferenceService:
+    routerGateway:
+      name: maas-default-gateway
+      namespace: openshift-ingress
+      manage: false
+    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    serviceAccountName: qwen35-9b-s3
+    schedulerAnnotations:
+      traffic.sidecar.istio.io/excludeInboundPorts: "9002"
+    podAnnotations:
+      sidecar.istio.io/proxyMemory: "160Mi"
+      sidecar.istio.io/proxyMemoryLimit: "512Mi"
+      sidecar.istio.io/proxyCPU: "50m"
+      sidecar.istio.io/proxyCPULimit: "500m"
+      instrumentation.opentelemetry.io/inject-sdk: "zuno-models-instrumentation"
+      instrumentation.opentelemetry.io/container-names: "main"
+  # Same shape as gpt-oss-20b's own mig-1g.24gb block (the proven sizing
+  # for a 1g.24gb co-resident workload on these nodes).
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+      nvidia.com/mig-1g.24gb: "1"
+    limits:
+      cpu: "8"
+      memory: 20Gi
+      nvidia.com/mig-1g.24gb: "1"
+  minReplicas: 1
+  maxReplicas: 1
+
+
 # ADR-0108 (roadmap WP-10): LM-Eval candidate local-model comparison.
 # Rendered by templates/lmevaljob.yaml, one LMEvalJob CR
 # (trustyai.opendatahub.io/v1alpha1, confirmed via `oc explain lmevaljob`
@@ -701,6 +845,88 @@ maas:
           priority: 50
       authPolicy:
         name: qwen36-27b-instruct-entitlement
+
+    # ADR-0526 (WP-087) / ADR-0521 decisions 5-6: the French urban-register variant, which carries all of Comage's traffic. Same manifest
+    # set every published model here gets - a MaaSModelRef, its
+    # MaaSSubscriptions and a MaaSAuthPolicy, all rendered by
+    # templates/maas.yaml's range over this list. Same two persona groups
+    # and rate limits as the two models above (their scoping decision is
+    # reused verbatim; broadening group coverage stays a separate,
+    # deliberate change).
+    - publishedName: qwen35-9b-wesh-maas
+      backendInferenceServiceName: qwen35-9b-wesh
+      # Structurally useless for the identity path - see gpt-oss-20b's own
+      # entry for the live elimination of this field. Kept wired and empty
+      # for consistency, not re-tested.
+      endpointOverride: ""
+      subscriptions:
+        - name: qwen35-9b-wesh-tekos
+          group: agent_tekos
+          tokenRateLimits:
+            - limit: 100000
+              window: 1h
+          priority: 10
+        - name: qwen35-9b-wesh-sales
+          group: sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
+        # ADR-0521 (WP-076) step 3: ai-gateway's OWN ServiceAccount
+        # identity, not a persona. This grant is what the `via_maas: true`
+        # provider entry in platform/ai-gateway/provider-routing.yaml
+        # depends on - without it the -maas sibling 403s and every turn
+        # silently falls through to the direct twin. See gpt-oss-20b's own
+        # entry for the full user-vs-group scoping rationale.
+        - name: qwen35-9b-wesh-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: qwen35-9b-wesh-entitlement
+
+    # ADR-0526 (WP-087) / ADR-0521 decisions 5-6: the unmodified Qwen3.5-9B base, published so the variant's MaaS path has a same-base comparison point. Same manifest
+    # set every published model here gets - a MaaSModelRef, its
+    # MaaSSubscriptions and a MaaSAuthPolicy, all rendered by
+    # templates/maas.yaml's range over this list. Same two persona groups
+    # and rate limits as the two models above (their scoping decision is
+    # reused verbatim; broadening group coverage stays a separate,
+    # deliberate change).
+    - publishedName: qwen35-9b-maas
+      backendInferenceServiceName: qwen35-9b
+      # Structurally useless for the identity path - see gpt-oss-20b's own
+      # entry for the live elimination of this field. Kept wired and empty
+      # for consistency, not re-tested.
+      endpointOverride: ""
+      subscriptions:
+        - name: qwen35-9b-tekos
+          group: agent_tekos
+          tokenRateLimits:
+            - limit: 100000
+              window: 1h
+          priority: 10
+        - name: qwen35-9b-sales
+          group: sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
+        # ADR-0521 (WP-076) step 3: ai-gateway's OWN ServiceAccount
+        # identity, not a persona. This grant is what the `via_maas: true`
+        # provider entry in platform/ai-gateway/provider-routing.yaml
+        # depends on - without it the -maas sibling 403s and every turn
+        # silently falls through to the direct twin. See gpt-oss-20b's own
+        # entry for the full user-vs-group scoping rationale.
+        - name: qwen35-9b-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: qwen35-9b-entitlement
 
 lmEval:
   enabled: true
