@@ -8,3 +8,20 @@
     build_image_name: mlops
     build_dockerfile_path: components/mlops/Containerfile
     build_context_dir: "."
+    # WP-087: the only component here that needs an explicit build-pod
+    # sizing - see apply_openshift_build.yml's own comment for why zero is
+    # actively harmful rather than merely unset. Sized from the observed
+    # failures: the evicted pods reported 4.7GB and 7.6GB of ephemeral use
+    # mid-build, against a node threshold of ~16GB. 20Gi requested covers
+    # the pip wheel cache, the unpacked CUDA libraries and the committed
+    # layers at once, with the limit leaving room for a fatter torch
+    # release without needing a second visit.
+    build_resources:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+        ephemeral-storage: 20Gi
+      limits:
+        cpu: "4"
+        memory: 8Gi
+        ephemeral-storage: 40Gi

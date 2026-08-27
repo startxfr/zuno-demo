@@ -120,6 +120,22 @@
           type: Docker
           dockerStrategy:
             dockerfilePath: "{{ build_dockerfile_path }}"
+        # Optional, and empty for every caller that does not set it - the
+        # 20 other roles using this task render exactly as before.
+        #
+        # WP-087: a BuildConfig with no resources gives its build pod an
+        # ephemeral-storage REQUEST OF ZERO, which has two consequences the
+        # kubelet applies literally. The scheduler will place it on a node
+        # with almost no free disk, and the eviction manager ranks pods by
+        # usage-above-request - so a zero-request pod writing several GB of
+        # image layers is always the first thing evicted when the node
+        # approaches its threshold. That is how mlops (torch + the full
+        # CUDA stack, ~7.6GB of layers, by far the largest image here) was
+        # evicted on 2 of 3 consecutive builds while every smaller image
+        # built fine, and why retrying is a lottery on which node it lands:
+        # free disk across this cluster's workers ranged from 21GB to 182GB
+        # at the time. Declaring a request fixes both halves.
+        resources: "{{ build_resources | default({}) }}"
         output:
           to:
             kind: ImageStreamTag
