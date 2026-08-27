@@ -596,8 +596,21 @@ def model_router_prefers_local(s: Dict[str, Any]) -> ScenarioResult:
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     routing = yaml.safe_load((repo_root / "platform/ai-gateway/provider-routing.yaml").read_text())
     providers = routing.get("providers", [])
-    ok = bool(providers) and providers[0]["name"] == "local" and "C1" in providers[0].get("eligible_for", [])
-    return ScenarioResult(s["id"], s["title"], ok, f"first_provider={providers[0]['name'] if providers else None}")
+    # kind-based, not name-based - same reasoning as c3_requests_fail_closed
+    # above. What this scenario guarantees is that a C1 call reaches a LOCAL
+    # provider first; which local one is a transport detail that moves with
+    # routing decisions. This asserted providers[0]["name"] == "local" and
+    # broke when WP-076/ADR-0521 put `local-maas` first (MaaS became the
+    # preferred local transport) - a false failure, since the head of the
+    # list was still local. Do not re-hardcode a name here.
+    first = providers[0] if providers else {}
+    ok = bool(providers) and first.get("kind") == "local" and "C1" in first.get("eligible_for", [])
+    return ScenarioResult(
+        s["id"],
+        s["title"],
+        ok,
+        f"first_provider={first.get('name')} kind={first.get('kind')} eligible_for={first.get('eligible_for')}",
+    )
 
 
 def bff_rejects_missing_jwt(s: Dict[str, Any]) -> ScenarioResult:
