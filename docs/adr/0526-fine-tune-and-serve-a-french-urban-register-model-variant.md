@@ -1,6 +1,6 @@
 # ADR-0526: Fine-tune and serve a French urban-register model variant (`-wesh`)
 
-- **Status:** Proposed
+- **Status:** Repo work merged (2026-08-27) - all nine decisions implemented in the repository; no pipeline run, no promotion PR and no live routing verification yet
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team

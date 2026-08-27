@@ -119,7 +119,7 @@ Approved external provider preference and default fallback order:
 
 Routing considers quality, cost, latency, availability, classification and agent/task rules. If no destination satisfies classification policy, the request must fail rather than violate policy.
 
-LoRA/PEFT is an architectural future capability. Comage is the first candidate. Desired benefits are lower response time, lower token consumption and improved relevance.
+LoRA/PEFT is an architectural capability. Comage remains the first candidate agent, but ADR-0526 (WP-087) replaced the objective: it is a **style** adaptation (contemporary French urban register), not the sales-jargon **domain** adaptation ADR-0301 originally scoped, and the trained adapter is **merged** into a standalone checkpoint served as its own model rather than loaded onto the shared runtime. The original desired benefits — lower response time, lower token consumption, improved relevance — do not apply to that objective and are no longer what this capability is measured on; the measure is register conformance plus an unchanged acceptance gate. The domain-adaptation objective was abandoned because the data for it does not exist: Comage's two declared knowledge domains hold zero rows.
 
 ## 7. RAG strategy
 
@@ -892,3 +892,44 @@ chart `image.tag` off `latest` — confirmed live (another session's fresh
 `agent-bff:latest` build sat undeployed) and reverted same-day. Release
 pinning is a point-in-time snapshot proof, not a standing chart-tracking
 target; revert to `latest` immediately after proving it.
+
+### Dated entries (roadmap work packages, v0.4) — current status per ADR
+
+- **ADR-0526 (WP-087)**, 2026-08-27, **Repo work merged**, not yet
+  live-verified: a French urban-register variant of ADR-0518's Qwen3.5-9B
+  training base — LoRA rank 8, merged into a standalone bf16 checkpoint,
+  served as `qwen3.5-9b-wesh` beside its unmodified base on a different
+  MIG node. Comage routes to it first on all four of its tasks, Tekos
+  second on all four of its own. Supersedes ADR-0301 (decisions 1, 5) and
+  ADR-0302 (decisions 2, 4) in part.
+  - **It closed the two independent reasons WP-34's pipeline had never
+    run**, neither of which was visible without executing it: nothing in
+    the repository compiled or uploaded a `PipelineVersion`, and the
+    compiled DAG name (`mlops-<agent>`) referenced a `Pipeline` CR that
+    was never rendered.
+  - **Four defects that neither the ADR nor the brief listed**, each
+    fatal on its own: the mlops image never copied `policies/` or
+    `platform/ai-gateway/`, which the gate's own checks read via
+    `parents[2]`; no persona credentials reached the pod, so
+    `run_scenarios.py` raised immediately; the tokenizer step produced no
+    `labels`, so `Trainer.train()` had nothing to compute a loss from;
+    and `ArtifactStore` had one boto3 client for two buckets in two
+    regions, which raises `PermanentRedirect` rather than following.
+  - **`target_modules` must be an anchored regex, not a suffix list.**
+    `mtp.layers.N.self_attn` carries `q_proj`/`k_proj`/`v_proj`/`o_proj`
+    under those exact names, so a suffix list injects LoRA into the
+    multi-token-prediction head, and `peft` 0.13 has no `exclude_modules`
+    to undo it. Verified against the real `model.safetensors.index.json`:
+    the anchored form matches exactly 80 modules and zero `mtp.*` or
+    `model.visual.*`.
+  - **The register half of the gate cannot be scenarios.** Anything added
+    to `scenarios.yaml` lands in the ADR-0028 denominator, where two
+    failing additions to twenty still score 91% and report PASS. It is
+    computed independently and AND-ed with the acceptance result.
+  - **The style corpus is the ground truth for the scorer's thresholds,
+    and it caught a real bug.** A first protected-span detector treated
+    any line beginning with a tool name as a shell command, so `git garde
+    l'historique de ton code… c'est le sang` — a French sentence whose
+    subject is git — produced false violations. Shell and YAML now
+    require real delimiters. Zero false positives across all 908
+    reference responses.

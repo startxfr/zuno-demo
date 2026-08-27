@@ -1,6 +1,6 @@
 # WP-087: Train, serve and route the French urban-register model variant (`-wesh`)
 
-- **State:** Not started (2026-08-27 — ADR-0526 authored and `Proposed`; no code written)
+- **State:** Repo work merged (2026-08-27) — Parts A-F implemented across 8 commits; operator follow-up (pipeline run, promotion PR, live routing verification) outstanding
 - **ADRs:** ADR-0526 (Proposed → Implemented). Supersedes in part ADR-0301 (decisions 1, 5) and ADR-0302 (decisions 2, 4).
 - **Depends on:** WP-34 (the `components/mlops/` CLI and `gitops/charts/mlops/` this WP fixes and extends), WP-076 (the MaaS per-model recipe), WP-083/WP-086 (the second permanent MIG node and the soft anti-affinity)
 - **Replaces the objective of:** WP-34 (`comage-lora` domain adaptation — never run, and its two knowledge domains hold zero rows)
