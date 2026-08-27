@@ -245,6 +245,12 @@ class IngestionConfig:
     # sequential read loop as the pipeline's next bottleneck).
     detect_changes_read_concurrency: int
 
+    # WP-084 (2026-08-27): validate re-reads every touched document from S3.
+    # Same S3-latency-bound shape as the knobs above - it was simply missed
+    # when the other stages were parallelized, and only showed up once the
+    # corpus reached 310k documents.
+    validate_read_concurrency: int
+
 
 def _env(name: str, default: Optional[str] = None, required: bool = False) -> Optional[str]:
     val = os.environ.get(name, default)
@@ -330,6 +336,7 @@ def load_config() -> IngestionConfig:
         fetch_redhat_concurrency=_env_int("FETCH_REDHAT_CONCURRENCY", 8),
         fetch_sxa_write_concurrency=_env_int("FETCH_SXA_WRITE_CONCURRENCY", 8),
         detect_changes_read_concurrency=_env_int("DETECT_CHANGES_READ_CONCURRENCY", 16),
+        validate_read_concurrency=_env_int("VALIDATE_READ_CONCURRENCY", 16),
         normalize_concurrency=_env_int("NORMALIZE_CONCURRENCY", 16),
         chunk_concurrency=_env_int("CHUNK_CONCURRENCY", 16),
         embed_concurrency=_env_int("EMBED_CONCURRENCY", 4),
@@ -352,6 +359,7 @@ def _s3_pool_size(config: "IngestionConfig") -> int:
         32,
         config.detect_changes_read_concurrency,
         config.index_read_concurrency,
+        config.validate_read_concurrency,
         config.normalize_concurrency,
         config.chunk_concurrency,
         config.fetch_redhat_concurrency,
@@ -2164,11 +2172,14 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
 
     touched_urls = set()
     freshness_failures = []
-    for doc_id in changeset["new"] + changeset["changed"]:
+    doc_ids = changeset["new"] + changeset["changed"]
+
+    def _check_one(doc_id):
+        """Returns (url, freshness_failure_or_None), or None when the record
+        is absent."""
         record = store.get_json(f"{config.normalized_prefix}/{doc_id}.chunks.json")
         if not record:
-            continue
-        touched_urls.add(record["url"])
+            return None
 
         # ADR-0205/WP-24: operational-source chunks must carry the full
         # freshness trio - checked against THIS run's own normalized state
@@ -2182,26 +2193,55 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
         if domain not in _IMMUTABLE_LEGACY_DOMAINS:
             missing = [f for f in _REQUIRED_FRESHNESS_FIELDS if not metadata.get(f)]
             if missing:
-                freshness_failures.append(
+                return record["url"], (
                     f"{record['url']}: domain '{domain}' chunk missing required freshness "
                     f"metadata: {', '.join(missing)}"
                 )
+        return record["url"], None
+
+    # WP-084 (2026-08-27): this was a serial S3 GET per document with no
+    # progress logging at all. On the 310,524-document SXA corpus that is
+    # ~28h of pure latency, and it looks identical to a hang for the first
+    # several hours - the run that exposed it sat 112 minutes without
+    # emitting a line. The other S3-bound stages were parallelized earlier;
+    # this one was simply missed because no corpus had been large enough to
+    # show it.
+    with ThreadPoolExecutor(max_workers=max(1, config.validate_read_concurrency)) as pool:
+        for done, result in enumerate(pool.map(_check_one, doc_ids), start=1):
+            if result is not None:
+                url, failure = result
+                touched_urls.add(url)
+                if failure:
+                    freshness_failures.append(failure)
+            if done % 10000 == 0:
+                logger.info("validate: %d/%d documents read", done, len(doc_ids))
 
     conn = _pg_connect(config)
     failures = list(freshness_failures)
     try:
+        # WP-084 (2026-08-27): this was one round-trip per URL - another
+        # 310,524 serial operations, on a single connection. One grouped
+        # query per batch answers the same question: a source absent from
+        # the result indexed no rows at all.
+        urls = sorted(touched_urls)
+        batch = 10000
         with conn.cursor() as cur:
-            for url in touched_urls:
+            for start in range(0, len(urls), batch):
+                window = urls[start:start + batch]
                 cur.execute(
-                    "SELECT count(*), count(*) FILTER (WHERE embedding IS NULL) "
-                    "FROM document_embeddings WHERE source = %s",
-                    (url,),
+                    "SELECT source, count(*), count(*) FILTER (WHERE embedding IS NULL) "
+                    "FROM document_embeddings WHERE source = ANY(%s) GROUP BY source",
+                    (window,),
                 )
-                total, missing_embedding = cur.fetchone()
-                if total == 0:
-                    failures.append(f"{url}: no rows indexed")
-                elif missing_embedding:
-                    failures.append(f"{url}: {missing_embedding}/{total} chunk(s) missing an embedding")
+                seen = {}
+                for source, total, missing_embedding in cur.fetchall():
+                    seen[source] = (total, missing_embedding)
+                for url in window:
+                    row = seen.get(url)
+                    if row is None:
+                        failures.append(f"{url}: no rows indexed")
+                    elif row[1]:
+                        failures.append(f"{url}: {row[1]}/{row[0]} chunk(s) missing an embedding")
     finally:
         conn.close()
 

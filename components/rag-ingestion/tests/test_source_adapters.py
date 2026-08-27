@@ -718,11 +718,22 @@ def test_stage_detect_changes_reads_raw_records_concurrently():
 
 
 class _FakeValidateCursor:
-    def execute(self, *_a, **_kw):
-        pass
+    def __init__(self):
+        self._window = []
+
+    def execute(self, _sql, params=None, *_a, **_kw):
+        # WP-084: validate now asks one grouped question per batch of sources
+        # instead of one round-trip per URL, so the double has to remember
+        # which window it was asked about.
+        self._window = list(params[0]) if params else []
 
     def fetchone(self):
         return (1, 0)  # total=1, missing_embedding=0 - the DB-side check always "passes"
+
+    def fetchall(self):
+        # Every requested source indexed exactly one row, none missing an
+        # embedding - the DB-side check still always "passes".
+        return [(url, 1, 0) for url in self._window]
 
     def __enter__(self):
         return self
@@ -1218,6 +1229,7 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
     cfg = types.SimpleNamespace(
         detect_changes_read_concurrency=64,
         index_read_concurrency=16,
+        validate_read_concurrency=16,
         normalize_concurrency=16,
         chunk_concurrency=16,
         fetch_redhat_concurrency=8,
@@ -1230,6 +1242,7 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
     small = types.SimpleNamespace(
         detect_changes_read_concurrency=4,
         index_read_concurrency=4,
+        validate_read_concurrency=4,
         normalize_concurrency=4,
         chunk_concurrency=4,
         fetch_redhat_concurrency=4,
@@ -1241,6 +1254,7 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
     for knob in (
         "detect_changes_read_concurrency",
         "index_read_concurrency",
+        "validate_read_concurrency",
         "normalize_concurrency",
         "chunk_concurrency",
         "fetch_redhat_concurrency",
@@ -1297,6 +1311,48 @@ def test_index_pgvector_fails_the_stage_when_the_index_cannot_be_rebuilt():
     assert raised is not None, "the stage reported success with the index missing"
     assert "87 MB" in str(raised), f"the cause was not surfaced: {raised}"
     assert state["rows_written"] > 0, "rows should still have been written"
+
+
+def test_stage_validate_reads_concurrently_and_groups_its_database_check():
+    """WP-084 regression: validate did one serial S3 GET *and* one SQL
+    round-trip per document. On the 310,524-document SXA corpus that is a
+    ~28h stage that logs nothing while it runs, so it is indistinguishable
+    from a hang - the run that exposed it sat 112 minutes in silence."""
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy")  # freshness-exempt
+
+    n = 250
+    doc_ids = [f"doc{i}" for i in range(n)]
+    store = FakeStore()
+    store.json["manifests/changeset.json"] = {
+        "new": doc_ids, "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+        "current_new_changed": {d: {"sha256": f"{d}-sha", "url": f"https://example.test/{d}"} for d in doc_ids},
+    }
+    for d in doc_ids:
+        store.json[f"normalized/{d}.chunks.json"] = {
+            "doc_id": d, "url": f"https://example.test/{d}", "title": "Doc",
+            "metadata": {"domain": "knowledge.sxa-legacy"}, "chunks": [],
+        }
+
+    executes = []
+
+    class _CountingCursor(_FakeValidateCursor):
+        def execute(self, sql, params=None, *a, **kw):
+            executes.append(" ".join(sql.split()))
+            return super().execute(sql, params, *a, **kw)
+
+    class _Conn(_FakeValidateConn):
+        def cursor(self):
+            return _CountingCursor()
+
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_Conn()):
+        stage_validate(config, store)
+
+    assert len(executes) < n, (
+        f"validate issued {len(executes)} statements for {n} documents - "
+        "the per-URL round-trip is back"
+    )
+    assert any("GROUP BY" in q for q in executes), "the check is no longer a grouped query"
+    assert any("ANY(" in q for q in executes), "sources are no longer batched"
 
 
 def test_ivfflat_lists_sizing_matches_pgvector_guidance():
@@ -1359,6 +1415,7 @@ TESTS = [
     test_s3_pool_covers_the_widest_stage_worker_pool,
     test_index_pgvector_raises_maintenance_work_mem_before_building_the_index,
     test_index_pgvector_fails_the_stage_when_the_index_cannot_be_rebuilt,
+    test_stage_validate_reads_concurrently_and_groups_its_database_check,
 ]
 
 

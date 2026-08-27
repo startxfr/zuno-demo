@@ -1448,7 +1448,9 @@ pipeline:
   #  symptom. A resources change is part of the compiled spec, so it needs a
   #  new name here - re-applying v0-6-0 is rejected as immutable, and since
   #  b7a86aaf that rejection fails the play loudly instead of silently.
-  version: v0-7-0
+  # v0-8-0 (2026-08-27): adds VALIDATE_READ_CONCURRENCY, which changes
+  #  CONFIG_KEYS and therefore the compiled spec - a new name is mandatory.
+  version: v0-8-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
@@ -1636,6 +1638,12 @@ resources:
   validate:
     requests: {cpu: "500m", memory: "1536Mi"}
     limits: {cpu: "2", memory: "6Gi"}
+    # WP-084 (2026-08-27): validate re-reads every touched document from S3.
+    # It was left serial when normalize/chunk/embed/index-pgvector were
+    # parallelized - invisible until the 310,524-document SXA corpus turned
+    # it into a ~28h stage that logs nothing while it runs. Same
+    # S3-latency-bound shape as detectChanges, so the same 64.
+    readConcurrency: 64
   reconcileAcls:
     requests: {cpu: "500m", memory: "1536Mi"}
     limits: {cpu: "2", memory: "6Gi"}

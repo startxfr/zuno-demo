@@ -70,6 +70,7 @@ CONFIG_KEYS = {
     # WP-58: detect-changes' per-document S3 read pool - same
     # every-domain-ConfigMap requirement as the two keys above.
     "DETECT_CHANGES_READ_CONCURRENCY": "DETECT_CHANGES_READ_CONCURRENCY",
+    "VALIDATE_READ_CONCURRENCY": "VALIDATE_READ_CONCURRENCY",
     # ADR-0219: normalize/chunk/embed/index-pgvector worker pools - same
     # every-domain-ConfigMap requirement as the keys above.
     "NORMALIZE_CONCURRENCY": "NORMALIZE_CONCURRENCY",
