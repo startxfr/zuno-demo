@@ -186,6 +186,11 @@ scenarios:
     # this flag - slangified syntax fails whatever the question was.
     expect_register: true
     min_markers: 1
+    # A live chat turn here is a full agent round-trip; the platform's own
+    # BFF ceiling for it is 110s, so the handler's 30s default timed this
+    # scenario out on the first run that reached it. Sits just above that
+    # ceiling for the same reason as the image check in security_checks.py.
+    timeout_seconds: 120
 
   - id: 22
     title: A technical turn keeps its terminology exact, register or not

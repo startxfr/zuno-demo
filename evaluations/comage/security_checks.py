@@ -181,11 +181,45 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     if resp.status_code != 200:
         return CheckResult("ai_gateway_local_only_forces_local_provider", False, f"status={resp.status_code} body={resp.text[:200]}")
     provider = resp.json().get("zuno_provider")
-    # ADR-0412: two local providers exist (qwen + gpt-oss); the ADR-0035
-    # invariant is "a local provider answered", not the qwen name
-    # specifically (a preference or a fallback may pick the other one).
-    ok = provider in ("local", "local-gpt-oss")
-    return CheckResult("ai_gateway_local_only_forces_local_provider", ok, f"zuno_provider={provider}")
+    # ADR-0412: several local providers exist; the ADR-0035 invariant is
+    # "a local provider answered", not any particular name. Resolve the
+    # answering provider's `kind` from provider-routing.yaml instead of
+    # keeping a name allow-list here: this asserted
+    # provider in ("local", "local-gpt-oss") and broke when WP-076/ADR-0521
+    # added the MaaS-routed local entries (`local-maas`,
+    # `local-gpt-oss-maas`) and made local-maas the preferred one - a false
+    # failure, since a local provider had in fact answered. Same fix as
+    # run_scenarios.py's model_router_prefers_local. Do not re-hardcode names.
+    # Candidate paths, not one hardcoded depth: in a checkout this file sits
+    # under evaluations/<agent>/, but in the acceptance-gate Job the same
+    # ConfigMap is mounted at three places at once (/gate with flat keys,
+    # /gate/policies, and /platform/ai-gateway at the filesystem root), so a
+    # single parents[N] guess resolves differently depending on where the
+    # loader put this module - which is exactly how this check first failed
+    # with "/gate/platform/ai-gateway/provider-routing.yaml not found".
+    here = pathlib.Path(__file__).resolve()
+    candidates = [
+        here.parents[2] / "platform/ai-gateway/provider-routing.yaml",
+        pathlib.Path("/platform/ai-gateway/provider-routing.yaml"),
+        here.parent / "provider-routing.yaml",
+        pathlib.Path("/gate/provider-routing.yaml"),
+    ]
+    routing_path = next((c for c in candidates if c.is_file()), None)
+    if routing_path is None:
+        return CheckResult(
+            "ai_gateway_local_only_forces_local_provider",
+            False,
+            f"provider-routing.yaml not found in any of {[str(c) for c in candidates]}",
+        )
+    routing = yaml.safe_load(routing_path.read_text())
+    kinds = {p["name"]: p.get("kind") for p in routing.get("providers", [])}
+    ok = kinds.get(provider) == "local"
+    return CheckResult(
+        "ai_gateway_local_only_forces_local_provider",
+        ok,
+        f"zuno_provider={provider} kind={kinds.get(provider)}",
+    )
+
 
 
 def entitlement_without_business_role_denied_salesforce() -> CheckResult:
@@ -285,7 +319,15 @@ def comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests() 
             "user_sub": "sale-01",
             "message": "Show me a chart of this quarter's pipeline by stage.",
         },
-        timeout=30,
+        # 120s, not 30s: this turn round-trips a real image generation
+        # (ADR-0415 routes it to SDXL on OVHcloud), and the platform's own
+        # BFF timeout for the chat path is already 110s. A 30s client
+        # timeout could therefore never observe a successful generation -
+        # it reported "timed out" as a MANDATORY security failure while
+        # the platform was behaving exactly as designed. Raised to sit
+        # just above the BFF's own ceiling, so a turn that still exceeds
+        # it is a genuine problem rather than this check's impatience.
+        timeout=120,
     )
     chart_images = chart_resp.json().get("images", []) if chart_resp.status_code == 200 else []
     chart_ok = chart_resp.status_code == 200 and all(
@@ -300,7 +342,15 @@ def comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests() 
             "user_sub": "sale-01",
             "message": "Generate a promotional marketing image of a modern sales team celebrating a big win.",
         },
-        timeout=30,
+        # 120s, not 30s: this turn round-trips a real image generation
+        # (ADR-0415 routes it to SDXL on OVHcloud), and the platform's own
+        # BFF timeout for the chat path is already 110s. A 30s client
+        # timeout could therefore never observe a successful generation -
+        # it reported "timed out" as a MANDATORY security failure while
+        # the platform was behaving exactly as designed. Raised to sit
+        # just above the BFF's own ceiling, so a turn that still exceeds
+        # it is a genuine problem rather than this check's impatience.
+        timeout=120,
     )
     marketing_images = marketing_resp.json().get("images", []) if marketing_resp.status_code == 200 else []
     marketing_ok = marketing_resp.status_code == 200 and any(
