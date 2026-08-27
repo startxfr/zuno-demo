@@ -168,3 +168,15 @@ unfixed 004 with the exact production error before being accepted.
 
 Neither this ADR's decisions nor its target state change. The end state was
 always `vector(1024)`; only the path to it was not repeatable.
+
+**Outcome, same day.** The fix was expected to leave the two dropped indexes
+for a later ingestion run to rebuild, and the commit that carried it says so.
+That turned out to be wrong, in the useful direction: with 004 no longer
+aborting, 006's own trailing `CREATE INDEX IF NOT EXISTS` recreated each index
+at `lists = 10` - cheap, because ten centroids cost almost nothing to build -
+and 007 then resized it properly within the Job's 300-second budget, using the
+`maintenance_work_mem` it now sets. All four schema-apply Jobs succeeded,
+`rag-tech` came back at `lists = 68` for 68,945 rows and `rag-sxa-legacy` at
+`lists = 319` for 319,713, and no ingestion run was needed. `make d2 check rag`,
+which requires every per-domain Job to have succeeded, reports installed
+again.
