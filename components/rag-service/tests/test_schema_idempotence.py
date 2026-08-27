@@ -268,6 +268,30 @@ def test_the_two_sql_copies_have_not_drifted() -> None:
     )
 
 
+def test_007_resizes_an_existing_index_and_gets_the_memory_it_needs(runtime: str, container: str) -> None:
+    """007's resize branch, which the tests above never reach: with only 25
+    rows the computed lists value is still the 10 that 006 built, so nothing
+    is rebuilt. Push the row count past a thousand and the branch fires -
+    including the `SET LOCAL maintenance_work_mem` that exists because the
+    real sxa-legacy corpus needs 87 MB against a 64 MB default. An
+    unexercised line in a migration is a line that breaks in production."""
+    _insert_rows(runtime, container, 11000)
+    rows = int(_scalar(runtime, container, f"SELECT count(*) FROM {_SCHEMA}.document_embeddings"))
+    assert rows >= 11000, f"expected the corpus to grow past 11000 rows, got {rows}"
+
+    _apply_chain(runtime, container, "application over a grown corpus")
+
+    lists = _scalar(
+        runtime, container,
+        "SELECT (regexp_match(pg_get_indexdef(c.oid), 'lists=''?([0-9]+)'))[1] "
+        "FROM pg_class c WHERE c.relname = 'ix_document_embeddings_embedding_cosine'",
+    )
+    expected = max(10, min(1000, rows // 1000))
+    assert lists == str(expected), (
+        f"007 should have resized the ivfflat index to lists={expected} for {rows} rows, found lists={lists}"
+    )
+
+
 CONTAINERLESS_TESTS = [test_the_two_sql_copies_have_not_drifted]
 
 # Order matters: these share one container and build on each other's state,
@@ -278,6 +302,7 @@ CONTAINER_TESTS = [
     test_the_ivfflat_index_survives_a_reapply,
     test_a_third_apply_is_still_clean,
     test_project_tables_exist_for_the_project_domain,
+    test_007_resizes_an_existing_index_and_gets_the_memory_it_needs,
 ]
 
 
