@@ -291,12 +291,32 @@ def test_main_dispatch_resolves_an_agent_never_hardcoded_into_any_route() -> Non
 def test_main_dispatch_refuses_a_placeholder_agent_the_same_way() -> None:
     """A placeholder is a real, registered agent (ADR-0007) - it must 404
     exactly like an unknown name, never route to a graph that doesn't
-    exist for it."""
-    comage = main_module._registry.get("comage")
-    assert comage is not None and comage.status == "placeholder"
+    exist for it.
+
+    The agent is chosen from the live registry rather than named. This
+    test used to hardcode `comage`, and silently started failing the day
+    that bundle flipped to `active` (2026-08-22) - it was asserting
+    "comage is a placeholder", which is a bundle fact that is *meant* to
+    change, instead of the invariant it exists to defend.
+
+    Among the placeholders it deliberately prefers one that declares a
+    graph shape: that proves _active_agent_or_404 refuses on `status`
+    alone, before GraphFactory is ever consulted, rather than merely
+    happening to refuse because there was no shape to build.
+    """
+    placeholders = [
+        a for a in main_module._registry._agents.values() if a.status == "placeholder"
+    ]
+    assert placeholders, "the real bundle set no longer contains any placeholder agent"
+    agent_def = next(
+        (a for a in placeholders if a.graph_shape), placeholders[0]
+    )
+
     try:
-        main_module._active_agent_or_404("comage")
-        raise AssertionError("expected an HTTPException for a placeholder agent")
+        main_module._active_agent_or_404(agent_def.name)
+        raise AssertionError(
+            f"expected an HTTPException for placeholder agent '{agent_def.name}'"
+        )
     except Exception as exc:  # HTTPException
         assert getattr(exc, "status_code", None) == 404, exc
 

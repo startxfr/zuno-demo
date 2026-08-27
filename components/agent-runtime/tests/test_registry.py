@@ -37,9 +37,12 @@ def test_tekos_loads_from_the_real_bundle() -> None:
     assert tekos.status == "active"
     assert tekos.preferred_classification == "C1"
     assert tekos.rag_top_k == 5
-    # WP-059 added the git.repository.* reads and ADR-0516 added
-    # diagram.generation.create; this assertion had not been updated for
-    # either until 2026-08-26.
+    # This assertion has drifted behind the bundle three times now:
+    # WP-059 added the git.repository.* reads, ADR-0516 added
+    # diagram.generation.create (both caught 2026-08-26), and WP-074
+    # (ADR-0355, commit 7a5a21cc) added the two aap.*.audit reads served
+    # by mcp-aap - caught 2026-08-28. The drift is the point of the test:
+    # a bundle change with no code change must show up here.
     assert set(tekos.declared_tools()) == {
         "search_confluence",
         "web_search",
@@ -47,6 +50,8 @@ def test_tekos_loads_from_the_real_bundle() -> None:
         "git.repository.read",
         "git.repository.list",
         "diagram.generation.create",
+        "aap.platform.audit",
+        "aap.cluster.audit",
     }
     # ADR-0203: declared_knowledge() is the union of every task's own
     # allowed_knowledge, mirroring declared_tools() exactly - there is no
@@ -60,6 +65,8 @@ def test_tekos_loads_from_the_real_bundle() -> None:
         "git.repository.read",
         "git.repository.list",
         "diagram.generation.create",
+        "aap.platform.audit",
+        "aap.cluster.audit",
     ]
     # ADR-0209 (WP-28): knowledge.project added alongside knowledge.tech -
     # the task can retrieve project memory too, gated per-turn on an
@@ -93,6 +100,9 @@ def test_placeholder_agents_declare_their_real_tool_ceiling() -> None:
         "git.file.write",
         "git.repository.create",
         "diagram.generation.create",
+        # WP-074 (ADR-0355): Arkos gets the platform audit only. The
+        # cluster audit is Tekos-only - see that bundle above.
+        "aap.platform.audit",
     ]
 
     comage = registry.get("comage")
