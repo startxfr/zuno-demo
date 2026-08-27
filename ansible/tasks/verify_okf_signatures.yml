@@ -78,12 +78,20 @@
     - fetched_result.rc == 0
     - fetched_result.stdout | default('') | length > 0
 
+# Name the remedy in the message. This check's whole failure mode is
+# "someone changed a bundle and never re-signed", and until 2026-08-27 it
+# reported that as a raw cosign dump with no indication of what to run -
+# which cost a full acceptance-gate run to diagnose.
 - name: "okf-signatures | fail if any fetched signature no longer verifies"
   ansible.builtin.fail:
     msg: >-
       OKF bundle signature verification failed for
       {{ bad_result.fetched_result.agent_dir.path | basename }}:
       {{ bad_result.stdout }} {{ bad_result.stderr }}
+      -- This normally means the bundle changed since it was last signed
+      (any edit or regeneration of agents/*/agent.okf.md does it). Re-sign
+      with:  make d3 sign agents  -- and if that verb then reports the
+      image is older than this checkout, run  make d2 build agent  first.
   loop: "{{ _okf_verify_results.results | default([]) }}"
   loop_control:
     loop_var: bad_result

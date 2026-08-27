@@ -77,6 +77,11 @@ DAY2_VERBS := check install build uninstall all reinstall
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
 DAY3_BACKUP_COMPONENTS := postgresql
+# ADR-0420/WP-069: re-signing the OKF bundles acts on already-installed
+# agent bundles - it builds nothing - so it belongs in this tier by the
+# definition above, not inside `make d2 build agent`. Its own component
+# list, same per-verb split as backup/restore.
+DAY3_SIGN_COMPONENTS := agents
 # Components that support "check" but neither test/stresstest nor
 # backup/restore - they contribute only their own precheck.yml
 # (ansible/playbooks/day3_check.yml). ADR-0524/WP-085: "lightspeed" and
@@ -84,8 +89,8 @@ DAY3_BACKUP_COMPONENTS := postgresql
 # across day tiers - checking only the operator would report healthy while the
 # OLSConfig operand is absent, and vice versa.
 DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config
-DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
+DAY3_VERBS := test stresstest backup restore check sign
 
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
@@ -127,6 +132,7 @@ help:
 	  '' \
 	  '  make day3|d3 test [component]        Check availability only (ADR-0057)' \
 	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
+	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after any agent.okf.md change' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
@@ -182,6 +188,7 @@ _complete-components:
 	     esac ;; \
 	  3) case "$(VERB)" in \
 	       backup|restore) echo "$(DAY3_BACKUP_COMPONENTS) all" ;; \
+	       sign) echo "$(DAY3_SIGN_COMPONENTS) all" ;; \
 	       *) echo "$(DAY3_COMPONENTS) all" ;; \
 	     esac ;; \
 	esac
@@ -429,12 +436,16 @@ if [[ -z "$$verb" ]]; then \
     '  backup       Trigger an on-demand backup' \
     '  restore      Restore from the most recent backup (fails if none exists)' \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
+    '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
     '' \
     'Components (test/stresstest/check; optional, default: all):' \
     '  $(DAY3_TEST_COMPONENTS)' \
     '' \
     'Components (backup/restore; optional, default: all):' \
     '  $(DAY3_BACKUP_COMPONENTS)' \
+    '' \
+    'Components (sign; optional, default: all):' \
+    '  $(DAY3_SIGN_COMPONENTS)' \
     '' \
     'Day 3 check-only components:' \
     '  $(DAY3_CHECK_ONLY_COMPONENTS)' \
@@ -447,7 +458,8 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest BULK=25' \
     'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection' \
     'Example: make d3 backup postgresql' \
-    'Example: make d3 restore postgresql'; \
+    'Example: make d3 restore postgresql' \
+    'Example: make d3 sign agents   # after regenerating any agents/*/agent.okf.md'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
@@ -487,6 +499,9 @@ case "$$verb" in \
   check) \
     case " $(DAY3_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 check component: '$$component' (expected one of: $(DAY3_COMPONENTS) or all)" >&2; exit 2;; esac; \
     $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_check.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+  sign) \
+    case " $(DAY3_SIGN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 sign component: '$$component' (expected one of: $(DAY3_SIGN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_sign.yml -e "target_component=$$component" $(EXTRA_VARS) ;; \
 esac
 endef
 
@@ -501,5 +516,5 @@ d3: $(if $(DAY_VERB),credentials-check)
 # directly, so e.g. `make d0 check postgresql` needs "check" and
 # "postgresql" to resolve to *something* as Make goals without erroring
 # as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)):
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)):
 	@:

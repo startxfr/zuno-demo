@@ -22,13 +22,21 @@
     build_dockerfile_path: components/agent-frontend/Dockerfile
     build_context_dir: "."
 
-# ADR-0420/WP-069: re-sign every OKF bundle against the agent-runtime image
-# just (re)built above, only on an explicit `make d2 build agent[/all]` -
-# not on every routine install's "ensure this image exists" dependency
-# path, which would re-run this idempotent-but-not-free Job on every
-# unrelated Day 2 install. Requires ansible/roles/vault (Transit engine)
-# and ansible/roles/supply_chain_signer_build (zuno-signer ServiceAccount,
-# supply-chain-signer image) to already be applied.
-- name: "agent_build | re-sign every OKF bundle (explicit build only)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
+# ADR-0420/WP-069: OKF bundle re-signing used to run here, gated on
+# `day2_verb == 'build'`. It moved to its own Day 3 verb - `make d3 sign
+# agents` - because signing acts on already-installed agent bundles and
+# builds nothing, and because burying it here left the step nameless: two
+# commits (WP-074, WP-087 Part D) regenerated OKF bundles without
+# re-signing, and the omission only surfaced much later as an
+# unactionable signature failure inside `make d2 check agents`.
+#
+# This is a reminder, not a substitute. It fires only on an explicit
+# build, where the bundles baked into the image just changed and their
+# stored signatures are therefore now stale.
+- name: "agent_build | remind that the OKF bundles must be re-signed"
+  ansible.builtin.debug:
+    msg: >-
+      agent-runtime was rebuilt, so the OKF bundle signatures in Vault no
+      longer match the bundles this image carries. Re-sign them now:
+      make d3 sign agents
   when: (day2_verb | default('install')) == 'build'

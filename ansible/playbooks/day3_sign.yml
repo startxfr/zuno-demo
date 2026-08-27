@@ -1,0 +1,59 @@
+---
+# `make day3|d3 sign [agents]`. ADR-0420/WP-069.
+#
+# Re-signs every agents/<agent>/ OKF bundle with the in-cluster Vault
+# Transit key and writes the results to Vault KV (zuno/okf-signatures).
+#
+# Why this is a Day 3 verb and no longer a side effect of `make d2 build
+# agent`: signing acts on already-installed agent bundles and builds
+# nothing, which is this tier's stated definition. Burying it in the build
+# meant the step had no name - two commits (WP-074, WP-087 Part D)
+# regenerated OKF bundles without re-signing, and the omission only
+# surfaced much later as an unactionable signature failure inside
+# `make d2 check agents`.
+#
+# The verification pass at the end is not decoration. The signing Job
+# signs the bundles baked into the agent-runtime:latest IMAGE (see
+# run_okf_signing_job.yml's own comment - it copies /app/agents out of
+# that image on purpose, so the signed bytes are by construction what the
+# runtime loads), whereas verify_okf_signatures.yml checks THIS CHECKOUT's
+# bytes. The two agree only when the image was built from the same commit.
+# So a verification failure immediately after a successful signing has
+# exactly one meaning: the image predates your checkout's bundles. Saying
+# so plainly is the whole point - that is the diagnosis this verb exists
+# to make cheap.
+- name: "Day 3: re-sign the OKF bundles"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    # Only one component exists today (agents). Validate rather than
+    # silently ignore, so `make d3 sign <typo>` is not a no-op that looks
+    # like a success - the Makefile already rejects unknown components,
+    # this covers a direct ansible-playbook invocation.
+    - name: Reject an unsupported sign component
+      ansible.builtin.fail:
+        msg: >-
+          Unsupported day3 sign component '{{ target_component }}' - only
+          'agents' (or 'all') is supported.
+      when: target_component | default('all') not in ['agents', 'all']
+
+    - name: Re-sign every OKF bundle
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
+
+    - name: Verify the freshly written signatures against this checkout
+      block:
+        - name: "okf-sign | verify"
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/verify_okf_signatures.yml"
+      rescue:
+        - name: "okf-sign | explain what a post-signing verification failure means"
+          ansible.builtin.fail:
+            msg: >-
+              The signing Job succeeded but the resulting signatures do not verify
+              against this checkout's agents/ tree. That means the deployed
+              agent-runtime:latest image - whose bundles are what actually got
+              signed - is older than the bundles committed here. Rebuild it first,
+              then re-run this verb:  make d2 build agent  &&  make d3 sign agents
