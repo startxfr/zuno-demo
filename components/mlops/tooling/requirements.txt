@@ -1,0 +1,9 @@
+# KFP SDK used ONLY to compile files/pipeline.py.tpl into a PipelineVersion
+# manifest (ansible/roles/mlops/tasks/compile_pipeline_version.yml). Kept
+# separate from ../requirements.txt on purpose: that one is the runtime
+# image's dependency set, and the image has no reason to carry the
+# compiler. Same split, same pins as
+# components/rag-ingestion/tooling/requirements.txt - the two compile the
+# same way and must not drift.
+kfp>=2.14.3,<3
+kfp-kubernetes>=2.14.3,<3

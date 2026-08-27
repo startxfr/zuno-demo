@@ -1,4 +1,25 @@
 {{- if .Values.pipeline.createPipelineResource }}
+{{- /*
+ADR-0526 (WP-087) fixes a real mismatch here. files/pipeline.py.tpl
+compiles a DAG named "<pipeline.name>-<agent>" and emits a PipelineVersion
+with include_pipeline_manifest=False - i.e. a version pointing at a
+Pipeline that must ALREADY exist. This template used to render exactly one
+CR named "mlops", so the compiled version referenced a Pipeline that was
+never created. That is one of the two reasons the mlops Pipeline still
+carries 0 versions and 0 runs.
+
+The fix mirrors gitops/charts/rag-ingestion/templates/pipeline.yaml: keep
+the base CR (ansible/roles/mlops's own install/precheck tasks look it up
+by that name) and add one per enabled candidate agent. The compile side
+then needs no change at all.
+
+The alternative - compiling under the base name - was rejected: it would
+still need per-agent PipelineVersion name suffixing (names are unique per
+NAMESPACE, not per pipeline - rag-ingestion hit exactly that live on
+2026-08-21), it would let two enabled agents push conflicting specs into
+one immutable Pipeline, and it would orphan the "mlops" CR the role
+already queries.
+*/ -}}
 apiVersion: pipelines.kubeflow.org/v2beta1
 kind: Pipeline
 metadata:
@@ -9,4 +30,20 @@ metadata:
 spec:
   displayName: {{ .Values.pipeline.displayName | quote }}
   description: {{ .Values.pipeline.description | quote }}
+{{- range $name, $agent := .Values.agents }}
+{{- if $agent.enabled }}
+---
+apiVersion: pipelines.kubeflow.org/v2beta1
+kind: Pipeline
+metadata:
+  name: {{ $.Values.pipeline.name }}-{{ $name }}
+  namespace: {{ $.Values.platform.namespace }}
+  labels:
+    {{- include "mlops.labels" $ | nindent 4 }}
+    zuno.io/mlops-agent: {{ $name | quote }}
+spec:
+  displayName: "{{ $.Values.pipeline.displayName }} ({{ $name }})"
+  description: {{ $.Values.pipeline.description | quote }}
+{{- end }}
+{{- end }}
 {{- end }}

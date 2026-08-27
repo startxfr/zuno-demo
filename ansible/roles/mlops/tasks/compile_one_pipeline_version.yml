@@ -1,0 +1,79 @@
+---
+# Compiles and applies ONE candidate agent's PipelineVersion
+# (files/pipeline.py.tpl's `python pipeline.py <agent>` step). Expects
+# `compile_pipeline_target` and the already-fetched
+# `_mlops_pipeline_source_cm` in scope from the including task.
+
+- name: "mlops | compile and apply the pipeline version for {{ compile_pipeline_target }}"
+  block:
+    - name: "mlops | create a working directory for the compile of {{ compile_pipeline_target }}"
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "mlops-pipeline-compile-{{ compile_pipeline_target }}"
+      register: _mlops_compile_dir
+
+    - name: "mlops | write the rendered pipeline.py to the working directory"
+      # From the IN-CLUSTER ConfigMap, never the working copy: what runs is
+      # what ArgoCD synced, and compiling from an unsynced local edit would
+      # produce a version that does not match the deployed ConfigMaps.
+      ansible.builtin.copy:
+        dest: "{{ _mlops_compile_dir.path }}/pipeline.py"
+        content: "{{ _mlops_pipeline_source_cm.resources[0].data['pipeline.py'] }}"
+        mode: "0644"
+
+    - name: "mlops | compile the PipelineVersion manifest for {{ compile_pipeline_target }}"
+      ansible.builtin.command:
+        cmd: "{{ zuno_repo_root }}/components/mlops/tooling/.venv/bin/python pipeline.py {{ compile_pipeline_target }}"
+        chdir: "{{ _mlops_compile_dir.path }}"
+      changed_when: true
+
+    - name: "mlops | apply the compiled PipelineVersion manifest for {{ compile_pipeline_target }}"
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ _mlops_compile_dir.path }}/pipeline-kubernetes.yaml"
+        namespace: zuno-mlops
+      register: _mlops_pipeline_version_apply
+
+    - name: "mlops | compile summary for {{ compile_pipeline_target }}"
+      ansible.builtin.debug:
+        msg: >-
+          {{ compile_pipeline_target }} pipeline version compiled and applied
+          ({{ 'changed' if _mlops_pipeline_version_apply.changed else 'already up to date' }}).
+  rescue:
+    # Kept VERBATIM from rag-ingestion's own rescue, because the
+    # distinction it draws is hard-won and applies identically here. An
+    # immutable-spec rejection is not in the same class as the failures
+    # below: it means the compiled pipeline genuinely CHANGED while the
+    # version name did not, so KFP refused the update and the cluster
+    # silently kept the OLD spec. Swallowing that reports ok=N failed=0
+    # while the operator's change never landed - which is exactly how a
+    # re-sized stage can look deployed and then run with its old limits.
+    - name: "mlops | FATAL: {{ compile_pipeline_target }} PipelineVersion is immutable and its name was not bumped"
+      ansible.builtin.fail:
+        msg: >-
+          The {{ compile_pipeline_target }} PipelineVersion was rejected as
+          immutable: the compiled spec differs from the live object but
+          `pipeline.version` in gitops/charts/mlops/values.yaml is unchanged,
+          so KFP kept the OLD spec and your change did NOT reach the cluster.
+          Bump `pipeline.version` (e.g. v0-1-0 -> v0-2-0), commit, WAIT for
+          ArgoCD to sync the mlops ConfigMaps - this task compiles from the
+          in-cluster mlops-pipeline-source ConfigMap, not from your working
+          copy - then re-run. Verify the new object rather than this play's
+          exit code.
+      when: >-
+        'Pipeline spec is immutable' in (ansible_failed_result.msg | default('') | string)
+
+    - name: "mlops | pipeline-version compile failed, not fatal, for {{ compile_pipeline_target }}"
+      ansible.builtin.debug:
+        msg: >-
+          Compiling/applying the {{ compile_pipeline_target }} PipelineVersion
+          failed (see the task output above for the actual error) - this does
+          not block the rest of the install, nor any other agent's compile in
+          this same loop. Common causes: no PyPI egress from this machine to
+          install kfp/kfp-kubernetes, or a files/pipeline.py.tpl compile error.
+  always:
+    - name: "mlops | clean up the compile working directory for {{ compile_pipeline_target }}"
+      ansible.builtin.file:
+        path: "{{ _mlops_compile_dir.path }}"
+        state: absent
+      when: _mlops_compile_dir.path is defined

@@ -1,0 +1,59 @@
+---
+# THIS IS THE MISSING STEP. The mlops Pipeline CR has carried 0 versions
+# and 0 runs since WP-34 merged, and this file is why: nothing in the
+# repository ever compiled or uploaded a PipelineVersion. The chart's
+# Pipeline CR (templates/pipeline.yaml) carries only displayName and
+# description - it is the container, never the content.
+#
+# files/pipeline.py.tpl already compiles with kubernetes_manifest_format=True
+# (see its __main__ block), which emits a real PipelineVersion CR
+# (pipelines.kubeflow.org/v2beta1) rather than needing a kfp.Client() REST
+# upload - so `oc apply`-ing that manifest is the whole missing operation.
+# Transposed from ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml,
+# which has been doing exactly this for its own domains all along.
+#
+# TWO THINGS DIFFER FROM THE RAG-INGESTION ORIGINAL and both matter:
+#   - the ConfigMap lives in zuno-mlops, not zuno-ai-build;
+#   - every compile target is suffixed in the version name (rag-ingestion
+#     leaves "tech" unsuffixed as its first-in-place target; mlops has no
+#     such privileged target, so there is no special case).
+#
+# Re-running is required after any `make d2 reinstall mlops`: deleting the
+# Application deletes the Pipeline CR and with it every version.
+- name: "mlops | set the list of pipeline compile targets"
+  # One entry per values.yaml `agents:` entry with enabled: true. Extend
+  # this list when a second candidate agent flips on.
+  ansible.builtin.set_fact:
+    _mlops_compile_targets: ["comage"]
+
+- name: "mlops | ensure the compiler venv (kfp SDK) exists"
+  ansible.builtin.pip:
+    requirements: "{{ zuno_repo_root }}/components/mlops/tooling/requirements.txt"
+    virtualenv: "{{ zuno_repo_root }}/components/mlops/tooling/.venv"
+    virtualenv_command: "python3 -m venv"
+
+- name: "mlops | read the rendered pipeline source ConfigMap"
+  # zuno-mlops, NOT zuno-ai-build - the mlops chart deploys into its own
+  # namespace (values.yaml's platform.namespace). Copying rag-ingestion's
+  # namespace here would silently find nothing and skip forever.
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: zuno-mlops
+    name: "zuno-mlops-d1-mlops-pipeline-source"
+  register: _mlops_pipeline_source_cm
+
+- name: "mlops | skip pipeline-version compile if the pipeline-source ConfigMap isn't rendered yet"
+  ansible.builtin.debug:
+    msg: >-
+      Skipping pipeline-version compile: ConfigMap
+      zuno-mlops-d1-mlops-pipeline-source not found in zuno-mlops (the d1
+      Application may not have synced yet).
+  when: (_mlops_pipeline_source_cm.resources | default([]) | length) == 0
+
+- name: "mlops | compile and apply each enabled agent's pipeline version"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/mlops/tasks/compile_one_pipeline_version.yml"
+  loop: "{{ _mlops_compile_targets }}"
+  loop_control:
+    loop_var: compile_pipeline_target
+  when: (_mlops_pipeline_source_cm.resources | default([]) | length) > 0

@@ -41,6 +41,70 @@
   retries: 60
   delay: 15
 
+# ADR-0526 (WP-087): compile and upload the PipelineVersion. Placed right
+# after the DSPA reports Ready, mirroring
+# ansible/roles/rag_ingestion/tasks/install.yml - KFP must be up before a
+# PipelineVersion can be applied against it.
+- name: "mlops | compile and apply the KFP PipelineVersion(s)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/mlops/tasks/compile_pipeline_version.yml"
+
+# WP-087: the `evaluate` stage runs the candidate agent's REAL acceptance
+# suite (ADR-0302 point 5), which authenticates a demo persona against
+# Keycloak - evaluations/tekos/run_scenarios.py raises outright without
+# DEMO_PERSONA_PASSWORD. The password is Keycloak-generated and lives in
+# zuno-auth, so it is copied into zuno-mlops here rather than invented as
+# a Vault path that does not exist. Exactly the mechanism
+# ansible/roles/agents/tasks/run_acceptance_gate.yml already uses to put
+# the same credential into zuno-ai-run.
+- name: "mlops | read the Keycloak-generated demo persona password"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-auth
+    name: demo-personas-password
+  register: _mlops_demo_password_secret
+  no_log: true
+
+- name: "mlops | read the Tekos frontend client secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-auth
+    name: tekos-frontend-client-secret
+  register: _mlops_client_secret_secret
+  no_log: true
+
+- name: "mlops | copy the acceptance-gate credentials into zuno-mlops so the evaluate stage can authenticate"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: acceptance-gate-credentials
+        namespace: zuno-mlops
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      data:
+        demo-persona-password: "{{ _mlops_demo_password_secret.resources[0].data.password }}"
+        tekos-frontend-client-secret: "{{ _mlops_client_secret_secret.resources[0].data.client_secret }}"
+  no_log: true
+  when: >-
+    (_mlops_demo_password_secret.resources | default([]) | length) > 0 and
+    (_mlops_client_secret_secret.resources | default([]) | length) > 0
+
+- name: "mlops | warn if the acceptance-gate credentials could not be copied"
+  ansible.builtin.debug:
+    msg: >-
+      demo-personas-password / tekos-frontend-client-secret not found in
+      zuno-auth, so zuno-mlops has no acceptance-gate-credentials Secret.
+      Every pipeline stage will fail to start (the KFP task references that
+      Secret by name). Run `make d0 configure keycloak` first, then re-run.
+  when: >-
+    (_mlops_demo_password_secret.resources | default([]) | length) == 0 or
+    (_mlops_client_secret_secret.resources | default([]) | length) == 0
+
 - name: "mlops | configure summary (DSPA)"
   ansible.builtin.debug:
     msg: >-
@@ -96,17 +160,26 @@
         return_content: true
       register: _mlops_pipelines_list
 
-    - name: "mlops | fail loudly if the mlops pipeline is not registered"
+    # WP-087: this used to compare display_name against 'mlops'. The CR's
+    # displayName is "MLOps: dataset-to-model LoRA/PEFT pipeline", so the
+    # check could NEVER pass - and its own rescue swallowed the failure, so
+    # it reported nothing wrong for as long as it existed. Match on the
+    # object NAME, which is what the chart actually sets to
+    # .Values.pipeline.name, and accept either the base CR or a per-agent
+    # one (ADR-0526 added the latter so compiled versions have a Pipeline
+    # to attach to).
+    - name: "mlops | fail loudly if no mlops pipeline is registered"
       ansible.builtin.fail:
         msg: >-
-          No pipeline named "mlops" found via the DSPA API - the Pipeline
-          CR (gitops/charts/mlops/templates/pipeline.yaml) may not have
-          synced yet, or KFP has not finished indexing it. Re-run `make
-          d1 install mlops` once ArgoCD reports the Application Healthy.
+          No pipeline named "mlops" or "mlops-<agent>" found via the DSPA
+          API - the Pipeline CRs
+          (gitops/charts/mlops/templates/pipeline.yaml) may not have synced
+          yet, or KFP has not finished indexing them. Re-run `make d2
+          install mlops` once ArgoCD reports the Application Healthy.
       when: >-
         not ((_mlops_pipelines_list.json.pipelines | default([]))
-             | selectattr('display_name', 'defined')
-             | selectattr('display_name', 'equalto', 'mlops')
+             | selectattr('name', 'defined')
+             | selectattr('name', 'match', '^mlops(-.+)?$')
              | list | length > 0)
 
     - name: "mlops | configure summary (pipeline registered)"

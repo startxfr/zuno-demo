@@ -199,7 +199,14 @@ if __name__ == "__main__":
         kubernetes_manifest_format=True,
         kubernetes_manifest_options=KubernetesManifestOptions(
             pipeline_name=pipeline_name,
-            pipeline_version_name="{{ .Values.pipeline.version }}",
+            # ALWAYS suffixed by target. PipelineVersion names are unique
+            # per NAMESPACE, not per pipeline - rag-ingestion proved this
+            # live on 2026-08-21, where compiling a second domain produced
+            # an object literally named the chart's single version value
+            # and was rejected "Pipeline spec is immutable". mlops has no
+            # privileged first target to leave unsuffixed, so every one is
+            # suffixed and there is no special case to get wrong later.
+            pipeline_version_name="{{ .Values.pipeline.version }}-" + target,
             namespace="{{ .Values.platform.namespace }}",
             include_pipeline_manifest=False,
         ),
