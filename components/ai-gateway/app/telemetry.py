@@ -89,6 +89,19 @@ _COST_PER_SECOND_LOCAL = {
     # silently fell through to zero cost.
     "local-maas": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,
     "local-gpt-oss-maas": _NODE_USD_PER_HOUR["g7e.2xlarge"] / 3600.0,
+    # ADR-0526 (WP-087): the French urban-register variant and its own
+    # unmodified base, on the same shared MIG host as "local" - priced
+    # from their slice sizes, not from a node type of their own. The
+    # variant takes a 2g.48gb slice (50% of the 96GB card, same share and
+    # therefore same rate as "local"); the base takes a 1g.24gb slice
+    # (25%). Each carries its -maas sibling at the identical rate:
+    # transport never changes the economics, and this table is keyed by
+    # PROVIDER name (candidate.name), so a via_maas call that reports
+    # under its own entry name would meter at $0 without its own row.
+    "local-wesh": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,
+    "local-wesh-maas": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.5) / 3600.0,
+    "local-qwen35": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.25) / 3600.0,
+    "local-qwen35-maas": (_NODE_USD_PER_HOUR["g7e.4xlarge"] * 0.25) / 3600.0,
 }
 
 _tracer: Optional[trace.Tracer] = None

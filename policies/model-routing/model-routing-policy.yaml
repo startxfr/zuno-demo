@@ -73,17 +73,25 @@ preferences:
   # mistral. mistral-codestral is deliberately left unlisted - a
   # code-specialized model has no place being preferred for general Q&A/
   # lookup, but stays reachable at the very end rather than excluded.
+  #
+  # ADR-0526 (WP-087) decision 7: the qwen3.5-9b-wesh pair is inserted in
+  # SECOND position on all four Tekos tasks - after each task's own
+  # existing first choice, never displacing it. Every other candidate
+  # keeps its existing relative order, so this is purely additive to the
+  # chains below. Tekos is C1-seeded and the variant is C1-eligible like
+  # every local provider, so it is reachable at Tekos's natural
+  # classification with no override.
   - agent: tekos
     task: answer-technical-question
-    preferred: [local-gpt-oss-maas, local-gpt-oss, local-maas, local, ovhcloud-gpt-oss-120b]
+    preferred: [local-gpt-oss-maas, local-gpt-oss, local-wesh-maas, local-wesh, local-maas, local, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   - agent: tekos
     task: find-relevant-docs
-    preferred: [local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    preferred: [local-maas, local, local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   - agent: tekos
     task: check-my-drive-docs
-    preferred: [local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    preferred: [local-maas, local, local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   # Plan->draft->reflect->write document workflow; C3 by agent seed - the
   # flagship local-only reflexional case. draft_node's own call is always
@@ -102,10 +110,43 @@ preferences:
   - agent: arkos
     task: workshop-presentation
     prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
-  # Multi-year comparison/analysis over C3 sxa-legacy data.
+  # ADR-0526 (WP-087) decision 7: Comage is the candidate agent, so the
+  # qwen3.5-9b-wesh pair leads the chain on ALL FOUR of its declared
+  # tasks. A preference is keyed by the (agent, task) tuple and an entry
+  # without `task` is rejected outright (app/model_routing_policy.py's
+  # own validation), so "the default for Comage" is expressible only as
+  # one entry per task - there is no agent-level default to write.
+  # Everything after the variant keeps the order it had before this WP:
+  # compare-historical-deals kept gpt-oss ahead of qwen (it was already a
+  # reflexional entry); the three tasks below had no entry at all, so
+  # their tails reproduce provider-routing.yaml's own file order exactly.
+  #
+  # Multi-year comparison/analysis over C3 sxa-legacy data. This is the
+  # task ADR-0526's Security considerations single out: it escalates to
+  # C3 whenever knowledge.sxa-legacy contributes (ADR-0034), so the
+  # variant answers C3 turns by default. That is legitimate for a local
+  # provider, and it is exactly why the substance half of the promotion
+  # gate stays mandatory (decision 8) - a style model that degrades
+  # reasoning on C3 financial and legacy data is a security-relevant
+  # regression, not a cosmetic one.
   - agent: comage
     task: compare-historical-deals
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    prefer: [local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  # Opportunity lookup by name/stage - a simple transactional read, and a
+  # tool-calling turn: the variant's serving runtime must therefore keep
+  # a tool-call parser configured (gitops/charts/models), or tool use
+  # breaks silently for this task.
+  - agent: comage
+    task: check-deal-status
+    prefer: [local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
+  # Opportunity stage write-back.
+  - agent: comage
+    task: update-opportunity-status
+    prefer: [local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
+  # Drive/mail lookup over the user's own material - also tool-calling.
+  - agent: comage
+    task: check-my-drive-and-mail
+    prefer: [local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
   # Project/bid synthesis.
   - agent: advantage
     task: answer-project-question
@@ -155,9 +196,14 @@ preferences:
   # app/main.py's _invoke_with_fallback (unchanged) naturally drops to
   # local if Codestral errors, giving "use local also for coding" for
   # free from already-live machinery.
+  # ADR-0526 (WP-087): the variant goes SECOND here too - mistral-codestral
+  # stays at index 0 and this entry stays non-strict. Both are enforced in
+  # CI by evaluations/tekos/gate_checks.py's
+  # tekos_write_code_prefers_mistral_codestral check, which fails the gate
+  # outright if either changes.
   - agent: tekos
     task: write-code
-    prefer: [mistral-codestral, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    prefer: [mistral-codestral, local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
 
 # ADR-0304 (WP-40 Part B): per (agent, task) "task class" quality/cost/
 # latency objectives, consumed by evaluations/routing_report.py alongside

@@ -135,11 +135,11 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `C2` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `C2` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `check-my-drive-and-mail` | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `answer-finance-question` (primary; prompt: `prompts/answer-finance-question.md`) | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `identify-business-ready-to-invoice` (project-required; prompt: `prompts/identify-business-ready-to-invoice.md`) | `C2` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `monthly-invoice-report` (project-required; prompt: `prompts/monthly-invoice-report.md`) | `C2` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-and-mail` | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
 
-**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`.
+**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`.
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

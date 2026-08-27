@@ -121,11 +121,11 @@ Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `plat
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `update-opportunity-status` | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `compare-historical-deals` | `C2` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `check-my-drive-and-mail` | `C2` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `C2` | `local-wesh-maas` | `local-wesh`, `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `update-opportunity-status` | `C2` | `local-wesh-maas` | `local-wesh`, `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `compare-historical-deals` | `C2` | `local-wesh-maas` | `local-wesh`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-maas`, `local`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `check-my-drive-and-mail` | `C2` | `local-wesh-maas` | `local-wesh`, `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b` | — | `policies/model-routing/model-routing-policy.yaml` |
 
-**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
+**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

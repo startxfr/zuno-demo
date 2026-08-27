@@ -175,6 +175,72 @@ providers:
     timeout_seconds: 60
     eligible_for: [C1, C2, C3]
 
+  # ADR-0526 (WP-087): the French urban-register variant and its own
+  # unmodified base, served side by side (decision 2) so the variant is
+  # comparable against the model it was fine-tuned from rather than
+  # against a different model. Both are standalone merged-weight
+  # checkpoints, each its own LLMInferenceService (decision 4 - NOT vLLM
+  # --lora-modules on a shared runtime), so neither sets serves_adapters:
+  # ADR-0303's adapter mechanism is bypassed here, not extended, and an
+  # adapter id must never be sent to a runtime that registers none.
+  #
+  # Declared AFTER local-gpt-oss and BEFORE openai deliberately. File
+  # order is the fallback order for every (agent, task) with NO
+  # `preferences:` entry, so declaring these first would silently make a
+  # French urban-register model the platform-wide default for every agent
+  # that never asked for it - naveo, soursage, and arkos's unlisted tasks
+  # included. Comage and Tekos reach the variant through explicit
+  # per-(agent, task) preferences in policies/model-routing/
+  # model-routing-policy.yaml instead (ADR-0526 decision 7).
+  #
+  # eligible_for is [C1, C2, C3], same as every other local provider: the
+  # merged checkpoint inherits the training corpus's C1 classification
+  # (decision 3), and Comage's compare-historical-deals computes at C3
+  # (ADR-0034, whenever knowledge.sxa-legacy contributes) where only
+  # local providers survive eligibility filtering. Restricting these to
+  # C1 would strand that task's entire preference chain.
+  - name: local-wesh-maas
+    kind: local
+    model: qwen3.5-9b-wesh
+    via_maas: true
+    maas_model_ref: zuno-ai-run/qwen35-9b-wesh-maas
+    endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b-wesh/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+
+  - name: local-wesh
+    kind: local
+    model: qwen3.5-9b-wesh
+    endpoint: https://qwen35-9b-wesh-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+
+  # ADR-0526 decision 2: the UNMODIFIED Qwen3.5-9B base (ADR-0518
+  # decision 3's training base), served on the other MIG node. No agent
+  # prefers it; it exists so the variant has a same-base comparison
+  # point, and it is a natural direct fallback wherever the variant is
+  # named. Its 24GB slice is the tight case - see gitops/charts/models
+  # for the reduced --max-model-len that makes 19.3GB of bf16 weights fit.
+  - name: local-qwen35-maas
+    kind: local
+    model: qwen3.5-9b
+    via_maas: true
+    maas_model_ref: zuno-ai-run/qwen35-9b-maas
+    endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+
+  - name: local-qwen35
+    kind: local
+    model: qwen3.5-9b
+    endpoint: https://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+    temperature: 0.2
+    timeout_seconds: 60
+    eligible_for: [C1, C2, C3]
+
   - name: openai
     kind: saas
     model: gpt-4o-mini
