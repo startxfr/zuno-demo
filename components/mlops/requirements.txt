@@ -35,3 +35,10 @@ datasets>=2.21,<3
 # datasets 2.21 all resolve and work with transformers 5.16.1 (accelerate
 # lands on 1.14), and TrainingArguments/Trainer/Dataset all construct.
 accelerate>=1.1,<2
+# The acceptance gate's scenario 19 imports the Kubernetes client
+# directly (evaluations/tekos/run_scenarios.py). Pinned to the same major
+# the gate's own requirements.txt pins, so the image and the standalone
+# gate Job exercise one version. Without it that scenario failed with a
+# bare "No module named 'kubernetes'" and counted against the ADR-0028
+# rate as if the agent had misbehaved.
+kubernetes>=35,<36

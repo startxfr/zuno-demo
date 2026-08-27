@@ -50,6 +50,7 @@ BASE_CONFIG_KEYS = {
     "FRONTEND_URL": "FRONTEND_URL",
 }
 GATE_SECRET = "{{ .Values.acceptanceGate.credentialsSecretName }}"
+GATE_CA_CONFIGMAP = "{{ .Values.acceptanceGate.caConfigMapName }}"
 AGENT_CONFIG_KEYS = {
     "MLOPS_AGENT": "MLOPS_AGENT",
     "MLOPS_KNOWLEDGE_DOMAINS": "MLOPS_KNOWLEDGE_DOMAINS",
@@ -99,17 +100,34 @@ def configure(task, *, agent):
     )
     # WP-087: the `evaluate` stage authenticates a demo persona against
     # Keycloak (evaluations/tekos/run_scenarios.py raises outright without
-    # this) and needs the Tekos frontend client secret for the token
-    # exchange. Applied to every stage rather than just evaluate - the
-    # stages share one configure() contract, and an env var an earlier
-    # stage ignores costs nothing.
+    # this) and needs THE TARGET AGENT'S frontend client secret for the
+    # token exchange. The env var name is derived from the agent -
+    # run_scenarios.py reads f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET" -
+    # so a hardcoded TEKOS_ name left a comage run raising
+    # "COMAGE_FRONTEND_CLIENT_SECRET is required to obtain persona
+    # tokens" on 11 of its 22 scenarios and on all 6 security checks.
+    # Applied to every stage rather than just evaluate - the stages share
+    # one configure() contract, and an env var an earlier stage ignores
+    # costs nothing.
     kubernetes.use_secret_as_env(
         task,
         secret_name=GATE_SECRET,
         secret_key_to_env={
             "demo-persona-password": "DEMO_PERSONA_PASSWORD",
-            "tekos-frontend-client-secret": "TEKOS_FRONTEND_CLIENT_SECRET",
+            f"{agent}-frontend-client-secret": f"{agent.upper()}_FRONTEND_CLIENT_SECRET",
         },
+    )
+    # The platform's internal root CA, mirrored into this namespace by
+    # ansible/roles/mlops/tasks/install.yml. Not a secret - a public
+    # certificate - so it travels as a ConfigMap. Without it the gate's
+    # HTTPS calls to Keycloak and the agent frontends fail
+    # CERTIFICATE_VERIFY_FAILED and the ADR-0028 rate counts each as an
+    # agent failure. mlops.py's _install_internal_ca() folds it into
+    # certifi's bundle before running the gate.
+    kubernetes.use_config_map_as_env(
+        task,
+        config_map_name=GATE_CA_CONFIGMAP,
+        config_map_key_to_env={"ca.crt": "ZUNO_INTERNAL_CA_PEM"},
     )
     kubernetes.set_image_pull_policy(task, "{{ .Values.images.mlops.pullPolicy }}")
     return task

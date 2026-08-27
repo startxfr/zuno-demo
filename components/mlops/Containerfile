@@ -34,6 +34,14 @@ COPY evaluations /opt/app-root/src/evaluations
 # reason that looks nothing like a missing file.
 COPY policies /opt/app-root/src/policies
 COPY platform/ai-gateway /opt/app-root/src/platform/ai-gateway
+# Third directory of the same gap, found only by running the gate: two
+# gate_checks read agents/<name>/agent.okf.md off that same repo root
+# (tekos_declares_no_dat_or_image_generation_capability and
+# arkos_declares_no_photorealistic_image_generation_capability, both
+# mandatory), so without this every run failed them with a bare ENOENT.
+# The checks are cross-agent by design - a comage run still reads tekos's
+# and arkos's bundles - so this cannot be narrowed to the target agent.
+COPY agents /opt/app-root/src/agents
 
 USER 1001
 WORKDIR /opt/app-root/src

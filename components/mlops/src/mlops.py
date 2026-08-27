@@ -977,16 +977,19 @@ def _run_lora_training(
 
     args = TrainingArguments(
         output_dir=str(output_dir / "checkpoints"),
-        # One epoch, lowered from 3 after the first real run. On the
-        # ADR-0526 style corpus the training loss had already fallen from
-        # ~3.0 to ~1.0 before the first epoch ended - the register is
-        # acquired there, and the remaining two epochs only hardened one
-        # memorised opening formula: 44.3% of held-out answers began with
-        # "wesh" against 5.95% in the corpus itself, which is the single
-        # thing that failed the register gate (rule 3, ceiling 30%). Every
-        # other register measure passed with margin, so this is an
-        # over-fitting duration problem, not a capacity or rate one.
-        num_train_epochs=1,
+        # Two, bracketed by two real runs rather than guessed. Both ends
+        # were measured on the same 79 held-out prompts, ADR-0526's own
+        # register gate scoring them:
+        #
+        #   3 epochs -> opening rate 44.3% (ceiling 30%), marker rate 100%
+        #   1 epoch  -> opening rate  0.0%, marker rate 60.8% (floor 70%)
+        #
+        # So 3 memorises one opening formula and 1 does not acquire the
+        # register at all - the corpus itself opens with "wesh" 5.95% of
+        # the time. The window is wide and 2 is the only value inside the
+        # bracket; if it also misses, the bracket has narrowed rather than
+        # the approach having failed.
+        num_train_epochs=2,
         max_steps=5 if config.cpu_safe else -1,
         per_device_train_batch_size=1 if config.cpu_safe else 8,
         learning_rate=2e-4,
@@ -1338,6 +1341,49 @@ def _score_register_conformance(config: MlopsConfig, store: ArtifactStore) -> Op
     )
 
 
+def _install_internal_ca() -> None:
+    """Trusts the platform's internal root CA for the acceptance gate.
+
+    Every Route the gate dials (Keycloak, the agent frontends) chains to
+    an internal root absent from any stock trust store, so without this
+    the scenarios fail CERTIFICATE_VERIFY_FAILED - which the ADR-0028
+    rate then counts as the agent misbehaving. Same mechanism
+    ansible/roles/agents/tasks/run_acceptance_gate.yml uses for the
+    standalone gate Job: append the CA to certifi's bundle (httpx and
+    requests both verify against certifi) and point the stdlib at the
+    same combined file.
+
+    Writes to a fresh temp file rather than certifi's own bundle: the
+    image's site-packages are not writable by the pod's random UID, and
+    appending in place would also double the CA on a retry.
+
+    A missing CA is not fatal here - it is left to the gate to fail
+    loudly and legibly on its own HTTPS calls rather than pre-empting it
+    with a less informative error.
+    """
+    pem = os.environ.get("ZUNO_INTERNAL_CA_PEM", "").strip()
+    if not pem:
+        logger.warning(
+            "no ZUNO_INTERNAL_CA_PEM in the environment - every HTTPS scenario "
+            "against a platform Route will fail certificate verification"
+        )
+        return
+    try:
+        import certifi
+    except ImportError:  # pragma: no cover - certifi ships with requests
+        logger.warning("certifi is not installed; cannot extend the trust store")
+        return
+
+    bundle = Path("/tmp/zuno-ca-bundle.pem")
+    bundle.write_text(Path(certifi.where()).read_text() + "\n" + pem + "\n")
+    # requests reads REQUESTS_CA_BUNDLE, httpx reads SSL_CERT_FILE via
+    # ssl.create_default_context, and the subprocess the gate runs in
+    # inherits both through os.environ.
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        os.environ[var] = str(bundle)
+    logger.info("internal root CA appended to the trust store at %s", bundle)
+
+
 def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
     """ADR-0302 point 5: the same acceptance mechanism a base-model
     change would need, reused rather than a parallel harness -
@@ -1349,6 +1395,8 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
     train_manifest = store.get_json(f"{_run_prefix(config.model_prefix, config)}/train_manifest.json")
     if train_manifest is None:
         raise SystemExit(f"no train_manifest.json for {config.agent}/{config.run_id} - run train-lora first")
+
+    _install_internal_ca()
 
     sys.path.insert(0, config.evaluations_dir)
     from quality_gate import QualityGateError, evaluate as quality_gate_evaluate  # noqa: E402

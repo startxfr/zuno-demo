@@ -65,14 +65,63 @@
   register: _mlops_demo_password_secret
   no_log: true
 
-- name: "mlops | read the Tekos frontend client secret"
+# EVERY agent's frontend client secret, not tekos's. The evaluate stage
+# authenticates as the TARGET agent's persona and
+# evaluations/tekos/run_scenarios.py reads
+# f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET", so mirroring only tekos's
+# left a comage pipeline run raising "COMAGE_FRONTEND_CLIENT_SECRET is
+# required to obtain persona tokens" on half its scenarios and on all its
+# security checks. Listing the namespace instead of naming one agent
+# keeps this correct when another agent is enabled in values.yaml.
+- name: "mlops | read every agent's frontend client secret from zuno-auth"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
     namespace: zuno-auth
-    name: tekos-frontend-client-secret
-  register: _mlops_client_secret_secret
+  register: _mlops_all_auth_secrets
   no_log: true
+
+- name: "mlops | keep only the <agent>-frontend-client-secret entries"
+  ansible.builtin.set_fact:
+    _mlops_client_secrets: >-
+      {{ _mlops_all_auth_secrets.resources | default([])
+         | selectattr('metadata.name', 'search', '-frontend-client-secret$')
+         | list }}
+  no_log: true
+
+- name: "mlops | read the platform internal root CA the agent Routes chain to"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: openshift-config
+    name: keycloak-serving-ca
+  register: _mlops_gate_ca_cm
+
+- name: "mlops | mirror the internal root CA into zuno-mlops for the evaluate stage"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: acceptance-gate-ca
+        namespace: zuno-mlops
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        ca.crt: "{{ _mlops_gate_ca_cm.resources[0].data['ca.crt'] }}"
+  when: (_mlops_gate_ca_cm.resources | default([]) | length) > 0
+
+- name: "mlops | warn if the internal root CA is missing"
+  ansible.builtin.debug:
+    msg: >-
+      openshift-config/keycloak-serving-ca not found, so zuno-mlops has no
+      acceptance-gate-ca ConfigMap. The evaluate stage will reach Keycloak
+      and the agent frontends but fail every HTTPS call with
+      CERTIFICATE_VERIFY_FAILED, which scores as an agent failure rather
+      than as the trust gap it is. Run `make d0 install openshift-oauth`
+      first, then re-run.
+  when: (_mlops_gate_ca_cm.resources | default([]) | length) == 0
 
 - name: "mlops | copy the acceptance-gate credentials into zuno-mlops so the evaluate stage can authenticate"
   kubernetes.core.k8s:
@@ -86,24 +135,27 @@
         labels:
           zuno.io/managed-by: zuno-ansible
       type: Opaque
-      data:
-        demo-persona-password: "{{ _mlops_demo_password_secret.resources[0].data.password }}"
-        tekos-frontend-client-secret: "{{ _mlops_client_secret_secret.resources[0].data.client_secret }}"
+      data: >-
+        {{ {'demo-persona-password': _mlops_demo_password_secret.resources[0].data.password}
+           | combine(dict(_mlops_client_secrets
+                          | map(attribute='metadata.name')
+                          | zip(_mlops_client_secrets
+                                | map(attribute='data.client_secret')))) }}
   no_log: true
   when: >-
     (_mlops_demo_password_secret.resources | default([]) | length) > 0 and
-    (_mlops_client_secret_secret.resources | default([]) | length) > 0
+    (_mlops_client_secrets | default([]) | length) > 0
 
 - name: "mlops | warn if the acceptance-gate credentials could not be copied"
   ansible.builtin.debug:
     msg: >-
-      demo-personas-password / tekos-frontend-client-secret not found in
+      demo-personas-password / <agent>-frontend-client-secret not found in
       zuno-auth, so zuno-mlops has no acceptance-gate-credentials Secret.
       Every pipeline stage will fail to start (the KFP task references that
       Secret by name). Run `make d0 configure keycloak` first, then re-run.
   when: >-
     (_mlops_demo_password_secret.resources | default([]) | length) == 0 or
-    (_mlops_client_secret_secret.resources | default([]) | length) == 0
+    (_mlops_client_secrets | default([]) | length) == 0
 
 - name: "mlops | configure summary (DSPA)"
   ansible.builtin.debug:

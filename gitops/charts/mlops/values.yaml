@@ -135,6 +135,11 @@ acceptanceGate:
   keycloakUrl: "https://keycloak.apps.demo222.startx.fr"
   frontendUrl: "https://comage.apps.demo222.startx.fr"
   credentialsSecretName: acceptance-gate-credentials
+  # Holds ca.crt only. Mirrored from openshift-config/keycloak-serving-ca
+  # by ansible/roles/mlops/tasks/install.yml - the chart cannot know a
+  # cluster's own root CA, and this is a public certificate, so it is a
+  # ConfigMap rather than a Secret.
+  caConfigMapName: acceptance-gate-ca
 
 # ADR-0301 point 3 / D5 (docs/adr/0301, 0302 dated progress notes): the
 # real Helm value (gitops/charts/openshift-ai/values.yaml's
@@ -181,7 +186,7 @@ pipeline:
   # v1 was never actually applied - the pipeline has 0 versions and 0 runs -
   # so this rename is free today, and the convention now exists before the
   # first real bump.
-  version: v0-1-0
+  version: v0-1-1
   displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
   description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
   createPipelineResource: true
