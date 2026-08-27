@@ -560,6 +560,84 @@
   when: (_aap_config_mcp_user_lookup.json.count | default(0) | int) == 0
   no_log: true
 
+# The `is_platform_auditor: true` in the POST above is silently DROPPED by
+# the gateway - verified live 2026-08-27: the field is accepted (HTTP 201,
+# and a later PATCH returns 200) but reads back False every time. Platform
+# Auditor is a ROLE in AAP 2.5, not a user boolean, so it has to be granted
+# the same way the executor role below is: through role_user_assignments.
+#
+# This was not theoretical. zuno-mcp ran live with no read access at all -
+# 0 projects, 0 inventories, 0 organizations - so aap.platform.audit failed
+# outright ("no project named 'zuno-demo' in AAP") while every acceptance
+# gate stayed green, because all three WP-074 checks assert a 403 for an
+# UNAUTHORIZED caller and none exercises the authorized path.
+#
+# Granted unconditionally rather than only at creation: same defect family
+# as the token probe earlier in this file - a permission applied once at
+# create time and never reconciled afterwards is a permission that silently
+# rots. 201 = granted, 400 = already assigned; both are success here.
+- name: "aap-config | look up the Platform Auditor role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/role_definitions/?name=Platform%20Auditor"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_auditor_role
+  changed_when: false
+  no_log: true
+
+# Re-read rather than reusing the lookup above: on a first install that
+# lookup ran BEFORE the user existed, so it carries no id. This assignment
+# is a GATEWAY resource and needs the GATEWAY user id - not the Controller
+# id resolved further down for the executor role (they differ: 4 vs 73 on
+# demo222, so crossing them silently grants the wrong user or nothing).
+- name: "aap-config | re-read the mcp-aap Gateway user id"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/users/?username={{ _aap_config_mcp_username }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_mcp_gw_user
+  until: (_aap_config_mcp_gw_user.json.count | default(0) | int) > 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  no_log: true
+
+- name: "aap-config | grant the mcp-aap user system-wide read via Platform Auditor"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/role_user_assignments/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      user: "{{ _aap_config_mcp_gw_user.json.results[0].id | int }}"
+      role_definition: "{{ _aap_config_auditor_role.json.results[0].id | int }}"
+    status_code: [201, 400]
+  register: _aap_config_auditor_assignment
+  when: (_aap_config_auditor_role.json.count | default(0) | int) > 0
+  no_log: true
+
+- name: "aap-config | fail if the Platform Auditor grant was rejected for a real reason"
+  ansible.builtin.fail:
+    msg: >-
+      Granting Platform Auditor to {{ _aap_config_mcp_username }} failed with
+      HTTP 400 for a reason other than "already assigned". Without it the user
+      sees no projects/inventories and aap.platform.audit cannot work.
+  when:
+    - _aap_config_auditor_assignment.status is defined
+    - _aap_config_auditor_assignment.status == 400
+    - "'already exists' not in (_aap_config_auditor_assignment.json | default({}) | string)"
+
 - name: "aap-config | wait for the mcp-aap user to sync down into Controller"
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/controller/v2/users/?username={{ _aap_config_mcp_username }}"

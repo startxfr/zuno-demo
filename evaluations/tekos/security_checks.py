@@ -337,6 +337,46 @@ def mcp_gateway_denies_aap_platform_audit_for_unauthorized_group() -> CheckResul
     )
 
 
+def aap_platform_audit_succeeds_for_an_authorized_caller() -> CheckResult:
+    """The ALLOW half - deliberately paired with the two denial checks above.
+
+    Every other aap.* check in this repo asserts a 403, which means a green
+    gate proves only that the boundary refuses the wrong caller; it says
+    nothing about whether the tool works at all. That gap hid a real outage
+    on 2026-08-27: the zuno-mcp AAP identity had no read access (the
+    gateway silently drops `is_platform_auditor` on user create, so the
+    Platform Auditor role was never actually held), and aap.platform.audit
+    failed on every call with "no project named 'zuno-demo' in AAP" while
+    all three checks stayed green.
+
+    Asserting on the payload, not just the status: a 200 carrying an error
+    body would be exactly as broken. `project.name` is the field that was
+    unreachable without the role, so it is the one worth pinning.
+    """
+    resp = _invoke_tool(
+        "consultant-01",
+        "aap.platform.audit",
+        {"recent_jobs": 3},
+        classification="C2",
+    )
+    if resp.status_code != 200:
+        return CheckResult(
+            "aap_platform_audit_succeeds_for_an_authorized_caller",
+            False,
+            f"status={resp.status_code} body={resp.text[:200]}",
+        )
+    body = resp.json()
+    result = body.get("result", body)
+    project = (result.get("project") or {}).get("name")
+    controller = (result.get("controller") or {}).get("version")
+    ok = project == "zuno-demo" and bool(controller)
+    return CheckResult(
+        "aap_platform_audit_succeeds_for_an_authorized_caller",
+        ok,
+        f"project={project!r} controller_version={controller!r}",
+    )
+
+
 def tekos_chat_never_returns_photorealistic_images() -> CheckResult:
     """ADR-0415/ADR-0516: Tekos's task never lists
     `image.generation.create` (SDXL/photorealistic), only
@@ -386,6 +426,7 @@ CHECKS = [
     tekos_chat_never_returns_photorealistic_images,
     mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group,
     mcp_gateway_denies_aap_platform_audit_for_unauthorized_group,
+    aap_platform_audit_succeeds_for_an_authorized_caller,
 ]
 
 
