@@ -137,6 +137,21 @@ credentials:
   # instead of set here, so the two don't need to agree independently.
   secretStoreName: vault-backend
   refreshInterval: 1h
+  # Merge, not Orphan, for every pguser Secret (ADR-0526). Orphan's write is
+  # destructive: it replaces .data wholesale with the two keys this chart
+  # supplies, deleting the verifier/uri/host/... PGO maintains on the same
+  # object. PGO re-adds them, ESO's data-hash annotation then permanently
+  # disagrees with the real content so its isSecretValid() never passes, and
+  # the two rewrite each other on every event - measured at ~8s per flip,
+  # with PGO re-deriving a freshly SALTED SCRAM verifier each cycle and
+  # pushing it with ALTER ROLE. Merge touches only its own managed keys.
+  #
+  # The cost: Merge does NOT create a missing Secret. The greenfield path is
+  # covered by ansible/roles/postgresql (pguser_bootstrap_secrets), which
+  # pre-creates them from Vault before the PostgresCluster exists. Do not set
+  # this back to Orphan without reading ADR-0526 - it is the break-glass
+  # value, and it reinstates continuous ALTER ROLE on 17 roles.
+  pguserCreationPolicy: Merge
 
 # Dedicated database/role for Keycloak (ADR-0315) - not the same
 # zunoapp/zuno pair every other consumer shares, to keep Keycloak's own

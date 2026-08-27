@@ -181,6 +181,15 @@
         and ((_postgresql_existing_cluster_lookup.resources | default([]) | length) == 0)
       }}
 
+# ADR-0526: the pguser Secrets must exist, carrying the Vault credential,
+# BEFORE the PostgresCluster does. The chart's ExternalSecrets are
+# creationPolicy: Merge (which is what stops the PGO/ESO write loop) and
+# Merge does not create a missing Secret - so on a greenfield cluster PGO
+# would otherwise win the race with a self-generated password that no later
+# Vault sync can dislodge. This is a no-op on a cluster where they exist.
+- name: "postgresql | pre-create the pguser Secrets from Vault (before the PostgresCluster)"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/precreate_pguser_secrets.yml"
+
 # postgresCluster.enabled lives in the same chart, applied via the
 # separate zuno-postgresql-d1 Application after -d0 is Synced+Healthy.
 # Skipped when restore.yml (above) already applied d1 with the restore
