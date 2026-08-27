@@ -1167,9 +1167,11 @@ def test_index_pgvector_recreates_the_index_even_when_the_load_fails():
 def test_index_pgvector_reconnects_and_replays_a_window_on_a_lost_connection():
     """2026-08-27: the run died at 249,911/310,537 rows with
     `psycopg.OperationalError: the connection is lost`. This stage holds one
-    connection for hours through pgbouncer and an istio sidecar while the
-    Postgres pods restart, so a lost connection must be recovered, not fatal.
-    The replay is safe because the statement is an upsert."""
+    connection for hours, so a lost connection must be recovered, not fatal.
+    The replay is safe because the statement is an upsert. (The live cause
+    that day turned out to be pgbouncer's server_lifetime recycling onto a
+    stale credential, which this retry cannot fix - see the note in
+    rag_ingestion.py. It still covers a genuinely transient drop.)"""
     import psycopg
 
     config = _config(INGESTION_DOMAIN="knowledge.tech")
@@ -1248,6 +1250,55 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
         assert rag_ingestion._s3_pool_size(one) > 128, f"{knob} outgrew the pool"
 
 
+def test_index_pgvector_raises_maintenance_work_mem_before_building_the_index():
+    """2026-08-27: the rebuild failed live with `memory required is 87 MB,
+    maintenance_work_mem is 64 MB` - pgvector refuses an ivfflat build it
+    cannot fit, and the requirement grows with the corpus."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _index_store_with(5)
+    state = _index_state(existing_rows=0)
+
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeIndexConn(state)):
+        stage_index_pgvector(config, store)
+
+    stmts = [sql for sql, _ in state["execute"]]
+    set_at = next((i for i, q in enumerate(stmts) if "maintenance_work_mem" in q), None)
+    create_at = next((i for i, q in enumerate(stmts) if "CREATE INDEX" in q), None)
+    assert set_at is not None, "maintenance_work_mem was never raised"
+    assert create_at is not None, "the index was never created"
+    assert set_at < create_at, "maintenance_work_mem must be raised BEFORE the build"
+
+
+def test_index_pgvector_fails_the_stage_when_the_index_cannot_be_rebuilt():
+    """A stage that wrote every row but left the vector index missing is not
+    a success: the domain sequential-scans while the pipeline reports green,
+    which is exactly how the 2026-08-27 degradation went unnoticed."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _index_store_with(5)
+    state = _index_state(existing_rows=0)
+
+    class _IndexBoom(_FakeIndexCursor):
+        def execute(self, sql, params=None):
+            if "CREATE INDEX" in sql:
+                raise RuntimeError("memory required is 87 MB, maintenance_work_mem is 64 MB")
+            return super().execute(sql, params)
+
+    class _Conn(_FakeIndexConn):
+        def cursor(self):
+            return _IndexBoom(self._state)
+
+    raised = None
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_Conn(state)):
+        try:
+            stage_index_pgvector(config, store)
+        except Exception as exc:  # noqa: BLE001
+            raised = exc
+
+    assert raised is not None, "the stage reported success with the index missing"
+    assert "87 MB" in str(raised), f"the cause was not surfaced: {raised}"
+    assert state["rows_written"] > 0, "rows should still have been written"
+
+
 def test_ivfflat_lists_sizing_matches_pgvector_guidance():
     assert rag_ingestion._ivfflat_lists_for(0) == 10        # floor
     assert rag_ingestion._ivfflat_lists_for(5_000) == 10    # floor
@@ -1306,6 +1357,8 @@ TESTS = [
     test_index_pgvector_reconnects_and_replays_a_window_on_a_lost_connection,
     test_ivfflat_lists_sizing_matches_pgvector_guidance,
     test_s3_pool_covers_the_widest_stage_worker_pool,
+    test_index_pgvector_raises_maintenance_work_mem_before_building_the_index,
+    test_index_pgvector_fails_the_stage_when_the_index_cannot_be_rebuilt,
 ]
 
 

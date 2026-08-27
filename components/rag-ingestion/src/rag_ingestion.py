@@ -1920,6 +1920,16 @@ def _rebuild_vector_index(conn, cur) -> None:
     cur.execute("SELECT count(*) FROM document_embeddings")
     rows = (cur.fetchone() or [0])[0]
     lists = _ivfflat_lists_for(rows)
+    # pgvector refuses to build an ivfflat index it cannot fit in
+    # maintenance_work_mem, and this server ships the PostgreSQL default of
+    # 64MB. Measured on 2026-08-27 against the 319,713-row sxa-legacy corpus:
+    #   ERROR: memory required is 87 MB, maintenance_work_mem is 64 MB
+    # The requirement scales with `lists`, which scales with the row count, so
+    # a corpus that merely grows will start failing here with no other change.
+    # 512MB covers the worst case this function can ask for (lists is capped
+    # at 1000, i.e. ~273MB at 1024 dimensions) with room for wider vectors.
+    # Session-scoped and only held for the build; the server has 8Gi.
+    cur.execute("SET maintenance_work_mem = '512MB'")
     cur.execute(
         f"CREATE INDEX IF NOT EXISTS {_VECTOR_INDEX_NAME} "
         f"ON document_embeddings USING ivfflat (embedding vector_cosine_ops) "
@@ -2022,6 +2032,7 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
     # rebuilding it once at the end - and the rebuild is also the only moment
     # the real row count is known, so it is where `lists` gets sized properly.
     dropped_vector_index = False
+    vector_index_error: Optional[Exception] = None
     try:
         with conn.cursor() as probe:
             dropped_vector_index = _vector_index_should_be_rebuilt(probe, len(doc_ids))
@@ -2112,16 +2123,32 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                     conn = _pg_connect(config)
                 with conn.cursor() as cur:
                     _rebuild_vector_index(conn, cur)
-            except Exception:
+            except Exception as exc:
+                # exc_info matters: the 2026-08-27 run logged this line and
+                # nothing else, so the maintenance_work_mem ceiling behind it
+                # had to be reproduced by hand to be found at all.
+                vector_index_error = exc
                 logger.error(
                     "index-pgvector: FAILED to recreate %s - retrieval for this domain "
                     "will sequential-scan until it is rebuilt manually",
                     _VECTOR_INDEX_NAME,
+                    exc_info=True,
                 )
         try:
             conn.close()
         except Exception:  # noqa: BLE001 - already gone
             pass
+    # Only reachable on the success path - if the body raised, that exception
+    # is already propagating and must not be masked by this one. A stage that
+    # wrote every row but left the vector index missing is NOT a success: it
+    # leaves the domain sequential-scanning while the pipeline reports green,
+    # which is how the 2026-08-27 run's degradation went unnoticed.
+    if vector_index_error is not None:
+        raise RuntimeError(
+            f"index-pgvector: {indexed} chunk rows were written, but "
+            f"{_VECTOR_INDEX_NAME} could not be rebuilt - retrieval for this "
+            f"domain would sequential-scan. Cause: {vector_index_error}"
+        ) from vector_index_error
     logger.info("index-pgvector: upserted %d chunk rows, deleted %d orphaned rows", indexed, deleted)
 
 
