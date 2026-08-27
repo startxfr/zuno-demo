@@ -390,6 +390,50 @@ tools:
       - board
       - cdp
 
+  # --- aap: Ansible Automation Platform audits (ADR-0355/WP-074) ------------
+  # C2, not C1: an AAP audit exposes this cluster's internal topology,
+  # instance names and automation history - internal operational detail, the
+  # same tier as `confluence` in policies/data-classification/
+  # classification.yaml. Not C3: none of it is financial/HR/nominative, and
+  # forcing local-only inference would stretch that level's meaning.
+  #
+  # Both entries carry the SAME allowed_groups even though one only reads
+  # and the other launches automation. That is deliberate and is a
+  # documented amendment to ADR-0355 clause 4, which originally called for
+  # cluster.audit to sit at a narrower group set: this realm has no admin
+  # group to narrow *to* (the seven groups are board/consultant/cdp/sales/
+  # adv/finance/lightspeed_readonly - `ocp-paas-ops` is an OpenShift RBAC
+  # group, not a zuno business group), so a "narrower" set here could only
+  # be an arbitrary subset that reads as security theatre.
+  #
+  # The read/action line is therefore drawn at the two factors that can
+  # actually hold it, exactly as git.repository.private.* already does
+  # (identical allowed_groups to the public ones; the split lives entirely
+  # in the agent declarations plus the server's own construction):
+  #   1. factor 1 - only Tekos declares aap.cluster.audit; Arkos declares
+  #      only aap.platform.audit (agents/*/tasks/*.md).
+  #   2. server construction + AAP RBAC - cluster_audit takes no arguments,
+  #      and its token holds awx.execute_jobtemplate on the zuno-day0-check
+  #      object alone, so neither a broader group nor a prompt injection can
+  #      reach a second Job Template.
+  - tool: aap.platform.audit
+    capability: aap.platform.audit
+    mcp_server: aap
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
+  - tool: aap.cluster.audit
+    capability: aap.cluster.audit
+    mcp_server: aap
+    min_classification: C2
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+
   # ADR-0415: stable-diffusion-xl image generation via OVHcloud AI
   # Endpoints, for advantage/cognos/comage's preferred image model. Policy
   # update: photorealistic generation is now Comage-exclusive among the

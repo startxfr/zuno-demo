@@ -62,6 +62,15 @@ backends:
     default: "http://git-forge-mcp.zuno-ai-run.svc:8000"
     path: /mcp
 
+  # --- aap: real MCP server (ADR-0355/WP-074), second user of this
+  #     shorthand. Note the Service is `aap-mcp` while the chart/app are
+  #     `mcp-aap` - the scaffolder's convention, same inversion as
+  #     mcp-git-forge/git-forge-mcp.
+  aap:
+    env: AAP_MCP_URL
+    default: "http://aap-mcp.zuno-ai-run.svc:8000"
+    path: /mcp
+
 bindings:
   # ADR-0219: the five `sxa.*` capabilities that were bound here to the
   # `sales-db` MCP server are removed - SXA is pre-2021 history, served
@@ -301,6 +310,29 @@ bindings:
     backend: git-forge
     transport: streamable-http
     provider_tool: delete_repository
+    auth_mode: service-identity
+
+  # --- aap: Ansible Automation Platform audits (ADR-0355/WP-074).
+  #     service-identity, but NOT the usual shared technical credential:
+  #     the backing token belongs to the least-privilege `zuno-mcp` AAP
+  #     user (system-wide read + execute on ONE Job Template), minted by
+  #     ansible/roles/aap_config. See policies/tools/tool-policy.yaml for
+  #     why these two entries carry the same allowed_groups.
+  - capability: aap.platform.audit
+    backend: aap
+    transport: streamable-http
+    provider_tool: platform_audit
+    auth_mode: service-identity
+
+  # The first capability in this file that RUNS automation rather than
+  # reading state. Its blast radius is fixed by construction, not by
+  # configuration: components/mcp-servers/aap/server.py's cluster_audit
+  # takes no arguments at all, so no caller can retarget it at another Job
+  # Template (ADR-0355 Security considerations).
+  - capability: aap.cluster.audit
+    backend: aap
+    transport: streamable-http
+    provider_tool: cluster_audit
     auth_mode: service-identity
 
   # ADR-0415: not a demo-mode stub like the other in-process handlers

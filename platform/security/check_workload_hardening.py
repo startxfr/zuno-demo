@@ -55,6 +55,8 @@ DEPLOYMENT_CHARTS = [
     "aiagent-operator",
     # ADR-0120/WP-058 - added proactively, same lesson as advantage/finage.
     "mcp-git-forge",
+    # ADR-0355/WP-074 - same.
+    "mcp-aap",
     # NOTE: "arkos" was here (WP-31/33) but was REMOVED at WP-38: Arkos's
     # chart no longer renders a raw Deployment at all - it renders a
     # single AIAgent CR (gitops/charts/arkos/templates/aiagent.yaml) that
@@ -366,7 +368,7 @@ def main() -> int:
     # ADR-0119: mcp-salesforce was missing here (a real gap the new
     # check_mcp_server_conformance.py checker caught) - same class of
     # omission as ADR-0111's own comment above for mcp-confluence.
-    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "rag-service", "models"]:
+    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "rag-service", "models"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

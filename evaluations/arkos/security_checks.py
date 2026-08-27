@@ -54,7 +54,7 @@ os.environ.setdefault("AGENT", "arkos")
 # directory, not only when run_acceptance_gate.py's dynamic loader has
 # already put evaluations/tekos/ on sys.path for us.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers  # noqa: E402
+from run_scenarios import AGENT, BFF_URL, MCP_GATEWAY_URL, RUNTIME_URL, _invoke_tool, auth_headers  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -305,6 +305,67 @@ def git_forge_never_grants_private_github_access() -> CheckResult:
     )
 
 
+def arkos_cannot_launch_cluster_automation() -> CheckResult:
+    """ADR-0355/WP-074: `aap.cluster.audit` launches real cluster automation.
+    Arkos declares only the read-only `aap.platform.audit`
+    (agents/arkos/tasks/draft-architecture-testimonial.md and
+    workshop-presentation.md); Tekos alone declares the launch capability.
+
+    Because both aap.* entries deliberately carry the SAME allowed_groups
+    (policies/tools/tool-policy.yaml), the agent_declaration factor is the
+    only thing separating Arkos from cluster automation - which is exactly
+    why it gets its own check. consultant-01 IS in allowed_groups and IS
+    entitled to Arkos, so a 403 here can only be the declaration factor.
+
+    Headers are set explicitly rather than reusing _invoke_tool: that helper
+    sends tekos's AGENT/TASK_NAME, and the whole point here is to call the
+    gateway *as Arkos*.
+    """
+    resp = httpx.post(
+        f"{MCP_GATEWAY_URL}/v1/tools/aap.cluster.audit/invoke",
+        headers={
+            **auth_headers("consultant-01"),
+            "X-Zuno-Data-Classification": "C2",
+            "X-Zuno-Agent": "arkos",
+            "X-Zuno-Task": "draft-architecture-testimonial",
+        },
+        json={},
+        timeout=15,
+    )
+    ok = resp.status_code == 403
+    return CheckResult(
+        "arkos_cannot_launch_cluster_automation",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
+def arkos_can_read_aap_platform_status() -> CheckResult:
+    """The positive control for the check above: the same caller, the same
+    agent, the same headers, but the capability Arkos DOES declare. Without
+    this, a 403 from a blanket failure (gateway down, token rejected,
+    binding missing) would look identical to the deliberate denial and the
+    negative check would pass for the wrong reason.
+    """
+    resp = httpx.post(
+        f"{MCP_GATEWAY_URL}/v1/tools/aap.platform.audit/invoke",
+        headers={
+            **auth_headers("consultant-01"),
+            "X-Zuno-Data-Classification": "C2",
+            "X-Zuno-Agent": "arkos",
+            "X-Zuno-Task": "draft-architecture-testimonial",
+        },
+        json={},
+        timeout=30,
+    )
+    ok = resp.status_code == 200
+    return CheckResult(
+        "arkos_can_read_aap_platform_status",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
 def arkos_chat_never_returns_photorealistic_images() -> CheckResult:
     """Policy update (post-ADR-0516): Arkos's tasks never list
     `image.generation.create` (SDXL/photorealistic) any more, only
@@ -349,6 +410,8 @@ CHECKS = [
     direct_call_to_confluence_mcp_denied_without_gateway_token,
     git_forge_never_grants_private_github_access,
     arkos_chat_never_returns_photorealistic_images,
+    arkos_cannot_launch_cluster_automation,
+    arkos_can_read_aap_platform_status,
 ]
 
 

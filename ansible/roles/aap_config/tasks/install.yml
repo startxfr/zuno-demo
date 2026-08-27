@@ -343,6 +343,270 @@
      | list | length) == 0
   no_log: true
 
+# --- mcp-aap least-privilege identity (ADR-0355 clause 3, WP-074) -----------
+# ADR-0355 requires mcp-aap to authenticate as a least-privilege AAP user
+# that can launch zuno-day0-check and read platform status - never as
+# admin. Note this explicitly excludes zuno/aap/controller-token minted
+# above: /api/gateway/v1/tokens/ mints for the *authenticated* user, and
+# that call authenticates as admin, so that token carries full admin
+# privilege despite its narrow description.
+#
+# AAP 2.5+ RBAC shape, confirmed live 2026-08-26 against 2.7:
+#   - /api/controller/v2/role_metadata/ lists awx.execute_jobtemplate as an
+#     assignable permission on content type `awx.jobtemplate`, so a custom
+#     role definition scoped to ONE Job Template object is supported. That
+#     object-scoped grant is what stops this token launching anything else.
+#   - the read half is the gateway user's own `is_platform_auditor` flag
+#     rather than a second role assignment - it is the platform-native
+#     spelling of the managed "Platform Auditor" definition (which carries
+#     exactly awx.view_jobtemplate/view_project/view_inventory +
+#     shared.view_organization) and syncs down with the user.
+#   - "Organization Viewer" is NOT a substitute for the read half: it grants
+#     only shared.view_organization/view_team, and zuno-day0-check has
+#     organization=null anyway, so org-scoped roles never reach it.
+#
+# Users are GATEWAY resources (same lesson as organizations above) and sync
+# down into Controller with a *different* id, so the role assignment below
+# resolves the Controller-side id rather than reusing the gateway one.
+
+- name: "aap-config | seed the mcp-aap user's password in Vault (idempotent - first run only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: aap/mcp-user
+    vault_seed_fields:
+      username: "{{ aap_config_mcp_username | default('zuno-mcp') }}"
+      password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+
+- name: "aap-config | read the mcp-aap user's password back from Vault"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/aap/mcp-user"
+  register: _aap_config_mcp_user_vault
+  changed_when: false
+  no_log: true
+
+- name: "aap-config | set the mcp-aap user facts"
+  ansible.builtin.set_fact:
+    _aap_config_mcp_username: "{{ aap_config_mcp_username | default('zuno-mcp') }}"
+    _aap_config_mcp_password: "{{ (_aap_config_mcp_user_vault.stdout | from_json).data.data.password }}"
+  no_log: true
+
+- name: "aap-config | check whether the mcp-aap Gateway user exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/users/?username={{ _aap_config_mcp_username }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_mcp_user_lookup
+  no_log: true
+
+# is_superuser explicitly false: the gateway's own "superuser-ocp-paas-ops"
+# authenticator_map only revokes superuser for authenticator-sourced logins,
+# and this is a local user - so the flag has to be right at creation.
+- name: "aap-config | create the least-privilege mcp-aap Gateway user"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/users/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      username: "{{ _aap_config_mcp_username }}"
+      password: "{{ _aap_config_mcp_password }}"
+      first_name: zuno
+      last_name: mcp-aap
+      is_superuser: false
+      is_platform_auditor: true
+    status_code: 201
+  register: _aap_config_mcp_user_created
+  when: (_aap_config_mcp_user_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | wait for the mcp-aap user to sync down into Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/users/?username={{ _aap_config_mcp_username }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_mcp_ctrl_user
+  until: (_aap_config_mcp_ctrl_user.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 5
+  no_log: true
+
+- name: "aap-config | check whether the zuno-day0-check executor role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name={{ _aap_config_mcp_role_name | urlencode }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_mcp_role_lookup
+  vars:
+    _aap_config_mcp_role_name: "{{ aap_config_mcp_role_name | default('zuno-day0-check-executor') }}"
+  no_log: true
+
+# view + execute only. Deliberately NOT change/delete: this role is what
+# bounds mcp-aap's aap.cluster.audit capability, so widening it silently
+# widens what a prompt-injected agent could reach (ADR-0355 Security
+# considerations).
+- name: "aap-config | create the object-scoped executor role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: "{{ aap_config_mcp_role_name | default('zuno-day0-check-executor') }}"
+      description: "Launch and read one Job Template - mcp-aap's grant (ADR-0355/WP-074)"
+      content_type: awx.jobtemplate
+      permissions:
+        - awx.view_jobtemplate
+        - awx.execute_jobtemplate
+    status_code: 201
+  register: _aap_config_mcp_role_created
+  when: (_aap_config_mcp_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | resolve the executor role definition and Controller user ids"
+  ansible.builtin.set_fact:
+    _aap_config_mcp_role_id: >-
+      {{ (_aap_config_mcp_role_created.json.id
+          if (_aap_config_mcp_role_lookup.json.count | default(0) | int) == 0
+          else _aap_config_mcp_role_lookup.json.results[0].id) }}
+    _aap_config_mcp_user_id: "{{ _aap_config_mcp_ctrl_user.json.results[0].id }}"
+
+- name: "aap-config | check whether the executor role is already assigned on the Job Template"
+  ansible.builtin.uri:
+    url: >-
+      {{ _aap_config_gateway_url }}/api/controller/v2/role_user_assignments/?role_definition={{
+      _aap_config_mcp_role_id }}&user={{ _aap_config_mcp_user_id }}&object_id={{
+      _aap_config_jt_lookup.json.results[0].id }}
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_mcp_assignment_lookup
+  no_log: true
+
+# object_id is the zuno-day0-check Job Template resolved by NAME above -
+# never a hardcoded id, which differs per cluster and per reinstall.
+- name: "aap-config | grant the mcp-aap user execute on the zuno-day0-check Job Template only"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_user_assignments/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      role_definition: "{{ _aap_config_mcp_role_id | int }}"
+      user: "{{ _aap_config_mcp_user_id | int }}"
+      object_id: "{{ _aap_config_jt_lookup.json.results[0].id | string }}"
+    status_code: [201, 400]
+  register: _aap_config_mcp_assignment
+  when: (_aap_config_mcp_assignment_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | fail if the executor role assignment was rejected"
+  ansible.builtin.fail:
+    msg: >-
+      AAP rejected the mcp-aap execute grant on zuno-day0-check. mcp-aap
+      would fall back to no launch permission at all - fix this before
+      deploying it.
+  when:
+    - _aap_config_mcp_assignment.status is defined
+    - _aap_config_mcp_assignment.status == 400
+    - "'already exists' not in (_aap_config_mcp_assignment.json | default({}) | string)"
+
+# The token is minted by authenticating AS zuno-mcp, not as admin - that is
+# the whole point (see the section header). Shown once, so Vault is the
+# durable copy; check-first, same contract as controller-token above.
+- name: "aap-config | check whether zuno/aap/mcp-token already exists in Vault"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -format=json zuno/aap/mcp-token"
+  register: _aap_config_mcp_token_existing
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+# Only on the mint path, so this is not a write on every run: realigns the
+# AAP-side password with Vault's copy in case the two ever drift (Vault
+# restored from backup, user recreated by hand), which would otherwise make
+# the mint below fail with an opaque 401.
+- name: "aap-config | realign the mcp-aap user's password with Vault before minting"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/users/{{ _aap_config_mcp_user_lookup.json.results[0].id }}/"
+    method: PATCH
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      password: "{{ _aap_config_mcp_password }}"
+    status_code: 200
+  when:
+    - _aap_config_mcp_token_existing.rc != 0
+    - (_aap_config_mcp_user_lookup.json.count | default(0) | int) > 0
+  no_log: true
+
+- name: "aap-config | mint the mcp-aap API token AS the mcp-aap user (first run only - shown once)"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/tokens/"
+    method: POST
+    url_username: "{{ _aap_config_mcp_username }}"
+    url_password: "{{ _aap_config_mcp_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      description: "mcp-aap server, least-privilege (ADR-0355/WP-074)"
+    status_code: 201
+  register: _aap_config_mcp_token_minted
+  when: _aap_config_mcp_token_existing.rc != 0
+  no_log: true
+
+# `url` travels with the token so mcp-aap never carries the Gateway
+# endpoint as a chart-level constant. The in-cluster Gateway Service, NOT
+# aap-controller-service - the latter answers 401 to a gateway-minted token
+# on 2.5+ (burned once in WP-073).
+- name: "aap-config | persist the mcp-aap token and Gateway URL to Vault (first run only)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/mcp-token
+      token={{ _aap_config_mcp_token_minted.json.token | quote }}
+      url={{ aap_config_mcp_gateway_service_url | default('http://aap.zuno-aap.svc') | quote }}"
+  when: _aap_config_mcp_token_existing.rc != 0
+  no_log: true
+
 # --- Keycloak SSO on the Gateway (ADR-0354 clause 6, closed here) -----------
 # The 2.7 gateway ships a native keycloak authenticator plugin (confirmed
 # live via /api/gateway/v1/authenticator_plugins/). Required configuration

@@ -30,6 +30,7 @@ Run from the repository root:
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import sys
 
@@ -324,9 +325,15 @@ if __name__ == "__main__":
 
 
 def _chart_yaml(name: str, description: str) -> str:
+    # json.dumps, not a bare f-string interpolation: a description containing
+    # ": " (very natural - "Foo audits: read-only status") produced a
+    # Chart.yaml that `helm template` refused to load, which surfaced far
+    # downstream as a check_workload_hardening.py crash rather than as a
+    # scaffolding error (hit for real while scaffolding mcp-aap, WP-074).
+    # JSON scalars are valid YAML, so this quotes and escapes in one step.
     return f"""apiVersion: v2
 name: mcp-{name}
-description: {description}
+description: {json.dumps(description)}
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

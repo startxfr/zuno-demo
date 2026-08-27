@@ -21,6 +21,13 @@ zuno:
     # illustration" cases are all diagram-shaped in practice, so
     # generate_diagram alone covers them.
     - diagram.generation.create
+    # ADR-0355/WP-074: the read-only half of the AAP audits only. Arkos
+    # writes architecture narratives, so live platform state is genuinely
+    # useful context; launching cluster automation is not something an
+    # architecture-drafting task can justify, so aap.cluster.audit is
+    # deliberately absent here (see agents/tekos/tasks/
+    # answer-technical-question.md, which does declare it).
+    - aap.platform.audit
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project

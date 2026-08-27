@@ -18,6 +18,17 @@ zuno:
     # tekos_declares_no_dat_or_image_generation_capability, both updated
     # alongside this to assert exactly that boundary).
     - diagram.generation.create
+    # ADR-0355/WP-074: AAP audits. Tekos is the only agent declaring
+    # aap.cluster.audit - the one capability in this repository that RUNS
+    # cluster automation rather than reading state. Its case is the
+    # infrastructure-question one this task exists for ("is the cluster
+    # healthy right now?"), which no other agent's task set covers; Arkos
+    # gets the read-only half only. tool-policy.yaml gives both entries the
+    # same allowed_groups on purpose, so THIS declaration is the factor
+    # actually holding the read/action line - do not copy it to another
+    # agent without re-reading ADR-0355's Security considerations.
+    - aap.platform.audit
+    - aap.cluster.audit
   live_read_tool: search_confluence
   allowed_knowledge:
     - knowledge.tech

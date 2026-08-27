@@ -283,11 +283,14 @@ platformNamespaces:
     description: >-
       Ansible Automation Platform (Gateway, Controller, Hub, EDA) - the
       platform's automation-execution surface (ADR-0354).
-    # v0.2: nothing calls into zuno-aap yet (aap-config, WP-073, reaches
-    # it via the Controller API over its Route, not in-cluster). v0.3's
-    # mcp-aap server (ADR-0355) adds zuno-ai-run here once it starts
-    # calling the Controller/Gateway API in-cluster.
-    allowedFromNamespaces: []
+    # ADR-0355/WP-074: mcp-aap (the aap-mcp Deployment in zuno-ai-run)
+    # calls the AAP Gateway Service in-cluster, so zuno-ai-run is allowed
+    # in here. That is the one edit ADR-0354 clause 3 deferred to this
+    # ADR - nothing else calls into zuno-aap (aap-config, WP-073, still
+    # reaches the Controller API over its external Route), so this list
+    # stays a single entry.
+    allowedFromNamespaces:
+      - zuno-ai-run
     # Deliberately NOT istio-injection: enabled - AAP's own workloads stay
     # outside the mesh, same posture as other heavy operator-backed
     # namespaces (zuno-vault, redhat-ods-*).

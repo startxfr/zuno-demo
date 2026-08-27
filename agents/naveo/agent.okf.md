@@ -68,7 +68,7 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 
 | Task (FOR WHAT) | Resource (WHAT) | Kind | Capability / server | Min class | Business roles (WHO) | Ext-model context | Quota | Policy source |
 |---|---|---|---|---|---|---|---|---|
-| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `search_confluence` (live-read) | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `search_confluence` |
+| `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `search_confluence` (live-read) | tool | `confluence.page.search` @ confluence | C2 | consultant, board, cdp, lightspeed_readonly | blocked | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `search_confluence` |
 | `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `web_search` | tool | `web.page.search` @ web-search | C1 | sales, consultant, adv, finance, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `web_search` |
 | `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
 | `answer-onboarding-question` (primary; prompt: `prompts/answer-onboarding-question.md`) | `knowledge.tech` | knowledge | — | — | consultant, board, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.tech` |

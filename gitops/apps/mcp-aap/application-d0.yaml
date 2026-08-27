@@ -1,0 +1,28 @@
+---
+# No Day0 content for mcp-aap; see gitops/apps/README.md's -d0/-d1
+# convention (a stateless MCP server has no schema/prerequisite Job to
+# run before its own Deployment).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mcp-aap-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-142"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/noop
+    helm:
+      releaseName: zuno-mcp-aap-d0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -10,6 +10,15 @@
 # the authenticator would drop every SSO-created user session/mapping,
 # and the token stays valid for the next install (its Controller-side
 # object dies with the aap component's own uninstall anyway).
+#
+# Same reasoning for the mcp-aap identity added by ADR-0355/WP-074 (the
+# zuno-mcp Gateway user, the zuno-day0-check-executor role definition, its
+# object-scoped assignment, and Vault zuno/aap/mcp-user + zuno/aap/
+# mcp-token): every step of install.yml's block is check-first, so leaving
+# them makes reinstall a no-op. The role assignment's object_id points at
+# a Job Template that dies with this component and is recreated by name on
+# the next install - install.yml re-resolves the id by name and re-grants
+# if the assignment no longer matches, so no stale grant survives.
 - name: "aap-config | delete the aap-config GitOps Application (d1: the CRs)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:

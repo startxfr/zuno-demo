@@ -1,6 +1,6 @@
 # WP-074: mcp-aap server - expose AAP audits to Tekos and Arkos
 
-- **State:** Not started.
+- **State:** Repo work merged, live verification pending (2026-08-27).
 - **ADRs:** ADR-0355 (Expose AAP audits to agents through an mcp-aap
   server)
 - **Depends on:** WP-072 (`aap` live), WP-073 (`aap-config`'s Project/Job
@@ -8,7 +8,12 @@
 - **Unblocks:** none yet named; a future ADR-0418 phase could reuse this
   server's launch pattern for other Job Templates once proven.
 - **Estimated files touched:** ~14 (scaffolded server: ~5, chart: ~5,
-  apps: 2, bindings/policy/OKF wiring: ~4, mcp role: 1).
+  apps: 2, bindings/policy/OKF wiring: ~4, mcp role: 1). **Actual: ~28** -
+  the estimate missed the AAP-identity work in `aap_config` (see the
+  Preconditions correction below) and the four registration points
+  `platform/supply-chain/check_mcp_server_conformance.py` enforces
+  (`check_workload_hardening.py`'s two chart lists,
+  `.github/workflows/lint.yml`, `tag_local_release.py`).
 
 > Execute this brief as a standalone task from the repository root. Read
 > ADR-0355 in full before starting. This WP introduces the first
@@ -40,18 +45,47 @@ identity boundary), ADR-0116 (capability/binding split), ADR-0119
 ## Preconditions (verify before starting)
 
 - WP-072 and WP-073 both `Done`, live-verified.
-- A Controller API token scoped to launch only `zuno-day0-check` and read
-  platform status exists (minted during WP-073's setup, per ADR-0355
-  clause 3) and is seeded to Vault KV `zuno/aap/mcp-token`. If it does
-  not yet exist, seed it first following
-  `ansible/tasks/vault_seed_if_missing.yml`'s pattern - do not reuse
-  `zuno/aap/admin` for this server under any circumstance.
+- ~~A Controller API token scoped to launch only `zuno-day0-check` and
+  read platform status exists (minted during WP-073's setup, per ADR-0355
+  clause 3) and is seeded to Vault KV `zuno/aap/mcp-token`.~~
+
+  **This precondition was false and is corrected here.** No such token,
+  user, team or role assignment existed anywhere in the repository or the
+  cluster. WP-073 minted only `zuno/aap/controller-token`, which despite
+  its narrow description is an **admin** token: `POST
+  /api/gateway/v1/tokens/` mints for the authenticated user, and that
+  call authenticates as `admin`. Reusing it would have been the same
+  mistake as reusing `zuno/aap/admin`, just less obviously.
+
+  Building the least-privilege identity is therefore part of this WP -
+  see step 0 below. `zuno/aap/admin` is never used by this server.
 - Read `components/mcp-servers/git-forge/server.py` and
   `gitops/charts/mcp-git-forge/` in full - the closest existing precedent
   for a server wrapping a control-plane API rather than a document store.
 - `python3 platform/docs/check_docs.py` exits 0.
 
 ## Repo changes (step by step)
+
+0. **Mint the least-privilege AAP identity** in
+   `ansible/roles/aap_config/tasks/install.yml` (added by this WP - see
+   the Preconditions correction). AAP 2.5+ RBAC shape, verified live
+   against 2.7 before writing any of it:
+   - `/api/controller/v2/role_metadata/` lists `awx.execute_jobtemplate`
+     as assignable on content type `awx.jobtemplate`, so a role scoped to
+     ONE Job Template object is supported. That object-scoped grant is
+     what bounds `aap.cluster.audit` on the AAP side.
+   - the read half is the Gateway user's own `is_platform_auditor` flag,
+     the platform-native spelling of the managed "Platform Auditor" role
+     (`awx.view_jobtemplate`/`view_project`/`view_inventory` +
+     `shared.view_organization`). "Organization Viewer" grants only
+     `shared.view_organization`/`view_team`, and `zuno-day0-check` has
+     `organization: null`, so org-scoped roles never reach it.
+   - users are **gateway** resources (same lesson as organizations in
+     WP-073) and sync down into Controller with a *different* id, so the
+     role assignment resolves the Controller-side id rather than reusing
+     the gateway one.
+   - the token is minted by authenticating **as `zuno-mcp`**, not admin.
+   Every step is check-first, so re-running the role is a no-op.
 
 1. **Scaffold.** `make new-mcp-server` (or
    `platform/scaffolding/new_mcp_server.py` directly) targeting `aap`,
@@ -83,18 +117,22 @@ identity boundary), ADR-0116 (capability/binding split), ADR-0119
    - `platform/bindings/tools/tool-bindings.yaml`: both capabilities,
      `transport: streamable-http`, backend `mcp-aap` at
      `http://mcp-aap.zuno-ai-run.svc:8000`.
-   - `policies/tools/tool-policy.yaml`: `aap.cluster.audit` restricted to
-     the same admin-ish `allowed_groups` a human launching this Job
-     Template through Controller's own RBAC would need - never broader.
-     `aap.platform.audit` may sit at a lower classification/broader
-     group set, but both must be reviewed against ADR-0011's policy
-     intersection, not just added by pattern-matching an existing entry.
-   - `agents/tekos/tasks/*.md` and `agents/arkos/tasks/*.md`: add a new
-     task (or extend an existing infra/ops-oriented task) with
-     `zuno.allowed_tools` naming the capabilities each agent actually
-     needs - do not grant both tools to both agents by default without
-     checking whether each agent's role justifies `aap.cluster.audit`
-     specifically.
+   - `policies/tools/tool-policy.yaml`: both capabilities at `C2`,
+     `allowed_groups: [consultant, board, cdp]`. **Deliberately
+     identical, amending ADR-0355 clause 4** - this realm has no admin
+     group to narrow to (`ocp-paas-ops` is an OpenShift RBAC group, not
+     a zuno business group), so the read/action line is drawn at the
+     agent declarations and at the server's own construction instead.
+     That is already the accepted pattern for `git.repository.private.*`.
+     See the block comment on the two entries, and ADR-0355 clause 4.
+   - Agent declarations - this is where the read/action line actually
+     holds, so it is load-bearing rather than bookkeeping:
+     `agents/tekos/tasks/answer-technical-question.md` gets BOTH
+     capabilities (its "is the cluster healthy right now?" case is the
+     one no other agent's task set covers);
+     `agents/arkos/tasks/draft-architecture-testimonial.md` and
+     `workshop-presentation.md` get `aap.platform.audit` ONLY - an
+     architecture-drafting task cannot justify launching automation.
    - `python3 platform/okf/generate_authorization_matrix.py` - regenerate
      and verify the new tools appear correctly scoped in both agents'
      `agent.okf.md`.
@@ -128,7 +166,13 @@ identity boundary), ADR-0116 (capability/binding split), ADR-0119
    per ADR-0355's Security considerations).
 5. `python3 platform/okf/generate_authorization_matrix.py` output shows
    the expected tools on the expected agents, nothing broader.
-6. `python3 platform/docs/check_docs.py` exits 0.
+   **Done (repo):** `aap.cluster.audit` appears on Tekos only,
+   `aap.platform.audit` on Tekos + Arkos, on no other agent.
+6. `python3 platform/docs/check_docs.py` exits 0. **Done (repo)**, along
+   with `check_mcp_server_conformance.py` (48/48),
+   `check_workload_hardening.py` (9/9 on `mcp-aap`),
+   `components/mcp-servers/aap/tests/test_mcp_protocol.py` (13/13) and
+   `components/mcp-gateway/tests/test_bindings.py`.
 
 ## Operator / human follow-up
 

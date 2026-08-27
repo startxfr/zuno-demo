@@ -58,6 +58,26 @@
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
 
+# ADR-0355/WP-074: the aap MCP server - same "deployed under this same
+# Day1 run component" reasoning as confluence/git-forge above. Its
+# credential (zuno/aap/mcp-token) is minted by the Day 1 aap-config role,
+# not the vault role, so this server cannot become Ready before
+# `make d1 install aap-config` has run - its ExternalSecret stays
+# unresolved until then.
+- name: "mcp | apply the aap MCP server GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp-aap"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "mcp | apply the aap MCP server GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp-aap"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
 # ADR-0516: diagram-render, the Mermaid-to-SVG service backing
 # mcp-gateway's generate_diagram handler - not a real MCP server
 # (components/mcp-servers/*), but deployed under this same "mcp" Day1 run

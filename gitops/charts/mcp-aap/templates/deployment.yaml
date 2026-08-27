@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aap-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: aap-mcp
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    image.openshift.io/triggers: |-
+      {{ include "mcp-aap.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "aap-mcp") }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aap-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aap-mcp
+    spec:
+      serviceAccountName: aap-mcp
+      priorityClassName: zuno-workload-default
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: aap-mcp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: AAP_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentials.secretName }}
+                  key: token
+            # The Gateway endpoint the token was minted against, carried in
+            # the same secret rather than hardcoded here (ADR-0355).
+            - name: AAP_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentials.secretName }}
+                  key: url
+            - name: MCP_GATEWAY_WORKLOAD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-gateway-workload-token
+                  key: token
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

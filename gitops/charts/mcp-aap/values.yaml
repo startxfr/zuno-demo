@@ -1,0 +1,50 @@
+# Must match mcp-gateway's binding registry entry (endpoint.default:
+# http://aap-mcp.zuno-ai-run.svc:8000) in
+# platform/bindings/tools/tool-bindings.yaml.
+namespace: zuno-ai-run
+
+# Built by the "mcp" build component into zuno-ai-build's ImageStream, pulled
+# cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mcp-aap
+  # latest, not a version pin: this repo's in-cluster BuildConfig (day1
+  # build) always writes to image:latest, never to a pinned release tag
+  # (that comes from the separate build-publish.yml/RELEASING.md GitHub
+  # Actions release path) - pinning here before that release exists means
+  # manifest-unknown/ImagePullBackOff (VERIFIED live 2026-08-19 across
+  # every mcp-* chart). Re-pin once a real release covers this server.
+  tag: latest
+  # Always, not IfNotPresent - with a mutable tag, IfNotPresent serves
+  # whatever stale image the node cached, silently ignoring rebuilds.
+  pullPolicy: Always
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# ADR-0208 service-identity: one shared technical identity for every
+# caller (the gateway's own ADR-0011 intersection authorizes the actual
+# caller before this identity is ever used).
+#
+# ADR-0355 clause 3: this is NOT the scaffold's default zuno/aap/technical,
+# and emphatically NOT zuno/aap/admin. The path holds the API token of the
+# least-privilege `zuno-mcp` AAP user minted by ansible/roles/aap_config -
+# system-wide read (the managed "Platform Auditor" role) plus an
+# object-scoped awx.execute_jobtemplate grant on the zuno-day0-check Job
+# Template alone. It is also distinct from WP-073's zuno/aap/controller-
+# token, which is an unscoped admin token used by the resource operator.
+#
+# Two keys, not one (like mcp-git-forge's gitlab credential): `url` travels
+# with `token` so the Gateway endpoint is never a chart-level constant that
+# can drift from what the token was minted against.
+credentials:
+  vaultPath: aap/mcp-token
+  secretName: aap-mcp-token-credentials
+  secretStoreName: vault-backend
+  refreshInterval: 1h

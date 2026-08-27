@@ -288,6 +288,55 @@ def mcp_gateway_denies_generate_image_for_tekos_agent_declaration() -> CheckResu
     )
 
 
+def mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group() -> CheckResult:
+    """ADR-0355 Security considerations, the mandated security-negative test:
+    `aap.cluster.audit` is this repository's only capability that RUNS
+    cluster automation, so an unauthorized caller must be stopped by the
+    platform's own policy layer - not merely by AAP-side RBAC further down.
+
+    tekos-entitlement-only-user-01 holds agent_tekos (so the BFF/runtime let
+    it through) but no business role at all, while Tekos's
+    answer-technical-question task DOES declare this capability - so the
+    agent_declaration factor passes and a 403 here can only come from the
+    user_group_rights factor (policies/tools/tool-policy.yaml:
+    aap.cluster.audit.allowed_groups: [consultant, board, cdp]). That is the
+    defence-in-depth claim ADR-0355 requires evidence for: the call never
+    reaches AAP at all.
+    """
+    resp = _invoke_tool(
+        "tekos-entitlement-only-user-01",
+        "aap.cluster.audit",
+        {},
+        classification="C2",
+    )
+    ok = resp.status_code == 403
+    return CheckResult(
+        "mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
+def mcp_gateway_denies_aap_platform_audit_for_unauthorized_group() -> CheckResult:
+    """The read-only half of the same boundary. Both aap.* entries carry the
+    same allowed_groups on purpose (see the block comment on them in
+    policies/tools/tool-policy.yaml), so both must deny the same caller -
+    an asymmetry here would mean one of the two entries drifted.
+    """
+    resp = _invoke_tool(
+        "tekos-entitlement-only-user-01",
+        "aap.platform.audit",
+        {},
+        classification="C2",
+    )
+    ok = resp.status_code == 403
+    return CheckResult(
+        "mcp_gateway_denies_aap_platform_audit_for_unauthorized_group",
+        ok,
+        f"status={resp.status_code} body={resp.text[:200]}",
+    )
+
+
 def tekos_chat_never_returns_photorealistic_images() -> CheckResult:
     """ADR-0415/ADR-0516: Tekos's task never lists
     `image.generation.create` (SDXL/photorealistic), only
@@ -335,6 +384,8 @@ CHECKS = [
     direct_call_to_confluence_mcp_denied_without_gateway_token,
     mcp_gateway_denies_generate_image_for_tekos_agent_declaration,
     tekos_chat_never_returns_photorealistic_images,
+    mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group,
+    mcp_gateway_denies_aap_platform_audit_for_unauthorized_group,
 ]
 
 
