@@ -223,7 +223,11 @@ agents:
     # modules. The anchor is what does that: mtp.layers.N.self_attn
     # carries q_proj/k_proj/v_proj/o_proj under those exact names, so a
     # plain suffix list would inject LoRA into the multi-token-prediction
-    # head. peft 0.13 has no exclude_modules to fall back on.
+    # head. peft resolves to 0.20 here, which DOES have exclude_modules -
+    # but an anchored regex is still the better tool: it states positively
+    # which modules are trained instead of enumerating what to subtract, so
+    # a future architecture variant that adds another head is excluded by
+    # construction rather than by remembering to extend a denylist.
     # mlp.* is deliberately untargeted: attention-only at rank 8 is
     # ADR-0526's own stated mitigation against catastrophic forgetting,
     # and a register shift is an output-distribution shift that does not

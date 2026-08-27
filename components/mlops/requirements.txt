@@ -9,7 +9,18 @@ httpx>=0.27,<0.28
 # training run targets a CUDA-capable node (the operator's own GPU
 # cluster, ADR-0301/0302's own explicit scope boundary).
 torch>=2.4,<3
-transformers>=4.44,<5
+# >=5.16, NOT <5. Verified in the built image against the live cluster
+# (2026-08-27): no 4.x release knows this platform's training base at all -
+# 4.57.6 (the highest the old <5 ceiling resolved to) has neither
+# Qwen3_5ForConditionalGeneration nor `qwen3_5` in CONFIG_MAPPING_NAMES, so
+# EVERY Auto* class fails on the checkpoint, not just the one WP-34 picked.
+# transformers 5.0.0 still lacks it; 5.16.1 has both. The checkpoint ships
+# no custom modelling code (no auto_map, no .py files), so trust_remote_code
+# is not an escape either. API-compatibility was checked in the same image
+# before bumping: AutoTokenizer/Trainer/TrainingArguments/AutoModelFor*
+# all still exist, every TrainingArguments parameter this component passes
+# is still accepted, and peft imports cleanly against it.
+transformers>=5.16,<6
 peft>=0.13,<1
 datasets>=2.21,<3
 accelerate>=0.34,<1
