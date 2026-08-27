@@ -34,6 +34,24 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: acceptance-gate
+        # WP-087: the mlops training pipeline runs the SAME acceptance gate
+        # from zuno-mlops, so the acceptance-gate peer above cannot reach
+        # it - an ingress `from` peer carrying only a podSelector matches
+        # same-namespace pods, and the pipeline pod is in another
+        # namespace. It timed out at the TCP level on every scenario that
+        # touches this service, which the ADR-0028 rate then scored as the
+        # agent misbehaving rather than as a policy gap.
+        #
+        # namespaceSelector AND podSelector inside ONE peer element is an
+        # intersection, not a union: only KFP component pods, and only
+        # those in zuno-mlops. Splitting them into two list items would
+        # instead admit that whole namespace plus every KFP pod anywhere.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-mlops
+          podSelector:
+            matchLabels:
+              pipelines.kubeflow.org/v2_component: "true"
       ports:
         - protocol: TCP
           port: 8080

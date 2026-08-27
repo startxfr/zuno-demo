@@ -89,6 +89,55 @@
          | list }}
   no_log: true
 
+# Scenario 19 of the acceptance gate lists pods in zuno-ai-run through
+# the in-cluster API to assert that ADR-0329's placeholder agents run no
+# workloads. Run from the pipeline it failed with a bare 403: the KFP
+# pipeline pod authenticates as pipeline-runner-mlops-dspa, not as the
+# standalone gate Job's acceptance-gate ServiceAccount.
+#
+# A separate Role rather than an extra subject on the agents role's
+# acceptance-gate Role: that one is created by run_acceptance_gate.yml,
+# which is a Day 3 verb an operator may never have run, so binding to it
+# would make this silently order-dependent. The rules are identical and
+# read-only.
+- name: "mlops | grant the pipeline ServiceAccount read-only pod access in zuno-ai-run (acceptance gate scenario 19)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        name: mlops-acceptance-gate
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      rules:
+        - apiGroups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list", "watch"]
+
+- name: "mlops | bind that Role to the mlops-dspa pipeline runner"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: mlops-acceptance-gate
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: mlops-acceptance-gate
+      subjects:
+        # KFP names the runner after the DataSciencePipelinesApplication
+        # this role waits on above (mlops-dspa), so this tracks that name.
+        - kind: ServiceAccount
+          name: pipeline-runner-mlops-dspa
+          namespace: zuno-mlops
+
 - name: "mlops | read the platform internal root CA the agent Routes chain to"
   kubernetes.core.k8s_info:
     api_version: v1
