@@ -100,6 +100,7 @@ def configure(task, *, agent):
 
 prepare_dataset = component("prepare-dataset")
 train_lora = component("train-lora")
+merge_export = component("merge-export")
 evaluate = component("evaluate")
 push_registry = component("push-registry")
 
@@ -146,7 +147,20 @@ def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
     # is even attempted - .after() enforces the DAG ordering; evaluate's
     # own non-zero exit on a failing gate (components/mlops/src/mlops.py)
     # stops the pipeline here, before push-registry's task ever starts.
-    evaluated = configure(evaluate(run_id=run_id).after(trained), agent="{{ $name }}")
+    # ADR-0526 (WP-087) decision 1: merge the adapter into a standalone
+    # checkpoint BEFORE evaluate, so push-registry can register the merged
+    # artifact's URI rather than the adapter's. No GPU here - but see
+    # values.yaml's merge: block for why it still needs explicit cpu,
+    # memory and ephemeral-storage: ~19GB in, ~19GB out, on a pod that
+    # would otherwise be BestEffort and evictable mid-upload.
+    merged = configure(merge_export(run_id=run_id).after(trained), agent="{{ $name }}")
+    merged.set_cpu_request("{{ $root.Values.merge.resources.cpuRequest }}")
+    merged.set_cpu_limit("{{ $root.Values.merge.resources.cpuLimit }}")
+    merged.set_memory_request("{{ $root.Values.merge.resources.memoryRequest }}")
+    merged.set_memory_limit("{{ $root.Values.merge.resources.memoryLimit }}")
+    merged.set_ephemeral_storage_request("{{ $root.Values.merge.resources.ephemeralStorageRequest }}")
+    merged.set_ephemeral_storage_limit("{{ $root.Values.merge.resources.ephemeralStorageLimit }}")
+    evaluated = configure(evaluate(run_id=run_id).after(merged), agent="{{ $name }}")
     configure(push_registry(run_id=run_id).after(evaluated), agent="{{ $name }}")
 
 

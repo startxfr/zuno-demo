@@ -249,9 +249,13 @@ def test_stage_train_lora_uploads_adapter_and_writes_train_manifest() -> None:
     )
     store.put_text("mlops/datasets/comage/run-001/examples.jsonl", json.dumps({"text": "hello", "source": "doc-1"}))
 
-    def _fake_train(cfg, examples, output_dir, base_model_ref=None):
+    def _fake_train(cfg, examples, output_dir, base_model_ref=None, held_out=None):
         # A non-s3 base model passes through _resolve_base_model untouched.
         assert base_model_ref == cfg.base_model
+        # WP-087: no test.jsonl in this fixture (it is a grounding-domain
+        # run, not a style one), so nothing is held out and no register
+        # samples are produced - the legacy path stays untouched.
+        assert held_out == []
         (output_dir / "adapter").mkdir(parents=True, exist_ok=True)
         (output_dir / "adapter" / "adapter_config.json").write_text("{}")
         (output_dir / "adapter" / "adapter_model.bin").write_bytes(b"fake-weights")

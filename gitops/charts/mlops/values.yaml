@@ -251,6 +251,23 @@ training:
     cpuLimit: "7"
     memoryLimit: 48Gi
 
+# ADR-0526 (WP-087): merge-export needs NO GPU, but it is far from free
+# and the WP only says "no GPU". It downloads the ~19GB base checkpoint,
+# holds the merged model in host RAM, and writes ~19GB back out - so it
+# needs real memory and, critically, real ephemeral storage. Left
+# unsized it would be BestEffort in a namespace with no LimitRange and
+# get evicted part-way through the upload, after the expensive GPU stage
+# has already succeeded.
+merge:
+  resources:
+    cpuRequest: "2"
+    cpuLimit: "4"
+    memoryRequest: 32Gi
+    memoryLimit: 48Gi
+    # base copy + merged output on the same disk, plus headroom.
+    ephemeralStorageRequest: 60Gi
+    ephemeralStorageLimit: 80Gi
+
 networkPolicy:
   enabled: true
   egressCidrs: []

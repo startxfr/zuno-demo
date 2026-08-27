@@ -66,6 +66,10 @@ logger = logging.getLogger("mlops")
 STAGES = (
     "prepare-dataset",
     "train-lora",
+    # ADR-0526 (WP-087) decision 1: merges the adapter into a standalone
+    # bf16 checkpoint. Between train and evaluate because the registered
+    # artifact URI must be the merged checkpoint, not the adapter.
+    "merge-export",
     "evaluate",
     "push-registry",
 )
@@ -789,11 +793,94 @@ def _load_dataset_manifest(config: MlopsConfig, store: ArtifactStore) -> Dict[st
     return manifest
 
 
+def _resolve_model_class(checkpoint_dir: str):
+    """Returns the transformers class that can load this checkpoint.
+
+    Reads the checkpoint's OWN config.json rather than picking an Auto*
+    class by hand. WP-34 used AutoModelForCausalLM, which is wrong here:
+    the staged checkpoint declares Qwen3_5ForConditionalGeneration with a
+    vision tower, and *ForConditionalGeneration architectures with a
+    vision config register under AutoModelForImageTextToText, not
+    AutoModelForCausalLM. Guessing between them is a coin flip that fails
+    at from_pretrained; reading architectures[0] is deterministic,
+    independent of the installed transformers version, and - decisively -
+    unit-testable offline with a stub module, which no Auto* choice is.
+    """
+    import transformers
+
+    config_path = Path(checkpoint_dir) / "config.json"
+    arch = None
+    if config_path.is_file():
+        declared = (json.loads(config_path.read_text(encoding="utf-8")) or {}).get("architectures") or []
+        arch = declared[0] if declared else None
+
+    if arch:
+        cls = getattr(transformers, arch, None)
+        if cls is not None:
+            logger.info("resolved model class %s from the checkpoint's own config.json", arch)
+            return cls
+        logger.warning(
+            "checkpoint declares %s but the installed transformers (%s) does not export it; "
+            "falling back to an Auto* class",
+            arch, getattr(transformers, "__version__", "unknown"),
+        )
+
+    for name in ("AutoModelForImageTextToText", "AutoModelForVision2Seq", "AutoModelForCausalLM"):
+        cls = getattr(transformers, name, None)
+        if cls is not None:
+            logger.info("using %s for %s", name, arch or "an undeclared architecture")
+            return cls
+    raise SystemExit(
+        f"cannot load architecture {arch!r}: installed transformers "
+        f"{getattr(transformers, '__version__', 'unknown')} exports neither it nor any usable Auto* class"
+    )
+
+
+def _make_collator(pad_token_id: int):
+    """Pads to the batch maximum and builds `labels`.
+
+    Two things, both load-bearing:
+
+    1. WP-34's tokenize step passed neither `labels` nor a collator that
+       synthesizes them, and transformers' default_data_collator does not
+       - so Trainer.train() had no loss to compute. The pipeline has never
+       run, so this never surfaced.
+    2. Prompt tokens are masked to -100, so loss is computed on the
+       ASSISTANT completion only. Full-sequence loss over single-turn
+       exchanges would also train the model to produce user turns in this
+       register, which is a real quality regression and free to avoid now
+       that prepare-dataset records the prompt prefix.
+    """
+    import torch
+
+    def collate(features):
+        width = max(len(f["input_ids"]) for f in features)
+        input_ids, attention, labels = [], [], []
+        for f in features:
+            ids = list(f["input_ids"])
+            mask = list(f.get("attention_mask") or [1] * len(ids))
+            lab = list(ids)
+            for i in range(min(int(f.get("prompt_len", 0)), len(lab))):
+                lab[i] = -100
+            pad = width - len(ids)
+            input_ids.append(ids + [pad_token_id] * pad)
+            attention.append(mask + [0] * pad)
+            labels.append(lab + [-100] * pad)
+        return {
+            "input_ids": torch.tensor(input_ids, dtype=torch.long),
+            "attention_mask": torch.tensor(attention, dtype=torch.long),
+            "labels": torch.tensor(labels, dtype=torch.long),
+        }
+
+    return collate
+
+
 def _run_lora_training(
     config: MlopsConfig,
     examples: List[Dict[str, Any]],
     output_dir: Path,
     base_model_ref: Optional[str] = None,
+    held_out: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Real PEFT/LoRA fine-tuning of config.base_model on `examples`
     (causal-LM text corpus), saved to output_dir via save_pretrained().
@@ -809,7 +896,7 @@ def _run_lora_training(
     import torch
     from datasets import Dataset
     from peft import LoraConfig, TaskType, get_peft_model
-    from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
+    from transformers import AutoTokenizer, Trainer, TrainingArguments
 
     base_ref = base_model_ref or config.base_model
     tokenizer = AutoTokenizer.from_pretrained(base_ref)
@@ -820,25 +907,60 @@ def _run_lora_training(
     # train pod's memory limit - where bf16 (the checkpoint's native
     # dtype) halves that. cpu_safe keeps the default: fp32 is the safe
     # dtype for CPU-only Trainer runs.
-    model = AutoModelForCausalLM.from_pretrained(
+    model_class = _resolve_model_class(base_ref)
+    model = model_class.from_pretrained(
         base_ref,
         **({} if config.cpu_safe else {"torch_dtype": torch.bfloat16}),
     )
 
+    # A LoraConfig with no target_modules leaves peft to guess from its own
+    # per-architecture table, which has no entry for qwen3_5 - so nothing
+    # is wrapped, nothing trains, and the merge is a no-op that produces a
+    # perfect copy of the base. See values.yaml's loraTargetModules for why
+    # this is an anchored regex rather than a suffix list.
+    lora_kwargs: Dict[str, Any] = {}
+    if config.lora_target_modules:
+        lora_kwargs["target_modules"] = config.lora_target_modules
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         r=config.lora_r,
         lora_alpha=config.lora_alpha,
         lora_dropout=config.lora_dropout,
+        **lora_kwargs,
     )
     model = get_peft_model(model, lora_config)
 
-    dataset = Dataset.from_list([{"text": ex["text"]} for ex in examples])
+    # Fail loudly on a regex that matched nothing. Without this the run is
+    # green end to end and the served variant is byte-identical to its
+    # base - the most expensive possible way to learn that a pattern was
+    # wrong (a full burst-node training run, then a live A/B that shows no
+    # difference).
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    wrapped = sum(1 for name, _ in model.named_modules() if name.endswith("lora_A.default"))
+    logger.info("LoRA wrapped %d modules, %d trainable parameters", wrapped, trainable)
+    if trainable == 0 or wrapped == 0:
+        raise SystemExit(
+            f"LoRA matched no modules (target_modules={config.lora_target_modules!r}) - "
+            f"training would be a no-op and the merged checkpoint identical to the base"
+        )
 
-    def _tokenize(batch):
-        return tokenizer(batch["text"], truncation=True, padding="max_length", max_length=256)
+    # prompt_len drives the collator's -100 masking. Computed per example
+    # against the SAME tokenizer, so the boundary is exact rather than a
+    # string-length approximation.
+    def _encode(ex: Dict[str, Any]) -> Dict[str, Any]:
+        full = tokenizer(ex["text"], truncation=True, max_length=max_length)
+        prompt_len = 0
+        if ex.get("prompt"):
+            prompt_len = len(tokenizer(ex["prompt"], truncation=True, max_length=max_length)["input_ids"])
+        return {
+            "input_ids": full["input_ids"],
+            "attention_mask": full["attention_mask"],
+            "prompt_len": min(prompt_len, len(full["input_ids"])),
+        }
 
-    tokenized = dataset.map(_tokenize, batched=True, remove_columns=["text"])
+    max_length = 256 if config.cpu_safe else 1024
+    dataset = Dataset.from_list([dict(ex) for ex in examples])
+    tokenized = dataset.map(_encode, remove_columns=list(dataset.column_names))
 
     args = TrainingArguments(
         output_dir=str(output_dir / "checkpoints"),
@@ -851,13 +973,70 @@ def _run_lora_training(
         report_to=[],
         use_cpu=config.cpu_safe or not torch.cuda.is_available(),
     )
-    trainer = Trainer(model=model, args=args, train_dataset=tokenized)
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tokenized,
+        data_collator=_make_collator(tokenizer.pad_token_id),
+    )
     train_result = trainer.train()
 
     model.save_pretrained(str(output_dir / "adapter"))
     tokenizer.save_pretrained(str(output_dir / "adapter"))
 
-    return {"train_loss": getattr(train_result, "training_loss", None), "steps": trainer.state.global_step}
+    stats = {"train_loss": getattr(train_result, "training_loss", None), "steps": trainer.state.global_step}
+    if held_out:
+        stats["register_samples"] = _generate_held_out(model, tokenizer, held_out, cpu_safe=config.cpu_safe)
+    return stats
+
+
+def _generate_held_out(model, tokenizer, held_out: List[Dict[str, Any]], *, cpu_safe: bool) -> List[Dict[str, Any]]:
+    """Generates completions for the held-out prompts, here in train-lora.
+
+    ADR-0526 decision 8 needs the candidate's own output to score, but the
+    merged model is deployed NOWHERE when the gate runs: evaluate runs
+    before push-registry, and promotion to serving is a later human PR. So
+    the samples are produced on the GPU that just finished training,
+    rather than by calling a service that does not exist yet.
+
+    Scoring the PEFT model rather than the merged one is equivalent:
+    merge_and_unload() computes W + (alpha/r).B.A, and the eval-mode LoRA
+    forward computes W.x + (alpha/r).B(A(x)) - the same function up to bf16
+    rounding, with dropout off. This costs zero extra GPU seconds and
+    needs no second burst-node scale-up.
+
+    Greedy (do_sample=False) so a gate result is reproducible: a sampled
+    decode would make the register score vary run to run and turn a
+    threshold into a coin flip.
+    """
+    import torch
+
+    limit = 4 if cpu_safe else len(held_out)
+    samples: List[Dict[str, Any]] = []
+    model.eval()
+    with torch.no_grad():
+        for row in held_out[:limit]:
+            messages = row.get("messages") or []
+            if len(messages) < 2:
+                continue
+            prompt = tokenizer.apply_chat_template(
+                messages[:-1], tokenize=False, add_generation_prompt=True
+            )
+            enc = tokenizer(prompt, return_tensors="pt").to(model.device)
+            out = model.generate(
+                **enc,
+                max_new_tokens=32 if cpu_safe else 256,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+            completion = tokenizer.decode(out[0][enc["input_ids"].shape[-1]:], skip_special_tokens=True)
+            samples.append({
+                "prompt": messages[-2].get("content", ""),
+                "reference": messages[-1].get("content", ""),
+                "completion": completion,
+            })
+    logger.info("generated %d held-out completions for register scoring", len(samples))
+    return samples
 
 
 def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
@@ -869,14 +1048,33 @@ def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
         raise SystemExit(f"no examples.jsonl for {config.agent}/{config.run_id} - run prepare-dataset first")
     examples = [json.loads(line) for line in examples_raw.decode("utf-8").splitlines() if line.strip()]
 
+    # ADR-0526 decision 8: the held-out split prepare-dataset carried
+    # forward. Absent on a grounding-domain run, which is why this is a
+    # soft read rather than a hard requirement.
+    held_out: List[Dict[str, Any]] = []
+    held_out_raw = store.get_bytes(f"{_run_prefix(config.dataset_prefix, config)}/test.jsonl")
+    if held_out_raw:
+        held_out = [json.loads(l) for l in held_out_raw.decode("utf-8").splitlines() if l.strip()]
+
     with tempfile.TemporaryDirectory() as tmp:
         output_dir = Path(tmp)
         # Resolved inside the TemporaryDirectory so an s3://-staged base
-        # model's ~18GB working copy is reclaimed with the run.
+        # model's ~19GB working copy is reclaimed with the run.
         base_model_ref = _resolve_base_model(config, store, output_dir)
-        train_stats = _run_lora_training(config, examples, output_dir, base_model_ref=base_model_ref)
+        train_stats = _run_lora_training(
+            config, examples, output_dir, base_model_ref=base_model_ref, held_out=held_out,
+        )
         adapter_prefix = f"{_run_prefix(config.model_prefix, config)}/adapter"
         uploaded = store.put_dir(adapter_prefix, output_dir / "adapter")
+
+    # Written under the EVAL prefix, not the model one: this is gate input,
+    # and evaluate is what reads it.
+    register_samples = train_stats.pop("register_samples", None)
+    if register_samples:
+        store.put_text(
+            f"{_run_prefix(config.eval_prefix, config)}/register_samples.jsonl",
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in register_samples),
+        )
 
     train_manifest = {
         "agent": config.agent,
@@ -896,6 +1094,122 @@ def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
     store.put_json(f"{_run_prefix(config.model_prefix, config)}/train_manifest.json", train_manifest)
     logger.info("train-lora: adapter for %s/%s uploaded to %s (%d files)",
                 config.agent, config.run_id, adapter_prefix, len(uploaded))
+
+
+# --------------------------------------------------------------------------
+# merge-export
+# --------------------------------------------------------------------------
+
+
+def stage_merge_export(config: MlopsConfig, store: ArtifactStore) -> None:
+    """ADR-0526 decision 1: merges the adapter into a standalone bf16
+    checkpoint and publishes it where gitops/charts/models reads models
+    from.
+
+    This is the stage that makes decision 4 possible: a merged checkpoint
+    is an ordinary model, servable as its own LLMInferenceService with its
+    own routable id, which is what vLLM's --lora-modules cannot give.
+    Training stays adapter-scale - only the serving artifact is full size.
+
+    Still no promotion: ADR-0302 point 7 is untouched. This writes weights
+    to S3; making them serve requires a human-reviewed PR against
+    gitops/charts/models/values.yaml, which nothing here touches.
+    """
+    import shutil
+    import tempfile
+
+    if not config.merged_model_s3uri:
+        raise SystemExit("merge-export requires MLOPS_MERGED_MODEL_S3URI")
+    train_manifest = store.get_json(f"{_run_prefix(config.model_prefix, config)}/train_manifest.json")
+    if train_manifest is None:
+        raise SystemExit(f"no train_manifest.json for {config.agent}/{config.run_id} - run train-lora first")
+
+    dest_bucket, dest_prefix = _split_s3_uri(config.merged_model_s3uri)
+
+    # The destination is a prefix a running KServe storage-initializer
+    # reads. On the first run it is empty and no LLMInferenceService
+    # points at it yet; on a re-run it holds the live variant's weights,
+    # and replacing them here would swap a serving model's checkpoint
+    # without the review ADR-0302 point 7 requires. Refuse by default.
+    existing = store.list_keys(
+        dest_prefix + "/", bucket=dest_bucket,
+        region=config.models_s3_region, endpoint=config.models_s3_endpoint,
+    )
+    if existing and not config.merged_overwrite:
+        raise SystemExit(
+            f"{config.merged_model_s3uri}/ already holds {len(existing)} objects. "
+            f"A served model may be reading them. Set MLOPS_MERGED_OVERWRITE=true only "
+            f"if replacing those weights in place is intended."
+        )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        from peft import PeftModel
+        from transformers import AutoTokenizer
+
+        base_ref = _resolve_base_model(config, store, workdir)
+        adapter_dir = workdir / "adapter"
+        adapter_dir.mkdir(parents=True, exist_ok=True)
+        count = store.download_prefix(store.bucket, train_manifest["adapter_s3_prefix"], adapter_dir)
+        if count == 0:
+            raise SystemExit(f"no adapter files under {train_manifest['adapter_s3_prefix']}")
+
+        model_class = _resolve_model_class(base_ref)
+        kwargs: Dict[str, Any] = {}
+        if not config.cpu_safe:
+            import torch
+
+            kwargs["torch_dtype"] = torch.bfloat16
+        base = model_class.from_pretrained(base_ref, **kwargs)
+        merged = PeftModel.from_pretrained(base, str(adapter_dir)).merge_and_unload()
+
+        out_dir = workdir / "merged"
+        merged.save_pretrained(str(out_dir), safe_serialization=True)
+        AutoTokenizer.from_pretrained(str(adapter_dir)).save_pretrained(str(out_dir))
+
+        # save_pretrained emits config + weights + tokenizer and nothing
+        # else. The staged checkpoint also carries preprocessor_config.json,
+        # video_preprocessor_config.json and chat_template.jinja, which vLLM
+        # needs - copy forward anything the base had that the merge did not
+        # produce, rather than enumerating a list that will drift.
+        carried = []
+        for src in sorted(Path(base_ref).iterdir()) if Path(base_ref).is_dir() else []:
+            if src.is_file() and not (out_dir / src.name).exists() and not src.name.startswith("model"):
+                shutil.copy2(src, out_dir / src.name)
+                carried.append(src.name)
+        if carried:
+            logger.info("carried forward from the base checkpoint: %s", ", ".join(carried))
+
+        files = [
+            {"key": f.relative_to(out_dir).as_posix(), "size": f.stat().st_size}
+            for f in sorted(out_dir.rglob("*")) if f.is_file()
+        ]
+        uploaded = store.put_dir(
+            dest_prefix, out_dir, bucket=dest_bucket,
+            region=config.models_s3_region, endpoint=config.models_s3_endpoint,
+        )
+
+    manifest = {
+        "agent": config.agent,
+        "run_id": config.run_id,
+        "base_model": config.base_model,
+        "adapter_s3_prefix": train_manifest["adapter_s3_prefix"],
+        "merged_model_uri": config.merged_model_s3uri,
+        "merged_bucket": dest_bucket,
+        "merged_prefix": dest_prefix,
+        "dtype": "float32" if config.cpu_safe else "bfloat16",
+        "files": files,
+        "file_count": len(files),
+        "total_bytes": sum(f["size"] for f in files),
+        "uploaded_count": len(uploaded),
+        "classification": train_manifest["classification"],
+        "merged_at": datetime.now(timezone.utc).isoformat(),
+    }
+    store.put_json(f"{_run_prefix(config.model_prefix, config)}/merge_manifest.json", manifest)
+    logger.info(
+        "merge-export: %d files (%.1f GB) -> %s",
+        len(files), manifest["total_bytes"] / 1e9, config.merged_model_s3uri,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -1037,6 +1351,7 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
 STAGE_FUNCTIONS = {
     "prepare-dataset": stage_prepare_dataset,
     "train-lora": stage_train_lora,
+    "merge-export": stage_merge_export,
     "evaluate": stage_evaluate,
     "push-registry": stage_push_registry,
 }
