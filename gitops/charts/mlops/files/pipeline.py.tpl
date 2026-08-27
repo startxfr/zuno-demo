@@ -175,8 +175,32 @@ def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
     merged.set_cpu_limit("{{ $root.Values.merge.resources.cpuLimit }}")
     merged.set_memory_request("{{ $root.Values.merge.resources.memoryRequest }}")
     merged.set_memory_limit("{{ $root.Values.merge.resources.memoryLimit }}")
-    merged.set_ephemeral_storage_request("{{ $root.Values.merge.resources.ephemeralStorageRequest }}")
-    merged.set_ephemeral_storage_limit("{{ $root.Values.merge.resources.ephemeralStorageLimit }}")
+    # NO ephemeral-storage request: kfp 2.17's PipelineTask simply has no
+    # setter for it (only cpu, memory and accelerator), and kfp.kubernetes
+    # offers volumes rather than resource requests. Verified against the
+    # installed SDK rather than assumed - an earlier revision of this file
+    # called set_ephemeral_storage_request and every compile died on
+    # AttributeError.
+    #
+    # That leaves a real exposure, because this stage genuinely needs the
+    # disk: ~19GB of base checkpoint in, ~19GB of merged checkpoint out, on
+    # the same filesystem. With no request it is a zero-request pod, which
+    # this cluster has already shown means "scheduled onto the fullest node
+    # and evicted first" - that is exactly how the mlops IMAGE build failed
+    # three times before being pinned. So steer it the only way the SDK
+    # allows, to the node group that actually has the headroom (155GB and
+    # 182GB free versus 19-47GB elsewhere).
+    #
+    # Not the gpu-burst node the training stage uses: that one scales from
+    # zero and is reclaimed after training, and parking a 40GB merge on it
+    # would hold an expensive node alive for no GPU work. These are the
+    # permanent MIG nodes, whose nvidia.com/gpu taint is PreferNoSchedule -
+    # it deprioritises without blocking, and this task requests no GPU.
+    kubernetes.add_node_selector(
+        merged,
+        label_key="{{ $root.Values.merge.nodeSelector.key }}",
+        label_value="{{ $root.Values.merge.nodeSelector.value }}",
+    )
     evaluated = configure(evaluate(run_id=run_id).after(merged), agent="{{ $name }}")
     configure(push_registry(run_id=run_id).after(evaluated), agent="{{ $name }}")
 

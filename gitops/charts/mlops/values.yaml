@@ -300,9 +300,16 @@ merge:
     cpuLimit: "4"
     memoryRequest: 32Gi
     memoryLimit: 48Gi
-    # base copy + merged output on the same disk, plus headroom.
-    ephemeralStorageRequest: 60Gi
-    ephemeralStorageLimit: 80Gi
+  # NOT ephemeral-storage requests: kfp 2.17's PipelineTask has no setter
+  # for those (verified against the installed SDK), so the only lever the
+  # SDK gives for "this stage needs a lot of disk" is placement. Same group
+  # label, and the same reasoning, as ansible/roles/mlops_build's own
+  # build_node_selector: these two nodes are the only ones here with real
+  # headroom. ~19GB in and ~19GB out on one filesystem is not something to
+  # leave to whichever node the scheduler happens to pick.
+  nodeSelector:
+    key: machine.startx.io/group
+    value: gpu
 
 networkPolicy:
   enabled: true
