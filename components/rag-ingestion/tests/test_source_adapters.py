@@ -1207,6 +1207,47 @@ def test_index_pgvector_reconnects_and_replays_a_window_on_a_lost_connection():
     assert state["rows_written"] >= 3000, state["rows_written"]
 
 
+def test_s3_pool_covers_the_widest_stage_worker_pool():
+    """Regression for WP-084: the pool was hard-coded to 32 while
+    DETECT_CHANGES_READ_CONCURRENCY was raised to 64, so half the workers
+    churned a TLS connection per GET instead of reusing a pooled one."""
+    import types
+
+    cfg = types.SimpleNamespace(
+        detect_changes_read_concurrency=64,
+        index_read_concurrency=16,
+        normalize_concurrency=16,
+        chunk_concurrency=16,
+        fetch_redhat_concurrency=8,
+        fetch_sxa_write_concurrency=8,
+    )
+    size = rag_ingestion._s3_pool_size(cfg)
+    assert size > 64, f"pool {size} does not cover 64 concurrent readers"
+
+    # Never drops below the floor botocore's default (10) is raised to.
+    small = types.SimpleNamespace(
+        detect_changes_read_concurrency=4,
+        index_read_concurrency=4,
+        normalize_concurrency=4,
+        chunk_concurrency=4,
+        fetch_redhat_concurrency=4,
+        fetch_sxa_write_concurrency=4,
+    )
+    assert rag_ingestion._s3_pool_size(small) >= 32
+
+    # Any single knob raised on its own must still be covered.
+    for knob in (
+        "detect_changes_read_concurrency",
+        "index_read_concurrency",
+        "normalize_concurrency",
+        "chunk_concurrency",
+        "fetch_redhat_concurrency",
+        "fetch_sxa_write_concurrency",
+    ):
+        one = types.SimpleNamespace(**{**vars(small), knob: 128})
+        assert rag_ingestion._s3_pool_size(one) > 128, f"{knob} outgrew the pool"
+
+
 def test_ivfflat_lists_sizing_matches_pgvector_guidance():
     assert rag_ingestion._ivfflat_lists_for(0) == 10        # floor
     assert rag_ingestion._ivfflat_lists_for(5_000) == 10    # floor
@@ -1264,6 +1305,7 @@ TESTS = [
     test_index_pgvector_recreates_the_index_even_when_the_load_fails,
     test_index_pgvector_reconnects_and_replays_a_window_on_a_lost_connection,
     test_ivfflat_lists_sizing_matches_pgvector_guidance,
+    test_s3_pool_covers_the_widest_stage_worker_pool,
 ]
 
 

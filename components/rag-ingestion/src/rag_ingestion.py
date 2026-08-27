@@ -342,6 +342,23 @@ def load_config() -> IngestionConfig:
 # --------------------------------------------------------------------------
 
 
+def _s3_pool_size(config: "IngestionConfig") -> int:
+    """Size CorpusStore's connection pool to the widest stage that shares it.
+
+    Every stage runs in its own pod, so only one of these worker pools is
+    ever live at a time - the maximum has to fit, not the sum. The headroom
+    covers the calling thread's own get/put around the pool."""
+    return 4 + max(
+        32,
+        config.detect_changes_read_concurrency,
+        config.index_read_concurrency,
+        config.normalize_concurrency,
+        config.chunk_concurrency,
+        config.fetch_redhat_concurrency,
+        config.fetch_sxa_write_concurrency,
+    )
+
+
 class CorpusStore:
     """Thin S3 wrapper - every stage's state lives here, not on local disk."""
 
@@ -368,7 +385,15 @@ class CorpusStore:
                 # this, excess threads would queue for a free pooled
                 # connection instead of actually running in parallel,
                 # silently capping the gain this store's callers pay for.
-                max_pool_connections=32,
+                # WP-084 (2026-08-27): this was a hard-coded 32 and stopped
+                # covering that when readConcurrency went 16 -> 64. The live
+                # detect-changes pod logged a continuous "Connection pool is
+                # full, discarding connection" stream: half its workers were
+                # re-establishing a TLS connection per GET, which is exactly
+                # the latency the raised concurrency was meant to hide.
+                # Derived now, so raising a knob in values.yaml can never
+                # silently outgrow it again.
+                max_pool_connections=_s3_pool_size(config),
             ),
         }
         if config.s3_endpoint:
