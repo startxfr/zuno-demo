@@ -18,8 +18,30 @@
 `olsConfig.provider.endpointMode: direct` — Lightspeed appelle
 `qwen36-27b-instruct-kserve-workload-svc:8000/v1`, le même endpoint que le fallback documenté
 d'`ai-gateway`, et non la passerelle MaaS. C'est une **régression assumée d'ADR-0521**, décidée
-avec l'opérateur humain, parce que le plan de contrôle MaaS ne rapproche plus aucune identité
-d'une `MaaSSubscription`.
+avec l'opérateur humain.
+
+**Diagnostic corrigé le 2026-08-27.** Ce paragraphe attribuait le contournement à un plan de
+contrôle MaaS qui « ne rapproche plus aucune identité d'une `MaaSSubscription` ». C'est faux, et
+la contradiction était visible : `local-maas` d'`ai-gateway` répondait 200 pendant tout ce temps.
+Le plan de contrôle est sain — le 403 venait de **deux erreurs de nommage dans notre propre
+chart**, prouvées par A/B sur la passerelle live avec un seul et même token `ai-gateway` :
+
+| ce qu'on change | résultat |
+|---|---|
+| corps `model` = `zuno-ai-run/qwen36-27b-instruct-maas` | **200**, complétion réelle |
+| corps `model` = `qwen3.6-27b-instruct` | **403** `no matching subscription found for user` |
+| chemin `/zuno-ai-run/qwen36-27b-instruct/v1` | **200** |
+| chemin `/zuno-ai-run/qwen36-27b-instruct-maas/v1` | **404** |
+
+Deux noms, deux rôles, que le chart avait intervertis : le **LLMInferenceService**
+(`qwen36-27b-instruct`) est la seule chose que l'HTTPRoute matche et va dans le chemin ; le
+**MaaSModelRef** qualifié (`zuno-ai-run/qwen36-27b-instruct-maas`) est l'identité sur laquelle
+l'`AuthPolicy` autorise et va dans le corps — le filtre `ipp-pre` la recopie dans
+`X-Gateway-Model-Name`, que lisent l'OPA et `/internal/v1/subscriptions/select`. `ai-gateway`
+modélisait déjà cette distinction (`model` vs `maas_model_ref`) ; `lightspeed-config` ne l'avait
+pas reprise. Corrigé dans le chart.
+
+La souscription `qwen36-27b-instruct-lightspeed` était `Active` et correcte depuis le début.
 
 Retour à MaaS = deux éditions, rien d'autre :
 1. `gitops/charts/lightspeed-config/values.yaml` : `endpointMode: maas` +

@@ -3,9 +3,14 @@
 {{- /* Derive credentialKey from the credential mode unless explicitly overridden. */ -}}
 {{- $credKey := .Values.credential.credentialKey }}
 {{- if not $credKey }}{{ $credKey = ternary "token" "apitoken" (eq .Values.credential.mode "saTokenSecret") }}{{ end }}
-{{- /* endpointMode: `direct` court-circuite MaaS (ADR-0524, temporaire). */ -}}
-{{- $providerURL := printf "%s/%s/%s/v1" $p.gatewayEndpoint $p.servingNamespace $p.publishedModelName }}
-{{- if eq $p.endpointMode "direct" }}{{ $providerURL = $p.directEndpoint }}{{ end }}
+{{- /* endpointMode: `direct` court-circuite MaaS (ADR-0524).
+       The path carries the LLMInferenceService name - it is the only thing
+       the HTTPRoute matches - while the body's `model` carries the MaaS
+       identity. Two different names; see values.yaml for the live A/B that
+       established which goes where. */ -}}
+{{- $providerURL := printf "%s/%s/%s/v1" $p.gatewayEndpoint $p.servingNamespace $p.llmISvcName }}
+{{- $bodyModel := $p.maasModelRef }}
+{{- if eq $p.endpointMode "direct" }}{{ $providerURL = $p.directEndpoint }}{{ $bodyModel = $p.modelName }}{{ end }}
 # ADR-0524: the OLSConfig singleton. Cluster-scoped in effect (the CRD accepts
 # only the name "cluster"), so exactly one Application may ever render it.
 apiVersion: ols.openshift.io/v1alpha1
@@ -31,13 +36,13 @@ spec:
           name: {{ .Values.credential.secretName }}
         credentialKey: {{ $credKey }}
         models:
-          - name: {{ $p.modelName }}
+          - name: {{ $bodyModel | quote }}
             contextWindowSize: {{ $p.contextWindowSize }}
             parameters:
               maxTokensForResponse: {{ $p.maxTokensForResponse }}
   ols:
     defaultProvider: {{ $p.name }}
-    defaultModel: {{ $p.modelName }}
+    defaultModel: {{ $bodyModel | quote }}
     # ADR-0524 clause 2: `rag` deliberately absent and byokRAGOnly false, so
     # the operator's RHOKP sidecar keeps serving official OpenShift docs.
     byokRAGOnly: {{ .Values.olsConfig.byokRAGOnly }}

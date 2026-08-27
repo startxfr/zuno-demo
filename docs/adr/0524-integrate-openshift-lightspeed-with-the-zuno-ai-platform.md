@@ -4,11 +4,13 @@
   chat reachable by the `consultant`/`sales` personas, cluster introspection answering, Confluence
   knowledge retrieved through the existing MCP Gateway, and a Confluence write correctly refused).
   **One clause is not yet met:** clause 1 routes inference through MaaS, and inference currently
-  goes direct to the KServe predictor because the MaaS control plane no longer resolves
-  subscriptions (`403 no matching subscription found for user`, reproduced for the known-good
-  `ai-gateway` identity on a model this ADR never touched - WP-076/ADR-0521 scope). The MaaS
-  entitlement (`MaaSSubscription` + OPA subject) was deliberately left in place so returning is two
-  value edits; see WP-085's "Contournement MaaS" section.
+  goes direct to the KServe predictor. The cause recorded here on 2026-08-27 - "the MaaS control
+  plane no longer resolves subscriptions", scoped to WP-076/ADR-0521 - was **wrong**, and is
+  corrected the same day: the control plane is healthy (`ai-gateway`'s `local-maas` answered 200
+  throughout), and the 403 came from two swapped names in this repo's own `lightspeed-config`
+  chart - the LLMInferenceService name belongs in the URL path, the qualified MaaSModelRef in the
+  request body's `model`. Both fixed; see WP-085's "Contournement MaaS" section for the live A/B
+  that established it.
 - **Target:** v0.4
 - **Date:** 2026-08-26
 - **Decision owners:** Zuno Demo architecture team

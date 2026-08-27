@@ -22,13 +22,33 @@ olsConfig:
   provider:
     name: zuno-maas
     type: rhoai_vllm
-    # Published MaaS model name, NOT the LLMInferenceService name -
-    # gitops/charts/models/values.yaml publishes qwen36-27b-instruct as
-    # "qwen36-27b-instruct-maas". Getting this wrong produces a 403 from the
-    # MaaSAuthPolicy's OPA map rather than a 404, because the model identity
-    # it authorizes on is derived from the request path.
-    publishedModelName: qwen36-27b-instruct-maas
-    # The name Lightspeed sends as the OpenAI "model" field.
+    # CORRECTION 2026-08-27: these two were swapped, and the comment that
+    # used to sit here said the model identity is "derived from the request
+    # path". It is not. Proven by A/B on the live gateway with one identical
+    # ai-gateway token, changing only the request BODY's `model` field:
+    #   body model = zuno-ai-run/qwen36-27b-instruct-maas  -> HTTP 200
+    #   body model = qwen3.6-27b-instruct                   -> HTTP 403
+    #     "no matching subscription found for user"
+    # and, separately, changing only the PATH segment:
+    #   path /zuno-ai-run/qwen36-27b-instruct/v1      -> HTTP 200
+    #   path /zuno-ai-run/qwen36-27b-instruct-maas/v1 -> HTTP 404
+    #
+    # So there are two distinct names with two distinct jobs, exactly as
+    # ai-gateway already models them (`model` vs `maas_model_ref` in
+    # platform/ai-gateway/provider-routing.yaml):
+    #
+    #   llmISvcName  - the LLMInferenceService, and the ONLY thing the
+    #                  HTTPRoute matches. Goes in the URL path.
+    #   maasModelRef - <namespace>/<MaaSModelRef>, the identity the
+    #                  MaaS AuthPolicy authorizes on. The ipp-pre ext_proc
+    #                  filter copies it out of the body into
+    #                  X-Gateway-Model-Name, which is what the OPA map and
+    #                  /internal/v1/subscriptions/select key on. Goes in the
+    #                  request body's `model`.
+    #   modelName    - what the KServe predictor itself answers to, used
+    #                  only when endpointMode=direct bypasses MaaS.
+    llmISvcName: qwen36-27b-instruct
+    maasModelRef: zuno-ai-run/qwen36-27b-instruct-maas
     modelName: qwen3.6-27b-instruct
     # TEMPORAIRE (2026-08-27) - voir ADR-0524 / WP-085.
     #
