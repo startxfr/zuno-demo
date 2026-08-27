@@ -977,7 +977,16 @@ def _run_lora_training(
 
     args = TrainingArguments(
         output_dir=str(output_dir / "checkpoints"),
-        num_train_epochs=1 if config.cpu_safe else 3,
+        # One epoch, lowered from 3 after the first real run. On the
+        # ADR-0526 style corpus the training loss had already fallen from
+        # ~3.0 to ~1.0 before the first epoch ended - the register is
+        # acquired there, and the remaining two epochs only hardened one
+        # memorised opening formula: 44.3% of held-out answers began with
+        # "wesh" against 5.95% in the corpus itself, which is the single
+        # thing that failed the register gate (rule 3, ceiling 30%). Every
+        # other register measure passed with margin, so this is an
+        # over-fitting duration problem, not a capacity or rate one.
+        num_train_epochs=1,
         max_steps=5 if config.cpu_safe else -1,
         per_device_train_batch_size=1 if config.cpu_safe else 8,
         learning_rate=2e-4,
