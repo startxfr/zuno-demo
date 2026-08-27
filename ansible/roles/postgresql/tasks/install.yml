@@ -181,7 +181,7 @@
         and ((_postgresql_existing_cluster_lookup.resources | default([]) | length) == 0)
       }}
 
-# ADR-0526: the pguser Secrets must exist, carrying the Vault credential,
+# ADR-0529: the pguser Secrets must exist, carrying the Vault credential,
 # BEFORE the PostgresCluster does. The chart's ExternalSecrets are
 # creationPolicy: Merge (which is what stops the PGO/ESO write loop) and
 # Merge does not create a missing Secret - so on a greenfield cluster PGO

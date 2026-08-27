@@ -63,7 +63,25 @@ nothing crunchy-named is found anywhere.
     PGO's `<cluster>-pguser-<user>` Secret name must be a valid
     Kubernetes RFC 1123 label, which rules out underscores, and unquoted
     PostgreSQL identifiers can't contain hyphens either, so a name valid
-    in both had to drop the separator entirely);
+    in both had to drop the separator entirely).
+
+    Two things about this Secret are easy to get wrong, both settled by
+    ADR-0529. First, the `ExternalSecret` is `creationPolicy: Merge`, not
+    `Orphan`: Orphan's write is destructive - it replaces `.data` wholesale
+    with `user`+`password` and deletes the `verifier`/`uri`/`host`/... PGO
+    maintains on the same object, which put the two controllers in a
+    continuous rewrite loop and had PGO re-deriving a freshly *salted* SCRAM
+    verifier every ~10s on all 17 roles. That broke any client whose SCRAM
+    session outlived pgbouncer's 3600s `server_lifetime`. Second, because
+    Merge does not *create* a missing Secret, `tasks/precreate_pguser_secrets.yml`
+    seeds all 17 from Vault before the `PostgresCluster` is applied - on a
+    greenfield cluster PGO would otherwise win the race with a self-generated
+    password that no later Vault sync can dislodge.
+
+    A consequence worth knowing before you rotate anything: under Merge, a new
+    password written to Vault will **not** reach the database on its own. The
+    deliberate-rotation runbook (including the `verifier` removal that forces
+    PGO to re-derive) is in ADR-0529;
   - a `PostgresCluster` (3 Patroni instances for HA, PgBouncer x2 in
     front, separate data/WAL volumes, one local PVC-backed pgBackRest
     repo always plus a second S3-compatible one once real credentials
