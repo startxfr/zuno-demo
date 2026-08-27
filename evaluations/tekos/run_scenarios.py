@@ -673,6 +673,70 @@ def health_endpoints_all_ok(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, json.dumps(statuses))
 
 
+def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
+    """ADR-0526 (WP-087): asserts HOW an answer is written, not what it says.
+
+    The one tone-aware check in this file. Every other scenario here is
+    deliberately tone-blind (status codes, JSON shape, non-emptiness,
+    latency, SSE framing), which is what makes the acceptance suite a clean
+    substance control for the register variant - see
+    evaluations/register_conformance.py's module docstring.
+
+    This is the POST-PROMOTION live check. It is NOT what gates the
+    pipeline: components/mlops's evaluate stage scores train-lora's
+    held-out completions offline, because the merged model is deployed
+    nowhere at gate time. Two checks, one scorer, no duplicated thresholds.
+
+    `expect_register: false` inverts it, which is how rules 11-13 get
+    asserted live: a technical question whose answer must NOT be slangified.
+    """
+    # Imported here, not at module scope, and with an explicit path setup:
+    # this file runs under TWO different layouts. In the repo it sits at
+    # evaluations/tekos/, with register_conformance.py one level up; in the
+    # acceptance-gate Job every script is flattened into /gate as sibling
+    # files. Covering both is two sys.path entries, and getting it wrong is
+    # an ImportError inside a live gate run.
+    _here = pathlib.Path(__file__).resolve().parent
+    for candidate in (_here, _here.parent):
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+    import register_conformance
+
+    timeout = s.get("timeout_seconds", 30)
+    resp = httpx.post(
+        f"{BFF_URL}/api/chat",
+        headers=auth_headers(s["persona"]),
+        json={"session_id": "eval-register", "message": s["message"]},
+        timeout=timeout,
+    )
+    if resp.status_code != 200:
+        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
+    body = resp.json()
+    record_run_id(s["persona"], body)
+    reply = body.get("reply") or ""
+    scored = register_conformance.score_text(reply)
+
+    # Rules 11-13 are asserted on EVERY register scenario, not only the
+    # negative one: slangified syntax is a failure whatever the question.
+    if scored["violations"]:
+        return ScenarioResult(
+            s["id"], s["title"], False,
+            "rules 11-13: " + "; ".join(f"{v['marker']} in {v['kind']}" for v in scored["violations"][:3]),
+        )
+    if s.get("expect_register", True):
+        ok = scored["marker_count"] >= int(s.get("min_markers", 1))
+    else:
+        # A technical answer may still carry register - rule 18 says
+        # professional topics use MEDIUM familiarity, not none - so this
+        # asserts a ceiling, never zero.
+        ok = scored["density"] <= float(s.get("max_density", 0.25))
+    return ScenarioResult(
+        s["id"], s["title"], ok,
+        f"markers={scored['marker_count']} density={scored['density']:.3f} "
+        f"found={','.join(scored['markers'][:6])} reply_len={len(reply)}",
+    )
+
+
 HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "portal_lists_all_agents": portal_lists_all_agents,
     "portal_requires_login": portal_requires_login,
@@ -682,6 +746,10 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "chat_first_token_latency": chat_first_token_latency,
     "chat_streaming_sse": chat_streaming_sse,
     "chat_triggers_tool": chat_triggers_tool,
+    # ADR-0526 (WP-087). Added to the SHARED dict, so all six agents get it
+    # from this one entry - only the agents whose scenarios.yaml declares
+    # the type actually run it.
+    "chat_register_conformance": chat_register_conformance,
     "chat_blocked_for_placeholder_agent": chat_blocked_for_placeholder_agent,
     "rag_retrieval_has_citation": rag_retrieval_has_citation,
     "mcp_gateway_denied": mcp_gateway_denied,

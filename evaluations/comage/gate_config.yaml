@@ -11,3 +11,35 @@
 # adjust comage's own threshold. Same 75% default as every other agent
 # until evidence suggests otherwise.
 scenario_threshold: 0.75
+
+# ADR-0526 (WP-087) decision 8: the register half of the gate. Read by
+# evaluations/register_conformance.py via quality_gate.load_gate_config's
+# returned dict - which already returns the WHOLE file, so adding these
+# needs no change to quality_gate.py and leaves scenario_threshold above
+# (the substance half) completely untouched.
+#
+# Both halves are mandatory. The acceptance suite is tone-blind by
+# construction, so it is a clean control for "did the register shift break
+# the reasoning"; these knobs only ever judge HOW an answer is written.
+#
+# Calibrated against the reference corpus itself (2026-08-27), not chosen
+# by intuition - measured over its 908 assistant turns:
+#   marker rate      86.1% test / 85.0% validation / 89.4% train
+#   distinct markers 21 in the 79-response test split alone
+#   response length  min 43 chars
+#   opening 'wesh'   3.8% - 10.6% depending on split
+#   mean density     0.071 - 0.091 markers per word
+# The floor sits ~15 points under the reference (loose enough to survive a
+# slightly weaker fine-tune, tight enough that a no-op merge scoring ~0%
+# can never be mistaken for a good one); the ceilings sit far above normal
+# usage while still catching the degenerate cases the corpus explicitly
+# forbids.
+register_marker_rate_threshold: 0.70
+register_min_distinct_markers: 5
+register_min_response_chars: 20
+# Corpus rule 3: "Do not start every answer with wesh."
+register_max_opening_marker_rate: 0.30
+# Corpus rule 17: "Do not saturate every sentence with slang." Without a
+# CEILING a naive more-markers-is-better scorer would reward exactly the
+# degenerate model rules 3 and 17 forbid.
+register_max_mean_density: 0.30

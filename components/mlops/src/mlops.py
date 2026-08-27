@@ -1217,6 +1217,37 @@ def stage_merge_export(config: MlopsConfig, store: ArtifactStore) -> None:
 # --------------------------------------------------------------------------
 
 
+def _score_register_conformance(config: MlopsConfig, store: ArtifactStore) -> Optional[Dict[str, Any]]:
+    """Scores train-lora's held-out completions (ADR-0526 decision 8).
+
+    Returns None when no samples exist - a grounding-domain run produces
+    none, and that must stay a no-op rather than an automatic failure.
+    Thresholds come from the agent's own gate_config.yaml, the same file
+    scenario_threshold lives in (ADR-0107: thresholds are data).
+    """
+    raw = store.get_bytes(f"{_run_prefix(config.eval_prefix, config)}/register_samples.jsonl")
+    if not raw:
+        if config.style_corpus_s3uri:
+            # A style run that produced no samples is a real failure: it
+            # means train-lora's generation step silently did nothing, and
+            # promoting on the acceptance half alone would skip decision 8.
+            raise SystemExit(
+                f"no register_samples.jsonl for {config.agent}/{config.run_id} but this is a "
+                f"style-corpus run - ADR-0526 decision 8 requires both halves of the gate"
+            )
+        return None
+
+    samples = [json.loads(l) for l in raw.decode("utf-8").splitlines() if l.strip()]
+    sys.path.insert(0, config.evaluations_dir)
+    import register_conformance  # noqa: E402
+    from quality_gate import load_gate_config  # noqa: E402
+
+    thresholds = register_conformance.thresholds_from_gate_config(load_gate_config(config.agent))
+    return register_conformance.score_corpus(
+        [s.get("completion", "") for s in samples], **thresholds
+    )
+
+
 def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
     """ADR-0302 point 5: the same acceptance mechanism a base-model
     change would need, reused rather than a parallel harness -
@@ -1244,8 +1275,28 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
 
     result["adapter_s3_prefix"] = train_manifest["adapter_s3_prefix"]
     result["classification"] = train_manifest["classification"]
+
+    # ADR-0526 decision 8: the register half, AND-ed with the acceptance
+    # result above. Computed independently rather than as extra scenarios,
+    # because scenarios land in the ADR-0028 DENOMINATOR - 3 register
+    # scenarios added to comage's 20 and all 3 failing still scores
+    # 20/23 = 87% >= 75% and reports PASS. That would not implement
+    # decision 8 at all.
+    register = _score_register_conformance(config, store)
+    if register is not None:
+        result["register_conformance"] = register
+        if result.get("overall") == "PASS" and not register.get("passed"):
+            result["overall"] = "FAIL"
+            result["register_failure"] = register.get("failures")
+
     store.put_json(f"{_run_prefix(config.eval_prefix, config)}/gate_result.json", result)
-    logger.info("evaluate: %s/%s gate result %s", config.agent, config.run_id, result.get("overall"))
+    logger.info(
+        "evaluate: %s/%s acceptance=%s register=%s -> %s",
+        config.agent, config.run_id,
+        result.get("scenario_rate", "n/a"),
+        "n/a" if register is None else ("PASS" if register.get("passed") else "FAIL"),
+        result.get("overall"),
+    )
     if result.get("overall") != "PASS":
         # Non-zero exit fails the KFP task, stopping the DAG before
         # push-registry ever runs - the pipeline-level enforcement of

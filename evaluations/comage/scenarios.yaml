@@ -161,3 +161,41 @@ scenarios:
     # fault - mcp-gateway's own health, still checked below, is the honest
     # proxy for "can this agent's traffic reach it".
     services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
+
+  # ADR-0526 (WP-087) decision 8, POST-PROMOTION live half.
+  #
+  # These two do NOT gate the pipeline, and that distinction matters. The
+  # pipeline's register check runs offline in components/mlops's evaluate
+  # stage, against train-lora's held-out completions, because the merged
+  # model is deployed nowhere at gate time (evaluate runs before
+  # push-registry, and promotion is a later human PR). These are the live
+  # confirmation once the variant is actually serving - WP-087's operator
+  # follow-up step 4.
+  #
+  # They also deliberately do NOT carry the register half of the gate. Any
+  # scenario added here lands in the ADR-0028 denominator: with 20 existing
+  # scenarios, 2 added and both failing still scores 20/22 = 91% >= 75% and
+  # reports PASS. That is exactly why the pipeline computes the register
+  # score independently and AND-s it, rather than trusting the pass rate.
+  - id: 21
+    title: A register turn is answered in contemporary French urban register
+    type: chat_register_conformance
+    persona: sale-01
+    message: "Explique-moi vite fait comment se passe le suivi d'une opportunité chez nous."
+    # Rules 11-13 are asserted on every register scenario regardless of
+    # this flag - slangified syntax fails whatever the question was.
+    expect_register: true
+    min_markers: 1
+
+  - id: 22
+    title: A technical turn keeps its terminology exact, register or not
+    type: chat_register_conformance
+    persona: sale-01
+    message: "Donne-moi la commande kubectl pour lister les pods et le champ YAML qui fixe les replicas."
+    # Inverted: asserts a CEILING, never zero. Corpus rule 18 says
+    # professional and technical topics use MEDIUM familiarity - so
+    # demanding a tone-free answer would contradict the trained objective.
+    # What must hold is rules 11-13: the command and the YAML key stay
+    # exact. The handler enforces those as a hard failure on top of this.
+    expect_register: false
+    max_density: 0.25

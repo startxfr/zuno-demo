@@ -10,6 +10,14 @@ configMapGenerator:
       - security_checks.py=../../../../../evaluations/tekos/security_checks.py
       - gate_checks.py=../../../../../evaluations/tekos/gate_checks.py
       - run_acceptance_gate.py=../../../../../evaluations/tekos/run_acceptance_gate.py
+      # ADR-0526 (WP-087): the register-conformance scorer, imported by
+      # run_scenarios.py's chat_register_conformance handler. It lives at
+      # evaluations/ root rather than in tekos/ because components/mlops's
+      # evaluate stage imports the SAME module - one scorer, one set of
+      # thresholds, two callers. This ConfigMap flattens everything into
+      # /gate, so the handler adds both its own directory and its parent
+      # to sys.path to cover the repo layout and this one.
+      - register_conformance.py=../../../../../evaluations/register_conformance.py
       # Repo policy files the checks read relative to their own resolved
       # location (security_checks.py: repo_root=parents[2] -> /gate;
       # gate_checks.py: parents[2] -> /) - must be projected into those
