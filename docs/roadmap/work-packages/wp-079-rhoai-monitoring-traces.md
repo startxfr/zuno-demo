@@ -5,7 +5,7 @@
   TempoStack component (distributor/ingester/querier/query-frontend/compactor/gateway) all
   `Running`, 0 CrashLoopBackOff. Three live-found bugs fixed same day (see "Live incident" and
   "Second correction" below, plus the TempoStack resources fix below that).
-- **ADRs:** ADR-0522 (Proposed)
+- **ADRs:** ADR-0522 (Implemented)
 - **Depends on:** WP-078 (metrics — same `DSCInitialization.spec.monitoring` block)
 - **Related:** WP-080 (Perses/Route/dashboard verification, next)
 
@@ -135,5 +135,10 @@ scratch (uninstall/reinstall, fresh redeploy).
 
 ## Status updates
 
-- ADR-0522 stays `Proposed` until WP-080 also lands and verifies — this WP alone only closes the
-  traces half of ADR-0522's acceptance criteria.
+- ADR-0522 → `Implemented`. The condition stated here in the future tense ("stays `Proposed`
+  until WP-080 also lands and verifies") was met on 2026-08-26: WP-080 closed `Done
+  (live-verified)` and carried the ADR to `Implemented`. This WP closed the traces half of that
+  acceptance criteria; its own `ADRs:` annotation lagged until 2026-08-27.
+- Item 6 above stayed ⬜ on purpose. WP-080 ran that live-traffic check and root-caused the
+  absence of traces to two deliberate phase-1 scope decisions, not a defect - see WP-080's
+  "Live finding".
