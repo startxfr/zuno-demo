@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Four checks, each independent (a failure in one doesn't block the others
+Six checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -16,6 +16,10 @@ from reporting):
     index row, and that row's status matches the ADR's own `**Status:**`
     field (catches stale statuses, e.g. an ADR quietly downgraded to
     "Partially implemented" without its index row following);
+  - wp_state: every docs/roadmap/work-packages/wp-*.md brief has a tracker
+    row, and that row's State matches the brief's own `- **State:**` line
+    (the WP half of adr_index - the roadmap's rule wants five copies moved
+    together, and this pair was the one nothing validated);
   - day0_day1_roles: every Makefile DAY0_COMPONENTS/DAY1_RUN_COMPONENTS/
     DAY1_BUILD_COMPONENTS entry has a matching ansible/roles/<name> role;
   - version_consistency: README.md/MEMORY.md/docs/architecture/*.md/
@@ -83,6 +87,28 @@ ADR_INDEX_EXCLUDED_FILES = {
     "0200-v0.2-roadmap.md",
     "0300-v0.3-roadmap.md",
     "0400-v0.4-roadmap.md",
+}
+
+WP_DIR = REPO_ROOT / "docs" / "roadmap" / "work-packages"
+# Both roadmap files carry WP tracker tables with the identical 6-column
+# header; there is no third one (verified across docs/roadmap/*.md).
+WP_TRACKER_PATHS = [
+    REPO_ROOT / "docs" / "roadmap" / "v0.1-v0.3-implementation-roadmap.md",
+    REPO_ROOT / "docs" / "roadmap" / "okf-roadmap.md",
+]
+
+# The declared state machine plus the three terminal states real work
+# actually reaches (both roadmap files document all eight). A WP that
+# merged code and was then superseded is `Abandoned` - see WP-066.
+WP_STATES = {
+    "not started",
+    "repo work in review",
+    "repo work merged",
+    "operator pending",
+    "done",
+    "abandoned",
+    "cancelled",
+    "closed — deferred",
 }
 
 
@@ -276,6 +302,110 @@ def check_adr_index() -> List[Finding]:
     return findings
 
 
+def _normalize_wp_state(text: str) -> str:
+    """Reduce a WP State value to its bare state phrase.
+
+    Deliberately NOT _normalize_adr_status: WP values carry four shapes that
+    one never does - `**bold**` wrappers, a date glued to the state with no
+    parenthesis (`Abandoned 2026-08-26`), a `.` sentence break instead of a
+    parenthetical (`Done. Live-verified ...`), and both em-dash and ASCII
+    hyphen as the clause separator, sometimes in the same file. Three
+    spellings of one state (`Done`, `Done — live-verified`, `Done. Live-...`)
+    must all reduce to `done`.
+    """
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)   # markdown links -> label
+    text = text.replace("**", "")
+    # `Closed — deferred` is one two-word state, not a state plus an
+    # elaboration, so it has to be recognised before the clause split would
+    # cut it at the em-dash (same shape as _normalize_adr_status's
+    # "Superseded by ADR-NNNN" special case).
+    compound = re.match(r"\s*Closed\s*[-\u2014\u2013]\s*deferred", text, re.IGNORECASE)
+    if compound:
+        return "closed — deferred"
+    # First clause boundary wins. The date alternative comes first so
+    # "Abandoned 2026-08-26" loses the date rather than keeping it.
+    text = re.split(r"\s+\d{4}-\d{2}-\d{2}|[(;.]|\s[-\u2014\u2013]\s", text)[0]
+    return " ".join(text.split()).casefold().strip(" .:,")
+
+
+def _wp_tracker_rows() -> dict:
+    """brief filename -> (row line, tracker path, cell count).
+
+    Keyed on the filename from the row's own link, never on the WP id:
+    `WP-57` and `WP-057` are two different work packages (likewise 58/058),
+    so any int() or zero-stripping would silently merge them.
+    """
+    rows = {}
+    for tracker_path in WP_TRACKER_PATHS:
+        for line in tracker_path.read_text().splitlines():
+            if not line.startswith("| WP-"):
+                continue
+            link = re.search(r"work-packages/(wp-[^)]+\.md)", line)
+            if not link:
+                # WP-00 is recorded as executed inline and has no brief.
+                continue
+            rows[link.group(1)] = (line, tracker_path, len(line.split("|")))
+    return rows
+
+
+def check_wp_state() -> List[Finding]:
+    """Every WP brief has a tracker row, and the two agree on the state.
+
+    The WP half of what check_adr_index does for ADRs. The roadmap's own
+    rule requires five copies to move together (ADR body + index + tracker +
+    brief + MEMORY.md); until this check existed only the first two were
+    validated, and the brief/tracker pair drifted repeatedly - WP-085 went
+    stale within a day of being written.
+    """
+    findings: List[Finding] = []
+    rows = _wp_tracker_rows()
+
+    for brief_path in sorted(WP_DIR.glob("wp-*.md")):
+        name = brief_path.name
+        if name not in rows:
+            findings.append(Finding("wp_state", f"{name} has no tracker row linking to it in docs/roadmap/"))
+            continue
+        row_line, tracker_path, cell_count = rows[name]
+        tracker_rel = tracker_path.relative_to(REPO_ROOT)
+
+        # 6 columns -> 8 fields once the leading/trailing empties are counted.
+        # A State value containing a literal `|` would shift every index, so
+        # report the row rather than compare the wrong cell (5 brief State
+        # lines already contain `|`; it is one copy-paste from a tracker cell).
+        if cell_count != 8:
+            findings.append(Finding(
+                "wp_state",
+                f"{tracker_rel}: the row for {name} has {cell_count - 2} columns, expected 6 - "
+                f"a `|` inside a cell would silently shift the State column",
+            ))
+            continue
+
+        body = brief_path.read_text()
+        # Anchored on the exact `- **State:**` bullet and consuming its
+        # indented continuation lines: 39 of 85 briefs wrap the value, and a
+        # dated variant (`- **State (2026-08-26):**`) must NOT match.
+        state_match = re.search(r"^- \*\*State:\*\*\s*(.+?)(?=\n- \*\*|\n\n|\Z)", body, re.MULTILINE | re.DOTALL)
+        if not state_match:
+            findings.append(Finding("wp_state", f"{name} has no `- **State:**` line"))
+            continue
+
+        brief_state = _normalize_wp_state(state_match.group(1))
+        row_state = _normalize_wp_state(row_line.split("|")[5])
+
+        if brief_state != row_state:
+            findings.append(Finding(
+                "wp_state",
+                f"{name} state drift: {tracker_rel} says '{row_state}', the brief says '{brief_state}'",
+            ))
+        for value, where in ((brief_state, name), (row_state, f"{tracker_rel} row for {name}")):
+            if value not in WP_STATES:
+                findings.append(Finding(
+                    "wp_state",
+                    f"{where}: '{value}' is not a declared WP state ({', '.join(sorted(WP_STATES))})",
+                ))
+    return findings
+
+
 def check_day0_day1_roles() -> List[Finding]:
     findings: List[Finding] = []
     lists = _parse_makefile_lists()
@@ -340,12 +470,13 @@ def main() -> int:
         check_make_commands()
         + check_auto_fix_commands()
         + check_adr_index()
+        + check_wp_state()
         + check_day0_day1_roles()
         + check_version_consistency(profile)
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
-          "docs/adr/README.md index, "
+          "docs/adr/README.md index, work-package state vs the roadmap trackers, "
           "Makefile/ansible role consistency, and platform version prose "
           f"against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
     if not findings:
