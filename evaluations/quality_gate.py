@@ -126,6 +126,15 @@ def evaluate(agent: str, candidate: Optional[str] = None) -> Dict[str, Any]:
         "security_ok": security_ok,
         "gate_checks_ok": gate_checks_ok,
         "overall": "PASS" if overall_ok else "FAIL",
+        # The three booleans above say a layer failed but never which
+        # check or which scenario, and callers that persist this result
+        # (mlops.stage_evaluate writes it to S3 as gate_result.json)
+        # were left with nothing to diagnose - the first end-to-end
+        # pipeline run reported "security_ok=false, gate_checks_ok=false"
+        # and no way to tell a stale assertion from a real regression
+        # without re-running the whole live gate. Carrying the summary
+        # through is additive: no existing key changes meaning.
+        "summary": summary,
     }
 
 

@@ -600,8 +600,59 @@ def test_stages_and_stage_functions_stay_in_sync() -> None:
     assert order.index("train-lora") < order.index("merge-export") < order.index("evaluate")
 
 
+def test_extract_answer_drops_the_reasoning_block_and_a_restarted_turn() -> None:
+    """Regression from the first end-to-end run (wesh-20260827-220749).
+
+    A Qwen3 chat template opens the assistant turn INSIDE a <think>
+    block, and generate() stopped on the base checkpoint's
+    <|endoftext|> rather than the template's <|im_end|> - so all 79
+    scored samples were reasoning + answer + a fabricated second turn.
+    Scoring that text put ADR-0526 decision 8's rule-3 opening rate at
+    31.6% when the real answers were at 44.3%: the contamination
+    under-reported the very failure the rule exists to catch.
+    """
+    raw = (
+        "Le sang, faut reflechir a deux trucs.\n</think>\n\n"
+        "Wesh mon reuf, en vrai y a pas de backup.\n"
+        "assistant\n<think>\n\n</think>\n\nEt une deuxieme reponse."
+    )
+    assert mlops._extract_answer(raw) == "Wesh mon reuf, en vrai y a pas de backup."
+    # No reasoning block at all: the whole decode is the answer.
+    assert mlops._extract_answer("  Wesh, direct.  ") == "Wesh, direct."
+    # Reasoning only, never closed - nothing is silently invented.
+    assert mlops._extract_answer("<think>je reflechis") == "<think>je reflechis"
+
+
+def test_chat_stop_ids_prefer_the_templates_end_of_turn_over_tokenizer_eos() -> None:
+    """<|im_end|> is what actually terminates an assistant turn; a base
+    checkpoint's eos is <|endoftext|>. Both must be passed, or generation
+    runs past the answer into a hallucinated next turn."""
+
+    class _Tok:
+        unk_token_id = 0
+        eos_token_id = 151643  # <|endoftext|>
+
+        def convert_tokens_to_ids(self, token):
+            return {"<|im_end|>": 151645, "<|endoftext|>": 151643}.get(token, 0)
+
+    assert mlops._chat_stop_token_ids(_Tok()) == [151645, 151643]
+
+    class _NoChatTok:
+        unk_token_id = 0
+        eos_token_id = 7
+
+        def convert_tokens_to_ids(self, token):
+            return 0  # every chat token maps to unk
+
+    # Falls back to the tokenizer's own eos rather than passing unk as a
+    # stop id, which would truncate at the first unknown token.
+    assert mlops._chat_stop_token_ids(_NoChatTok()) == [7]
+
+
 TESTS = [
     # WP-087 / ADR-0526
+    test_extract_answer_drops_the_reasoning_block_and_a_restarted_turn,
+    test_chat_stop_ids_prefer_the_templates_end_of_turn_over_tokenizer_eos,
     test_registry_session_sends_a_bearer_token_and_trusts_the_service_ca,
     test_registry_base_url_is_https_and_built_from_values_not_hardcoded,
     test_push_registry_registers_the_merged_checkpoint_uri_when_a_merge_ran,

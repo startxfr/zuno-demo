@@ -49,6 +49,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -1002,6 +1003,69 @@ def _run_lora_training(
     return stats
 
 
+# A chat-templated generation prefix ends INSIDE the assistant turn, and on
+# a Qwen3 template it also opens a <think> block. Two consequences bit the
+# first real run (wesh-20260827-220749), and both silently corrupted the
+# ADR-0526 decision 8 score rather than failing:
+#
+#  - generate() stops on generation_config.json's eos, which on a BASE
+#    checkpoint is <|endoftext|>, not the chat template's <|im_end|>. So
+#    every one of the 79 samples ran past its own answer and re-opened a
+#    fabricated user/assistant turn, doubling the scored text.
+#  - what remains still starts with the model's REASONING, not its answer.
+#    The register score was therefore computed over reasoning plus a
+#    hallucinated second turn.
+#
+# Measured on that run's stored samples: scoring the real answer moves the
+# rule-3 opening rate from 31.6% to 44.3% - the contaminated reading was
+# not merely noisy, it under-reported the failure it was meant to catch.
+_ROLE_RESTART = re.compile(r"\n\s*(assistant|user|system)\s*\n")
+
+
+def _chat_stop_token_ids(tokenizer) -> List[int]:
+    """Stop ids for a chat-templated decode, widest-first.
+
+    Returns the template's own end-of-turn token alongside whatever the
+    tokenizer calls eos, because on a base checkpoint those differ and
+    only the former actually terminates an assistant turn.
+    """
+    ids: List[int] = []
+    unk = getattr(tokenizer, "unk_token_id", None)
+    for token in ("<|im_end|>", "<|endoftext|>"):
+        try:
+            tid = tokenizer.convert_tokens_to_ids(token)
+        except Exception:  # a tokenizer without this vocabulary at all
+            continue
+        if isinstance(tid, int) and tid >= 0 and tid != unk and tid not in ids:
+            ids.append(tid)
+    eos = getattr(tokenizer, "eos_token_id", None)
+    if isinstance(eos, int) and eos not in ids:
+        ids.append(eos)
+    return ids
+
+
+def _extract_answer(decoded: str) -> str:
+    """The assistant's answer alone, from a raw chat-template decode.
+
+    Drops the reasoning block the template opens (everything up to and
+    including the last </think>) and anything after the model restarts a
+    turn. Both guards are belt-and-braces alongside the stop ids above:
+    a model that emits no </think> keeps its whole output.
+    """
+    if "</think>" in decoded:
+        # FIRST occurrence, not last: when the model also restarts a turn
+        # it opens a second <think> block, and rsplit would return that
+        # fabricated turn's answer instead of this turn's. Stripping the
+        # reasoning must also come BEFORE the role-restart cut - a
+        # reasoning block that itself rambles into a fake user turn would
+        # otherwise be mistaken for the answer.
+        decoded = decoded.split("</think>", 1)[1]
+    match = _ROLE_RESTART.search(decoded)
+    if match:
+        decoded = decoded[: match.start()]
+    return decoded.strip()
+
+
 def _generate_held_out(model, tokenizer, held_out: List[Dict[str, Any]], *, cpu_safe: bool) -> List[Dict[str, Any]]:
     """Generates completions for the held-out prompts, here in train-lora.
 
@@ -1025,6 +1089,7 @@ def _generate_held_out(model, tokenizer, held_out: List[Dict[str, Any]], *, cpu_
 
     limit = 4 if cpu_safe else len(held_out)
     samples: List[Dict[str, Any]] = []
+    stop_ids = _chat_stop_token_ids(tokenizer)
     model.eval()
     with torch.no_grad():
         for row in held_out[:limit]:
@@ -1040,12 +1105,16 @@ def _generate_held_out(model, tokenizer, held_out: List[Dict[str, Any]], *, cpu_
                 max_new_tokens=32 if cpu_safe else 256,
                 do_sample=False,
                 pad_token_id=tokenizer.pad_token_id,
+                **({"eos_token_id": stop_ids} if stop_ids else {}),
             )
-            completion = tokenizer.decode(out[0][enc["input_ids"].shape[-1]:], skip_special_tokens=True)
+            decoded = tokenizer.decode(out[0][enc["input_ids"].shape[-1]:], skip_special_tokens=True)
             samples.append({
                 "prompt": messages[-2].get("content", ""),
                 "reference": messages[-1].get("content", ""),
-                "completion": completion,
+                # raw kept alongside: when a register score looks wrong,
+                # the decode is the first thing worth reading.
+                "raw": decoded,
+                "completion": _extract_answer(decoded),
             })
     logger.info("generated %d held-out completions for register scoring", len(samples))
     return samples
@@ -1302,6 +1371,21 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
             result["register_failure"] = register.get("failures")
 
     store.put_json(f"{_run_prefix(config.eval_prefix, config)}/gate_result.json", result)
+    # A stage that fails must say what failed in its own log. Reading the
+    # first end-to-end run meant fetching gate_result.json out of S3 by
+    # hand to learn anything past three booleans.
+    if result.get("overall") != "PASS":
+        summary = result.get("summary") or {}
+        for layer in ("scenarios", "security_checks", "gate_checks"):
+            for item in (summary.get(layer) or {}).get("failed", []):
+                logger.warning(
+                    "evaluate: %s FAILED %s: %s",
+                    layer,
+                    item.get("name") or item.get("id"),
+                    (item.get("detail") or "").strip() or "(no detail)",
+                )
+        for failure in (register or {}).get("failures", []):
+            logger.warning("evaluate: register FAILED %s", failure)
     logger.info(
         "evaluate: %s/%s acceptance=%s register=%s -> %s",
         config.agent, config.run_id,

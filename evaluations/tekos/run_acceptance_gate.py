@@ -113,6 +113,14 @@ def main() -> int:
 
     print(f"OVERALL RESULT: {'PASS' if overall_ok else 'FAIL'}")
 
+    # `failed` carries WHICH item failed, not just how many. The printed
+    # tables above already say it, but stdout is thrown away by every
+    # programmatic caller: quality_gate.evaluate() parses only this last
+    # JSON line, so a pipeline that persists the result (mlops writes it
+    # to S3 as gate_result.json) recorded "gate_checks 12/14" with no way
+    # to tell a stale assertion from a real regression without re-running
+    # the whole live gate. Bounded by construction - names only, and only
+    # for failures.
     summary = {
         "scenarios": {
             "passed": scenario_passed,
@@ -121,18 +129,33 @@ def main() -> int:
             "threshold": SCENARIO_THRESHOLD,
             "gate": "quality",
             "result": "PASS" if scenario_ok else "FAIL",
+            "failed": [
+                {"id": r.id, "title": r.title, "detail": (r.detail or "")[:300]}
+                for r in scenario_results
+                if not r.passed
+            ],
         },
         "security_checks": {
             "passed": security_passed,
             "total": security_total,
             "gate": "mandatory",
             "result": "PASS" if security_ok else "FAIL",
+            "failed": [
+                {"name": r.name, "detail": (r.detail or "")[:300]}
+                for r in security_results
+                if not r.passed
+            ],
         },
         "gate_checks": {
             "passed": gate_passed,
             "total": gate_total,
             "gate": "mandatory",
             "result": "PASS" if gate_ok else "FAIL",
+            "failed": [
+                {"name": r.name, "detail": (r.detail or "")[:300]}
+                for r in gate_results
+                if not r.passed
+            ],
         },
         "overall": "PASS" if overall_ok else "FAIL",
     }
