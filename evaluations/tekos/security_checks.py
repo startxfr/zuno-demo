@@ -177,8 +177,28 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     # `local-gpt-oss-maas`) and made local-maas the preferred one - a false
     # failure, since a local provider had in fact answered. Same fix as
     # run_scenarios.py's model_router_prefers_local. Do not re-hardcode names.
-    repo_root = pathlib.Path(__file__).resolve().parents[2]
-    routing = yaml.safe_load((repo_root / "platform/ai-gateway/provider-routing.yaml").read_text())
+    # Candidate paths, not one hardcoded depth: in a checkout this file sits
+    # under evaluations/<agent>/, but in the acceptance-gate Job the same
+    # ConfigMap is mounted at three places at once (/gate with flat keys,
+    # /gate/policies, and /platform/ai-gateway at the filesystem root), so a
+    # single parents[N] guess resolves differently depending on where the
+    # loader put this module - which is exactly how this check first failed
+    # with "/gate/platform/ai-gateway/provider-routing.yaml not found".
+    here = pathlib.Path(__file__).resolve()
+    candidates = [
+        here.parents[2] / "platform/ai-gateway/provider-routing.yaml",
+        pathlib.Path("/platform/ai-gateway/provider-routing.yaml"),
+        here.parent / "provider-routing.yaml",
+        pathlib.Path("/gate/provider-routing.yaml"),
+    ]
+    routing_path = next((c for c in candidates if c.is_file()), None)
+    if routing_path is None:
+        return CheckResult(
+            "ai_gateway_local_only_forces_local_provider",
+            False,
+            f"provider-routing.yaml not found in any of {[str(c) for c in candidates]}",
+        )
+    routing = yaml.safe_load(routing_path.read_text())
     kinds = {p["name"]: p.get("kind") for p in routing.get("providers", [])}
     ok = kinds.get(provider) == "local"
     return CheckResult(
