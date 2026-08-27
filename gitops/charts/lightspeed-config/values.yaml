@@ -30,11 +30,35 @@ olsConfig:
     publishedModelName: qwen36-27b-instruct-maas
     # The name Lightspeed sends as the OpenAI "model" field.
     modelName: qwen3.6-27b-instruct
+    # TEMPORAIRE (2026-08-27) - voir ADR-0524 / WP-085.
+    #
+    #   maas   : chemin nominal d'ADR-0521, via la passerelle MaaS.
+    #   direct : appel direct du Service KServe, en contournant MaaS.
+    #
+    # `direct` est actif parce que le plan de controle MaaS ne sait plus
+    # rapprocher une identite d'une MaaSSubscription : 403 "no matching
+    # subscription found for user", reproduit le 2026-08-27 pour l'identite
+    # CONNUE BONNE `ai-gateway` et sur `gpt-oss-20b`, un modele que WP-085 n'a
+    # jamais touche. Cache informer, PostgreSQL, MaaSModelRef et
+    # MaaSSubscription ont tous ete elimines par test - le defaut est en amont,
+    # perimetre WP-076/ADR-0521.
+    #
+    # Repasser a `maas` est une edition d'UNE valeur ici, plus le retrait du
+    # bloc lightspeed dans gitops/charts/models/templates/networkpolicy-qwen.yaml.
+    # L'entitlement MaaS (MaaSSubscription + sujet OPA) reste en place et intact
+    # exactement pour rendre ce retour possible sans autre travail.
+    endpointMode: direct  # direct | maas
+
     # In-cluster MaaS gateway root. Same endpoint ai-gateway's maasAdapter
     # uses (MAAS_GATEWAY_ENDPOINT), path-scoped per model below.
     gatewayEndpoint: https://maas-default-gateway-istio.openshift-ingress.svc
     # Serving namespace segment of the MaaS path (/{ns}/{publishedModel}/v1).
     servingNamespace: zuno-ai-run
+    # endpointMode=direct : le Service KServe du workload, en OpenAI-compatible
+    # sur 8000. Meme endpoint que le fallback documente d'ai-gateway
+    # (LOCAL_MODEL_ENDPOINT). Verifie live le 2026-08-27 : HTTP 200 avec la CA
+    # service-ca et un token factice.
+    directEndpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     contextWindowSize: 128000
     maxTokensForResponse: 2048
 
@@ -142,7 +166,22 @@ caBundle:
 # permanently Degraded, and ArgoCD's wave-ordered sync then never reaches the
 # resources behind it, wedging the whole Application.
 credential:
-  mode: saTokenSecret  # saTokenSecret | apiKey
+  # staticToken : Secret Opaque portant la cle `apitoken`, avec une valeur
+  #   factice. Necessaire meme en endpointMode=direct, pour DEUX raisons :
+  #   1. `credentialsSecretRef` est REQUIS par le CRD.
+  #   2. l'operateur v1.1.2 IGNORE `credentialKey` et exige en dur la cle
+  #      `apitoken` - defaut constate live le 2026-08-27
+  #      ("missing key 'apitoken'"), qui laissait OLSConfig.status vide et
+  #      aucun operand cree. C'est ce defaut, et non MaaS, qui bloquait A.
+  #   Le predictor KServe n'exige aucune authentification : ai-gateway lui
+  #   envoie litteralement "not-required" (app/providers.py).
+  # saTokenSecret : token de ServiceAccount long, pour MaaS via TokenReview.
+  # apiKey        : cle MaaS sk-oai-*, depuis Vault.
+  mode: staticToken  # staticToken | saTokenSecret | apiKey
+  # Valeur placee dans la cle `apitoken` en mode staticToken. N'est jamais un
+  # secret : le predictor l'ignore. Ne PAS reutiliser ce mode pour un endpoint
+  # qui authentifie reellement.
+  staticTokenValue: not-required
   secretName: lightspeed-maas-credentials
   # OLSConfig.spec.llm.providers[].credentialKey. Left empty so the template
   # derives it from `mode` - the two modes produce Secrets with DIFFERENT key

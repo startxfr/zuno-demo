@@ -42,3 +42,15 @@
       modelsS3:
         bucket: "{{ zuno_models_s3_bucket | default('zuno-demo-rag-corpus') }}"
         prefix: "{{ zuno_models_s3_prefix | default('models') }}"
+      # ADR-0524 (WP-085), TEMPORAIRE : ouvre le predictor qwen a
+      # openshift-lightspeed. Doit etre pose ICI et non dans
+      # gitops/apps/models/application-d1.yaml : gitops_app_extra_helm_values
+      # REMPLACE spec.source.helm.values en bloc, donc une valeur ecrite dans
+      # l'Application serait silencieusement perdue - exactement la derive qui a
+      # fait echouer le premier install de lightspeed-config le 2026-08-26.
+      #
+      # A retirer en meme temps que le bloc lightspeed de
+      # gitops/charts/models/templates/networkpolicy-qwen.yaml, des que MaaS
+      # sait de nouveau resoudre les subscriptions (WP-076).
+      lightspeed:
+        enabled: "{{ models_lightspeed_direct | default(true) | bool }}"

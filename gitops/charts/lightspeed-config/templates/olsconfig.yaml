@@ -3,6 +3,9 @@
 {{- /* Derive credentialKey from the credential mode unless explicitly overridden. */ -}}
 {{- $credKey := .Values.credential.credentialKey }}
 {{- if not $credKey }}{{ $credKey = ternary "token" "apitoken" (eq .Values.credential.mode "saTokenSecret") }}{{ end }}
+{{- /* endpointMode: `direct` court-circuite MaaS (ADR-0524, temporaire). */ -}}
+{{- $providerURL := printf "%s/%s/%s/v1" $p.gatewayEndpoint $p.servingNamespace $p.publishedModelName }}
+{{- if eq $p.endpointMode "direct" }}{{ $providerURL = $p.directEndpoint }}{{ end }}
 # ADR-0524: the OLSConfig singleton. Cluster-scoped in effect (the CRD accepts
 # only the name "cluster"), so exactly one Application may ever render it.
 apiVersion: ols.openshift.io/v1alpha1
@@ -23,7 +26,7 @@ spec:
     providers:
       - name: {{ $p.name }}
         type: {{ $p.type }}
-        url: {{ printf "%s/%s/%s/v1" $p.gatewayEndpoint $p.servingNamespace $p.publishedModelName | quote }}
+        url: {{ $providerURL | quote }}
         credentialsSecretRef:
           name: {{ .Values.credential.secretName }}
         credentialKey: {{ $credKey }}

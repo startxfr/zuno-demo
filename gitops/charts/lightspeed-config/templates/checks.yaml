@@ -4,8 +4,18 @@ misleading if it slips through, so they fail the render instead.
 */ -}}
 {{- if .Values.lightspeedConfig.enabled -}}
 
-{{- if not (has .Values.credential.mode (list "saTokenSecret" "apiKey")) -}}
-{{- fail (printf "credential.mode must be \"saTokenSecret\" or \"apiKey\", got %q (WP-085 step 2)" .Values.credential.mode) -}}
+{{- if not (has .Values.credential.mode (list "staticToken" "saTokenSecret" "apiKey")) -}}
+{{- fail (printf "credential.mode must be \"staticToken\", \"saTokenSecret\" or \"apiKey\", got %q (WP-085 step 2)" .Values.credential.mode) -}}
+{{- end -}}
+
+{{- if not (has .Values.olsConfig.provider.endpointMode (list "direct" "maas")) -}}
+{{- fail (printf "olsConfig.provider.endpointMode must be \"direct\" or \"maas\", got %q (ADR-0524)" .Values.olsConfig.provider.endpointMode) -}}
+{{- end -}}
+
+{{- /* staticToken porte une valeur factice : sur MaaS il produirait un 401
+       opaque plutot qu'une erreur claire. */ -}}
+{{- if and (eq .Values.olsConfig.provider.endpointMode "maas") (eq .Values.credential.mode "staticToken") -}}
+{{- fail "endpointMode=maas avec credential.mode=staticToken : MaaS exige une vraie identite (TokenReview ou cle sk-oai-*). Utiliser saTokenSecret ou apiKey." -}}
 {{- end -}}
 
 {{- if and (eq .Values.credential.mode "apiKey") (not .Values.credential.apiKeyEnabled) -}}

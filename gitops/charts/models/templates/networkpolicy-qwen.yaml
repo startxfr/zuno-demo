@@ -46,6 +46,29 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
+{{- if .Values.lightspeed.enabled }}
+    # ADR-0524: OpenShift Lightspeed calling this predictor DIRECTLY, while the
+    # MaaS control plane is unable to match any identity to a subscription (403
+    # "no matching subscription found for user", reproduced 2026-08-27 for the
+    # known-good ai-gateway identity on an untouched model - WP-076 scope).
+    #
+    # This is a DELIBERATE, TEMPORARY regression of ADR-0521 ("route local model
+    # traffic through MaaS"), scoped to one namespace and one port. Remove this
+    # block and flip lightspeed-config's provider.endpointMode back to `maas`
+    # once MaaS resolves subscriptions again - the rest of the Lightspeed wiring
+    # (entitlement, MaaSSubscription, OPA subject) is already in place and
+    # untouched, so the revert is those two edits and nothing else.
+    #
+    # namespaceSelector rather than podSelector: Lightspeed's pods are
+    # operator-owned and carry no label this chart controls.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.lightspeed.namespace }}
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- end }}
 {{- if .Values.metrics.enabled }}
     # ADR-0413: admits prometheus-k8s's scrape of vLLM's own /metrics
     # endpoint. NOT actually needed once this became an LLMInferenceService

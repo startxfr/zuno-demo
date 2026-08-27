@@ -1011,3 +1011,12 @@ lmEval:
       # examples per split). Update both together if taskNames changes.
       datasetHfRepo: hails/mmlu_no_train
       datasetHfConfig: abstract_algebra
+
+# ADR-0524 (WP-085), TEMPORAIRE: autorise OpenShift Lightspeed a appeler le
+# predictor qwen directement, pendant que le plan de controle MaaS ne sait plus
+# rapprocher une identite d'une MaaSSubscription (403, WP-076). Regression
+# assumee et tracee d'ADR-0521, a retirer des que MaaS refonctionne - voir le
+# commentaire dans templates/networkpolicy-qwen.yaml.
+lightspeed:
+  enabled: false
+  namespace: openshift-lightspeed
