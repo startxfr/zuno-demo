@@ -6,16 +6,25 @@
 #
 # Deliberately NOT touched here: the zuno organization, the Controller
 # API token (Vault zuno/aap/controller-token), and the Keycloak SSO
-# authenticator. All three are idempotent no-ops on reinstall, deleting
-# the authenticator would drop every SSO-created user session/mapping,
-# and the token stays valid for the next install (its Controller-side
-# object dies with the aap component's own uninstall anyway).
+# authenticator. Deleting the authenticator would drop every SSO-created
+# user session/mapping, and the other two are handled on reinstall.
+#
+# CORRECTION (2026-08-27): this block used to claim the token "stays valid
+# for the next install". It does not, and that sentence is what let the
+# trap sit unnoticed. `make d1 uninstall aap` runs
+# `DROP DATABASE IF EXISTS "aap"` (ansible/roles/aap/tasks/uninstall.yml,
+# WP-077) - that IS the Gateway database, and the OAuth token rows live in
+# it. The token is therefore dead after any uninstall/reinstall cycle,
+# while Vault keeps the now-meaningless string. install.yml no longer
+# trusts the Vault path's mere existence: it probes the token against
+# /api/controller/v2/organizations/ and re-mints on 401. Leaving the stale
+# value here is safe *because* of that probe, not because it survives.
 #
 # Same reasoning for the mcp-aap identity added by ADR-0355/WP-074 (the
 # zuno-mcp Gateway user, the zuno-day0-check-executor role definition, its
 # object-scoped assignment, and Vault zuno/aap/mcp-user + zuno/aap/
-# mcp-token): every step of install.yml's block is check-first, so leaving
-# them makes reinstall a no-op. The role assignment's object_id points at
+# mcp-token): every step of install.yml's block is check-first, and its
+# token is probed and re-minted the same way, so leaving them is a no-op. The role assignment's object_id points at
 # a Job Template that dies with this component and is recreated by name on
 # the next install - install.yml re-resolves the id by name and re-grants
 # if the assignment no longer matches, so no stale grant survives.

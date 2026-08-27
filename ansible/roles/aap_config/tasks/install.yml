@@ -127,10 +127,23 @@
 # /me/ endpoint has a lazy-user-sync quirk this flow never touches).
 # Tokens are shown once at creation, so Vault (zuno/aap/controller-token)
 # is the durable source and the aap-config chart's ExternalSecret
-# re-materializes it. Mint-then-seed only when the Vault path doesn't
-# exist yet - the same check-first contract as
-# ansible/tasks/vault_seed_if_missing.yml (a fresh token per run would
-# litter the gateway with orphans and desync the Secret).
+# re-materializes it.
+#
+# Idempotence is based on the token still WORKING, not merely on the Vault
+# path existing. That distinction is the whole point: `make d1 uninstall
+# aap` drops the `aap` database (ansible/roles/aap/tasks/uninstall.yml,
+# WP-077), which is the Gateway's own DB and therefore holds the OAuth
+# token rows. A reinstall leaves Vault holding a string the gateway no
+# longer recognizes, and every tower.ansible.com CR then authenticates
+# with it and gets 401 - silently, because the resource operator's create
+# task is `ignore_errors`, so the CRs report Successful while creating
+# nothing. That is exactly how the `zuno` inventory went missing and hung
+# this role's own lookup below for 30 retries with no usable error.
+#
+# So: probe first, re-mint only on a token the gateway actually rejects.
+# The original concern behind check-first still holds (a fresh token per
+# run would litter the gateway with orphans and desync the Secret) and is
+# preserved - a valid token is never replaced.
 
 - name: "aap-config | locate the Vault server pod"
   kubernetes.core.k8s_info:
@@ -175,6 +188,43 @@
   failed_when: false
   no_log: true
 
+# NOT /api/controller/v2/ping/: that endpoint answers 200 even with no
+# credentials at all (verified live 2026-08-27), so it can never tell a
+# live token from a dead one. /organizations/ is the endpoint the resource
+# operator itself fails on, so probing it reproduces the real failure
+# rather than approximating it. /me/ is avoided for the lazy-user-sync
+# quirk noted at the top of this section.
+- name: "aap-config | probe whether the Vault-held Gateway token still authenticates"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ (_aap_config_token_existing.stdout | from_json).data.data.token }}"
+    validate_certs: false
+    status_code: [200, 401, 403]
+  register: _aap_config_token_probe
+  when: _aap_config_token_existing.rc == 0
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "aap-config | decide whether the Gateway token must be (re-)minted"
+  ansible.builtin.set_fact:
+    _aap_config_token_needs_mint: >-
+      {{ (_aap_config_token_existing.rc != 0)
+         or ((_aap_config_token_probe.status | default(401)) != 200) }}
+
+- name: "aap-config | report that a dead Gateway token is being replaced"
+  ansible.builtin.debug:
+    msg: >-
+      The token in Vault zuno/aap/controller-token no longer authenticates
+      against AAP (HTTP {{ _aap_config_token_probe.status | default('n/a') }}) - re-minting.
+      This is the expected outcome after an `aap` uninstall/reinstall cycle,
+      which drops the Gateway database the token lives in.
+  when:
+    - _aap_config_token_existing.rc == 0
+    - _aap_config_token_needs_mint | bool
+
 - name: "aap-config | mint a Gateway API access token (first run only - shown once)"
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/gateway/v1/tokens/"
@@ -188,7 +238,7 @@
       description: "zuno-aap-config resource-operator connection (WP-073)"
     status_code: 201
   register: _aap_config_token_minted
-  when: _aap_config_token_existing.rc != 0
+  when: _aap_config_token_needs_mint | bool
   no_log: true
 
 - name: "aap-config | persist the Gateway token to Vault (first run only)"
@@ -199,8 +249,21 @@
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/controller-token
       token={{ _aap_config_token_minted.json.token | quote }}"
-  when: _aap_config_token_existing.rc != 0
+  when: _aap_config_token_needs_mint | bool
   no_log: true
+
+# The ExternalSecret refreshes hourly. Without forcing it here, the Secret
+# the four tower.ansible.com CRs read would keep serving the dead token for
+# up to an hour - long past the inventory wait below, so the role would
+# still fail despite having just fixed the credential.
+- name: "aap-config | force the aap-controller-token Secret to pick up the new token"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_externalsecret_refresh.yml"
+  vars:
+    es_name: aap-controller-token
+    es_namespace: zuno-aap
+    es_expect_key: token
+    es_expect_value: "{{ _aap_config_token_minted.json.token }}"
+  when: _aap_config_token_needs_mint | bool
 
 # --- The CRs themselves -----------------------------------------------------
 
@@ -215,6 +278,32 @@
         enabled: true
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
+
+# A re-minted token only reaches the CRs on their NEXT reconcile, and the
+# resource operator reconciles on a long period when nothing about the CR
+# changes - ArgoCD re-applying an identical manifest triggers nothing. So
+# nudge them explicitly, otherwise the waits below can time out against
+# CRs that are still holding the dead credential. Absent CRs are fine: on
+# a first install ArgoCD has only just created them, and their initial
+# reconcile already uses the fresh token.
+- name: "aap-config | force the tower.ansible.com CRs to reconcile with the new token"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: tower.ansible.com/v1alpha1
+    kind: "{{ item.kind }}"
+    namespace: zuno-aap
+    name: "{{ item.name }}"
+    definition:
+      metadata:
+        annotations:
+          zuno.io/token-refreshed-at: "{{ lookup('pipe', 'date +%s') }}"
+  loop:
+    - {kind: AnsibleProject, name: "{{ aap_config_project_name | default('zuno-demo') }}"}
+    - {kind: AnsibleInventory, name: "{{ aap_config_inventory_name | default('zuno') }}"}
+    - {kind: AnsibleCredential, name: "{{ aap_config_credential_name | default('zuno-cluster-reader') }}"}
+    - {kind: JobTemplate, name: "{{ aap_config_job_template_name | default('zuno-day0-check') }}"}
+  failed_when: false
+  when: _aap_config_token_needs_mint | bool
 
 # ArgoCD reports the CRs Synced/Healthy the moment they're applied (no
 # custom health checks exist for tower.ansible.com kinds) - the resource
@@ -554,6 +643,30 @@
   failed_when: false
   no_log: true
 
+# Same trap as the controller token above, and worse here: after an `aap`
+# reinstall the zuno-mcp USER is recreated by the tasks above (that half
+# self-heals), but its token would not be, so mcp-aap would ship a token
+# belonging to a user id that no longer exists and 401 on every tool call.
+- name: "aap-config | probe whether the Vault-held mcp-aap token still authenticates"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/organizations/"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ (_aap_config_mcp_token_existing.stdout | from_json).data.data.token }}"
+    validate_certs: false
+    status_code: [200, 401, 403]
+  register: _aap_config_mcp_token_probe
+  when: _aap_config_mcp_token_existing.rc == 0
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "aap-config | decide whether the mcp-aap token must be (re-)minted"
+  ansible.builtin.set_fact:
+    _aap_config_mcp_token_needs_mint: >-
+      {{ (_aap_config_mcp_token_existing.rc != 0)
+         or ((_aap_config_mcp_token_probe.status | default(401)) != 200) }}
+
 # Only on the mint path, so this is not a write on every run: realigns the
 # AAP-side password with Vault's copy in case the two ever drift (Vault
 # restored from backup, user recreated by hand), which would otherwise make
@@ -571,7 +684,7 @@
       password: "{{ _aap_config_mcp_password }}"
     status_code: 200
   when:
-    - _aap_config_mcp_token_existing.rc != 0
+    - _aap_config_mcp_token_needs_mint | bool
     - (_aap_config_mcp_user_lookup.json.count | default(0) | int) > 0
   no_log: true
 
@@ -588,7 +701,7 @@
       description: "mcp-aap server, least-privilege (ADR-0355/WP-074)"
     status_code: 201
   register: _aap_config_mcp_token_minted
-  when: _aap_config_mcp_token_existing.rc != 0
+  when: _aap_config_mcp_token_needs_mint | bool
   no_log: true
 
 # `url` travels with the token so mcp-aap never carries the Gateway
@@ -604,8 +717,20 @@
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/aap/mcp-token
       token={{ _aap_config_mcp_token_minted.json.token | quote }}
       url={{ aap_config_mcp_gateway_service_url | default('http://aap.zuno-aap.svc') | quote }}"
-  when: _aap_config_mcp_token_existing.rc != 0
+  when: _aap_config_mcp_token_needs_mint | bool
   no_log: true
+
+# Tolerant of absence by design: mcp-aap's ExternalSecret is applied by the
+# Day 2 `mcp` role, which normally runs long after this one. On that first
+# install there is no stale Secret to correct.
+- name: "aap-config | force the mcp-aap token Secret to pick up the new token"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_externalsecret_refresh.yml"
+  vars:
+    es_name: aap-mcp-token-credentials
+    es_namespace: zuno-ai-run
+    es_expect_key: token
+    es_expect_value: "{{ _aap_config_mcp_token_minted.json.token }}"
+  when: _aap_config_mcp_token_needs_mint | bool
 
 # --- Keycloak SSO on the Gateway (ADR-0354 clause 6, closed here) -----------
 # The 2.7 gateway ships a native keycloak authenticator plugin (confirmed
