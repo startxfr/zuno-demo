@@ -129,8 +129,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v0.3 | Partially implemented | Introduce LoRA and PEFT model customization |
-| [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v0.3 | Partially implemented | Build dataset-to-model MLOps pipelines |
+| [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v0.3 | Superseded by ADR-0526 | Introduce LoRA and PEFT model customization |
+| [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v0.3 | Superseded by ADR-0526 | Build dataset-to-model MLOps pipelines |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Partially implemented | Support dynamic LoRA adapter loading |
 | [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | v0.3 | Partially implemented | Optimize model selection using quality cost and latency |
 | [ADR-0305](0305-introduce-automated-model-benchmarking.md) | v0.3 | Partially implemented | Introduce automated model benchmarking |
@@ -204,6 +204,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Implemented | Parallelize the detect-changes read stage's per-document S3 GETs |
 | [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | v0.4 | Proposed | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
 | [ADR-0525](0525-batch-index-pgvector-writes-and-size-ivfflat-from-real-rows.md) | v0.4 | Repo work merged | Batch index-pgvector writes and size the ivfflat index from real row counts |
+| [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) | v0.4 | Proposed | Fine-tune and serve a French urban-register model variant (`-wesh`) beside its base |
 
 ## version 0.5
 
