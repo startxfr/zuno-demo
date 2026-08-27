@@ -1,6 +1,8 @@
 # ADR-0520: Parallelize the detect-changes read stage
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-25 via WP-58 - `detect-changes` went from
+  3h48m17s to 13m25s on the same domain, a ~17x speedup; the full pipeline reached SUCCEEDED
+  end-to-end in 16m51s)
 - **Target:** v0.4
 - **Date:** 2026-08-25
 - **Decision owners:** Zuno Demo architecture team

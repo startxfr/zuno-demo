@@ -1,6 +1,8 @@
 # ADR-0518: Modernize the local model fleet — Qwen3.6-27B chat, Qwen3-Embedding-0.6B, Qwen3.5-9B training base
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-26 - all three legs: `qwen3.6-27b-instruct` and
+  `qwen3-embedding-0.6b` both serving `Ready`, and `rag.document_embeddings` is `vector(1024)`
+  carrying a re-ingested corpus, so migration 006 and the big-bang re-embed both completed)
 - **Target:** v0.4
 - **Date:** 2026-08-25
 - **Decision owners:** Zuno Demo architecture team
@@ -120,3 +122,10 @@ hybrid linear attention, *not* plain Qwen3 dense) and `Qwen3ForCausalLM`
   rag-service 59, rag-ingestion 42, evaluations 37) and the four touched
   charts rendering. Awaiting S3 transfer completion, then deploy +
   re-ingestion + live verification.
+- 2026-08-27: closed out to `Implemented`. The note above is superseded - the S3 transfer,
+  deploy, re-ingestion and live verification all completed. Confirmed live:
+  `qwen36-27b-instruct` and `embeddings` (serving `qwen3-embedding-0.6b`) are both `Ready`, and
+  `rag.document_embeddings` in `rag-tech` is `vector(1024)` holding a re-ingested corpus - so
+  migration 006's TRUNCATE-then-widen and the big-bang re-embed both ran to completion. The
+  empty `rag-sxa-legacy` table is not a gap in this ADR: that re-embed is WP-084's open operator
+  action, and `rag-sales` is empty because `domains.sales` ships `enabled: false` per ADR-0218.

@@ -1,6 +1,7 @@
 # ADR-0519: Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa)
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-25 via WP-57 - the SXA fetch stage went from
+  127min+ and incomplete to 35m27s, with CPU utilization rising from 4.3% to 89%+)
 - **Target:** v0.4
 - **Date:** 2026-08-25
 - **Decision owners:** Zuno Demo architecture team

@@ -1,6 +1,8 @@
 # ADR-0415: Consume stable-diffusion-xl via OVHcloud AI Endpoints
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-21 - a real image was returned through the
+  `generate_image` tool; OVHcloud's actual SDXL model id, `stable-diffusion-xl-base-v10`, was
+  corrected in 872fe948 after the first live call 404'd on the id this ADR originally named)
 - **Target:** v0.4
 - **Date:** 2026-08-20
 - **Decision owners:** Zuno Demo architecture team
@@ -183,3 +185,14 @@ current agent-runtime implementation rather than assumed:
 
 See [Standard clauses](README.md#standard-clauses) for Consequences, Security/Operational
 considerations, Migration/evolution, Acceptance criteria and Review evidence.
+
+## Dated progress notes
+
+- 2026-08-27: closed out to `Implemented`. The decision has been in service since 102789e1
+  (2026-08-20); the one real-world correction was OVHcloud's actual SDXL model id
+  (`stable-diffusion-xl-base-v10`, 872fe948) after the id named here 404'd as `model_not_found`.
+  Known literal drift left in place, deliberately: `components/ai-gateway/app/image_providers.py`
+  still defaults `model` to `stable-diffusion-xl`, and
+  `components/mcp-gateway/app/handlers/image_gen.py` still posts that id in its JSON body. Neither
+  is load-bearing today (ai-gateway routes by `image-provider-routing.yaml`, not by the request
+  body), but both would bite if the default ever became the effective value.

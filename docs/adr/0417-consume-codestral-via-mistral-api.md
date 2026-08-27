@@ -1,6 +1,8 @@
 # ADR-0417: Consume Codestral via the Mistral API
 
-- **Status:** Proposed
+- **Status:** Implemented (smoke-tested live 2026-08-27 - a real completion returned from
+  `api.mistral.ai` (`model_name: codestral-latest`) using the dedicated
+  `MISTRAL_CODESTRAL_API_KEY` credential, confirming the model id this ADR could not verify)
 - **Target:** v0.4
 - **Date:** 2026-08-20
 - **Decision owners:** Zuno Demo architecture team
@@ -216,3 +218,13 @@ Two things needed for this have no precedent in the repo:
 
 See [Standard clauses](README.md#standard-clauses) for Consequences, Security/Operational
 considerations, Migration/evolution, Acceptance criteria and Review evidence.
+
+## Dated progress notes
+
+- 2026-08-27: closed out to `Implemented` after the live smoke test. The accepted risks flagged
+  that the model name was never independently verified against Mistral's own console; this
+  resolves that. Executed from inside the `ai-gateway` pod through the same
+  `langchain_mistralai.ChatMistralAI` path `providers.py` uses, with the dedicated
+  `MISTRAL_CODESTRAL_API_KEY`: a real completion came back,
+  `response_metadata.model_name: codestral-latest`. The id is correct as written and the
+  dedicated credential chain resolves end to end.

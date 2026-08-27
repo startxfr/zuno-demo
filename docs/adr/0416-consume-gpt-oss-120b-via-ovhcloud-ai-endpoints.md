@@ -1,6 +1,8 @@
 # ADR-0416: Consume gpt-oss-120b via OVHcloud AI Endpoints
 
-- **Status:** Proposed
+- **Status:** Implemented (smoke-tested live 2026-08-27 - a real completion returned from
+  OVHcloud AI Endpoints (`model_name: gpt-oss-120b`) using the shared `OVHCLOUD_API_KEY`
+  credential ADR-0415 established, which was this ADR's own stated first verification step)
 - **Target:** v0.4
 - **Date:** 2026-08-20
 - **Decision owners:** Zuno Demo architecture team
@@ -200,3 +202,12 @@ chain the same way `openai`/`anthropic` already are.
 
 See [Standard clauses](README.md#standard-clauses) for Consequences, Security/Operational
 considerations, Migration/evolution, Acceptance criteria and Review evidence.
+
+## Dated progress notes
+
+- 2026-08-27: closed out to `Implemented` after the live smoke test this ADR's accepted risks
+  named as the natural first verification step. Executed from inside the `ai-gateway` pod through
+  the same `langchain_openai.ChatOpenAI` path `providers.py` uses, against
+  `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1` with the in-cluster `OVHCLOUD_API_KEY`: a
+  real completion came back, `response_metadata.model_name: gpt-oss-120b`. That closes the one
+  open question - the credential and model id are real, not merely declared.

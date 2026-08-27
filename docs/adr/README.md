@@ -192,16 +192,16 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | v0.4 | Implemented | Consolidate Grafana dashboards into six platform views |
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | v0.4 | Proposed | Consolidate zuno-ai-run into three tiered MIG predictors |
-| [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
-| [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Proposed | Consume gpt-oss-120b via OVHcloud AI Endpoints |
-| [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Proposed | Consume Codestral via the Mistral API |
+| [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
+| [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume gpt-oss-120b via OVHcloud AI Endpoints |
+| [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Implemented | Consume Codestral via the Mistral API |
 | [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Proposed | Execute Day 0 and Day 1 operations as AAP Job Templates |
 | [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Proposed | Split model preference into preferred/fallback, with prompt-slot overrides |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Implemented | Sign supply-chain artifacts in-cluster with Vault Transit |
 | [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Implemented | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
-| [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Proposed | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
-| [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Proposed | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
-| [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Proposed | Parallelize the detect-changes read stage's per-document S3 GETs |
+| [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Implemented | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
+| [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Implemented | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
+| [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Implemented | Parallelize the detect-changes read stage's per-document S3 GETs |
 | [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | v0.4 | Proposed | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
 
 ## version 0.5
