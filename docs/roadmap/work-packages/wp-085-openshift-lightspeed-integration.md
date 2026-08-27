@@ -1,11 +1,13 @@
 # WP-085: Integrate OpenShift Lightspeed with Zuno inference, knowledge and identity
 
-- **State:** Live. Étapes 1-7 exécutées sur demo222 le 2026-08-27. Lightspeed sert
-  (6 pods `Running`, `ApiReady`/`ConsolePluginReady`/`CacheReady`/`MCPServerReady`/`RHOKPReady`
-  tous `True`), `make d3 test platform` -> **9/9 passed**. **Une réserve** : l'inférence passe
-  temporairement en direct sur le predictor KServe et non par MaaS - voir « Contournement MaaS »
-  ci-dessous. Vérification navigateur non encore faite.
-- **ADRs:** ADR-0524 (Proposed)
+- **State:** **Done — live-verified 2026-08-27 on demo222.** Les quatre tests console sont
+  concluants pour `consultant-01` et `sale-01` : documentation OpenShift, introspection cluster,
+  connaissance Confluence interne, et refus correct d'une écriture Confluence. L'app-server charge
+  `Loaded 2 tools from MCP server 'zuno-mcp'` — exactement le plafond `MCP_FRONTDOOR_CAPABILITIES`,
+  servi par identité utilisateur réelle via TokenReview. `make d3 test platform` : 9/9.
+  **Réserve** : l'inférence passe en direct sur le predictor KServe et non par MaaS — voir
+  « Contournement MaaS » ci-dessous, bloqué sur WP-076.
+- **ADRs:** ADR-0524 (Implemented, avec la réserve clause 1 - inférence hors MaaS)
 - **Depends on:** ADR-0521/WP-076 (Implemented - MaaS is the local-model transport this reuses),
   ADR-0117 (Implemented - the Confluence MCP server), ADR-0060 (Implemented - Day 1/Day 2/Day 3
   sequencing)
@@ -28,6 +30,43 @@ Retour à MaaS = deux éditions, rien d'autre :
 L'entitlement MaaS (`MaaSSubscription` + sujet OPA) est resté en place et intact exactement pour
 rendre ce retour trivial. Une garde de rendu refuse déjà `endpointMode: maas` combiné à
 `credential.mode: staticToken`, qui produirait un 401 opaque.
+
+## Vérification navigateur — quatre défauts, dont un de notre code (2026-08-27)
+
+La vérification en tant que `consultant-01` a validé la documentation OpenShift du premier coup et
+révélé quatre défauts, tous corrigés :
+
+1. **`valueFrom.type` devait être `kubernetes`, pas `client`.** C'est le plus structurant, et il
+   tranche l'inconnue que ce WP portait depuis le début (« le plugin console transmet-il le token
+   pour `type: client` ? »). Réponse : **non** — la lecture de `ols/utils/mcp_utils.py` dans
+   l'image de l'opérateur montre que `client` attend des en-têtes que *le client de l'API* doit
+   fournir par serveur, ce que la console n'envoie jamais ; `zuno-mcp` était donc écarté **avant
+   tout appel** (`requires client headers but none provided`) et la gateway ne recevait rien.
+   `kubernetes` résout le placeholder en `Bearer <user_token>`, `user_token` étant documenté comme
+   *"User's kubernetes token"*. C'est aussi ce que Red Hat utilise pour son propre serveur
+   `openshift`, dans le même fichier de configuration. Le per-user est donc atteint **sans** le
+   repli service-identity que ce WP tenait en réserve.
+
+2. **Aucun accès au chat.** L'opérateur crée le ClusterRole `lightspeed-operator-query-access`
+   mais ne le lie à personne : tout utilisateur voyait *"Not authorized"*. L'app-server tranche par
+   `TokenReview` + `SubjectAccessReview`, donc le token console était bien transmis — il ne manquait
+   que le droit.
+
+3. **Introspection cluster vide.** *"You don't have permission to list pods"* était le comportement
+   **correct** : `openshift-mcp-server` agit avec les droits réels de l'utilisateur, et les personas
+   n'en avaient aucun. Résolu par une RoleBinding `view` sur les namespaces Zuno, en réutilisant la
+   découverte `zunoManagedNamespaces` existante.
+
+4. **Un défaut de notre propre code.** `automountServiceAccountToken: false` — posture d'origine
+   légitime (*"ce service n'appelle jamais l'API Kubernetes"*), rendue fausse par l'ajout de
+   TokenReview à `app/auth.py`. Chaque appel de Lightspeed répondait **503**, ce qui faisait
+   ressembler un bug d'infrastructure à un refus d'autorisation. Le montage est désormais
+   conditionné à `lightspeed.enabled`.
+
+**Piège méthodologique à retenir :** le test « demander la création d'une page Confluence » a
+d'abord semblé réussir alors qu'aucun outil Confluence n'était chargé — le modèle refusait faute
+d'outil, pas par politique. Un test négatif ne prouve rien tant que le chemin positif n'est pas
+prouvé.
 
 ## Défauts externes constatés en live (2026-08-27)
 

@@ -202,7 +202,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Implemented | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
 | [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Implemented | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
 | [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Implemented | Parallelize the detect-changes read stage's per-document S3 GETs |
-| [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | v0.4 | Proposed | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
+| [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | v0.4 | Implemented | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
 | [ADR-0525](0525-batch-index-pgvector-writes-and-size-ivfflat-from-real-rows.md) | v0.4 | Repo work merged | Batch index-pgvector writes and size the ivfflat index from real row counts |
 | [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) | v0.4 | Repo work merged | Fine-tune and serve a French urban-register model variant (`-wesh`) beside its base |
 

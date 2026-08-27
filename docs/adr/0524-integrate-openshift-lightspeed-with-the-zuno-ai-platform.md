@@ -1,6 +1,14 @@
 # ADR-0524: Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-27 on demo222 - operator + operands running,
+  chat reachable by the `consultant`/`sales` personas, cluster introspection answering, Confluence
+  knowledge retrieved through the existing MCP Gateway, and a Confluence write correctly refused).
+  **One clause is not yet met:** clause 1 routes inference through MaaS, and inference currently
+  goes direct to the KServe predictor because the MaaS control plane no longer resolves
+  subscriptions (`403 no matching subscription found for user`, reproduced for the known-good
+  `ai-gateway` identity on a model this ADR never touched - WP-076/ADR-0521 scope). The MaaS
+  entitlement (`MaaSSubscription` + OPA subject) was deliberately left in place so returning is two
+  value edits; see WP-085's "Contournement MaaS" section.
 - **Target:** v0.4
 - **Date:** 2026-08-26
 - **Decision owners:** Zuno Demo architecture team
