@@ -34,9 +34,17 @@ data:
 {{ .Files.Get "files/sql/006_embedding_1024.sql" | indent 4 }}
   # ADR-0525 shipped files/sql/007_ivfflat_lists.sql and referenced it from
   # job-schema-apply.yaml's psql args, but never published it here - so the
-  # Job mounted a /sql without it and, under ON_ERROR_STOP=1, every
-  # per-domain schema apply failed on the missing file. Added by WP-088,
-  # which needs that Job to run at all for 008 below.
+  # Job mounts a /sql without it and, under ON_ERROR_STOP=1, would fail on
+  # the missing file. Added by WP-088, which needs that Job to run at all
+  # for 008 below.
+  #
+  # Correction (2026-08-27): this is a latent gap, NOT the cause of the
+  # currently-failing tech/sales/sxa-legacy Jobs - those fail earlier, at
+  # 004_rag_chunking.sql's `ALTER COLUMN embedding TYPE vector(384)`, with
+  # "expected 384 dimensions, not 1024" against columns ADR-0518 already
+  # widened. 004 is stale and makes the whole Job non-idempotent: it can
+  # only ever succeed once, on a pre-ADR-0518 database. Fixing that is its
+  # own reviewed change, not this WP's.
   007_ivfflat_lists.sql: |
 {{ .Files.Get "files/sql/007_ivfflat_lists.sql" | indent 4 }}
   # ADR-0527: project_memberships becomes a projection of project_grants.
