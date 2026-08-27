@@ -17,15 +17,15 @@ the largest single lever, and required on this vLLM build regardless for
 the MIG/NVML crash ADR-0518 documents). All three are values-driven; see
 values.yaml's qwen35Model block before changing any of them.
 
-KNOWN RISK, UNVERIFIED. Qwen3.5-9B is a BASE model, not an instruct one,
-so it may ship without a chat template - in which case vLLM's
-/v1/chat/completions returns 400 rather than serving. That is tolerable
-where this model sits (no agent prefers it; it is at the tail of every
-resolved chain, reached only after six other providers have failed) but
-it must be confirmed on the live pod's /v1/models and a real chat call
-before treating this as a working fallback. The variant does not share
-the risk: its merged checkpoint carries the tokenizer the mlops pipeline
-rendered the training corpus with, chat template included.
+CHAT TEMPLATE: present. Verified against the staged checkpoint
+(2026-08-27) - s3://zuno-demo-rag-corpus/models/qwen3.5-9b/ carries a
+7756-byte chat_template.jinja, so /v1/chat/completions works without the
+caller supplying a template. Worth recording because "Qwen3.5-9B" is a
+base model id, not an instruct one, and the natural assumption is the
+opposite. The same checkpoint is self-consistent (13 objects, 19.3GB, a
+model.safetensors.index.json whose weight_map names match the real shard
+objects) and declares text_config.dtype: bfloat16 - it is the unquantized
+checkpoint ADR-0526 decision 1 requires, not a quantized one.
 */ -}}
 {{- $qwen35Maas := "" }}
 {{- range .Values.maas.models }}
