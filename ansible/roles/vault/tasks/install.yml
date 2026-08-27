@@ -610,6 +610,22 @@
       client_secret: "{{ zuno_admin_aap_client_token |
         default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
+# ADR-0530/WP-091: the "zuno-admin-api" client-credentials client backing
+# agent-bff's GET /api/colleagues and GET /api/groups. Unlike every client
+# above, this secret is read by TWO consumers - Keycloak resolves it through
+# KC_VAULT to validate the client, and agent-bff presents it to authenticate -
+# so it is seeded once here and both sides read this one path. Seeding it
+# twice, or letting either side generate its own, produces a 401 that looks
+# like a permissions problem.
+- name: "vault | generate and seed the zuno-admin-api client-credentials secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: keycloak/zuno-admin-api-client
+    vault_seed_fields:
+      client_secret: "{{ zuno_admin_zuno_admin_api_token |
+        default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
+
 # Grafana's oauth-proxy sidecar (gitops/charts/grafana): AES-key-sized
 # opaque secret for signing/encrypting its session cookie, same
 # single-opaque-value shape as mcp/gateway-workload-token below.

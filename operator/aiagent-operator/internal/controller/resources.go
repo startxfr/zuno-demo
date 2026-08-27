@@ -124,6 +124,13 @@ func vaultSessionSecretPath(agentName string) string {
 
 const vaultRedisSecretPath = "redis/session-store"
 
+// ADR-0530/WP-091: the zuno-admin-api client-credentials secret. Shared, not
+// per-agent - gitops/charts/keycloak resolves this SAME path through KC_VAULT
+// to validate the client, and every agent-bff reads it here to authenticate.
+// A second value generated on either side is a 401 that reads like a
+// permissions problem.
+const vaultAdminAPIClientSecretPath = "keycloak/zuno-admin-api-client"
+
 func toCoreResources(rr zunov1alpha1.ResourceRequirements) corev1.ResourceRequirements {
 	out := corev1.ResourceRequirements{}
 	if rr.Requests.CPU != "" || rr.Requests.Memory != "" {
@@ -297,6 +304,32 @@ func desiredBFFDeployment(agent *zunov1alpha1.AIAgent, cfg OperatorConfig) *apps
 		{Name: "KEYCLOAK_JWKS_URL", Value: cfg.KeycloakJWKSURL},
 		{Name: "OIDC_AUDIENCE", Value: agent.Spec.BFF.OIDCAudience},
 		{Name: "AGENT_RUNTIME_BASE_URL", Value: cfg.AgentRuntimeBaseURL},
+	}
+
+	// ADR-0530/WP-091: agent-bff's NewAdminClient returns nil - and both
+	// GET /api/colleagues and GET /api/groups fail closed with 503 - unless
+	// all three are set. Appending them is what turns the boundary on; the
+	// guard is what keeps a deployment without it working exactly as before.
+	if cfg.KeycloakAdminClientID != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "KEYCLOAK_ADMIN_BASE_URL", Value: cfg.KeycloakAdminBaseURL},
+			corev1.EnvVar{Name: "KEYCLOAK_ADMIN_CLIENT_ID", Value: cfg.KeycloakAdminClientID},
+			corev1.EnvVar{Name: "KEYCLOAK_ADMIN_CLIENT_SECRET", ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: bffAdminSecretName(agent.Spec.AgentName)},
+					Key:                  "KEYCLOAK_ADMIN_CLIENT_SECRET",
+					// Optional, and load-bearing. The Vault path is seeded by
+					// ansible/roles/vault, not by this operator or ArgoCD, so
+					// the Deployment can be reconciled before the Secret
+					// exists. Without this the pod sits in
+					// CreateContainerConfigError and the BFF stops serving;
+					// with it the var is unset, NewAdminClient returns nil,
+					// and only /api/colleagues and /api/groups degrade - to
+					// the 503 they already document.
+					Optional: boolPtr(true),
+				},
+			}},
+		)
 	}
 
 	return &appsv1.Deployment{
@@ -489,6 +522,44 @@ func desiredFrontendExternalSecret(agent *zunov1alpha1.AIAgent) *unstructured.Un
 		},
 	}
 	_ = unstructured.SetNestedSlice(es.Object, data, "spec", "data")
+
+	return es
+}
+
+func bffAdminSecretName(agentName string) string {
+	return agentName + "-bff-admin-secret"
+}
+
+// desiredBFFExternalSecret delivers the zuno-admin-api client secret to
+// agent-bff (ADR-0530/WP-091).
+//
+// Deliberately separate from desiredFrontendExternalSecret rather than another
+// key on it: the frontend has no business holding a credential that can
+// enumerate every user and group in the realm. ADR-0213 asked for least
+// privilege on this boundary and this split is where that is enforced.
+func desiredBFFExternalSecret(agent *zunov1alpha1.AIAgent) *unstructured.Unstructured {
+	name := bffAdminSecretName(agent.Spec.AgentName)
+	es := &unstructured.Unstructured{}
+	es.SetGroupVersionKind(externalSecretGVK)
+	es.SetName(name)
+	es.SetNamespace(agent.Spec.TargetNamespace)
+	es.SetLabels(commonLabels(agent.Spec.AgentName, "bff"))
+
+	_ = unstructured.SetNestedField(es.Object, "1h", "spec", "refreshInterval")
+	_ = unstructured.SetNestedMap(es.Object, map[string]interface{}{
+		"name": "vault-backend",
+		"kind": "ClusterSecretStore",
+	}, "spec", "secretStoreRef")
+	_ = unstructured.SetNestedMap(es.Object, map[string]interface{}{
+		"name":           name,
+		"creationPolicy": "Owner",
+	}, "spec", "target")
+	_ = unstructured.SetNestedSlice(es.Object, []interface{}{
+		map[string]interface{}{
+			"secretKey": "KEYCLOAK_ADMIN_CLIENT_SECRET",
+			"remoteRef": map[string]interface{}{"key": vaultAdminAPIClientSecretPath, "property": "client_secret"},
+		},
+	}, "spec", "data")
 
 	return es
 }

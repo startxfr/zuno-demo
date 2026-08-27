@@ -123,6 +123,15 @@ func (r *AIAgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, fmt.Errorf("reconciling frontend external secret: %w", esErr)
 	}
 
+	// ADR-0530/WP-091: must exist before the BFF Deployment references it,
+	// same ordering the frontend ExternalSecret already follows above.
+	if cfg.KeycloakAdminClientID != "" {
+		bffESErr := r.applyOwned(ctx, &agent, desiredBFFExternalSecret(&agent))
+		if bffESErr != nil && !meta.IsNoMatchError(bffESErr) {
+			return ctrl.Result{}, fmt.Errorf("reconciling bff admin external secret: %w", bffESErr)
+		}
+	}
+
 	bffDeploy := desiredBFFDeployment(&agent, cfg)
 	if err := r.applyOwned(ctx, &agent, bffDeploy); err != nil {
 		return ctrl.Result{}, fmt.Errorf("reconciling bff deployment: %w", err)

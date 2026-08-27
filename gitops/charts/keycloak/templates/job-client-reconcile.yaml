@@ -1,0 +1,186 @@
+{{- if .Values.keycloak.enabled }}
+# ADR-0530/WP-091: make files/realm-zuno.json authoritative for CLIENTS.
+#
+# The realm import next door only ever creates. The operator runs it with
+# `--override=false` and the KeycloakRealmImport CRD has no field to change
+# that, and it does not re-run the import when the CR's realm changes either.
+# Measured 2026-08-28: the import Job still carried its original
+# creationTimestamp while the CR was at generation 2, with the Application
+# Synced/Healthy. So every client added to that file after the realm's one
+# import - `zuno-admin-api` being the case that finally forced the issue - was
+# delivered into the CR by ArgoCD, read by the operator, and never applied.
+#
+# This Job closes that gap for clients, and ONLY for clients. See ADR-0530
+# clause 4: groups, users, realm roles, identity providers, client scopes and
+# realm settings are still create-only. The script says so out loud on every
+# run, because a mechanism that reconciles half a realm while looking total
+# would be a worse trap than the one it replaces.
+#
+# Sync hook, not PreSync, for the reason ADR-0313's 2026-08-14 incident
+# records: the Sync phase only begins once every PreSync hook has succeeded,
+# so a PreSync consumer of a Sync-phase Secret deadlocks. Wave -5 puts it
+# after the ExternalSecrets (-20), the Keycloak CR (-15), the client ConfigMap
+# (-16) and the realm import (-10) - but the operator imports asynchronously,
+# so the script still waits for the realm rather than assuming that ordering
+# is enough.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zuno-keycloak-client-reconcile
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  # Bounded like the schema-apply Job, and for the same reason: a pod stuck in
+  # CreateContainerConfigError is not a pod *failure*, so backoffLimit never
+  # fires and the sync would hang forever instead of failing visibly.
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak-client-reconcile
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kcadm
+          image: {{ .Values.clientReconcile.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          env:
+            - name: KC_SERVER
+              value: {{ .Values.clientReconcile.serverUrl | quote }}
+            - name: KC_REALM
+              value: zuno
+            - name: KC_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.adminSecretName }}
+                  key: username
+            - name: KC_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.adminSecretName }}
+                  key: password
+          volumeMounts:
+            - name: realm
+              mountPath: /realm
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              echo "ADR-0530: reconciling CLIENTS only."
+              echo "  NOT reconciled: groups, users, realm roles, identity"
+              echo "  providers, client scopes, realm settings. Those remain"
+              echo "  create-only - editing them in realm-zuno.json still has"
+              echo "  no effect on a live realm. See ADR-0530 clause 4."
+
+              # kcadm writes its session to $HOME/.keycloak by default, and
+              # this pod runs with a read-only root filesystem under an
+              # arbitrary OpenShift UID with no writable home. Every
+              # invocation is pinned to the tmp emptyDir instead.
+              KCADM="/opt/keycloak/bin/kcadm.sh"
+              CFG="--config /tmp/kcadm.config"
+
+              # The realm import is applied by the operator asynchronously, so
+              # on a fresh install the realm may not exist yet when this hook
+              # runs. Wait for it rather than racing it.
+              ready=""
+              for attempt in $(seq 1 60); do
+                if $KCADM config credentials $CFG --server "$KC_SERVER" \
+                     --realm master --user "$KC_ADMIN_USER" \
+                     --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1 \
+                   && $KCADM get "realms/$KC_REALM" $CFG --fields realm >/dev/null 2>&1; then
+                  ready="yes"
+                  break
+                fi
+                echo "waiting for keycloak and realm '$KC_REALM' (attempt $attempt)"
+                sleep 5
+              done
+              if [ -z "$ready" ]; then
+                echo "ERROR: keycloak or realm '$KC_REALM' never became reachable" >&2
+                exit 1
+              fi
+
+              created=0
+              updated=0
+              for f in /realm/client-*.json; do
+                [ -e "$f" ] || continue
+                base=$(basename "$f")
+                cid=${base#client-}
+                cid=${cid%.json}
+
+                # --format csv --noquotes yields the bare internal id, or
+                # nothing at all when no client matches.
+                id=$($KCADM get clients -r "$KC_REALM" $CFG \
+                       -q "clientId=$cid" --fields id \
+                       --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+
+                if [ -z "$id" ]; then
+                  $KCADM create clients -r "$KC_REALM" $CFG -f "$f"
+                  echo "created client $cid"
+                  created=$((created + 1))
+                else
+                  # -m is load-bearing. kcadm's own help: "Merge is
+                  # automatically enabled UNLESS --file is specified" - so a
+                  # bare `-f` PUTs the file as the whole representation and
+                  # drops everything Keycloak itself maintains. Measured
+                  # against this realm on 2026-08-28: every existing client
+                  # would have lost its protocolMapper ids and its
+                  # server-managed `realm_client` attribute. With -m, kcadm
+                  # GETs the live client, merges the declared fields over it,
+                  # and PUTs the result.
+                  $KCADM update "clients/$id" -r "$KC_REALM" $CFG -f "$f" -m
+                  echo "updated client $cid"
+                  updated=$((updated + 1))
+                fi
+              done
+
+              # Service-account role mappings, declared in realm-zuno.json as
+              # users[] entries named service-account-<clientId> - the shape a
+              # real Keycloak realm export uses, so the file stays a valid
+              # export rather than growing a bespoke side-list.
+              mapped=0
+              for f in /realm/svcroles-*.txt; do
+                [ -e "$f" ] || continue
+                base=$(basename "$f")
+                cid=${base#svcroles-}
+                cid=${cid%.txt}
+                while read -r container role; do
+                  [ -n "${container:-}" ] || continue
+                  [ -n "${role:-}" ] || continue
+                  $KCADM add-roles -r "$KC_REALM" $CFG \
+                    --uusername "service-account-$cid" \
+                    --cclientid "$container" --rolename "$role"
+                  echo "granted $container/$role to service-account-$cid"
+                  mapped=$((mapped + 1))
+                done < "$f"
+              done
+
+              echo "reconcile complete: $created created, $updated updated, $mapped role mappings applied"
+      volumes:
+        - name: realm
+          configMap:
+            name: zuno-keycloak-clients
+        - name: tmp
+          emptyDir: {}
+{{- end }}

@@ -165,6 +165,29 @@ spec:
               value: {{ .Values.bff.oidcAudience | quote }}
             - name: AGENT_RUNTIME_BASE_URL
               value: {{ .Values.bff.agentRuntimeBaseUrl | quote }}
+            {{- if .Values.keycloak.adminClientId }}
+            # ADR-0530/WP-091. agent-bff's NewAdminClient returns nil - and
+            # both endpoints fail closed with 503 - if any of these three is
+            # empty, which is the documented behavior when the boundary is
+            # not provisioned. Rendering them is what turns it on.
+            - name: KEYCLOAK_ADMIN_BASE_URL
+              value: {{ .Values.keycloak.adminBaseUrl | quote }}
+            - name: KEYCLOAK_ADMIN_CLIENT_ID
+              value: {{ .Values.keycloak.adminClientId | quote }}
+            - name: KEYCLOAK_ADMIN_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tekos-bff-admin-secret
+                  key: KEYCLOAK_ADMIN_CLIENT_SECRET
+                  # optional, and load-bearing. The Vault path is seeded by
+                  # ansible/roles/vault, NOT by ArgoCD, so this chart can sync
+                  # before the Secret exists. Without `optional` that is a
+                  # CreateContainerConfigError and the BFF stops serving
+                  # entirely; with it, the var is simply unset, NewAdminClient
+                  # returns nil, and /api/colleagues and /api/groups keep
+                  # returning the documented 503 while everything else works.
+                  optional: true
+            {{- end }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

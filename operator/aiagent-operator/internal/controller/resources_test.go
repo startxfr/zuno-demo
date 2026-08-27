@@ -204,15 +204,98 @@ func TestDesiredBFFDeployment_ImageTriggerAnnotation(t *testing.T) {
 	require.Equal(t, `spec.template.spec.containers[?(@.name=="bff")].image`, triggers[0].FieldPath)
 }
 
-func TestDesiredBFFDeployment_NoSecretEnvVars(t *testing.T) {
+// The BFF used to hold no secret at all, and this test asserted exactly that.
+// ADR-0530/WP-091 knowingly overturns that invariant for one credential: the
+// zuno-admin-api client secret, which agent-bff needs to reach Keycloak's
+// Admin REST API for GET /api/colleagues and GET /api/groups.
+//
+// The assertion is narrowed rather than dropped. "Holds no secret" was never
+// the real requirement - "holds nothing it does not need" was - so the test
+// now names the single permitted secret and still fails on any second one.
+func TestDesiredBFFDeployment_OnlySecretIsTheAdminClientCredential(t *testing.T) {
 	agent := sampleAgent()
 	cfg := DefaultOperatorConfig()
 
 	deploy := desiredBFFDeployment(agent, cfg)
 	require.Equal(t, "tekos-bff", deploy.Name)
+
+	var fromSecret []string
 	for _, e := range deploy.Spec.Template.Spec.Containers[0].Env {
-		require.Nil(t, e.ValueFrom, "bff deployment must never reference a secret directly (it validates JWTs via Keycloak JWKS, holds no secret of its own)")
+		if e.ValueFrom == nil {
+			continue
+		}
+		require.NotNil(t, e.ValueFrom.SecretKeyRef,
+			"bff env %q reads from a non-secret source it has no reason to need", e.Name)
+		fromSecret = append(fromSecret, e.Name)
 	}
+	require.Equal(t, []string{"KEYCLOAK_ADMIN_CLIENT_SECRET"}, fromSecret,
+		"the admin client credential is the ONLY secret the bff may reference (ADR-0530); anything else is a privilege the BFF was never granted")
+
+	ref := envVarByName(t, deploy.Spec.Template.Spec.Containers[0].Env, "KEYCLOAK_ADMIN_CLIENT_SECRET")
+	require.Equal(t, "tekos-bff-admin-secret", ref.ValueFrom.SecretKeyRef.Name)
+	require.Equal(t, "KEYCLOAK_ADMIN_CLIENT_SECRET", ref.ValueFrom.SecretKeyRef.Key)
+
+	// The Vault path behind this Secret is seeded by ansible/roles/vault, not
+	// by this operator and not by ArgoCD, so the Deployment WILL be reconciled
+	// before the Secret exists. Non-optional, that is a
+	// CreateContainerConfigError and the BFF stops serving every route.
+	// Optional, only the two admin endpoints degrade, to the 503 they already
+	// document. This assertion is the difference between a feature that is
+	// off and an outage.
+	require.NotNil(t, ref.ValueFrom.SecretKeyRef.Optional)
+	require.True(t, *ref.ValueFrom.SecretKeyRef.Optional,
+		"the admin client secret must be optional - see the comment above")
+}
+
+// Blanking the client id must take the whole boundary away - no env vars at
+// all, so agent-bff's NewAdminClient returns nil and both endpoints keep
+// failing closed with 503 rather than half-configuring themselves into a 500.
+func TestDesiredBFFDeployment_AdminBoundaryIsOptional(t *testing.T) {
+	agent := sampleAgent()
+	cfg := DefaultOperatorConfig()
+	cfg.KeycloakAdminClientID = ""
+
+	deploy := desiredBFFDeployment(agent, cfg)
+	for _, e := range deploy.Spec.Template.Spec.Containers[0].Env {
+		require.NotContains(t, e.Name, "KEYCLOAK_ADMIN_",
+			"disabling the boundary must leave no KEYCLOAK_ADMIN_* env behind")
+		require.Nil(t, e.ValueFrom)
+	}
+}
+
+// The credential is shared platform-wide, not minted per agent: Keycloak
+// resolves the SAME Vault path through KC_VAULT to validate the client. A
+// per-agent path here would authenticate against nothing.
+func TestDesiredBFFExternalSecret_SharedVaultPath(t *testing.T) {
+	agent := sampleAgent()
+
+	es := desiredBFFExternalSecret(agent)
+	require.Equal(t, "external-secrets.io/v1beta1", es.GetAPIVersion())
+	require.Equal(t, "ExternalSecret", es.GetKind())
+	require.Equal(t, "tekos-bff-admin-secret", es.GetName())
+
+	data, found, err := unstructured.NestedSlice(es.Object, "spec", "data")
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, data, 1, "the bff needs exactly one secret, not a bundle")
+
+	entry := data[0].(map[string]interface{})
+	require.Equal(t, "KEYCLOAK_ADMIN_CLIENT_SECRET", entry["secretKey"])
+	remote := entry["remoteRef"].(map[string]interface{})
+	require.Equal(t, "keycloak/zuno-admin-api-client", remote["key"])
+	require.NotContains(t, remote["key"], agent.Spec.AgentName,
+		"the admin client secret is shared with gitops/charts/keycloak; a per-agent path would not match what Keycloak validates against")
+}
+
+func envVarByName(t *testing.T, env []corev1.EnvVar, name string) corev1.EnvVar {
+	t.Helper()
+	for _, e := range env {
+		if e.Name == name {
+			return e
+		}
+	}
+	t.Fatalf("env var %q not found", name)
+	return corev1.EnvVar{}
 }
 
 func TestDesiredFrontendRoute_Fields(t *testing.T) {

@@ -1,0 +1,44 @@
+{{- if .Values.keycloak.enabled }}
+# ADR-0530/WP-091: the client definitions job-client-reconcile.yaml applies.
+#
+# Rendered from the SAME files/realm-zuno.json the realm import uses, so there
+# is one source of truth and no second list to keep in step. Helm does the
+# splitting here - one file per client, one role list per service account - so
+# the Job needs no JSON tooling at all. That matters: the Keycloak image has
+# neither jq nor python (verified 2026-08-28), and it is the only image with
+# kcadm.sh in it.
+#
+# The `replace` below is NOT optional. realmimport.yaml performs the same
+# substitution before parsing, and skipping it here would have the reconcile
+# Job write the literal string "apps.mycluster.example.com" into the redirect
+# URIs of every live client - silently breaking every agent login on the first
+# run.
+{{- $realmRaw := .Files.Get "files/realm-zuno.json" | replace "apps.mycluster.example.com" .Values.clusterBaseDomain }}
+{{- $realm := $realmRaw | fromJson }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zuno-keycloak-clients
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-16"
+data:
+{{- range $c := $realm.clients }}
+  client-{{ $c.clientId }}.json: |
+{{ $c | toPrettyJson | indent 4 }}
+{{- end }}
+{{- range $u := $realm.users }}
+{{- if $u.serviceAccountClientId }}
+  # One "<role-container-client> <role-name>" per line, consumed by the Job's
+  # read loop. Flat text rather than JSON for exactly the no-jq reason above.
+  svcroles-{{ $u.serviceAccountClientId }}.txt: |
+{{- range $container, $roles := $u.clientRoles }}
+{{- range $r := $roles }}
+    {{ $container }} {{ $r }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

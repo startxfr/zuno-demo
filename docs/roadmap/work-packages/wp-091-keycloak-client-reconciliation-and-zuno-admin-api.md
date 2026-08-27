@@ -1,6 +1,6 @@
 # WP-091: Reconcile Keycloak clients, and provision zuno-admin-api (promotes ADR-0530)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-28) - live reconcile run still to be agreed
 - **ADRs:** ADR-0530 (Proposed -> Implemented after this WP and a live run)
 - **Depends on:** nothing new. Uses the existing `keycloak-admin` Secret, the existing `vault-secrets` projected volume, and `ansible/roles/vault`'s seeding pattern.
 - **Blocks:** ADR-0527's live two-persona pass (WP-088/WP-089 cannot be exercised at all while `GET /api/colleagues` and `GET /api/groups` return 503), and ADR-0213's long-standing "trust boundary unprovisioned" caveat.

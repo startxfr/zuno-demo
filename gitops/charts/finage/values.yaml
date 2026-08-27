@@ -61,6 +61,11 @@ vault:
   oidcClientSecretPath: zuno/keycloak/finage-frontend
   sessionSecretPath: zuno/finage/frontend-session
   redisSecretPath: zuno/redis/session-store
+  # ADR-0530/WP-091: the zuno-admin-api client-credentials secret, read by
+  # agent-bff for GET /api/colleagues and GET /api/groups. Shared with
+  # gitops/charts/keycloak, which resolves the SAME path through KC_VAULT -
+  # do not point either side at a path of its own.
+  adminApiClientSecretPath: zuno/keycloak/zuno-admin-api-client
 
 # ADR-0042: server-side session store (gitops/charts/redis, zuno-auth namespace).
 redis:
@@ -69,6 +74,15 @@ redis:
 
 keycloak:
   issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
+  # ADR-0530/WP-091: agent-bff's Keycloak Admin API boundary. Bare host - the
+  # client appends /realms/<realm>/... itself. Note this chart, unlike tekos/
+  # comage/advantage, has no jwksUrl: the 2026-08-22 in-cluster JWKS fix never
+  # reached it. That gap is pre-existing and untouched here; this URL is the
+  # in-cluster listener regardless, because the external Route presents a
+  # Vault-internal CA. Blanking adminClientId disables the whole boundary and
+  # agent-bff keeps its documented fail-closed 503.
+  adminBaseUrl: http://zuno-service.zuno-auth.svc:8080
+  adminClientId: zuno-admin-api
   # matches the Keycloak CR's actual Route hostname, see
   # gitops/charts/keycloak/templates/keycloak.yaml
   # ADR-0411: ConfigMap (this chart's own namespace, key ca.crt) holding

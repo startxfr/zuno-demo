@@ -1,6 +1,13 @@
 # ADR-0530: Reconcile Keycloak clients instead of relying on a create-only realm import
 
-- **Status:** Proposed
+- **Status:** Repo work merged (2026-08-28) - the mechanism, the `zuno-admin-api`
+  declaration, its Vault seeding and delivery, and the agent-bff wiring across
+  the four Helm-managed agents and the two operator-managed ones are all in the
+  repository, with 8 chart tests and 3 operator tests covering them. **Not yet
+  run live**: Keycloak is shared infrastructure and the first reconcile rewrites
+  every declared client, so that run is to be agreed rather than folded into a
+  routine sync. `Implemented` needs it, plus the 200s on `GET /api/colleagues`
+  and `GET /api/groups` that ADR-0527's two-persona pass depends on
 - **Target:** v0.4
 - **Date:** 2026-08-28
 - **Decision owners:** Zuno Demo architecture team
@@ -138,3 +145,10 @@ it to the realm file would have changed nothing and looked like it should.
   degrade rather than break.
 - Nothing here changes how a *fresh* install behaves: the import still creates
   the realm, and the reconcile Job then finds every client already correct.
+- A pre-flight diff of the ten live clients against what this chart renders
+  found no substantive drift: identical scopes, identical mappers, identical
+  attributes, and every stored client secret still the `${vault.*}` placeholder
+  the import wrote. The first reconcile is therefore expected to create exactly
+  one client and change nothing else. That also means the point-in-time mirror
+  `ansible/roles/mlops` keeps of each `<agent>-frontend-client-secret` does not
+  go stale as a result of this change.

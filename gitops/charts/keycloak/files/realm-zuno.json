@@ -1039,6 +1039,18 @@
                     "temporary": false
                 }
             ]
+        },
+        {
+            "username": "service-account-zuno-admin-api",
+            "enabled": true,
+            "serviceAccountClientId": "zuno-admin-api",
+            "clientRoles": {
+                "realm-management": [
+                    "view-users",
+                    "query-users",
+                    "query-groups"
+                ]
+            }
         }
     ],
     "clients": [{
@@ -1557,6 +1569,26 @@
                 }
             }],
             "secret": "${vault.aap_client_secret}",
+            "clientAuthenticatorType": "client-secret"
+        },
+        {
+            "clientId": "zuno-admin-api",
+            "name": "agent-bff Keycloak Admin API client (ADR-0213/ADR-0527/ADR-0530)",
+            "description": "Confidential client-credentials client backing GET /api/colleagues and GET /api/groups. Never a login client - no browser flow, no redirect URI. Its service account holds view-users/query-users/query-groups on realm-management and nothing else; manage-users is deliberately withheld.",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "redirectUris": [],
+            "webOrigins": [],
+            "defaultClientScopes": [
+                "basic",
+                "roles"
+            ],
+            "secret": "${vault.admin_api_client_secret}",
             "clientAuthenticatorType": "client-secret"
         }
     ],

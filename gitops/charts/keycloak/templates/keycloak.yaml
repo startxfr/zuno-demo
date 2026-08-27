@@ -173,6 +173,18 @@ spec:
                     items:
                       - key: client_secret
                         path: zuno_aap__client__secret
+                - secret:
+                    # ADR-0530/WP-091: zuno-admin-api, agent-bff's Admin API
+                    # client. Note the file name: ${vault.admin_api_client_secret}
+                    # in realm-zuno.json escapes every underscore of the KEY as
+                    # "__", so it is zuno_admin__api__client__secret - the realm
+                    # prefix keeps its single underscore. Getting this wrong
+                    # fails silently at runtime, per this block's header.
+                    name: zuno-admin-api-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_admin__api__client__secret
         containers:
           - name: keycloak
             securityContext:

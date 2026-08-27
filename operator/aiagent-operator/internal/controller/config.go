@@ -51,6 +51,19 @@ type OperatorConfig struct {
 	// reconcile. Empty disables the volume/mount/env var entirely.
 	KeycloakCAConfigMapName string
 
+	// KeycloakAdminBaseURL and KeycloakAdminClientID configure agent-bff's
+	// Keycloak Admin API boundary (ADR-0213, extended by ADR-0527's project
+	// RBAC tab, provisioned by ADR-0530). The bare host only - the client
+	// appends /realms/<realm>/... itself. The matching client secret is not
+	// here: it reaches the pod from Vault via desiredBFFExternalSecret, never
+	// through operator config.
+	//
+	// Blanking KeycloakAdminClientID disables the boundary entirely - no
+	// ExternalSecret, no env vars - and agent-bff keeps its documented
+	// fail-closed 503 on GET /api/colleagues and GET /api/groups.
+	KeycloakAdminBaseURL  string
+	KeycloakAdminClientID string
+
 	// AgentRuntimeBaseURL, RedisAddr, SessionMaxLifetimeSeconds: fixed
 	// in-cluster coordinates for shared platform services, identical
 	// across every agent (see gitops/charts/tekos/values.yaml).
@@ -97,6 +110,8 @@ func DefaultOperatorConfig() OperatorConfig {
 		ClusterBaseDomain:         getenvDefault("CLUSTER_BASE_DOMAIN", "apps.mycluster.example.com"),
 		KeycloakJWKSURL:           getenvDefault("KEYCLOAK_JWKS_URL", "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs"),
 		KeycloakCAConfigMapName:   getenvDefault("KEYCLOAK_CA_CONFIGMAP_NAME", "agent-frontend-keycloak-ca"),
+		KeycloakAdminBaseURL:      getenvDefault("KEYCLOAK_ADMIN_BASE_URL", "http://zuno-service.zuno-auth.svc:8080"),
+		KeycloakAdminClientID:     getenvDefault("KEYCLOAK_ADMIN_CLIENT_ID", "zuno-admin-api"),
 		AgentRuntimeBaseURL:       getenvDefault("AGENT_RUNTIME_BASE_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"),
 		RedisAddr:                 getenvDefault("REDIS_ADDR", "zuno-redis-master.zuno-auth.svc.cluster.local:6379"),
 		SessionMaxLifetimeSeconds: getenvDefault("SESSION_MAX_LIFETIME_SECONDS", "43200"),

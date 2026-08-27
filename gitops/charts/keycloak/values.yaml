@@ -43,6 +43,17 @@ clusterBaseDomain: apps.mycluster.example.com
 # Kubernetes Secret names populated by ExternalSecrets resolving against the
 # vault-backend ClusterSecretStore. Never hardcode values here.
 adminSecretName: keycloak-admin
+
+# ADR-0530/WP-091: templates/job-client-reconcile.yaml. The image is the same
+# RHBK server image the operator runs (kcadm.sh ships in it; nothing else in
+# this cluster has that CLI, and the image has no curl or jq to script around
+# its absence). Keep the tag in step with the rhbk-operator CSV - 26.6.6-opr.1
+# as of 2026-08-28. serverUrl is the in-cluster HTTP listener: the Keycloak CR
+# sets httpEnabled, and the operator's own NetworkPolicy allows 8080 from any
+# source, so no truststore or Route round-trip is involved.
+clientReconcile:
+  image: registry.redhat.io/rhbk/keycloak-rhel9:26.6
+  serverUrl: http://zuno-service.zuno-auth.svc:8080
 googleOAuthSecretName: google-oauth-client
 postgresqlSecretName: keycloak-postgresql-app
 
