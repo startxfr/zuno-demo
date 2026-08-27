@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import time
 from typing import Dict, Optional
@@ -52,6 +53,31 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
     await conn.set_type_codec(
         "jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog"
     )
+
+    # ADR-0525: ivfflat only scans `probes` of its `lists` partitions per
+    # query, and the default is 1. That was survivable while every domain
+    # was built with lists=10 (one probe still covered ~10% of the corpus),
+    # but ingestion now sizes lists from the real row count - ~310 on the SXA
+    # corpus - and one probe there would scan ~0.3% and quietly lose recall.
+    # Reading `lists` back off the live index and setting probes to its
+    # square root keeps the two ends in step per domain, with no knob to
+    # forget: a domain the ingestion never resized still reports lists=10 and
+    # gets probes=3.
+    #
+    # Best-effort by design. A domain whose index is momentarily absent (the
+    # ingestion drops it for a bulk load) simply falls back to the default
+    # rather than failing the whole connection - retrieval still works, it
+    # just sequential-scans, which is what a missing index means anyway.
+    try:
+        lists = await conn.fetchval(
+            "SELECT (regexp_match(pg_get_indexdef(c.oid), 'lists=''?([0-9]+)'))[1]::int "
+            "FROM pg_class c "
+            "WHERE c.relname = 'ix_document_embeddings_embedding_cosine'"
+        )
+    except Exception:  # pragma: no cover - defensive, see docstring above
+        lists = None
+    if lists:
+        await conn.execute(f"SET ivfflat.probes = {max(1, math.isqrt(int(lists)))}")
 
 
 async def _connect_one(binding: KnowledgeBinding) -> None:

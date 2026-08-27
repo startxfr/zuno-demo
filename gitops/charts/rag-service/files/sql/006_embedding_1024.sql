@@ -29,8 +29,12 @@ BEGIN
 END
 $$;
 
--- Same ivfflat/cosine shape 004 built for the 384 column; lists stays
--- sized for the small demo corpus (~ rows/1000, floored low).
+-- Same ivfflat/cosine shape 004 built for the 384 column. lists=10 is only
+-- a starting value: this file runs from a schema Job against a table that is
+-- usually still empty, so it cannot know the real row count. 007 re-sizes it
+-- afterwards, and the index-pgvector stage re-sizes it again after any bulk
+-- load (ADR-0525). Do not read the 10 here as a considered choice for a
+-- populated corpus - knowledge.sxa-legacy holds ~310k rows and wants ~310.
 CREATE INDEX IF NOT EXISTS ix_document_embeddings_embedding_cosine
     ON document_embeddings USING ivfflat (embedding vector_cosine_ops)
     WITH (lists = 10);

@@ -24,6 +24,7 @@ from rag_ingestion import (  # noqa: E402
     stage_chunk,
     stage_detect_changes,
     stage_embed,
+    stage_index_pgvector,
     stage_normalize,
     stage_validate,
 )
@@ -872,57 +873,6 @@ def test_embed_batch_asks_the_server_to_truncate_oversized_chunks():
     assert len(vectors) == 2
 
 
-TESTS = [
-    test_every_fetch_stage_has_an_adapter_bound_to_one_domain,
-    test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write,
-    test_fetch_redhat_stamps_domain_and_canonical_technology,
-    test_fetch_confluence_uses_explicit_per_source_technology,
-    test_fetch_confluence_scopes_via_ancestor_cql_when_directories_set,
-    test_fetch_confluence_resolves_a_shared_directory_scope_only_once,
-    test_fetch_salesforce_writes_sales_metadata_from_fixture_records,
-    test_fetch_salesforce_without_credentials_fails_closed,
-    test_split_sql_statements_handles_semicolons_inside_quoted_values,
-    test_split_sql_statements_skips_comment_only_lines,
-    test_parse_create_table_columns_skips_constraints_keeps_declared_order,
-    test_parse_insert_rows_handles_quoted_commas_escaped_quotes_and_null,
-    test_load_sxa_dump_writes_one_record_per_row_without_any_sql_engine,
-    test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
-    test_load_sxa_dump_short_circuits_when_dump_checksum_is_unchanged,
-    test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
-    test_normalize_carries_domain_technology_and_extensions_into_metadata,
-    test_normalize_defaults_missing_domain_to_the_run_domain,
-    test_parse_duration_spec_supports_days_hours_minutes_and_none,
-    test_parse_duration_spec_rejects_a_malformed_value,
-    test_parse_http_last_modified_handles_valid_missing_and_malformed,
-    test_normalize_computes_indexed_at_and_stale_after_from_the_duration_spec,
-    test_normalize_omits_stale_after_for_sxa_legacy_regardless_of_spec,
-    test_normalize_omits_stale_after_when_no_duration_is_configured,
-    test_stage_detect_changes_classifies_new_changed_deleted_unchanged,
-    test_stage_detect_changes_reads_raw_records_concurrently,
-    test_stage_validate_fails_closed_on_an_operational_chunk_missing_freshness_metadata,
-    test_stage_validate_passes_a_complete_operational_chunk,
-    test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement,
-    test_stage_validate_advances_manifest_only_after_confirming_indexed_rows,
-    test_stage_validate_does_not_advance_manifest_on_failure,
-    test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system,
-    test_embed_batch_asks_the_server_to_truncate_oversized_chunks,
-]
-
-
-def main() -> int:
-    failures = 0
-    for test in TESTS:
-        try:
-            test()
-            print(f"PASS {test.__name__}")
-        except Exception as exc:  # noqa: BLE001
-            failures += 1
-            print(f"FAIL {test.__name__}: {exc}")
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
 
 
 # --- ADR-0219: embed batches ACROSS documents, not within one ---------------
@@ -1051,3 +1001,239 @@ def test_chunk_stage_processes_every_document_under_concurrency():
         record = store.json[f"normalized/{doc_id}.chunks.json"]
         assert record["chunks"], doc_id
         assert record["url"] == f"sxa-dump://contact/{doc_id}"
+
+
+# --------------------------------------------------------------------------
+# index-pgvector (ADR-0525)
+# --------------------------------------------------------------------------
+
+
+class _FakeIndexCursor:
+    """Records how index-pgvector talks to PostgreSQL. The point of these
+    tests is the SHAPE of that conversation - one executemany per batch
+    rather than one execute per row - so every call is captured."""
+
+    def __init__(self, state):
+        self._state = state
+
+    def execute(self, sql, params=None):
+        self._state["execute"].append((" ".join(sql.split()), params))
+        if "count(*)" in sql:
+            self._state["fetchone"] = (self._state["existing_rows"],)
+        if "DROP INDEX" in sql:
+            self._state["index_present"] = False
+        if "CREATE INDEX" in sql:
+            self._state["index_present"] = True
+            self._state["created_ddl"].append(" ".join(sql.split()))
+
+    def executemany(self, sql, params_seq):
+        rows = list(params_seq)
+        self._state["executemany"].append((" ".join(sql.split()), rows))
+        self._state["rows_written"] += len(rows)
+
+    def fetchone(self):
+        return self._state.get("fetchone", (0,))
+
+    @property
+    def rowcount(self):
+        return 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+
+class _FakeIndexConn:
+    def __init__(self, state):
+        self._state = state
+
+    def cursor(self):
+        return _FakeIndexCursor(self._state)
+
+    def commit(self):
+        self._state["commits"] += 1
+
+    def rollback(self):
+        self._state["rollbacks"] += 1
+
+    def close(self):
+        self._state["closed"] = True
+
+
+def _index_state(existing_rows=0):
+    return {
+        "execute": [], "executemany": [], "created_ddl": [],
+        "rows_written": 0, "commits": 0, "rollbacks": 0,
+        "existing_rows": existing_rows, "index_present": True, "closed": False,
+    }
+
+
+def _index_store_with(doc_count, chunks_per_doc=1):
+    store = FakeStore()
+    doc_ids = [f"doc{i}" for i in range(doc_count)]
+    store.json["manifests/changeset.json"] = {
+        "new": doc_ids, "changed": [], "deleted": [], "deleted_urls": [], "unchanged": [],
+        "current_new_changed": {},
+    }
+    for d in doc_ids:
+        store.json[f"normalized/{d}.chunks.json"] = {
+            "doc_id": d, "url": f"sxa-dump://t/{d}", "title": "T",
+            "metadata": {"domain": "knowledge.tech"},
+            "chunks": [
+                {"chunk_index": c, "text": f"{d}-{c}", "embedding": [0.0, 0.1]}
+                for c in range(chunks_per_doc)
+            ],
+        }
+    return store
+
+
+def test_index_pgvector_batches_writes_instead_of_one_execute_per_row():
+    """ADR-0525: the stage used to issue one execute() per chunk row, which
+    on a pgbouncer+mesh connection cost ~35ms each and made this the
+    pipeline's slowest stage. Rows must now go out via executemany."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _index_store_with(2500)
+    state = _index_state(existing_rows=0)
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeIndexConn(state)):
+        stage_index_pgvector(config, store)
+
+    assert state["rows_written"] == 2500, state["rows_written"]
+    # The upsert must never be issued one row at a time again.
+    assert not [sql for sql, _ in state["execute"] if "INSERT INTO document_embeddings" in sql]
+    assert state["executemany"], "no batched write was issued"
+    # 2500 rows go out in 5 flushes, not 2500 round-trips. Five rather than
+    # three because a window boundary also forces a flush: at
+    # INDEX_READ_CONCURRENCY=16 the window is 1024 documents, so the batches
+    # are 1000+24, 1000+24, 452 - the per-window commit still bounds what a
+    # failover can lose, exactly as before.
+    assert len(state["executemany"]) == 5, len(state["executemany"])
+    assert state["commits"] >= 3, "per-window commit boundary was lost"
+    # The upsert itself is unchanged - it is what makes a re-run safe.
+    sql = state["executemany"][0][0]
+    assert "ON CONFLICT (source, chunk_index) DO UPDATE" in sql
+
+
+def test_index_pgvector_rebuilds_the_vector_index_sized_from_real_rows():
+    """The schema Job builds ivfflat against an empty table, so lists=10 is
+    all it can know. After a bulk load the stage knows the true count and
+    must re-size accordingly."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _index_store_with(10)
+    state = _index_state(existing_rows=0)   # empty table => bulk load path
+    state["existing_rows"] = 0
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeIndexConn(state)):
+        # after the load the table "contains" 310_000 rows
+        original = rag_ingestion._rebuild_vector_index
+
+        def _sized(conn, cur):
+            state["existing_rows"] = 310_000
+            return original(conn, cur)
+
+        with mock.patch.object(rag_ingestion, "_rebuild_vector_index", _sized):
+            stage_index_pgvector(config, store)
+
+    assert any("DROP INDEX" in sql for sql, _ in state["execute"]), "index was not dropped"
+    assert state["created_ddl"], "index was never recreated"
+    assert "lists = 310" in state["created_ddl"][-1], state["created_ddl"][-1]
+    assert state["index_present"] is True
+
+
+def test_index_pgvector_recreates_the_index_even_when_the_load_fails():
+    """Leaving the index dropped would silently degrade this domain's
+    retrieval to a sequential scan until someone noticed."""
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _index_store_with(5)
+    state = _index_state(existing_rows=0)
+
+    class _Boom(_FakeIndexConn):
+        def cursor(self):
+            cur = _FakeIndexCursor(self._state)
+            if self._state["execute"] and not self._state.get("blown"):
+                self._state["blown"] = True
+                raise RuntimeError("connection lost mid-load")
+            return cur
+
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_Boom(state)):
+        try:
+            stage_index_pgvector(config, store)
+        except RuntimeError:
+            pass
+
+    assert state["closed"] is True, "connection was not closed"
+
+
+def test_ivfflat_lists_sizing_matches_pgvector_guidance():
+    assert rag_ingestion._ivfflat_lists_for(0) == 10        # floor
+    assert rag_ingestion._ivfflat_lists_for(5_000) == 10    # floor
+    assert rag_ingestion._ivfflat_lists_for(68_944) == 68   # knowledge.tech today
+    assert rag_ingestion._ivfflat_lists_for(310_537) == 310 # knowledge.sxa-legacy
+    assert rag_ingestion._ivfflat_lists_for(50_000_000) == 1000  # cap
+
+
+# NOTE: this list, main() and the __main__ guard live at the END of the
+# file on purpose. They used to sit mid-file, which meant any test added
+# below them was never defined by the time main() ran and never executed -
+# four ADR-0219 concurrency tests sat dead that way. Keep them last.
+TESTS = [
+    test_every_fetch_stage_has_an_adapter_bound_to_one_domain,
+    test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write,
+    test_fetch_redhat_stamps_domain_and_canonical_technology,
+    test_fetch_confluence_uses_explicit_per_source_technology,
+    test_fetch_confluence_scopes_via_ancestor_cql_when_directories_set,
+    test_fetch_confluence_resolves_a_shared_directory_scope_only_once,
+    test_fetch_salesforce_writes_sales_metadata_from_fixture_records,
+    test_fetch_salesforce_without_credentials_fails_closed,
+    test_split_sql_statements_handles_semicolons_inside_quoted_values,
+    test_split_sql_statements_skips_comment_only_lines,
+    test_parse_create_table_columns_skips_constraints_keeps_declared_order,
+    test_parse_insert_rows_handles_quoted_commas_escaped_quotes_and_null,
+    test_load_sxa_dump_writes_one_record_per_row_without_any_sql_engine,
+    test_load_sxa_dump_reimport_of_same_snapshot_is_idempotent,
+    test_load_sxa_dump_short_circuits_when_dump_checksum_is_unchanged,
+    test_load_sxa_dump_refuses_non_dump_content_and_missing_key,
+    test_normalize_carries_domain_technology_and_extensions_into_metadata,
+    test_normalize_defaults_missing_domain_to_the_run_domain,
+    test_parse_duration_spec_supports_days_hours_minutes_and_none,
+    test_parse_duration_spec_rejects_a_malformed_value,
+    test_parse_http_last_modified_handles_valid_missing_and_malformed,
+    test_normalize_computes_indexed_at_and_stale_after_from_the_duration_spec,
+    test_normalize_omits_stale_after_for_sxa_legacy_regardless_of_spec,
+    test_normalize_omits_stale_after_when_no_duration_is_configured,
+    test_stage_detect_changes_classifies_new_changed_deleted_unchanged,
+    test_stage_detect_changes_reads_raw_records_concurrently,
+    test_stage_validate_fails_closed_on_an_operational_chunk_missing_freshness_metadata,
+    test_stage_validate_passes_a_complete_operational_chunk,
+    test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement,
+    test_stage_validate_advances_manifest_only_after_confirming_indexed_rows,
+    test_stage_validate_does_not_advance_manifest_on_failure,
+    test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system,
+    test_embed_batch_asks_the_server_to_truncate_oversized_chunks,
+    test_fetch_redhat_sends_conditional_headers_and_skips_a_304,
+    test_fetch_redhat_fetches_discovered_links_concurrently,
+    test_embed_pools_single_chunk_documents_into_full_batches,
+    test_embed_writes_back_every_document_and_survives_a_failed_batch,
+    test_embed_still_batches_within_a_long_multi_chunk_document,
+    test_chunk_stage_processes_every_document_under_concurrency,
+    test_index_pgvector_batches_writes_instead_of_one_execute_per_row,
+    test_index_pgvector_rebuilds_the_vector_index_sized_from_real_rows,
+    test_index_pgvector_recreates_the_index_even_when_the_load_fails,
+    test_ivfflat_lists_sizing_matches_pgvector_guidance,
+]
+
+
+def main() -> int:
+    failures = 0
+    for test in TESTS:
+        try:
+            test()
+            print(f"PASS {test.__name__}")
+        except Exception as exc:  # noqa: BLE001
+            failures += 1
+            print(f"FAIL {test.__name__}: {exc}")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

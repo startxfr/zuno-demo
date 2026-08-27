@@ -1844,6 +1844,65 @@ def _pg_connect(config: IngestionConfig):
     return conn
 
 
+# ADR-0525: one round-trip per chunk row made this the pipeline's slowest
+# stage. The ingestion pod reaches PostgreSQL through pgbouncer with
+# sslmode=require from a mesh-injected pod, so every execute() pays
+# app -> istio sidecar -> pgbouncer -> Postgres. Measured at ~35ms/row
+# (~113k rows in ~66 min on the SXA corpus) - that is latency, not
+# server-side insert cost. psycopg3's executemany() pipelines a whole batch
+# into one flight, so the per-row latency term collapses.
+_INDEX_WRITE_BATCH_ROWS = 1000
+
+_VECTOR_INDEX_NAME = "ix_document_embeddings_embedding_cosine"
+
+# Rebuilding a 310k-row index to add a handful of documents would cost far
+# more than it saves, so the drop/recreate below only runs when the load is
+# large relative to what is already indexed.
+_VECTOR_INDEX_REBUILD_RATIO = 0.2
+
+_INDEX_UPSERT_SQL = """
+    INSERT INTO document_embeddings (source, chunk_index, title, content, embedding, metadata)
+    VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+    ON CONFLICT (source, chunk_index) DO UPDATE SET
+        title = EXCLUDED.title,
+        content = EXCLUDED.content,
+        embedding = EXCLUDED.embedding,
+        metadata = EXCLUDED.metadata,
+        updated_at = now()
+"""
+
+
+def _ivfflat_lists_for(rows: int) -> int:
+    """pgvector sizes ivfflat at roughly rows/1000 below 1M rows. Floored at
+    10 - the value 006_embedding_1024.sql ships, which is all a schema Job
+    running against an empty table can know - and capped at 1000."""
+    return max(10, min(1000, rows // 1000))
+
+
+def _vector_index_should_be_rebuilt(cur, incoming_docs: int) -> bool:
+    cur.execute("SELECT count(*) FROM document_embeddings")
+    existing = (cur.fetchone() or [0])[0]
+    if existing == 0:
+        return True
+    return incoming_docs >= existing * _VECTOR_INDEX_REBUILD_RATIO
+
+
+def _rebuild_vector_index(conn, cur) -> None:
+    """Recreates the ivfflat index sized from the row count that is now
+    actually present. This is the only point in the system that knows it:
+    the schema Job builds the index when the table is still empty."""
+    cur.execute("SELECT count(*) FROM document_embeddings")
+    rows = (cur.fetchone() or [0])[0]
+    lists = _ivfflat_lists_for(rows)
+    cur.execute(
+        f"CREATE INDEX IF NOT EXISTS {_VECTOR_INDEX_NAME} "
+        f"ON document_embeddings USING ivfflat (embedding vector_cosine_ops) "
+        f"WITH (lists = {lists})"
+    )
+    conn.commit()
+    logger.info("index-pgvector: rebuilt %s with lists=%d for %d rows", _VECTOR_INDEX_NAME, lists, rows)
+
+
 def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
     changeset = _load_changeset(config, store, "index-pgvector")
     if not changeset:
@@ -1858,17 +1917,35 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
     # also means the open transaction no longer interleaves with S3 latency
     # at all.
     window_size = max(1, config.index_read_concurrency) * 64
+    doc_ids = changeset["new"] + changeset["changed"]
+
+    # ADR-0525: on a bulk load, maintaining ivfflat per row costs more than
+    # rebuilding it once at the end - and the rebuild is also the only moment
+    # the real row count is known, so it is where `lists` gets sized properly.
+    dropped_vector_index = False
+    try:
+        with conn.cursor() as probe:
+            dropped_vector_index = _vector_index_should_be_rebuilt(probe, len(doc_ids))
+            if dropped_vector_index:
+                probe.execute(f"DROP INDEX IF EXISTS {_VECTOR_INDEX_NAME}")
+                conn.commit()
+                logger.info("index-pgvector: dropped %s for the bulk load", _VECTOR_INDEX_NAME)
+    except Exception:
+        conn.rollback()
+        dropped_vector_index = False
+        logger.warning("index-pgvector: could not drop %s, indexing with it in place", _VECTOR_INDEX_NAME)
+
     try:
         with conn.cursor() as cur, ThreadPoolExecutor(
             max_workers=max(1, config.index_read_concurrency)
         ) as io_pool:
-            doc_ids = changeset["new"] + changeset["changed"]
             position = 0
             for offset in range(0, len(doc_ids), window_size):
                 window = doc_ids[offset:offset + window_size]
                 fetched = io_pool.map(
                     lambda d: store.get_json(f"{config.normalized_prefix}/{d}.chunks.json"), window
                 )
+                pending: list = []
                 for doc_id, record in zip(window, fetched):
                     position += 1
                     if not record:
@@ -1883,17 +1960,7 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                             continue
                         metadata = dict(record["metadata"])
                         metadata["chunk_index"] = chunk["chunk_index"]
-                        cur.execute(
-                            """
-                            INSERT INTO document_embeddings (source, chunk_index, title, content, embedding, metadata)
-                            VALUES (%s, %s, %s, %s, %s, %s::jsonb)
-                            ON CONFLICT (source, chunk_index) DO UPDATE SET
-                                title = EXCLUDED.title,
-                                content = EXCLUDED.content,
-                                embedding = EXCLUDED.embedding,
-                                metadata = EXCLUDED.metadata,
-                                updated_at = now()
-                            """,
+                        pending.append(
                             (
                                 record["url"],
                                 chunk["chunk_index"],
@@ -1901,9 +1968,18 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                                 chunk["text"],
                                 chunk["embedding"],
                                 json.dumps(metadata),
-                            ),
+                            )
                         )
-                        indexed += 1
+                        # Flush inside the window so a single window cannot
+                        # build an unbounded list of 1024-dimension vectors.
+                        if len(pending) >= _INDEX_WRITE_BATCH_ROWS:
+                            cur.executemany(_INDEX_UPSERT_SQL, pending)
+                            indexed += len(pending)
+                            pending.clear()
+                if pending:
+                    cur.executemany(_INDEX_UPSERT_SQL, pending)
+                    indexed += len(pending)
+                    pending.clear()
                 # Commit per window, not per run and no longer per document.
                 # Per-run was never safe (a Patroni failover mid-run lost
                 # every upserted row); per-document cost one commit
@@ -1911,6 +1987,8 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                 # dominated the stage. A window bounds what a failover can
                 # lose to the documents prefetched above, and the upsert
                 # keeps partial progress safe to re-run either way.
+                # ADR-0525 batches the writes WITHIN a window; this commit
+                # boundary deliberately did not move.
                 conn.commit()
                 logger.info(
                     "index-pgvector: %d/%d documents processed, %d chunk rows so far",
@@ -1925,6 +2003,19 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
         conn.rollback()
         raise
     finally:
+        # Must survive the exception path: leaving the index dropped would
+        # degrade this domain's retrieval to a sequential scan until the next
+        # successful run.
+        if dropped_vector_index:
+            try:
+                with conn.cursor() as cur:
+                    _rebuild_vector_index(conn, cur)
+            except Exception:
+                logger.error(
+                    "index-pgvector: FAILED to recreate %s - retrieval for this domain "
+                    "will sequential-scan until it is rebuilt manually",
+                    _VECTOR_INDEX_NAME,
+                )
         conn.close()
     logger.info("index-pgvector: upserted %d chunk rows, deleted %d orphaned rows", indexed, deleted)
 

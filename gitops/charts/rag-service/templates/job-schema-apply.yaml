@@ -111,6 +111,11 @@ spec:
             # land in the already-widened column in the same run.
             - -f
             - /sql/006_embedding_1024.sql
+            # ADR-0525: re-size the ivfflat index from the live row count.
+            # After 006 on purpose - 006 may DROP and rebuild the index as
+            # part of the 384 -> 1024 cutover, which would undo this.
+            - -f
+            - /sql/007_ivfflat_lists.sql
             {{- if .seed }}
             - -f
             - /sql/seed.sql
