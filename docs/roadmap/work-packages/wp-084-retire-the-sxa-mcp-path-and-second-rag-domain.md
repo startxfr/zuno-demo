@@ -378,6 +378,32 @@ Then, once deployed:
   password is read from the environment once at pod start and the replay
   presents the same one. If a run dies here again with an auth failure in the
   pgbouncer log, the fix is not in `rag_ingestion.py`.
+- 2026-08-27: **step 6 ingestion is DONE.** Run `9z45t` processed
+  310,524/310,524 documents and wrote **319,713 chunk rows / 310,398 distinct
+  sources**, 0 orphans deleted. Verified in the database: **0 rows** carry a
+  source outside `sxa-dump://`, so decision 3's URL scheme holds at 100%.
+  `index-pgvector` ran 17:41:41-18:33:53Z (52 min) and never lost its
+  connection, so the retry in `788e8ea4` remains **unproven in the field** -
+  it was simply not needed. Stage timings: detect-changes 46 min, normalize
+  44, chunk 45, embed 60, index-pgvector 52.
+- 2026-08-27 (`4fa2e0be`): **the run exited 0 while leaving the domain
+  degraded.** It logged `FAILED to recreate
+  ix_document_embeddings_embedding_cosine` and returned success anyway. The
+  other seven indexes were present; the vector one was gone, so
+  `knowledge.sxa-legacy` would have sequential-scanned 319,713 `vector(1024)`
+  rows across a 2.4GB table behind a green pipeline. Cause reproduced in a
+  rolled-back transaction rather than guessed:
+  `ERROR: memory required is 87 MB, maintenance_work_mem is 64 MB`. 64MB is
+  the PostgreSQL default this server ships, and `lists` is sized `rows//1000`,
+  so **the requirement grows with the corpus** - a domain that merely
+  accumulates documents starts failing here with nothing else changing. Fixed
+  three ways: raise `maintenance_work_mem` to 512MB for the build (covers the
+  capped worst case, ~273MB at lists=1000/1024 dims), log the exception with
+  `exc_info` (the handler had discarded it, which is why the cause needed
+  reproducing by hand), and raise after the `finally` on the success path so a
+  missing index fails the stage instead of reporting green. The index itself
+  was rebuilt live in 40s with the operator's approval, so retrieval is no
+  longer degraded.
 - Still open: compile `v0-7-0` (`make d2 install rag-ingestion`; verify the
   compiled object carries `cpu: 2`, never the play's exit code), then steps 7
   and 8.
