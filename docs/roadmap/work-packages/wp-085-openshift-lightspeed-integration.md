@@ -43,6 +43,19 @@ pas reprise. Corrigé dans le chart.
 
 La souscription `qwen36-27b-instruct-lightspeed` était `Active` et correcte depuis le début.
 
+**Bascule tentée le 2026-08-27, annulée.** Les deux noms corrigés, le rendu `maas` est juste — mais
+un **troisième** défaut bloque, celui-là côté opérateur et déjà connu pour `staticToken` : OLS
+v1.1.2 ignore `credentialKey` et exige en dur la clé `apitoken`, alors que `saTokenSecret` produit
+un Secret dont la clé est `token`. L'app-server crashe au démarrage
+(`FileNotFoundError: /etc/apikeys/lightspeed-maas-credentials/apitoken`). Retour en `direct`
+immédiat, Lightspeed re-vérifié sain (`ApiReady=True`, pod `2/2`).
+
+Ce qu'il resterait à faire pour clore la clause 1 : une tâche ansible qui lise le token du SA
+`lightspeed-maas-client` et l'écrive dans un Secret **Opaque** sous la clé `apitoken` — le type
+`service-account-token` peuple `token` et ne se renomme pas. À noter aussi : le type d'un Secret
+est immuable, donc tout changement de `credential.mode` exige de supprimer l'ancien Secret avant
+qu'ArgoCD puisse synchroniser.
+
 Retour à MaaS = deux éditions, rien d'autre :
 1. `gitops/charts/lightspeed-config/values.yaml` : `endpointMode: maas` +
    `credential.mode: saTokenSecret` (ou `apiKey`)

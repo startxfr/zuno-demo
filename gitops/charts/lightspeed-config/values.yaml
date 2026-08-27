@@ -67,6 +67,23 @@ olsConfig:
     # bloc lightspeed dans gitops/charts/models/templates/networkpolicy-qwen.yaml.
     # L'entitlement MaaS (MaaSSubscription + sujet OPA) reste en place et intact
     # exactement pour rendre ce retour possible sans autre travail.
+    # BASCULE TENTEE ET ANNULEE le 2026-08-27. Les deux noms sont corriges et
+    # le rendu `maas` est bon (chemin + corps verifies par A/B live), mais la
+    # bascule bute sur un TROISIEME defaut, cote operateur celui-la et deja
+    # documente plus bas pour `staticToken` : OLS v1.1.2 IGNORE `credentialKey`
+    # et exige en dur la cle `apitoken`. Or `credential.mode: saTokenSecret`
+    # produit un Secret de type kubernetes.io/service-account-token, dont la
+    # cle est `token`. L'app-server crashe alors au demarrage :
+    #   FileNotFoundError: '/etc/apikeys/lightspeed-maas-credentials/apitoken'
+    # Un simple changement de template ne suffit pas : le type
+    # service-account-token est peuple par le controleur sous `token`, et on ne
+    # peut pas le renommer. Il faudrait une tache ansible qui lise le token du
+    # SA et ecrive un Secret Opaque sous la cle `apitoken`.
+    #
+    # Piege de deploiement au passage : le type d'un Secret est IMMUABLE, donc
+    # changer credential.mode fait echouer la synchro ArgoCD
+    # (`Secret ... is invalid: type: Invalid`) tant que l'ancien Secret n'est
+    # pas supprime a la main.
     endpointMode: direct  # direct | maas
 
     # In-cluster MaaS gateway root. Same endpoint ai-gateway's maasAdapter
