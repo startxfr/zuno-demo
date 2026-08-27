@@ -185,3 +185,32 @@ func (c *AdminClient) UserGroups(ctx context.Context, userID string) ([]string, 
 	}
 	return groups, nil
 }
+
+// Group is one realm group (ADR-0527's GET /api/groups).
+type Group struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+// RealmGroups calls GET /admin/realms/{realm}/groups and returns every
+// top-level realm group.
+//
+// This needs the realm-management `query-groups` role on the zuno-admin-api
+// service account, IN ADDITION to WP-066's view-users/query-users - never
+// manage-users, never manage-realm, per ADR-0213's least-privilege
+// constraint which ADR-0527 inherits. Without it Keycloak answers 403,
+// which adminGet surfaces as an error and the caller must turn into a 503:
+// a silently empty group list would read as "this realm has no groups" and
+// quietly prevent every group grant.
+func (c *AdminClient) RealmGroups(ctx context.Context) ([]Group, error) {
+	// briefRepresentation omits sub-groups and attributes - this endpoint
+	// only ever offers top-level business-role groups as grant targets.
+	query := url.Values{}
+	query.Set("briefRepresentation", "true")
+	var groups []Group
+	if err := c.adminGet(ctx, "/groups", query, &groups); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}

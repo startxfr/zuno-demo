@@ -10,10 +10,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -68,14 +70,24 @@ func main() {
 	// ADR-0515: manual drag-reorder and irreversible hard-delete.
 	mux.HandleFunc("PUT /api/conversations/reorder", reorderConversationsHandler(verifier, runtimeClient, cfg.AgentName))
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/hard-delete", hardDeleteConversationHandler(verifier, runtimeClient, cfg.AgentName))
-	// ADR-0213: role-based conversation sharing.
-	mux.HandleFunc("GET /api/conversations/{run_id}/members", listMembersHandler(verifier, runtimeClient, cfg.AgentName))
-	mux.HandleFunc("PUT /api/conversations/{run_id}/members/{subject}", grantMembershipHandler(verifier, runtimeClient, cfg.AgentName))
-	mux.HandleFunc("DELETE /api/conversations/{run_id}/members/{subject}", revokeMembershipHandler(verifier, runtimeClient, cfg.AgentName))
-	mux.HandleFunc("PATCH /api/conversations/{run_id}/owner", transferOwnershipHandler(verifier, runtimeClient, cfg.AgentName))
+	// ADR-0527: cloning survives ADR-0213's removal, with new semantics -
+	// the copy stays in the source's project and the cloner owns it.
 	mux.HandleFunc("POST /api/conversations/{run_id}/clone", cloneConversationHandler(verifier, runtimeClient, cfg.AgentName))
-	// ADR-0213: BFF-only, never forwards to agent-runtime.
+	// ADR-0527: projects are the sharing and context boundary. No {agent}
+	// segment - a project is cross-agent; only its conversations are not.
+	mux.HandleFunc("GET /api/projects", listProjectsHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("POST /api/projects", createProjectHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("GET /api/projects/{project_id}", getProjectHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("PUT /api/projects/{project_id}", saveProjectHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("GET /api/projects/{project_id}/delete-preview", deleteProjectPreviewHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("DELETE /api/projects/{project_id}", deleteProjectHandler(verifier, runtimeClient, cfg.AgentName))
+	mux.HandleFunc("PUT /api/projects/{project_id}/star", starProjectHandler(verifier, runtimeClient, cfg.AgentName, true))
+	mux.HandleFunc("DELETE /api/projects/{project_id}/star", starProjectHandler(verifier, runtimeClient, cfg.AgentName, false))
+	// ADR-0213/ADR-0527: BFF-only, never forwards to agent-runtime. Both
+	// ride the same zuno-admin-api Keycloak trust boundary and both fail
+	// closed (503) until an operator provisions it.
 	mux.HandleFunc("GET /api/colleagues", listColleaguesHandler(verifier, adminClient, cfg.AgentName))
+	mux.HandleFunc("GET /api/groups", listGroupsHandler(verifier, adminClient, cfg.AgentName))
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -213,6 +225,10 @@ type apiChatResponse struct {
 	Images     []runtime.Image    `json:"images"`
 	RunID      string             `json:"run_id"`
 	SourceMode string             `json:"source_mode"`
+	// ADR-0528: the server-resolved project this turn belonged to, so this
+	// BFF can set zuno.project_id on its own span for the non-streaming
+	// path. Never the Salesforce opportunity id.
+	ProjectID string `json:"project_id"`
 }
 
 type apiErrorResponse struct {
@@ -226,6 +242,12 @@ type apiConversation struct {
 	Title     string `json:"title"`
 	UpdatedAt string `json:"updated_at"`
 	Starred   bool   `json:"starred"`
+	// ADR-0527: the project this conversation belongs to (empty for a
+	// project-less private one) and the caller's effective role on it, so
+	// the sidebar can group the list and decide read-only mode without a
+	// second call.
+	ProjectID string `json:"project_id"`
+	Role      string `json:"role"`
 }
 
 // apiTranscriptTurn is the frontend-facing shape of one structured
@@ -280,43 +302,111 @@ type apiHardDeleteResponse struct {
 	Deleted bool `json:"deleted"`
 }
 
-// apiMember is the frontend-facing shape of one conversation-membership
-// entry (ADR-0213, GET /api/conversations/{run_id}/members).
-type apiMember struct {
+// projectContextMaxChars mirrors app/projects.py's PROJECT_CONTEXT_MAX_CHARS,
+// app/schemas.py's, and the projects DDL's ck_projects_context_length
+// (ADR-0527 clause 5). Checked here too so an oversized body is refused at
+// the edge rather than after travelling the whole chain.
+const projectContextMaxChars = 54000
+
+// apiProject is the frontend-facing shape of one entry of GET /api/projects
+// (ADR-0527). Carries no Salesforce identifier by design - ADR-0528 keeps it
+// off every surface that does not strictly need it, so the list says only
+// WHETHER this is a customer project.
+type apiProject struct {
+	ProjectID         string `json:"project_id"`
+	Title             string `json:"title"`
+	Classification    string `json:"classification"`
+	IsCustomer        bool   `json:"is_customer"`
+	Starred           bool   `json:"starred"`
+	Role              string `json:"role"`
+	ConversationCount int    `json:"conversation_count"`
+	UpdatedAt         string `json:"updated_at"`
+}
+
+// apiProjectGrant is one entry of a project's ACL (ADR-0527). Exactly one of
+// Subject/GroupName is set.
+type apiProjectGrant struct {
 	Subject   string `json:"subject"`
+	GroupName string `json:"group_name"`
 	Role      string `json:"role"`
+	// Response-only; ignored on the way in.
 	GrantedBy string `json:"granted_by"`
 	CreatedAt string `json:"created_at"`
 }
 
-// apiGrantMembershipRequest is the frontend-facing request body for
-// PUT /api/conversations/{run_id}/members/{subject} (ADR-0213).
-type apiGrantMembershipRequest struct {
-	Role string `json:"role"`
+// apiProjectDetail is the frontend-facing shape of GET /api/projects/{id}.
+// Grants and the Salesforce fields arrive populated only for an admin -
+// agent-runtime decides that, this BFF only relays what it was given.
+type apiProjectDetail struct {
+	ProjectID               string            `json:"project_id"`
+	Title                   string            `json:"title"`
+	Context                 string            `json:"context"`
+	Classification          string            `json:"classification"`
+	IsCustomer              bool              `json:"is_customer"`
+	Role                    string            `json:"role"`
+	CreatedBy               string            `json:"created_by"`
+	CreatedAt               string            `json:"created_at"`
+	UpdatedAt               string            `json:"updated_at"`
+	Grants                  []apiProjectGrant `json:"grants"`
+	SalesforceOpportunityID string            `json:"salesforce_opportunity_id"`
+	SalesforceVerifiedAt    string            `json:"salesforce_verified_at"`
 }
 
-// apiGrantMembershipResponse is that endpoint's frontend-facing response body.
-type apiGrantMembershipResponse struct {
-	Subject string `json:"subject"`
-	Role    string `json:"role"`
+// apiCreateProjectRequest is the frontend-facing request body for
+// POST /api/projects (ADR-0527).
+type apiCreateProjectRequest struct {
+	Title                   string            `json:"title"`
+	Context                 string            `json:"context"`
+	Classification          string            `json:"classification"`
+	SalesforceOpportunityID string            `json:"salesforce_opportunity_id"`
+	Grants                  []apiProjectGrant `json:"grants"`
 }
 
-// apiRevokeMembershipResponse is the frontend-facing response body for
-// DELETE /api/conversations/{run_id}/members/{subject} (ADR-0213).
-type apiRevokeMembershipResponse struct {
-	Revoked bool `json:"revoked"`
+// apiSaveProjectRequest is the frontend-facing request body for
+// PUT /api/projects/{project_id} - the WHOLE desired state, committed by the
+// dialog's single Save. A null `grants` means "not editing grants" and
+// leaves them untouched; a non-null one is the full desired set.
+type apiSaveProjectRequest struct {
+	Title                   string            `json:"title"`
+	Context                 string            `json:"context"`
+	Classification          string            `json:"classification"`
+	SalesforceOpportunityID string            `json:"salesforce_opportunity_id"`
+	Grants                  []apiProjectGrant `json:"grants"`
 }
 
-// apiTransferOwnershipRequest is the frontend-facing request body for
-// PATCH /api/conversations/{run_id}/owner (ADR-0213).
-type apiTransferOwnershipRequest struct {
-	NewOwnerSub string `json:"new_owner_sub"`
+// apiCreateProjectResponse is the response body for both POST /api/projects
+// and PUT /api/projects/{project_id}.
+type apiCreateProjectResponse struct {
+	ProjectID string `json:"project_id"`
 }
 
-// apiTransferOwnershipResponse is that endpoint's frontend-facing response body.
-type apiTransferOwnershipResponse struct {
-	RunID    string `json:"run_id"`
-	OwnerSub string `json:"owner_sub"`
+// apiDeletePreview is the response body for
+// GET /api/projects/{project_id}/delete-preview (ADR-0527 clause 7).
+type apiDeletePreview struct {
+	ConversationsTotal       int `json:"conversations_total"`
+	ConversationsOtherOwners int `json:"conversations_other_owners"`
+	MembersUsers             int `json:"members_users"`
+	MembersGroups            int `json:"members_groups"`
+}
+
+// apiDeleteProjectResponse is the response body for
+// DELETE /api/projects/{project_id} - a cascade SOFT-delete.
+type apiDeleteProjectResponse struct {
+	ConversationsArchived int `json:"conversations_archived"`
+}
+
+// apiProjectStarResponse is the response body for
+// PUT/DELETE /api/projects/{project_id}/star.
+type apiProjectStarResponse struct {
+	Starred bool `json:"starred"`
+}
+
+// apiRealmGroup is one GET /api/groups entry (ADR-0527): a business-role
+// group that may be a project grant target. Agent entitlement groups
+// (agent_*) are filtered out server-side and never appear here.
+type apiRealmGroup struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 // apiCloneConversationResponse is the frontend-facing response body for
@@ -324,6 +414,10 @@ type apiTransferOwnershipResponse struct {
 type apiCloneConversationResponse struct {
 	RunID       string `json:"run_id"`
 	SourceRunID string `json:"source_run_id"`
+	// ADR-0527: the clone keeps the source's project and takes a derived
+	// title, so the frontend can name and place the new tab directly.
+	Title     string `json:"title"`
+	ProjectID string `json:"project_id"`
 }
 
 // apiColleague is one GET /api/colleagues search result. Ineligible
@@ -490,6 +584,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			Images:     resp.Images,
 			RunID:      resp.RunID,
 			SourceMode: resp.SourceMode,
+			ProjectID:  resp.ProjectID,
 		})
 	}
 }
@@ -632,7 +727,10 @@ func listConversationsHandler(verifier *jwks.Verifier, runtimeClient *runtime.Cl
 
 		out := make([]apiConversation, len(items))
 		for i, c := range items {
-			out[i] = apiConversation{RunID: c.RunID, Title: c.Title, UpdatedAt: c.UpdatedAt, Starred: c.Starred}
+			out[i] = apiConversation{
+				RunID: c.RunID, Title: c.Title, UpdatedAt: c.UpdatedAt, Starred: c.Starred,
+				ProjectID: c.ProjectID, Role: c.Role,
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(out)
@@ -819,9 +917,15 @@ func hardDeleteConversationHandler(verifier *jwks.Verifier, runtimeClient *runti
 	}
 }
 
-// listMembersHandler handles GET /api/conversations/{run_id}/members
-// (ADR-0213): owner-only.
-func listMembersHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+// --------------------------------------------------------------------------
+// ADR-0527: projects. Thin proxies in the same shape as every conversation
+// handler above - authorize() enforces ADR-0040's agent entitlement (the
+// first RBAC dimension), and the project role (the second) is resolved by
+// agent-runtime against project_grants, never here.
+// --------------------------------------------------------------------------
+
+// listProjectsHandler handles GET /api/projects.
+func listProjectsHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
 	entitlementGroup := "agent_" + agentName
 	return func(w http.ResponseWriter, r *http.Request) {
 		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
@@ -832,68 +936,62 @@ func listMembersHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, 
 
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
-		members, err := runtimeClient.ListMembers(ctx, token, r.PathValue("run_id"))
+		items, err := runtimeClient.ListProjects(ctx, token)
 		if err != nil {
-			log.Printf("agent-bff: agent runtime list-members call failed: %v", err)
+			log.Printf("agent-bff: agent runtime list-projects call failed: %v", err)
 			writeUpstreamError(w, err, "agent runtime unreachable")
 			return
 		}
 
-		out := make([]apiMember, len(members))
-		for i, m := range members {
-			out[i] = apiMember{Subject: m.Subject, Role: m.Role, GrantedBy: m.GrantedBy, CreatedAt: m.CreatedAt}
+		out := make([]apiProject, len(items))
+		for i, p := range items {
+			out[i] = apiProject{
+				ProjectID: p.ProjectID, Title: p.Title, Classification: p.Classification,
+				IsCustomer: p.IsCustomer, Starred: p.Starred, Role: p.Role,
+				ConversationCount: p.ConversationCount, UpdatedAt: p.UpdatedAt,
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(out)
 	}
 }
 
-// grantMembershipHandler handles
-// PUT /api/conversations/{run_id}/members/{subject} (ADR-0213):
-// owner-only. Eligibility of {subject} is the frontend's own
-// responsibility (it only offers eligible colleagues from
-// GET /api/colleagues) - this handler and the Agent Runtime endpoint it
-// proxies to both trust that computation rather than re-verifying it,
-// the ADR's own explicitly-accepted trust boundary.
-func grantMembershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
-	entitlementGroup := "agent_" + agentName
-	return func(w http.ResponseWriter, r *http.Request) {
-		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
-		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
-		if !ok {
-			return
+// validateGrants applies the two grant rules this BFF can check without a
+// database: exactly one target per grant, and a known role. The last-admin
+// guard and the duplicate check need the whole set in context and stay in
+// agent-runtime's assert_grants_are_valid, which is the authority - this is
+// a fast 400 for an obviously malformed body, not the authorization.
+func validateGrants(grants []apiProjectGrant) error {
+	for _, g := range grants {
+		if (g.Subject == "") == (g.GroupName == "") {
+			return fmt.Errorf("each grant must name exactly one of subject or group_name")
 		}
-
-		var req apiGrantMembershipRequest
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid request body")
-			return
-		}
-		switch req.Role {
-		case "reader", "actor", "cloner":
+		switch g.Role {
+		case "read", "clone", "write", "admin":
 		default:
-			writeError(w, http.StatusBadRequest, "role must be one of reader, actor, cloner")
-			return
+			return fmt.Errorf("role must be one of read, clone, write, admin")
 		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-		defer cancel()
-		result, err := runtimeClient.GrantMembership(ctx, token, r.PathValue("run_id"), r.PathValue("subject"), req.Role)
-		if err != nil {
-			log.Printf("agent-bff: agent runtime grant-membership call failed: %v", err)
-			writeUpstreamError(w, err, "agent runtime unreachable")
-			return
+		// ADR-0040: agent_<name> entitlement groups are not business-role
+		// groups and can never be a grant target. Refused here AND in
+		// agent-runtime, on both the write and the resolution side, so
+		// neither a bad write nor a stale row can widen access.
+		if g.GroupName != "" && strings.HasPrefix(g.GroupName, "agent_") {
+			return fmt.Errorf("%q is an agent entitlement group, not a business-role group - it cannot be a project grant target", g.GroupName)
 		}
-
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(apiGrantMembershipResponse{Subject: result.Subject, Role: result.Role})
 	}
+	return nil
 }
 
-// revokeMembershipHandler handles
-// DELETE /api/conversations/{run_id}/members/{subject} (ADR-0213):
-// owner-only, soft revocation.
-func revokeMembershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+func toRuntimeGrants(grants []apiProjectGrant) []runtime.ProjectGrant {
+	out := make([]runtime.ProjectGrant, len(grants))
+	for i, g := range grants {
+		out[i] = runtime.ProjectGrant{Subject: g.Subject, GroupName: g.GroupName, Role: g.Role}
+	}
+	return out
+}
+
+// createProjectHandler handles POST /api/projects.
+func createProjectHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
 	entitlementGroup := "agent_" + agentName
 	return func(w http.ResponseWriter, r *http.Request) {
 		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
@@ -902,57 +1000,217 @@ func revokeMembershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Cli
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-		defer cancel()
-		result, err := runtimeClient.RevokeMembership(ctx, token, r.PathValue("run_id"), r.PathValue("subject"))
-		if err != nil {
-			log.Printf("agent-bff: agent runtime revoke-membership call failed: %v", err)
-			writeUpstreamError(w, err, "agent runtime unreachable")
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(apiRevokeMembershipResponse{Revoked: result.Revoked})
-	}
-}
-
-// transferOwnershipHandler handles PATCH /api/conversations/{run_id}/owner
-// (ADR-0213): owner-only.
-func transferOwnershipHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
-	entitlementGroup := "agent_" + agentName
-	return func(w http.ResponseWriter, r *http.Request) {
-		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
-		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
-		if !ok {
-			return
-		}
-
-		var req apiTransferOwnershipRequest
+		var req apiCreateProjectRequest
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid request body")
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
 			return
 		}
-		if strings.TrimSpace(req.NewOwnerSub) == "" {
-			writeError(w, http.StatusBadRequest, "new_owner_sub is required")
+		if strings.TrimSpace(req.Title) == "" {
+			writeError(w, http.StatusBadRequest, "title is required")
+			return
+		}
+		// ADR-0527 clause 5: the same 54000 ceiling the request schema and
+		// the SQL CHECK enforce - rejected here too so an oversized body
+		// never travels the whole chain to be refused at the end.
+		if len(req.Context) > projectContextMaxChars {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("context must be at most %d characters", projectContextMaxChars))
+			return
+		}
+		if err := validateGrants(req.Grants); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
-		result, err := runtimeClient.TransferOwnership(ctx, token, r.PathValue("run_id"), req.NewOwnerSub)
+		result, err := runtimeClient.CreateProject(ctx, token, runtime.CreateProjectRequest{
+			Title:                   req.Title,
+			Context:                 req.Context,
+			Classification:          req.Classification,
+			SalesforceOpportunityID: req.SalesforceOpportunityID,
+			Grants:                  toRuntimeGrants(req.Grants),
+		})
 		if err != nil {
-			log.Printf("agent-bff: agent runtime transfer-ownership call failed: %v", err)
+			log.Printf("agent-bff: agent runtime create-project call failed: %v", err)
 			writeUpstreamError(w, err, "agent runtime unreachable")
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(apiTransferOwnershipResponse{RunID: result.RunID, OwnerSub: result.OwnerSub})
+		_ = json.NewEncoder(w).Encode(apiCreateProjectResponse{ProjectID: result.ProjectID})
+	}
+}
+
+// getProjectHandler handles GET /api/projects/{project_id}.
+func getProjectHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		detail, err := runtimeClient.GetProject(ctx, token, r.PathValue("project_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime get-project call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		grants := make([]apiProjectGrant, len(detail.Grants))
+		for i, g := range detail.Grants {
+			grants[i] = apiProjectGrant{
+				Subject: g.Subject, GroupName: g.GroupName, Role: g.Role,
+				GrantedBy: g.GrantedBy, CreatedAt: g.CreatedAt,
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiProjectDetail{
+			ProjectID: detail.ProjectID, Title: detail.Title, Context: detail.Context,
+			Classification: detail.Classification, IsCustomer: detail.IsCustomer, Role: detail.Role,
+			CreatedBy: detail.CreatedBy, CreatedAt: detail.CreatedAt, UpdatedAt: detail.UpdatedAt,
+			Grants:                  grants,
+			SalesforceOpportunityID: detail.SalesforceOpportunityID,
+			SalesforceVerifiedAt:    detail.SalesforceVerifiedAt,
+		})
+	}
+}
+
+// saveProjectHandler handles PUT /api/projects/{project_id} - the single
+// full-state commit behind the dialog's one Save.
+func saveProjectHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		var req apiSaveProjectRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		if strings.TrimSpace(req.Title) == "" {
+			writeError(w, http.StatusBadRequest, "title is required")
+			return
+		}
+		if len(req.Context) > projectContextMaxChars {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("context must be at most %d characters", projectContextMaxChars))
+			return
+		}
+		if req.Grants != nil {
+			if err := validateGrants(req.Grants); err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		result, err := runtimeClient.SaveProject(ctx, token, r.PathValue("project_id"), runtime.SaveProjectRequest{
+			Title:                   req.Title,
+			Context:                 req.Context,
+			Classification:          req.Classification,
+			SalesforceOpportunityID: req.SalesforceOpportunityID,
+			Grants:                  toRuntimeGrants(req.Grants),
+		})
+		if err != nil {
+			log.Printf("agent-bff: agent runtime save-project call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiCreateProjectResponse{ProjectID: result.ProjectID})
+	}
+}
+
+// deleteProjectPreviewHandler handles GET /api/projects/{project_id}/delete-preview.
+func deleteProjectPreviewHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		preview, err := runtimeClient.DeleteProjectPreview(ctx, token, r.PathValue("project_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime delete-preview call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiDeletePreview{
+			ConversationsTotal:       preview.ConversationsTotal,
+			ConversationsOtherOwners: preview.ConversationsOtherOwners,
+			MembersUsers:             preview.MembersUsers,
+			MembersGroups:            preview.MembersGroups,
+		})
+	}
+}
+
+// deleteProjectHandler handles DELETE /api/projects/{project_id} - a
+// cascade SOFT-delete (ADR-0527 clause 7), never a purge.
+func deleteProjectHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		result, err := runtimeClient.DeleteProject(ctx, token, r.PathValue("project_id"))
+		if err != nil {
+			log.Printf("agent-bff: agent runtime delete-project call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiDeleteProjectResponse{ConversationsArchived: result.ConversationsArchived})
+	}
+}
+
+// starProjectHandler handles PUT/DELETE /api/projects/{project_id}/star.
+func starProjectHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string, starred bool) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		token, ok := authorize(w, r, verifier, entitlementGroup, identity)
+		if !ok {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		result, err := runtimeClient.SetProjectStar(ctx, token, r.PathValue("project_id"), starred)
+		if err != nil {
+			log.Printf("agent-bff: agent runtime project-star call failed: %v", err)
+			writeUpstreamError(w, err, "agent runtime unreachable")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(apiProjectStarResponse{Starred: result.Starred})
 	}
 }
 
 // cloneConversationHandler handles POST /api/conversations/{run_id}/clone
-// (ADR-0213): owner or cloner only.
+// (ADR-0527 clause 4): any role from `clone` upward; the copy stays in the
+// source's project and the cloner owns it.
 func cloneConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentName string) http.HandlerFunc {
 	entitlementGroup := "agent_" + agentName
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -972,7 +1230,10 @@ func cloneConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Cl
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(apiCloneConversationResponse{RunID: result.RunID, SourceRunID: result.SourceRunID})
+		_ = json.NewEncoder(w).Encode(apiCloneConversationResponse{
+			RunID: result.RunID, SourceRunID: result.SourceRunID,
+			Title: result.Title, ProjectID: result.ProjectID,
+		})
 	}
 }
 
@@ -1037,6 +1298,62 @@ func listColleaguesHandler(verifier *jwks.Verifier, adminClient *keycloak.AdminC
 				Eligible:    hasEntitlement && sharesBusinessRole,
 			})
 		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(out)
+	}
+}
+
+// listGroupsHandler handles GET /api/groups (ADR-0527): BFF-only, never
+// forwards to agent-runtime, and rides the same zuno-admin-api Keycloak
+// Admin API trust boundary ADR-0213 introduced for /api/colleagues.
+//
+// Returns only BUSINESS-ROLE groups. ADR-0040 keeps agent_<name>
+// entitlement ("which agent may this person open at all") apart from
+// business role ("what may they reach inside it"), and offering an
+// entitlement group as a project grant target would collapse the two -
+// "shared with the consultants" would silently become "shared with everyone
+// who can open this agent". Filtered here and refused again in
+// agent-runtime, so neither layer alone is load-bearing.
+//
+// Fails closed with 503 in BOTH failure modes: no admin client (the
+// zuno-admin-api client isn't provisioned yet) and any Keycloak error -
+// including the 403 returned when the service account lacks the
+// query-groups role. Never a 200 with an empty list, which would read as
+// "this realm has no groups" and quietly prevent every group grant.
+func listGroupsHandler(verifier *jwks.Verifier, adminClient *keycloak.AdminClient, agentName string) http.HandlerFunc {
+	entitlementGroup := "agent_" + agentName
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
+		if _, ok := authorize(w, r, verifier, entitlementGroup, identity); !ok {
+			return
+		}
+
+		if adminClient == nil {
+			log.Printf("agent-bff: GET /api/groups called but KEYCLOAK_ADMIN_* is not configured - failing closed")
+			writeError(w, http.StatusServiceUnavailable, "group directory is unavailable")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		groups, err := adminClient.RealmGroups(ctx)
+		if err != nil {
+			log.Printf("agent-bff: keycloak admin realm-groups lookup failed: %v", err)
+			writeError(w, http.StatusServiceUnavailable, "group directory is unavailable")
+			return
+		}
+
+		out := make([]apiRealmGroup, 0, len(groups))
+		for _, g := range groups {
+			name := strings.TrimPrefix(g.Path, "/")
+			if name == "" || strings.HasPrefix(name, "agent_") {
+				continue
+			}
+			out = append(out, apiRealmGroup{Name: name, Path: g.Path})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

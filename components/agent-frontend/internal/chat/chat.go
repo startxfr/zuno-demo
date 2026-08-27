@@ -80,6 +80,15 @@ type chatConfig struct {
 	// endpoint (ADR-0213), always "/api/colleagues" today - same
 	// injected-rather-than-hardcoded rationale as ApiURL above.
 	ColleaguesURL string `json:"colleaguesURL"`
+	// ProjectsURL is this same-origin page's own project base (ADR-0527),
+	// always "/api/projects" today - same injected-rather-than-hardcoded
+	// rationale as ApiURL above.
+	ProjectsURL string `json:"projectsURL"`
+	// GroupsURL is this same-origin page's own business-role group lookup
+	// (ADR-0527), always "/api/groups". Like ColleaguesURL it fails closed
+	// (503) until the zuno-admin-api Keycloak client is provisioned - the
+	// frontend must surface that rather than render an empty picker.
+	GroupsURL string `json:"groupsURL"`
 	// AgentNavStrip (ADR-0515) is the cross-agent masthead navigation
 	// strip: every OTHER agent this signed-in caller is entitled to and
 	// that is actually active/clickable - the same entitlement-filtered
@@ -139,6 +148,8 @@ func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager,
 			ApiURL:           "/api/chat",
 			ConversationsURL: "/api/conversations",
 			ColleaguesURL:    "/api/colleagues",
+			ProjectsURL:      "/api/projects",
+			GroupsURL:        "/api/groups",
 			AgentNavStrip:    buildAgentNavStrip(agents, sess, clusterBaseDomain),
 			PromptExamples:   agent.PrimaryTaskPromptExamples(),
 		}

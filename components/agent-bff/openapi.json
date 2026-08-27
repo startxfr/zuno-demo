@@ -11,7 +11,11 @@
       "description": "In-cluster Service (Tekos deployment, v0's only agent)"
     }
   ],
-  "security": [{ "bearerAuth": [] }],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "paths": {
     "/healthz": {
       "get": {
@@ -21,7 +25,14 @@
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "text/plain": { "schema": { "type": "string", "example": "ok" } } }
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "ok"
+                }
+              }
+            }
           }
         }
       }
@@ -37,38 +48,80 @@
             "in": "header",
             "required": false,
             "description": "text/event-stream requests the SSE variant of this response (ADR-0045) instead of the default synchronous JSON reply.",
-            "schema": { "type": "string", "enum": ["application/json", "text/event-stream"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "application/json",
+                "text/event-stream"
+              ]
+            }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
           }
         },
         "responses": {
           "200": {
             "description": "Synchronous JSON reply (default, Content-Type: application/json), or a Server-Sent Events stream (Content-Type: text/event-stream) when the request's Accept header asked for one (ADR-0045). The SSE variant is a sequence of frames, in order: one 'start' frame (SseStartEvent), zero or more 'tool' frames (SseToolEvent), zero or more 'token' frames (SseTokenEvent), then exactly one terminal frame - either 'done' (SseDoneEvent) or 'error' (SseErrorEvent). Each frame's data payload matches the named component schema below. OpenAPI 3.0 has no first-class way to type a stream of discriminated event payloads under one response, so they are documented in this prose plus as ordinary schemas under components.schemas rather than via a non-standard vendor extension a validator may not recognize.",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/ChatResponse" } },
-              "text/event-stream": { "schema": { "type": "string" } }
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "400": {
             "description": "Invalid request body (missing/empty message).",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing, invalid or expired bearer token.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group (ADR-0040). The response never names which group was expected or which groups the caller actually has (Security considerations: \"document authorization failures without leaking policy internals\").",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "502": {
             "description": "The Agent Runtime was unreachable or returned an error.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -84,17 +137,55 @@
             "in": "query",
             "required": false,
             "description": "true to return only starred conversations.",
-            "schema": { "type": "boolean" }
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The caller's conversations.",
-            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Conversation" } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Conversation"
+                  }
+                }
+              }
+            }
           },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -104,17 +195,69 @@
         "summary": "Read a conversation's structured message history (ADR-0212)",
         "description": "Reused when reopening a conversation from the left-nav conversation list, to repopulate its exact prior message history.",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "The conversation's turns, oldest first.",
-            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/TranscriptTurn" } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TranscriptTurn"
+                  }
+                }
+              }
+            }
           },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or this run_id belongs to a different subject.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No workflow run found for this run_id.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or this run_id belongs to a different subject.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No workflow run found for this run_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -123,19 +266,86 @@
         "operationId": "renameConversation",
         "summary": "Rename a conversation (ADR-0212)",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameRequest"
+              }
+            }
+          }
         },
         "responses": {
-          "200": { "description": "Renamed.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RenameResponse" } } } },
-          "400": { "description": "Invalid request body (missing/empty title).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller (collapsed with 'not owned by the caller' - never confirms another subject's run_id exists).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Renamed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenameResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body (missing/empty title).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conversation found for this run_id owned by the caller (collapsed with 'not owned by the caller' - never confirms another subject's run_id exists).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
@@ -143,14 +353,66 @@
         "summary": "Delete a conversation (ADR-0212 follow-up, soft-delete)",
         "description": "Hides the conversation from GET /api/conversations by setting archived_at - the underlying Agent Runtime checkpoint (the actual message history) is never deleted.",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Archived.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ArchiveResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conversation found for this run_id owned by the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -161,14 +423,65 @@
         "description": "The caller's full desired run_id order for this agent - each entry's index becomes its server-side sort_order. run_ids the caller doesn't own are silently skipped rather than failing the whole request.",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReorderRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderRequest"
+              }
+            }
+          }
         },
         "responses": {
-          "200": { "description": "Reordered.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReorderResponse" } } } },
-          "400": { "description": "Invalid request body (empty run_ids).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Reordered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReorderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body (empty run_ids).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -178,109 +491,135 @@
         "summary": "Permanently delete a conversation (ADR-0515)",
         "description": "Irreversible - unlike DELETE /api/conversations/{run_id} (soft-delete/archive), this purges both the conversation's metadata row and its underlying LangGraph checkpoint/message history. The frontend requires an explicit user confirmation before calling this.",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Deleted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HardDeleteResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
-        }
-      }
-    },
-    "/api/conversations/{run_id}/members": {
-      "get": {
-        "operationId": "listMembers",
-        "summary": "List a conversation's granted memberships (ADR-0213)",
-        "description": "Owner-only. Never includes the owner, who is not a membership row.",
-        "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": { "description": "The conversation's granted memberships.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Member" } } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
-        }
-      }
-    },
-    "/api/conversations/{run_id}/members/{subject}": {
-      "put": {
-        "operationId": "grantMembership",
-        "summary": "Grant a colleague a role on a conversation (ADR-0213)",
-        "description": "Owner-only. Eligibility of {subject} (holds this agent's entitlement and shares a business-role group with the caller) is the frontend's own responsibility via GET /api/colleagues - this endpoint trusts that computation rather than re-verifying it, the ADR's own explicitly-accepted trust boundary.",
-        "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "subject", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantMembershipRequest" } } }
-        },
-        "responses": {
-          "200": { "description": "Granted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantMembershipResponse" } } } },
-          "400": { "description": "Invalid request body (role not one of reader, actor, cloner).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
-        }
-      },
-      "delete": {
-        "operationId": "revokeMembership",
-        "summary": "Revoke a colleague's role on a conversation (ADR-0213)",
-        "description": "Owner-only, soft revocation - no live kick. The collaborator's already-open tab keeps working until their next access, which then fails the fail-closed role check.",
-        "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "subject", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": { "description": "Revoked.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RevokeMembershipResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
-        }
-      }
-    },
-    "/api/conversations/{run_id}/owner": {
-      "patch": {
-        "operationId": "transferOwnership",
-        "summary": "Transfer ownership of a conversation (ADR-0213)",
-        "description": "Owner-only. The outgoing owner is downgraded to an actor membership, never losing access outright.",
-        "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransferOwnershipRequest" } } }
-        },
-        "responses": {
-          "200": { "description": "Transferred.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransferOwnershipResponse" } } } },
-          "400": { "description": "Invalid request body (missing/empty new_owner_sub).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardDeleteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conversation found for this run_id owned by the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/conversations/{run_id}/clone": {
       "post": {
         "operationId": "cloneConversation",
-        "summary": "Clone a conversation into a new, independently-owned one (ADR-0213)",
-        "description": "Owner or cloner only. Copies the source's full checkpoint into a fresh thread - no live sync back to the original.",
+        "summary": "Clone a conversation inside its own project (ADR-0527)",
+        "description": "Any role from clone upward. Copies the source's full checkpoint into a fresh thread - no live sync back - keeping it in the SOURCE's project with a derived title. The cloner becomes the copy's owner, which is what makes the clone role useful rather than archival: they may write to their own copy while remaining unable to write to the original.",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Cloned.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CloneConversationResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller (or the caller's role is neither owner nor cloner).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Cloned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloneConversationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conversation found for this run_id owned by the caller (or the caller's role is neither owner nor cloner).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -290,13 +629,60 @@
         "summary": "Search colleagues eligible to be granted a role on a conversation (ADR-0213)",
         "description": "BFF-only - does not call the Agent Runtime. Calls Keycloak's Admin REST API via a dedicated confidential client (zuno-admin-api, view-users/query-users scope only) to search users by q, then computes eligibility: a candidate is eligible only if they hold this agent's agent_<AGENT_NAME> entitlement group AND share at least one business-role group with the caller. Ineligible candidates are still returned (eligible: false) so the frontend can grey them out rather than hide them. Fails closed (503) if the Keycloak Admin API client isn't provisioned (KEYCLOAK_ADMIN_CLIENT_ID/_SECRET unset) - never returns a silent empty list.",
         "parameters": [
-          { "name": "q", "in": "query", "required": false, "description": "Search text (name/username/email prefix).", "schema": { "type": "string" } }
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search text (name/username/email prefix).",
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Matching colleagues.", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Colleague" } } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "503": { "description": "The Keycloak Admin API trust boundary isn't provisioned yet, or Keycloak's Admin API is unreachable.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Matching colleagues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Colleague"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Keycloak Admin API trust boundary isn't provisioned yet, or Keycloak's Admin API is unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -306,28 +692,750 @@
         "summary": "Star a conversation (ADR-0212)",
         "description": "The caller's own personal, private star - never shared with other users.",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Starred.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StarResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Starred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conversation found for this run_id owned by the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       },
       "delete": {
         "operationId": "unstarConversation",
         "summary": "Unstar a conversation (ADR-0212)",
         "parameters": [
-          { "name": "run_id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Unstarred.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StarResponse" } } } },
-          "401": { "description": "Missing, invalid or expired bearer token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "403": { "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "404": { "description": "No conversation found for this run_id owned by the caller.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
-          "502": { "description": "The Agent Runtime was unreachable or returned an error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "200": {
+            "description": "Unstarred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No conversation found for this run_id owned by the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime was unreachable or returned an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "operationId": "listProjects",
+        "summary": "List the projects the caller may see (ADR-0527)",
+        "description": "Every live project the caller holds a grant on, directly or through one of their business-role groups, with their effective role, their private star and a live conversation count. Deliberately not agent-scoped: a project is cross-agent (ADR-0527 clause 6), only its conversations are not.",
+        "responses": {
+          "200": {
+            "description": "The caller's projects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createProject",
+        "summary": "Create a project (ADR-0527)",
+        "description": "The creator receives an admin grant, merged into whatever grants the dialog submitted, so a project can never be created unadministrable (ADR-0527 clause 3 - there is no owner column). A supplied Salesforce opportunity is verified under the caller's own identity before the project is stored (ADR-0528).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body: empty title, a context over 54000 characters, a grant naming neither or both of subject/group_name, an unknown role, an agent_* entitlement group as a grant target, or a grant set with no user holding the admin role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Salesforce is unreachable, so the supplied opportunity could not be verified - the project is not stored with an unverified link (ADR-0528, fail closed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}": {
+      "get": {
+        "operationId": "getProject",
+        "summary": "Read one project (ADR-0527)",
+        "description": "Any grant reads the project. `grants` and the salesforce_* fields are populated only for an admin caller.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project found for this id that the caller holds any grant on - deliberately indistinguishable from a project that does not exist, so this surface never confirms one the caller cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveProject",
+        "summary": "Save a project's whole desired state in one commit (ADR-0527)",
+        "description": "The single-save commit behind the two-tab dialog: everything the user changed arrives at once, which is why ADR-0527 needs one endpoint where ADR-0213 needed five per-member ones. The write role covers title and context; changing grants or the Salesforce link requires admin and is refused with 403 rather than silently ignored.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body - same rules as createProject.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Either Salesforce could not verify a changed opportunity link, or the project-membership projection could not be pushed to rag-service - in which case NO change was applied (ADR-0527 clause 8: the push happens inside the mutation's transaction, before its commit, so a revocation is never half-applied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project found for this id that the caller holds any grant on - deliberately indistinguishable from a project that does not exist, so this surface never confirms one the caller cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteProject",
+        "summary": "Archive a project and all its conversations (ADR-0527 clause 7)",
+        "description": "Admin only. A cascade SOFT-delete: the project and every conversation in it - including colleagues' - receive archived_at. Nothing is erased; the irreversible purge stays per-conversation and owner-only.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteProjectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project found for this id that the caller holds any grant on - deliberately indistinguishable from a project that does not exist, so this surface never confirms one the caller cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}/delete-preview": {
+      "get": {
+        "operationId": "deleteProjectPreview",
+        "summary": "Counts for the delete confirmation (ADR-0527 clause 7)",
+        "description": "Admin only. Names how much would be archived, and how much of it belongs to other members.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project found for this id that the caller holds any grant on - deliberately indistinguishable from a project that does not exist, so this surface never confirms one the caller cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}/star": {
+      "put": {
+        "operationId": "starProject",
+        "summary": "Star a project for the caller (ADR-0527)",
+        "description": "A member's private organizing flag over a project they can already read - the same reasoning ADR-0212 applied to conversation_stars.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Starred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStarResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project found for this id that the caller holds any grant on - deliberately indistinguishable from a project that does not exist, so this surface never confirms one the caller cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unstarProject",
+        "summary": "Remove the caller's star from a project (ADR-0527)",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unstarred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStarResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group, or the caller's project role is insufficient for this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The Agent Runtime is unreachable or returned an unexpected status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No project found for this id that the caller holds any grant on - deliberately indistinguishable from a project that does not exist, so this surface never confirms one the caller cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "operationId": "listGroups",
+        "summary": "List the business-role groups that may be project grant targets (ADR-0527)",
+        "description": "BFF-only - never forwarded to the Agent Runtime, and rides the same zuno-admin-api Keycloak Admin API trust boundary ADR-0213 introduced for /api/colleagues. Needs the realm-management query-groups role in addition to WP-066's view-users/query-users; never manage-users, never manage-realm. agent_* entitlement groups are filtered out: ADR-0040 keeps entitlement and business role apart, and offering one here would turn 'shared with the consultants' into 'shared with everyone who can open this agent'.",
+        "responses": {
+          "200": {
+            "description": "The realm's business-role groups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RealmGroup"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Token is valid but lacks the agent_<AGENT_NAME> entitlement group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The group directory is unavailable - either the zuno-admin-api Keycloak client is not provisioned, or the Admin API call failed (including the 403 returned when the service account lacks query-groups). Deliberately never a 200 with an empty list, which would read as 'this realm has no groups' and quietly prevent every group grant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -344,224 +1452,691 @@
     "schemas": {
       "ChatRequest": {
         "type": "object",
-        "required": ["session_id", "message"],
+        "required": [
+          "session_id",
+          "message"
+        ],
         "properties": {
-          "session_id": { "type": "string", "description": "Caller-generated correlation ID for this chat session." },
-          "message": { "type": "string", "minLength": 1 },
-          "project_id": { "type": "string", "description": "ADR-0209: scopes this turn to a project's durable, cross-session, cross-agent memory (knowledge.project). Optional - omitted or empty means no project memory is read or written for this turn. Propagated to the Agent Runtime exactly as received, following the same identity-propagation pattern as ADR-0032/0033 - this BFF never validates or resolves project membership itself. ADR-0512 (WP-55): for a project_required task this is only a CANDIDATE - the Agent Runtime verifies it against Salesforce under the caller's own identity before trusting it, or blocks the request; for every other task it is unchanged, unverified, passed through as-is." },
-          "run_id": { "type": "string", "description": "ADR-0212: identifies the conversation to resume. Optional - omit to start a new conversation (the Agent Runtime mints a fresh run_id, returned in the SSE 'start' event); supply a prior run_id to resume it from its last checkpoint. Propagated to the Agent Runtime exactly as received, which enforces ownership - this BFF does not validate it itself." }
+          "session_id": {
+            "type": "string",
+            "description": "Caller-generated correlation ID for this chat session."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project_id": {
+            "type": "string",
+            "description": "ADR-0209: scopes this turn to a project's durable, cross-session, cross-agent memory (knowledge.project). Optional - omitted or empty means no project memory is read or written for this turn. Propagated to the Agent Runtime exactly as received, following the same identity-propagation pattern as ADR-0032/0033 - this BFF never validates or resolves project membership itself. ADR-0512 (WP-55): for a project_required task this is only a CANDIDATE - the Agent Runtime verifies it against Salesforce under the caller's own identity before trusting it, or blocks the request; for every other task it is unchanged, unverified, passed through as-is."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "ADR-0212: identifies the conversation to resume. Optional - omit to start a new conversation (the Agent Runtime mints a fresh run_id, returned in the SSE 'start' event); supply a prior run_id to resume it from its last checkpoint. Propagated to the Agent Runtime exactly as received, which enforces ownership - this BFF does not validate it itself."
+          }
         }
       },
       "Citation": {
         "type": "object",
-        "required": ["source", "title"],
+        "required": [
+          "source",
+          "title"
+        ],
         "properties": {
-          "source": { "type": "string" },
-          "title": { "type": "string" }
+          "source": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
         }
       },
       "Image": {
         "type": "object",
         "description": "ADR-0415: a generate_image tool result for this turn (stable-diffusion-xl via OVHcloud AI Endpoints).",
-        "required": ["data_base64", "mime_type", "alt"],
+        "required": [
+          "data_base64",
+          "mime_type",
+          "alt"
+        ],
         "properties": {
-          "data_base64": { "type": "string" },
-          "mime_type": { "type": "string" },
-          "alt": { "type": "string" }
+          "data_base64": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          }
         }
       },
       "ChatResponse": {
         "type": "object",
         "description": "ADR-0215: run_id/source_mode added to the synchronous JSON reply - previously only the SSE 'start' event exposed run_id, so a synchronous caller had no way to resume the conversation for a follow-up turn.",
-        "required": ["reply", "citations", "images", "run_id", "source_mode"],
+        "required": [
+          "reply",
+          "citations",
+          "images",
+          "run_id",
+          "source_mode"
+        ],
         "properties": {
-          "reply": { "type": "string" },
-          "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } },
-          "images": { "type": "array", "items": { "$ref": "#/components/schemas/Image" }, "description": "ADR-0415: empty unless this turn's agent/task is entitled to generate_image and the model chose to call it." },
-          "run_id": { "type": "string", "description": "ADR-0212/ADR-0215: identifies this conversation - pass it as the request's run_id to resume with history on a later turn." },
-          "source_mode": { "type": "string", "enum": ["indexed", "live", "both", "none"], "description": "ADR-0205: whether this reply used indexed knowledge, a live tool call, or both." }
+          "reply": {
+            "type": "string"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Image"
+            },
+            "description": "ADR-0415: empty unless this turn's agent/task is entitled to generate_image and the model chose to call it."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "ADR-0212/ADR-0215: identifies this conversation - pass it as the request's run_id to resume with history on a later turn."
+          },
+          "source_mode": {
+            "type": "string",
+            "enum": [
+              "indexed",
+              "live",
+              "both",
+              "none"
+            ],
+            "description": "ADR-0205: whether this reply used indexed knowledge, a live tool call, or both."
+          },
+          "project_id": {
+            "type": "string",
+            "description": "ADR-0528: the server-resolved project this turn belonged to, so agent-bff can set the zuno.project_id span attribute on the non-streaming path. Empty outside a project. Never the Salesforce opportunity id."
+          }
         }
       },
       "Conversation": {
         "type": "object",
         "description": "ADR-0212: one entry of the caller's own conversation list.",
-        "required": ["run_id", "title", "updated_at", "starred"],
+        "required": [
+          "run_id",
+          "title",
+          "updated_at",
+          "starred"
+        ],
         "properties": {
-          "run_id": { "type": "string" },
-          "title": { "type": "string" },
-          "updated_at": { "type": "string", "format": "date-time" },
-          "starred": { "type": "boolean" }
+          "run_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "starred": {
+            "type": "boolean"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "ADR-0527: the project this conversation belongs to, or empty for a project-less conversation private to its owner."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read",
+              "clone",
+              "write",
+              "admin"
+            ],
+            "description": "ADR-0527: the caller's effective role on this conversation - their project role, or write/admin when they own it. Returned per row so the sidebar can decide read-only mode without a second call."
+          }
         }
       },
       "TranscriptTurn": {
         "type": "object",
         "description": "ADR-0212: one turn of a conversation's structured message history.",
-        "required": ["role", "content", "ts"],
+        "required": [
+          "role",
+          "content",
+          "ts"
+        ],
         "properties": {
-          "role": { "type": "string", "enum": ["user", "assistant"] },
-          "content": { "type": "string" },
-          "ts": { "type": "string", "format": "date-time" },
-          "images": { "type": "array", "items": { "$ref": "#/components/schemas/Image" }, "description": "ADR-0415: present only on an assistant turn that generated at least one image." }
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Image"
+            },
+            "description": "ADR-0415: present only on an assistant turn that generated at least one image."
+          }
         }
       },
       "RenameRequest": {
         "type": "object",
-        "required": ["title"],
+        "required": [
+          "title"
+        ],
         "properties": {
-          "title": { "type": "string", "minLength": 1 }
+          "title": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "RenameResponse": {
         "type": "object",
-        "required": ["run_id", "title"],
+        "required": [
+          "run_id",
+          "title"
+        ],
         "properties": {
-          "run_id": { "type": "string" },
-          "title": { "type": "string" }
+          "run_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
         }
       },
       "StarResponse": {
         "type": "object",
-        "required": ["starred"],
+        "required": [
+          "starred"
+        ],
         "properties": {
-          "starred": { "type": "boolean" }
+          "starred": {
+            "type": "boolean"
+          }
         }
       },
       "ArchiveResponse": {
         "type": "object",
-        "required": ["archived"],
+        "required": [
+          "archived"
+        ],
         "properties": {
-          "archived": { "type": "boolean" }
+          "archived": {
+            "type": "boolean"
+          }
         }
       },
       "ReorderRequest": {
         "type": "object",
         "description": "ADR-0515: the caller's full desired conversation order for this agent.",
-        "required": ["run_ids"],
+        "required": [
+          "run_ids"
+        ],
         "properties": {
-          "run_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
         }
       },
       "ReorderResponse": {
         "type": "object",
-        "required": ["updated"],
+        "required": [
+          "updated"
+        ],
         "properties": {
-          "updated": { "type": "integer", "description": "Count of conversations actually reordered - run_ids the caller doesn't own are silently skipped." }
+          "updated": {
+            "type": "integer",
+            "description": "Count of conversations actually reordered - run_ids the caller doesn't own are silently skipped."
+          }
         }
       },
       "HardDeleteResponse": {
         "type": "object",
         "description": "ADR-0515: irreversible, unlike ArchiveResponse's soft-delete.",
-        "required": ["deleted"],
+        "required": [
+          "deleted"
+        ],
         "properties": {
-          "deleted": { "type": "boolean" }
-        }
-      },
-      "Member": {
-        "type": "object",
-        "description": "ADR-0213: one granted conversation membership (never the owner, who is not a membership row).",
-        "required": ["subject", "role", "granted_by", "created_at"],
-        "properties": {
-          "subject": { "type": "string" },
-          "role": { "type": "string", "enum": ["reader", "actor", "cloner"] },
-          "granted_by": { "type": "string" },
-          "created_at": { "type": "string", "format": "date-time" }
-        }
-      },
-      "GrantMembershipRequest": {
-        "type": "object",
-        "required": ["role"],
-        "properties": {
-          "role": { "type": "string", "enum": ["reader", "actor", "cloner"] }
-        }
-      },
-      "GrantMembershipResponse": {
-        "type": "object",
-        "required": ["subject", "role"],
-        "properties": {
-          "subject": { "type": "string" },
-          "role": { "type": "string", "enum": ["reader", "actor", "cloner"] }
-        }
-      },
-      "RevokeMembershipResponse": {
-        "type": "object",
-        "required": ["revoked"],
-        "properties": {
-          "revoked": { "type": "boolean" }
-        }
-      },
-      "TransferOwnershipRequest": {
-        "type": "object",
-        "required": ["new_owner_sub"],
-        "properties": {
-          "new_owner_sub": { "type": "string", "minLength": 1 }
-        }
-      },
-      "TransferOwnershipResponse": {
-        "type": "object",
-        "required": ["run_id", "owner_sub"],
-        "properties": {
-          "run_id": { "type": "string" },
-          "owner_sub": { "type": "string" }
+          "deleted": {
+            "type": "boolean"
+          }
         }
       },
       "CloneConversationResponse": {
         "type": "object",
         "description": "ADR-0213: the newly-created, independently-owned conversation.",
-        "required": ["run_id", "source_run_id"],
+        "required": [
+          "run_id",
+          "source_run_id"
+        ],
         "properties": {
-          "run_id": { "type": "string" },
-          "source_run_id": { "type": "string" }
+          "run_id": {
+            "type": "string"
+          },
+          "source_run_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "ADR-0527: the clone's derived title (\"Foo\" becomes \"Foo (copy)\")."
+          },
+          "project_id": {
+            "type": "string",
+            "description": "ADR-0527: the clone stays in the SOURCE's project, so this echoes it."
+          }
         }
       },
       "Colleague": {
         "type": "object",
         "description": "ADR-0213: one GET /api/colleagues search result. Ineligible candidates are still included (eligible: false) so the frontend can grey them out rather than hide them.",
-        "required": ["sub", "displayName", "eligible"],
+        "required": [
+          "sub",
+          "displayName",
+          "eligible"
+        ],
         "properties": {
-          "sub": { "type": "string" },
-          "displayName": { "type": "string" },
-          "eligible": { "type": "boolean" }
+          "sub": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "eligible": {
+            "type": "boolean"
+          }
         }
       },
       "ErrorResponse": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
-          "error": { "type": "string", "description": "Human-readable reason - never a raw internal error or stack trace." }
+          "error": {
+            "type": "string",
+            "description": "Human-readable reason - never a raw internal error or stack trace."
+          }
         }
       },
       "SseStartEvent": {
         "type": "object",
         "description": "ADR-0045 request correlation - the first frame of every SSE stream.",
-        "required": ["request_id"],
-        "properties": { "request_id": { "type": "string", "format": "uuid" } }
+        "required": [
+          "request_id"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "ADR-0528: the server-resolved project for this run, the streaming-path equivalent of ChatResponse.project_id."
+          }
+        }
       },
       "SseToolEvent": {
         "type": "object",
         "description": "Emitted around a live tool call (e.g. search_confluence) actually running.",
-        "required": ["name", "status"],
+        "required": [
+          "name",
+          "status"
+        ],
         "properties": {
-          "name": { "type": "string", "example": "search_confluence" },
-          "status": { "type": "string", "enum": ["started", "finished"] }
+          "name": {
+            "type": "string",
+            "example": "search_confluence"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "finished"
+            ]
+          }
         }
       },
       "SseTokenEvent": {
         "type": "object",
         "description": "One per model token/chunk.",
-        "required": ["delta"],
-        "properties": { "delta": { "type": "string" } }
+        "required": [
+          "delta"
+        ],
+        "properties": {
+          "delta": {
+            "type": "string"
+          }
+        }
       },
       "SseDoneEvent": {
         "type": "object",
         "description": "Terminal frame on success.",
-        "required": ["citations"],
-        "properties": { "citations": { "type": "array", "items": { "$ref": "#/components/schemas/Citation" } } }
+        "required": [
+          "citations"
+        ],
+        "properties": {
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            }
+          }
+        }
       },
       "SseErrorEvent": {
         "type": "object",
         "description": "Terminal frame instead of done if the graph raised mid-stream.",
-        "required": ["message"],
-        "properties": { "message": { "type": "string" } }
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ProjectGrant": {
+        "type": "object",
+        "description": "ADR-0527: one entry of a project's ACL. Exactly one of subject/group_name is set - the XOR project_grants' own CHECK constraint enforces. group_name must be a business-role group; an agent_* entitlement group is refused (ADR-0040).",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "Keycloak subject this grant targets. Empty when this is a group grant."
+          },
+          "group_name": {
+            "type": "string",
+            "description": "Business-role group this grant targets (sales, sales_admin, consultant, adv, finance, board). Empty when this is a user grant."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read",
+              "clone",
+              "write",
+              "admin"
+            ],
+            "description": "read: view only. clone: read plus copy a conversation. write: read/clone plus send messages and edit the project's title and context. admin: write plus manage grants, the Salesforce link and deletion."
+          },
+          "granted_by": {
+            "type": "string",
+            "description": "Subject that made this grant. Response-only."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Response-only."
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "description": "ADR-0527: one entry of the caller's project list. Carries no Salesforce identifier by design (ADR-0528) - only whether this IS a customer project.",
+        "required": [
+          "project_id",
+          "title",
+          "role"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Server-minted UUID. Never the Salesforce opportunity id (ADR-0528)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ],
+            "description": "ADR-0034: the floor every turn in this project escalates to."
+          },
+          "is_customer": {
+            "type": "boolean",
+            "description": "ADR-0528: true when a verified Salesforce opportunity is linked. False means a free project - fully usable, and still drawing its own project quota."
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "The caller's own private star."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read",
+              "clone",
+              "write",
+              "admin"
+            ],
+            "description": "The caller's effective role, the strongest of their direct and group grants."
+          },
+          "conversation_count": {
+            "type": "integer",
+            "description": "Live conversations across ALL agents - it describes the project, not this agent's sidebar."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectDetail": {
+        "type": "object",
+        "description": "ADR-0527: one project in full. grants and the salesforce_* fields are populated by the Agent Runtime only for an admin caller - the grant list names colleagues, and ADR-0528 keeps the opportunity id off every surface that does not strictly need it.",
+        "required": [
+          "project_id",
+          "title",
+          "role"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 54000,
+            "description": "ADR-0527 clause 5: the standing engagement context, injected into every conversation of this project as delimited BACKGROUND - never as instructions, so it can never rewrite the OKF task prompt. Budgeted at injection time, so this ceiling is a storage limit, not what reaches the model."
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ]
+          },
+          "is_customer": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read",
+              "clone",
+              "write",
+              "admin"
+            ]
+          },
+          "created_by": {
+            "type": "string",
+            "description": "Audit metadata only - NEVER an authorization input. ADR-0527 clause 3 gives a project no owner; the creator simply holds an admin grant."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGrant"
+            },
+            "description": "Admin-only; empty for every other role."
+          },
+          "salesforce_opportunity_id": {
+            "type": "string",
+            "description": "Admin-only (ADR-0528). Never emitted in a header or a span."
+          },
+          "salesforce_verified_at": {
+            "type": "string",
+            "description": "Admin-only. Re-verified past quota-policy.yaml's project_binding.validity_window."
+          }
+        }
+      },
+      "CreateProjectRequest": {
+        "type": "object",
+        "description": "ADR-0527: POST /api/projects body. The Agent Runtime merges the caller's own admin grant into `grants`, so a project can never be created unadministrable.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 54000
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ]
+          },
+          "salesforce_opportunity_id": {
+            "type": "string",
+            "description": "ADR-0528: optional. Verified against Salesforce under the CALLER's own identity at save time; an unverifiable value rejects the save rather than being stored. Empty means a free project."
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGrant"
+            }
+          }
+        }
+      },
+      "SaveProjectRequest": {
+        "type": "object",
+        "description": "ADR-0527: PUT /api/projects/{project_id} body - the WHOLE desired state at once, which is why this ADR needs one endpoint where ADR-0213 needed five (the dialog stages every change and commits on a single validation). A null `grants` means the caller is not editing grants and leaves them untouched; a non-null one is the full desired set, so anything absent from it is revoked. Editing grants or the Salesforce link requires the admin role.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 54000
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "C1",
+              "C2",
+              "C3"
+            ]
+          },
+          "salesforce_opportunity_id": {
+            "type": "string",
+            "description": "ADR-0528: optional. Verified against Salesforce under the CALLER's own identity at save time; an unverifiable value rejects the save rather than being stored. Empty means a free project."
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGrant"
+            }
+          }
+        }
+      },
+      "CreateProjectResponse": {
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          }
+        }
+      },
+      "DeletePreview": {
+        "type": "object",
+        "description": "ADR-0527 clause 7: the counts the delete confirmation must name, including how many conversations belong to other members - a project admin archiving colleagues' visible work should be told the size of what they are doing.",
+        "properties": {
+          "conversations_total": {
+            "type": "integer"
+          },
+          "conversations_other_owners": {
+            "type": "integer"
+          },
+          "members_users": {
+            "type": "integer"
+          },
+          "members_groups": {
+            "type": "integer"
+          }
+        }
+      },
+      "DeleteProjectResponse": {
+        "type": "object",
+        "description": "ADR-0527 clause 7: a cascade SOFT-delete. The project and every conversation in it get archived_at; nothing is erased.",
+        "properties": {
+          "conversations_archived": {
+            "type": "integer"
+          }
+        }
+      },
+      "ProjectStarResponse": {
+        "type": "object",
+        "properties": {
+          "starred": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RealmGroup": {
+        "type": "object",
+        "description": "ADR-0527: one business-role group that may be a project grant target. agent_* entitlement groups are filtered out server-side and never appear here (ADR-0040).",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
       }
     }
   }

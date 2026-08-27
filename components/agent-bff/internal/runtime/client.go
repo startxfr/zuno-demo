@@ -91,6 +91,12 @@ type Conversation struct {
 	Title     string `json:"title"`
 	UpdatedAt string `json:"updated_at"`
 	Starred   bool   `json:"starred"`
+	// ADR-0527: the project this conversation belongs to, empty for a
+	// project-less private one, and the caller's effective role on it
+	// (read/clone/write/admin). Both are returned per row so the sidebar
+	// can group the list and decide read-only mode without a second call.
+	ProjectID string `json:"project_id"`
+	Role      string `json:"role"`
 }
 
 // TranscriptTurn mirrors one entry of the Agent Runtime's structured
@@ -150,43 +156,100 @@ type HardDeleteResponse struct {
 	Deleted bool `json:"deleted"`
 }
 
-// Member mirrors one entry of the Agent Runtime's membership list
-// (ADR-0213, GET /v1/agents/{agent}/runs/{run_id}/members).
-type Member struct {
+// ProjectGrant mirrors one entry of a project's ACL (ADR-0527). Exactly
+// one of Subject/GroupName is set - the XOR the runtime enforces both in
+// Pydantic and in project_grants' own CHECK constraint.
+type ProjectGrant struct {
 	Subject   string `json:"subject"`
+	GroupName string `json:"group_name"`
 	Role      string `json:"role"`
 	GrantedBy string `json:"granted_by"`
 	CreatedAt string `json:"created_at"`
 }
 
-// GrantMembershipRequest is the Agent Runtime's documented request body
-// for PUT /v1/agents/{agent}/runs/{run_id}/members/{subject} (ADR-0213).
-type GrantMembershipRequest struct {
-	Role string `json:"role"`
+// Project mirrors one entry of GET /v1/projects (ADR-0527). Deliberately
+// carries no Salesforce field: ADR-0528 keeps the opportunity identifier
+// off every surface that does not strictly need it, so the list exposes
+// only whether the project IS a customer project.
+type Project struct {
+	ProjectID         string `json:"project_id"`
+	Title             string `json:"title"`
+	Classification    string `json:"classification"`
+	IsCustomer        bool   `json:"is_customer"`
+	Starred           bool   `json:"starred"`
+	Role              string `json:"role"`
+	ConversationCount int    `json:"conversation_count"`
+	UpdatedAt         string `json:"updated_at"`
 }
 
-// GrantMembershipResponse is that endpoint's documented response body.
-type GrantMembershipResponse struct {
-	Subject string `json:"subject"`
-	Role    string `json:"role"`
+// ProjectDetail mirrors GET /v1/projects/{project_id} (ADR-0527). Grants
+// and the Salesforce fields are populated by the runtime only when the
+// caller is an admin - the grant list names colleagues, and ADR-0528 keeps
+// the opportunity id admin-only.
+type ProjectDetail struct {
+	ProjectID               string         `json:"project_id"`
+	Title                   string         `json:"title"`
+	Context                 string         `json:"context"`
+	Classification          string         `json:"classification"`
+	IsCustomer              bool           `json:"is_customer"`
+	Role                    string         `json:"role"`
+	CreatedBy               string         `json:"created_by"`
+	CreatedAt               string         `json:"created_at"`
+	UpdatedAt               string         `json:"updated_at"`
+	Grants                  []ProjectGrant `json:"grants"`
+	SalesforceOpportunityID string         `json:"salesforce_opportunity_id"`
+	SalesforceVerifiedAt    string         `json:"salesforce_verified_at"`
 }
 
-// RevokeMembershipResponse is the documented response body for
-// DELETE /v1/agents/{agent}/runs/{run_id}/members/{subject} (ADR-0213).
-type RevokeMembershipResponse struct {
-	Revoked bool `json:"revoked"`
+// CreateProjectRequest is the Agent Runtime's documented request body for
+// POST /v1/projects (ADR-0527).
+type CreateProjectRequest struct {
+	Title                   string         `json:"title"`
+	Context                 string         `json:"context"`
+	Classification          string         `json:"classification"`
+	SalesforceOpportunityID string         `json:"salesforce_opportunity_id,omitempty"`
+	Grants                  []ProjectGrant `json:"grants"`
 }
 
-// TransferOwnershipRequest is the Agent Runtime's documented request body
-// for PATCH /v1/agents/{agent}/runs/{run_id}/owner (ADR-0213).
-type TransferOwnershipRequest struct {
-	NewOwnerSub string `json:"new_owner_sub"`
+// SaveProjectRequest is the request body for PUT /v1/projects/{project_id}
+// (ADR-0527) - the WHOLE desired state at once, which is why this ADR needs
+// one endpoint where ADR-0213 needed five. A nil Grants means "the caller
+// may not edit grants" and leaves them untouched; a non-nil value is the
+// full desired set, so anything absent from it is revoked.
+type SaveProjectRequest struct {
+	Title                   string         `json:"title"`
+	Context                 string         `json:"context"`
+	Classification          string         `json:"classification"`
+	SalesforceOpportunityID string         `json:"salesforce_opportunity_id,omitempty"`
+	Grants                  []ProjectGrant `json:"grants"`
 }
 
-// TransferOwnershipResponse is that endpoint's documented response body.
-type TransferOwnershipResponse struct {
-	RunID    string `json:"run_id"`
-	OwnerSub string `json:"owner_sub"`
+// CreateProjectResponse is the documented response body for POST /v1/projects.
+type CreateProjectResponse struct {
+	ProjectID string `json:"project_id"`
+}
+
+// DeletePreview is the documented response body for
+// GET /v1/projects/{project_id}/delete-preview (ADR-0527 clause 7) - the
+// counts the confirmation must name before an admin archives colleagues'
+// visible work.
+type DeletePreview struct {
+	ConversationsTotal       int `json:"conversations_total"`
+	ConversationsOtherOwners int `json:"conversations_other_owners"`
+	MembersUsers             int `json:"members_users"`
+	MembersGroups            int `json:"members_groups"`
+}
+
+// DeleteProjectResponse is the documented response body for
+// DELETE /v1/projects/{project_id} (a cascade SOFT-delete).
+type DeleteProjectResponse struct {
+	ConversationsArchived int `json:"conversations_archived"`
+}
+
+// ProjectStarResponse is the documented response body for
+// PUT/DELETE /v1/projects/{project_id}/star.
+type ProjectStarResponse struct {
+	Starred bool `json:"starred"`
 }
 
 // CloneConversationResponse is the documented response body for
@@ -194,6 +257,11 @@ type TransferOwnershipResponse struct {
 type CloneConversationResponse struct {
 	RunID       string `json:"run_id"`
 	SourceRunID string `json:"source_run_id"`
+	// ADR-0527: the clone stays in the SOURCE's project and takes a derived
+	// title, so the frontend can name and place the new tab without
+	// re-fetching the list.
+	Title     string `json:"title"`
+	ProjectID string `json:"project_id"`
 }
 
 // ChatResponse is the Agent Runtime's documented response body.
@@ -212,6 +280,11 @@ type ChatResponse struct {
 	Images     []Image    `json:"images"`
 	RunID      string     `json:"run_id"`
 	SourceMode string     `json:"source_mode"`
+	// ADR-0528: the server-resolved project this turn belonged to, so
+	// agent-bff can tag its own span with zuno.project_id on the
+	// non-streaming path (the streaming path reads it from the SSE start
+	// event instead).
+	ProjectID string `json:"project_id"`
 }
 
 // Client calls one agent's chat endpoint on the shared Agent Runtime.
@@ -456,54 +529,78 @@ func (c *Client) HardDeleteConversation(ctx context.Context, bearerToken, runID 
 
 // ListMembers calls GET /v1/agents/{agent}/runs/{run_id}/members
 // (ADR-0213) - owner-only.
-func (c *Client) ListMembers(ctx context.Context, bearerToken, runID string) ([]Member, error) {
-	path := fmt.Sprintf("/v1/agents/%s/runs/%s/members", c.agentName, url.PathEscape(runID))
-	var out []Member
-	if err := c.doJSON(ctx, http.MethodGet, bearerToken, path, nil, &out); err != nil {
+// ListProjects fetches GET /v1/projects (ADR-0527). No {agent} segment:
+// a project is cross-agent, and only its conversations are agent-scoped.
+func (c *Client) ListProjects(ctx context.Context, bearerToken string) ([]Project, error) {
+	var out []Project
+	if err := c.doJSON(ctx, http.MethodGet, bearerToken, "/v1/projects", nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// GrantMembership calls PUT /v1/agents/{agent}/runs/{run_id}/members/{subject}
-// (ADR-0213) - owner-only.
-func (c *Client) GrantMembership(ctx context.Context, bearerToken, runID, subject, role string) (*GrantMembershipResponse, error) {
-	path := fmt.Sprintf("/v1/agents/%s/runs/%s/members/%s", c.agentName, url.PathEscape(runID), url.PathEscape(subject))
-	var out GrantMembershipResponse
-	body := GrantMembershipRequest{Role: role}
-	if err := c.doJSON(ctx, http.MethodPut, bearerToken, path, body, &out); err != nil {
+// CreateProject posts POST /v1/projects (ADR-0527). The runtime merges the
+// caller's own admin grant into the submitted set, so a project can never
+// be created unadministrable.
+func (c *Client) CreateProject(ctx context.Context, bearerToken string, req CreateProjectRequest) (*CreateProjectResponse, error) {
+	var out CreateProjectResponse
+	if err := c.doJSON(ctx, http.MethodPost, bearerToken, "/v1/projects", req, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-// RevokeMembership calls DELETE /v1/agents/{agent}/runs/{run_id}/members/{subject}
-// (ADR-0213) - owner-only, soft revocation.
-func (c *Client) RevokeMembership(ctx context.Context, bearerToken, runID, subject string) (*RevokeMembershipResponse, error) {
-	path := fmt.Sprintf("/v1/agents/%s/runs/%s/members/%s", c.agentName, url.PathEscape(runID), url.PathEscape(subject))
-	var out RevokeMembershipResponse
-	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, path, nil, &out); err != nil {
+// GetProject fetches GET /v1/projects/{project_id} (ADR-0527).
+func (c *Client) GetProject(ctx context.Context, bearerToken, projectID string) (*ProjectDetail, error) {
+	var out ProjectDetail
+	if err := c.doJSON(ctx, http.MethodGet, bearerToken, "/v1/projects/"+url.PathEscape(projectID), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-// TransferOwnership calls PATCH /v1/agents/{agent}/runs/{run_id}/owner
-// (ADR-0213) - owner-only; the outgoing owner is downgraded to actor,
-// never losing access outright.
-func (c *Client) TransferOwnership(ctx context.Context, bearerToken, runID, newOwnerSub string) (*TransferOwnershipResponse, error) {
-	path := fmt.Sprintf("/v1/agents/%s/runs/%s/owner", c.agentName, url.PathEscape(runID))
-	var out TransferOwnershipResponse
-	body := TransferOwnershipRequest{NewOwnerSub: newOwnerSub}
-	if err := c.doJSON(ctx, http.MethodPatch, bearerToken, path, body, &out); err != nil {
+// SaveProject puts PUT /v1/projects/{project_id} (ADR-0527) - the single
+// full-state commit behind the dialog's one Save.
+func (c *Client) SaveProject(ctx context.Context, bearerToken, projectID string, req SaveProjectRequest) (*CreateProjectResponse, error) {
+	var out CreateProjectResponse
+	if err := c.doJSON(ctx, http.MethodPut, bearerToken, "/v1/projects/"+url.PathEscape(projectID), req, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-// CloneConversation calls POST /v1/agents/{agent}/runs/{run_id}/clone
-// (ADR-0213) - owner or cloner only; copies the checkpoint into a fresh,
-// independently-owned conversation with no live sync back.
+// DeleteProjectPreview fetches GET /v1/projects/{project_id}/delete-preview.
+func (c *Client) DeleteProjectPreview(ctx context.Context, bearerToken, projectID string) (*DeletePreview, error) {
+	var out DeletePreview
+	if err := c.doJSON(ctx, http.MethodGet, bearerToken, "/v1/projects/"+url.PathEscape(projectID)+"/delete-preview", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteProject calls DELETE /v1/projects/{project_id} - a cascade
+// SOFT-delete (ADR-0527 clause 7), never a purge.
+func (c *Client) DeleteProject(ctx context.Context, bearerToken, projectID string) (*DeleteProjectResponse, error) {
+	var out DeleteProjectResponse
+	if err := c.doJSON(ctx, http.MethodDelete, bearerToken, "/v1/projects/"+url.PathEscape(projectID), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SetProjectStar toggles the caller's personal star on a project.
+func (c *Client) SetProjectStar(ctx context.Context, bearerToken, projectID string, starred bool) (*ProjectStarResponse, error) {
+	method := http.MethodDelete
+	if starred {
+		method = http.MethodPut
+	}
+	var out ProjectStarResponse
+	if err := c.doJSON(ctx, method, bearerToken, "/v1/projects/"+url.PathEscape(projectID)+"/star", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *Client) CloneConversation(ctx context.Context, bearerToken, runID string) (*CloneConversationResponse, error) {
 	path := fmt.Sprintf("/v1/agents/%s/runs/%s/clone", c.agentName, url.PathEscape(runID))
 	var out CloneConversationResponse

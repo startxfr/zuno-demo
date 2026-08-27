@@ -136,14 +136,26 @@ func main() {
 	// ADR-0515: manual drag-reorder and irreversible hard-delete.
 	mux.HandleFunc("PUT /api/conversations/reorder", conversationsProxy)
 	mux.HandleFunc("DELETE /api/conversations/{run_id}/hard-delete", conversationsProxy)
-	// ADR-0213: role-based conversation sharing - same generic proxy,
-	// path/method-driven, no new handler logic needed.
-	mux.HandleFunc("GET /api/conversations/{run_id}/members", conversationsProxy)
-	mux.HandleFunc("PUT /api/conversations/{run_id}/members/{subject}", conversationsProxy)
-	mux.HandleFunc("DELETE /api/conversations/{run_id}/members/{subject}", conversationsProxy)
-	mux.HandleFunc("PATCH /api/conversations/{run_id}/owner", conversationsProxy)
+	// ADR-0527: cloning survives ADR-0213's removal with new semantics (the
+	// copy stays in the source's project and the cloner owns it) - same
+	// generic proxy, path/method-driven, no new handler logic needed.
 	mux.HandleFunc("POST /api/conversations/{run_id}/clone", conversationsProxy)
+	// ADR-0527: projects are the sharing and context boundary. The proxy is
+	// path-transparent (it forwards r.URL.Path verbatim), so a new BFF
+	// resource needs only a registration line here.
+	mux.HandleFunc("GET /api/projects", conversationsProxy)
+	mux.HandleFunc("POST /api/projects", conversationsProxy)
+	mux.HandleFunc("GET /api/projects/{project_id}", conversationsProxy)
+	mux.HandleFunc("PUT /api/projects/{project_id}", conversationsProxy)
+	mux.HandleFunc("GET /api/projects/{project_id}/delete-preview", conversationsProxy)
+	mux.HandleFunc("DELETE /api/projects/{project_id}", conversationsProxy)
+	mux.HandleFunc("PUT /api/projects/{project_id}/star", conversationsProxy)
+	mux.HandleFunc("DELETE /api/projects/{project_id}/star", conversationsProxy)
+	// ADR-0213/ADR-0527: the two Keycloak-Admin-backed lookups the project
+	// RBAC tab needs - both fail closed (503) until zuno-admin-api is
+	// provisioned.
 	mux.HandleFunc("GET /api/colleagues", conversationsProxy)
+	mux.HandleFunc("GET /api/groups", conversationsProxy)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,

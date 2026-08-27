@@ -102,11 +102,15 @@ func TestOpenAPISpecIsWellFormed(t *testing.T) {
 		"/api/conversations/{run_id}/star",
 		"/api/conversations/reorder",
 		"/api/conversations/{run_id}/hard-delete",
-		"/api/conversations/{run_id}/members",
-		"/api/conversations/{run_id}/members/{subject}",
-		"/api/conversations/{run_id}/owner",
 		"/api/conversations/{run_id}/clone",
 		"/api/colleagues",
+		// ADR-0527: projects replace ADR-0213's per-conversation membership
+		// surface (three paths, six schemas, six tests below - all removed).
+		"/api/projects",
+		"/api/projects/{project_id}",
+		"/api/projects/{project_id}/delete-preview",
+		"/api/projects/{project_id}/star",
+		"/api/groups",
 	}
 	for _, path := range paths {
 		if _, ok := doc.Paths[path]; !ok {
@@ -173,28 +177,72 @@ func TestHardDeleteResponseMatchesOpenAPISpec(t *testing.T) {
 
 // ADR-0213 wire structs.
 
-func TestMemberMatchesOpenAPISpec(t *testing.T) {
-	assertMatchesSchema(t, loadOpenAPISpec(t), apiMember{}, "Member")
+// ADR-0527 wire structs. Reflected against openapi.json field-for-field,
+// the same way every shape above is - so a schema and a Go struct can never
+// drift silently.
+
+func TestProjectMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiProject{}, "Project")
 }
 
-func TestGrantMembershipRequestMatchesOpenAPISpec(t *testing.T) {
-	assertMatchesSchema(t, loadOpenAPISpec(t), apiGrantMembershipRequest{}, "GrantMembershipRequest")
+func TestProjectGrantMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiProjectGrant{}, "ProjectGrant")
 }
 
-func TestGrantMembershipResponseMatchesOpenAPISpec(t *testing.T) {
-	assertMatchesSchema(t, loadOpenAPISpec(t), apiGrantMembershipResponse{}, "GrantMembershipResponse")
+func TestProjectDetailMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiProjectDetail{}, "ProjectDetail")
 }
 
-func TestRevokeMembershipResponseMatchesOpenAPISpec(t *testing.T) {
-	assertMatchesSchema(t, loadOpenAPISpec(t), apiRevokeMembershipResponse{}, "RevokeMembershipResponse")
+func TestCreateProjectRequestMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiCreateProjectRequest{}, "CreateProjectRequest")
 }
 
-func TestTransferOwnershipRequestMatchesOpenAPISpec(t *testing.T) {
-	assertMatchesSchema(t, loadOpenAPISpec(t), apiTransferOwnershipRequest{}, "TransferOwnershipRequest")
+func TestSaveProjectRequestMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiSaveProjectRequest{}, "SaveProjectRequest")
 }
 
-func TestTransferOwnershipResponseMatchesOpenAPISpec(t *testing.T) {
-	assertMatchesSchema(t, loadOpenAPISpec(t), apiTransferOwnershipResponse{}, "TransferOwnershipResponse")
+func TestCreateProjectResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiCreateProjectResponse{}, "CreateProjectResponse")
+}
+
+func TestDeletePreviewMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiDeletePreview{}, "DeletePreview")
+}
+
+func TestDeleteProjectResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiDeleteProjectResponse{}, "DeleteProjectResponse")
+}
+
+func TestProjectStarResponseMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiProjectStarResponse{}, "ProjectStarResponse")
+}
+
+func TestRealmGroupMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), apiRealmGroup{}, "RealmGroup")
+}
+
+// ADR-0527: the removed ADR-0213 surface must stay removed. A stray Member
+// schema left behind in openapi.json would keep documenting an endpoint no
+// handler serves.
+func TestConversationMembershipSurfaceIsGone(t *testing.T) {
+	doc := loadOpenAPISpec(t)
+	for _, path := range []string{
+		"/api/conversations/{run_id}/members",
+		"/api/conversations/{run_id}/members/{subject}",
+		"/api/conversations/{run_id}/owner",
+	} {
+		if _, ok := doc.Paths[path]; ok {
+			t.Errorf("openapi.json still documents %q, which ADR-0527 removed", path)
+		}
+	}
+	for _, schema := range []string{
+		"Member", "GrantMembershipRequest", "GrantMembershipResponse",
+		"RevokeMembershipResponse", "TransferOwnershipRequest", "TransferOwnershipResponse",
+	} {
+		if _, ok := doc.Components.Schemas[schema]; ok {
+			t.Errorf("openapi.json still defines schema %q, which ADR-0527 removed", schema)
+		}
+	}
 }
 
 func TestCloneConversationResponseMatchesOpenAPISpec(t *testing.T) {
