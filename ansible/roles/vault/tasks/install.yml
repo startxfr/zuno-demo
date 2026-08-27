@@ -301,6 +301,10 @@
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault read -format=json transit/keys/zuno-platform-signer"
   register: _vault_transit_key_raw
   changed_when: false
+  # k8s_exec stamps the whole command line, root token included, into the
+  # result's invocation.module_args - so an unmasked failure here prints the
+  # token. Same reason as every other VAULT_TOKEN task in this role.
+  no_log: true
 
 - name: "vault | select the Transit key's latest version (indexed by latest_version, not hardcoded, so a real future rotation stays correct)"
   ansible.builtin.set_fact:
@@ -1244,3 +1248,6 @@
     container: vault
     command: >-
       sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/platform/cluster-domain domain={{ cluster_base_domain }}"
+  # See the Transit-key read above: unmasked, a failure here prints the root
+  # token via invocation.module_args.
+  no_log: true

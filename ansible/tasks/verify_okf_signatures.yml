@@ -57,6 +57,36 @@
   no_log: true
   when: not _okf_verify_skip
 
+# Strip the token before these results travel any further.
+#
+# kubernetes.core.k8s_exec does NOT mark `command` as no_log in its argument
+# spec, so the module stamps the whole command line - VAULT_TOKEN included -
+# into every result's `invocation.module_args`. Task-level `no_log` censors
+# only that task's own callback output; the registered variable keeps the
+# payload, which is the entire point of registering it. Any later task that
+# consumes those results as a `loop:` gets the item copied verbatim into its
+# own result, and the `fail` task below then prints the whole dict by design.
+# That chain put `VAULT_TOKEN=hvs...` in the play output on 2026-08-27.
+#
+# Projecting to just the three fields the two loops actually use breaks the
+# chain at its source. Do NOT "fix" this by adding no_log to the fail task
+# instead: that would suppress the remedy message added the same day (see the
+# comment above it), trading a leak for the opacity that cost a full
+# acceptance-gate run to diagnose.
+- name: "okf-signatures | project the fetched signatures, dropping the token-bearing invocation"
+  ansible.builtin.set_fact:
+    _okf_verify_signatures: >-
+      {{ _okf_verify_signatures | default([]) + [{
+           'agent_dir': fetched_raw.agent_dir,
+           'rc': fetched_raw.rc | default(1),
+           'stdout': fetched_raw.stdout | default('') }] }}
+  loop: "{{ _okf_verify_fetched.results | default([]) }}"
+  loop_control:
+    loop_var: fetched_raw
+    label: "{{ fetched_raw.agent_dir.path | basename }}"
+  no_log: true
+  when: not _okf_verify_skip
+
 - name: "okf-signatures | verify each fetched signature against the current bundle content"
   ansible.builtin.shell:
     cmd: >-
@@ -66,7 +96,7 @@
       --signature /tmp/{{ (fetched_result.agent_dir.path | basename) }}.sig
       --public-key agents/zuno-platform-signer.pub
     chdir: "{{ zuno_repo_root }}"
-  loop: "{{ _okf_verify_fetched.results | default([]) }}"
+  loop: "{{ _okf_verify_signatures | default([]) }}"
   loop_control:
     loop_var: fetched_result
     label: "{{ fetched_result.agent_dir.path | basename }}"
