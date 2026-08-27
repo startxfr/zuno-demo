@@ -36,6 +36,7 @@ import json
 import logging
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -1903,6 +1904,65 @@ def _rebuild_vector_index(conn, cur) -> None:
     logger.info("index-pgvector: rebuilt %s with lists=%d for %d rows", _VECTOR_INDEX_NAME, lists, rows)
 
 
+# ADR-0525 follow-up (2026-08-27): this stage holds ONE connection for hours.
+# The 12:50 run died at 249,911/310,537 rows with
+# `psycopg.OperationalError: the connection is lost` - the pod talks to
+# PostgreSQL through pgbouncer and an istio sidecar, and the Postgres pods
+# were restarting. A multi-hour single connection cannot be assumed to
+# survive, so a lost one is recovered rather than fatal.
+_INDEX_DB_ATTEMPTS = 4
+_INDEX_DB_BACKOFF_SECONDS = 2.0
+
+
+def _discard_connection(conn) -> None:
+    """Drops a connection that is probably already dead.
+
+    Both calls are guarded on purpose: in the 12:50 failure the
+    `conn.rollback()` in the error handler *itself* raised
+    `the connection is lost`, which replaced the real error with a
+    misleading one. Cleanup must never be able to mask the cause.
+    """
+    for step in (conn.rollback, conn.close):
+        try:
+            step()
+        except Exception:  # noqa: BLE001 - the connection is already gone
+            pass
+
+
+def _write_window(conn, config, rows: list) -> int:
+    """Upserts one window's rows, reconnecting and replaying on a lost
+    connection. Returns (rows written, connection to keep using).
+
+    Replay is safe without any bookkeeping because the statement is an
+    upsert: re-applying a window that was partially committed rewrites the
+    same rows to the same values. That is the same property that let the
+    2026-08-27 run resume over the 112,864 rows an earlier run had left.
+    """
+    for attempt in range(1, _INDEX_DB_ATTEMPTS + 1):
+        try:
+            with conn.cursor() as cur:
+                for start in range(0, len(rows), _INDEX_WRITE_BATCH_ROWS):
+                    cur.executemany(_INDEX_UPSERT_SQL, rows[start:start + _INDEX_WRITE_BATCH_ROWS])
+            conn.commit()
+            return len(rows), conn
+        except psycopg.OperationalError as exc:
+            if attempt == _INDEX_DB_ATTEMPTS:
+                logger.error(
+                    "index-pgvector: connection lost and not recovered after %d attempts: %s",
+                    _INDEX_DB_ATTEMPTS, exc,
+                )
+                raise
+            logger.warning(
+                "index-pgvector: connection lost (%s), reconnecting and replaying "
+                "this window - attempt %d/%d",
+                exc, attempt, _INDEX_DB_ATTEMPTS,
+            )
+            _discard_connection(conn)
+            time.sleep(_INDEX_DB_BACKOFF_SECONDS * attempt)
+            conn = _pg_connect(config)
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
     changeset = _load_changeset(config, store, "index-pgvector")
     if not changeset:
@@ -1936,15 +1996,18 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
         logger.warning("index-pgvector: could not drop %s, indexing with it in place", _VECTOR_INDEX_NAME)
 
     try:
-        with conn.cursor() as cur, ThreadPoolExecutor(
+        with ThreadPoolExecutor(
             max_workers=max(1, config.index_read_concurrency)
         ) as io_pool:
             position = 0
             for offset in range(0, len(doc_ids), window_size):
                 window = doc_ids[offset:offset + window_size]
-                fetched = io_pool.map(
+                # Deliberately OUTSIDE the retry below: the S3 prefetch does
+                # not depend on the database connection, so a replay must not
+                # re-fetch it.
+                fetched = list(io_pool.map(
                     lambda d: store.get_json(f"{config.normalized_prefix}/{d}.chunks.json"), window
-                )
+                ))
                 pending: list = []
                 for doc_id, record in zip(window, fetched):
                     position += 1
@@ -1970,16 +2033,6 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                                 json.dumps(metadata),
                             )
                         )
-                        # Flush inside the window so a single window cannot
-                        # build an unbounded list of 1024-dimension vectors.
-                        if len(pending) >= _INDEX_WRITE_BATCH_ROWS:
-                            cur.executemany(_INDEX_UPSERT_SQL, pending)
-                            indexed += len(pending)
-                            pending.clear()
-                if pending:
-                    cur.executemany(_INDEX_UPSERT_SQL, pending)
-                    indexed += len(pending)
-                    pending.clear()
                 # Commit per window, not per run and no longer per document.
                 # Per-run was never safe (a Patroni failover mid-run lost
                 # every upserted row); per-document cost one commit
@@ -1987,27 +2040,37 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                 # dominated the stage. A window bounds what a failover can
                 # lose to the documents prefetched above, and the upsert
                 # keeps partial progress safe to re-run either way.
-                # ADR-0525 batches the writes WITHIN a window; this commit
-                # boundary deliberately did not move.
-                conn.commit()
+                # ADR-0525 batches the writes WITHIN a window (in
+                # _INDEX_WRITE_BATCH_ROWS chunks); this commit boundary
+                # deliberately did not move.
+                if pending:
+                    written, conn = _write_window(conn, config, pending)
+                    indexed += written
                 logger.info(
                     "index-pgvector: %d/%d documents processed, %d chunk rows so far",
                     position, len(doc_ids), indexed,
                 )
 
-            for url in changeset.get("deleted_urls", []):
-                cur.execute("DELETE FROM document_embeddings WHERE source = %s", (url,))
-                deleted += cur.rowcount
-        conn.commit()
+            deleted_urls = changeset.get("deleted_urls", [])
+            if deleted_urls:
+                with conn.cursor() as cur:
+                    for url in deleted_urls:
+                        cur.execute("DELETE FROM document_embeddings WHERE source = %s", (url,))
+                        deleted += cur.rowcount
+                conn.commit()
     except Exception:
-        conn.rollback()
+        _discard_connection(conn)
         raise
     finally:
         # Must survive the exception path: leaving the index dropped would
         # degrade this domain's retrieval to a sequential scan until the next
-        # successful run.
+        # successful run. The failure that gets here is usually a LOST
+        # connection, so the rebuild needs a fresh one - the whole point is
+        # that this runs when things have already gone wrong.
         if dropped_vector_index:
             try:
+                if getattr(conn, "closed", False):
+                    conn = _pg_connect(config)
                 with conn.cursor() as cur:
                     _rebuild_vector_index(conn, cur)
             except Exception:
@@ -2016,7 +2079,10 @@ def stage_index_pgvector(config: IngestionConfig, store: CorpusStore) -> None:
                     "will sequential-scan until it is rebuilt manually",
                     _VECTOR_INDEX_NAME,
                 )
-        conn.close()
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001 - already gone
+            pass
     logger.info("index-pgvector: upserted %d chunk rows, deleted %d orphaned rows", indexed, deleted)
 
 

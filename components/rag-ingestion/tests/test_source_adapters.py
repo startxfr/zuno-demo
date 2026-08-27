@@ -1164,6 +1164,49 @@ def test_index_pgvector_recreates_the_index_even_when_the_load_fails():
     assert state["closed"] is True, "connection was not closed"
 
 
+def test_index_pgvector_reconnects_and_replays_a_window_on_a_lost_connection():
+    """2026-08-27: the run died at 249,911/310,537 rows with
+    `psycopg.OperationalError: the connection is lost`. This stage holds one
+    connection for hours through pgbouncer and an istio sidecar while the
+    Postgres pods restart, so a lost connection must be recovered, not fatal.
+    The replay is safe because the statement is an upsert."""
+    import psycopg
+
+    config = _config(INGESTION_DOMAIN="knowledge.tech")
+    store = _index_store_with(3000)
+    state = _index_state(existing_rows=500_000)  # big table => no index rebuild
+
+    class _FlakyConn(_FakeIndexConn):
+        def cursor(self):
+            # Die once, partway through, exactly like the live failure.
+            if self._state["executemany"] and not self._state.get("blown"):
+                self._state["blown"] = True
+                self._state["discarded"] = True
+                raise psycopg.OperationalError("the connection is lost")
+            return _FakeIndexCursor(self._state)
+
+        def rollback(self):
+            # The live failure ALSO raised here, replacing the real error
+            # with a misleading one. Cleanup must swallow this.
+            raise psycopg.OperationalError("the connection is lost")
+
+    conns = []
+
+    def _fake_connect(_cfg):
+        c = _FlakyConn(state)
+        conns.append(c)
+        return c
+
+    with mock.patch.object(rag_ingestion, "_pg_connect", _fake_connect):
+        with mock.patch.object(rag_ingestion.time, "sleep", lambda *_a: None):
+            stage_index_pgvector(config, store)
+
+    assert state["blown"] is True, "the failure never triggered"
+    assert len(conns) >= 2, "no reconnection happened"
+    # Every row still lands despite the mid-flight loss.
+    assert state["rows_written"] >= 3000, state["rows_written"]
+
+
 def test_ivfflat_lists_sizing_matches_pgvector_guidance():
     assert rag_ingestion._ivfflat_lists_for(0) == 10        # floor
     assert rag_ingestion._ivfflat_lists_for(5_000) == 10    # floor
@@ -1219,6 +1262,7 @@ TESTS = [
     test_index_pgvector_batches_writes_instead_of_one_execute_per_row,
     test_index_pgvector_rebuilds_the_vector_index_sized_from_real_rows,
     test_index_pgvector_recreates_the_index_even_when_the_load_fails,
+    test_index_pgvector_reconnects_and_replays_a_window_on_a_lost_connection,
     test_ivfflat_lists_sizing_matches_pgvector_guidance,
 ]
 

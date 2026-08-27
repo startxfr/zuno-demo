@@ -1443,7 +1443,12 @@ pipeline:
   # that rejection as non-fatal, so the play still reports failed=0 while
   # silently keeping the old spec. Always confirm the compiled version
   # actually changed rather than trusting the play's exit code.
-  version: v0-6-0
+  # v0-7-0 (2026-08-27): detect-changes resources reverted to cpu:2/6Gi
+  #  after the O(n^2) fix (d340e7ab) showed the v0-6-0 sizing was treating a
+  #  symptom. A resources change is part of the compiled spec, so it needs a
+  #  new name here - re-applying v0-6-0 is rejected as immutable, and since
+  #  b7a86aaf that rejection fails the play loudly instead of silently.
+  version: v0-7-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true
@@ -1635,23 +1640,26 @@ resources:
     requests: {cpu: "500m", memory: "1536Mi"}
     limits: {cpu: "2", memory: "6Gi"}
   detectChanges:
-    requests: {cpu: "1", memory: "3Gi"}
-    # WP-084 (2026-08-26): sized up to match `normalize`. This stage does
-    # one S3 GET per document over the WHOLE corpus - the same shape and
-    # scale of work as normalize - but had been sized like the small
-    # fixed-cost stages (validate, reconcileAcls). On the 310,537-document
-    # SXA dump that cost ~108 min: measured 48 docs/s using 982m of its
-    # 2-CPU limit, i.e. latency-bound at 16 workers rather than CPU-bound.
-    # The 2026-08-26 run was terminated at 110 min, ~2 min from finishing.
-    limits: {cpu: "8", memory: "24Gi"}
+    # CORRECTION (2026-08-27). An earlier WP-084 change raised these to
+    # cpu:8/24Gi on the theory that the stage was latency-bound at 16
+    # workers. That diagnosis was WRONG, and this comment previously
+    # asserted it as fact. The ~108 min this stage took on the SXA dump was
+    # a genuine O(n^2): `unchanged_ids` was computed with
+    # `doc_id not in new_ids` against plain lists, scanned once per
+    # document, which pegs a core regardless of how much CPU it is given.
+    # Fixed in d340e7ab by using a set. Sizing was treating the symptom, so
+    # it goes back to what the other fixed-cost stages use. If a future
+    # measurement (taken AFTER that fix) shows a real CPU ceiling here,
+    # raise these again - but on evidence, not on this reasoning.
+    requests: {cpu: "500m", memory: "1536Mi"}
+    limits: {cpu: "2", memory: "6Gi"}
     # WP-58: bounds the per-document S3 GET pool that rebuilds
     # detect-changes' "current" state (DETECT_CHANGES_READ_CONCURRENCY) -
     # network/S3-latency-bound, same rationale as resources.fetch's
     # concurrency knobs above.
-    # WP-084: 16 -> 64. At ~330ms per GET this projects ~194 docs/s (~27
-    # min for the SXA dump) drawing ~4 CPU, which is why the limit above
-    # is 8 and not 4 - 64 workers must not be throttled back into the same
-    # latency wall they are meant to hide.
+    # WP-084: 16 -> 64. This half of the change stands on its own: the pool
+    # really is S3-latency-bound, and 64 in-flight GETs cost little CPU
+    # once the O(n^2) above is gone.
     readConcurrency: 64
 
 networkPolicy:
