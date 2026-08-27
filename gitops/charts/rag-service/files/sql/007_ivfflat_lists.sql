@@ -15,6 +15,9 @@
 -- re-sizes it again after any bulk load, which is the only moment a truly
 -- accurate row count exists; this file exists so a database that never gets
 -- re-ingested is not left mis-sized.
+--
+-- It RESIZES an existing index; it never creates a missing one. See the
+-- guard below for why.
 DO $$
 DECLARE
     v_rows   bigint;
@@ -35,13 +38,34 @@ BEGIN
       FROM pg_class c
      WHERE c.relname = 'ix_document_embeddings_embedding_cosine';
 
-    IF v_current IS NOT NULL AND v_current = v_lists THEN
+    -- 2026-08-27: an ABSENT index is not this file's job to create, and
+    -- treating it as "needs rebuilding" made things worse rather than
+    -- better. 006 creates it on a fresh database while the table is still
+    -- empty, and rag-ingestion's index-pgvector stage recreates it after
+    -- any bulk load (_rebuild_vector_index, CREATE INDEX IF NOT EXISTS).
+    -- Both of those build it at a moment when building it is cheap or
+    -- properly resourced; this Job is neither. It runs with
+    -- activeDeadlineSeconds: 300, and - measured that same day against the
+    -- 319,713-row sxa-legacy corpus - the build needs 87 MB of
+    -- maintenance_work_mem against this server's 64 MB default, so it
+    -- would abort outright and, under ON_ERROR_STOP=1, fail the whole
+    -- schema apply for every domain. Defer instead, loudly.
+    IF v_current IS NULL THEN
+        RAISE NOTICE 'ivfflat index absent for % rows - deferring creation to rag-ingestion''s index-pgvector stage', v_rows;
+        RETURN;
+    END IF;
+
+    IF v_current = v_lists THEN
         RAISE NOTICE 'ivfflat lists already %, nothing to do', v_lists;
         RETURN;
     END IF;
 
-    RAISE NOTICE 'resizing ivfflat lists % -> % for % rows',
-        coalesce(v_current, -1), v_lists, v_rows;
+    RAISE NOTICE 'resizing ivfflat lists % -> % for % rows', v_current, v_lists, v_rows;
+    -- Same measured ceiling as above: the requirement scales with `lists`,
+    -- so a corpus that merely grows starts failing here with no other
+    -- change. Mirrors what rag_ingestion.py's _rebuild_vector_index sets,
+    -- for the same reason. Session-scoped, held only for this build.
+    SET LOCAL maintenance_work_mem = '512MB';
     DROP INDEX IF EXISTS ix_document_embeddings_embedding_cosine;
     EXECUTE format(
         'CREATE INDEX ix_document_embeddings_embedding_cosine '

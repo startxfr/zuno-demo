@@ -129,3 +129,42 @@ hybrid linear attention, *not* plain Qwen3 dense) and `Qwen3ForCausalLM`
   migration 006's TRUNCATE-then-widen and the big-bang re-embed both ran to completion. The
   empty `rag-sxa-legacy` table is not a gap in this ADR: that re-embed is WP-084's open operator
   action, and `rag-sales` is empty because `domains.sales` ships `enabled: false` per ADR-0218.
+
+### 2026-08-27 — the 384 -> 1024 cutover left the schema-apply Job unrepeatable
+
+Decision 2 guarded `006_embedding_1024.sql` so a re-run cannot wipe the
+re-ingested corpus, but nothing guarded the migration that runs *before* it.
+`004_rag_chunking.sql` kept narrowing the same column to `vector(384)`
+unconditionally, so on any database this cutover had already widened, the
+schema-apply Job aborted at 004 with `expected 384 dimensions, not 1024` and
+never reached 006 at all. The Job could therefore only ever succeed once, on a
+pre-cutover database.
+
+Two consequences were live and unnoticed until a pre-deployment check for
+WP-088 went looking:
+
+- Because psql commits each statement separately, 004's
+  `DROP INDEX IF EXISTS ix_document_embeddings_embedding_cosine` **committed**
+  before its `ALTER` aborted. Every failed run left the domain's ivfflat index
+  dropped and unrebuilt. Verified on 2026-08-27: the index was absent from
+  `rag-tech` (68,931 embedded rows) and `rag-sxa-legacy` (319,713), so vector
+  search on both real corpora had degraded to a sequential scan.
+- This ADR's own documented rollback — "`git revert` + re-sync + re-ingestion
+  back to 384" — could not work either: the re-sync runs 004 against a
+  populated 1024-wide column and aborts the same way. Rollback would have
+  needed a manual `TRUNCATE` first.
+
+Fixed by giving 004 the same `atttypmod` guard 006 already carried, keyed on
+the 1536 that `002_pgvector.sql` creates, so it fires only on a genuinely fresh
+database. `007_ivfflat_lists.sql` additionally stopped treating an absent index
+as one to rebuild — that build needs 87 MB of `maintenance_work_mem` against
+this server's 64 MB default (measured the same day on the sxa-legacy corpus)
+and would abort inside a Job capped at `activeDeadlineSeconds: 300`; creation
+is deferred to rag-ingestion's `index-pgvector` stage, which already sets the
+memory it needs. `components/rag-service/tests/test_schema_idempotence.py`
+now applies the whole chain three times over real 1024-dimensional rows
+against a throwaway pgvector container, and was confirmed to fail on the
+unfixed 004 with the exact production error before being accepted.
+
+Neither this ADR's decisions nor its target state change. The end state was
+always `vector(1024)`; only the path to it was not repeatable.

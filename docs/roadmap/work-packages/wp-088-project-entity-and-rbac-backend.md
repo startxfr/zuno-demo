@@ -173,6 +173,19 @@ Read also: [ADR-0209](../../adr/0209-introduce-project-scoped-agent-memory.md)
   secret - still outstanding from WP-066 - and add the `realm-management`
   `query-groups` role alongside WP-066's `view-users`/`query-users`. Until then
   both `GET /api/colleagues` and `GET /api/groups` answer 503, by design.
+- **Done 2026-08-27, by code rather than by hand:** the `project` knowledge
+  domain was still `enabled: false` in
+  `gitops/charts/rag-service/values.yaml`, so no schema-apply Job had ever been
+  rendered for it and `rag-project` held no tables at all. That is not cosmetic
+  for this WP - without `project_memberships`, the ADR-0527 clause 8 projection
+  returns 500 and every project create/save fails 503, so the feature would
+  have been dead on arrival. Flipped in the repo (the same route WP-21 used for
+  `sales` and WP-065 for `sxa-legacy`), which required first fixing an
+  unrelated pre-existing defect that made the schema-apply Job unrepeatable -
+  see ADR-0518's 2026-08-27 note. Everything else that block was waiting on was
+  already provisioned and was verified live that day: database, role (can log
+  in), `vector` extension, CREATE/CONNECT grants, and a `SecretSynced` Vault
+  ExternalSecret.
 - Rebuild and redeploy `agent-runtime`, `rag-service`, the agent BFF and the
   agent frontend; confirm the startup DDL applied (the two `NOTICE` lines) on a
   database that still holds pre-existing `conversations.project_id` values.

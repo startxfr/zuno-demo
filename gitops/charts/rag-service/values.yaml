@@ -129,11 +129,24 @@ knowledgeDomains:
     seed: false
   # knowledge.project (ADR-0209/WP-28) - unlike the four domains above,
   # this one has no rag-ingestion schedule to wait on (no source
-  # pipeline writes here at all, see knowledge/project/domain.yaml) -
-  # still ships disabled by default because its database/credentials are
-  # provisioned by the same WP-21 operator step as every other domain.
+  # pipeline writes here at all, see knowledge/project/domain.yaml).
+  #
+  # Enabled 2026-08-27 (WP-088 operator follow-up): the WP-21 provisioning
+  # this block used to wait on is done and was verified live that day - the
+  # rag-project database and the ragproject role exist on the PGO cluster
+  # (the role can log in), the `vector` extension is installed, the
+  # CREATE/CONNECT grants are in place, and the Vault-backed
+  # zuno-postgresql-pguser-ragproject ExternalSecret reports SecretSynced.
+  # Only this flag was still holding the schema back, so rag-project had no
+  # tables at all.
+  #
+  # ADR-0527 makes this load-bearing rather than merely tidy: its project
+  # RBAC is projected into project_memberships (005_project_memory.sql,
+  # extended by 008), and agent-runtime pushes that projection inside the
+  # grant-mutation transaction. With no such table, every project create or
+  # save fails 503 - the feature cannot work at all without this.
   - domain: project
-    enabled: false
+    enabled: true
     database: rag-project
     schema: rag
     envPrefix: RAGPROJECT
