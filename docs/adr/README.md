@@ -205,6 +205,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | v0.4 | Implemented | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
 | [ADR-0525](0525-batch-index-pgvector-writes-and-size-ivfflat-from-real-rows.md) | v0.4 | Repo work merged | Batch index-pgvector writes and size the ivfflat index from real row counts |
 | [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) | v0.4 | Repo work merged | Fine-tune and serve a French urban-register model variant (`-wesh`) beside its base |
+| [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | v0.4 | Proposed | Introduce the project as the sharing and context boundary |
+| [ADR-0528](0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md) | v0.4 | Proposed | Re-key project binding, quota and telemetry onto the Zuno project id |
 
 ## version 0.5
 
@@ -214,7 +216,7 @@ Goal: make the OpenShift AI MaaS governance plane live and route agent model cal
 |---|---|---|---|
 | [ADR-0201](0201-complete-the-openshift-ai-maas-governance-plane-integration.md) | v0.5 | Implemented | Complete the OpenShift AI MaaS governance plane integration |
 | [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md) | v0.5 | Implemented | Define OKF quota policy enforced via Kuadrant |
-| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.5 | Partially implemented | Introduce project-bound tasks with Salesforce-verified context |
+| [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md) | v0.5 | Superseded by ADR-0528 | Introduce project-bound tasks with Salesforce-verified context |
 | [ADR-0521](0521-route-local-model-traffic-through-maas.md) | v0.5 | Implemented | Route ai-gateway's local model traffic through MaaS |
 | [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) | v0.5 | Implemented | Enable OpenShift AI's built-in monitoring stack, side-by-side with the existing observability stack |
 | [ADR-0523](0523-dual-export-traces-into-the-rhoai-monitoring-stack.md) | v0.5 | Implemented | Dual-export traces into the RHOAI monitoring stack |
@@ -242,7 +244,7 @@ Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part o
 |---|---|---|---|
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.7 | Partially implemented | Automate source-specific knowledge ingestion |
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.7 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
-| [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.7 | Partially implemented | Introduce role-based conversation sharing between colleagues |
+| [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.7 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | v0.7 | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
 
 ## OKF stream
