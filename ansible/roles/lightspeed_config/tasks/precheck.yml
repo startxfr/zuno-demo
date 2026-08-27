@@ -45,13 +45,31 @@
 # here is the actionable signal - the most common causes, in order, are an
 # unseeded MaaS credential (WP-085 step 2), a missing CA bundle on the MaaS hop,
 # and a MaaSAuthPolicy that does not list this ServiceAccount.
-- name: "lightspeed-config | warn when any OLSConfig condition is not True"
+# Une condition False n'est pas forcement un echec : l'operateur publie
+# OtelCollectorReady / AgenticConsolePluginReady / AlertsAdapterReady a False
+# avec le message "... is disabled; image not provided" pour des composants
+# optionnels que cette installation ne deploie pas. Les compter comme des
+# defauts ferait crier au loup a chaque execution - constate live le
+# 2026-08-27, ou les 5 conditions qui comptent etaient toutes True.
+- name: "lightspeed-config | isolate the conditions that are genuinely failing"
+  ansible.builtin.set_fact:
+    _ols_failing: >-
+      {{ (_ols_cr.resources[0].status.conditions | default([]))
+         | rejectattr('status', 'equalto', 'True')
+         | rejectattr('message', 'search', '(?i)disabled|image not provided')
+         | list }}
+  when: (_ols_cr.resources | default([]) | length) > 0
+
+- name: "lightspeed-config | warn when a condition is genuinely not True"
   ansible.builtin.debug:
     msg: >-
-      One or more OLSConfig conditions are not True. Check
-      `oc get olsconfig cluster -o jsonpath='{.status.conditions}'` and the
-      lightspeed-operator-controller-manager logs in openshift-lightspeed.
+      Conditions OLSConfig en echec :
+      {{ _ols_failing | map(attribute='type') | list | join(', ') }}.
+      Verifier `oc get olsconfig cluster -o jsonpath='{.status.conditions}'` et
+      les logs de lightspeed-operator-controller-manager dans
+      openshift-lightspeed. Causes les plus frequentes, dans l'ordre : un
+      credential MaaS absent ou invalide, le bundle CA manquant sur le saut
+      MaaS, ou une MaaSAuthPolicy qui ne liste pas ce ServiceAccount.
   when:
     - (_ols_cr.resources | default([]) | length) > 0
-    - (_ols_cr.resources[0].status.conditions | default([])
-       | rejectattr('status', 'equalto', 'True') | list | length) > 0
+    - (_ols_failing | default([]) | length) > 0

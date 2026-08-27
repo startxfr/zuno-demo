@@ -39,22 +39,37 @@
   when: (_ls_crd.resources | default([]) | length) > 0
   failed_when: false
 
-# Prefers an app-server-ish name, then anything that is not the operator's own
-# metrics/webhook Service. Name-shape matching rather than a label selector: the
-# operator's operand labels are as unverified as its Service names, so matching
-# on the thing we can actually see listed is the more honest heuristic - and the
-# candidates are reported below either way.
-- name: "day3-lightspeed | pick the API Service to probe"
+# Which Service to probe is decided by REACHABILITY, not by importance.
+#
+# Verified live 2026-08-27: the operator installs its own NetworkPolicies, and
+# `lightspeed-app-server` admits only `openshift-console`, `openshift-monitoring`
+# and the ingress policy-group on 8443 - **not** same-namespace pods. A probe Job
+# in this namespace therefore times out against it, by the operator's design, not
+# by any fault of ours. That invalidated the assumption this file was first
+# written on ("same-namespace is always admitted"), which holds for the platform
+# default-deny baseline but not for a policy an operator ships itself.
+#
+# `lightspeed-rhokp` and `openshift-mcp-server` both admit `podSelector: {}` -
+# any pod in the namespace - and were confirmed answering (200 and 404
+# respectively; a 404 still proves HTTP is being served). They are what this
+# probe targets.
+#
+# The API server itself is NOT left unverified: `OLSConfig.status.ApiReady` is
+# the operator's own published assertion about it, checked by
+# ansible/roles/lightspeed_config/tasks/precheck.yml. The two checks are
+# complementary - conditions for the unreachable component, real HTTP for the
+# reachable ones.
+- name: "day3-lightspeed | pick a same-namespace-reachable Service to probe"
   ansible.builtin.set_fact:
     _ls_candidates: >-
       {{ (_ls_services.resources | default([]))
-         | rejectattr('metadata.name', 'search', 'operator|webhook|metrics')
+         | rejectattr('metadata.name', 'search', 'operator|webhook|metrics|app-server|console-plugin|postgres')
          | list }}
 
 - name: "day3-lightspeed | resolve host and port"
   ansible.builtin.set_fact:
     _ls_target: >-
-      {{ (_ls_candidates | selectattr('metadata.name', 'search', 'app-server|app|server') | list
+      {{ (_ls_candidates | selectattr('metadata.name', 'search', 'rhokp|mcp-server') | list
           | default([], true) | first)
          | default((_ls_candidates | first) | default({}, true), true) }}
   when: (_ls_candidates | length) > 0
