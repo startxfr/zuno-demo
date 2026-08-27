@@ -23,6 +23,17 @@ COPY components/mlops/src/mlops.py /opt/app-root/src/mlops.py
 COPY components/mlops/mlops-run /opt/app-root/src/mlops-run
 RUN chmod 0755 /opt/app-root/src/mlops-run
 COPY evaluations /opt/app-root/src/evaluations
+# WP-087: evaluations/ alone is NOT enough, and the gap is invisible until
+# a run actually happens. evaluations/<agent>/gate_checks.py and
+# security_checks.py both resolve their repo root as
+# pathlib.Path(__file__).resolve().parents[2] - which inside this image is
+# /opt/app-root/src - and then read policies/... and
+# platform/ai-gateway/provider-routing.yaml from there. Both check layers
+# are mandatory (a failure is not skippable), so without these two COPYs
+# the `evaluate` stage fails 100% of the time, on every agent, for a
+# reason that looks nothing like a missing file.
+COPY policies /opt/app-root/src/policies
+COPY platform/ai-gateway /opt/app-root/src/platform/ai-gateway
 
 USER 1001
 WORKDIR /opt/app-root/src

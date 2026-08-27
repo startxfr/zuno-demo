@@ -28,6 +28,10 @@ data:
   PGSCHEMA: {{ .Values.postgres.schema | quote }}
   PGSSLMODE: {{ .Values.postgres.sslmode | quote }}
   MLOPS_EVALUATIONS_DIR: {{ .Values.evaluations.dir | quote }}
+  # WP-087: the `evaluate` stage runs the agent's real acceptance suite
+  # against the live platform - see values.yaml's acceptanceGate block.
+  KEYCLOAK_URL: {{ .Values.acceptanceGate.keycloakUrl | quote }}
+  FRONTEND_URL: {{ .Values.acceptanceGate.frontendUrl | quote }}
   # ADR-0301 point 3 / D5: the real Helm value, never the ADRs' original
   # stale zuno-ai-build (see values.yaml's own modelRegistry.namespace
   # comment).

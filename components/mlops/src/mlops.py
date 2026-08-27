@@ -1262,11 +1262,53 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
 def _model_registry_base_url(config: MlopsConfig) -> str:
     if config.model_registry_url:
         return config.model_registry_url.rstrip("/")
-    # In-cluster default: one Model Registry instance per registered name,
-    # namespace read from the real Helm value (D5 - see MlopsConfig's own
-    # field comment), never the stale zuno-ai-build the ADRs' original
-    # Decision text assumed.
-    return f"http://modelregistry-sample.{config.model_registry_namespace}.svc.cluster.local:8080"
+    # WP-087: WP-34's default named modelregistry-sample:8080 over plain
+    # HTTP. No such Service exists - not in this namespace, not anywhere -
+    # which is one reason push-registry has never run successfully.
+    #
+    # Every part is a VALUE, not a literal, and deliberately so: nothing in
+    # this repository creates or names a ModelRegistry instance (the
+    # openshift-ai chart only sets registriesNamespace), so the service
+    # name, port and scheme are operator observations, not facts this repo
+    # owns. UNVERIFIED against a live cluster - an operator corrects a Helm
+    # value here, never code.
+    return (
+        f"{config.model_registry_scheme}://{config.model_registry_service}"
+        f".{config.model_registry_namespace}.svc.cluster.local:{config.model_registry_port}"
+    )
+
+
+def _registry_session(config: MlopsConfig) -> "requests.Session":
+    """A requests Session carrying the Model Registry's auth and TLS trust.
+
+    WP-34 issued three bare requests.post calls: no Authorization header
+    and no CA bundle, which cannot work against an HTTPS, authenticated
+    registry. The token is read fresh from disk at call time (a projected
+    ServiceAccount token is rotated in place, so caching its contents at
+    import would eventually send an expired one), and verification uses
+    the cluster's service-CA bundle - the same pattern app/providers.py
+    and app/maas_adapter.py already use for in-cluster TLS.
+    """
+    session = requests.Session()
+    token = os.environ.get("MODEL_REGISTRY_TOKEN")
+    if not token and config.model_registry_token_path:
+        token_file = Path(config.model_registry_token_path)
+        if token_file.is_file():
+            token = token_file.read_text(encoding="utf-8").strip()
+    if token:
+        session.headers["Authorization"] = f"Bearer {token}"
+    else:
+        logger.warning(
+            "no Model Registry token available (MODEL_REGISTRY_TOKEN unset, %s absent) - "
+            "the registry call will be unauthenticated",
+            config.model_registry_token_path,
+        )
+    ca = config.model_registry_ca_bundle
+    if ca and Path(ca).is_file():
+        session.verify = ca
+    elif config.model_registry_scheme == "https":
+        logger.warning("CA bundle %s not found; falling back to the system trust store", ca)
+    return session
 
 
 def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
@@ -1291,10 +1333,21 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
         raise SystemExit(f"no train_manifest.json for {config.agent}/{config.run_id}")
 
     base_url = _model_registry_base_url(config)
-    model_name = f"{config.agent}-lora"
+    model_name = config.registered_model_name or f"{config.agent}-lora"
     version_name = config.run_id
+    session = _registry_session(config)
 
-    registered_model = requests.post(
+    # ADR-0526 acceptance: "a model version whose artifact URI points at
+    # the MERGED checkpoint in S3". Falls back to the adapter prefix when
+    # no merge ran, so a grounding-domain run still registers something
+    # meaningful rather than failing on a missing manifest.
+    merge_manifest = store.get_json(f"{_run_prefix(config.model_prefix, config)}/merge_manifest.json")
+    if merge_manifest and merge_manifest.get("merged_model_uri"):
+        artifact_uri = merge_manifest["merged_model_uri"]
+    else:
+        artifact_uri = f"s3://{config.s3_bucket}/{train_manifest['adapter_s3_prefix']}"
+
+    registered_model = session.post(
         f"{base_url}/api/model_registry/v1alpha3/registered_models",
         json={"name": model_name, "description": f"LoRA adapter for {config.agent} (ADR-0301/WP-34)"},
         timeout=30,
@@ -1302,7 +1355,7 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
     registered_model.raise_for_status()
     registered_model_id = registered_model.json()["id"]
 
-    model_version = requests.post(
+    model_version = session.post(
         f"{base_url}/api/model_registry/v1alpha3/registered_models/{registered_model_id}/versions",
         json={
             "name": version_name,
@@ -1317,8 +1370,7 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
     model_version.raise_for_status()
     model_version_id = model_version.json()["id"]
 
-    artifact_uri = f"s3://{config.s3_bucket}/{train_manifest['adapter_s3_prefix']}"
-    model_artifact = requests.post(
+    model_artifact = session.post(
         f"{base_url}/api/model_registry/v1alpha3/model_versions/{model_version_id}/artifacts",
         json={"name": f"{model_name}-{version_name}-artifact", "uri": artifact_uri, "artifactType": "model-artifact"},
         timeout=30,

@@ -45,13 +45,22 @@ class _FakeStore:
     def __init__(self):
         self.objects: dict = {}
 
-    def download_prefix(self, bucket, prefix, local_dir):
-        # Mirrors ArtifactStore.download_prefix; the fake is flat (no
-        # per-bucket namespacing), bucket is accepted and ignored.
-        prefix = prefix.rstrip("/") + "/"
+    @property
+    def bucket(self):
+        return "test-bucket"
+
+    def _ns(self, bucket):
+        """WP-087: the real store spans several buckets in several regions.
+        The fake namespaces non-default buckets by prefix so a cross-bucket
+        write cannot silently land in the default one and pass a test that
+        would fail live."""
+        return "" if bucket in (None, "test-bucket") else f"@{bucket}/"
+
+    def download_prefix(self, bucket, prefix, local_dir, *, region=None, endpoint=None, include=None):
+        prefix = self._ns(bucket) + prefix.rstrip("/") + "/"
         count = 0
         for key, data in self.objects.items():
-            if key.startswith(prefix):
+            if key.startswith(prefix) and (include is None or include(key[len(prefix):])):
                 target = pathlib.Path(local_dir) / key[len(prefix):]
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
@@ -68,23 +77,24 @@ class _FakeStore:
     def put_text(self, key, text):
         self.objects[key] = text.encode("utf-8")
 
-    def get_bytes(self, key):
-        return self.objects.get(key)
+    def get_bytes(self, key, *, bucket=None, region=None, endpoint=None):
+        return self.objects.get(self._ns(bucket) + key)
 
-    def put_bytes(self, key, data):
-        self.objects[key] = data
+    def put_bytes(self, key, data, *, bucket=None):
+        self.objects[self._ns(bucket) + key] = data
 
-    def put_dir(self, prefix, local_dir):
+    def put_dir(self, prefix, local_dir, *, bucket=None, region=None, endpoint=None):
         uploaded = []
         for path in sorted(local_dir.rglob("*")):
             if path.is_file():
-                key = f"{prefix}/{path.relative_to(local_dir).as_posix()}"
+                key = f"{self._ns(bucket)}{prefix}/{path.relative_to(local_dir).as_posix()}"
                 self.objects[key] = path.read_bytes()
                 uploaded.append(key)
         return uploaded
 
-    def list_keys(self, prefix):
-        return [k for k in self.objects if k.startswith(prefix)]
+    def list_keys(self, prefix, *, bucket=None, region=None, endpoint=None):
+        full = self._ns(bucket) + prefix
+        return [k for k in self.objects if k.startswith(full)]
 
 
 def _config(**overrides) -> "mlops.MlopsConfig":
@@ -418,9 +428,12 @@ def test_stage_push_registry_registers_the_adapter_via_the_model_registry_api() 
             resp.json.return_value = {"id": "ma-1"}
         return resp
 
-    with mock.patch.object(mlops.requests, "post", side_effect=_fake_post) as mock_post:
+    session = mock.MagicMock()
+    session.post = mock.MagicMock(side_effect=_fake_post)
+    with mock.patch.object(mlops, "_registry_session", return_value=session):
         mlops.stage_push_registry(config, store)
 
+    mock_post = session.post
     assert mock_post.call_count == 3
     registration = store.get_json("mlops/registrations/comage/run-001/registration.json")
     assert registration["registered_model_id"] == "rm-1"
@@ -441,7 +454,118 @@ def test_model_registry_base_url_honors_an_explicit_override() -> None:
     assert mlops._model_registry_base_url(config) == "http://custom-registry:9090"
 
 
+# --- WP-087 / ADR-0526 --------------------------------------------------
+
+
+def test_registry_session_sends_a_bearer_token_and_trusts_the_service_ca() -> None:
+    """WP-34's three bare requests.post calls carried neither, which cannot
+    work against an HTTPS authenticated registry."""
+    with tempfile.TemporaryDirectory() as tmp:
+        token = pathlib.Path(tmp) / "token"
+        token.write_text("tok-abc\n")
+        ca = pathlib.Path(tmp) / "service-ca.crt"
+        ca.write_text("-----BEGIN CERTIFICATE-----")
+        config = _config(model_registry_token_path=str(token), model_registry_ca_bundle=str(ca))
+        session = mlops._registry_session(config)
+    assert session.headers["Authorization"] == "Bearer tok-abc"
+    assert session.verify == str(ca)
+
+
+def test_registry_base_url_is_https_and_built_from_values_not_hardcoded() -> None:
+    """The WP-34 default named modelregistry-sample:8080 over plain HTTP -
+    a Service that exists nowhere."""
+    url = mlops._model_registry_base_url(_config())
+    assert url == "https://zuno.rhoai-model-registries.svc.cluster.local:8443"
+    assert "modelregistry-sample" not in url
+    custom = mlops._model_registry_base_url(
+        _config(model_registry_service="mr", model_registry_port=9999, model_registry_scheme="http")
+    )
+    assert custom == "http://mr.rhoai-model-registries.svc.cluster.local:9999"
+
+
+def test_push_registry_registers_the_merged_checkpoint_uri_when_a_merge_ran() -> None:
+    """ADR-0526 acceptance: the registered version's artifact URI must
+    point at the MERGED checkpoint, not the adapter."""
+    config = _config(merged_model_s3uri="s3://models-bucket/models/qwen3.5-9b-wesh")
+    store = _FakeStore()
+    store.put_json("mlops/evaluations/comage/run-001/gate_result.json", {"overall": "PASS"})
+    store.put_json(
+        "mlops/models/comage/run-001/train_manifest.json",
+        {"classification": "C1", "base_model": "b", "lora_r": 8,
+         "adapter_s3_prefix": "mlops/models/comage/run-001/adapter"},
+    )
+    store.put_json(
+        "mlops/models/comage/run-001/merge_manifest.json",
+        {"merged_model_uri": "s3://models-bucket/models/qwen3.5-9b-wesh"},
+    )
+    session = mock.MagicMock()
+    session.post.return_value = mock.MagicMock(**{"json.return_value": {"id": "x"}})
+    with mock.patch.object(mlops, "_registry_session", return_value=session):
+        mlops.stage_push_registry(config, store)
+    registration = store.get_json("mlops/registrations/comage/run-001/registration.json")
+    assert registration["artifact_uri"] == "s3://models-bucket/models/qwen3.5-9b-wesh"
+
+
+def test_merge_export_refuses_a_non_empty_destination_without_an_explicit_override() -> None:
+    """That prefix is what a running KServe storage-initializer reads -
+    overwriting it silently would swap a serving model's weights."""
+    config = _config(merged_model_s3uri="s3://models-bucket/models/qwen3.5-9b-wesh")
+    store = _FakeStore()
+    store.put_json("mlops/models/comage/run-001/train_manifest.json",
+                   {"classification": "C1", "adapter_s3_prefix": "mlops/models/comage/run-001/adapter"})
+    store.put_bytes("models/qwen3.5-9b-wesh/config.json", b"{}", bucket="models-bucket")
+
+    raised = ""
+    try:
+        mlops.stage_merge_export(config, store)
+    except SystemExit as exc:
+        raised = str(exc)
+    assert "already holds" in raised, f"expected a refusal, got {raised!r}"
+    assert "MLOPS_MERGED_OVERWRITE" in raised
+
+
+def test_merge_export_requires_a_train_manifest_first() -> None:
+    config = _config(merged_model_s3uri="s3://models-bucket/models/qwen3.5-9b-wesh")
+    raised = False
+    try:
+        mlops.stage_merge_export(config, _FakeStore())
+    except SystemExit:
+        raised = True
+    assert raised
+
+
+def test_split_s3_uri_rejects_malformed_input() -> None:
+    assert mlops._split_s3_uri("s3://b/p/q") == ("b", "p/q")
+    assert mlops._split_s3_uri("s3://b/p/") == ("b", "p")
+    for bad in ("https://b/p", "s3://b", "s3://", "b/p"):
+        raised = False
+        try:
+            mlops._split_s3_uri(bad)
+        except SystemExit:
+            raised = True
+        assert raised, f"{bad!r} should have been rejected"
+
+
+def test_stages_and_stage_functions_stay_in_sync() -> None:
+    """A stage in one and not the other is an argparse rejection at run
+    time - and WP-087 names only STAGE_FUNCTIONS."""
+    assert set(mlops.STAGES) == set(mlops.STAGE_FUNCTIONS)
+    assert "merge-export" in mlops.STAGES
+    # merge-export must sit between train-lora and evaluate: push-registry
+    # registers the merged artifact's URI.
+    order = list(mlops.STAGES)
+    assert order.index("train-lora") < order.index("merge-export") < order.index("evaluate")
+
+
 TESTS = [
+    # WP-087 / ADR-0526
+    test_registry_session_sends_a_bearer_token_and_trusts_the_service_ca,
+    test_registry_base_url_is_https_and_built_from_values_not_hardcoded,
+    test_push_registry_registers_the_merged_checkpoint_uri_when_a_merge_ran,
+    test_merge_export_refuses_a_non_empty_destination_without_an_explicit_override,
+    test_merge_export_requires_a_train_manifest_first,
+    test_split_s3_uri_rejects_malformed_input,
+    test_stages_and_stage_functions_stay_in_sync,
     test_escalate_never_downgrades,
     test_escalate_upgrades_when_candidate_is_higher,
     test_escalate_unknown_candidate_defaults_to_c1_weight,

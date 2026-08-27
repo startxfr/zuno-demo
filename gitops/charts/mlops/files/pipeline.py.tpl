@@ -46,7 +46,10 @@ BASE_CONFIG_KEYS = {
     "MLOPS_MODELS_S3_ENDPOINT": "MLOPS_MODELS_S3_ENDPOINT",
     "MLOPS_MERGED_MODEL_S3URI": "MLOPS_MERGED_MODEL_S3URI",
     "MLOPS_MERGED_OVERWRITE": "MLOPS_MERGED_OVERWRITE",
+    "KEYCLOAK_URL": "KEYCLOAK_URL",
+    "FRONTEND_URL": "FRONTEND_URL",
 }
+GATE_SECRET = "{{ .Values.acceptanceGate.credentialsSecretName }}"
 AGENT_CONFIG_KEYS = {
     "MLOPS_AGENT": "MLOPS_AGENT",
     "MLOPS_KNOWLEDGE_DOMAINS": "MLOPS_KNOWLEDGE_DOMAINS",
@@ -93,6 +96,20 @@ def configure(task, *, agent):
         task,
         secret_name=PG_SECRET,
         secret_key_to_env={"PGUSER": "PGUSER", "PGPASSWORD": "PGPASSWORD"},
+    )
+    # WP-087: the `evaluate` stage authenticates a demo persona against
+    # Keycloak (evaluations/tekos/run_scenarios.py raises outright without
+    # this) and needs the Tekos frontend client secret for the token
+    # exchange. Applied to every stage rather than just evaluate - the
+    # stages share one configure() contract, and an env var an earlier
+    # stage ignores costs nothing.
+    kubernetes.use_secret_as_env(
+        task,
+        secret_name=GATE_SECRET,
+        secret_key_to_env={
+            "demo-persona-password": "DEMO_PERSONA_PASSWORD",
+            "tekos-frontend-client-secret": "TEKOS_FRONTEND_CLIENT_SECRET",
+        },
     )
     kubernetes.set_image_pull_policy(task, "{{ .Values.images.mlops.pullPolicy }}")
     return task
