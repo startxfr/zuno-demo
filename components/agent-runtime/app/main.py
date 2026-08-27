@@ -1200,6 +1200,7 @@ async def agent_chat(
                 graph, initial_state, config, request_id, run_id,
                 agent=agent_def.name, graph_shape=agent_def.graph_shape,
                 conversations_pool=conversations_pool, write_lock_holder=write_lock_holder,
+                project_id=resolved_project_id,
             ),
             media_type="text/event-stream",
             headers={
@@ -1210,9 +1211,12 @@ async def agent_chat(
         )
 
     try:
-        with api_request_span(run_id, agent=agent_def.name, request_id=request_id):
+        with api_request_span(
+            run_id, agent=agent_def.name, request_id=request_id, project_id=resolved_project_id
+        ):
             with graph_run_span(
-                payload.session_id, agent=agent_def.name, graph_shape=agent_def.graph_shape, run_id=run_id
+                payload.session_id, agent=agent_def.name, graph_shape=agent_def.graph_shape,
+                run_id=run_id, project_id=resolved_project_id,
             ) as recorder:
                 final_state = await _ainvoke_with_retry(
                     graph, initial_state, config, session_id=payload.session_id, request_id=request_id,
@@ -1232,6 +1236,9 @@ async def agent_chat(
         images=final_state.get("generated_images", []),
         run_id=run_id,
         source_mode=final_state.get("source_mode", "indexed"),
+        # ADR-0528: lets agent-bff tag its own span on the non-streaming
+        # path (the streaming path reads it from the SSE start event).
+        project_id=resolved_project_id or "",
     )
 
 
@@ -1273,6 +1280,7 @@ async def _stream_chat(
     graph_shape: Optional[str] = None,
     conversations_pool: Optional[Any] = None,
     write_lock_holder: Optional[str] = None,
+    project_id: Optional[str] = None,
 ) -> AsyncIterator[str]:
     """Streams token deltas from the `reason` node's underlying chat model
     via LangGraph's `astream_events` (v2), which surfaces
@@ -1310,9 +1318,14 @@ async def _stream_chat(
     agent_chat, previously only emitted for non-streaming calls even
     though streaming is the common case.
     """
-    with api_request_span(run_id, agent=agent, request_id=request_id) as api_recorder:
+    with api_request_span(
+        run_id, agent=agent, request_id=request_id, project_id=project_id
+    ) as api_recorder:
         try:
-            yield _sse("start", {"request_id": request_id, "run_id": run_id})
+            # ADR-0528: the start event carries the server-resolved project
+            # so agent-bff can tag its own span from the streaming path, the
+            # way it reads run_id today.
+            yield _sse("start", {"request_id": request_id, "run_id": run_id, "project_id": project_id or ""})
 
             citations: Any = []
             images: Any = []
@@ -1330,7 +1343,8 @@ async def _stream_chat(
             lease_lost = False
             next_renewal_at = time.monotonic() + _WRITE_LOCK_RENEW_SECONDS
             with graph_run_span(
-                initial_state.get("session_id", ""), agent=agent, graph_shape=graph_shape, run_id=run_id
+                initial_state.get("session_id", ""), agent=agent, graph_shape=graph_shape,
+                run_id=run_id, project_id=project_id,
             ) as graph_recorder:
                 while attempts_remaining:
                     attempts_remaining -= 1

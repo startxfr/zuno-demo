@@ -762,10 +762,14 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
                 run_id=state.get("run_id"),
                 agent_name=agent.name,
                 task_name=code_task.name,
-                # ADR-0511/ADR-0512 (WP-55): only a verified binding may
-                # draw project quota - gated on the task's own mark, never
-                # on state["project_id"] being merely truthy.
-                project_id=state.get("project_id") if code_task.project_required else None,
+                # ADR-0528: any real project draws project quota, customer
+                # or free. The old `if task.project_required` gate is gone
+                # because state["project_id"] is no longer client-assertable
+                # at all - app/main.py's agent_chat resolves it from the
+                # conversation's own projects row after verifying the caller
+                # holds a grant (ADR-0527), which is strictly stronger than
+                # a frontmatter mark. The Salesforce id is never sent.
+                project_id=state.get("project_id"),
             )
         except ModelRouterError as exc:
             logger.error("code generation model call failed: %s", exc)
@@ -891,10 +895,14 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 run_id=state.get("run_id"),
                 agent_name=agent.name,
                 task_name=task.name,
-                # ADR-0511/ADR-0512 (WP-55): only a verified binding may
-                # draw project quota - gated on the task's own mark, never
-                # on state["project_id"] being merely truthy.
-                project_id=state.get("project_id") if task.project_required else None,
+                # ADR-0528: any real project draws project quota, customer
+                # or free. The old `if task.project_required` gate is gone
+                # because state["project_id"] is no longer client-assertable
+                # at all - app/main.py's agent_chat resolves it from the
+                # conversation's own projects row after verifying the caller
+                # holds a grant (ADR-0527), which is strictly stronger than
+                # a frontmatter mark. The Salesforce id is never sent.
+                project_id=state.get("project_id"),
                 tools=tool_schemas,
             )
         except ModelRouterError as exc:
@@ -1009,7 +1017,7 @@ async def _resolve_image_generation_call(
             # ADR-0511/ADR-0512 (WP-55): only a verified binding may draw
             # project quota - gated on the task's own mark, never on
             # state["project_id"] being merely truthy.
-            project_id=state.get("project_id") if task.project_required else None,
+            project_id=state.get("project_id"),
         )
     except ModelRouterError as exc:
         logger.error("follow-up model call after generate_image failed: %s", exc)
@@ -1168,7 +1176,7 @@ async def _resolve_diagram_generation_call(
                 run_id=state.get("run_id"),
                 agent_name=agent.name,
                 task_name=task.name,
-                project_id=state.get("project_id") if task.project_required else None,
+                project_id=state.get("project_id"),
                 tools=[_GENERATE_DIAGRAM_TOOL_SCHEMA],
             )
         except ModelRouterError as exc:
@@ -1209,7 +1217,7 @@ async def _resolve_diagram_generation_call(
             run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
-            project_id=state.get("project_id") if task.project_required else None,
+            project_id=state.get("project_id"),
             # Forced synthesis - no more diagram tool-calling rounds after this.
         )
     except ModelRouterError as exc:
@@ -1322,7 +1330,7 @@ async def _resolve_git_forge_calls(
             run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
-            project_id=state.get("project_id") if task.project_required else None,
+            project_id=state.get("project_id"),
             tools=git_tool_schemas or None,
         )
     except ModelRouterError as exc:
@@ -1358,7 +1366,7 @@ async def _resolve_git_forge_calls(
             run_id=state.get("run_id"),
             agent_name=agent.name,
             task_name=task.name,
-            project_id=state.get("project_id") if task.project_required else None,
+            project_id=state.get("project_id"),
             # Forced synthesis - no more git tool-calling rounds after this.
         )
     except ModelRouterError as exc:

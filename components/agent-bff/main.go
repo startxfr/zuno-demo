@@ -118,6 +118,12 @@ type requestIdentity struct {
 	// by metricsMiddleware after the handler returns, to tag the
 	// bff_request span for the per-run resource dashboard.
 	runID string
+	// projectID (ADR-0528): the server-resolved project this request
+	// belonged to. Learned from the SSE start event on the streaming path,
+	// from ChatResponse on the non-streaming one, and from the path on the
+	// project routes. Same lifecycle as runID above - read back by
+	// metricsMiddleware to tag the bff_request span.
+	projectID string
 }
 
 type ctxKeyIdentity struct{}
@@ -151,7 +157,7 @@ func metricsMiddleware(agent string, next http.Handler) http.Handler {
 		code := strconv.Itoa(rec.status)
 		telemetry.RecordRequest(r.Context(), agent, code, identity.sub, identity.groups)
 		telemetry.RecordDuration(r.Context(), agent, code, float64(time.Since(start).Milliseconds()))
-		telemetry.EndBFFRequestSpan(span, code, identity.runID, start)
+		telemetry.EndBFFRequestSpan(span, code, identity.runID, identity.projectID, start)
 	})
 }
 
@@ -586,6 +592,9 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			SourceMode: resp.SourceMode,
 			ProjectID:  resp.ProjectID,
 		})
+		if identity != nil {
+			identity.projectID = resp.ProjectID // ADR-0528
+		}
 	}
 }
 
@@ -596,6 +605,12 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 // this is a best-effort peek (ADR-0517), not a protocol implementation -
 // see proxySSE's own comment on why a miss here is never fatal.
 var runIDFromSSE = regexp.MustCompile(`"run_id"\s*:\s*"([^"]+)"`)
+
+// projectIDFromSSE extracts project_id from that same start event
+// (ADR-0528). Deliberately a second pattern over the same buffered bytes
+// rather than one combined regex: project_id is empty outside a project,
+// and a combined pattern would then fail to match run_id either.
+var projectIDFromSSE = regexp.MustCompile(`"project_id"\s*:\s*"([^"]*)"`)
 
 // proxySSE relays an already-200-OK SSE response body to w chunk by chunk,
 // flushing after every read so token deltas reach the caller as they
@@ -632,6 +647,9 @@ func proxySSE(w http.ResponseWriter, resp *http.Response, identity *requestIdent
 				pending = append(pending, buf[:n]...)
 				if m := runIDFromSSE.FindSubmatch(pending); m != nil {
 					identity.runID = string(m[1])
+					if pm := projectIDFromSSE.FindSubmatch(pending); pm != nil {
+						identity.projectID = string(pm[1])
+					}
 					needRunID = false
 					pending = nil
 				} else {

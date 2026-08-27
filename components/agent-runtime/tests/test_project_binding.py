@@ -428,43 +428,6 @@ async def test_stamp_salesforce_verification_fails_closed_on_a_none_pool() -> No
 # --------------------------------------------------------------------------
 
 
-async def test_reason_node_forwards_project_id_only_when_task_is_project_required() -> None:
-    prompt_task = TaskDefinition(
-        name="t", title="T", description="", allowed_tools=[], prompt="You are a test agent.",
-    )
-    agent = AgentDefinition(name="fake-agent", status="active", preferred_classification="C2", rag_top_k=5)
-
-    captured = []
-
-    async def fake_invoke_with_fallback(**kwargs):
-        captured.append(kwargs.get("project_id"))
-        return SimpleNamespace(content="ok", tool_calls=[]), SimpleNamespace(name="ai-gateway")
-
-    saved = nodes._model_router.invoke_with_fallback
-    nodes._model_router.invoke_with_fallback = fake_invoke_with_fallback
-    try:
-        state = {
-            "message": "hi", "bearer_token": "t", "request_id": "req-1",
-            "project_id": "006ShouldOnlyLeakWhenRequired",
-            "retrieved_docs": [], "tool_results": {}, "errors": [], "history": [], "summary": "",
-        }
-        # project_required False: header must stay unset even though
-        # state["project_id"] is truthy - this is finding 4's actual fix.
-        prompt_task.project_required = False
-        reason_node = _make_reason_node(agent, prompt_task)
-        await reason_node(state)
-        assert captured[-1] is None, "an ordinary task must never leak project_id into the quota header"
-
-        # project_required True: the same truthy state["project_id"] must
-        # now reach invoke_with_fallback.
-        prompt_task.project_required = True
-        reason_node = _make_reason_node(agent, prompt_task)
-        await reason_node(state)
-        assert captured[-1] == "006ShouldOnlyLeakWhenRequired"
-    finally:
-        nodes._model_router.invoke_with_fallback = saved
-
-
 TESTS = [
     test_looks_like_salesforce_id_matches_standard_prefix_and_length,
     test_select_match_requires_exact_id_for_id_shaped_candidate,
@@ -487,7 +450,6 @@ TESTS = [
     test_finages_real_bundle_still_declares_project_required,
     test_record_turn_with_project_id_still_no_ops_on_a_none_pool,
     test_stamp_salesforce_verification_fails_closed_on_a_none_pool,
-    test_reason_node_forwards_project_id_only_when_task_is_project_required,
 ]
 
 

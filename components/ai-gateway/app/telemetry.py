@@ -190,6 +190,7 @@ def model_call_span(
     agent: Optional[str] = None,
     run_id: Optional[str] = None,
     model_kind: Optional[str] = None,
+    project_id: Optional[str] = None,
 ) -> Iterator["ModelCallRecorder"]:
     """Wraps one model invocation: records a span plus the zuno.model_calls
     / zuno.model_call_duration_ms metrics (ADR-0029) unconditionally, for
@@ -245,6 +246,15 @@ def model_call_span(
     model_kind is redundant with the existing provider/model labels for
     aggregate dashboards, but is what lets the per-run resource dashboard
     group local-vs-distant without hardcoding provider names).
+
+    ADR-0528: `project_id` is the ZUNO project this turn belonged to - the
+    engagement dimension that reached the quota ledger but no trace until
+    now. It is a SPAN attribute only, never added to the counters above,
+    for exactly the reason run_id is not: projects are created ad hoc at
+    runtime, so their cardinality is unbounded. Per-engagement cost and
+    latency views are built from traces (joined on zuno.run_id), never from
+    counters. It is never the Salesforce opportunity id, which stays in the
+    database.
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
@@ -266,6 +276,8 @@ def model_call_span(
             span.set_attribute("zuno.run_id", run_id)
         if model_kind:
             span.set_attribute("zuno.model_kind", model_kind)
+        if project_id:
+            span.set_attribute("zuno.project_id", project_id)
         recorder = ModelCallRecorder(provider=provider)
         try:
             yield recorder

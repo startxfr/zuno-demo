@@ -71,6 +71,10 @@ def graph_run_span(
     agent: Optional[str] = None,
     graph_shape: Optional[str] = None,
     run_id: Optional[str] = None,
+    # ADR-0528: the engagement this run belonged to. Span attribute only,
+    # never a metric label - projects are created ad hoc, so their
+    # cardinality is unbounded, the same reasoning run_id already carries.
+    project_id: Optional[str] = None,
 ) -> Iterator[GraphRunRecorder]:
     """WP-24 (ADR-0205): wraps one LangGraph run, recording the same
     no-silent-substitution signals the response body carries -
@@ -98,6 +102,8 @@ def graph_run_span(
             span.set_attribute("zuno.graph_shape", graph_shape)
         if run_id:
             span.set_attribute("zuno.run_id", run_id)
+        if project_id:
+            span.set_attribute("zuno.project_id", project_id)  # ADR-0528
         recorder = GraphRunRecorder()
         try:
             yield recorder
@@ -131,7 +137,10 @@ class ApiRequestRecorder:
 
 @contextmanager
 def api_request_span(
-    run_id: str, agent: Optional[str] = None, request_id: Optional[str] = None
+    run_id: str,
+    agent: Optional[str] = None,
+    request_id: Optional[str] = None,
+    project_id: Optional[str] = None,  # ADR-0528
 ) -> Iterator[ApiRequestRecorder]:
     """ADR-0517: wraps the whole agent_chat handler body (from run_id
     resolution through the response), enclosing agent_graph_run on the
@@ -149,6 +158,8 @@ def api_request_span(
             span.set_attribute("zuno.agent", agent)
         if request_id:
             span.set_attribute("zuno.request_id", request_id)
+        if project_id:
+            span.set_attribute("zuno.project_id", project_id)  # ADR-0528
         recorder = ApiRequestRecorder()
         try:
             yield recorder

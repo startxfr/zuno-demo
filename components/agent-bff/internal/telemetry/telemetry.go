@@ -172,7 +172,11 @@ func StartBFFRequestSpan(ctx context.Context, agent string) trace.Span {
 // chat call, or a non-chat conversation-management endpoint), in which
 // case the span is still recorded, just not joinable to a specific run in
 // the per-run resource dashboard.
-func EndBFFRequestSpan(span trace.Span, code, runID string, start time.Time) {
+// ADR-0528 adds projectID on the same terms: the engagement dimension, empty
+// outside a project, and a SPAN attribute only - never a label on
+// requestCounter above, because projects are created ad hoc at runtime and
+// their cardinality is unbounded. Never the Salesforce opportunity id.
+func EndBFFRequestSpan(span trace.Span, code, runID, projectID string, start time.Time) {
 	if span == nil {
 		return
 	}
@@ -182,6 +186,9 @@ func EndBFFRequestSpan(span trace.Span, code, runID string, start time.Time) {
 	)
 	if runID != "" {
 		span.SetAttributes(attribute.String("zuno.run_id", runID))
+	}
+	if projectID != "" {
+		span.SetAttributes(attribute.String("zuno.project_id", projectID))
 	}
 	span.End()
 }

@@ -86,15 +86,26 @@ class ModelRouter:
             # model_call_span and app/maas_adapter.py.
             headers["X-Zuno-Request-Id"] = request_id
         if project_id:
-            # ADR-0511/ADR-0512 (WP-55): only ever set by a caller that
-            # already confirmed task.project_required (app/graph/nodes.py's
-            # call sites below) - an ordinary task's optional, client-
-            # asserted state["project_id"] must never reach this header,
-            # or a caller could shift its own consumption onto an
-            # arbitrary project's quota bucket just by asserting a
-            # project_id string nothing ever verified. ai-gateway's own
-            # quota.py draws the project budget down first when this
-            # header is present (ADR-0511 clause 2's precedence).
+            # ADR-0528 (superseding ADR-0512 clause 3's keying): this is
+            # the ZUNO project id - a server-minted UUID - and never the
+            # Salesforce opportunity id, which is not emitted in any header
+            # or span.
+            #
+            # It used to be gated on the task's own project_required mark,
+            # because state["project_id"] was copied verbatim from the
+            # request body and a caller could otherwise shift consumption
+            # onto an arbitrary project's quota bucket by asserting a
+            # string nothing verified. That gate is gone, and the guarantee
+            # is stronger rather than weaker: ADR-0527 removed the
+            # client-asserted value from _initial_state entirely, so the id
+            # reaching here was resolved by app/main.py's agent_chat from
+            # the conversation's own projects row AFTER verifying the
+            # caller holds a grant on it. Database-verified membership beats
+            # a frontmatter mark, and it covers every project - customer or
+            # free - rather than only Salesforce-backed ones.
+            #
+            # ai-gateway's quota.py draws the project budget down first when
+            # this header is present (ADR-0511 clause 2's precedence).
             headers["X-Zuno-Project-Id"] = project_id
         if run_id:
             # ADR-0517: lets ai-gateway tag its model_call span with the

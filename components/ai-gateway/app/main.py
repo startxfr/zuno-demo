@@ -278,6 +278,7 @@ async def chat_completions(
             _stream_completion(
                 candidates, classification, messages, request_id, adapter_decl,
                 identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
+                project_id=project_id,
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -478,6 +479,9 @@ async def _invoke_with_fallback(
                 candidate.name, effective_model_name, classification, request_id,
                 adapter=adapter_name, caller_sub=caller_sub, groups=groups, agent=agent,
                 run_id=run_id, model_kind=candidate.kind,
+                # ADR-0528: the engagement dimension. Reached the quota
+                # ledger already; this is the first time it reaches a trace.
+                project_id=project_id,
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 if tools:
@@ -567,6 +571,11 @@ async def _stream_completion(
     tools: Optional[List[Dict[str, Any]]] = None,
     agent: str = "",
     run_id: Optional[str] = None,
+    # ADR-0528: the engagement dimension, so the streaming path tags its
+    # model_call span the same way the non-streaming one does. Streaming is
+    # the common case (agent-runtime always streams), so omitting it here
+    # would have left the attribute effectively absent in practice.
+    project_id: Optional[str] = None,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -602,6 +611,7 @@ async def _stream_completion(
                 groups=identity.groups if identity else None,
                 agent=agent,
                 run_id=run_id, model_kind=candidate.kind,
+                project_id=project_id,  # ADR-0528
             ) as call:
                 model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
                 if tools:

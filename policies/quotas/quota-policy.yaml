@@ -16,16 +16,28 @@
 #   - token budgets -> AI Gateway configuration (only the inference layer
 #     can meter tokens - ADR-0029 already tracks per-request usage there).
 # Identity dimensions come only from validated tokens (ADR-0033) - user =
-# JWT `sub`, group = business-role `groups` claim (ADR-0040) - or from the
-# ADR-0512 Salesforce-verified project binding; never from client-supplied
-# headers.
+# JWT `sub`, group = business-role `groups` claim (ADR-0040) - or, for the
+# project dimension, from the conversation's own ADR-0527 project row after
+# agent-runtime has verified the caller holds a grant on it; never from
+# client-supplied headers.
 #
-# Precedence (ADR-0511 clause 2): when a conversation carries a verified
-# project binding, usage draws down the PROJECT's quota first; the USER's
-# personal quota applies once the project's is exhausted (or absent); the
-# GROUP quota is the outermost ceiling. Outside project context: user, then
-# group. Exhaustion at every applicable level fails the request with an
-# explicit quota error - never silent degradation.
+# ADR-0528 re-keyed that project dimension. It used to be the
+# Salesforce-verified binding of ADR-0512, which meant only Salesforce-backed
+# work could carry a project at all, and the X-Zuno-Project-Id header had to
+# be gated on the task's own `project_required` mark because the id was
+# otherwise a client assertion. It is now the ZUNO project id - a
+# server-minted UUID - and every project draws project quota, customer
+# (Salesforce-linked) or free. The guarantee is stronger, not weaker: the id
+# is resolved from the database against the caller's grants rather than
+# vouched for by a frontmatter mark. The Salesforce opportunity id is never
+# emitted in a header or a span.
+#
+# Precedence (ADR-0511 clause 2): when a conversation belongs to a project,
+# usage draws down the PROJECT's quota first; the USER's personal quota
+# applies once the project's is exhausted (or absent); the GROUP quota is the
+# outermost ceiling. Outside project context: user, then group. Exhaustion at
+# every applicable level fails the request with an explicit quota error -
+# never silent degradation.
 #
 # Schema:
 #   classes.<name>:            a named quota class bundling limits. Tasks opt
@@ -90,6 +102,11 @@ precedence:
   default: [user, group]
 
 project_binding:
-  # ADR-0512 clause 3: a verified Salesforce project binding is
-  # re-verified on resume once older than this window.
+  # ADR-0528 (re-keying ADR-0512 clause 3): how long a project's Salesforce
+  # link stays trusted before re-verification. Now scoped per PROJECT rather
+  # than per conversation - verification happens when an admin sets the link,
+  # and again on the project once the stamp ages out, so an ordinary chat
+  # turn inside a fresh customer project makes no Salesforce call at all.
+  # Only `project_required` tasks are gated on it; a free project has no
+  # link and no window to age.
   validity_window: 24h

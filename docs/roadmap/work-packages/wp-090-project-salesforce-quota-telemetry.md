@@ -1,6 +1,12 @@
 # WP-090: Salesforce link, quota and telemetry on the Zuno project id (promotes ADR-0528)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-27)
+
+> Sequencing note (2026-08-27): step 2 landed early, inside WP-088 Part A.
+> Removing `_bind_project_if_required` was not separable - `agent_chat`
+> cannot compile against a binding step that no longer matches the
+> server-resolved project - so `_require_customer_project` shipped with the
+> backend it depends on. Steps 1 and 3-6 landed here as briefed.
 - **ADRs:** ADR-0528 (Proposed -> Repo work merged after this WP; Implemented needs a live Salesforce pass, still blocked on the WP-22/WP-33 sandbox credential gap)
 - **Depends on:** WP-088 (needs `projects.salesforce_*` and the server-resolved `project_id` on graph state)
 - **Estimated files touched:** ~10

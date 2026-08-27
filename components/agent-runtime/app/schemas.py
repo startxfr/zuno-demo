@@ -66,6 +66,11 @@ class ChatResponse(BaseModel):
     # answer's context came from indexed retrieval, a live capability
     # call, both, or neither. See app/graph/nodes.py:_compute_source_mode.
     source_mode: str = "indexed"
+    # ADR-0528: the SERVER-RESOLVED project this turn belonged to, empty
+    # outside a project. Lets agent-bff set zuno.project_id on its own span
+    # for the non-streaming path; the streaming path carries the same value
+    # on the SSE start event. Never the Salesforce opportunity id.
+    project_id: str = ""
 
 
 class RenameConversationRequest(BaseModel):
