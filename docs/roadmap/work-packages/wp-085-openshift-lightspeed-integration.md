@@ -1,13 +1,53 @@
 # WP-085: Integrate OpenShift Lightspeed with Zuno inference, knowledge and identity
 
-- **State:** Repo work done (steps 1-3, 5, 6 and the service-identity half of
-  step 4). No cluster change made. Live verification pending - see the checklist
-  below, every item of which is still an operator step.
+- **State:** Live. Étapes 1-7 exécutées sur demo222 le 2026-08-27. Lightspeed sert
+  (6 pods `Running`, `ApiReady`/`ConsolePluginReady`/`CacheReady`/`MCPServerReady`/`RHOKPReady`
+  tous `True`), `make d3 test platform` -> **9/9 passed**. **Une réserve** : l'inférence passe
+  temporairement en direct sur le predictor KServe et non par MaaS - voir « Contournement MaaS »
+  ci-dessous. Vérification navigateur non encore faite.
 - **ADRs:** ADR-0524 (Proposed)
 - **Depends on:** ADR-0521/WP-076 (Implemented - MaaS is the local-model transport this reuses),
   ADR-0117 (Implemented - the Confluence MCP server), ADR-0060 (Implemented - Day 1/Day 2/Day 3
   sequencing)
 - **Related:** WP-072/WP-073 (the `aap`/`aap-config` two-component split this mirrors)
+
+## Contournement MaaS en vigueur (temporaire)
+
+`olsConfig.provider.endpointMode: direct` — Lightspeed appelle
+`qwen36-27b-instruct-kserve-workload-svc:8000/v1`, le même endpoint que le fallback documenté
+d'`ai-gateway`, et non la passerelle MaaS. C'est une **régression assumée d'ADR-0521**, décidée
+avec l'opérateur humain, parce que le plan de contrôle MaaS ne rapproche plus aucune identité
+d'une `MaaSSubscription`.
+
+Retour à MaaS = deux éditions, rien d'autre :
+1. `gitops/charts/lightspeed-config/values.yaml` : `endpointMode: maas` +
+   `credential.mode: saTokenSecret` (ou `apiKey`)
+2. retirer le bloc `lightspeed` de `gitops/charts/models/templates/networkpolicy-qwen.yaml`
+   et de `ansible/roles/models/tasks/install.yml`
+
+L'entitlement MaaS (`MaaSSubscription` + sujet OPA) est resté en place et intact exactement pour
+rendre ce retour trivial. Une garde de rendu refuse déjà `endpointMode: maas` combiné à
+`credential.mode: staticToken`, qui produirait un 401 opaque.
+
+## Défauts externes constatés en live (2026-08-27)
+
+1. **L'opérateur Lightspeed v1.1.2 ignore `spec.llm.providers[].credentialKey`** et exige en dur
+   la clé `apitoken`, alors que son propre CRD documente le champ (*"defaults to apitoken if not
+   set"*). Symptôme : `OLSConfig.status` vide, aucun operand. Contourné par `credential.mode:
+   staticToken`, qui rend un Secret Opaque portant `apitoken`.
+2. **MaaS ne résout plus les subscriptions** : `403 no matching subscription found for user`,
+   reproduit pour l'identité **connue bonne** `ai-gateway` et sur `gpt-oss-20b`, un modèle que ce
+   WP n'a jamais touché. Éliminés par test : cache informer (resync propre après redémarrage),
+   PostgreSQL (connecté), `MaaSModelRef` (`Ready`), `MaaSSubscription` (`Ready`/`Valid`).
+   Périmètre **WP-076/ADR-0521**, pas celui-ci.
+3. **L'opérateur pose ses propres NetworkPolicies** : `lightspeed-app-server` n'admet sur 8443 que
+   `openshift-console`, `openshift-monitoring` et l'ingress — **pas** le same-namespace. La sonde
+   Day 3 cible donc `lightspeed-rhokp`/`openshift-mcp-server`, qui admettent `podSelector: {}`.
+
+## Acquis positif
+
+**TokenReview accepte un token de ServiceAccount legacy sans audience** — le 403 (et non 401) le
+prouve. C'était la principale inconnue de l'étape 2 de ce WP, désormais tranchée.
 
 ## Goal
 
