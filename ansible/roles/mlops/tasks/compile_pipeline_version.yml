@@ -57,3 +57,36 @@
   loop_control:
     loop_var: compile_pipeline_target
   when: (_mlops_pipeline_source_cm.resources | default([]) | length) > 0
+
+# The per-target rescue above is deliberately non-fatal (one agent's
+# compile error must not block another's, and rag-ingestion's own task is
+# shaped the same way) - but "non-fatal" printed mid-play is exactly how a
+# real failure hides behind `failed=0`. This WP exists because the
+# pipeline had zero versions for months; the one thing that must never
+# again be silent is STILL having zero afterwards.
+#
+# So: not an assertion about any single target, but about the outcome the
+# whole task exists to produce.
+- name: "mlops | re-read the PipelineVersions after compiling"
+  kubernetes.core.k8s_info:
+    api_version: pipelines.kubeflow.org/v2beta1
+    kind: PipelineVersion
+    namespace: zuno-mlops
+  register: _mlops_pipeline_versions
+  when: (_mlops_pipeline_source_cm.resources | default([]) | length) > 0
+
+- name: "mlops | fail loudly if compiling produced no PipelineVersion at all"
+  ansible.builtin.fail:
+    msg: >-
+      Every compile target failed: zuno-mlops still has ZERO
+      PipelineVersions, so the mlops pipeline cannot be run at all. The
+      actual error is in the "compile the PipelineVersion manifest" task
+      output above - this play would otherwise have reported failed=0 and
+      moved on. Common causes: a files/pipeline.py.tpl compile error (an
+      empty Helm value reaching a kfp API that validates it is one), no
+      PyPI egress to build the compiler venv, or the in-cluster
+      pipeline-source ConfigMap not yet carrying your committed change -
+      this task compiles from that ConfigMap, never from your working copy.
+  when: >-
+    (_mlops_pipeline_source_cm.resources | default([]) | length) > 0 and
+    (_mlops_pipeline_versions.resources | default([]) | length) == 0

@@ -24,7 +24,19 @@ images:
     # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
     tag: latest
     # Always, not IfNotPresent - the mutable :latest tag needs it to avoid serving a stale cached image; see RELEASING.md.
-  pullPolicy: Always
+    #
+    # WP-087: this key was indented one level too far LEFT (a sibling of
+    # `mlops:`, not a child), while files/pipeline.py.tpl has always read
+    # .Values.images.mlops.pullPolicy. Helm resolves the missing path to an
+    # empty string rather than failing, so the compiled DAG called
+    # set_image_pull_policy(task, "") and kfp rejected it outright:
+    # "Invalid imagePullPolicy. Must be one of Always, Never, IfNotPresent."
+    # Nothing else in this chart reads either path, so the mistake was
+    # invisible to helm lint, helm template and every unit test - it could
+    # only ever surface by actually compiling the pipeline, which nothing
+    # did until now. gitops/charts/rag-ingestion nests it correctly under
+    # images.ingestion, which is why its own compile has always worked.
+    pullPolicy: Always
 
 externalSecrets:
   enabled: true
