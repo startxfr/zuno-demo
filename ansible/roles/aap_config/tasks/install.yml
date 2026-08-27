@@ -279,6 +279,46 @@
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 
+# Census of what the CRs were supposed to produce, BEFORE waiting on it.
+# A CR reporting Successful proves nothing (the resource operator's create
+# task is ignore_errors, so a 401 leaves the CR green and the object
+# absent) - only the Controller API is authoritative. Cheap: four GETs
+# against an API this role already talks to, and it turns a 5-minute
+# opaque wait into a targeted nudge.
+- name: "aap-config | census the objects the CRs are supposed to have produced"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/{{ item.path }}/?name={{ item.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200, 401, 403]
+  register: _aap_config_census
+  loop:
+    - {path: projects, name: "{{ aap_config_project_name | default('zuno-demo') }}"}
+    - {path: inventories, name: "{{ aap_config_inventory_name | default('zuno') }}"}
+    - {path: credentials, name: "{{ aap_config_credential_name | default('zuno-cluster-reader') }}"}
+    - {path: job_templates, name: "{{ aap_config_job_template_name | default('zuno-day0-check') }}"}
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+# Two distinct defects to catch, and the second is the one that bit on
+# 2026-08-27: an object can EXIST and still be unusable. `zuno-day0-check`
+# was present with inventory: None while ask_inventory_on_launch is false,
+# i.e. a Job Template that cannot be launched at all - which a plain
+# existence test would have called healthy. So: any missing object, or a
+# Job Template whose inventory never got bound.
+- name: "aap-config | decide whether the tower.ansible.com CRs need a nudge"
+  ansible.builtin.set_fact:
+    _aap_config_crs_need_nudge: >-
+      {{ (_aap_config_token_needs_mint | bool)
+         or (_aap_config_census.results
+             | map(attribute='json.count', default=0) | map('int') | select('equalto', 0) | list | length > 0)
+         or ((_aap_config_census.results[3].json.results | default([]) | length) > 0
+             and (_aap_config_census.results[3].json.results[0].inventory | default(none)) is none) }}
+
 # A re-minted token only reaches the CRs on their NEXT reconcile, and the
 # resource operator reconciles on a long period when nothing about the CR
 # changes - ArgoCD re-applying an identical manifest triggers nothing. So
@@ -286,7 +326,7 @@
 # CRs that are still holding the dead credential. Absent CRs are fine: on
 # a first install ArgoCD has only just created them, and their initial
 # reconcile already uses the fresh token.
-- name: "aap-config | force the tower.ansible.com CRs to reconcile with the new token"
+- name: "aap-config | force the tower.ansible.com CRs to reconcile"
   kubernetes.core.k8s:
     state: patched
     api_version: tower.ansible.com/v1alpha1
@@ -303,7 +343,7 @@
     - {kind: AnsibleCredential, name: "{{ aap_config_credential_name | default('zuno-cluster-reader') }}"}
     - {kind: JobTemplate, name: "{{ aap_config_job_template_name | default('zuno-day0-check') }}"}
   failed_when: false
-  when: _aap_config_token_needs_mint | bool
+  when: _aap_config_crs_need_nudge | bool
 
 # ArgoCD reports the CRs Synced/Healthy the moment they're applied (no
 # custom health checks exist for tower.ansible.com kinds) - the resource
