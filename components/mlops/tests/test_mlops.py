@@ -115,9 +115,25 @@ def _config(**overrides) -> "mlops.MlopsConfig":
         lora_alpha=16,
         lora_dropout=0.05,
         cpu_safe=True,
+        # ADR-0526 (WP-087). style_corpus_s3uri defaults to None here on
+        # purpose: the default fixture must keep exercising WP-34's
+        # grounding-domain branch, so the style branch is opted into
+        # per-test rather than silently becoming the default everywhere.
+        style_corpus_s3uri=None,
+        merged_model_s3uri=None,
+        merged_overwrite=False,
+        models_s3_region=None,
+        models_s3_endpoint=None,
+        lora_target_modules=None,
         evaluations_dir="/nonexistent",
         model_registry_url=None,
         model_registry_namespace="rhoai-model-registries",
+        registered_model_name=None,
+        model_registry_service="zuno",
+        model_registry_port=8443,
+        model_registry_scheme="https",
+        model_registry_ca_bundle=None,
+        model_registry_token_path=None,
     )
     base.update(overrides)
     return mlops.MlopsConfig(**base)

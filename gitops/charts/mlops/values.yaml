@@ -47,6 +47,30 @@ s3:
     accessKeyProperty: accessKeyId
     secretKeyProperty: secretAccessKey
 
+# ADR-0526 (WP-087): the models bucket is NOT this chart's s3: bucket, and
+# critically NOT its region either - zuno-demo-rag-corpus is eu-west-2
+# while s3.region above is us-east-1. boto3 raises PermanentRedirect
+# rather than following the redirect, so mlops.py builds a second client
+# for these; the Vault credential (rag/s3) is the same one and already
+# grants both buckets. Mirrors gitops/charts/models' own modelsS3 block -
+# keep the two in step.
+modelsS3:
+  region: eu-west-2
+  endpoint: ""
+
+# ADR-0526 decision 1: where merge-export publishes the merged bf16
+# checkpoint. This is the exact prefix gitops/charts/models' weshModel
+# reads its spec.model.uri from (<prefix>/<servedModelName>/), so
+# promotion is a values change in THAT chart and nothing else - this
+# pipeline still never writes gitops/charts/models/values.yaml
+# (ADR-0302 point 7).
+mergedModel:
+  s3Uri: s3://zuno-demo-rag-corpus/models/qwen3.5-9b-wesh
+  # Refuse to overwrite a non-empty destination. On the first run the
+  # prefix is empty and no LLMInferenceService reads it yet; on any
+  # re-run it is the live variant's own weights. Flip only deliberately.
+  overwrite: false
+
 artifacts:
   datasetPrefix: mlops/datasets
   modelPrefix: mlops/models
@@ -59,7 +83,15 @@ postgres:
   host: zuno-postgresql-rw.zuno-data.svc.cluster.local
   port: 5432
   database: rag-tech
-  schema: public
+  # rag, not public. document_embeddings lives in the `rag` schema
+  # (rag-ingestion creates it there), and mlops.py issues
+  # `SET search_path TO <schema>, public` - with `public` here that
+  # resolves to "public, public" and every query fails with
+  # "relation document_embeddings does not exist". Unreachable on the
+  # WP-087 style objective (that branch never opens a PG connection at
+  # all), but wrong for any grounding-domain run, which is how it stayed
+  # wrong: the pipeline has never executed.
+  schema: rag
   sslmode: require
   secretName: mlops-postgres-credentials
   externalSecret:
@@ -108,7 +140,16 @@ pipelineServer:
 
 pipeline:
   name: mlops
-  version: v1
+  # BUMP THIS ON EVERY CHANGE TO THE COMPILED DAG. A KFP PipelineVersion's
+  # spec is immutable: re-applying a changed spec under a name that already
+  # exists is REJECTED, and the old spec silently stays in force. That is
+  # exactly the trap rag-ingestion hit live (see its own values.yaml
+  # comment and ansible/roles/rag_ingestion/tasks/
+  # compile_one_pipeline_version.yml's fatal rescue branch, mirrored here).
+  # v1 was never actually applied - the pipeline has 0 versions and 0 runs -
+  # so this rename is free today, and the convention now exists before the
+  # first real bump.
+  version: v0-1-0
   displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
   description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
   createPipelineResource: true
@@ -123,7 +164,23 @@ pipeline:
 agents:
   comage:
     enabled: true
-    knowledgeDomains: [knowledge.sales, knowledge.project]
+    # DELIBERATELY EMPTY since ADR-0526/WP-087. Comage's two declared
+    # domains are exactly why WP-34's objective never ran: knowledge.sales
+    # resolves to rag-sales (table present, 0 rows) and knowledge.project
+    # has no document_embeddings table at all. The replacement objective
+    # is a STYLE adaptation drawing on styleCorpusS3Uri below, so
+    # prepare-dataset takes that branch and _fetch_domain_grounding_rows
+    # returns early without opening a Postgres connection. Re-populating
+    # this list would not fail loudly - it would just be ignored while
+    # styleCorpusS3Uri is set.
+    knowledgeDomains: []
+    # ADR-0526 decision 3: the new data-collection surface, overriding
+    # ADR-0302 point 2 for this objective. 716 train / 113 validation /
+    # 79 held-out test single-turn conversations in OpenAI Messages JSONL,
+    # split at seed level, plus a 21-rule style specification. C1 by
+    # construction - synthetic conversational material, no business,
+    # customer or financial content - so the trained artifact inherits C1.
+    styleCorpusS3Uri: s3://zuno-corpus/qwen-wesh-training-corpus.tgz
     # ADR-0518: Qwen3.5-9B staged in S3 (same literal-bucket convention
     # gitops/charts/models' modelsS3 uses), replacing the HF repo id
     # ibm-granite/granite-3.1-2b-instruct that mlops.py pulled from
@@ -137,6 +194,21 @@ agents:
     loraR: 8
     loraAlpha: 16
     loraDropout: 0.05
+    # peft matches a STRING target_modules with re.fullmatch against the
+    # full module key. Verified against the staged checkpoint's own
+    # model.safetensors.index.json (2026-08-27): this matches exactly 80
+    # modules - 24 linear_attn.in_proj_qkv + 24 linear_attn.out_proj on
+    # the linear_attention layers, and q/k/v/o_proj on the 8
+    # full_attention ones - and matches ZERO mtp.* or model.visual.*
+    # modules. The anchor is what does that: mtp.layers.N.self_attn
+    # carries q_proj/k_proj/v_proj/o_proj under those exact names, so a
+    # plain suffix list would inject LoRA into the multi-token-prediction
+    # head. peft 0.13 has no exclude_modules to fall back on.
+    # mlp.* is deliberately untargeted: attention-only at rank 8 is
+    # ADR-0526's own stated mitigation against catastrophic forgetting,
+    # and a register shift is an output-distribution shift that does not
+    # need the FFN.
+    loraTargetModules: 'model\.language_model\.layers\.\d+\.(self_attn\.(q|k|v|o)_proj|linear_attn\.(in_proj_qkv|out_proj))'
 
 # ADR-0351: GPU wiring for the train-lora pipeline task - the ONLY stage
 # that needs a GPU. Before this, no task declared any resources at all

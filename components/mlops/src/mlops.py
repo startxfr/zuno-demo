@@ -53,7 +53,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import boto3
 import psycopg
@@ -151,6 +151,45 @@ class MlopsConfig:
     lora_dropout: float
     cpu_safe: bool  # forces a tiny, real-but-trivial training run (no GPU needed)
 
+    # ADR-0526 (WP-087) decision 3: a NEW data-collection surface, added
+    # deliberately. This OVERRIDES ADR-0302 point 2, which restricted
+    # datasets to document_embeddings plus evaluation transcripts and
+    # stated that "no new data-collection surface is introduced" - a
+    # register-shift objective cannot be expressed in either source. When
+    # set, prepare-dataset takes the style-corpus branch and never opens a
+    # Postgres connection at all. The corpus is C1 by construction
+    # (synthetic conversational style material, no business, customer or
+    # financial content), so the escalate-only rule leaves the dataset -
+    # and therefore the trained artifact - at C1.
+    style_corpus_s3uri: Optional[str]
+
+    # ADR-0526 decision 1: where merge-export publishes the merged bf16
+    # checkpoint. This is the SAME bucket/prefix gitops/charts/models'
+    # modelsS3 serves every model from (<prefix>/<servedModelName>/), so
+    # promotion is a values.yaml change and nothing else.
+    merged_model_s3uri: Optional[str]
+    # Refuses to overwrite a non-empty destination unless this is set. The
+    # destination is a prefix a running KServe storage-initializer reads:
+    # on a re-run, silently replacing it would swap the weights under a
+    # live model without the human review ADR-0302 point 7 requires.
+    merged_overwrite: bool
+
+    # The models bucket lives in a DIFFERENT REGION from this pipeline's
+    # own artifact bucket (eu-west-2 vs us-east-1). boto3 will not follow
+    # that redirect on a client built for the wrong region - it raises
+    # PermanentRedirect - so the base-model download and the merged upload
+    # need their own client. Same Vault credential (rag/s3) grants both.
+    models_s3_region: Optional[str]
+    models_s3_endpoint: Optional[str]
+
+    # peft LoraConfig.target_modules. A single string is matched with
+    # re.fullmatch against the FULL module key, which is what makes the
+    # `model.language_model.layers.` anchor able to exclude the mtp.*
+    # multi-token-prediction head and the vision tower structurally. See
+    # _run_lora_training for why a suffix list is not safe on this
+    # architecture.
+    lora_target_modules: Optional[str]
+
     # evaluations/<agent>/quality_gate.py integration.
     evaluations_dir: str
 
@@ -164,6 +203,20 @@ class MlopsConfig:
     # string here.
     model_registry_url: Optional[str]
     model_registry_namespace: str
+    # The registered model's name. Defaults to "<agent>-lora" for
+    # backwards compatibility with WP-34's own naming.
+    registered_model_name: Optional[str]
+    # ADR-0526/WP-087: the in-cluster Model Registry is HTTPS with an
+    # Authorization header, not the plain-HTTP unauthenticated
+    # modelregistry-sample:8080 WP-34 assumed (that Service exists
+    # nowhere). Every part is a value rather than a literal: nothing in
+    # this repository creates or names a ModelRegistry instance, so these
+    # are operator observations - UNVERIFIED against a live cluster.
+    model_registry_service: str
+    model_registry_port: int
+    model_registry_scheme: str
+    model_registry_ca_bundle: Optional[str]
+    model_registry_token_path: Optional[str]
 
 
 def load_config() -> MlopsConfig:
@@ -194,9 +247,25 @@ def load_config() -> MlopsConfig:
         lora_alpha=_env_int("MLOPS_LORA_ALPHA", 16),
         lora_dropout=float(_env("MLOPS_LORA_DROPOUT", "0.05")),
         cpu_safe=_env_bool("MLOPS_CPU_SAFE", False),
+        style_corpus_s3uri=_env("MLOPS_STYLE_CORPUS_S3URI"),
+        merged_model_s3uri=_env("MLOPS_MERGED_MODEL_S3URI"),
+        merged_overwrite=_env_bool("MLOPS_MERGED_OVERWRITE", False),
+        models_s3_region=_env("MLOPS_MODELS_S3_REGION"),
+        models_s3_endpoint=_env("MLOPS_MODELS_S3_ENDPOINT"),
+        lora_target_modules=_env("MLOPS_LORA_TARGET_MODULES"),
         evaluations_dir=_env("MLOPS_EVALUATIONS_DIR", "/opt/app-root/src/evaluations"),
         model_registry_url=_env("MODEL_REGISTRY_URL"),
         model_registry_namespace=_env("MODEL_REGISTRY_NAMESPACE", "rhoai-model-registries"),
+        registered_model_name=_env("MLOPS_REGISTERED_MODEL_NAME"),
+        model_registry_service=_env("MODEL_REGISTRY_SERVICE", "zuno"),
+        model_registry_port=_env_int("MODEL_REGISTRY_PORT", 8443),
+        model_registry_scheme=_env("MODEL_REGISTRY_SCHEME", "https"),
+        model_registry_ca_bundle=_env(
+            "MODEL_REGISTRY_CA_BUNDLE", "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+        ),
+        model_registry_token_path=_env(
+            "MODEL_REGISTRY_TOKEN_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        ),
     )
 
 
@@ -207,19 +276,53 @@ def load_config() -> MlopsConfig:
 
 
 class ArtifactStore:
+    """One credential, possibly several regions.
+
+    WP-087: this pipeline's own artifact bucket (S3_BUCKET, us-east-1) and
+    the models bucket the base checkpoint and the merged export live in
+    (zuno-demo-rag-corpus, eu-west-2) are in DIFFERENT regions. A boto3
+    client built for one region does not follow the redirect to the other -
+    it raises PermanentRedirect - so a single shared client cannot serve
+    both. Clients are therefore cached per (region, endpoint) and built on
+    demand from the same credential; the default one keeps serving every
+    call that does not ask for an override, so nothing else changes.
+    """
+
     def __init__(self, config: MlopsConfig):
         self._bucket = config.s3_bucket
+        self._path_style = config.s3_path_style
+        self._access_key = config.aws_access_key_id
+        self._secret_key = config.aws_secret_access_key
+        self._default_region = config.s3_region or None
+        self._default_endpoint = config.s3_endpoint or None
+        self._clients: Dict[tuple, Any] = {}
+        self._client = self._client_for(self._default_region, self._default_endpoint)
+
+    def _client_for(self, region: Optional[str], endpoint: Optional[str]):
+        key = (region or None, endpoint or None)
+        cached = self._clients.get(key)
+        if cached is not None:
+            return cached
         from botocore.config import Config as BotoClientConfig
 
         client_kwargs: dict = {
-            "region_name": config.s3_region or None,
-            "aws_access_key_id": config.aws_access_key_id,
-            "aws_secret_access_key": config.aws_secret_access_key,
-            "config": BotoClientConfig(s3={"addressing_style": "path" if config.s3_path_style else "auto"}),
+            "region_name": key[0],
+            "aws_access_key_id": self._access_key,
+            "aws_secret_access_key": self._secret_key,
+            "config": BotoClientConfig(s3={"addressing_style": "path" if self._path_style else "auto"}),
         }
-        if config.s3_endpoint:
-            client_kwargs["endpoint_url"] = config.s3_endpoint
-        self._client = boto3.client("s3", **client_kwargs)
+        if key[1]:
+            client_kwargs["endpoint_url"] = key[1]
+        client = boto3.client("s3", **client_kwargs)
+        self._clients[key] = client
+        return client
+
+    def _resolve(self, bucket: Optional[str], region: Optional[str], endpoint: Optional[str]):
+        """Every cross-bucket call goes through here, so "which client for
+        which bucket" is decided in exactly one place."""
+        if bucket is None or bucket == self._bucket:
+            return self._bucket if bucket is None else bucket, self._client
+        return bucket, self._client_for(region or self._default_region, endpoint or self._default_endpoint)
 
     def put_json(self, key: str, obj: Any) -> None:
         self._client.put_object(
@@ -241,9 +344,21 @@ class ArtifactStore:
     def put_text(self, key: str, text: str) -> None:
         self._client.put_object(Bucket=self._bucket, Key=key, Body=text.encode("utf-8"), ContentType="text/plain")
 
-    def get_bytes(self, key: str) -> Optional[bytes]:
+    @property
+    def bucket(self) -> str:
+        return self._bucket
+
+    def get_bytes(
+        self,
+        key: str,
+        *,
+        bucket: Optional[str] = None,
+        region: Optional[str] = None,
+        endpoint: Optional[str] = None,
+    ) -> Optional[bytes]:
+        target_bucket, client = self._resolve(bucket, region, endpoint)
         try:
-            resp = self._client.get_object(Bucket=self._bucket, Key=key)
+            resp = client.get_object(Bucket=target_bucket, Key=key)
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
                 return None
@@ -253,27 +368,59 @@ class ArtifactStore:
     def put_bytes(self, key: str, data: bytes) -> None:
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data)
 
-    def list_keys(self, prefix: str) -> List[str]:
-        paginator = self._client.get_paginator("list_objects_v2")
+    def list_keys(
+        self,
+        prefix: str,
+        *,
+        bucket: Optional[str] = None,
+        region: Optional[str] = None,
+        endpoint: Optional[str] = None,
+    ) -> List[str]:
+        target_bucket, client = self._resolve(bucket, region, endpoint)
+        paginator = client.get_paginator("list_objects_v2")
         keys: List[str] = []
-        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+        for page in paginator.paginate(Bucket=target_bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
                 keys.append(obj["Key"])
         return keys
 
-    def put_dir(self, prefix: str, local_dir: Path) -> List[str]:
+    def put_dir(
+        self,
+        prefix: str,
+        local_dir: Path,
+        *,
+        bucket: Optional[str] = None,
+        region: Optional[str] = None,
+        endpoint: Optional[str] = None,
+    ) -> List[str]:
         """Uploads every file under local_dir, preserving relative paths
-        under prefix - used once by train-lora to publish an adapter's
-        saved-checkpoint directory (adapter_config.json + weights)."""
+        under prefix - train-lora publishes an adapter's saved-checkpoint
+        directory this way, and merge-export the merged model.
+
+        upload_file, never put_bytes: an adapter is a few MB but a merged
+        Qwen3.5-9B checkpoint is ~19GB across four shards, and buffering
+        one 5GB shard in memory would blow the stage's memory limit. This
+        is the upload mirror of download_prefix's own reason for using
+        download_file."""
+        target_bucket, client = self._resolve(bucket, region, endpoint)
         uploaded = []
         for path in sorted(local_dir.rglob("*")):
             if path.is_file():
                 key = f"{prefix}/{path.relative_to(local_dir).as_posix()}"
-                self.put_bytes(key, path.read_bytes())
+                client.upload_file(str(path), target_bucket, key)
                 uploaded.append(key)
         return uploaded
 
-    def download_prefix(self, bucket: str, prefix: str, local_dir: Path) -> int:
+    def download_prefix(
+        self,
+        bucket: str,
+        prefix: str,
+        local_dir: Path,
+        *,
+        region: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        include: Optional[Callable[[str], bool]] = None,
+    ) -> int:
         """Downloads every object under s3://bucket/prefix/ into
         local_dir, preserving relative paths - train-lora's base-model
         fetch (ADR-0518). Takes an explicit bucket (the base model lives
@@ -281,20 +428,54 @@ class ArtifactStore:
         MLOPS_BASE_MODEL) but reuses this store's client/credentials.
         download_file streams to disk via boto3's managed transfer -
         never get_bytes: safetensors shards run ~5GB each and buffering
-        one in memory would eat half the train pod's memory request."""
+        one in memory would eat half the train pod's memory request.
+
+        `include` filters by RELATIVE key, so a caller that only needs the
+        tokenizer can take ~11MB instead of the full 19.3GB checkpoint -
+        which is exactly what prepare-dataset does to render the chat
+        template without ever touching the weights."""
+        target_bucket, client = self._resolve(bucket, region, endpoint)
         prefix = prefix.rstrip("/") + "/"
-        paginator = self._client.get_paginator("list_objects_v2")
+        paginator = client.get_paginator("list_objects_v2")
         count = 0
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for page in paginator.paginate(Bucket=target_bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
                 rel = obj["Key"][len(prefix):]
                 if not rel:
                     continue
+                if include is not None and not include(rel):
+                    continue
                 target = local_dir / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
-                self._client.download_file(bucket, obj["Key"], str(target))
+                client.download_file(target_bucket, obj["Key"], str(target))
                 count += 1
         return count
+
+
+def _split_s3_uri(uri: str) -> tuple:
+    """s3://bucket/prefix -> (bucket, prefix). One parser, so the base
+    model, the style corpus and the merged destination cannot drift."""
+    if not uri.startswith("s3://"):
+        raise SystemExit(f"not an s3:// URI: {uri}")
+    bucket, _, prefix = uri[len("s3://"):].partition("/")
+    if not bucket or not prefix:
+        raise SystemExit(f"malformed s3:// URI (need bucket and key/prefix): {uri}")
+    return bucket, prefix.rstrip("/")
+
+
+# Enough of the base checkpoint to render a chat template, and no more:
+# ~11MB of tokenizer files against 19.3GB of weights. prepare-dataset runs
+# on a plain CPU pod and has no business downloading safetensors.
+_TOKENIZER_FILES = (
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "tokenizer.model",
+    "special_tokens_map.json",
+    "chat_template.jinja",
+    "vocab.json",
+    "merges.txt",
+    "generation_config.json",
+)
 
 
 def _resolve_base_model(config: MlopsConfig, store: ArtifactStore, workdir: Path) -> str:
@@ -305,12 +486,15 @@ def _resolve_base_model(config: MlopsConfig, store: ArtifactStore, workdir: Path
     a pre-mounted local path) passes through untouched."""
     if not config.base_model.startswith("s3://"):
         return config.base_model
-    bucket, _, prefix = config.base_model[len("s3://"):].partition("/")
-    if not bucket or not prefix:
-        raise SystemExit(f"malformed s3:// base model URI: {config.base_model}")
+    bucket, prefix = _split_s3_uri(config.base_model)
     local_dir = workdir / "base-model"
     local_dir.mkdir(parents=True, exist_ok=True)
-    count = store.download_prefix(bucket, prefix, local_dir)
+    # region/endpoint overrides: the models bucket is in another region
+    # than this pipeline's artifact bucket - see ArtifactStore's docstring.
+    count = store.download_prefix(
+        bucket, prefix, local_dir,
+        region=config.models_s3_region, endpoint=config.models_s3_endpoint,
+    )
     if count == 0 or not (local_dir / "config.json").exists():
         raise SystemExit(
             f"base model download from {config.base_model} yielded no usable "
@@ -327,6 +511,95 @@ def _run_prefix(base_prefix: str, config: MlopsConfig) -> str:
 # --------------------------------------------------------------------------
 # prepare-dataset
 # --------------------------------------------------------------------------
+
+
+def _download_style_corpus(config: MlopsConfig, store: ArtifactStore, workdir: Path) -> Dict[str, List[Dict[str, Any]]]:
+    """ADR-0526 decision 3: reads the staged French urban-register corpus.
+
+    A single .tgz holding OpenAI Messages JSONL - one single-turn
+    user/assistant conversation per line - split at SEED level, so
+    paraphrases of a seed never cross a split boundary and the held-out
+    test set is genuinely held out.
+
+    Extraction is filtered rather than trusting the archive: a tar member
+    whose name escapes the extraction root (absolute, or containing '..')
+    is refused outright. The archive is ours today, but "we produced it"
+    is not an access-control property, and this runs as a pod with the
+    pipeline's own S3 credentials.
+    """
+    import tarfile
+
+    bucket, key = _split_s3_uri(config.style_corpus_s3uri)
+    # The corpus bucket is named by the URI, not assumed to be S3_BUCKET -
+    # ArtifactStore._resolve picks the default client when they match and
+    # a region-correct one when they do not.
+    raw = store.get_bytes(key, bucket=bucket)
+    if raw is None:
+        raise SystemExit(f"style corpus not found at {config.style_corpus_s3uri}")
+
+    root = workdir / "style-corpus"
+    root.mkdir(parents=True, exist_ok=True)
+    archive = workdir / "style-corpus.tgz"
+    archive.write_bytes(raw)
+    with tarfile.open(archive, "r:gz") as tar:
+        safe = []
+        for member in tar.getmembers():
+            name = Path(member.name)
+            if name.is_absolute() or ".." in name.parts:
+                logger.warning("refusing unsafe tar member %s", member.name)
+                continue
+            if not (member.isfile() or member.isdir()):
+                logger.warning("refusing non-regular tar member %s", member.name)
+                continue
+            safe.append(member)
+        tar.extractall(root, members=safe)
+
+    splits: Dict[str, List[Dict[str, Any]]] = {}
+    for split in ("train", "validation", "test"):
+        matches = sorted(root.rglob(f"{split}.jsonl"))
+        if not matches:
+            raise SystemExit(f"style corpus {config.style_corpus_s3uri} has no {split}.jsonl")
+        rows = []
+        for line in matches[0].read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+        splits[split] = rows
+    logger.info(
+        "style corpus: %s train / %s validation / %s test conversations",
+        len(splits["train"]), len(splits["validation"]), len(splits["test"]),
+    )
+    return splits
+
+
+def _load_chat_tokenizer(config: MlopsConfig, store: ArtifactStore, workdir: Path):
+    """Tokenizer only - the ~11MB of the base checkpoint needed to render
+    a chat template, never the weights (see _TOKENIZER_FILES)."""
+    from transformers import AutoTokenizer
+
+    if not config.base_model.startswith("s3://"):
+        return AutoTokenizer.from_pretrained(config.base_model)
+    bucket, prefix = _split_s3_uri(config.base_model)
+    local_dir = workdir / "tokenizer"
+    local_dir.mkdir(parents=True, exist_ok=True)
+    store.download_prefix(
+        bucket, prefix, local_dir,
+        region=config.models_s3_region, endpoint=config.models_s3_endpoint,
+        include=lambda rel: rel in _TOKENIZER_FILES,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(str(local_dir))
+    if getattr(tokenizer, "chat_template", None) is None:
+        # Verified present on the staged Qwen3.5-9B checkpoint
+        # (chat_template.jinja, 2026-08-27), so this is a guard, not an
+        # expected path - but a base model id is not a promise of one, and
+        # silently training on un-templated text would produce a model
+        # that never emits the turn structure vLLM serves.
+        raise SystemExit(
+            f"{config.base_model} has no chat_template; refusing to render the style corpus "
+            f"with an invented one - stage a checkpoint that carries chat_template.jinja "
+            f"or set one explicitly on the tokenizer"
+        )
+    return tokenizer
 
 
 def _pg_connect(config: MlopsConfig):
@@ -380,7 +653,94 @@ def _load_scenario_seed_texts(config: MlopsConfig) -> List[str]:
     return [s["message"] for s in data.get("scenarios", []) if s.get("type") in chat_types and s.get("message")]
 
 
+def _prepare_style_dataset(config: MlopsConfig, store: ArtifactStore) -> None:
+    """ADR-0526 decision 3's branch: a style corpus, not domain grounding.
+
+    Renders every conversation through the BASE MODEL'S OWN chat template,
+    so training sees exactly the turn structure vLLM will serve at
+    inference. Each example carries two fields:
+
+      text   - the full rendered conversation (prompt + completion)
+      prompt - the same render truncated to the generation prefix
+
+    train-lora masks `prompt`'s tokens out of the loss. Without that
+    split, full-sequence LM loss over 716 single-turn exchanges would also
+    teach the model to generate USER turns in this register - a real
+    quality regression, and free to avoid once the prefix is recorded here.
+
+    Classification is C1 and stays C1: the corpus is synthetic
+    conversational style material with no business, customer or financial
+    content, and this branch never reads document_embeddings, so there is
+    nothing that could escalate it (ADR-0034's rule is escalate-only).
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        workdir = Path(tmp)
+        splits = _download_style_corpus(config, store, workdir)
+        tokenizer = _load_chat_tokenizer(config, store, workdir)
+
+        examples: List[Dict[str, Any]] = []
+        skipped = 0
+        for split in ("train", "validation"):
+            for row in splits[split]:
+                messages = row.get("messages") or []
+                if len(messages) < 2 or messages[-1].get("role") != "assistant":
+                    skipped += 1
+                    continue
+                text = tokenizer.apply_chat_template(messages, tokenize=False)
+                prompt = tokenizer.apply_chat_template(
+                    messages[:-1], tokenize=False, add_generation_prompt=True
+                )
+                examples.append({"text": text, "prompt": prompt, "source": f"style-corpus/{split}"})
+        if skipped:
+            logger.warning("skipped %d corpus rows without a trailing assistant turn", skipped)
+        if not examples:
+            raise SystemExit(f"style corpus {config.style_corpus_s3uri} yielded no usable examples")
+
+        run_prefix = _run_prefix(config.dataset_prefix, config)
+        store.put_text(
+            f"{run_prefix}/examples.jsonl",
+            "\n".join(json.dumps(ex, ensure_ascii=False) for ex in examples),
+        )
+        # Carried forward untouched for the register-conformance half of
+        # the gate (ADR-0526 decision 8): train-lora generates completions
+        # for these held-out prompts, evaluate scores them. Held out means
+        # held out - nothing above ever trains on this split.
+        store.put_text(
+            f"{run_prefix}/test.jsonl",
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in splits["test"]),
+        )
+
+        manifest = {
+            "agent": config.agent,
+            "run_id": config.run_id,
+            "objective": "style-register",
+            "corpus_uri": config.style_corpus_s3uri,
+            "split_counts": {k: len(v) for k, v in splits.items()},
+            "example_count": len(examples),
+            "grounding_row_count": 0,
+            "scenario_seed_count": 0,
+            "test_example_count": len(splits["test"]),
+            "classification": "C1",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        store.put_json(f"{run_prefix}/dataset_manifest.json", manifest)
+        logger.info(
+            "prepare-dataset: %d style examples + %d held-out test prompts for %s/%s (C1)",
+            len(examples), len(splits["test"]), config.agent, config.run_id,
+        )
+
+
 def stage_prepare_dataset(config: MlopsConfig, store: ArtifactStore) -> None:
+    # ADR-0526 decision 3 overrides ADR-0302 point 2 for this objective
+    # only. The two branches are mutually exclusive by design: a style
+    # corpus and domain-grounding rows train different things, and mixing
+    # them would make the dataset's classification depend on which source
+    # happened to dominate.
+    if config.style_corpus_s3uri:
+        _prepare_style_dataset(config, store)
+        return
     rows = _fetch_domain_grounding_rows(config)
     seed_texts = _load_scenario_seed_texts(config)
 

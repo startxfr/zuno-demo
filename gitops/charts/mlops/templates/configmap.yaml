@@ -14,6 +14,14 @@ data:
   S3_MODEL_PREFIX: {{ .Values.artifacts.modelPrefix | quote }}
   S3_EVAL_PREFIX: {{ .Values.artifacts.evalPrefix | quote }}
   S3_REGISTRY_PREFIX: {{ .Values.artifacts.registryPrefix | quote }}
+  # ADR-0526 (WP-087): the models bucket's own region/endpoint. Separate
+  # from S3_REGION above because zuno-demo-rag-corpus is eu-west-2 while
+  # this pipeline's artifact bucket is us-east-1 - one boto3 client cannot
+  # serve both (PermanentRedirect).
+  MLOPS_MODELS_S3_REGION: {{ .Values.modelsS3.region | quote }}
+  MLOPS_MODELS_S3_ENDPOINT: {{ .Values.modelsS3.endpoint | quote }}
+  MLOPS_MERGED_MODEL_S3URI: {{ .Values.mergedModel.s3Uri | quote }}
+  MLOPS_MERGED_OVERWRITE: {{ .Values.mergedModel.overwrite | quote }}
   PGHOST: {{ .Values.postgres.host | quote }}
   PGPORT: {{ .Values.postgres.port | quote }}
   PGDATABASE: {{ .Values.postgres.database | quote }}

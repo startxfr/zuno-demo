@@ -23,5 +23,10 @@ data:
   MLOPS_LORA_R: {{ $agent.loraR | quote }}
   MLOPS_LORA_ALPHA: {{ $agent.loraAlpha | quote }}
   MLOPS_LORA_DROPOUT: {{ $agent.loraDropout | quote }}
+  # ADR-0526 (WP-087). Both are per-agent because the OBJECTIVE is
+  # per-agent: styleCorpusS3Uri selects prepare-dataset's style branch,
+  # loraTargetModules is tied to the base checkpoint's own architecture.
+  MLOPS_STYLE_CORPUS_S3URI: {{ $agent.styleCorpusS3Uri | default "" | quote }}
+  MLOPS_LORA_TARGET_MODULES: {{ $agent.loraTargetModules | default "" | quote }}
 {{- end }}
 {{- end }}
