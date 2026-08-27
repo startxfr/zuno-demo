@@ -106,8 +106,10 @@ mcp:
   #   serviceIdentity - a dedicated Keycloak client-credentials token carrying
   #     a read-only group. Works against mcp-gateway's existing auth.py with no
   #     code change (valueFrom.type: secret).
-  #   perUser        - forwards the console user's own OpenShift token
-  #     (valueFrom.type: client) for mcp-gateway's additive TokenReview branch.
+  #   perUser        - transmet le token OpenShift de l'utilisateur connecte
+  #     (valueFrom.type: kubernetes) vers la branche TokenReview de
+  #     mcp-gateway. NB: `kubernetes`, pas `client` - voir le commentaire
+  #     detaille dans templates/olsconfig.yaml.
   #
   # Only ONE may be active: they both set the Authorization header, and the
   # CRD has no precedence rule between two entries with the same header name.
@@ -194,3 +196,13 @@ credential:
   serviceAccountName: lightspeed-maas-client
   apiKeyEnabled: false
   apiKeyVaultPath: maas/gateway-api-key
+
+# ADR-0524 : qui peut ouvrir le chat Lightspeed dans la console. Sans binding,
+# l'operateur refuse tout le monde ("Not authorized"). Groupes OpenShift, tels
+# que la synchronisation Keycloak les cree (noms nus, sans "/").
+chatAccess:
+  enabled: true
+  bindingName: zuno-lightspeed-query-access
+  groups:
+    - consultant
+    - sales

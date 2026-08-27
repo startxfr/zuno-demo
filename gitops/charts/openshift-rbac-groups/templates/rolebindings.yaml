@@ -11,6 +11,36 @@ combination of ocp-paas-ops (full cluster) and ocp-ai-ops (admin on the
 AI namespaces), so it has no successor binding here.
 */}}
 {{- range .Values.zunoManagedNamespaces }}
+{{- if $.Values.personaView.enabled }}
+{{- /*
+ADR-0524 : lecture seule pour les personas metier sur les namespaces Zuno.
+Motive par l'introspection Lightspeed : openshift-mcp-server agit avec les
+droits REELS de l'utilisateur, donc sans ce grant la console repondait
+"You don't have permission to list pods in the zuno-ai-run namespace" -
+comportement correct, mais assistant muet. Constate live le 2026-08-27.
+`view` et non `edit` : Lightspeed lit l'etat du cluster, il ne le modifie pas.
+Meme mecanisme de decouverte que les deux bindings ci-dessous - la liste des
+namespaces vient de zunoManagedNamespaces, jamais recopiee a la main.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-personas-view
+  namespace: {{ . }}
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+{{- range $.Values.personaView.groups }}
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: {{ . }}
+{{- end }}
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+{{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

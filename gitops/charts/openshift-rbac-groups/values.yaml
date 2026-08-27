@@ -11,3 +11,11 @@ roleBindings:
 # ocp-ai-dev/ocp-ai-ops RBAC (ADR-0349, ex ADR-0320's zuno-admin), which
 # is intended behavior.
 zunoManagedNamespaces: []
+
+# ADR-0524 : lecture seule des personas metier sur les namespaces Zuno, pour
+# que l'introspection cluster de Lightspeed leur reponde quelque chose.
+personaView:
+  enabled: true
+  groups:
+    - consultant
+    - sales

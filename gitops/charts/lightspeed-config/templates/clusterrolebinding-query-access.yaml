@@ -1,0 +1,29 @@
+{{- if and .Values.lightspeedConfig.enabled .Values.chatAccess.enabled }}
+# ADR-0524 : ouvre le chat Lightspeed aux groupes metier.
+#
+# L'operateur cree le ClusterRole `lightspeed-operator-query-access`
+# (nonResourceURLs /ols-access et /ls-access) mais NE LE LIE A PERSONNE - par
+# defaut, tout utilisateur voit "Not authorized" dans la console, constate live
+# le 2026-08-27. L'app-server tranche via TokenReview + SubjectAccessReview,
+# donc le token console etait deja transmis : il ne manquait que ce droit.
+#
+# Ce binding vit ici plutot que dans gitops/charts/openshift-rbac-groups parce
+# que le ClusterRole reference n'existe qu'apres l'installation de l'operateur
+# (Day 1), dont ce composant Day 2 depend deja.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.chatAccess.bindingName }}
+  labels:
+    zuno.io/managed-by: argocd
+subjects:
+{{- range .Values.chatAccess.groups }}
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: {{ . }}
+{{- end }}
+roleRef:
+  kind: ClusterRole
+  name: lightspeed-operator-query-access
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

@@ -22,7 +22,17 @@ spec:
     spec:
       serviceAccountName: mcp-gateway
       priorityClassName: zuno-workload-default
-      automountServiceAccountToken: false
+      # ADR-0524 : le montage du token de ServiceAccount devient necessaire des
+      # que le front-door /mcp est actif - app/auth.py s'authentifie avec lui
+      # aupres de l'API TokenReview pour resoudre le token de l'utilisateur
+      # console. Sans lui, chaque appel de Lightspeed repond 503 et
+      # l'app-server journalise "Failed to get tools from MCP server
+      # 'zuno-mcp'" (constate live le 2026-08-27).
+      #
+      # Reste false par defaut : hors front-door, ce service n'appelle
+      # effectivement jamais l'API Kubernetes, et c'est la posture d'origine
+      # qu'il faut conserver.
+      automountServiceAccountToken: {{ .Values.lightspeed.enabled }}
       {{- if .Values.topologySpreadConstraints.enabled }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}

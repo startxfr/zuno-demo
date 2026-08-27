@@ -66,10 +66,21 @@ spec:
             secretRef:
               name: {{ .Values.mcp.serviceIdentity.secretName }}
           {{- else }}
-            # The console user's own OpenShift token, for mcp-gateway's
-            # additive TokenReview branch (WP-085 step 4). Requires that
-            # branch to be deployed, or every call 401s.
-            type: client
+            # Le token OpenShift de l'utilisateur connecte a la console, resolu
+            # par la branche TokenReview de mcp-gateway (app/auth.py,
+            # validate_token_or_kubernetes).
+            #
+            # `kubernetes` et NON `client` : verifie live le 2026-08-27 en lisant
+            # ols/utils/mcp_utils.py dans l'image de l'operateur. `client` attend
+            # des en-tetes que le CLIENT DE L'API doit fournir par serveur, ce que
+            # le plugin console n'envoie jamais - le serveur etait alors ecarte
+            # avant tout appel ("requires client headers but none provided") et
+            # mcp-gateway ne recevait rien du tout. `kubernetes` resout le
+            # placeholder en `Bearer <user_token>`, ou user_token est documente
+            # comme "User's kubernetes token". C'est exactement le per-user
+            # recherche - et c'est aussi ce que Red Hat utilise pour son propre
+            # serveur `openshift` dans le meme fichier de configuration.
+            type: kubernetes
           {{- end }}
   {{- end }}
 {{- end }}
