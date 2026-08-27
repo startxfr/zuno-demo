@@ -39,6 +39,28 @@
           {{ compile_pipeline_target }} pipeline version compiled and applied
           ({{ 'changed' if _rag_ingestion_pipeline_version_apply.changed else 'already up to date' }}).
   rescue:
+    # An immutable-spec rejection is NOT in the same class as the failures
+    # below. It means the compiled pipeline genuinely CHANGED but the version
+    # name in values.yaml did not, so KFP refused the update and the cluster
+    # silently kept the OLD spec. Swallowing that as "not fatal" makes the
+    # whole play report ok=N failed=0 while the operator's change never
+    # landed - which is exactly how a re-sized stage can appear deployed and
+    # then run with its previous limits. Fail loudly and say what to do.
+    - name: "rag_ingestion | FATAL: {{ compile_pipeline_target }} PipelineVersion is immutable and its name was not bumped"
+      ansible.builtin.fail:
+        msg: >-
+          The {{ compile_pipeline_target }} PipelineVersion was rejected as
+          immutable: the compiled spec differs from the live object but
+          `pipeline.version` in gitops/charts/rag-ingestion/values.yaml is
+          unchanged, so KFP kept the OLD spec and your change did NOT reach
+          the cluster. Bump `pipeline.version` (e.g. v0-6-0 -> v0-7-0),
+          commit, WAIT for ArgoCD to sync the rag-ingestion ConfigMaps - this
+          task compiles from the in-cluster `rag-ingestion-pipeline-source`
+          ConfigMap, not from your working copy - then re-run. Verify the new
+          object rather than this play's exit code.
+      when: >-
+        'Pipeline spec is immutable' in (ansible_failed_result.msg | default('') | string)
+
     - name: "rag_ingestion | pipeline-version compile failed, not fatal, for {{ compile_pipeline_target }}"
       ansible.builtin.debug:
         msg: >-
