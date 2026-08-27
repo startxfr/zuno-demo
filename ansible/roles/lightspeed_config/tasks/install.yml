@@ -102,3 +102,15 @@
     # aap's multi-component operand, so the same generous budget.
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
+
+# ADR-0524 clause 1: OLS v1.1.2 can only read a credential from an Opaque
+# Secret keyed `apitoken`, which a ServiceAccount-token Secret can never be.
+# Runs AFTER the Application above so the chart's SA-token Secret exists to
+# copy from; the app-server picks the bridged credential up on its next
+# restart. A no-op in every credential.mode except saTokenSecret.
+- name: "lightspeed-config | resolve the credential Secret name"
+  ansible.builtin.set_fact:
+    _ls_cred_secret_name: "{{ lightspeed_credential_secret_name | default('lightspeed-maas-credentials') }}"
+
+- name: "lightspeed-config | bridge the ServiceAccount token into the key OLS reads"
+  ansible.builtin.include_tasks: satoken_credential.yml

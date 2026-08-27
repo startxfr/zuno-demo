@@ -2,7 +2,11 @@
 {{- $p := .Values.olsConfig.provider }}
 {{- /* Derive credentialKey from the credential mode unless explicitly overridden. */ -}}
 {{- $credKey := .Values.credential.credentialKey }}
-{{- if not $credKey }}{{ $credKey = ternary "token" "apitoken" (eq .Values.credential.mode "saTokenSecret") }}{{ end }}
+{{- /* Always `apitoken`: OLS v1.1.2 ignores this field and hardcodes that key
+       (live 2026-08-27), and every mode now delivers it - staticToken and
+       apiKey render it directly, saTokenSecret gets it bridged from the
+       SA-token Secret by ansible. Kept declared so the CRD reads truthfully. */ -}}
+{{- if not $credKey }}{{ $credKey = "apitoken" }}{{ end }}
 {{- /* endpointMode: `direct` court-circuite MaaS (ADR-0524).
        The path carries the LLMInferenceService name - it is the only thing
        the HTTPRoute matches - while the body's `model` carries the MaaS
