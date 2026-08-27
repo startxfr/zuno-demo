@@ -1,6 +1,6 @@
 # WP-084: Retire the SXA MCP/SQL path and the second RAG domain (promotes ADR-0219)
 
-- **State:** Repo work merged (2026-08-26). Operator teardown and one re-ingestion still open — see below.
+- **State:** Done (2026-08-27). Repo work, operator teardown, the full re-ingestion and its verification are all complete; two rag-ingestion throughput/robustness defects this WP uncovered are fixed and recorded below.
 - **ADRs:** ADR-0219 (Implemented); supersedes ADR-0216 and ADR-0217 in full
 - **Supersedes:** [WP-065](wp-065-sxa-mariadb-import-rag.md) and [WP-067](wp-067-sxa-weekly-rag-corpus.md), both Abandoned
 - **Depends on:** WP-065, WP-067 (both merged; this WP removes what they built)
@@ -404,9 +404,52 @@ Then, once deployed:
   missing index fails the stage instead of reporting green. The index itself
   was rebuilt live in 40s with the operator's approval, so retrieval is no
   longer degraded.
-- Still open: compile `v0-7-0` (`make d2 install rag-ingestion`; verify the
-  compiled object carries `cpu: 2`, never the play's exit code), then steps 7
-  and 8.
+- 2026-08-27: **steps 7 and 8 done, and the WP flips to `Done`.**
+  `v0-7-0-sxa-legacy` compiled and verified *on the object* (`detect-changes`
+  carries `cpu: 2 / 6Gi`; the remaining `cpu: 8` entries are `normalize` and
+  `embed`, sized that way on purpose). `make d2 check agents` passes: 20/20
+  acceptance scenarios (threshold 75%), 12/12 mandatory security-negative
+  checks, 4/4 capability gates. Note it first failed on OKF signature
+  verification for five of eight bundles - `1a4d1380` (WP-087) regenerated
+  every `agent.okf.md` without re-signing; a peer session's
+  `okf-bundle-signing` Job at 19:33:44Z cleared it. Nothing to do with SXA,
+  but it blocks *every* gate while it lasts.
+- 2026-08-27: **the gates do not cover SXA**, so they were not accepted as
+  step 8's evidence on their own - the report contains zero occurrences of
+  "sxa" and runs only the tekos scenario suite. Retrieval was verified
+  directly instead, against `rag-service`'s `/v1/search` with a query term
+  taken from the corpus rather than guessed
+  (`renouvellement de souscription JBoss Enterprise Application Platform`):
+  HTTP 200, three results, all `sxa-dump://` sources, `domain =
+  knowledge.sxa-legacy`, snippets carrying real product records. All 319,713
+  rows are tagged `metadata.domain = knowledge.sxa-legacy`.
+- 2026-08-27: **worth knowing, not a defect.** Querying `/v1/search` directly
+  with `caller_groups: ['tech']` - a group *not* in this domain's
+  `allowed_groups` - returns the same results. That is by design:
+  `search.py`'s ACL clause only restricts documents carrying a non-empty
+  `metadata.acl_groups`, and `domains` is documented there as defense in
+  depth, with the real domain boundary evaluated upstream in agent-runtime
+  and mcp-gateway (verified in-pod on 2026-08-26). Calling rag-service
+  directly bypasses that layer by construction. **All 319,713 SXA rows carry
+  an empty `acl_groups`**, so this corpus is protected by the upstream policy
+  plane plus rag-service's NetworkPolicy, and by nothing at the row level -
+  consistent with ADR-0219 opening it to four groups, but state it rather
+  than let someone discover it.
+- 2026-08-27 (`81ea85b8`): **`stage_validate` carried the same defect class
+  twice.** Run 9z45t sat 112 minutes on it having logged one line, looking
+  exactly like a hang; it was doing one serial S3 `get_json` per document
+  (~28h for 310,524 documents, with no progress logging at all) *and* one
+  `SELECT` per touched URL on a single connection - another 310,524
+  round-trips. Item 5 parallelized `normalize`/`chunk`/`embed`/
+  `index-pgvector` and missed this stage, exactly as it missed
+  `detect-changes`' O(n^2): no corpus had been large enough to expose either.
+  Fixed with a bounded pool behind a new `VALIDATE_READ_CONCURRENCY`
+  (defaulted to 64, wired through both ConfigMap templates and CONFIG_KEYS,
+  which goes 44 -> 45 and forces `v0-8-0`), progress logging every 10k
+  documents so a slow stage is distinguishable from a stuck one, and a single
+  grouped `source = ANY(...) GROUP BY source` per 10k-URL batch. The run was
+  terminated rather than left to finish: its useful output was already
+  complete and verified.
 - After the operator steps above land: flip this WP to `Done` and add a dated
   MEMORY.md bullet.
 
