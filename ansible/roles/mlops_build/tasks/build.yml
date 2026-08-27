@@ -16,6 +16,15 @@
     # the pip wheel cache, the unpacked CUDA libraries and the committed
     # layers at once, with the limit leaving room for a fatter torch
     # release without needing a second visit.
+    # Pinned to the GPU group NOT because the build needs a GPU - it does
+    # not - but because those two nodes are the only ones with real disk
+    # headroom (155GB and 182GB free against 19-47GB on the other three),
+    # and this is the largest image in the repository. A group label rather
+    # than a hostname, so it survives a node being replaced. Their
+    # nvidia.com/gpu taint is PreferNoSchedule, which deprioritises but
+    # never blocks, so no toleration is needed alongside this.
+    build_node_selector:
+      machine.startx.io/group: gpu
     build_resources:
       requests:
         cpu: "1"

@@ -136,6 +136,20 @@
         # free disk across this cluster's workers ranged from 21GB to 182GB
         # at the time. Declaring a request fixes both halves.
         resources: "{{ build_resources | default({}) }}"
+        # Also optional, also empty by default (confirmed a real field with
+        # `oc explain buildconfig.spec.nodeSelector`).
+        #
+        # WP-087: `resources` above is necessary but NOT sufficient, which
+        # only became visible by watching where the scheduler put things.
+        # An ephemeral-storage REQUEST is compared against a node's
+        # allocatable (~88GB here) minus other pods' requests - and almost
+        # nothing in this cluster requests ephemeral-storage at all, so
+        # every node looks empty to the scheduler regardless of how much
+        # disk its container images are actually occupying. The sized mlops
+        # build was promptly placed on the fullest worker of the five (19GB
+        # genuinely free) and evicted again. A request lowers eviction
+        # priority; only a selector steers placement.
+        nodeSelector: "{{ build_node_selector | default({}) }}"
         output:
           to:
             kind: ImageStreamTag
