@@ -20,6 +20,10 @@ export interface StartEventData {
   // contract, but captured by Chat.tsx for the first time here (this
   // component's own half of the resume contract).
   run_id: string;
+  // ADR-0528: the server-resolved project for this run, empty outside a
+  // project. Authoritative - a client-requested project_id is only a
+  // request until the server has verified the caller's grant on it.
+  project_id?: string;
 }
 
 export interface TokenEventData {

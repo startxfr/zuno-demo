@@ -65,6 +65,15 @@ export interface ChatConfig {
   // ADR-0213: same-origin colleague-search endpoint this page's Go
   // server proxies to the BFF - always "/api/colleagues" today.
   colleaguesURL: string;
+  // ADR-0527: this page's own project base ("/api/projects"). Mirrors
+  // internal/chat/chat.go's chatConfig field-for-field - nothing enforces
+  // that mirror, so the two must be kept in step by hand.
+  projectsURL: string;
+  // ADR-0527: the business-role group lookup ("/api/groups"). Like
+  // colleaguesURL it fails closed (503) until the zuno-admin-api Keycloak
+  // client is provisioned; ProjectDialog surfaces that rather than
+  // rendering an empty picker.
+  groupsURL: string;
   // ADR-0515: every OTHER agent this signed-in caller is entitled to and
   // that is active/clickable, entitlement-filtered server-side
   // (internal/chat/chat.go's buildAgentNavStrip, reusing

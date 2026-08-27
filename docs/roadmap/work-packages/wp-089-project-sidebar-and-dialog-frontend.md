@@ -1,6 +1,6 @@
 # WP-089: Projects sidebar, project dialog and read-only tabs (promotes ADR-0527)
 
-- **State:** Not started
+- **State:** Repo work merged (2026-08-27)
 - **ADRs:** ADR-0527 clause 9 (Partially implemented -> Implemented once this WP lands and the live two-persona pass runs)
 - **Depends on:** WP-088 (the `/api/projects` and `/api/groups` routes, and `Conversation`'s new `project_id`/`role` fields)
 - **Estimated files touched:** ~10

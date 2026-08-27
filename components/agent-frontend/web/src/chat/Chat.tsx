@@ -34,7 +34,13 @@ import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
 import { AGENT_ICONS } from "../shared/agentIcons";
 import { ConversationList } from "../shared/ConversationList";
-import { getTranscript, listConversations, renameConversation } from "../shared/conversations";
+import {
+  getTranscript,
+  listConversations,
+  renameConversation,
+  type Conversation,
+} from "../shared/conversations";
+import { can, type ProjectRole } from "../shared/projects";
 import { Footer } from "../shared/Footer";
 import { SSEParser } from "../shared/sse";
 import { openAgentTab } from "../shared/tabTracker";
@@ -106,9 +112,23 @@ interface TabState {
   // generic error, since it's an expected, transient contention state,
   // not a failure.
   busy: boolean;
+  // ADR-0527: the project this conversation belongs to (null for a
+  // project-less one), and the caller's effective right on it.
+  projectId: string | null;
+  // null only for a tab opened before the list resolved. `read` and `clone`
+  // render the tab WITHOUT a composer - the server refuses their sends with
+  // 403 anyway, so offering the box would only produce a confusing error.
+  role: ProjectRole | null;
 }
 
-function newTab(opts: { runId: string | null; title?: string; starred?: boolean; input?: string }): TabState {
+function newTab(opts: {
+  runId: string | null;
+  title?: string;
+  starred?: boolean;
+  input?: string;
+  projectId?: string | null;
+  role?: ProjectRole | null;
+}): TabState {
   return {
     id: opts.runId ?? newTempTabId(),
     runId: opts.runId,
@@ -122,6 +142,9 @@ function newTab(opts: { runId: string | null; title?: string; starred?: boolean;
     loadingHistory: opts.runId !== null,
     error: null,
     busy: false,
+    projectId: opts.projectId ?? null,
+    // A conversation you are creating is yours, so you may write to it.
+    role: opts.role ?? "write",
   };
 }
 
@@ -243,7 +266,13 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         // list_conversations' own default order (ADR-0515: the caller's
         // manual drag-reorder, "most recent" absent a manual reorder).
         const mostRecent = list[0];
-        const tab = newTab({ runId: mostRecent.run_id, title: mostRecent.title, starred: mostRecent.starred });
+        const tab = newTab({
+          runId: mostRecent.run_id,
+          title: mostRecent.title,
+          starred: mostRecent.starred,
+          projectId: mostRecent.project_id,
+          role: mostRecent.role,
+        });
         setTabs([tab]);
         setActiveTabId(tab.id);
         loadTranscriptInto(tab.id, mostRecent.run_id);
@@ -275,20 +304,32 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
     window.history.replaceState(null, "", url.toString());
   }, [activeTabId, tabs]);
 
-  function openConversation(runId: string, title: string, starred: boolean) {
-    const existing = tabs.find((t) => t.runId === runId);
+  // ADR-0527: takes the whole Conversation rather than three positional
+  // fields, because a tab now needs project_id and the caller's role to
+  // decide read-only mode.
+  function openConversation(c: Conversation) {
+    const existing = tabs.find((t) => t.runId === c.run_id);
     if (existing) {
       setActiveTabId(existing.id);
       return;
     }
-    const tab = newTab({ runId, title, starred });
+    const tab = newTab({
+      runId: c.run_id,
+      title: c.title,
+      starred: c.starred,
+      projectId: c.project_id,
+      role: c.role,
+    });
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
-    loadTranscriptInto(tab.id, runId);
+    loadTranscriptInto(tab.id, c.run_id);
   }
 
-  function openNewConversation(prefill = "") {
-    const tab = newTab({ runId: null, input: prefill });
+  // projectId attaches the new conversation to a project (the "+" on a
+  // project row). The server re-checks the caller holds `write` on it
+  // before recording anything - this only carries the request.
+  function openNewConversation(prefill = "", projectId: string | null = null) {
+    const tab = newTab({ runId: null, input: prefill, projectId });
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   }
@@ -340,6 +381,10 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           session_id: tab.sessionId,
           message: text,
           run_id: tab.runId ?? undefined,
+          // ADR-0527: only meaningful when creating a conversation. On a
+          // resume the server ignores it entirely (a conversation's project
+          // is fixed at creation), so there is no reason to send it.
+          project_id: tab.runId === null ? (tab.projectId ?? undefined) : undefined,
         }),
         signal: controller.signal,
       });
@@ -386,7 +431,15 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         for (const evt of events) {
           if (evt.event === "start") {
             const data = JSON.parse(evt.data) as StartEventData;
-            updateTab(tab.id, (t) => ({ ...t, runId: data.run_id }));
+            // ADR-0528: the start event now also carries the SERVER-RESOLVED
+            // project, which is authoritative - a brand-new conversation's
+            // requested project_id is only a request until the server has
+            // checked the caller's grant on it.
+            updateTab(tab.id, (t) => ({
+              ...t,
+              runId: data.run_id,
+              projectId: data.project_id ? data.project_id : t.projectId,
+            }));
             setConversationsRefreshToken((n) => n + 1);
             // eslint-disable-next-line no-console
             console.debug("zuno chat request_id", data.request_id);
@@ -539,13 +592,15 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       sidebar={
         <ConversationList
           conversationsURL={config.conversationsURL}
+          projectsURL={config.projectsURL}
           colleaguesURL={config.colleaguesURL}
+          groupsURL={config.groupsURL}
           activeRunId={activeTab?.runId ?? null}
           refreshSignal={conversationsRefreshToken}
           width={sidebarWidth}
           onWidthChange={handleSidebarWidthChange}
           onOpenConversation={openConversation}
-          onNewConversation={() => openNewConversation()}
+          onNewConversation={(projectId) => openNewConversation("", projectId ?? null)}
         />
       }
       masthead={masthead}
@@ -693,6 +748,30 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                 Your message wasn&rsquo;t sent. Try again in a moment.
               </Alert>
             )}
+            {activeTab.role !== null && !can(activeTab.role, "write") ? (
+              // ADR-0527 clause 9: a read-only tab hides the composer
+              // entirely rather than disabling it. The server refuses these
+              // roles' sends with 403 anyway, so offering a box that always
+              // fails would teach the user nothing. Same inline-Alert shape
+              // as the lease-contention state just above, which is the
+              // precedent this codebase already set for "you cannot write
+              // right now, and here is why".
+              <Alert
+                variant="info"
+                isInline
+                isPlain
+                title={
+                  activeTab.role === "read"
+                    ? "You have read-only access to this project"
+                    : "You can read and clone this conversation, but not send messages"
+                }
+                style={{ marginBottom: "1rem" }}
+              >
+                {activeTab.role === "clone"
+                  ? "Clone it from the sidebar to continue in a copy of your own."
+                  : "Ask a project admin for the write role if you need to take part."}
+              </Alert>
+            ) : (
             <Form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -730,6 +809,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                 </FlexItem>
               </Flex>
             </Form>
+            )}
           </PageSection>
         </>
       )}

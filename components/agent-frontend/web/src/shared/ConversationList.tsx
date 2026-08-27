@@ -1,29 +1,15 @@
 import * as React from "react";
 import {
   Button,
-  Dropdown,
-  DropdownItem,
-  DropdownList,
+  Divider,
   EmptyState,
   EmptyStateBody,
-  MenuToggle,
-  type MenuToggleElement,
   PageSidebar,
   PageSidebarBody,
   Spinner,
   TextInput,
 } from "@patternfly/react-core";
-import {
-  BanIcon,
-  CloneIcon,
-  EllipsisVIcon,
-  GripVerticalIcon,
-  OutlinedStarIcon,
-  PencilAltIcon,
-  ShareIcon,
-  StarIcon,
-  TrashIcon,
-} from "@patternfly/react-icons";
+import { AngleDownIcon, AngleRightIcon, FolderIcon, PlusIcon } from "@patternfly/react-icons";
 import {
   cloneConversation,
   deleteConversation,
@@ -34,13 +20,19 @@ import {
   setStar,
   type Conversation,
 } from "./conversations";
-import { ShareDialog } from "./ShareDialog";
+import { listProjects, type Project } from "./projects";
+import { ConversationRow } from "./ConversationRow";
+import { ProjectDialog } from "./ProjectDialog";
+import { ProjectRow } from "./ProjectRow";
 
 export interface ConversationListProps {
   conversationsURL: string;
-  // ADR-0213: same-origin colleague-search endpoint, passed straight
-  // through to ShareDialog - this component never calls it directly.
+  // ADR-0527: the project base and the two Keycloak-Admin-backed lookups,
+  // passed straight through to ProjectDialog - this component never calls
+  // them itself.
+  projectsURL: string;
   colleaguesURL: string;
+  groupsURL: string;
   // The run_id of the currently active in-app tab, if any - highlighted
   // in the list.
   activeRunId: string | null;
@@ -51,17 +43,18 @@ export interface ConversationListProps {
   refreshSignal?: number;
   // Current sidebar width in px and its setter, owned by chat/Chat.tsx
   // (it applies the value as a CSS custom property on <Page>, the only
-  // thing PageSidebar's own width actually listens to - see
-  // ResizeHandle below). Lifted up rather than kept local so Chat.tsx can
+  // thing PageSidebar's own width actually listens to - see ResizeHandle
+  // below). Lifted up rather than kept local so Chat.tsx can
   // persist/restore it.
   width: number;
   onWidthChange: (width: number) => void;
-  // ADR-0515: opening or creating a conversation now activates an in-app
-  // tab in chat/Chat.tsx - this list never navigates or opens a browser
-  // tab itself (shared/tabTracker.ts is agent-scoped now, used only by
-  // the masthead's cross-agent nav strip).
-  onOpenConversation: (runId: string, title: string, starred: boolean) => void;
-  onNewConversation: () => void;
+  // ADR-0515: opening or creating a conversation activates an in-app tab in
+  // chat/Chat.tsx - this list never navigates or opens a browser tab
+  // itself. ADR-0527 widens the payload to the whole Conversation, because
+  // the tab now needs project_id and the caller's role to decide read-only
+  // mode, and threading four positional arguments would be worse.
+  onOpenConversation: (conversation: Conversation) => void;
+  onNewConversation: (projectId?: string) => void;
 }
 
 const MIN_SIDEBAR_WIDTH = 220;
@@ -140,19 +133,21 @@ function ResizeHandle({
   );
 }
 
-// Left-hand conversation list (ADR-0212), rendered via PatternFly Page's
-// sidebar prop. No context/store, prop-driven like shared/UserMenu.tsx -
-// opening/creating a conversation is delegated to the parent (Chat.tsx)
-// via onOpenConversation/onNewConversation, which own the in-app tab set
-// (ADR-0515) - this component only ever renders and reorders the list.
+// ADR-0212's left-hand conversation list, restructured by ADR-0527 clause 9
+// into two blocks: PROJECTS (each foldable, showing this agent's
+// conversations for that project) and, below a separator, CONVERSATIONS -
+// the caller's own project-less ones.
 //
-// ADR-0515 (WP-061): every row now carries a drag handle (manual reorder,
-// persisted via reorderConversations) and a right-aligned kebab menu
-// consolidating rename/star/soft-delete/hard-delete - replacing ADR-0214's
-// standalone star/trash buttons and double-click-to-rename stopgap.
+// Still prop-driven with no context/store, like shared/UserMenu.tsx:
+// opening or creating a conversation is delegated to Chat.tsx, which owns
+// the in-app tab set (ADR-0515). Both blocks render the SAME
+// ConversationRow, extracted from this file rather than reimplemented, so
+// ADR-0515's row layout cannot drift between them.
 export function ConversationList({
   conversationsURL,
+  projectsURL,
   colleaguesURL,
+  groupsURL,
   activeRunId,
   refreshSignal,
   width,
@@ -161,91 +156,104 @@ export function ConversationList({
   onNewConversation,
 }: ConversationListProps): React.ReactElement {
   const [conversations, setConversations] = React.useState<Conversation[] | null>(null);
+  const [projects, setProjects] = React.useState<Project[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [renamingRunId, setRenamingRunId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
-  const [openKebabRunId, setOpenKebabRunId] = React.useState<string | null>(null);
   const [draggedRunId, setDraggedRunId] = React.useState<string | null>(null);
-  // ADR-0213: the conversation currently open in the share dialog, if
-  // any - null closes it. Only run_id/title are needed (ShareDialog
-  // fetches its own member list once open).
-  const [sharing, setSharing] = React.useState<{ runId: string; title: string } | null>(null);
   const [cloning, setCloning] = React.useState<string | null>(null);
-  const renameInputRef = React.useRef<HTMLInputElement | null>(null);
+  // undefined = closed, null = create mode, string = edit that project.
+  const [dialogProjectId, setDialogProjectId] = React.useState<string | null | undefined>(undefined);
+  const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(loadExpanded);
+  const [projectsExpanded, setProjectsExpanded] = React.useState(true);
+  const [conversationsExpanded, setConversationsExpanded] = React.useState(true);
 
   React.useEffect(() => {
-    if (renamingRunId !== null) {
-      renameInputRef.current?.focus();
-    }
-  }, [renamingRunId]);
+    persistExpanded(expandedProjects);
+  }, [expandedProjects]);
 
   const refresh = React.useCallback(() => {
-    listConversations(conversationsURL)
-      .then(setConversations)
+    // Both lists in parallel - they are independent reads and the sidebar
+    // needs both before it can group anything.
+    Promise.all([listConversations(conversationsURL), listProjects(projectsURL)])
+      .then(([conversationList, projectList]) => {
+        setConversations(conversationList);
+        setProjects(projectList);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
-  }, [conversationsURL]);
+  }, [conversationsURL, projectsURL]);
 
   React.useEffect(() => {
     refresh();
   }, [refresh, refreshSignal]);
 
-  async function toggleStar(runId: string, starred: boolean) {
+  function fail(err: unknown) {
+    setError(err instanceof Error ? err.message : String(err));
+  }
+
+  async function toggleStar(c: Conversation) {
     try {
-      await setStar(conversationsURL, runId, starred);
+      await setStar(conversationsURL, c.run_id, !c.starred);
       refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      fail(err);
     }
   }
 
-  async function deleteConversationRow(runId: string, title: string) {
-    if (!window.confirm(`Delete "${title || "Untitled conversation"}"? This hides it from your list, but keeps its history.`)) {
-      return;
-    }
-    try {
-      await deleteConversation(conversationsURL, runId);
-      refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function hardDeleteConversationRow(runId: string, title: string) {
+  async function deleteConversationRow(c: Conversation) {
     if (
       !window.confirm(
-        `Permanently delete "${title || "Untitled conversation"}"? This cannot be undone - its entire message history is erased.`,
+        `Delete "${c.title || "Untitled conversation"}"? This hides it from the list, but keeps its history.`,
       )
     ) {
       return;
     }
     try {
-      await hardDeleteConversation(conversationsURL, runId);
+      await deleteConversation(conversationsURL, c.run_id);
       refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      fail(err);
     }
   }
 
-  async function cloneConversationRow(runId: string, title: string) {
-    setCloning(runId);
+  async function hardDeleteConversationRow(c: Conversation) {
+    if (
+      !window.confirm(
+        `Permanently delete "${c.title || "Untitled conversation"}"? This cannot be undone - its entire message history is erased.`,
+      )
+    ) {
+      return;
+    }
     try {
-      const newRunId = await cloneConversation(conversationsURL, runId);
+      await hardDeleteConversation(conversationsURL, c.run_id);
       refresh();
-      // ADR-0213: the clone is immediately usable and solely owned by
-      // the caller - open it right away rather than leaving them to
-      // find it in the (now-refreshed) list themselves.
-      onOpenConversation(newRunId, title, false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      fail(err);
+    }
+  }
+
+  async function cloneConversationRow(c: Conversation) {
+    setCloning(c.run_id);
+    try {
+      // ADR-0527 clause 4: the copy stays in the source's project and the
+      // cloner owns it, so they can write to it immediately - open it right
+      // away rather than leaving them to find it in the refreshed list.
+      const clone = await cloneConversation(conversationsURL, c.run_id);
+      refresh();
+      onOpenConversation({
+        run_id: clone.run_id,
+        title: clone.title,
+        updated_at: new Date().toISOString(),
+        starred: false,
+        project_id: clone.project_id || null,
+        role: "write",
+      });
+    } catch (err) {
+      fail(err);
     } finally {
       setCloning(null);
     }
-  }
-
-  function startRename(runId: string, title: string) {
-    setRenamingRunId(runId);
-    setRenameValue(title);
   }
 
   async function commitRename(runId: string, title: string) {
@@ -258,14 +266,16 @@ export function ConversationList({
       await renameConversation(conversationsURL, runId, trimmed);
       refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      fail(err);
     }
   }
 
-  // ADR-0515: manual drag-reorder, disabled while a search filter is
-  // active - reordering a filtered subset's *visual* order against the
-  // full underlying list's positions is ambiguous, so this pass simply
-  // doesn't offer it while filtered.
+  // ADR-0515: manual drag-reorder, disabled while a search filter is active
+  // (reordering a filtered subset against the full list's positions is
+  // ambiguous). ADR-0527 narrows it further, per row: conversations.sort_order
+  // is a single shared column, so reordering a colleague's conversation in a
+  // shared project would move it in THEIR list too. A per-subject ordering
+  // table is deliberately out of scope for WP-089.
   const dragEnabled = search.trim() === "";
 
   function handleDrop(targetRunId: string) {
@@ -287,220 +297,229 @@ export function ConversationList({
       conversationsURL,
       list.map((c) => c.run_id),
     ).catch((err) => {
-      setError(err instanceof Error ? err.message : String(err));
+      fail(err);
       refresh();
     });
   }
 
-  const filtered = (conversations ?? []).filter((c) =>
-    c.title.toLowerCase().includes(search.trim().toLowerCase()),
+  const needle = search.trim().toLowerCase();
+  const matching = (conversations ?? []).filter((c) => c.title.toLowerCase().includes(needle));
+  const looseConversations = matching.filter((c) => c.project_id === null);
+  const visibleProjects = (projects ?? []).filter(
+    (p) =>
+      needle === "" ||
+      p.title.toLowerCase().includes(needle) ||
+      matching.some((c) => c.project_id === p.project_id),
   );
+
+  function toggleProject(projectId: string) {
+    setExpandedProjects((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }
+
+  function renderConversation(c: Conversation, indent: boolean) {
+    return (
+      <ConversationRow
+        key={c.run_id}
+        conversation={c}
+        indent={indent}
+        isActive={c.run_id === activeRunId}
+        dragEnabled={dragEnabled && c.project_id === null}
+        isDragged={draggedRunId === c.run_id}
+        isRenaming={renamingRunId === c.run_id}
+        renameValue={renameValue}
+        isCloning={cloning === c.run_id}
+        onRenameValueChange={setRenameValue}
+        onCommitRename={() => void commitRename(c.run_id, renameValue)}
+        onCancelRename={() => setRenamingRunId(null)}
+        onStartRename={() => {
+          setRenamingRunId(c.run_id);
+          setRenameValue(c.title);
+        }}
+        onOpen={() => onOpenConversation(c)}
+        onToggleStar={() => void toggleStar(c)}
+        onClone={() => void cloneConversationRow(c)}
+        onDelete={() => void deleteConversationRow(c)}
+        onHardDelete={() => void hardDeleteConversationRow(c)}
+        onDragStart={() => setDraggedRunId(c.run_id)}
+        onDrop={() => handleDrop(c.run_id)}
+      />
+    );
+  }
+
+  function blockHeader(
+    label: string,
+    expanded: boolean,
+    onToggle: () => void,
+    onAdd: () => void,
+    addLabel: string,
+  ) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+        <Button
+          variant="plain"
+          aria-label={expanded ? `Collapse all ${label.toLowerCase()}` : `Expand all ${label.toLowerCase()}`}
+          aria-expanded={expanded}
+          onClick={onToggle}
+          style={{ padding: "0 0.125rem" }}
+        >
+          <FolderIcon />
+        </Button>
+        <span
+          style={{
+            flex: 1,
+            fontSize: "0.75rem",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+            color: "var(--pf-t--global--text--color--subtle)",
+          }}
+        >
+          {label}
+        </span>
+        <Button variant="plain" aria-label={addLabel} onClick={onAdd} style={{ padding: "0 0.25rem" }}>
+          <PlusIcon />
+        </Button>
+        <Button
+          variant="plain"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={onToggle}
+          style={{ padding: "0 0.125rem" }}
+        >
+          {expanded ? <AngleDownIcon /> : <AngleRightIcon />}
+        </Button>
+      </div>
+    );
+  }
+
+  const loading = conversations === null || projects === null;
 
   return (
     <PageSidebar style={{ position: "relative" }}>
       <ResizeHandle width={width} onWidthChange={onWidthChange} />
       <PageSidebarBody>
-        <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", height: "100%" }}>
-          <Button variant="primary" isBlock onClick={onNewConversation}>
-            New conversation
-          </Button>
+        <div
+          style={{
+            padding: "1rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+            height: "100%",
+          }}
+        >
           <TextInput
-            aria-label="Search conversations"
-            placeholder="Search conversations…"
+            aria-label="Search projects and conversations"
+            placeholder="Search…"
             value={search}
             onChange={(_e, value) => setSearch(value)}
           />
           {error && (
-            <div style={{ color: "var(--pf-t--global--color--status--danger--100)", fontSize: "0.875rem" }}>
+            <div
+              style={{ color: "var(--pf-t--global--color--status--danger--100)", fontSize: "0.875rem" }}
+            >
               {error}
             </div>
           )}
-          {conversations === null && !error ? (
-            <Spinner size="md" aria-label="Loading conversations" />
-          ) : filtered.length === 0 ? (
-            <EmptyState titleText="No conversations yet" headingLevel="h3">
-              <EmptyStateBody>Start a new conversation to see it here.</EmptyStateBody>
-            </EmptyState>
+          {loading && !error ? (
+            <Spinner size="md" aria-label="Loading projects and conversations" />
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", overflowY: "auto" }}>
-              {filtered.map((c) => (
-                <div
-                  key={c.run_id}
-                  draggable={dragEnabled}
-                  onDragStart={() => dragEnabled && setDraggedRunId(c.run_id)}
-                  onDragOver={(e) => {
-                    if (dragEnabled) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onDrop={(e) => {
-                    if (!dragEnabled) {
-                      return;
-                    }
-                    e.preventDefault();
-                    handleDrop(c.run_id);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.375rem",
-                    padding: "0.5rem",
-                    borderRadius: "var(--pf-t--global--border-radius--medium, 4px)",
-                    opacity: draggedRunId === c.run_id ? 0.5 : 1,
-                    background:
-                      c.run_id === activeRunId
-                        ? "var(--pf-t--global--background--color--secondary--default)"
-                        : undefined,
-                  }}
-                >
-                  {dragEnabled && (
-                    <span
-                      aria-hidden="true"
-                      style={{ cursor: "grab", display: "flex", color: "var(--pf-t--global--icon--color--subtle)" }}
-                    >
-                      <GripVerticalIcon />
-                    </span>
-                  )}
-                  {c.starred && (
-                    <span
-                      aria-label="Starred"
-                      style={{ display: "flex", color: "var(--pf-t--global--icon--color--favorite--default)" }}
-                    >
-                      <StarIcon />
-                    </span>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {renamingRunId === c.run_id ? (
-                      <TextInput
-                        ref={renameInputRef}
-                        aria-label="Rename conversation"
-                        value={renameValue}
-                        onChange={(_e, value) => setRenameValue(value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void commitRename(c.run_id, renameValue);
-                          if (e.key === "Escape") setRenamingRunId(null);
-                        }}
-                        onBlur={() => void commitRename(c.run_id, renameValue)}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onOpenConversation(c.run_id, c.title, c.starred)}
-                        title={c.title || "Untitled conversation"}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          textAlign: "left",
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          color: "var(--pf-t--global--text--color--regular)",
-                        }}
-                      >
-                        {c.title || "Untitled conversation"}
-                      </button>
-                    )}
-                  </div>
-                  <Dropdown
-                    isOpen={openKebabRunId === c.run_id}
-                    onOpenChange={(isOpen) => setOpenKebabRunId(isOpen ? c.run_id : null)}
-                    toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-                      <MenuToggle
-                        ref={toggleRef}
-                        aria-label={`Actions for ${c.title || "Untitled conversation"}`}
-                        variant="plain"
-                        onClick={() => setOpenKebabRunId(openKebabRunId === c.run_id ? null : c.run_id)}
-                        isExpanded={openKebabRunId === c.run_id}
-                      >
-                        <EllipsisVIcon />
-                      </MenuToggle>
-                    )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", overflowY: "auto" }}>
+              {blockHeader(
+                "Projects",
+                projectsExpanded,
+                () => setProjectsExpanded((v) => !v),
+                () => setDialogProjectId(null),
+                "New project",
+              )}
+              {projectsExpanded &&
+                (visibleProjects.length === 0 ? (
+                  <div
+                    style={{
+                      fontSize: "0.875rem",
+                      color: "var(--pf-t--global--text--color--subtle)",
+                      padding: "0 0.5rem",
+                    }}
                   >
-                    <DropdownList>
-                      <DropdownItem
-                        key="rename"
-                        icon={<PencilAltIcon />}
-                        onClick={() => {
-                          setOpenKebabRunId(null);
-                          startRename(c.run_id, c.title);
-                        }}
-                      >
-                        Rename
-                      </DropdownItem>
-                      <DropdownItem
-                        key="star"
-                        icon={c.starred ? <OutlinedStarIcon /> : <StarIcon />}
-                        onClick={() => {
-                          setOpenKebabRunId(null);
-                          void toggleStar(c.run_id, !c.starred);
-                        }}
-                      >
-                        {c.starred ? "Unstar" : "Star"}
-                      </DropdownItem>
-                      <DropdownItem
-                        key="share"
-                        icon={<ShareIcon />}
-                        onClick={() => {
-                          setOpenKebabRunId(null);
-                          setSharing({ runId: c.run_id, title: c.title });
-                        }}
-                      >
-                        Share
-                      </DropdownItem>
-                      <DropdownItem
-                        key="clone"
-                        icon={<CloneIcon />}
-                        isDisabled={cloning === c.run_id}
-                        onClick={() => {
-                          setOpenKebabRunId(null);
-                          void cloneConversationRow(c.run_id, c.title);
-                        }}
-                      >
-                        {cloning === c.run_id ? "Cloning…" : "Clone"}
-                      </DropdownItem>
-                      <DropdownItem
-                        key="delete"
-                        icon={<TrashIcon />}
-                        onClick={() => {
-                          setOpenKebabRunId(null);
-                          void deleteConversationRow(c.run_id, c.title);
-                        }}
-                      >
-                        Delete
-                      </DropdownItem>
-                      <DropdownItem
-                        key="hard-delete"
-                        icon={<BanIcon />}
-                        isDanger
-                        onClick={() => {
-                          setOpenKebabRunId(null);
-                          void hardDeleteConversationRow(c.run_id, c.title);
-                        }}
-                      >
-                        Delete permanently
-                      </DropdownItem>
-                    </DropdownList>
-                  </Dropdown>
-                </div>
-              ))}
+                    No projects yet.
+                  </div>
+                ) : (
+                  visibleProjects.map((p) => (
+                    <div key={p.project_id}>
+                      <ProjectRow
+                        project={p}
+                        expanded={expandedProjects.has(p.project_id)}
+                        onToggleExpanded={() => toggleProject(p.project_id)}
+                        onOpenDialog={() => setDialogProjectId(p.project_id)}
+                        onNewConversation={() => onNewConversation(p.project_id)}
+                      />
+                      {expandedProjects.has(p.project_id) &&
+                        matching
+                          .filter((c) => c.project_id === p.project_id)
+                          .map((c) => renderConversation(c, true))}
+                    </div>
+                  ))
+                ))}
+
+              <Divider />
+
+              {blockHeader(
+                "Conversations",
+                conversationsExpanded,
+                () => setConversationsExpanded((v) => !v),
+                () => onNewConversation(),
+                "New conversation",
+              )}
+              {conversationsExpanded &&
+                (looseConversations.length === 0 ? (
+                  <EmptyState titleText="No conversations yet" headingLevel="h3">
+                    <EmptyStateBody>Start a new conversation to see it here.</EmptyStateBody>
+                  </EmptyState>
+                ) : (
+                  looseConversations.map((c) => renderConversation(c, false))
+                ))}
             </div>
           )}
         </div>
       </PageSidebarBody>
-      {sharing && (
-        <ShareDialog
+      {dialogProjectId !== undefined && (
+        <ProjectDialog
           isOpen
-          onClose={() => setSharing(null)}
-          conversationsURL={conversationsURL}
+          onClose={() => setDialogProjectId(undefined)}
+          onSaved={refresh}
+          projectsURL={projectsURL}
           colleaguesURL={colleaguesURL}
-          runId={sharing.runId}
-          title={sharing.title}
+          groupsURL={groupsURL}
+          projectId={dialogProjectId}
         />
       )}
     </PageSidebar>
   );
+}
+
+// Which projects are unfolded, persisted the same local-only way ADR-0212
+// persists the sidebar width - a view preference, never synced.
+const _EXPANDED_KEY = "zuno.projects.expanded";
+
+function loadExpanded(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(_EXPANDED_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistExpanded(expanded: Set<string>) {
+  try {
+    window.localStorage.setItem(_EXPANDED_KEY, JSON.stringify([...expanded]));
+  } catch {
+    // A blocked/full localStorage must never break the sidebar.
+  }
 }
