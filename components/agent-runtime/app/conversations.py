@@ -3,6 +3,20 @@ conversation_stars) on a dedicated Postgres pool - deliberately separate
 from ADR-0103's checkpoint pool (app/main.py), never sharing a connection
 or credential with it (ADR-0212 Security considerations).
 
+ADR-0527 adds the project tables (projects, project_grants, project_stars)
+to this same database and drops ADR-0213's conversation_memberships. The
+project lives here rather than beside ADR-0209's project_memberships in
+rag-project for two reasons: every hot-path read is a join of conversations
+against the project and its grants, which PostgreSQL can only do inside one
+database; and this runtime deliberately holds no rag-project credential
+(see app/clients/project_memory_client.py's docstring). rag-service keeps
+enforcing knowledge.project access against its own project_memberships,
+which app/projects.py maintains as a projection.
+
+app/projects.py owns project CRUD and grant resolution; this module owns
+the conversation surface and the one query that joins the two
+(resolve_access).
+
 Fail-closed posture, distinct from the checkpoint pool's optional
 MemorySaver degrade: `pool_context()` yields None only when CONVERSATIONS_PG*
 is entirely unconfigured (this feature is off for this deployment, e.g.
@@ -22,13 +36,18 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
-# ADR-0213: the four access levels a subject can hold on a conversation -
-# "owner" is never a conversation_memberships row (see get_role below),
-# the other three are.
-Role = Literal["owner", "reader", "actor", "cloner"]
+# ADR-0527: the four project roles, in ascending order of power. They form
+# a TOTAL order - cloning exposes nothing a reader cannot already see (the
+# cloner holds the whole transcript by definition), so making clone a rung
+# rather than a sibling capability keeps "the strongest grant that matches
+# the caller wins" well-defined when a direct grant and a group grant
+# disagree. Replaces ADR-0213's owner/reader/actor/cloner conversation
+# vocabulary, which is gone with conversation_memberships.
+Role = Literal["read", "clone", "write", "admin"]
 
 import psycopg
 from fastapi import HTTPException
@@ -98,33 +117,141 @@ UPDATE conversations SET sort_order = ranked.rn
 FROM ranked
 WHERE conversations.run_id = ranked.run_id;
 
--- ADR-0213: role-based sharing. Owner stays a plain conversations.owner_sub
--- column (never a membership row - see get_role) so there is never a
--- possibility of two disagreeing "owner" rows; these two tables hold
--- everything else this ADR adds.
-CREATE TABLE IF NOT EXISTS conversation_memberships (
-    id          bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    run_id      text        NOT NULL REFERENCES conversations(run_id),
-    subject     text        NOT NULL,
-    role        text        NOT NULL CHECK (role IN ('reader', 'actor', 'cloner')),
-    granted_by  text        NOT NULL,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_conversation_memberships_run_subject UNIQUE (run_id, subject)
-);
-CREATE INDEX IF NOT EXISTS ix_conversation_memberships_run_id ON conversation_memberships (run_id);
-CREATE INDEX IF NOT EXISTS ix_conversation_memberships_subject ON conversation_memberships (subject);
-
--- ADR-0512/WP-55: the Salesforce-verified project binding for a
--- project_required conversation, and when it was last verified.
--- project_id itself (above) is unchanged in shape/meaning for every other
--- task - it stays client-asserted and unverified; only project_required
--- conversations ever populate project_id_verified_at, and app/main.py
--- treats its presence (and freshness against
--- policies/quotas/quota-policy.yaml's project_binding.validity_window) as
--- the signal that project_id on this row is a verified value, not a
--- client assertion.
+-- ADR-0512/WP-55: retained for one release. ADR-0528 stops writing this
+-- column (the Salesforce stamp now lives on projects.salesforce_verified_at,
+-- verified once per project rather than once per conversation); the
+-- migration below clears it alongside any unverifiable project_id, and
+-- dropping the column itself is deliberately a separate change.
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id_verified_at timestamptz;
 
+-- ADR-0527: the project is a first-class object and the source of truth
+-- for project_id, which ADR-0209 left as a client-asserted string. No
+-- owner column by design: the creator simply gets an 'admin' grant below,
+-- and created_by is audit metadata that is NEVER an authorization input
+-- (unlike conversations.owner_sub, which still is). An engagement
+-- outlives whoever opened it, so the "project can never become
+-- unadministrable" invariant is held by projects.save_project's
+-- last-admin guard instead of by a single-owner column.
+CREATE TABLE IF NOT EXISTS projects (
+    project_id                text        PRIMARY KEY,
+    title                     text        NOT NULL,
+    context                   text        NOT NULL DEFAULT '',
+    -- ADR-0034/0035: the classification the context inherits and every
+    -- turn in this project escalates to, monotonically.
+    classification            text        NOT NULL DEFAULT 'C2'
+                                          CHECK (classification IN ('C1', 'C2', 'C3')),
+    -- ADR-0528: set => "customer project", NULL => "free project". Never
+    -- emitted in a header or a span - app/clients/model_router.py sends
+    -- project_id, and only project_id.
+    salesforce_opportunity_id text,
+    salesforce_verified_at    timestamptz,
+    -- ADR-0527: monotone counter the rag-project project_memberships
+    -- projection is keyed on, so a late retry can never rewind it.
+    grants_revision           bigint      NOT NULL DEFAULT 1,
+    created_by                text        NOT NULL,
+    created_at                timestamptz NOT NULL DEFAULT now(),
+    updated_at                timestamptz NOT NULL DEFAULT now(),
+    archived_at               timestamptz,
+    CONSTRAINT ck_projects_context_length CHECK (char_length(context) <= 54000),
+    CONSTRAINT ck_projects_salesforce_pair
+        CHECK ((salesforce_opportunity_id IS NULL) = (salesforce_verified_at IS NULL))
+);
+CREATE INDEX IF NOT EXISTS ix_projects_live ON projects (project_id) WHERE archived_at IS NULL;
+
+-- ADR-0527: four roles forming a total order (read < clone < write <
+-- admin) granted to a Keycloak subject OR a business-role group. XOR, not
+-- ADR-0209 project_memberships' inclusive OR: the RBAC tab renders one row
+-- per grant under either a Users or a Groups subsection, and a row
+-- carrying both would have no unambiguous home nor revoke semantics.
+-- agent_* entitlement groups are refused as grant targets in Python
+-- (app/projects.py's _business_role_groups) on both the write and the
+-- resolution side - admitting them would collapse ADR-0040's two
+-- dimensions into one.
+CREATE TABLE IF NOT EXISTS project_grants (
+    id          bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    project_id  text        NOT NULL REFERENCES projects(project_id),
+    subject     text,
+    group_name  text,
+    role        text        NOT NULL CHECK (role IN ('read', 'clone', 'write', 'admin')),
+    granted_by  text        NOT NULL,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ck_project_grants_subject_xor_group
+        CHECK ((subject IS NULL) <> (group_name IS NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_project_grants_subject
+    ON project_grants (project_id, subject) WHERE subject IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_project_grants_group
+    ON project_grants (project_id, group_name) WHERE group_name IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_project_grants_subject ON project_grants (subject) WHERE subject IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_project_grants_group ON project_grants (group_name) WHERE group_name IS NOT NULL;
+
+-- ADR-0527: a star is one member's private organizing flag, not a
+-- property of the project - the same reasoning ADR-0212 used to keep
+-- conversation_stars out of the conversations row.
+CREATE TABLE IF NOT EXISTS project_stars (
+    project_id text        NOT NULL REFERENCES projects(project_id),
+    subject    text        NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, subject)
+);
+
+-- ADR-0527 migration. conversations.project_id was a free text field any
+-- caller could set through ChatRequest (ADR-0209's "forwarded as-is, this
+-- BFF does not validate project membership"). Anything with no projects
+-- row was never verifiable and nothing consumed it beyond ADR-0512's
+-- now-superseded per-conversation binding, so it is cleared. This MUST
+-- run before the foreign key below: the DDL is fail-fast inside
+-- pool_context(), so adding the constraint first would crash-loop the pod
+-- on any database that still holds such a value.
+DO $$
+DECLARE orphans bigint;
+BEGIN
+    SELECT count(*) INTO orphans FROM conversations c
+    WHERE c.project_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.project_id = c.project_id);
+    IF orphans > 0 THEN
+        RAISE NOTICE 'ADR-0527: clearing % unverifiable conversations.project_id value(s)', orphans;
+        UPDATE conversations c
+        SET project_id = NULL, project_id_verified_at = NULL
+        WHERE c.project_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.project_id = c.project_id);
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_conversations_project') THEN
+        ALTER TABLE conversations
+            ADD CONSTRAINT fk_conversations_project
+            FOREIGN KEY (project_id) REFERENCES projects(project_id);
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS ix_conversations_project ON conversations (project_id) WHERE project_id IS NOT NULL;
+
+-- ADR-0527 supersedes ADR-0213 in full: sharing moves from the
+-- conversation to the project, so this table is dropped rather than
+-- migrated. That is safe precisely because ADR-0213 was never provisioned
+-- - GET /api/colleagues has always answered 503 for want of the
+-- zuno-admin-api Keycloak client, so no grant was ever made in service.
+-- The count is raised as a NOTICE anyway, so an operator sees any row
+-- that somehow existed.
+DO $$
+DECLARE leftovers bigint;
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = current_schema() AND table_name = 'conversation_memberships'
+    ) THEN
+        EXECUTE 'SELECT count(*) FROM conversation_memberships' INTO leftovers;
+        RAISE NOTICE 'ADR-0527: dropping conversation_memberships (% row(s))', leftovers;
+    END IF;
+END $$;
+DROP TABLE IF EXISTS conversation_memberships;
+
+-- ADR-0213's one surviving clause: two collaborators must never race on
+-- one LangGraph checkpoint thread. Project sharing creates that hazard
+-- exactly as conversation sharing did, so the lease stays - now renewed
+-- mid-stream, which ADR-0213 specified and its implementation omitted.
 CREATE TABLE IF NOT EXISTS conversation_write_locks (
     run_id           text        PRIMARY KEY REFERENCES conversations(run_id),
     holder_sub       text        NOT NULL,
@@ -197,6 +324,40 @@ def _derive_title(message: str, *, max_length: int = 60) -> str:
     return text[: max_length - 1].rstrip() + "…"
 
 
+# ADR-0527: the SQL rank of each role, mirroring _ROLE_RANK in
+# app/projects.py. Kept as an inline CASE rather than a PostgreSQL enum so
+# the vocabulary lives in exactly one migration-free place (the CHECK
+# constraint in _DDL) and adding a rung never needs a type migration.
+_ROLE_RANK_SQL = "CASE g.role WHEN 'admin' THEN 4 WHEN 'write' THEN 3 WHEN 'clone' THEN 2 ELSE 1 END"
+
+# ADR-0527's access rule as one reusable predicate over a `conversations c`
+# alias: the caller's own conversation always qualifies (owner_sub still
+# grants write on what you started, which is what makes the `clone` role
+# useful rather than merely archival), otherwise a live project grant of
+# at least min_rank does. A conversation with no project and no ownership
+# match satisfies neither branch, so it stays private - fail closed by
+# construction rather than by a separate check the caller might forget.
+_ACCESS_PREDICATE = f"""(
+    c.owner_sub = %(subject)s
+    OR EXISTS (
+        SELECT 1 FROM projects p
+        JOIN project_grants g ON g.project_id = p.project_id
+        WHERE p.project_id = c.project_id
+          AND p.archived_at IS NULL
+          AND (g.subject = %(subject)s OR g.group_name = ANY(%(groups)s::text[]))
+          AND {_ROLE_RANK_SQL} >= %(min_rank)s
+    )
+)"""
+
+ROLE_RANK = {"read": 1, "clone": 2, "write": 3, "admin": 4}
+
+
+def rank_of(role: Optional[str]) -> int:
+    """0 for "no role at all" - the fail-closed floor every rank
+    comparison in this module and app/projects.py comes back to."""
+    return ROLE_RANK.get(role or "", 0)
+
+
 async def record_turn(
     pool: Optional[AsyncConnectionPool],
     *,
@@ -222,20 +383,21 @@ async def record_turn(
     asked for, it must degrade the same way an unconfigured pool already
     does rather than 500 the whole chat reply over a missed metadata row.
 
-    project_id (ADR-0512/WP-55): pass the ALREADY-VERIFIED project id for
-    a project_required task's turn (app/main.py's binding step runs before
-    this call and never lets an unverified value reach here) - None for
-    every other task, leaving project_id/project_id_verified_at untouched.
-    Writing it here rather than via a separate post-verification UPDATE
-    avoids an ordering problem: on a brand-new run_id this INSERT is what
-    creates the row in the first place, so a verified binding for the very
-    first turn of a conversation has nowhere else to land atomically.
-    Passed again on every subsequent turn of an already-bound conversation
-    (main.py re-supplies the cached value when still fresh) - the ON
-    CONFLICT branch below re-stamps project_id_verified_at each time,
-    which is harmless (it only widens the cached-freshness window) and
-    keeps this function's SQL a single unconditional statement rather than
-    two conditional variants."""
+    project_id (ADR-0527): the SERVER-RESOLVED project this conversation
+    belongs to - app/main.py's agent_chat verifies the caller holds a grant
+    on it before calling, and ADR-0527 removed the client-asserted value
+    from _initial_state entirely. Only ever honoured on the INSERT branch:
+    a conversation's project is fixed when it is created, so the ON
+    CONFLICT branch deliberately leaves project_id alone rather than
+    letting a later turn move a conversation between projects (which would
+    silently move it between two different ACLs).
+
+    Security note (ADR-0527): because this function swallows pool errors,
+    a swallowed INSERT leaves a LangGraph checkpoint with no conversations
+    row. resolve_access below returns None for that state, so the next
+    access is DENIED - never treated as "no project restriction". That
+    asymmetry is deliberate: losing a metadata row must cost visibility,
+    never authorization."""
     if pool is None:
         return
     title = _derive_title(opening_message)
@@ -245,8 +407,7 @@ async def record_turn(
                 await cur.execute(
                     """
                     INSERT INTO conversations (
-                        run_id, agent_name, owner_sub, title, sort_order,
-                        project_id, project_id_verified_at
+                        run_id, agent_name, owner_sub, title, sort_order, project_id
                     )
                     VALUES (
                         %(run_id)s, %(agent_name)s, %(owner_sub)s, %(title)s,
@@ -255,16 +416,9 @@ async def record_turn(
                              WHERE agent_name = %(agent_name)s AND owner_sub = %(owner_sub)s),
                             1
                         ) - 1,
-                        %(project_id)s::text,
-                        CASE WHEN %(project_id)s::text IS NOT NULL THEN now() ELSE NULL END
+                        %(project_id)s::text
                     )
-                    ON CONFLICT (run_id) DO UPDATE SET
-                        updated_at = now(),
-                        project_id = COALESCE(EXCLUDED.project_id, conversations.project_id),
-                        project_id_verified_at = CASE
-                            WHEN EXCLUDED.project_id IS NOT NULL THEN now()
-                            ELSE conversations.project_id_verified_at
-                        END
+                    ON CONFLICT (run_id) DO UPDATE SET updated_at = now()
                     """,
                     {
                         "run_id": run_id,
@@ -279,31 +433,6 @@ async def record_turn(
             "conversations pool unavailable, skipping metadata write: run_id=%s agent=%s: %s",
             run_id, agent_name, exc,
         )
-
-
-async def get_project_binding(pool: Optional[AsyncConnectionPool], *, run_id: str) -> Optional[Dict[str, Any]]:
-    """ADR-0512/WP-55: the cached verified binding for run_id, or None if
-    no conversations row exists yet (a brand-new run_id - not a failure)
-    or the row exists but has never been bound (project_id_verified_at is
-    NULL, e.g. an ordinary task's client-asserted-but-unverified
-    project_id). app/main.py checks this before deciding whether a
-    project_required task's turn can skip a fresh Salesforce call
-    (project_binding.is_binding_still_valid against the returned
-    project_id_verified_at). Fails closed (503) on an unconfigured pool,
-    like every function here except record_turn - a project_required task
-    cannot be offered at all without conversation persistence, since there
-    would be nowhere to cache or trust a prior verification."""
-    pool = _require_pool(pool)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT project_id, project_id_verified_at FROM conversations WHERE run_id = %s",
-                (run_id,),
-            )
-            row = await cur.fetchone()
-    if row is None or row["project_id_verified_at"] is None:
-        return None
-    return {"project_id": row["project_id"], "project_id_verified_at": row["project_id_verified_at"]}
 
 
 async def resolve_owner(pool: Optional[AsyncConnectionPool], run_id: str) -> Optional[str]:
@@ -322,34 +451,153 @@ async def resolve_owner(pool: Optional[AsyncConnectionPool], run_id: str) -> Opt
     return row["owner_sub"] if row else None
 
 
+async def resolve_access(
+    pool: Optional[AsyncConnectionPool],
+    *,
+    run_id: str,
+    subject: str,
+    groups: List[str],
+) -> Optional[Dict[str, Any]]:
+    """ADR-0527's single access check, replacing ADR-0213's get_role. One
+    statement and one round trip: the conversation, its project, and the
+    caller's strongest matching grant, resolved together by a lateral join
+    rather than by three sequential queries on the hot /chat path.
+
+    Returns None - the fail-closed denial every caller must act on - when
+    the run_id has no conversations row at all (including the swallowed-
+    write case record_turn documents), when the conversation is private to
+    someone else, or when its project is archived or ungranted. Never
+    guesses a default role.
+
+    On success the dict carries `role` (the caller's effective role on
+    THIS conversation, already accounting for ownership) plus the project
+    fields agent_chat needs for context injection and ADR-0528's customer-
+    project check, so no caller ever needs a second query.
+    """
+    pool = _require_pool(pool)
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                f"""
+                SELECT c.owner_sub, c.agent_name, c.project_id, c.archived_at,
+                       p.title AS project_title,
+                       p.context AS project_context,
+                       p.classification AS project_classification,
+                       p.salesforce_opportunity_id IS NOT NULL AS is_customer,
+                       p.salesforce_verified_at,
+                       p.archived_at AS project_archived_at,
+                       g.role AS project_role
+                FROM conversations c
+                LEFT JOIN projects p
+                       ON p.project_id = c.project_id AND p.archived_at IS NULL
+                LEFT JOIN LATERAL (
+                    SELECT g.role FROM project_grants g
+                    WHERE g.project_id = p.project_id
+                      AND (g.subject = %(subject)s OR g.group_name = ANY(%(groups)s::text[]))
+                    ORDER BY {_ROLE_RANK_SQL} DESC
+                    LIMIT 1
+                ) g ON TRUE
+                WHERE c.run_id = %(run_id)s
+                """,
+                {"run_id": run_id, "subject": subject, "groups": list(groups)},
+            )
+            row = await cur.fetchone()
+
+    if row is None:
+        return None
+
+    project_role = row["project_role"]
+    if row["owner_sub"] == subject:
+        # You may always write your own conversation, whatever your project
+        # role - ADR-0527 clause 3. An owner who is also a project admin
+        # keeps the stronger role so they retain the admin-only actions.
+        role: Optional[str] = "admin" if project_role == "admin" else "write"
+    elif project_role is None:
+        # Either no project (private to its owner) or no grant on it.
+        return None
+    else:
+        role = project_role
+
+    return {
+        "role": role,
+        "owner_sub": row["owner_sub"],
+        "agent_name": row["agent_name"],
+        "archived_at": row["archived_at"],
+        "project_id": row["project_id"],
+        "project_title": row["project_title"],
+        "project_context": row["project_context"] or "",
+        "project_classification": row["project_classification"],
+        "is_customer": bool(row["is_customer"]),
+        "salesforce_verified_at": row["salesforce_verified_at"],
+    }
+
+
 async def list_conversations(
     pool: Optional[AsyncConnectionPool],
     *,
     agent_name: str,
-    owner_sub: str,
+    subject: str,
+    groups: List[str],
     starred_only: bool = False,
 ) -> List[Dict[str, Any]]:
+    """ADR-0527 widens ADR-0212's owner-only list to two disjoint blocks,
+    both still scoped to this agent (a project is cross-agent, but a
+    sidebar is not - ADR-0527 clause 6):
+
+    1. the caller's own conversations that belong to no project, and
+    2. every live conversation of every live project the caller holds a
+       grant on - including conversations owned by colleagues, which is
+       the whole point of a shared project.
+
+    This is the single most security-sensitive query in the module: it
+    moved from one owner_sub predicate to a membership join, and a mistake
+    here leaks colleagues' conversations. tests/test_conversations.py
+    covers all five shapes ADR-0527's Security considerations enumerate.
+
+    Each row carries project_id and the caller's effective role so the
+    frontend can group the list and decide read-only mode without a second
+    call.
+    """
     pool = _require_pool(pool)
-    query = """
-        SELECT c.run_id, c.title, c.updated_at, (s.run_id IS NOT NULL) AS starred
+    query = f"""
+        SELECT c.run_id, c.title, c.updated_at, c.project_id,
+               (s.run_id IS NOT NULL) AS starred,
+               (c.owner_sub = %(subject)s) AS owned,
+               g.role AS project_role
         FROM conversations c
-        LEFT JOIN conversation_stars s ON s.run_id = c.run_id AND s.subject = %(owner_sub)s
-        WHERE c.agent_name = %(agent_name)s AND c.owner_sub = %(owner_sub)s AND c.archived_at IS NULL
+        LEFT JOIN conversation_stars s
+               ON s.run_id = c.run_id AND s.subject = %(subject)s
+        LEFT JOIN projects p
+               ON p.project_id = c.project_id AND p.archived_at IS NULL
+        LEFT JOIN LATERAL (
+            SELECT g.role FROM project_grants g
+            WHERE g.project_id = p.project_id
+              AND (g.subject = %(subject)s OR g.group_name = ANY(%(groups)s::text[]))
+            ORDER BY {_ROLE_RANK_SQL} DESC
+            LIMIT 1
+        ) g ON TRUE
+        WHERE c.agent_name = %(agent_name)s
+          AND c.archived_at IS NULL
+          AND (
+                (c.project_id IS NULL AND c.owner_sub = %(subject)s)
+                OR (p.project_id IS NOT NULL AND g.role IS NOT NULL)
+              )
     """
     if starred_only:
         query += " AND s.run_id IS NOT NULL"
-    # ADR-0515: the list's own order is now the caller's manual
-    # drag-reorder (sort_order), not an automatic starred-first rule -
-    # starred is still returned per row, but only drives ordering of the
-    # *open in-app tabs* client-side (chat/Chat.tsx), a separate concern.
-    # updated_at DESC only breaks ties among rows that still share a
-    # sort_order (never happens through this module's own writers, but
-    # keeps the order deterministic against any future direct SQL).
+    # ADR-0515: the list's own order is the caller's manual drag-reorder
+    # (sort_order), not an automatic starred-first rule - starred is still
+    # returned per row, but only drives ordering of the *open in-app tabs*
+    # client-side (chat/Chat.tsx), a separate concern. updated_at DESC only
+    # breaks ties among rows that still share a sort_order.
     query += " ORDER BY COALESCE(c.sort_order, 9223372036854775807) ASC, c.updated_at DESC"
 
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute(query, {"agent_name": agent_name, "owner_sub": owner_sub})
+            await cur.execute(
+                query,
+                {"agent_name": agent_name, "subject": subject, "groups": list(groups)},
+            )
             rows = await cur.fetchall()
     return [
         {
@@ -357,55 +605,79 @@ async def list_conversations(
             "title": r["title"],
             "updated_at": r["updated_at"].isoformat(),
             "starred": r["starred"],
+            "project_id": r["project_id"],
+            # Ownership wins for the same reason it does in resolve_access.
+            "role": ("admin" if r["project_role"] == "admin" else "write") if r["owned"] else r["project_role"],
         }
         for r in rows
     ]
 
 
-async def archive_conversation(pool: Optional[AsyncConnectionPool], *, run_id: str, owner_sub: str) -> bool:
+async def archive_conversation(
+    pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str, groups: List[str]
+) -> bool:
     """Soft-delete: hides the conversation from list_conversations (which
     already filters archived_at IS NULL) without touching the underlying
     LangGraph checkpoint - the message history itself is never deleted,
-    only this metadata row's visibility. Same "collapsed to one
-    not-found case" rationale as rename_conversation/set_star. Guards
-    `archived_at IS NULL` in the WHERE clause so re-archiving an already
-    archived conversation reports not-found rather than silently
-    bumping nothing."""
+    only this metadata row's visibility.
+
+    ADR-0527 clause 4 widens this from owner-only to "the owner, or a
+    project admin" - a project admin already holds cascade archival over
+    the whole project, so withholding it per-conversation would be
+    arbitrary. It stops short of the irreversible purge, which stays
+    owner-only. Returns False (the caller maps this to a 404) for an
+    unknown run_id, an insufficient role, or an already-archived row
+    alike - collapsed to one case so this endpoint never confirms that
+    another subject's run_id exists at all."""
     pool = _require_pool(pool)
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                "UPDATE conversations SET archived_at = now() WHERE run_id = %s AND owner_sub = %s AND archived_at IS NULL",
-                (run_id, owner_sub),
+                f"""
+                UPDATE conversations c SET archived_at = now()
+                WHERE c.run_id = %(run_id)s AND c.archived_at IS NULL AND {_ACCESS_PREDICATE}
+                """,
+                {"run_id": run_id, "subject": subject, "groups": list(groups),
+                 "min_rank": ROLE_RANK["admin"]},
             )
             return cur.rowcount > 0
 
 
 async def rename_conversation(
-    pool: Optional[AsyncConnectionPool], *, run_id: str, owner_sub: str, title: str
+    pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str, groups: List[str], title: str
 ) -> bool:
-    """Returns False (the caller maps this to a 404) for either an unknown
-    run_id or one owned by a different subject - collapsed to a single
-    case, unlike _resolve_run_id's 404/403 split, so this endpoint never
-    confirms that another subject's run_id exists at all."""
+    """ADR-0527 clause 4: the conversation's owner, or a project `write`
+    member. Same "collapsed to one not-found case" rationale as
+    archive_conversation."""
     pool = _require_pool(pool)
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                "UPDATE conversations SET title = %s, updated_at = now() WHERE run_id = %s AND owner_sub = %s",
-                (title, run_id, owner_sub),
+                f"""
+                UPDATE conversations c SET title = %(title)s, updated_at = now()
+                WHERE c.run_id = %(run_id)s AND {_ACCESS_PREDICATE}
+                """,
+                {"title": title, "run_id": run_id, "subject": subject, "groups": list(groups),
+                 "min_rank": ROLE_RANK["write"]},
             )
             return cur.rowcount > 0
 
 
-async def set_star(pool: Optional[AsyncConnectionPool], *, run_id: str, owner_sub: str, starred: bool) -> bool:
-    """Toggles the caller's personal star. Same "collapsed to one not-found
-    case" rationale as rename_conversation."""
+async def set_star(
+    pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str, groups: List[str], starred: bool
+) -> bool:
+    """Toggles the caller's personal star. ADR-0527 clause 4 makes this
+    available to anyone who may READ the conversation, not just its owner:
+    a star is one member's private organizing flag over what they can see,
+    and a shared project is exactly the case where organizing someone
+    else's conversation is legitimate."""
     pool = _require_pool(pool)
+    params = {"run_id": run_id, "subject": subject, "groups": list(groups), "min_rank": ROLE_RANK["read"]}
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                "SELECT 1 FROM conversations WHERE run_id = %s AND owner_sub = %s", (run_id, owner_sub)
+                f"SELECT 1 FROM conversations c WHERE c.run_id = %(run_id)s AND {_ACCESS_PREDICATE}",
+                params,
             )
             if await cur.fetchone() is None:
                 return False
@@ -413,11 +685,11 @@ async def set_star(pool: Optional[AsyncConnectionPool], *, run_id: str, owner_su
                 await cur.execute(
                     "INSERT INTO conversation_stars (run_id, subject) VALUES (%s, %s) "
                     "ON CONFLICT (run_id, subject) DO NOTHING",
-                    (run_id, owner_sub),
+                    (run_id, subject),
                 )
             else:
                 await cur.execute(
-                    "DELETE FROM conversation_stars WHERE run_id = %s AND subject = %s", (run_id, owner_sub)
+                    "DELETE FROM conversation_stars WHERE run_id = %s AND subject = %s", (run_id, subject)
                 )
     return True
 
@@ -472,111 +744,26 @@ async def hard_delete_conversation(pool: Optional[AsyncConnectionPool], *, run_i
     return True
 
 
-async def get_role(pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str) -> Optional[Role]:
-    """ADR-0213: three-tier role resolution - an owner_sub match first
-    (owner is implicit, never a membership row, so there is never a
-    possibility of two disagreeing "owner" rows for one conversation),
-    then a matching conversation_memberships row, else None. None is the
-    fail-closed default every caller must deny access on - this function
-    never guesses a default role. Used by app/main.py's _resolve_run_id
-    and every other access check this ADR widens from a bare
-    owner_sub == identity.sub comparison."""
-    pool = _require_pool(pool)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT owner_sub FROM conversations WHERE run_id = %s", (run_id,))
-            row = await cur.fetchone()
-            if row is None:
-                return None
-            if row["owner_sub"] == subject:
-                return "owner"
-            await cur.execute(
-                "SELECT role FROM conversation_memberships WHERE run_id = %s AND subject = %s",
-                (run_id, subject),
-            )
-            member = await cur.fetchone()
-    return member["role"] if member else None
-
-
-async def list_members(pool: Optional[AsyncConnectionPool], *, run_id: str) -> List[Dict[str, Any]]:
-    """ADR-0213: owner-only endpoint (enforced by the caller). Returns
-    every granted membership - never includes the owner, who is not a
-    membership row."""
-    pool = _require_pool(pool)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT subject, role, granted_by, created_at FROM conversation_memberships "
-                "WHERE run_id = %s ORDER BY created_at",
-                (run_id,),
-            )
-            rows = await cur.fetchall()
-    return [
-        {
-            "subject": r["subject"],
-            "role": r["role"],
-            "granted_by": r["granted_by"],
-            "created_at": r["created_at"].isoformat(),
-        }
-        for r in rows
-    ]
-
-
-async def grant_membership(
-    pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str, role: str, granted_by: str
-) -> None:
-    """ADR-0213: idempotent upsert - re-granting an already-granted
-    subject a different role updates it in place (the natural reading of
-    "the owner changed their mind about the role") rather than erroring."""
-    pool = _require_pool(pool)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "INSERT INTO conversation_memberships (run_id, subject, role, granted_by) "
-                "VALUES (%s, %s, %s, %s) "
-                "ON CONFLICT (run_id, subject) DO UPDATE SET role = EXCLUDED.role, granted_by = EXCLUDED.granted_by",
-                (run_id, subject, role, granted_by),
-            )
-
-
-async def revoke_membership(pool: Optional[AsyncConnectionPool], *, run_id: str, subject: str) -> bool:
-    """ADR-0213: soft revocation only, per the ADR's own Decision - no
-    live kick. Deletes the membership row; the collaborator's next access
-    then fails the get_role() fail-closed check above."""
-    pool = _require_pool(pool)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM conversation_memberships WHERE run_id = %s AND subject = %s",
-                (run_id, subject),
-            )
-            return cur.rowcount > 0
-
-
-async def transfer_ownership(
-    pool: Optional[AsyncConnectionPool], *, run_id: str, current_owner_sub: str, new_owner_sub: str
-) -> bool:
-    """ADR-0213: the outgoing owner is downgraded to an actor membership,
-    never losing access outright. A leftover membership row the new
-    owner may already have held (e.g. they were an actor before this
-    promotion) is harmless and left as-is - get_role() checks owner_sub
-    first and never reaches it."""
-    pool = _require_pool(pool)
-    async with pool.connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "UPDATE conversations SET owner_sub = %s, updated_at = now() WHERE run_id = %s AND owner_sub = %s",
-                (new_owner_sub, run_id, current_owner_sub),
-            )
-            if cur.rowcount == 0:
-                return False
-            await cur.execute(
-                "INSERT INTO conversation_memberships (run_id, subject, role, granted_by) "
-                "VALUES (%s, %s, 'actor', %s) "
-                "ON CONFLICT (run_id, subject) DO UPDATE SET role = 'actor', granted_by = EXCLUDED.granted_by",
-                (run_id, current_owner_sub, new_owner_sub),
-            )
-    return True
+def _derive_clone_title(title: str, *, max_length: int = 200) -> str:
+    """ADR-0527 clause 4: a clone stays in its source project, so it needs
+    a name that distinguishes it in the same list. "Foo" -> "Foo (copy)",
+    "Foo (copy)" -> "Foo (copy 2)", "Foo (copy 7)" -> "Foo (copy 8)".
+    Truncates to the same 200-character ceiling app/schemas.py enforces on
+    a rename, so cloning a maximal title can never produce a row the
+    rename endpoint would refuse."""
+    base = title or "Untitled conversation"
+    match = re.fullmatch(r"(?P<stem>.*) \(copy(?: (?P<n>\d+))?\)", base)
+    if match:
+        stem = match.group("stem")
+        nth = int(match.group("n") or 1) + 1
+        suffix = f" (copy {nth})"
+    else:
+        stem = base
+        suffix = " (copy)"
+    room = max_length - len(suffix)
+    if len(stem) > room:
+        stem = stem[: room - 1].rstrip() + "\u2026"
+    return stem + suffix
 
 
 async def clone_conversation(
@@ -585,27 +772,42 @@ async def clone_conversation(
     source_run_id: str,
     new_run_id: str,
     owner_sub: str,
-) -> bool:
-    """ADR-0213: creates the new conversations row for a clone, owned
-    solely by the cloner, with no live sync back to the original -
-    agent_name and title are copied from the source row directly (a
-    correlated INSERT...SELECT) so the caller doesn't need to fetch and
-    re-pass them. The caller (app/main.py's clone endpoint) is
-    responsible for copying the LangGraph checkpoint's channel_values
-    into new_run_id's thread_id separately - this module never opens
-    that pool (module docstring). sort_order follows record_turn's own
-    convention: always lands above everything else in the new owner's
-    list. Returns False if source_run_id doesn't exist (the caller
-    already checked a role against it, so this should only fail if the
-    source was deleted in a race)."""
+) -> Optional[str]:
+    """ADR-0527 clause 4: the clone stays in the SOURCE's project (ADR-0213
+    made it a brand-new independently-owned conversation with no project;
+    that is what changed) and takes a derived title. The cloner becomes
+    owner_sub, which is precisely what makes the `clone` role useful: they
+    may write to their own copy while remaining unable to write to the
+    original. Grants are untouched - the project's RBAC already covers the
+    copy, and nothing is reset.
+
+    agent_name, project_id and title are copied from the source row by a
+    correlated INSERT...SELECT so the caller needs no prior fetch. The
+    caller (app/main.py's clone endpoint) copies the LangGraph
+    checkpoint's channel_values into new_run_id's thread separately - this
+    module never opens that pool (module docstring). sort_order follows
+    record_turn's convention: the copy lands at the top of the cloner's
+    own list.
+
+    Returns the new title, or None if source_run_id no longer exists (the
+    caller already checked a role against it, so this only loses a race
+    with a delete)."""
     pool = _require_pool(pool)
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
+            await cur.execute("SELECT title FROM conversations WHERE run_id = %s", (source_run_id,))
+            source = await cur.fetchone()
+            if source is None:
+                return None
+            new_title = _derive_clone_title(source["title"])
             await cur.execute(
                 """
-                INSERT INTO conversations (run_id, agent_name, owner_sub, title, source_run_id, sort_order)
+                INSERT INTO conversations (
+                    run_id, agent_name, owner_sub, title, source_run_id, project_id, sort_order
+                )
                 SELECT
-                    %(new_run_id)s, c.agent_name, %(owner_sub)s, c.title, %(source_run_id)s,
+                    %(new_run_id)s, c.agent_name, %(owner_sub)s, %(new_title)s,
+                    %(source_run_id)s, c.project_id,
                     COALESCE(
                         (SELECT MIN(sort_order) FROM conversations
                          WHERE agent_name = c.agent_name AND owner_sub = %(owner_sub)s),
@@ -613,9 +815,14 @@ async def clone_conversation(
                     ) - 1
                 FROM conversations c WHERE c.run_id = %(source_run_id)s
                 """,
-                {"new_run_id": new_run_id, "owner_sub": owner_sub, "source_run_id": source_run_id},
+                {
+                    "new_run_id": new_run_id,
+                    "owner_sub": owner_sub,
+                    "new_title": new_title,
+                    "source_run_id": source_run_id,
+                },
             )
-            return cur.rowcount > 0
+            return new_title if cur.rowcount > 0 else None
 
 
 _WRITE_LOCK_TTL_SECONDS = 30

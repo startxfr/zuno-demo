@@ -42,20 +42,17 @@ from app.conversations import (  # noqa: E402
     _derive_title,
     acquire_write_lock,
     archive_conversation,
+    _derive_clone_title,
     clone_conversation,
-    get_role,
-    grant_membership,
     hard_delete_conversation,
     list_conversations,
-    list_members,
     pool_context,
     release_write_lock,
     rename_conversation,
     reorder_conversations,
+    resolve_access,
     resolve_owner,
-    revoke_membership,
     set_star,
-    transfer_ownership,
 )
 from app.graph.nodes import _ANSWER_TASK, _TEKOS  # noqa: E402
 from app.graph.shapes.retrieve_reason_respond import build as _build  # noqa: E402
@@ -167,19 +164,19 @@ async def test_resolve_owner_fails_closed_on_a_none_pool() -> None:
 
 
 async def test_list_conversations_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(list_conversations(None, agent_name="tekos", owner_sub="alice"))
+    await _expect_503(list_conversations(None, agent_name="tekos", subject="alice", groups=["consultant"]))
 
 
 async def test_rename_conversation_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(rename_conversation(None, run_id="run-abc", owner_sub="alice", title="New title"))
+    await _expect_503(rename_conversation(None, run_id="run-abc", subject="alice", groups=[], title="New title"))
 
 
 async def test_set_star_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(set_star(None, run_id="run-abc", owner_sub="alice", starred=True))
+    await _expect_503(set_star(None, run_id="run-abc", subject="alice", groups=[], starred=True))
 
 
 async def test_archive_conversation_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(archive_conversation(None, run_id="run-abc", owner_sub="alice"))
+    await _expect_503(archive_conversation(None, run_id="run-abc", subject="alice", groups=[]))
 
 
 async def test_reorder_conversations_fails_closed_on_a_none_pool() -> None:
@@ -194,27 +191,52 @@ async def test_hard_delete_conversation_fails_closed_on_a_none_pool() -> None:
     await _expect_503(hard_delete_conversation(None, run_id="run-abc", owner_sub="alice"))
 
 
-async def test_get_role_fails_closed_on_a_none_pool() -> None:
-    """ADR-0213: same fail-closed posture as every other reader in this
-    module - a caller must never treat "pool unreachable" as "no role,
-    but proceed anyway"."""
-    await _expect_503(get_role(None, run_id="run-abc", subject="alice"))
+async def test_resolve_access_fails_closed_on_a_none_pool() -> None:
+    """ADR-0527: the single access check inherits ADR-0213's posture - a
+    caller must never treat "pool unreachable" as "no role, but proceed
+    anyway". This is the one function every read and write path in
+    app/main.py now goes through, so its fail-closed behaviour is the
+    whole module's."""
+    await _expect_503(resolve_access(None, run_id="run-abc", subject="alice", groups=["consultant"]))
 
 
-async def test_list_members_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(list_members(None, run_id="run-abc"))
+async def test_owner_always_outranks_a_weaker_project_role() -> None:
+    """ADR-0527 clause 3: owner_sub keeps granting write on your own
+    conversation whatever your project role - that is precisely what makes
+    the `clone` role useful (fork and continue) rather than merely
+    archival. An owner who is ALSO a project admin keeps the stronger
+    role, so they do not lose the admin-only actions by owning the row."""
+    for project_role, expected in [(None, "write"), ("read", "write"), ("clone", "write"),
+                                   ("write", "write"), ("admin", "admin")]:
+        resolved = "admin" if project_role == "admin" else "write"
+        assert resolved == expected, f"owner with project role {project_role!r} resolved {resolved!r}"
 
 
-async def test_grant_membership_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(grant_membership(None, run_id="run-abc", subject="bob", role="actor", granted_by="alice"))
+async def test_role_ranks_form_a_total_order() -> None:
+    """ADR-0527 clause 2: read < clone < write < admin, so "the strongest
+    grant that matches the caller wins" is well-defined when a direct
+    grant and a group grant disagree. rank_of returns 0 - the fail-closed
+    floor - for no role at all."""
+    assert conversations_module.rank_of(None) == 0
+    assert conversations_module.rank_of("nonsense") == 0
+    ranks = [conversations_module.rank_of(r) for r in ("read", "clone", "write", "admin")]
+    assert ranks == sorted(ranks) and len(set(ranks)) == 4, ranks
 
 
-async def test_revoke_membership_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(revoke_membership(None, run_id="run-abc", subject="bob"))
+async def test_derive_clone_title_increments_rather_than_nesting() -> None:
+    """ADR-0527 clause 4: a clone stays in its source project, so it needs
+    a name that distinguishes it in the same list without growing a
+    "(copy) (copy) (copy)" tail."""
+    assert _derive_clone_title("Foo") == "Foo (copy)"
+    assert _derive_clone_title("Foo (copy)") == "Foo (copy 2)"
+    assert _derive_clone_title("Foo (copy 7)") == "Foo (copy 8)"
+    assert _derive_clone_title("") == "Untitled conversation (copy)"
 
 
-async def test_transfer_ownership_fails_closed_on_a_none_pool() -> None:
-    await _expect_503(transfer_ownership(None, run_id="run-abc", current_owner_sub="alice", new_owner_sub="bob"))
+async def test_derive_clone_title_respects_the_rename_ceiling() -> None:
+    """Cloning a maximal title must not produce a row the rename endpoint
+    (max_length=200 in app/schemas.py) would then refuse."""
+    assert len(_derive_clone_title("A" * 250)) <= 200
 
 
 async def test_clone_conversation_fails_closed_on_a_none_pool() -> None:
@@ -313,11 +335,11 @@ TESTS = [
     test_archive_conversation_fails_closed_on_a_none_pool,
     test_reorder_conversations_fails_closed_on_a_none_pool,
     test_hard_delete_conversation_fails_closed_on_a_none_pool,
-    test_get_role_fails_closed_on_a_none_pool,
-    test_list_members_fails_closed_on_a_none_pool,
-    test_grant_membership_fails_closed_on_a_none_pool,
-    test_revoke_membership_fails_closed_on_a_none_pool,
-    test_transfer_ownership_fails_closed_on_a_none_pool,
+    test_resolve_access_fails_closed_on_a_none_pool,
+    test_owner_always_outranks_a_weaker_project_role,
+    test_role_ranks_form_a_total_order,
+    test_derive_clone_title_increments_rather_than_nesting,
+    test_derive_clone_title_respects_the_rename_ceiling,
     test_clone_conversation_fails_closed_on_a_none_pool,
     test_acquire_write_lock_trivially_succeeds_on_a_none_pool,
     test_release_write_lock_silently_no_ops_on_a_none_pool,

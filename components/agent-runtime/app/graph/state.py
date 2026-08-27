@@ -71,6 +71,22 @@ class AgentState(TypedDict, total=False):
     # (app/clients/rag_client.py) and to the extraction endpoint at
     # session end. None/absent means no project memory involvement.
     project_id: Optional[str]
+    # ADR-0527 clause 5: the project's standing engagement context, up to
+    # 54000 characters, injected in reason_node/draft_node as a delimited
+    # BACKGROUND block - never as instructions, so a user-editable field
+    # can never rewrite the OKF-sourced task prompt (ADR-0039). Truncated
+    # to agent.project_context_token_budget at injection time.
+    #
+    # Declared here for the same non-optional reason run_id is: LangGraph
+    # only carries declared schema fields, so omitting this entry would
+    # make every state.get("project_context") silently return "" with no
+    # error anywhere.
+    project_context: str
+    # ADR-0034/0035: the project's classification, folded into the turn's
+    # effective classification by retrieve_node's monotone escalation -
+    # never a downgrade, so a C3 project can never route to an external
+    # model.
+    project_classification: Optional[str]
 
     # Node outputs, accumulated as the graph runs
     retrieved_docs: List[RetrievedDoc]

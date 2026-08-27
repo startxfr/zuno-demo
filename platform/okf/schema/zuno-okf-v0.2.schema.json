@@ -136,6 +136,23 @@
                   "maximum": 32000
                 }
               }
+            },
+            "project_context": {
+              "description": "ADR-0527: the standing engagement context of the project a conversation belongs to, injected into this agent's prompt as a delimited BACKGROUND block - never as instructions, so a user-editable field can never rewrite the task prompt this bundle declares (ADR-0039). Entirely optional, exactly like `history` above.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "description": "Whether this agent carries its conversation's project context into its prompts at all. Defaults true.",
+                  "type": "boolean"
+                },
+                "token_budget": {
+                  "description": "Approximate token budget (the same character/4 heuristic as history above, app/graph/history.py's truncate_to_token_budget) for the injected project context. Separate from the history budget on purpose, so a long engagement briefing can never crowd out the conversation itself. The project's 54000-character storage ceiling is an INPUT limit; this is what actually reaches the model.",
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 32000
+                }
+              }
             }
           }
         },

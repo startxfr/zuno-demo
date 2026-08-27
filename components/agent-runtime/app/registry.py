@@ -49,6 +49,14 @@ OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 # shared default silently inflating every agent's per-turn token spend.
 HISTORY_TOKEN_BUDGET_DEFAULT = int(os.getenv("HISTORY_TOKEN_BUDGET", "1800"))
 HISTORY_MAX_TURNS_DEFAULT = 6
+# ADR-0527 clause 5: the project context's own token budget, separate from
+# the history budget above so a long engagement briefing can never crowd
+# out the conversation itself. The 54000-character storage ceiling is an
+# INPUT limit; this is what actually reaches the model, and a maximal
+# context (~13500 tokens) is truncated hard to fit here. Overridable per
+# bundle via zuno.memory.project_context.token_budget, exactly like
+# history's.
+PROJECT_CONTEXT_TOKEN_BUDGET_DEFAULT = int(os.getenv("PROJECT_CONTEXT_TOKEN_BUDGET", "1200"))
 # Operational kill switch (ADR-0215): forces every agent's history off
 # regardless of bundle content, for a rollback that needs no image
 # rebuild.
@@ -169,6 +177,13 @@ class AgentDefinition:
     # app/graph/history.py) token budget for summary + verbatim history
     # combined.
     history_token_budget: int = HISTORY_TOKEN_BUDGET_DEFAULT
+    # ADR-0527: `zuno.memory.project_context.enabled` - whether this agent
+    # carries its conversation's project context into its prompts at all.
+    project_context_enabled: bool = True
+    # `zuno.memory.project_context.token_budget` - same char/4 heuristic
+    # as the history budget (app/graph/history.py's
+    # truncate_to_token_budget).
+    project_context_token_budget: int = PROJECT_CONTEXT_TOKEN_BUDGET_DEFAULT
     # ADR-0416: `zuno.model.local_only` - an agent-declared, unconditional
     # local-only restriction, independent of the turn's own computed
     # classification (ADR-0034). Distinct from the existing per-tool-call
@@ -296,6 +311,9 @@ class AgentRegistry:
         # parse-with-default pattern immediately above this block.
         memory = zuno.get("memory") or {}
         history = memory.get("history") or {}
+        # ADR-0527: zuno.memory.project_context is optional in exactly the
+        # same way zuno.memory.history is.
+        project_context = memory.get("project_context") or {}
         return AgentDefinition(
             name=name,
             status=zuno.get("status", "placeholder"),
@@ -307,6 +325,10 @@ class AgentRegistry:
             history_enabled=bool(history.get("enabled", True)) and not HISTORY_DISABLED,
             history_max_turns=int(history.get("max_turns", HISTORY_MAX_TURNS_DEFAULT)),
             history_token_budget=int(history.get("token_budget", HISTORY_TOKEN_BUDGET_DEFAULT)),
+            project_context_enabled=bool(project_context.get("enabled", True)),
+            project_context_token_budget=int(
+                project_context.get("token_budget", PROJECT_CONTEXT_TOKEN_BUDGET_DEFAULT)
+            ),
             local_only=bool(model.get("local_only", False)),
         )
 

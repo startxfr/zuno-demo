@@ -32,5 +32,15 @@ data:
 {{ .Files.Get "files/sql/005_project_memory.sql" | indent 4 }}
   006_embedding_1024.sql: |
 {{ .Files.Get "files/sql/006_embedding_1024.sql" | indent 4 }}
+  # ADR-0525 shipped files/sql/007_ivfflat_lists.sql and referenced it from
+  # job-schema-apply.yaml's psql args, but never published it here - so the
+  # Job mounted a /sql without it and, under ON_ERROR_STOP=1, every
+  # per-domain schema apply failed on the missing file. Added by WP-088,
+  # which needs that Job to run at all for 008 below.
+  007_ivfflat_lists.sql: |
+{{ .Files.Get "files/sql/007_ivfflat_lists.sql" | indent 4 }}
+  # ADR-0527: project_memberships becomes a projection of project_grants.
+  008_project_membership_projection.sql: |
+{{ .Files.Get "files/sql/008_project_membership_projection.sql" | indent 4 }}
   seed.sql: |
 {{ .Files.Get "files/sql/seed.sql" | indent 4 }}

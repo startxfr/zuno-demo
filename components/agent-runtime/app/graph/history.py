@@ -261,3 +261,27 @@ def make_history_node(agent: AgentDefinition, task: TaskDefinition, model_router
         return {"history": history, "summary": summary, "history_classification": history_classification}
 
     return record_history
+
+
+def truncate_to_token_budget(text: str, token_budget: int) -> str:
+    """ADR-0527 clause 5: bound the project context before it reaches the
+    prompt. Uses the same deliberately-approximate char/4 heuristic as
+    estimate_tokens above - a project context is background, and spending
+    a real tokenizer call per turn to bound background would cost more
+    than it saves.
+
+    Cuts on the last whitespace boundary inside the budget so the block
+    never ends mid-word, and marks the cut so a reader (and the model) can
+    tell the context was shortened rather than authored that way. A budget
+    of 0 or less disables injection entirely by returning "".
+    """
+    if not text or token_budget <= 0:
+        return ""
+    max_chars = token_budget * _CHARS_PER_TOKEN
+    if len(text) <= max_chars:
+        return text
+    head = text[:max_chars]
+    cut = head.rfind(" ")
+    if cut > 0:
+        head = head[:cut]
+    return head.rstrip() + " […truncated]"

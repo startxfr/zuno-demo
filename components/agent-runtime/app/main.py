@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import uuid
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -20,7 +22,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 
-from app import conversations, project_binding
+from app import conversations, project_binding, projects
 from app.auth import CallerIdentity, validate_token
 from app.clients import project_memory_client
 from app.graph import history as history_mod
@@ -32,10 +34,10 @@ from app.registry import AgentDefinition, AgentRegistry
 from app.schemas import (
     ChatRequest,
     ChatResponse,
-    GrantMembershipRequest,
+    CreateProjectRequest,
     RenameConversationRequest,
     ReorderConversationsRequest,
-    TransferOwnershipRequest,
+    SaveProjectRequest,
 )
 from app.telemetry import api_request_span, graph_run_span, init_telemetry
 
@@ -116,6 +118,14 @@ async def lifespan(app: FastAPI):
 
     async with conversations.pool_context() as conversations_pool:
         app.state.conversations_pool = conversations_pool
+        # ADR-0527 clause 8: re-push every live project's grant set to
+        # rag-service, repairing any divergence left by the residual
+        # window in projects.save_project (push succeeded, commit then
+        # failed) or by a rag-service outage that outlasted a retry.
+        # Deliberately non-fatal: a rag-service outage must not stop this
+        # runtime from booting, and the projection is a DENY gate - a stale
+        # one over-denies, which is the safe direction.
+        await projects.reconcile_projections(conversations_pool)
 
         conninfo = _checkpoint_conninfo()
         if conninfo is None:
@@ -221,10 +231,17 @@ def _initial_state(payload: ChatRequest, identity: CallerIdentity, request_id: s
         # model-call trace/usage record can be joined back to this exact
         # chat turn.
         "request_id": request_id,
-        # ADR-0209/WP-28: forwarded as received - this runtime does not
-        # itself validate project membership (rag-service does, fail
-        # closed, at retrieval time).
-        "project_id": payload.project_id,
+        # ADR-0527: deliberately ABSENT. project_id used to be copied
+        # straight from the request body here, which is exactly what made
+        # ADR-0512 gate the X-Zuno-Project-Id header on the task's
+        # project_required mark - a client could otherwise shift its
+        # consumption onto an arbitrary project's quota. agent_chat now
+        # resolves it from the conversation's own projects row after
+        # verifying the caller holds a grant, and sets it on the state
+        # itself. Removing this one line IS the "server-verified project"
+        # guarantee ADR-0528 clause 4 relies on; do not restore it.
+        "project_context": "",
+        "project_classification": None,
         "retrieved_docs": [],
         "tool_results": {},
         "errors": [],
@@ -259,11 +276,13 @@ async def _resolve_run_id(
     Operational considerations). conversations_pool defaults to None so
     every existing call site/test keeps today's exact behavior unchanged.
 
-    ADR-0213 widens it again: any granted role (owner/reader/actor/
-    cloner), not owner alone, may resolve/resume a run_id - this is the
-    *read/resume* gate only. agent_chat additionally requires owner or
-    actor specifically before letting a resumed run_id actually accept a
-    new message (see its own write-role check).
+    ADR-0527 widens it again, and moves the ACL from the conversation to
+    the project: any effective role - the caller's own conversation, or any
+    grant on its project - may resolve/resume a run_id. This is the
+    *read/resume* gate only. agent_chat additionally requires `write` or
+    `admin` before letting a resumed run_id accept a new message (see its
+    own write-role check), so `read` and `clone` members reach the
+    transcript and nothing more.
     """
     if payload.run_id is None:
         return str(uuid.uuid4())
@@ -275,9 +294,18 @@ async def _resolve_run_id(
 
     stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
     if conversations_pool is not None:
-        role = await conversations.get_role(conversations_pool, run_id=payload.run_id, subject=identity.sub)
-        if role is not None:
+        access = await conversations.resolve_access(
+            conversations_pool,
+            run_id=payload.run_id,
+            subject=identity.sub,
+            groups=identity.groups,
+        )
+        if access is not None:
             return payload.run_id
+        # No effective role. Fall through to the checkpoint-only check
+        # below, which still covers a pre-ADR-0212 run_id with no
+        # conversations row - but only for its own original subject, so a
+        # missing row can never become "no project restriction".
         owner_sub = await conversations.resolve_owner(conversations_pool, payload.run_id)
         if owner_sub is not None:
             stored_sub = owner_sub
@@ -504,15 +532,17 @@ async def list_conversations_endpoint(
     starred: bool = False,
     identity: CallerIdentity = Depends(validate_token),
 ) -> List[Dict[str, Any]]:
-    """ADR-0212: the caller's own conversations for this agent, starred
-    first, most recently updated first. owner_sub = identity.sub only
-    under this ADR alone - ADR-0213 widens listing to shared
-    conversations too."""
+    """ADR-0527: the caller's project-less conversations for this agent,
+    plus every live conversation of every project they hold a grant on -
+    including colleagues', which is the point of a shared project. Each
+    row carries project_id and the caller's effective role so the sidebar
+    can group them and decide read-only mode without a second call."""
     agent_def = _active_agent_or_404(agent)
     return await conversations.list_conversations(
         request.app.state.conversations_pool,
         agent_name=agent_def.name,
-        owner_sub=identity.sub,
+        subject=identity.sub,
+        groups=identity.groups,
         starred_only=starred,
     )
 
@@ -551,8 +581,8 @@ async def transcript_endpoint(
     (unknown run)/403 (wrong subject) split as extract_memory_endpoint,
     widened by conversations.resolve_owner the same way _resolve_run_id
     is (see that function's docstring). ADR-0213: any granted role
-    (owner/reader/actor/cloner) may read the transcript - reading is the
-    minimum right every role carries."""
+    (read/clone/write/admin) may read the transcript - reading is the
+    minimum right every ADR-0527 role carries."""
     agent_def = _active_agent_or_404(agent)
     graph = request.app.state.graph_factory.graph_for(agent_def)
     config = {"configurable": {"thread_id": run_id}}
@@ -563,8 +593,10 @@ async def transcript_endpoint(
     stored_sub = (tuple_.checkpoint.get("channel_values") or {}).get("user_sub")
     conversations_pool = request.app.state.conversations_pool
     if conversations_pool is not None:
-        role = await conversations.get_role(conversations_pool, run_id=run_id, subject=identity.sub)
-        if role is not None:
+        access = await conversations.resolve_access(
+            conversations_pool, run_id=run_id, subject=identity.sub, groups=identity.groups
+        )
+        if access is not None:
             return await _build_transcript_structured(graph, run_id)
     owner_sub = await conversations.resolve_owner(conversations_pool, run_id)
     if owner_sub is not None:
@@ -590,7 +622,11 @@ async def rename_conversation_endpoint(
     subject's run_id exists."""
     _active_agent_or_404(agent)
     ok = await conversations.rename_conversation(
-        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub, title=payload.title
+        request.app.state.conversations_pool,
+        run_id=run_id,
+        subject=identity.sub,
+        groups=identity.groups,
+        title=payload.title,
     )
     if not ok:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
@@ -606,7 +642,11 @@ async def star_conversation_endpoint(
     comment)."""
     _active_agent_or_404(agent)
     ok = await conversations.set_star(
-        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub, starred=True
+        request.app.state.conversations_pool,
+        run_id=run_id,
+        subject=identity.sub,
+        groups=identity.groups,
+        starred=True,
     )
     if not ok:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
@@ -619,7 +659,11 @@ async def unstar_conversation_endpoint(
 ) -> Dict[str, bool]:
     _active_agent_or_404(agent)
     ok = await conversations.set_star(
-        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub, starred=False
+        request.app.state.conversations_pool,
+        run_id=run_id,
+        subject=identity.sub,
+        groups=identity.groups,
+        starred=False,
     )
     if not ok:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
@@ -636,7 +680,10 @@ async def archive_conversation_endpoint(
     conversations.archived_at."""
     _active_agent_or_404(agent)
     ok = await conversations.archive_conversation(
-        request.app.state.conversations_pool, run_id=run_id, owner_sub=identity.sub
+        request.app.state.conversations_pool,
+        run_id=run_id,
+        subject=identity.sub,
+        groups=identity.groups,
     )
     if not ok:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
@@ -667,105 +714,234 @@ async def hard_delete_conversation_endpoint(
     return {"deleted": True}
 
 
-@app.get("/v1/agents/{agent}/runs/{run_id}/members")
-async def list_members_endpoint(
-    agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+# --------------------------------------------------------------------------
+# ADR-0527: projects. Deliberately outside the /v1/agents/{agent} family -
+# a project is cross-agent (clause 6), and only its conversations are
+# agent-scoped. Every handler resolves the caller's effective role through
+# app/projects.py, which fails closed on an absent grant.
+# --------------------------------------------------------------------------
+
+
+@app.get("/v1/projects")
+async def list_projects_endpoint(
+    request: Request, identity: CallerIdentity = Depends(validate_token)
 ) -> List[Dict[str, Any]]:
-    """ADR-0213: owner-only - lists every granted membership (never
-    includes the owner, who is not a membership row). 404 rather than
-    403 for a non-owner caller, same collapsed-case rationale as every
-    other conversation-management endpoint here - this never confirms
-    another subject's run_id exists, or that the caller merely lacks
-    owner rights on one that does."""
-    _active_agent_or_404(agent)
-    pool = request.app.state.conversations_pool
-    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
-    if role != "owner":
-        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
-    return await conversations.list_members(pool, run_id=run_id)
+    """Every live project the caller holds a grant on - directly or
+    through one of their business-role groups - with their effective role,
+    their personal star and a live conversation count."""
+    return await projects.list_projects(
+        request.app.state.conversations_pool, subject=identity.sub, groups=identity.groups
+    )
 
 
-@app.put("/v1/agents/{agent}/runs/{run_id}/members/{subject}")
-async def grant_membership_endpoint(
-    agent: str,
-    run_id: str,
-    subject: str,
-    payload: GrantMembershipRequest,
+@app.post("/v1/projects")
+async def create_project_endpoint(
+    payload: CreateProjectRequest,
     request: Request,
     identity: CallerIdentity = Depends(validate_token),
 ) -> Dict[str, str]:
-    """ADR-0213: owner-only. Eligibility of `subject` (holds this agent's
-    entitlement AND shares a business-role group with the caller) is
-    computed by agent-bff's colleague-lookup endpoint before this call is
-    ever made - this endpoint trusts its sole caller (agent-bff, over the
-    same in-cluster-only network path every other conversation-management
-    route already uses) and does not re-verify Keycloak group membership
-    itself. This is the ADR's own explicitly-accepted trust boundary, not
-    an oversight - see the ADR's Security considerations."""
-    _active_agent_or_404(agent)
+    """ADR-0527 clause 3: no owner column - the creator is simply given an
+    `admin` grant, merged into whatever grants the dialog submitted (and
+    overriding a weaker self-grant, so a creator cannot lock themselves
+    out on the very first save). ADR-0528: a supplied Salesforce
+    opportunity is verified here, under this caller's own identity, before
+    the project is stored - a project is never persisted with an
+    unverified link."""
     pool = request.app.state.conversations_pool
-    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
-    if role != "owner":
-        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
-    await conversations.grant_membership(
-        pool, run_id=run_id, subject=subject, role=payload.role, granted_by=identity.sub
+    grants = [g.model_dump() for g in payload.grants if g.subject != identity.sub]
+    grants.append({"subject": identity.sub, "group_name": None, "role": "admin"})
+
+    sf_id, sf_at = await _verify_salesforce_link(payload.salesforce_opportunity_id, identity)
+    project_id = await projects.create_project(
+        pool,
+        title=payload.title,
+        context=payload.context,
+        classification=payload.classification,
+        salesforce_opportunity_id=sf_id,
+        salesforce_verified_at=sf_at,
+        created_by=identity.sub,
+        grants=grants,
     )
-    return {"subject": subject, "role": payload.role}
+    return {"project_id": project_id}
 
 
-@app.delete("/v1/agents/{agent}/runs/{run_id}/members/{subject}")
-async def revoke_membership_endpoint(
-    agent: str, run_id: str, subject: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+@app.get("/v1/projects/{project_id}")
+async def get_project_endpoint(
+    project_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, Any]:
+    """Any grant reads the project. `grants` and the Salesforce identifier
+    are returned only to an admin - the grant list names colleagues, and
+    ADR-0528 keeps the opportunity id off every surface that does not
+    strictly need it."""
+    return await projects.get_project(
+        request.app.state.conversations_pool,
+        project_id=project_id,
+        subject=identity.sub,
+        groups=identity.groups,
+    )
+
+
+@app.put("/v1/projects/{project_id}")
+async def save_project_endpoint(
+    project_id: str,
+    payload: SaveProjectRequest,
+    request: Request,
+    identity: CallerIdentity = Depends(validate_token),
+) -> Dict[str, str]:
+    """The single-save commit behind ADR-0527's two-tab dialog: the whole
+    desired state arrives at once, which is why this ADR needs one
+    endpoint where ADR-0213 needed five.
+
+    `write` covers the Description tab. Touching grants or the Salesforce
+    link requires `admin`, checked explicitly rather than silently
+    ignored - a UI that sends a change it may not make should be told, not
+    quietly obeyed in part."""
+    pool = request.app.state.conversations_pool
+    role = await projects.require_role(
+        pool, project_id=project_id, subject=identity.sub, groups=identity.groups, minimum="write"
+    )
+
+    current = await projects.get_project(
+        pool, project_id=project_id, subject=identity.sub, groups=identity.groups
+    )
+    wants_grant_change = payload.grants is not None
+    wants_link_change = (
+        payload.salesforce_opportunity_id or None
+    ) != current.get("salesforce_opportunity_id")
+    if (wants_grant_change or wants_link_change) and role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="changing project members or the Salesforce link requires the 'admin' role",
+        )
+
+    if wants_link_change:
+        sf_id, sf_at = await _verify_salesforce_link(payload.salesforce_opportunity_id, identity)
+    else:
+        sf_id = current.get("salesforce_opportunity_id")
+        sf_at = current.get("salesforce_verified_at")
+
+    await projects.save_project(
+        pool,
+        project_id=project_id,
+        title=payload.title,
+        context=payload.context,
+        salesforce_opportunity_id=sf_id,
+        salesforce_verified_at=sf_at,
+        grants=[g.model_dump() for g in payload.grants] if payload.grants is not None else None,
+        actor=identity.sub,
+    )
+    return {"project_id": project_id}
+
+
+@app.get("/v1/projects/{project_id}/delete-preview")
+async def delete_project_preview_endpoint(
+    project_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, int]:
+    """ADR-0527 clause 7: the counts the confirmation must name before an
+    admin archives colleagues' visible work."""
+    pool = request.app.state.conversations_pool
+    await projects.require_role(
+        pool, project_id=project_id, subject=identity.sub, groups=identity.groups, minimum="admin"
+    )
+    return await projects.delete_preview(pool, project_id=project_id, subject=identity.sub)
+
+
+@app.delete("/v1/projects/{project_id}")
+async def delete_project_endpoint(
+    project_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, int]:
+    """ADR-0527 clause 7: cascade SOFT-delete. The project and every
+    conversation in it - including colleagues' - get archived_at; nothing
+    is erased, which is why this is offered to a project admin at all. The
+    irreversible purge stays per-conversation and owner-only."""
+    pool = request.app.state.conversations_pool
+    await projects.require_role(
+        pool, project_id=project_id, subject=identity.sub, groups=identity.groups, minimum="admin"
+    )
+    return await projects.archive_project_cascade(pool, project_id=project_id)
+
+
+@app.put("/v1/projects/{project_id}/star")
+async def star_project_endpoint(
+    project_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
 ) -> Dict[str, bool]:
-    """ADR-0213: owner-only, soft revocation only (the ADR's own Decision)
-    - no live kick; the collaborator's already-open tab keeps working
-    until their next access, which then fails the fail-closed role check
-    _resolve_run_id/transcript_endpoint/agent_chat all apply."""
-    _active_agent_or_404(agent)
+    """A member's private organizing flag - available to anyone who may
+    read the project, the same reasoning ADR-0212 applied to
+    conversation_stars."""
     pool = request.app.state.conversations_pool
-    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
-    if role != "owner":
-        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
-    ok = await conversations.revoke_membership(pool, run_id=run_id, subject=subject)
-    return {"revoked": ok}
-
-
-@app.patch("/v1/agents/{agent}/runs/{run_id}/owner")
-async def transfer_ownership_endpoint(
-    agent: str,
-    run_id: str,
-    payload: TransferOwnershipRequest,
-    request: Request,
-    identity: CallerIdentity = Depends(validate_token),
-) -> Dict[str, str]:
-    """ADR-0213: owner-only. The outgoing owner is downgraded to an actor
-    membership, never losing access outright
-    (conversations.transfer_ownership)."""
-    _active_agent_or_404(agent)
-    pool = request.app.state.conversations_pool
-    ok = await conversations.transfer_ownership(
-        pool, run_id=run_id, current_owner_sub=identity.sub, new_owner_sub=payload.new_owner_sub
+    await projects.require_role(
+        pool, project_id=project_id, subject=identity.sub, groups=identity.groups, minimum="read"
     )
-    if not ok:
-        raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
-    return {"run_id": run_id, "owner_sub": payload.new_owner_sub}
+    await projects.set_project_star(pool, project_id=project_id, subject=identity.sub, starred=True)
+    return {"starred": True}
+
+
+@app.delete("/v1/projects/{project_id}/star")
+async def unstar_project_endpoint(
+    project_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
+) -> Dict[str, bool]:
+    pool = request.app.state.conversations_pool
+    await projects.require_role(
+        pool, project_id=project_id, subject=identity.sub, groups=identity.groups, minimum="read"
+    )
+    await projects.set_project_star(pool, project_id=project_id, subject=identity.sub, starred=False)
+    return {"starred": False}
+
+
+async def _verify_salesforce_link(
+    candidate: Optional[str], identity: CallerIdentity
+) -> tuple:
+    """ADR-0528 clause 2: verification moved from conversation start to
+    project save. The same project_binding.verify_project_binding call
+    under the caller's own identity (ADR-0013/ADR-0032), the same three
+    distinguishable causes - only the moment changed. An empty candidate
+    means "free project" and is not an error.
+
+    Failure rejects the save rather than storing an unverified link, so
+    ck_projects_salesforce_pair's "both or neither" invariant holds by
+    construction."""
+    if not candidate:
+        return None, None
+    try:
+        verified = await project_binding.verify_project_binding(
+            candidate,
+            bearer_token=identity.token,
+            agent_name="project-admin",
+            task_name="project-salesforce-link",
+        )
+    except project_binding.ProjectCandidateMissingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except project_binding.ProjectNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except project_binding.ProjectAccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except project_binding.ProjectBindingUnreachableError as exc:
+        logger.error("salesforce verification unreachable for candidate=%s: %s", candidate, exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return verified, datetime.now(timezone.utc)
 
 
 @app.post("/v1/agents/{agent}/runs/{run_id}/clone")
 async def clone_conversation_endpoint(
     agent: str, run_id: str, request: Request, identity: CallerIdentity = Depends(validate_token)
 ) -> Dict[str, str]:
-    """ADR-0213: owner or cloner only - copies the source checkpoint's
-    channel_values into a fresh thread_id (a full checkpoint snapshot,
-    not an incremental write - no live sync back to the original) and
-    creates a new, independently-owned conversations row. Fails closed
-    (404) for both an unknown run_id and a role that isn't owner/cloner,
-    same collapsed-case rationale as every other conversation-management
-    endpoint here."""
+    """ADR-0527 clause 4: any role from `clone` upward may clone. The copy
+    stays in the SOURCE's project (ADR-0213 made it a project-less,
+    independently-owned conversation - that is what changed) and takes a
+    derived title, but the cloner becomes its owner_sub, which is exactly
+    what makes the `clone` role useful: they may write to their own copy
+    while remaining unable to write to the original.
+
+    The checkpoint copy is a full snapshot, not an incremental write - no
+    live sync back. Fails closed (404) for both an unknown run_id and an
+    insufficient role, the same collapsed-case rationale as every other
+    conversation-management endpoint here."""
     agent_def = _active_agent_or_404(agent)
     pool = request.app.state.conversations_pool
-    role = await conversations.get_role(pool, run_id=run_id, subject=identity.sub)
-    if role not in ("owner", "cloner"):
+    access = await conversations.resolve_access(
+        pool, run_id=run_id, subject=identity.sub, groups=identity.groups
+    )
+    if access is None or conversations.rank_of(access["role"]) < conversations.ROLE_RANK["clone"]:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
 
     graph = request.app.state.graph_factory.graph_for(agent_def)
@@ -786,10 +962,17 @@ async def clone_conversation_endpoint(
         new_checkpoint.get("channel_versions") or {},
     )
 
-    ok = await conversations.clone_conversation(pool, source_run_id=run_id, new_run_id=new_run_id, owner_sub=identity.sub)
-    if not ok:
+    new_title = await conversations.clone_conversation(
+        pool, source_run_id=run_id, new_run_id=new_run_id, owner_sub=identity.sub
+    )
+    if new_title is None:
         raise HTTPException(status_code=404, detail=f"no conversation found for run_id '{run_id}'")
-    return {"run_id": new_run_id, "source_run_id": run_id}
+    return {
+        "run_id": new_run_id,
+        "source_run_id": run_id,
+        "title": new_title,
+        "project_id": access["project_id"] or "",
+    }
 
 
 async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict[str, Any], *, session_id: str, request_id: str):
@@ -811,57 +994,82 @@ async def _ainvoke_with_retry(graph, initial_state: Dict[str, Any], config: Dict
         return await graph.ainvoke(initial_state, config=config)
 
 
-async def _bind_project_if_required(
+async def _require_customer_project(
     agent_def: AgentDefinition,
-    payload: ChatRequest,
     identity: CallerIdentity,
     conversations_pool: Optional[Any],
-    run_id: str,
-) -> Optional[str]:
-    """ADR-0512/WP-55: for a project_required primary task, resolves and
-    verifies the caller-supplied candidate project (payload.project_id)
-    through app/project_binding.py before any tool call, retrieval or
-    model action runs - called from agent_chat between
-    _seed_history_backfill and record_turn, so the verified id can be
-    written atomically into the same INSERT/UPDATE record_turn already
-    performs (see that function's own docstring for why). Returns None
-    for every task that doesn't set zuno.project_required: true -
-    agent_chat then behaves exactly as before this ADR landed.
+    project_id: Optional[str],
+) -> None:
+    """ADR-0528 clause 3, superseding ADR-0512 clause 3: a
+    `zuno.project_required` task must run in a CUSTOMER project - one
+    whose Salesforce link is present and currently valid. The enforcement
+    point moved from "verify a caller-supplied candidate at conversation
+    start" to "check the conversation's own project", but the fail-closed
+    posture did not: no project is a 400, a free project is a 403, and
+    Salesforce being unreachable during a re-verification is a 503.
 
-    Checks app/conversations.py's cached binding first
-    (project_binding.is_binding_still_valid against
-    project_id_verified_at) so a resumed conversation within the validity
-    window skips a fresh Salesforce call entirely - ADR-0512's own
-    Operational considerations: "latency lands once per conversation, not
-    per turn." conversations_pool must be configured for a
-    project_required task (get_project_binding fails closed, 503,
-    otherwise) - there is nowhere to cache or trust a prior verification
-    without it.
+    Returns immediately for every task that does not set
+    `zuno.project_required: true` - those behave exactly as before.
+
+    Re-verification now happens once per PROJECT per validity window
+    rather than once per conversation, which is ADR-0512's own
+    "latency lands once per conversation, not per turn" taken one level
+    further now that a project outlives a conversation. The ordinary chat
+    path makes no Salesforce call at all while the stamp is fresh.
     """
     task = agent_def.tasks.get(agent_def.primary_task) if agent_def.primary_task else None
     if task is None or not task.project_required:
-        return None
+        return
 
-    existing = await conversations.get_project_binding(conversations_pool, run_id=run_id)
-    if existing is not None and project_binding.is_binding_still_valid(existing["project_id_verified_at"]):
-        return existing["project_id"]
+    if project_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"task '{task.name}' requires a project - start this conversation "
+                "inside a customer project"
+            ),
+        )
+
+    # get_project fails closed (503) on an unconfigured pool, and 404s
+    # when the caller holds no grant - a project_required task cannot run
+    # without both.
+    detail = await projects.get_project(
+        conversations_pool, project_id=project_id, subject=identity.sub, groups=identity.groups
+    )
+    if not detail["is_customer"]:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"task '{task.name}' requires a customer project - this project has no "
+                "verified Salesforce opportunity"
+            ),
+        )
+
+    # get_project only reveals the Salesforce fields to an admin (ADR-0528
+    # keeps the identifier off every surface that does not need it), so a
+    # non-admin member cannot trigger the re-verification below. That is
+    # deliberate: re-verification must run under an identity that may read
+    # the opportunity, and a project admin is the identity that set it.
+    verified_at = detail.get("salesforce_verified_at")
+    opportunity_id = detail.get("salesforce_opportunity_id")
+    if opportunity_id is None or project_binding.is_binding_still_valid(verified_at):
+        return
 
     try:
-        return await project_binding.verify_project_binding(
-            payload.project_id,
+        await project_binding.verify_project_binding(
+            opportunity_id,
             bearer_token=identity.token,
             agent_name=agent_def.name,
             task_name=task.name,
         )
-    except project_binding.ProjectCandidateMissingError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except project_binding.ProjectNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except project_binding.ProjectAccessDeniedError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except project_binding.ProjectBindingUnreachableError as exc:
-        logger.error("project binding verification unreachable for run_id=%s: %s", run_id, exc)
+        logger.error("project re-verification unreachable for project_id=%s: %s", project_id, exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    await projects.stamp_salesforce_verification(conversations_pool, project_id=project_id)
 
 
 @app.post("/v1/agents/{agent}/chat")
@@ -893,40 +1101,90 @@ async def agent_chat(
     # dashboard.
     initial_state["run_id"] = run_id
     await _seed_history_backfill(graph, run_id, payload.run_id is not None, initial_state, agent_def)
-    # ADR-0512/WP-55: fail-closed before any graph action for a
-    # project_required primary task - raises HTTPException itself on any
-    # denial/failure, so nothing below this line runs unverified.
-    verified_project_id = await _bind_project_if_required(agent_def, payload, identity, conversations_pool, run_id)
-    if verified_project_id is not None:
-        initial_state["project_id"] = verified_project_id
+    # ADR-0527: resolve which project this turn belongs to, server-side.
+    # On a RESUME the conversation's own row decides and payload.project_id
+    # is ignored outright (a conversation's project is fixed at creation -
+    # letting a later turn move it would silently move it between two
+    # different ACLs). On a BRAND-NEW conversation the caller's requested
+    # project is checked against their own grants before it is recorded.
+    # _initial_state no longer copies payload.project_id at all, so nothing
+    # downstream can see an unverified value.
+    resolved_project_id: Optional[str] = None
+    project_context = ""
+    project_classification: Optional[str] = None
+    if payload.run_id is not None and conversations_pool is not None:
+        access = await conversations.resolve_access(
+            conversations_pool, run_id=run_id, subject=identity.sub, groups=identity.groups
+        )
+        if access is not None:
+            resolved_project_id = access["project_id"]
+            project_context = access["project_context"]
+            project_classification = access["project_classification"]
+            if payload.project_id is not None and payload.project_id != resolved_project_id:
+                logger.warning(
+                    "ignoring client-supplied project_id on resume: body=%s conversation=%s (run_id=%s)",
+                    payload.project_id, resolved_project_id, run_id,
+                )
+    elif payload.project_id is not None and conversations_pool is not None:
+        # Brand-new conversation asking to be created inside a project:
+        # `write` or better, or it does not get created there at all.
+        await projects.require_role(
+            conversations_pool,
+            project_id=payload.project_id,
+            subject=identity.sub,
+            groups=identity.groups,
+            minimum="write",
+        )
+        resolved_project_id = payload.project_id
+        detail = await projects.get_project(
+            conversations_pool,
+            project_id=payload.project_id,
+            subject=identity.sub,
+            groups=identity.groups,
+        )
+        project_context = detail["context"]
+        project_classification = detail["classification"]
+
+    if resolved_project_id is not None:
+        initial_state["project_id"] = resolved_project_id
+    # ADR-0527 clause 5: the project's standing context, injected in
+    # reason_node/draft_node as delimited background - never instructions.
+    initial_state["project_context"] = project_context
+    if project_classification:
+        initial_state["project_classification"] = project_classification
+
+    # ADR-0512/WP-55 (re-keyed by ADR-0528): fail-closed before any graph
+    # action for a project_required primary task - raises HTTPException
+    # itself on any denial, so nothing below this line runs unverified.
+    await _require_customer_project(agent_def, identity, conversations_pool, resolved_project_id)
+
     # ADR-0212: creates the conversations row on first use of run_id
     # (title derived from this opening message) or just bumps updated_at
     # on resume - no-ops if conversation persistence isn't configured, so
-    # chat itself never depends on this pool being up. project_id here is
-    # the ADR-0512-verified value above (None for every non-project_required
-    # task, leaving that row's project_id/project_id_verified_at untouched).
+    # chat itself never depends on this pool being up.
     await conversations.record_turn(
         conversations_pool,
         run_id=run_id,
         agent_name=agent_def.name,
         owner_sub=identity.sub,
         opening_message=payload.message,
-        project_id=verified_project_id,
+        project_id=resolved_project_id,
     )
 
-    # ADR-0213: a resumed conversation requires a write-capable role
-    # (owner/actor - _resolve_run_id above only proved *read* access,
-    # any of the four roles) and the single-active-writer lease. Checked
-    # only after record_turn above, which guarantees a conversations row
-    # exists for run_id by now - conversation_write_locks has a foreign
-    # key on conversations.run_id, so acquiring any earlier could fail
-    # for a run_id resuming a genuinely pre-ADR-0212 checkpoint. A brand
-    # new conversation (payload.run_id was None) has no role to check
-    # yet and no lease to contend for.
+    # ADR-0527: a resumed conversation requires a write-capable effective
+    # role (`write` or `admin` - _resolve_run_id above only proved *read*
+    # access, which `read` and `clone` also carry) and the
+    # single-active-writer lease. Checked only after record_turn above,
+    # which guarantees a conversations row exists for run_id by now -
+    # conversation_write_locks has a foreign key on conversations.run_id,
+    # so acquiring any earlier could fail for a run_id resuming a
+    # genuinely pre-ADR-0212 checkpoint. A brand new conversation
+    # (payload.run_id was None) has no role to check yet and no lease to
+    # contend for.
     write_lock_holder: Optional[str] = None
     if payload.run_id is not None and conversations_pool is not None:
-        role = await conversations.get_role(conversations_pool, run_id=run_id, subject=identity.sub)
-        if role is not None and role not in ("owner", "actor"):
+        role = access["role"] if access is not None else None
+        if role is not None and conversations.rank_of(role) < conversations.ROLE_RANK["write"]:
             raise HTTPException(status_code=403, detail="this role cannot send messages in this conversation")
         if not await conversations.acquire_write_lock(conversations_pool, run_id=run_id, holder_sub=identity.sub):
             raise HTTPException(
@@ -989,6 +1247,12 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
 # tool-calling node would add a second entry here.
 _TOOL_NODES = {"tool_call": "search_confluence"}
 
+# ADR-0527: how often the streaming path renews its write lease. Comfortably
+# inside conversations._WRITE_LOCK_TTL_SECONDS (30) so a renewal that is late
+# by a scheduling hiccup still lands before the lease expires, and far enough
+# apart that a long reply costs a handful of UPDATEs rather than one per token.
+_WRITE_LOCK_RENEW_SECONDS = 10
+
 # Shown to the client for an unexpected exception in _stream_chat's own
 # except blocks - never str(exc) directly (see the comment at each yield
 # site for the incident this followed). request_id is already what
@@ -1026,6 +1290,15 @@ async def _stream_chat(
     ADR's Decision text asks for. The lease's own TTL is the fallback if
     even this never runs (a hard crash).
 
+    ADR-0527 fixes what ADR-0213 specified but never implemented: the
+    lease is also RENEWED while tokens stream. Its TTL is 30 seconds and
+    agent-bff allows an SSE response 180, so a long reply routinely
+    outlived its own lease - leaving it expired and stealable mid-run,
+    which is precisely the checkpoint race the lease exists to prevent.
+    Renewal is throttled on a monotonic clock so it costs one UPDATE every
+    ~10 seconds rather than one per token, and a failed renewal ends the
+    stream with an error event rather than continuing unprotected.
+
     ADR-0517: wraps this whole generator's execution in api_request_span,
     the streaming-path equivalent of the sync path's span in agent_chat -
     errors are handled internally here (an SSE "error" event, not a raised
@@ -1052,6 +1325,10 @@ async def _stream_chat(
             # coherently) - sent_any tracks that boundary.
             sent_any = False
             attempts_remaining = 2
+            # ADR-0527: lease renewal state. next_renewal_at is monotonic,
+            # so it is immune to a wall-clock step during a long stream.
+            lease_lost = False
+            next_renewal_at = time.monotonic() + _WRITE_LOCK_RENEW_SECONDS
             with graph_run_span(
                 initial_state.get("session_id", ""), agent=agent, graph_shape=graph_shape, run_id=run_id
             ) as graph_recorder:
@@ -1075,6 +1352,24 @@ async def _stream_chat(
                                 if token:
                                     sent_any = True
                                     yield _sse("token", {"delta": token})
+                                    if (
+                                        write_lock_holder is not None
+                                        and conversations_pool is not None
+                                        and time.monotonic() >= next_renewal_at
+                                    ):
+                                        # acquire_write_lock's ON CONFLICT
+                                        # renews in place when we are still
+                                        # the holder, and returns False only
+                                        # if someone else legitimately took
+                                        # over after ours expired - at which
+                                        # point continuing would race their
+                                        # writes on the same thread.
+                                        if not await conversations.acquire_write_lock(
+                                            conversations_pool, run_id=run_id, holder_sub=write_lock_holder
+                                        ):
+                                            lease_lost = True
+                                            break
+                                        next_renewal_at = time.monotonic() + _WRITE_LOCK_RENEW_SECONDS
                             elif kind == "on_chain_start" and name in _TOOL_NODES:
                                 yield _sse("tool", {"name": _TOOL_NODES[name], "status": "started"})
                             elif kind == "on_chain_end" and name in _TOOL_NODES:
@@ -1095,6 +1390,30 @@ async def _stream_chat(
                                 output = event["data"].get("output") or {}
                                 if output.get("generated_images"):
                                     images = output["generated_images"]
+                        if lease_lost:
+                            # ADR-0527: another collaborator legitimately
+                            # took the lease over after ours expired.
+                            # Stopping here is the point - continuing would
+                            # race their writes on the same LangGraph
+                            # thread, the exact data-integrity gap the
+                            # lease closes.
+                            logger.warning(
+                                "write lease lost mid-stream, ending reply: run_id=%s holder=%s",
+                                run_id, write_lock_holder,
+                            )
+                            api_recorder.mark_error()
+                            graph_recorder.mark_error()
+                            yield _sse(
+                                "error",
+                                {
+                                    "message": (
+                                        "Another collaborator started writing to this conversation, "
+                                        "so this reply was stopped. Reopen the conversation to see "
+                                        "the current state."
+                                    )
+                                },
+                            )
+                            return
                     except psycopg.OperationalError as exc:
                         if sent_any or attempts_remaining == 0:
                             logger.error("SSE stream failed request_id=%s: %s", request_id, exc)

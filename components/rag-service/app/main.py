@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from app import db, ogx_provider, project_memory
 from app.bindings import KnowledgeBindingRegistry
 from app.schemas import (
+    ProjectMembershipsReplaceRequest,
+    ProjectMembershipsReplaceResponse,
     ProjectMemoryWriteRequest,
     ProjectMemoryWriteResponse,
     SearchRequest,
@@ -159,3 +161,35 @@ async def write_project_memory(payload: ProjectMemoryWriteRequest) -> ProjectMem
         logger.error("project-memory write failed for project_id=%r: %s", payload.project_id, exc)
         raise HTTPException(status_code=500, detail=f"project-memory write failed: {exc}") from exc
     return ProjectMemoryWriteResponse(**result)
+
+
+@app.put("/v1/projects/{project_id}/memberships", response_model=ProjectMembershipsReplaceResponse)
+async def replace_project_memberships(
+    project_id: str, payload: ProjectMembershipsReplaceRequest
+) -> ProjectMembershipsReplaceResponse:
+    """ADR-0527 clause 8: agent-runtime pushes a project's grant set here so
+    project_memberships keeps gating knowledge.project retrieval, without
+    this runtime ever handing out a second database credential (the same
+    reasoning that put the project-memory write above behind this service).
+
+    project_memberships is now a projection of project_grants in the
+    agent-conversations database, not the ACL of record - but
+    app/search.py's fail-closed check against it is unchanged, so this
+    service still decides for itself rather than trusting a caller's
+    membership claim.
+
+    The caller treats any non-2xx as fatal and rolls its own transaction
+    back, so a revocation is never half-applied. An out-of-order retry is
+    answered 200 with applied=False rather than an error - it was
+    superseded, not rejected.
+    """
+    try:
+        result = await project_memory.replace_project_memberships(
+            project_id=project_id,
+            revision=payload.revision,
+            members=[m.model_dump() for m in payload.members],
+        )
+    except Exception as exc:
+        logger.error("membership projection failed for project_id=%r: %s", project_id, exc)
+        raise HTTPException(status_code=500, detail=f"membership projection failed: {exc}") from exc
+    return ProjectMembershipsReplaceResponse(**result)

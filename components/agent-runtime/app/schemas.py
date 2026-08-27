@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChatRequest(BaseModel):
@@ -27,15 +27,14 @@ class ChatRequest(BaseModel):
     # project_id field, following the same identity-propagation pattern
     # ADR-0032/0033 already use.
     #
-    # ADR-0512 (WP-55): for a project_required task, this is only ever
-    # treated as a CANDIDATE - app/main.py's pre-graph binding step
-    # verifies it via the MCP Gateway's salesforce.opportunity.read under
-    # the caller's own identity before trusting it, and overwrites
-    # initial_state["project_id"] with the verified id (or blocks the
-    # request fail-closed). This field only "stops being client-asserted"
-    # for that specific class of task; for every other task it remains
-    # exactly what it always was - an optional, unverified value passed
-    # straight through.
+    # ADR-0527: the project this conversation belongs to. Honoured ONLY
+    # when creating a brand-new conversation (run_id is None), and even
+    # then only after app/main.py's agent_chat has verified the caller
+    # holds a `write` grant on it - the value never reaches AgentState
+    # unverified, because _initial_state no longer copies it at all.
+    # On resume it is ignored entirely (a conversation's project is fixed
+    # at creation) and only logged on mismatch, the same posture
+    # _initial_state already applies to an informational user_sub.
     project_id: Optional[str] = Field(default=None, min_length=1)
 
 
@@ -81,11 +80,55 @@ class ReorderConversationsRequest(BaseModel):
     run_ids: List[str] = Field(min_length=1)
 
 
-class GrantMembershipRequest(BaseModel):
-    # ADR-0213: PUT /v1/agents/{agent}/runs/{run_id}/members/{subject} body.
-    role: Literal["reader", "actor", "cloner"]
+# ADR-0527 clause 5: the project context's storage and input ceiling.
+# Mirrored in app/projects.py, in _DDL's ck_projects_context_length (the
+# backstop) and in web/src/shared/projects.ts (the live counter).
+PROJECT_CONTEXT_MAX_CHARS = 54000
+
+ProjectRole = Literal["read", "clone", "write", "admin"]
 
 
-class TransferOwnershipRequest(BaseModel):
-    # ADR-0213: PATCH /v1/agents/{agent}/runs/{run_id}/owner body.
-    new_owner_sub: str = Field(min_length=1)
+class ProjectGrantSpec(BaseModel):
+    """ADR-0527 clause 2: one grant, targeting exactly one of a Keycloak
+    subject or a business-role group. The XOR mirrors project_grants'
+    own ck_project_grants_subject_xor_group - validated here so the API
+    returns a 400 that names the rule, rather than surfacing a constraint
+    violation as a 500. app/projects.py's assert_grants_are_valid applies
+    the rules this shape cannot express (the last-admin guard, duplicate
+    targets, and the agent_* entitlement-group refusal)."""
+
+    subject: Optional[str] = Field(default=None, min_length=1)
+    group_name: Optional[str] = Field(default=None, min_length=1)
+    role: ProjectRole
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self) -> "ProjectGrantSpec":
+        if (self.subject is None) == (self.group_name is None):
+            raise ValueError("exactly one of subject or group_name must be set")
+        return self
+
+
+class CreateProjectRequest(BaseModel):
+    # ADR-0527: POST /v1/projects body. `grants` is the full desired set;
+    # app/main.py merges the creator's own admin grant into it before
+    # persisting, so a project can never be created unadministrable.
+    title: str = Field(min_length=1, max_length=200)
+    context: str = Field(default="", max_length=PROJECT_CONTEXT_MAX_CHARS)
+    classification: Literal["C1", "C2", "C3"] = "C2"
+    # ADR-0528: optional. Present and verifiable => customer project;
+    # absent => free project. Verified at save time under the caller's own
+    # identity, never stored unverified.
+    salesforce_opportunity_id: Optional[str] = Field(default=None, min_length=1)
+    grants: List[ProjectGrantSpec] = Field(default_factory=list)
+
+
+class SaveProjectRequest(CreateProjectRequest):
+    # ADR-0527: PUT /v1/projects/{project_id} body - the whole desired
+    # state at once, which is why this ADR needs one endpoint where
+    # ADR-0213 needed five (the dialog stages every change and commits on
+    # a single validation).
+    #
+    # grants=None means "the caller may not edit grants" - a `write`
+    # member editing only the Description tab - and leaves them untouched.
+    # A non-None value is the FULL desired set: anything absent is revoked.
+    grants: Optional[List[ProjectGrantSpec]] = None

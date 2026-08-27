@@ -111,3 +111,33 @@ class ProjectMemoryWriteRequest(BaseModel):
 class ProjectMemoryWriteResponse(BaseModel):
     facts_written: int
     memories_written: int
+
+
+class ProjectMembershipEntry(BaseModel):
+    """ADR-0527: one projected grant. Exactly one of subject/group_name is
+    set, mirroring project_memberships' own CHECK. The ROLE is deliberately
+    absent: ADR-0209's membership check is binary, and projecting a role
+    this service has no use for would invite it to start making
+    authorization decisions ADR-0527 keeps in agent-runtime."""
+
+    subject: Optional[str] = None
+    group_name: Optional[str] = None
+
+
+class ProjectMembershipsReplaceRequest(BaseModel):
+    """ADR-0527 clause 8: replace-all for one project's membership
+    projection. `revision` is agent-runtime's monotone
+    projects.grants_revision - it makes this endpoint idempotent and
+    non-rewindable, so a retry that arrives after a newer push is ignored
+    rather than resurrecting a stale grant set."""
+
+    revision: int = Field(ge=0)
+    members: List[ProjectMembershipEntry] = Field(default_factory=list)
+
+
+class ProjectMembershipsReplaceResponse(BaseModel):
+    # False when a newer revision is already stored - a success, not an
+    # error: the caller's push was simply superseded.
+    applied: bool
+    revision: int
+    rows: int

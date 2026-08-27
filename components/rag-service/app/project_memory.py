@@ -138,3 +138,65 @@ async def write_project_memory(
         project_id, agent, facts_written, memories_written,
     )
     return {"facts_written": facts_written, "memories_written": memories_written}
+
+
+async def replace_project_memberships(
+    project_id: str,
+    revision: int,
+    members: List[Dict[str, Optional[str]]],
+) -> Dict[str, Any]:
+    """ADR-0527 clause 8: apply agent-runtime's grant set to this project's
+    projection, replace-all, in one transaction.
+
+    project_memberships is no longer the ACL of record - project_grants in
+    the agent-conversations database is - but it remains the fail-closed
+    gate app/search.py's _check_project_membership enforces before any
+    knowledge.project content is touched, unchanged. That check is
+    defence in depth precisely because this service decides for itself,
+    against its own database, rather than trusting a membership claim
+    carried in a search request.
+
+    `revision` is monotone per project. A push whose revision is older than
+    what is stored is ignored (applied=False, 200) rather than applied:
+    without that, a retry delayed behind a newer push would resurrect a
+    grant set that has already been revoked.
+    """
+    pool = get_pool(_PROJECT_DOMAIN)
+    if pool is None:
+        raise ProjectMemoryError(f"no live database pool for domain '{_PROJECT_DOMAIN}'")
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            stored = await conn.fetchval(
+                "SELECT max(revision) FROM project_memberships WHERE project_id = $1",
+                project_id,
+            )
+            if stored is not None and revision < stored:
+                logger.info(
+                    "ignoring out-of-order membership push for project %s (revision %d < stored %d)",
+                    project_id, revision, stored,
+                )
+                return {"applied": False, "revision": int(stored), "rows": 0}
+
+            await conn.execute("DELETE FROM project_memberships WHERE project_id = $1", project_id)
+            rows = 0
+            for member in members:
+                subject = member.get("subject")
+                group_name = member.get("group_name")
+                if (subject is None) == (group_name is None):
+                    # Mirrors ck_project_memberships_subject_or_group and
+                    # agent-runtime's own XOR validation - a malformed entry
+                    # is dropped rather than allowed to widen the gate.
+                    logger.warning(
+                        "skipping malformed membership entry for project %s: %r", project_id, member
+                    )
+                    continue
+                await conn.execute(
+                    "INSERT INTO project_memberships (project_id, subject, group_name, granted_by, revision) "
+                    "VALUES ($1, $2, $3, $4, $5)",
+                    project_id, subject, group_name, "agent-runtime (ADR-0527 projection)", revision,
+                )
+                rows += 1
+
+    logger.info("projected %d membership row(s) for project %s at revision %d", rows, project_id, revision)
+    return {"applied": True, "revision": revision, "rows": rows}

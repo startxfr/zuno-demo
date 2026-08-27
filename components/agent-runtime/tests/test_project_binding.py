@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ADR-0512/WP-55 tests: app/project_binding.py's verification/matching
-logic, app/main.py's pre-graph binding wiring (_bind_project_if_required),
+logic, app/main.py's pre-graph customer-project check (_require_customer_project),
 and app/graph/nodes.py's quota-header gating (project_id only reaches
 ai-gateway for a task that actually declared project_required).
 
@@ -44,7 +44,10 @@ from app.auth import CallerIdentity  # noqa: E402
 from app.clients import mcp_client  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.graph.nodes import _make_reason_node, _registry  # noqa: E402
-from app.main import _bind_project_if_required  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+
+import app.projects as projects_module  # noqa: E402
+from app.main import _require_customer_project  # noqa: E402
 from app.registry import AgentDefinition, TaskDefinition  # noqa: E402
 from app.schemas import ChatRequest  # noqa: E402
 
@@ -209,7 +212,11 @@ async def test_verify_project_binding_raises_not_found_on_zero_matches() -> None
 
 
 # --------------------------------------------------------------------------
-# app/main.py's _bind_project_if_required wiring
+# app/main.py's _require_customer_project wiring (ADR-0528, superseding
+# ADR-0512 clause 3: the check moved from "verify a caller-supplied
+# candidate at conversation start" to "the conversation's own project must
+# be a customer project", and Salesforce verification itself moved to
+# project save)
 # --------------------------------------------------------------------------
 
 
@@ -224,151 +231,169 @@ def _fake_agent(task: TaskDefinition, primary_task_name: str = "t") -> AgentDefi
     )
 
 
-async def test_bind_project_if_required_returns_none_for_unmarked_task() -> None:
-    """Unmarked tasks must be byte-identical to pre-ADR-0512 behavior: zero
-    calls into conversations.get_project_binding or project_binding at
-    all - proven here by never monkeypatching either and still getting a
-    clean None back."""
+async def test_unmarked_task_is_untouched_by_the_customer_project_check() -> None:
+    """ADR-0528 preserves ADR-0512's guarantee that unmarked tasks behave
+    exactly as before: zero calls into app/projects.py or project_binding
+    at all - proven by never monkeypatching either and still returning
+    cleanly, with no project supplied."""
     task = TaskDefinition(name="t", title="T", description="", allowed_tools=[], project_required=False)
     agent = _fake_agent(task)
-    payload = ChatRequest(session_id="s", user_sub="alice", message="hi", project_id=None)
-    result = await _bind_project_if_required(agent, payload, _identity(), conversations_pool=None, run_id="run-1")
-    assert result is None
+    await _require_customer_project(agent, _identity(), None, None)
 
 
-async def test_bind_project_if_required_uses_fresh_cached_binding_without_reverifying() -> None:
-    task = TaskDefinition(name="t", title="T", description="", allowed_tools=["salesforce.opportunity.read"], project_required=True)
+async def test_project_required_task_refuses_a_conversation_with_no_project() -> None:
+    """Fail closed, first branch: 400. The task cannot act without an
+    engagement, and no project at all is a client-side mistake, not an
+    authorization failure."""
+    task = TaskDefinition(name="t", title="T", description="", allowed_tools=[], project_required=True)
     agent = _fake_agent(task)
-    payload = ChatRequest(session_id="s", user_sub="alice", message="hi", project_id=None)
+    try:
+        await _require_customer_project(agent, _identity(), object(), None)
+        raise AssertionError("expected HTTPException")
+    except HTTPException as exc:
+        assert exc.status_code == 400, exc.status_code
 
+
+async def test_project_required_task_refuses_a_free_project() -> None:
+    """ADR-0528 clause 3: a free project (no verified Salesforce link) is
+    a real, fully usable project - it simply cannot host a
+    project_required task. 403, distinct from the 400 above so the two
+    causes stay distinguishable."""
+    task = TaskDefinition(name="t", title="T", description="", allowed_tools=[], project_required=True)
+    agent = _fake_agent(task)
+
+    async def fake_get_project(pool, *, project_id, subject, groups):
+        return {"is_customer": False, "salesforce_opportunity_id": None, "salesforce_verified_at": None}
+
+    saved = projects_module.get_project
+    projects_module.get_project = fake_get_project
+    try:
+        await _require_customer_project(agent, _identity(), object(), "proj-1")
+        raise AssertionError("expected HTTPException")
+    except HTTPException as exc:
+        assert exc.status_code == 403, exc.status_code
+    finally:
+        projects_module.get_project = saved
+
+
+async def test_a_fresh_customer_project_makes_no_salesforce_call() -> None:
+    """ADR-0528's whole point: verification lands once per PROJECT per
+    validity window, so the ordinary chat path inside a fresh customer
+    project touches Salesforce zero times. Proven by leaving
+    verify_project_binding un-patched - it would raise on any real call."""
+    task = TaskDefinition(name="t", title="T", description="", allowed_tools=[], project_required=True)
+    agent = _fake_agent(task)
     fresh = datetime.now(timezone.utc) - timedelta(seconds=5)
 
-    async def fake_get_project_binding(pool, *, run_id):
-        return {"project_id": "006CachedOpportunity", "project_id_verified_at": fresh}
+    calls = []
 
-    verify_calls = []
+    async def fake_get_project(pool, *, project_id, subject, groups):
+        return {
+            "is_customer": True,
+            "salesforce_opportunity_id": "006Verified",
+            "salesforce_verified_at": fresh,
+        }
 
-    async def fake_verify(*args, **kwargs):
-        verify_calls.append((args, kwargs))
-        raise AssertionError("should never re-verify within the validity window")
+    async def exploding_verify(candidate, **kwargs):
+        calls.append(candidate)
+        raise AssertionError("must not re-verify inside the validity window")
 
-    saved_get = conversations_module.get_project_binding
-    saved_verify = project_binding.verify_project_binding
-    conversations_module.get_project_binding = fake_get_project_binding
-    project_binding.verify_project_binding = fake_verify
+    saved_get, saved_verify = projects_module.get_project, project_binding.verify_project_binding
+    projects_module.get_project = fake_get_project
+    project_binding.verify_project_binding = exploding_verify
     try:
-        result = await _bind_project_if_required(
-            agent, payload, _identity(), conversations_pool=object(), run_id="run-2"
-        )
-        assert result == "006CachedOpportunity"
-        assert not verify_calls
+        await _require_customer_project(agent, _identity(), object(), "proj-1")
+        assert calls == [], calls
     finally:
-        conversations_module.get_project_binding = saved_get
+        projects_module.get_project = saved_get
         project_binding.verify_project_binding = saved_verify
 
 
-async def test_bind_project_if_required_reverifies_past_the_validity_window() -> None:
-    task = TaskDefinition(name="t", title="T", description="", allowed_tools=["salesforce.opportunity.read"], project_required=True)
+async def test_a_stale_customer_project_reverifies_once_and_restamps() -> None:
+    """Past the window, exactly one verification runs and its success is
+    recorded on the PROJECT (not the conversation), so the next turn is
+    fresh again."""
+    task = TaskDefinition(name="t", title="T", description="", allowed_tools=[], project_required=True)
     agent = _fake_agent(task)
-    payload = ChatRequest(session_id="s", user_sub="alice", message="hi", project_id="Acme Renewal FY26")
+    stale = datetime.now(timezone.utc) - timedelta(seconds=project_binding.VALIDITY_WINDOW_SECONDS + 60)
+    verified, stamped = [], []
 
+    async def fake_get_project(pool, *, project_id, subject, groups):
+        return {
+            "is_customer": True,
+            "salesforce_opportunity_id": "006Verified",
+            "salesforce_verified_at": stale,
+        }
+
+    async def fake_verify(candidate, **kwargs):
+        verified.append(candidate)
+        return candidate
+
+    async def fake_stamp(pool, *, project_id):
+        stamped.append(project_id)
+
+    saved = (projects_module.get_project, project_binding.verify_project_binding,
+             projects_module.stamp_salesforce_verification)
+    projects_module.get_project = fake_get_project
+    project_binding.verify_project_binding = fake_verify
+    projects_module.stamp_salesforce_verification = fake_stamp
+    try:
+        await _require_customer_project(agent, _identity(), object(), "proj-1")
+        assert verified == ["006Verified"], verified
+        assert stamped == ["proj-1"], stamped
+    finally:
+        (projects_module.get_project, project_binding.verify_project_binding,
+         projects_module.stamp_salesforce_verification) = saved
+
+
+async def test_reverification_maps_each_typed_error_to_the_right_http_status() -> None:
+    """ADR-0512's three distinguishable causes survive the move: a
+    Salesforce outage must stay tellable apart from an authorization
+    denial."""
+    task = TaskDefinition(name="t", title="T", description="", allowed_tools=[], project_required=True)
+    agent = _fake_agent(task)
     stale = datetime.now(timezone.utc) - timedelta(seconds=project_binding.VALIDITY_WINDOW_SECONDS + 60)
 
-    async def fake_get_project_binding(pool, *, run_id):
-        return {"project_id": "006Stale", "project_id_verified_at": stale}
-
-    async def fake_verify(candidate, **kwargs):
-        assert candidate == "Acme Renewal FY26"
-        return "006FreshlyVerified"
-
-    saved_get = conversations_module.get_project_binding
-    saved_verify = project_binding.verify_project_binding
-    conversations_module.get_project_binding = fake_get_project_binding
-    project_binding.verify_project_binding = fake_verify
-    try:
-        result = await _bind_project_if_required(
-            agent, payload, _identity(), conversations_pool=object(), run_id="run-3"
-        )
-        assert result == "006FreshlyVerified"
-    finally:
-        conversations_module.get_project_binding = saved_get
-        project_binding.verify_project_binding = saved_verify
-
-
-async def test_bind_project_if_required_maps_each_typed_error_to_the_right_http_status() -> None:
-    task = TaskDefinition(name="t", title="T", description="", allowed_tools=["salesforce.opportunity.read"], project_required=True)
-    agent = _fake_agent(task)
-
-    async def fake_get_project_binding(pool, *, run_id):
-        return None  # no cached binding - always falls through to verify
-
-    saved_get = conversations_module.get_project_binding
-    saved_verify = project_binding.verify_project_binding
-    conversations_module.get_project_binding = fake_get_project_binding
+    async def fake_get_project(pool, *, project_id, subject, groups):
+        return {
+            "is_customer": True,
+            "salesforce_opportunity_id": "006Verified",
+            "salesforce_verified_at": stale,
+        }
 
     cases = [
-        (project_binding.ProjectCandidateMissingError, 400),
-        (project_binding.ProjectNotFoundError, 404),
-        (project_binding.ProjectAccessDeniedError, 403),
-        (project_binding.ProjectBindingUnreachableError, 503),
+        (project_binding.ProjectNotFoundError("unknown"), 404),
+        (project_binding.ProjectAccessDeniedError("no access"), 403),
+        (project_binding.ProjectBindingUnreachableError("down"), 503),
     ]
+    saved = (projects_module.get_project, project_binding.verify_project_binding)
+    projects_module.get_project = fake_get_project
     try:
-        for error_cls, expected_status in cases:
-            async def fake_verify(*args, _cls=error_cls, **kwargs):
-                raise _cls("boom")
+        for error, expected_status in cases:
+            async def failing_verify(candidate, _error=error, **kwargs):
+                raise _error
 
-            project_binding.verify_project_binding = fake_verify
-            payload = ChatRequest(session_id="s", user_sub="alice", message="hi", project_id="whatever")
+            project_binding.verify_project_binding = failing_verify
             try:
-                await _bind_project_if_required(agent, payload, _identity(), conversations_pool=object(), run_id="run-4")
-                raise AssertionError(f"expected HTTPException for {error_cls.__name__}")
-            except Exception as exc:  # HTTPException
-                assert getattr(exc, "status_code", None) == expected_status, (error_cls.__name__, exc)
+                await _require_customer_project(agent, _identity(), object(), "proj-1")
+                raise AssertionError(f"expected {expected_status} for {type(error).__name__}")
+            except HTTPException as exc:
+                assert exc.status_code == expected_status, (type(error).__name__, exc.status_code)
     finally:
-        conversations_module.get_project_binding = saved_get
-        project_binding.verify_project_binding = saved_verify
+        (projects_module.get_project, project_binding.verify_project_binding) = saved
 
 
-async def test_bind_project_if_required_uses_finages_real_project_required_tasks() -> None:
+async def test_finages_real_bundle_still_declares_project_required() -> None:
     """Not a fixture - the REAL Finage bundle, parsed by the real registry
-    (AGENTS_DIR set at the top of this file), proving
-    identify-business-ready-to-invoice/monthly-invoice-report genuinely
-    carry project_required: true end to end from the OKF Markdown file
-    through app/registry.py's TaskDefinition, not just in a hand-built
-    test fixture."""
+    (AGENTS_DIR set at the top of this file). ADR-0528 changes what
+    project_required MEANS, never which tasks carry it."""
     finage = _registry.get("finage")
     assert finage is not None, "finage bundle failed to load from AGENTS_DIR"
-    invoice_task = finage.tasks["identify-business-ready-to-invoice"]
-    assert invoice_task.project_required is True
-    report_task = finage.tasks["monthly-invoice-report"]
-    assert report_task.project_required is True
+    assert finage.tasks["identify-business-ready-to-invoice"].project_required is True
+    assert finage.tasks["monthly-invoice-report"].project_required is True
     # answer-finance-question (Finage's real primary_task) must stay
-    # unmarked - this ADR must not silently widen to tasks it wasn't
-    # asked to cover.
+    # unmarked - neither ADR widened to tasks it wasn't asked to cover.
     assert finage.tasks["answer-finance-question"].project_required is False
-
-    async def fake_get_project_binding(pool, *, run_id):
-        return None
-
-    async def fake_verify(candidate, **kwargs):
-        assert candidate == "Acme Renewal FY26"
-        assert kwargs["task_name"] == "identify-business-ready-to-invoice"
-        return "006Verified"
-
-    saved_get = conversations_module.get_project_binding
-    saved_verify = project_binding.verify_project_binding
-    conversations_module.get_project_binding = fake_get_project_binding
-    project_binding.verify_project_binding = fake_verify
-    try:
-        agent_with_invoice_primary = _fake_agent(invoice_task, primary_task_name="identify-business-ready-to-invoice")
-        payload = ChatRequest(session_id="s", user_sub="alice", message="hi", project_id="Acme Renewal FY26")
-        result = await _bind_project_if_required(
-            agent_with_invoice_primary, payload, _identity(), conversations_pool=object(), run_id="run-5"
-        )
-        assert result == "006Verified"
-    finally:
-        conversations_module.get_project_binding = saved_get
-        project_binding.verify_project_binding = saved_verify
 
 
 # --------------------------------------------------------------------------
@@ -384,12 +409,16 @@ async def test_record_turn_with_project_id_still_no_ops_on_a_none_pool() -> None
     )  # no exception raised = pass
 
 
-async def test_get_project_binding_fails_closed_on_a_none_pool() -> None:
+async def test_stamp_salesforce_verification_fails_closed_on_a_none_pool() -> None:
+    """ADR-0528 replaced conversations.get_project_binding (the
+    per-conversation stamp) with a per-project one. Same fail-closed
+    posture: recording a verification must never silently succeed against
+    an unreachable pool, or a stale stamp would look fresh forever."""
     try:
-        await conversations_module.get_project_binding(None, run_id="run-abc")
-        raise AssertionError("expected HTTPException(503)")
-    except Exception as exc:
-        assert getattr(exc, "status_code", None) == 503
+        await projects_module.stamp_salesforce_verification(None, project_id="proj-1")
+        raise AssertionError("expected HTTPException")
+    except HTTPException as exc:
+        assert exc.status_code == 503, exc.status_code
 
 
 # --------------------------------------------------------------------------
@@ -449,13 +478,15 @@ TESTS = [
     test_verify_project_binding_raises_access_denied_on_403,
     test_verify_project_binding_raises_unreachable_on_transport_error,
     test_verify_project_binding_raises_not_found_on_zero_matches,
-    test_bind_project_if_required_returns_none_for_unmarked_task,
-    test_bind_project_if_required_uses_fresh_cached_binding_without_reverifying,
-    test_bind_project_if_required_reverifies_past_the_validity_window,
-    test_bind_project_if_required_maps_each_typed_error_to_the_right_http_status,
-    test_bind_project_if_required_uses_finages_real_project_required_tasks,
+    test_unmarked_task_is_untouched_by_the_customer_project_check,
+    test_project_required_task_refuses_a_conversation_with_no_project,
+    test_project_required_task_refuses_a_free_project,
+    test_a_fresh_customer_project_makes_no_salesforce_call,
+    test_a_stale_customer_project_reverifies_once_and_restamps,
+    test_reverification_maps_each_typed_error_to_the_right_http_status,
+    test_finages_real_bundle_still_declares_project_required,
     test_record_turn_with_project_id_still_no_ops_on_a_none_pool,
-    test_get_project_binding_fails_closed_on_a_none_pool,
+    test_stamp_salesforce_verification_fails_closed_on_a_none_pool,
     test_reason_node_forwards_project_id_only_when_task_is_project_required,
 ]
 
