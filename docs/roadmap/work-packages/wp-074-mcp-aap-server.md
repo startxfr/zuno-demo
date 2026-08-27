@@ -1,6 +1,7 @@
 # WP-074: mcp-aap server - expose AAP audits to Tekos and Arkos
 
-- **State:** Repo work merged, live verification pending (2026-08-27).
+- **State:** Done (live-verified 2026-08-27). Both tools proven against real AAP; two live
+  defects found and fixed in the process - see "Live findings" below.
 - **ADRs:** ADR-0355 (Expose AAP audits to agents through an mcp-aap
   server)
 - **Depends on:** WP-072 (`aap` live), WP-073 (`aap-config`'s Project/Job
@@ -190,10 +191,31 @@ On repository merge but before live confirmation:
 
 After all live acceptance checks pass:
 
-- WP-074 -> `Done`.
-- ADR-0355 -> `Implemented`.
-- Update `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` and
-  `MEMORY.md`.
+- WP-074 -> `Done` (2026-08-27).
+- ADR-0355 -> `Implemented` (2026-08-27).
+- `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` tracker row -> `Done`.
+
+## Live findings (2026-08-27)
+
+Two real defects, neither visible from the acceptance gate:
+
+1. **`aap.platform.audit` was broken in production while the gate was green.**
+   `zuno-mcp` could see 0 projects, 0 inventories and 0 organizations, so every call failed with
+   "no project named 'zuno-demo' in AAP". Root cause: **Platform Auditor is a role in AAP 2.5, not
+   a user boolean.** The `is_platform_auditor: true` sent on user create is accepted and silently
+   dropped (POST 201, later PATCH 200, field reads back `False` every time), so the read half of
+   ADR-0355 clause 3 was never granted. Now issued via `role_user_assignments`, unconditionally
+   rather than at create time only. Watch the ids: that assignment is a *Gateway* resource and
+   needs the Gateway user id (4 here), not the Controller id used for the executor role (73).
+
+2. **The gate could not have caught it.** All three aap.* checks assert a `403` for an
+   unauthorized caller, so green proved only that the boundary refuses the wrong caller - nothing
+   about whether the tools work. Added `aap_platform_audit_succeeds_for_an_authorized_caller`,
+   which requires a `200` *and* a payload naming the project.
+
+Evidence: `platform_audit` -> controller 4.8.6, project `zuno-demo` `successful`, 3 recent runs.
+`cluster_audit` -> launched `zuno-day0-check`, job 76 `successful`, `created_by: zuno-mcp`,
+localhost `ok=157 failures=0`. Least privilege intact: 403 launching any other Job Template.
 
 ## Rollback
 

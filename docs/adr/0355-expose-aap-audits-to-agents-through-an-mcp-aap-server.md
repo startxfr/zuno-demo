@@ -1,6 +1,11 @@
 # ADR-0355: Expose AAP audits to agents through an mcp-aap server
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-08-27 - both tools exercised against real AAP
+  from the running `aap-mcp` pod: `platform_audit` returned controller 4.8.6 and the
+  `zuno-demo` project, `cluster_audit` really launched `zuno-day0-check` as `zuno-mcp`
+  (job 76, successful, 157 ok / 0 failures). Clause 3's least privilege holds: the identity
+  is not a superuser and gets 403 launching any other Job Template. Clause 4 was amended
+  during WP-074 - see that section)
 - **Target:** v0.3
 - **Date:** 2026-08-24
 - **Decision owners:** Zuno Demo architecture team
