@@ -305,6 +305,53 @@ Then, once deployed:
 - 2026-08-26: step 2 executed - `rag-sxa` and `ragsxa` dropped, PGO reconcile
   verified healthy afterwards. Steps 3, 4 and 6-8 remain open; step 6 (the
   first full index of 314,428 documents) is the critical path.
+- 2026-08-27: three more step-6 attempts failed, each on a different cause.
+  `f5p8j` died overnight to a platform outage (Vault re-sealed on a pod
+  restart, the mesh CA expired behind it, 77 pods down) - unrelated to this
+  WP. `6cp5l` reached `index-pgvector` and wrote **249,911 of ~310,537 rows**
+  before `psycopg.OperationalError: the connection is lost` at 12:50, one hour
+  in. Progress survived: the per-window commits from item 5 plus the
+  `ON CONFLICT (source, chunk_index)` upsert make a relaunch idempotent, so
+  the remainder is ~60,600 documents upserting over the rest.
+- 2026-08-27 (`788e8ea4`): `index-pgvector` now reconnects and replays.
+  Holding one Postgres connection for a 3-5h stage, through pgbouncer and
+  istio, against a cluster whose primary shows **12 restarts**, cannot
+  survive; worse, the error handler's own `conn.rollback()` raised the same
+  `OperationalError` and masked the original failure. The cursor moved inside
+  the window loop, rollback/close are guarded, a fresh connection is opened
+  with backoff and the window replayed, the S3 prefetch stays outside the
+  retry, and the `finally` that rebuilds the ivfflat index uses the *current*
+  connection so a dropped index is never left dropped on the error path.
+- 2026-08-27 (`788e8ea4`): **a diagnosis recorded here as fact was wrong.**
+  `detect-changes` had been raised to cpu:8/24Gi with a `values.yaml` comment
+  asserting it was "latency-bound, not CPU-bound". The real cost was item 6's
+  O(n^2), fixed in `d340e7ab`; the sizing was treating a symptom. It reverts
+  to cpu:2/6Gi with the comment corrected. `readConcurrency: 64` stands.
+  Because a `resources` block is part of the compiled spec, the
+  PipelineVersion moves `v0-6-0` -> `v0-7-0`.
+- 2026-08-27 (`253242b8`): `readConcurrency: 64` was doing less than claimed.
+  `CorpusStore` hard-coded `max_pool_connections=32` - a number WP-58 picked
+  to clear a *default* of 16, with a comment saying the pool must exceed the
+  worker count. Raising the knob to 64 left it behind, and the live
+  `detect-changes` pod logged a continuous `Connection pool is full,
+  discarding connection` stream: half the workers re-establishing a TLS
+  connection per GET, exactly the latency the knob exists to hide. The size is
+  now derived from the widest knob (max, not sum - one stage per pod) plus
+  headroom: 68 for this domain. Only a running pod's WARNING lines exposed
+  this; no test or lint could have.
+- 2026-08-27: step 6 attempt `9z45t` is **in flight**, launched 14:23Z by a
+  peer session and left to run by the operator rather than restarted. Caveat
+  for whoever reads its result: KFP runs one pod per stage, each pulling
+  `rag-ingestion:latest` with `imagePullPolicy: Always`, so a rebuild swaps
+  the image *between stages of the same run*. `9z45t` started `detect-changes`
+  on the pre-fix image and its later stages take the rebuilt one - it is not
+  evidence that any single build ran end-to-end. It also runs the `v0-6-0`
+  spec, so `detect-changes` still has the oversized cpu:8/24Gi.
+- Still open: compile `v0-7-0` (`make d2 install rag-ingestion`; verify the
+  compiled object carries `cpu: 2`, never the play's exit code), then steps 7
+  and 8. Postgres's 12 restarts are **deliberately not diagnosed** - if a run
+  fails again on a lost connection despite the retry, that is the signal to go
+  after the restarts themselves.
 - After the operator steps above land: flip this WP to `Done` and add a dated
   MEMORY.md bullet.
 
