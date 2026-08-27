@@ -534,6 +534,49 @@ def test_merge_export_requires_a_train_manifest_first() -> None:
     assert raised
 
 
+def test_cross_region_client_does_not_inherit_a_region_pinned_endpoint() -> None:
+    """The failure this guards against is silent at every layer except AWS.
+
+    S3_ENDPOINT here is region-pinned (https://s3.<region>.amazonaws.com),
+    so a cross-bucket call that overrides region_name but inherits that
+    endpoint builds a client aimed at one region while dialling another's
+    host. Nothing raises locally - AWS answers PermanentRedirect at request
+    time, which is how it reached a live pipeline run.
+    """
+    built = []
+
+    class _Rec(mlops.ArtifactStore):
+        def _client_for(self, region, endpoint):
+            built.append((region, endpoint))
+            return f"client:{region}:{endpoint}"
+
+    store = _Rec.__new__(_Rec)
+    store._bucket = "corpus"
+    store._path_style = False
+    store._access_key = store._secret_key = None
+    store._default_region = "us-east-1"
+    store._default_endpoint = "https://s3.us-east-1.amazonaws.com"
+    store._clients = {}
+    store._client = "default-client"
+
+    # same bucket -> the default client, untouched
+    assert store._resolve(None, None, None)[1] == "default-client"
+    assert store._resolve("corpus", None, None)[1] == "default-client"
+
+    # other bucket + explicit region, no endpoint -> region only, endpoint None
+    bucket, _ = store._resolve("models", "eu-west-2", None)
+    assert bucket == "models"
+    assert built[-1] == ("eu-west-2", None), built[-1]
+
+    # an EXPLICIT endpoint is still honoured (non-AWS S3 stays reachable)
+    store._resolve("models", "eu-west-2", "https://minio.local")
+    assert built[-1] == ("eu-west-2", "https://minio.local")
+
+    # no region override -> the defaults, endpoint included
+    store._resolve("models", None, None)
+    assert built[-1] == ("us-east-1", "https://s3.us-east-1.amazonaws.com")
+
+
 def test_split_s3_uri_rejects_malformed_input() -> None:
     assert mlops._split_s3_uri("s3://b/p/q") == ("b", "p/q")
     assert mlops._split_s3_uri("s3://b/p/") == ("b", "p")
@@ -564,6 +607,7 @@ TESTS = [
     test_push_registry_registers_the_merged_checkpoint_uri_when_a_merge_ran,
     test_merge_export_refuses_a_non_empty_destination_without_an_explicit_override,
     test_merge_export_requires_a_train_manifest_first,
+    test_cross_region_client_does_not_inherit_a_region_pinned_endpoint,
     test_split_s3_uri_rejects_malformed_input,
     test_stages_and_stage_functions_stay_in_sync,
     test_escalate_never_downgrades,

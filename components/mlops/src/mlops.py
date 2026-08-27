@@ -323,10 +323,22 @@ class ArtifactStore:
 
     def _resolve(self, bucket: Optional[str], region: Optional[str], endpoint: Optional[str]):
         """Every cross-bucket call goes through here, so "which client for
-        which bucket" is decided in exactly one place."""
+        which bucket" is decided in exactly one place.
+
+        An explicit region override must NOT inherit the default endpoint.
+        S3_ENDPOINT is region-pinned here (the chart derives
+        https://s3.<region>.amazonaws.com), so falling back to it while
+        overriding region_name builds a client aimed at eu-west-2 that
+        still dials the us-east-1 host - and AWS answers PermanentRedirect.
+        Region and endpoint travel together or not at all: when a caller
+        names a region and no endpoint, pass None and let boto3 derive the
+        regional endpoint itself.
+        """
         if bucket is None or bucket == self._bucket:
-            return self._bucket if bucket is None else bucket, self._client
-        return bucket, self._client_for(region or self._default_region, endpoint or self._default_endpoint)
+            return (self._bucket if bucket is None else bucket), self._client
+        if region:
+            return bucket, self._client_for(region, endpoint or None)
+        return bucket, self._client_for(self._default_region, endpoint or self._default_endpoint)
 
     def put_json(self, key: str, obj: Any) -> None:
         self._client.put_object(
