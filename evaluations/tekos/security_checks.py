@@ -168,11 +168,24 @@ def ai_gateway_local_only_forces_local_provider() -> CheckResult:
     if resp.status_code != 200:
         return CheckResult("ai_gateway_local_only_forces_local_provider", False, f"status={resp.status_code} body={resp.text[:200]}")
     provider = resp.json().get("zuno_provider")
-    # ADR-0412: two local providers exist (qwen + gpt-oss); the ADR-0035
-    # invariant is "a local provider answered", not the qwen name
-    # specifically (a preference or a fallback may pick the other one).
-    ok = provider in ("local", "local-gpt-oss")
-    return CheckResult("ai_gateway_local_only_forces_local_provider", ok, f"zuno_provider={provider}")
+    # ADR-0412: several local providers exist; the ADR-0035 invariant is
+    # "a local provider answered", not any particular name. Resolve the
+    # answering provider's `kind` from provider-routing.yaml instead of
+    # keeping a name allow-list here: this asserted
+    # provider in ("local", "local-gpt-oss") and broke when WP-076/ADR-0521
+    # added the MaaS-routed local entries (`local-maas`,
+    # `local-gpt-oss-maas`) and made local-maas the preferred one - a false
+    # failure, since a local provider had in fact answered. Same fix as
+    # run_scenarios.py's model_router_prefers_local. Do not re-hardcode names.
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    routing = yaml.safe_load((repo_root / "platform/ai-gateway/provider-routing.yaml").read_text())
+    kinds = {p["name"]: p.get("kind") for p in routing.get("providers", [])}
+    ok = kinds.get(provider) == "local"
+    return CheckResult(
+        "ai_gateway_local_only_forces_local_provider",
+        ok,
+        f"zuno_provider={provider} kind={kinds.get(provider)}",
+    )
 
 
 def entitlement_without_business_role_denied_confluence() -> CheckResult:
