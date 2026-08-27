@@ -314,8 +314,7 @@ Then, once deployed:
   `ON CONFLICT (source, chunk_index)` upsert make a relaunch idempotent, so
   the remainder is ~60,600 documents upserting over the rest.
 - 2026-08-27 (`788e8ea4`): `index-pgvector` now reconnects and replays.
-  Holding one Postgres connection for a 3-5h stage, through pgbouncer and
-  istio, against a cluster whose primary shows **12 restarts**, cannot
+  Holding one Postgres connection for a 3-5h stage cannot be assumed to
   survive; worse, the error handler's own `conn.rollback()` raised the same
   `OperationalError` and masked the original failure. The cursor moved inside
   the window loop, rollback/close are guarded, a fresh connection is opened
@@ -347,11 +346,41 @@ Then, once deployed:
   on the pre-fix image and its later stages take the rebuilt one - it is not
   evidence that any single build ran end-to-end. It also runs the `v0-6-0`
   spec, so `detect-changes` still has the oversized cpu:8/24Gi.
+- 2026-08-27: **correction - the 12:50 failure was misattributed here and in
+  `788e8ea4`'s message to restarting Postgres pods. It was not.** The pods'
+  `RESTARTS` column is a per-container sum, not database crashes: every
+  container of every instance shows exactly 2, including the init/sidecars,
+  and all three nodes went `Ready` within 11s of each other at 08:35Z - a
+  routine cluster restart. The `database` containers had been up continuously
+  since 08:47Z, and Patroni logged nothing but "I am the leader with the lock"
+  through the whole window, so there was no failover either. At 12:50 Postgres
+  had been up four hours.
+
+  The pgbouncer log has the real sequence: the pooled server connection hit
+  pgbouncer's default 3600s `server_lifetime` (`closing because: server
+  lifetime over (age=3611s)`), and the re-login immediately after failed with
+  `password authentication failed for user "ragsxalegacy"`. With no server
+  connection available, pgbouncer closed the client connection - which is the
+  `the connection is lost` the stage saw. This was the only `server lifetime
+  over` event of the day: every other client is recycled by the 600s idle
+  timeout long before an hour, so this ingestion is the only workload that
+  ever reaches it.
+
+  Behind it, `.data.password` on `zuno-postgresql-pguser-ragsxalegacy` is
+  claimed by two controllers - `postgrescluster-controller` (Apply, actively
+  re-applying) and `externalsecrets.external-secrets.io` (`refreshInterval:
+  1h`). **17 of 18 `pguser` secrets are in that state.** Investigating that
+  conflict is explicitly out of scope for this WP (operator's decision,
+  2026-08-27).
+
+  **What this means for the retry in `788e8ea4`:** it recovers a transient
+  drop, and nothing more. It cannot recover a stale credential, because the
+  password is read from the environment once at pod start and the replay
+  presents the same one. If a run dies here again with an auth failure in the
+  pgbouncer log, the fix is not in `rag_ingestion.py`.
 - Still open: compile `v0-7-0` (`make d2 install rag-ingestion`; verify the
   compiled object carries `cpu: 2`, never the play's exit code), then steps 7
-  and 8. Postgres's 12 restarts are **deliberately not diagnosed** - if a run
-  fails again on a lost connection despite the retry, that is the signal to go
-  after the restarts themselves.
+  and 8.
 - After the operator steps above land: flip this WP to `Done` and add a dated
   MEMORY.md bullet.
 

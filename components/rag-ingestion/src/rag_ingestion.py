@@ -1931,10 +1931,24 @@ def _rebuild_vector_index(conn, cur) -> None:
 
 # ADR-0525 follow-up (2026-08-27): this stage holds ONE connection for hours.
 # The 12:50 run died at 249,911/310,537 rows with
-# `psycopg.OperationalError: the connection is lost` - the pod talks to
-# PostgreSQL through pgbouncer and an istio sidecar, and the Postgres pods
-# were restarting. A multi-hour single connection cannot be assumed to
-# survive, so a lost one is recovered rather than fatal.
+# `psycopg.OperationalError: the connection is lost`. A multi-hour single
+# connection cannot be assumed to survive, so a lost one is recovered rather
+# than fatal.
+#
+# CORRECTION (same day): the first version of this comment blamed restarting
+# Postgres pods. That was wrong - the pods' restart counts are a per-container
+# sum from routine cluster restarts, and the database had been up 4h at 12:50.
+# The pgbouncer log shows the real sequence: the pooled server connection hit
+# pgbouncer's 3600s `server_lifetime`, and the re-login that follows failed
+# with `password authentication failed for user "ragsxalegacy"`. Nothing else
+# on the platform holds a connection an hour (everything else is recycled by
+# the 600s idle timeout), which is why only this stage ever sees it.
+#
+# So be clear about what this retry does and does not buy: it recovers a
+# genuinely transient drop. It CANNOT recover a credential that went stale,
+# because the password is read from the environment once at pod start and the
+# replay presents the same one. If a run dies here again with an auth failure
+# in the pgbouncer log, the fix is not in this file.
 _INDEX_DB_ATTEMPTS = 4
 _INDEX_DB_BACKOFF_SECONDS = 2.0
 
