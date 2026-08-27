@@ -1,6 +1,6 @@
 # WP-39: Dynamic LoRA adapter loading (promotes ADR-0303)
 
-- **State:** Repo work merged (2026-08-15); GPU verification pending.
+- **State:** Operator pending (2026-08-15 - repo work merged; GPU verification is the outstanding operator step).
   Step 0 promoted ADR-0303 verbatim. New
   `policies/model-routing/model-routing-policy.yaml` (per-agent/task
   `adapter:` declarations, `adapters: []` by default - WP-34's GPU

@@ -1,5 +1,7 @@
 # WP-22: Ingestion source adapters and cadences (completes ADR-0204; promotes ADR-0105)
 
+- **State:** Done (2026-08-26 - tech/legacy live cadence runs completed; the Salesforce and
+  Aramis clauses were superseded by ADR-0218 rather than delivered here).
 - **State (2026-08-26):** [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
   amended and enacted. Aramis is no longer merely untracked here: the
   `fetch-aramis` adapter and every trace of its wiring are removed from the

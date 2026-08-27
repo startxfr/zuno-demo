@@ -2,7 +2,7 @@
 
 > ADR-0201 retargeted to v0.5 (make the MaaS governance plane live and used by agents) on 2026-08-24 — see `docs/roadmap/versions.md`.
 
-- **State:** Done for the governance plane; agent-integration wiring deferred by scope
+- **State:** Done (2026-08-25 - the governance plane is live; agent-integration wiring deferred by scope
   decision, not by any remaining blocker (2026-08-25: **RESOLVED**, not upstream-blocked
   after all. The apparent identity mismatch — MaaS mandates adopting KServe's HTTPRoute,
   whose `publishers/...` identity never matched what maas-api/OPA/TokenRateLimitPolicy key

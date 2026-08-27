@@ -1,6 +1,6 @@
 # WP-42: Policy-driven autonomous optimization (promotes ADR-0309)
 
-- **State:** Repo work merged (2026-08-15); observed live autonomy cycle +
+- **State:** Operator pending (2026-08-15 - repo work merged); observed live autonomy cycle +
   user sign-off pending - **the roadmap's final WP; this closes the
   v0.1-v0.3 repo work.** Step 0 promoted ADR-0309 verbatim. New
   `policies/optimization/optimization-policy.yaml` + README: ships

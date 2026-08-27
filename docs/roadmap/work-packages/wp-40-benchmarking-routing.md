@@ -1,6 +1,6 @@
 # WP-40: Automated benchmarking and routing optimization (promotes ADR-0305 + ADR-0304)
 
-- **State:** Repo work merged (2026-08-15); live benchmark+report loop
+- **State:** Operator pending (2026-08-15 - repo work merged); live benchmark+report loop
   pending. Step 0 promoted both ADR-0305 and ADR-0304 verbatim.
   **Part A** (`evaluations/benchmark.py`): orchestrates an LM-Eval results
   read (`--lm-eval-results-file`, the primary/testable path - a local

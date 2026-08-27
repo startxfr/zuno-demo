@@ -53,7 +53,11 @@ Inherited unchanged from the
   confirmations move it to `Implemented`. ADRs with no operator dependency
   go straight to `Implemented` on merge.
 - **WP state machine:** `Not started → Repo work in review → Repo work
-  merged → Operator pending → Done`. `Done` requires the brief's
+  merged → Operator pending → Done`, plus three terminal states for work that
+  stops early: `Abandoned` (superseded by another decision), `Cancelled`
+  (deprioritized), `Closed — deferred` (blocked outside this repo). A WP that
+  merged code but was then superseded is `Abandoned`, and its brief must say
+  what landed - see WP-065/WP-066. `Done` requires the brief's
   Status-updates section executed (ADR body + index + tracker + brief +
   MEMORY.md) and `python3 platform/docs/check_docs.py` to pass.
 - **Immutability boundary:** only ADR `**Status:**` lines, dated
@@ -73,7 +77,9 @@ flip prescribed by each brief's Status-updates section.
 
 Update the **State** column as WPs progress; everything else is fixed at
 authoring time. States: `Not started | Repo work in review | Repo work
-merged | Operator pending | Done`.
+merged | Operator pending | Done | Abandoned | Cancelled | Closed — deferred`.
+`platform/docs/check_docs.py` enforces this vocabulary AND that each row's
+State matches its brief's own `- **State:**` line.
 
 ### Phase 1 — OKF v0.1: content excellence
 

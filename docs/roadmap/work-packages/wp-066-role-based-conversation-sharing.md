@@ -2,7 +2,13 @@
 
 > ADR-0213 retargeted to v0.7 (roadmap reprioritization, grouped with ADR-0105/ADR-0206) on 2026-08-26 — see `docs/roadmap/versions.md`.
 
-- **State:** Repo work merged (2026-08-21)
+- **State:** **Abandoned 2026-08-27** — superseded by ADR-0527/Phase 21 (WP-088/WP-089),
+  which moves sharing from the conversation to the project. Unlike a WP that was never
+  built, the repo work here DID merge on 2026-08-21 (f0b8d4a6: sharing, roles, write-lease,
+  `ShareDialog`) - but it was never switched on: the Keycloak trust boundary it needs was
+  deliberately left unprovisioned, so the feature fails closed with 503. Do not count on it.
+  The `zuno-admin-api` provisioning it was waiting for carries over to WP-088, which reuses
+  the same `GET /api/colleagues`.
 - **ADRs:** ADR-0213
 - **Depends on:** ADR-0212's conversation substrate (`conversations`,
   `conversation_stars`, `_resolve_run_id`) — already `Implemented`.
