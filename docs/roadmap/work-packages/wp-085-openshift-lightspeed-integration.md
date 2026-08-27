@@ -43,7 +43,21 @@ pas reprise. Corrigé dans le chart.
 
 La souscription `qwen36-27b-instruct-lightspeed` était `Active` et correcte depuis le début.
 
-**Bascule tentée le 2026-08-27, annulée.** Les deux noms corrigés, le rendu `maas` est juste — mais
+**Bascule réussie au second essai le 2026-08-27** — voir « Première tentative » ci-dessous pour
+ce qui avait bloqué. L'inférence passe désormais par MaaS :
+`POST https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1/chat/completions`
+→ **HTTP 200** dans les logs de l'app-server, sur une vraie requête. Clause 1 d'ADR-0524 satisfaite.
+
+Le risque que j'avais annoncé — OLS rejetant un nom de modèle contenant `/` — **ne s'est pas
+matérialisé** : `zuno-ai-run/qwen36-27b-instruct-maas` est accepté tel quel. Le vrai obstacle était
+ailleurs (la clé du credential), et il est levé par le pont
+`ansible/roles/lightspeed_config/tasks/satoken_credential.yml`.
+
+À noter pour ne pas se méprendre : une requête faite en `kube:admin` charge `0 tools from MCP
+server 'zuno-mcp'`. Ce n'est pas une régression mais le fail-closed attendu — `identityMode:
+perUser`, et `kube:admin` n'a aucune habilitation métier Zuno. À reconfirmer avec un persona réel.
+
+**Première tentative le 2026-08-27, annulée.** Les deux noms corrigés, le rendu `maas` est juste — mais
 un **troisième** défaut bloque, celui-là côté opérateur et déjà connu pour `staticToken` : OLS
 v1.1.2 ignore `credentialKey` et exige en dur la clé `apitoken`, alors que `saTokenSecret` produit
 un Secret dont la clé est `token`. L'app-server crashe au démarrage

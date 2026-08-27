@@ -3,14 +3,13 @@
 - **Status:** Implemented (live-verified 2026-08-27 on demo222 - operator + operands running,
   chat reachable by the `consultant`/`sales` personas, cluster introspection answering, Confluence
   knowledge retrieved through the existing MCP Gateway, and a Confluence write correctly refused).
-  **One clause is not yet met:** clause 1 routes inference through MaaS, and inference currently
-  goes direct to the KServe predictor. The cause recorded here on 2026-08-27 - "the MaaS control
-  plane no longer resolves subscriptions", scoped to WP-076/ADR-0521 - was **wrong**, and is
-  corrected the same day: the control plane is healthy (`ai-gateway`'s `local-maas` answered 200
-  throughout), and the 403 came from two swapped names in this repo's own `lightspeed-config`
-  chart - the LLMInferenceService name belongs in the URL path, the qualified MaaSModelRef in the
-  request body's `model`. Both fixed; see WP-085's "Contournement MaaS" section for the live A/B
-  that established it.
+  Clause 1 (inference through MaaS) was met on 2026-08-27 - a real query reached
+  `maas-default-gateway-istio` and returned HTTP 200. It had been bypassed for a day on a
+  diagnosis that turned out to be wrong: "the MaaS control plane no longer resolves
+  subscriptions", scoped to WP-076/ADR-0521. The control plane was healthy throughout
+  (`ai-gateway`'s `local-maas` answered 200 the whole time); the 403 came from two swapped names
+  in this repo's own `lightspeed-config` chart, and the flip then needed a credential bridge
+  because OLS v1.1.2 hardcodes the `apitoken` key. See WP-085 for the live A/B and both fixes.
 - **Target:** v0.4
 - **Date:** 2026-08-26
 - **Decision owners:** Zuno Demo architecture team
