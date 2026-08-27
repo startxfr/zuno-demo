@@ -84,7 +84,7 @@ olsConfig:
     # changer credential.mode fait echouer la synchro ArgoCD
     # (`Secret ... is invalid: type: Invalid`) tant que l'ancien Secret n'est
     # pas supprime a la main.
-    endpointMode: direct  # direct | maas
+    endpointMode: maas  # direct | maas
 
     # In-cluster MaaS gateway root. Same endpoint ai-gateway's maasAdapter
     # uses (MAAS_GATEWAY_ENDPOINT), path-scoped per model below.
@@ -216,7 +216,7 @@ credential:
   #   envoie litteralement "not-required" (app/providers.py).
   # saTokenSecret : token de ServiceAccount long, pour MaaS via TokenReview.
   # apiKey        : cle MaaS sk-oai-*, depuis Vault.
-  mode: staticToken  # staticToken | saTokenSecret | apiKey
+  mode: saTokenSecret  # staticToken | saTokenSecret | apiKey
   # Valeur placee dans la cle `apitoken` en mode staticToken. N'est jamais un
   # secret : le predictor l'ignore. Ne PAS reutiliser ce mode pour un endpoint
   # qui authentifie reellement.
