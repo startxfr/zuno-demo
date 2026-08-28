@@ -1,12 +1,59 @@
 # ADR-0527: Introduce the project as the sharing and context boundary
 
-- **Status:** Partially implemented (2026-08-27) - WP-088's repo work is merged: the `projects`/`project_grants`/`project_stars` schema with its guarded migration (unverifiable `conversations.project_id` values cleared and NOTICE'd before the foreign key is added, `conversation_memberships` dropped); `app/projects.py` (grant resolution, the last-admin guard, the entitlement-group refusal on both the write and the resolution side, cascade archival); `conversations.resolve_access` replacing ADR-0213's `get_role` as the single one-round-trip access check; `list_conversations` widened from an `owner_sub` filter to the two-block membership join; the project context injected at BOTH prompt sites (`reason_node` and `arkos_nodes`' `draft_node`) under its own token budget, with `project_classification` folded into ADR-0034's escalation; the `project_memberships` projection pushed inside the grant-mutation transaction before its commit, with a monotone `grants_revision` and a non-fatal startup reconciliation; eight project endpoints, ten OpenAPI schemas and `GET /api/groups` through agent-bff; and the frontend Go route/config wiring. 23 new automated tests plus two rewritten suites. Along the way it fixed the write lease never being renewed mid-stream (ADR-0213 specified it, no call existed) and ADR-0525's `007_ivfflat_lists.sql` never being published by `configmap-schema.yaml`. WP-089 completed the frontend on the same day: `ConversationRow.tsx` extracted from `ConversationList.tsx` as a no-op refactor first, so the two sidebar blocks render ADR-0515's row rather than two implementations that drift; `projects.ts`, `ProjectRow.tsx` and a two-tab `ProjectDialog.tsx` that stages every change locally and commits with one request; `ConversationList.tsx` restructured into the PROJECTS and CONVERSATIONS blocks with per-project fold state persisted locally; read-only conversation tabs that hide the composer entirely rather than disabling it; and `ShareDialog.tsx` deleted with ADR-0213's membership client. Residual gaps before `Implemented`: (1) the `zuno-admin-api` Keycloak confidential client is still unprovisioned (inherited from WP-066) and now also needs the `query-groups` realm-management role, so `GET /api/colleagues` and `GET /api/groups` both fail closed with 503 and no grant can be added through the UI at all; (2) the live two-persona pass covering this ADR's acceptance criteria. Note this component still has no frontend unit-test suite (the same gap ADR-0213's and ADR-0515's status lines record), so the React work is verified by `tsc --noEmit` and the live pass, not by automated tests.
+- **Status:** Partially implemented (2026-08-27) - WP-088's repo work is merged: the `projects`/`project_grants`/`project_stars` schema with its guarded migration (unverifiable `conversations.project_id` values cleared and NOTICE'd before the foreign key is added, `conversation_memberships` dropped); `app/projects.py` (grant resolution, the last-admin guard, the entitlement-group refusal on both the write and the resolution side, cascade archival); `conversations.resolve_access` replacing ADR-0213's `get_role` as the single one-round-trip access check; `list_conversations` widened from an `owner_sub` filter to the two-block membership join; the project context injected at BOTH prompt sites (`reason_node` and `arkos_nodes`' `draft_node`) under its own token budget, with `project_classification` folded into ADR-0034's escalation; the `project_memberships` projection pushed inside the grant-mutation transaction before its commit, with a monotone `grants_revision` and a non-fatal startup reconciliation; eight project endpoints, ten OpenAPI schemas and `GET /api/groups` through agent-bff; and the frontend Go route/config wiring. 23 new automated tests plus two rewritten suites. Along the way it fixed the write lease never being renewed mid-stream (ADR-0213 specified it, no call existed) and ADR-0525's `007_ivfflat_lists.sql` never being published by `configmap-schema.yaml`. WP-089 completed the frontend on the same day: `ConversationRow.tsx` extracted from `ConversationList.tsx` as a no-op refactor first, so the two sidebar blocks render ADR-0515's row rather than two implementations that drift; `projects.ts`, `ProjectRow.tsx` and a two-tab `ProjectDialog.tsx` that stages every change locally and commits with one request; `ConversationList.tsx` restructured into the PROJECTS and CONVERSATIONS blocks with per-project fold state persisted locally; read-only conversation tabs that hide the composer entirely rather than disabling it; and `ShareDialog.tsx` deleted with ADR-0213's membership client. Residual gap before `Implemented`, as of 2026-08-28: the live **two-persona** pass covering this ADR's acceptance criteria - sharing a project between two identities and checking each one's effective role - has still not been run. What HAS run is a single-persona pass (see the dated notes below): all four components rebuilt, `zuno-admin-api` provisioned by ADR-0530 so `GET /api/colleagues` and `GET /api/groups` answer 200, the backend exercised end to end, and the sidebar and dialog driven in a real browser. That pass found four defects in the seams between components, all fixed. Note this component still has no frontend unit-test suite (the same gap ADR-0213's and ADR-0515's status lines record), so the React work is verified by `tsc --noEmit` and the live pass, not by automated tests.
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0213](0213-introduce-role-based-conversation-sharing.md) in full — conversation-level sharing (`conversation_memberships`, the reader/actor/cloner vocabulary, the five per-conversation membership endpoints, `ShareDialog.tsx`) is replaced by project-level sharing, not merely re-scoped. ADR-0213's single-active-writer lease is the one clause that survives, restated below. Extends [ADR-0209](0209-introduce-project-scoped-agent-memory.md) (its `project_id` stops being client-asserted) and [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) (its conversation list stops being filtered on `owner_sub` alone).
 
 ## Dated progress notes
+
+### 2026-08-28 - the first real UI pass, and the two clause-9 regressions it found
+
+The user drove the rebuilt frontend and reported two things broken. Both were
+regressions from WP-089 (`e6e0a548`), and both were invisible to every check
+run before this point - `tsc --noEmit` passes on each of them, and this
+component still has no test suite.
+
+**The conversation history was empty, for everyone.** `ConversationList`
+selected the project-less block with `c.project_id === null`, but this ADR's
+own contract declares `project_id` as a plain `string` and documents the EMPTY
+STRING as "no project" - `openapi.json` says so, and the Go structs conform.
+Verified live: 48 of 48 rows arrive as `""`. So those rows matched neither
+sidebar block and rendered nowhere. This was never limited to newly created
+conversations, which is only where it gets noticed; a plain reload showed the
+same emptiness. The refresh path was never at fault and is untouched.
+
+Fixed by normalizing once at the fetch boundary rather than scattering
+truthiness checks, so the declared TypeScript type stops contradicting the
+wire and the three existing strict comparisons become correct without being
+edited.
+
+**Project creation was impossible.** Clause 3's last-admin guard was applied to
+the create path, where the draft seeds `role: "admin"` with `grants: []` - so
+the Create button was disabled from the moment the dialog opened, whatever was
+typed. A closed loop rather than an inconvenience: the creator cannot add
+themselves, because agent-bff's colleague search excludes the caller by design,
+so the only escape was to make somebody else admin first. The guard was also
+arguing with its own author - the code comment beside the seed already noted
+that the server merges the creator's admin grant regardless.
+
+Fixed by seeding that grant client-side instead of leaving the list empty. The
+guard is unchanged and now passes honestly, and the RBAC tab shows who will
+actually administer the project. This needed the caller's identity, which the
+server has always injected as `ChatConfig.subject` and which no TSX file had
+ever read.
+
+Verified in a real browser as `consultant-01` (Playwright, full OIDC login):
+the CONVERSATIONS block lists its rows, the Create button enables on a title,
+the RBAC tab shows the creator as Admin, and a project created from the dialog
+appears in the PROJECTS block and returns `role: "admin"` from
+`GET /api/projects`. No client-side errors. The test project was archived
+afterwards.
+
+Note for whoever runs the two-persona pass: the chat surface is served at
+`/<agent-name>`, not `/chat` - `/` is the portal catch-all and silently renders
+the portal instead, which looks like a broken app rather than a wrong URL.
 
 ### 2026-08-28 - rebuilt, and the backend verified against the live cluster
 
