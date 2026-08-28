@@ -1,0 +1,130 @@
+# Tool-calling probe set for WP-087's third gate half, scored by
+# evaluations/tool_calling_conformance.py.
+#
+# WHY THESE TWO TOOLS AND NO OTHERS. Only tools the MODEL chooses can
+# regress the way the `-wesh` variant did; a tool a graph node calls
+# deterministically is unaffected by the model's preference. Checked
+# against components/agent-runtime/app/graph/nodes.py: the only
+# model-facing schemas Comage ever receives are generate_image and
+# generate_diagram, both from check-deal-status (the one task declaring
+# image.generation.create / diagram.generation.create).
+#
+#   salesforce.opportunity.read   graph-driven via that task's
+#                                 live_read_tool - never offered to the model
+#   salesforce.opportunity.update
+#   list_drive_files / read_gmail
+#   web_search                    declared in task frontmatter but bound to
+#                                 nothing in the runtime - no schema, no
+#                                 live_read_tool. Out of scope here, and
+#                                 worth its own look.
+#
+# EVERY probe offers BOTH tools and runs under check-deal-status's own
+# system prompt, because the regression only appears under a real system
+# prompt: with no system message the variant still calls correctly, so a
+# prompt-free probe set would score it green and prove nothing.
+#
+# Baselines measured 2026-08-28 on the served workloads, same schemas:
+#   qwen3.5-9b       calls generate_image and generate_diagram correctly,
+#                    but on a no-tool question invented
+#                    "salesforce.opportunity.read" - a tool it was never
+#                    offered. The base model over-fires; scoring recall
+#                    alone would call it perfect.
+#   qwen3.5-9b-wesh  0 calls on all three, narrating each one
+#                    ("generate_image c'est le bail.").
+# That is why the scorer is two-sided.
+
+task: check-deal-status
+
+# Rendered into the request verbatim; names and required keys copied from
+# _GENERATE_IMAGE_TOOL_SCHEMA / _GENERATE_DIAGRAM_TOOL_SCHEMA so the probe
+# exercises what the runtime actually sends, not a paraphrase.
+offered_tools: [generate_image, generate_diagram]
+
+probes:
+  # --- an image is the right answer -------------------------------------
+  - id: img-01
+    expects_tool: generate_image
+    message: "Fais-moi un visuel marketing photorealiste d'une equipe commerciale qui fete une signature."
+  - id: img-02
+    expects_tool: generate_image
+    message: "J'ai besoin d'une illustration pour la page d'accueil de notre campagne : des clients souriants dans un bureau moderne."
+  - id: img-03
+    expects_tool: generate_image
+    message: "Genere une image promotionnelle pour le lancement de notre offre de printemps."
+  - id: img-04
+    expects_tool: generate_image
+    message: "Peux-tu me creer un mockup visuel de notre stand pour le salon ?"
+  - id: img-05
+    expects_tool: generate_image
+    message: "Il me faut une photo d'ambiance pour la newsletter commerciale de ce mois-ci."
+  - id: img-06
+    expects_tool: generate_image
+    message: "Dessine une scene realiste d'une poignee de main entre deux dirigeants apres un contrat."
+  - id: img-07
+    expects_tool: generate_image
+    message: "Fabrique-moi une illustration de couverture pour la plaquette commerciale."
+  - id: img-08
+    expects_tool: generate_image
+    message: "Produis un visuel publicitaire montrant notre produit utilise sur le terrain."
+
+  # --- a diagram is the right answer ------------------------------------
+  - id: dia-01
+    expects_tool: generate_diagram
+    message: "Dessine-moi le schema des etapes du cycle de vente, de la prise de contact a la signature."
+  - id: dia-02
+    expects_tool: generate_diagram
+    message: "Fais un diagramme de sequence entre le commercial, le client et le service juridique lors d'une signature."
+  - id: dia-03
+    expects_tool: generate_diagram
+    message: "Represente sous forme de schema les differents stades d'une opportunite Salesforce et leurs transitions."
+  - id: dia-04
+    expects_tool: generate_diagram
+    message: "Trace l'organigramme de notre processus de validation des remises commerciales."
+  - id: dia-05
+    expects_tool: generate_diagram
+    message: "Montre-moi un schema de flux du parcours d'un lead jusqu'a la facturation."
+  - id: dia-06
+    expects_tool: generate_diagram
+    message: "Fais un diagramme des dependances entre les etapes de qualification d'un deal."
+  - id: dia-07
+    expects_tool: generate_diagram
+    message: "Schematise l'enchainement des relances sur une opportunite qui stagne."
+
+  # --- neither tool applies ---------------------------------------------
+  # The half that catches a retrain overshooting into "always call".
+  - id: none-01
+    expects_tool: null
+    message: "Ou en est l'opportunite OPP-4821 ?"
+  - id: none-02
+    expects_tool: null
+    message: "Quels sont les deals qui closent ce trimestre ?"
+  - id: none-03
+    expects_tool: null
+    message: "Explique-moi comment se passe le suivi d'une opportunite chez nous."
+  - id: none-04
+    expects_tool: null
+    message: "Salut, tu vas bien ?"
+  - id: none-05
+    expects_tool: null
+    message: "Resume-moi la situation du compte Finage en deux phrases."
+  - id: none-06
+    expects_tool: null
+    message: "Quelle est la difference entre un lead et une opportunite ?"
+  - id: none-07
+    expects_tool: null
+    message: "Pourquoi ce deal est-il bloque depuis trois semaines ?"
+  - id: none-08
+    expects_tool: null
+    message: "Donne-moi trois arguments pour relancer un client qui ne repond plus."
+  - id: none-09
+    expects_tool: null
+    message: "Combien de temps dure en moyenne notre cycle de vente ?"
+  - id: none-10
+    expects_tool: null
+    message: "Qui est l'interlocuteur principal sur le dossier OPP-4821 ?"
+  - id: none-11
+    expects_tool: null
+    message: "Rappelle-moi ce qu'on avait convenu avec ce client la derniere fois."
+  - id: none-12
+    expects_tool: null
+    message: "Merci, c'est note."

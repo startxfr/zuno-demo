@@ -43,3 +43,35 @@ register_max_opening_marker_rate: 0.30
 # CEILING a naive more-markers-is-better scorer would reward exactly the
 # degenerate model rules 3 and 17 forbid.
 register_max_mean_density: 0.30
+
+# WP-087 third gate half: tool-calling conformance, read by
+# evaluations/tool_calling_conformance.py through the same
+# load_gate_config dict the two knob sets above come from.
+#
+# WHY IT EXISTS. The two halves above both passed on four consecutive runs
+# while the `-wesh` variant stopped calling tools entirely - it narrated
+# them instead ("generate_image c'est le bail."). Neither half looks at
+# tool calls, so neither could see it. The capability was never lost:
+# forced with tool_choice="required" the variant still emits a correct
+# call with correct arguments, so what regressed is the DECISION to call.
+#
+# TWO-SIDED ON PURPOSE. A retrain aimed at this defect can overshoot into
+# calling a tool on every turn, which is just as broken. The base model
+# already shows that failure mode: on a probe where neither offered tool
+# applied it invented "salesforce.opportunity.read", a tool it was never
+# given. Scoring recall alone would have called that perfect.
+#
+# Not calibrated against a reference corpus the way the register knobs
+# were - there is no such corpus for tool use. These are engineering
+# floors, set where a working model is comfortably clear and the observed
+# failure is unambiguously caught (variant: 0.0 call rate, 1.0 narration).
+# Revisit them once Phase 3 produces a second data point.
+tool_min_call_rate: 0.90
+tool_max_false_fire_rate: 0.10
+# The specific pathology, kept as its own ceiling rather than folded into
+# the call rate: "named the tool and then wrote a sentence" is a different
+# failure from "declined", and only one of them is this regression.
+tool_max_narration_rate: 0.10
+# A one-sided probe set makes both rates meaningless and is the easiest
+# way to end up with a scorer that always passes.
+tool_min_probes_per_side: 5
