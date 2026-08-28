@@ -6,6 +6,54 @@
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) (abandoned before implementation — see that record's Historical context/decision)
 
+## Dated progress notes
+
+### 2026-08-28 - prompt_examples was a field nobody filled, and the composer now reads it
+
+This ADR's status line says `zuno.prompt_examples` "is a real OKF task-schema
+field". True, and incomplete: the field was declared, parsed
+(`internal/okf/okf.go`), carried through `chatConfig`, and read by
+`Chat.tsx`'s "Create new chat" empty state - **and not one task in any of the
+eight agent bundles ever declared a single example.** The whole path rendered
+nothing for seven days. The pipe was laid and the tap never opened.
+
+47 examples now exist across the 21 tasks of the six agents that have real task
+sets. `cognos` and `soursage` are deliberately excluded: they are
+`zuno.status: placeholder` with no chat page, so starters for a conversation
+that cannot happen would be noise.
+
+The field gained a second consumer at the same time. The chat composer was
+reframed - one bordered block, message box above, actions below - and its "/"
+trigger opens a two-level menu (`chat/TaskPromptMenu.tsx`): this agent's tasks,
+each flying out its own examples. Choosing one fills the message box, unsent,
+and returns the caret so the text can be edited.
+
+**That menu does not select a task, and must not be read as doing so.**
+agent-runtime accepts no task in the request; the chat route always executes
+`primary_task` (ADR-0342). It is a writing aid. Turning it into a real task
+selector would need a field through the frontend->BFF->runtime contract, graph
+and `allowed_tools` selection in the runtime, and a per-task authorization
+decision - its own ADR and WP, not a UI change.
+
+Two consequences worth recording for whoever edits an agent bundle next:
+
+- Editing any `agents/**` bundle invalidates its signature. agent-runtime runs
+  with `ZUNO_REQUIRE_SIGNED_BUNDLES=true`, so its next pod crash-loops on
+  `failed to load OKF bundles`. `make d3 sign agents` is necessary but **not
+  sufficient**: it writes to Vault, while the pod mounts a Secret fed by an
+  ExternalSecret on a one-hour `refreshInterval`. Until that syncs, the pod
+  keeps failing behind a playbook that reported success. Force it with
+  `oc annotate externalsecret agent-runtime-okf-signatures -n zuno-ai-run
+  force-sync="$(date +%s)" --overwrite`, then let the CrashLoopBackOff retry -
+  kubelet refreshes mounted Secrets, so no pod delete is needed.
+- Agent replies now render as Markdown (`chat/Markdown.tsx`, react-markdown +
+  remark-gfm). Raw HTML in a reply is inert by design and `rehype-raw` must not
+  be added: the text is LLM-written with the RAG corpus in context, so an
+  injected `<img onerror=...>` in an ingested document would otherwise reach
+  this page.
+
+Live-confirmed by the operator on 2026-08-28.
+
 ## Context
 
 ADR-0505 tied in-app tab identity to *task*: one tab per `zuno.tasks`
