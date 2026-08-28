@@ -16,6 +16,24 @@ zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"
 # ansible/roles/vault/tasks/install.yml, so an operator can set
 # zuno_admin_mainpwd once (ansible/confidential.yml) and get known
 # credentials everywhere instead of the role's random fallback.
+#
+# "everywhere" is narrower than it reads, and deliberately so. Only the four
+# overrides below are wired: zunoapp, keycloak (Keycloak's own admin), the
+# keycloak PostgreSQL role, and ragtech. The other 14 PostgreSQL roles listed
+# in ansible/roles/postgresql/defaults/main.yml (aapgateway, aapcontroller,
+# aapeda, aaphub, maas, ogxserver, ragadv, ragproject, ragsales, ragsxalegacy,
+# agentcheckpoints, agentconversations, metricsservice, msawxreadonly) have no
+# override here and keep the role's per-path
+# `lookup('ansible.builtin.password', '/dev/null', ...)`, so each gets its own
+# distinct random password.
+#
+# The accepted consequence: zunoapp, keycloak and ragtech share ONE password on
+# the live cluster (verified 2026-08-28 - 16 distinct password digests across 18
+# pguser Secrets), so a leak of zuno_admin_password yields all three at once.
+# That is a demo-convenience trade, not an oversight, and no ADR forbids it -
+# do not "fix" it by rotating one of the three in isolation. Under ADR-0529's
+# creationPolicy: Merge a new Vault value no longer reaches the database on its
+# own; rotation now requires that ADR's explicit runbook.
 zuno_admin_vault_token: "{{ zuno_admin_token }}"
 zuno_admin_postgresql_root_password: "{{ zuno_admin_password }}"
 zuno_admin_keycloak_root_password: "{{ zuno_admin_password }}"

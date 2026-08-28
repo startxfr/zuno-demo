@@ -724,16 +724,18 @@ class _FakeValidateCursor:
     def execute(self, _sql, params=None, *_a, **_kw):
         # WP-084: validate now asks one grouped question per batch of sources
         # instead of one round-trip per URL, so the double has to remember
-        # which window it was asked about.
-        self._window = list(params[0]) if params else []
+        # which window it was asked about. Since the 2026-08-28 freshness
+        # predicate the params are (run_watermark, window), not (window,).
+        self._window = list(params[1]) if params else []
 
     def fetchone(self):
         return (1, 0)  # total=1, missing_embedding=0 - the DB-side check always "passes"
 
     def fetchall(self):
         # Every requested source indexed exactly one row, none missing an
-        # embedding - the DB-side check still always "passes".
-        return [(url, 1, 0) for url in self._window]
+        # embedding, none predating this run - the DB-side check still always
+        # "passes".
+        return [(url, 1, 0, 0) for url in self._window]
 
     def __enter__(self):
         return self
@@ -791,6 +793,65 @@ def test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement():
     store = _validate_store_with({"domain": "knowledge.sxa-legacy"})  # missing all three, exempt
     with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_FakeValidateConn()):
         stage_validate(config, store)  # must not raise
+
+
+def test_stage_validate_warns_on_rows_older_than_the_changeset():
+    """WP-084 follow-up (2026-08-28): validate checked PRESENCE, never
+    FRESHNESS. When the 8tvbn run lost an embed batch to a 503, the 63 affected
+    documents still carried non-null rows from the PREVIOUS run, so validate
+    reported "all touched documents indexed successfully".
+
+    The stale count must now be reported - and deliberately must NOT fail the
+    stage, nor stop the manifest from advancing. If that trade is ever revisited
+    this test is the one to flip."""
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy")
+    store = _validate_store_with({"domain": "knowledge.sxa-legacy"})
+    store.json["manifests/changeset.json"]["generated_at"] = "2026-08-28T00:00:00Z"
+
+    class _StaleCursor(_FakeValidateCursor):
+        def fetchall(self):
+            # One row per source, embedded, but written before this run started.
+            return [(url, 1, 0, 1) for url in self._window]
+
+    class _Conn(_FakeValidateConn):
+        def cursor(self):
+            return _StaleCursor()
+
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_Conn()), \
+            mock.patch.object(rag_ingestion.logger, "warning") as warned:
+        stage_validate(config, store)  # must NOT raise
+
+    messages = " ".join(str(c.args) for c in warned.call_args_list)
+    assert "predate this run" in messages, messages
+    assert "will NOT be reprocessed" in messages, messages
+    # The trade being made explicit: the manifest still advances.
+    assert "manifests/manifest.json" in store.json
+
+
+def test_stage_validate_passes_the_changeset_watermark_to_the_freshness_check():
+    """The watermark must be the changeset's own generated_at - detect-changes
+    stamps it before any stage writes a row, so it is the only boundary that
+    needs no extra state. A wrong or missing value would silently make the
+    freshness predicate always-false."""
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy")
+    store = _validate_store_with({"domain": "knowledge.sxa-legacy"})
+    store.json["manifests/changeset.json"]["generated_at"] = "2026-08-28T00:00:00Z"
+    seen_params = []
+
+    class _CapturingCursor(_FakeValidateCursor):
+        def execute(self, sql, params=None, *a, **kw):
+            seen_params.append(params)
+            return super().execute(sql, params, *a, **kw)
+
+    class _Conn(_FakeValidateConn):
+        def cursor(self):
+            return _CapturingCursor()
+
+    with mock.patch.object(rag_ingestion, "_pg_connect", return_value=_Conn()):
+        stage_validate(config, store)
+
+    assert seen_params, "validate issued no database statement"
+    assert seen_params[0][0] == "2026-08-28T00:00:00Z", seen_params[0][0]
 
 
 def test_stage_validate_advances_manifest_only_after_confirming_indexed_rows():
@@ -934,23 +995,27 @@ def test_embed_pools_single_chunk_documents_into_full_batches():
 
 
 def test_embed_writes_back_every_document_and_survives_a_failed_batch():
-    """A failed batch must not abort the stage or lose the other documents -
-    the chunks it covered simply stay unembedded for stage_validate to catch."""
+    """A permanently failing batch must not abort the stage or lose the other
+    documents - the chunks it covered simply stay unembedded.
+
+    The failure is keyed on batch CONTENT, not on a call counter: since the
+    2026-08-28 retry the same batch is attempted _EMBED_ATTEMPTS times, so a
+    counter-based double would succeed on the retry and stop exercising the
+    give-up path this test exists for."""
     doc_ids = [f"d{i}" for i in range(6)]
     config = _config(
         INGESTION_DOMAIN="knowledge.sxa-legacy", EMBEDDING_BATCH_SIZE="2",
         EMBED_CONCURRENCY="1", EMBEDDING_DIMENSIONS="3",
     )
     store = _single_chunk_store(doc_ids)
-    calls = {"n": 0}
 
     def flaky_embed_batch(texts, cfg):
-        calls["n"] += 1
-        if calls["n"] == 2:
+        if any("d2" in text or "d3" in text for text in texts):
             raise rag_ingestion.requests.RequestException("predictor 503")
         return [[0.1, 0.2, 0.3] for _ in texts]
 
-    with mock.patch.object(rag_ingestion, "_embed_batch", flaky_embed_batch):
+    with mock.patch.object(rag_ingestion, "_embed_batch", flaky_embed_batch), \
+            mock.patch.object(rag_ingestion.time, "sleep"):
         stage_embed(config, store)
 
     embedded = [
@@ -960,6 +1025,64 @@ def test_embed_writes_back_every_document_and_survives_a_failed_batch():
     # Every record is still written back; only the failed batch's two are bare.
     assert len(embedded) == 4, embedded
     assert all(f"normalized/{d}.chunks.json" in store.json for d in doc_ids)
+
+
+def test_embed_retries_a_transient_request_failure_then_succeeds():
+    """WP-084 follow-up (2026-08-28): a single ~1s 503 from the predictor cost
+    the 8tvbn run 64 chunks across 63 documents, because a failed batch was
+    abandoned outright. A transient failure must now be retried, and the chunks
+    must end up embedded like any other."""
+    doc_ids = ["d0", "d1"]
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa-legacy", EMBEDDING_BATCH_SIZE="2",
+        EMBED_CONCURRENCY="1", EMBEDDING_DIMENSIONS="3",
+    )
+    store = _single_chunk_store(doc_ids)
+    calls = {"n": 0}
+
+    def transiently_flaky(texts, cfg):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise rag_ingestion.requests.RequestException("predictor 503")
+        return [[0.1, 0.2, 0.3] for _ in texts]
+
+    with mock.patch.object(rag_ingestion, "_embed_batch", transiently_flaky), \
+            mock.patch.object(rag_ingestion.time, "sleep") as slept:
+        stage_embed(config, store)
+
+    assert calls["n"] == 3, f"expected two retries then success, got {calls['n']} calls"
+    for doc_id in doc_ids:
+        chunk = store.json[f"normalized/{doc_id}.chunks.json"]["chunks"][0]
+        assert "embedding" in chunk, f"{doc_id} was not embedded after the retry"
+    # Linear backoff, like the lost-connection recovery in index-pgvector.
+    assert [c.args[0] for c in slept.call_args_list] == [
+        rag_ingestion._EMBED_BACKOFF_SECONDS * 1,
+        rag_ingestion._EMBED_BACKOFF_SECONDS * 2,
+    ]
+
+
+def test_embed_gives_up_after_the_attempt_budget():
+    """The retry must stay bounded: a predictor that is down for good has to
+    cost exactly _EMBED_ATTEMPTS calls and then leave the chunks unembedded,
+    never abort the stage and never loop."""
+    config = _config(
+        INGESTION_DOMAIN="knowledge.sxa-legacy", EMBEDDING_BATCH_SIZE="2",
+        EMBED_CONCURRENCY="1", EMBEDDING_DIMENSIONS="3",
+    )
+    store = _single_chunk_store(["d0"])
+    calls = {"n": 0}
+
+    def always_down(texts, cfg):
+        calls["n"] += 1
+        raise rag_ingestion.requests.RequestException("predictor 503")
+
+    with mock.patch.object(rag_ingestion, "_embed_batch", always_down), \
+            mock.patch.object(rag_ingestion.time, "sleep"):
+        stage_embed(config, store)  # must not raise
+
+    assert calls["n"] == rag_ingestion._EMBED_ATTEMPTS, calls["n"]
+    chunk = store.json["normalized/d0.chunks.json"]["chunks"][0]
+    assert "embedding" not in chunk, "a permanently failed batch must stay unembedded"
 
 
 def test_embed_still_batches_within_a_long_multi_chunk_document():

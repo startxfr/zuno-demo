@@ -1746,6 +1746,14 @@ def stage_chunk(config: IngestionConfig, store: CorpusStore) -> None:
 # --------------------------------------------------------------------------
 
 
+# Mirrors _INDEX_DB_ATTEMPTS/_INDEX_DB_BACKOFF_SECONDS, deliberately as module
+# constants rather than IngestionConfig fields: a new config field would have to
+# be added to CONFIG_KEYS in gitops/charts/rag-ingestion/files/pipeline.py.tpl
+# and the PipelineVersion recompiled, where this only needs an image rebuild.
+_EMBED_ATTEMPTS = 4
+_EMBED_BACKOFF_SECONDS = 2.0
+
+
 def _embed_batch(texts: list, config: IngestionConfig) -> list:
     """Same request/response contract as components/rag-service/app/embeddings.py
     (OpenAI-compatible /v1/embeddings) - both sides must agree on this shape."""
@@ -1801,15 +1809,35 @@ def stage_embed(config: IngestionConfig, store: CorpusStore) -> None:
     embedded_chunks = 0
 
     def _embed_one_batch(batch):
-        """batch is a list of (record, chunk). Returns (batch, vectors|None)."""
-        try:
-            return batch, _embed_batch([chunk["text"] for _, chunk in batch], config)
-        except requests.RequestException as exc:
-            logger.error(
-                "embed: request failed for %d chunk(s) starting at %s chunk %d: %s",
-                len(batch), batch[0][0]["url"], batch[0][1]["chunk_index"], exc,
-            )
-            return batch, None
+        """batch is a list of (record, chunk). Returns (batch, vectors|None).
+
+        WP-084 follow-up (2026-08-28): a single ~1s 503 from the predictor cost
+        this stage 64 chunks across 63 documents, with no retry at all. Retrying
+        is safe because _embed_batch has no side effect - it POSTs and returns
+        vectors - so a replayed batch is indistinguishable from a first attempt.
+        Same bounded-attempts-with-linear-backoff shape as the lost-connection
+        recovery in _upsert_window_with_reconnect below.
+        """
+        for attempt in range(1, _EMBED_ATTEMPTS + 1):
+            try:
+                return batch, _embed_batch([chunk["text"] for _, chunk in batch], config)
+            except requests.RequestException as exc:
+                if attempt == _EMBED_ATTEMPTS:
+                    logger.error(
+                        "embed: request failed for %d chunk(s) starting at %s chunk %d "
+                        "after %d attempts: %s",
+                        len(batch), batch[0][0]["url"], batch[0][1]["chunk_index"],
+                        _EMBED_ATTEMPTS, exc,
+                    )
+                    return batch, None
+                logger.warning(
+                    "embed: request failed for %d chunk(s) starting at %s chunk %d "
+                    "(%s) - retrying, attempt %d/%d",
+                    len(batch), batch[0][0]["url"], batch[0][1]["chunk_index"],
+                    exc, attempt, _EMBED_ATTEMPTS,
+                )
+                time.sleep(_EMBED_BACKOFF_SECONDS * attempt)
+        raise AssertionError("unreachable")  # pragma: no cover
 
     with ThreadPoolExecutor(max_workers=max(1, config.index_read_concurrency)) as io_pool, \
             ThreadPoolExecutor(max_workers=workers) as embed_pool:
@@ -2218,43 +2246,93 @@ def stage_validate(config: IngestionConfig, store: CorpusStore) -> None:
 
     conn = _pg_connect(config)
     failures = list(freshness_failures)
+    # Rows that exist but predate this run - reported, never fatal. See the
+    # long comment below the query for why this is a warning and not a failure.
+    stale_warnings = []
+    # stage_detect_changes stamps this at the very start of the run, so any row
+    # older than it cannot have been written by this run. No new state needed.
+    run_watermark = changeset.get("generated_at")
     try:
         # WP-084 (2026-08-27): this was one round-trip per URL - another
         # 310,524 serial operations, on a single connection. One grouped
         # query per batch answers the same question: a source absent from
         # the result indexed no rows at all.
+        #
+        # WP-084 follow-up (2026-08-28): the query checked PRESENCE, never
+        # FRESHNESS, and that is a real blind spot. When a run loses an embed
+        # batch (one 503 cost 64 chunks on 2026-08-28), the affected documents
+        # still carry rows from a PREVIOUS run - non-null, fully indexed - so
+        # this stage reported "all touched documents indexed successfully" and
+        # advanced the manifest over documents it had not actually reindexed.
+        # On a virgin corpus the gap shows up as "no rows indexed"; on a
+        # populated one the stale rows mask it completely.
+        #
+        # The stale count is deliberately a WARNING, not a failure: it makes an
+        # invisible problem visible without failing a 4-hour run on a condition
+        # the pipeline has tolerated all along. Note what that does NOT buy -
+        # the manifest still advances, so the affected documents are still not
+        # reprocessed on the next run. Promoting this to a hard failure is a
+        # one-line change (append to `failures` instead of `stale_warnings`)
+        # if operations later decides the interruption is worth it.
+        #
+        # No false positives are possible: _INDEX_UPSERT_SQL sets
+        # `updated_at = now()` unconditionally on ON CONFLICT, so every row this
+        # run touched - changed content or not - carries a fresh timestamp.
         urls = sorted(touched_urls)
         batch = 10000
         with conn.cursor() as cur:
             for start in range(0, len(urls), batch):
                 window = urls[start:start + batch]
                 cur.execute(
-                    "SELECT source, count(*), count(*) FILTER (WHERE embedding IS NULL) "
+                    "SELECT source, count(*), count(*) FILTER (WHERE embedding IS NULL), "
+                    "count(*) FILTER (WHERE updated_at < %s) "
                     "FROM document_embeddings WHERE source = ANY(%s) GROUP BY source",
-                    (window,),
+                    (run_watermark, window),
                 )
                 seen = {}
-                for source, total, missing_embedding in cur.fetchall():
-                    seen[source] = (total, missing_embedding)
+                for source, total, missing_embedding, stale in cur.fetchall():
+                    seen[source] = (total, missing_embedding, stale)
                 for url in window:
                     row = seen.get(url)
                     if row is None:
                         failures.append(f"{url}: no rows indexed")
-                    elif row[1]:
+                        continue
+                    if row[1]:
                         failures.append(f"{url}: {row[1]}/{row[0]} chunk(s) missing an embedding")
+                    if row[2]:
+                        stale_warnings.append(
+                            f"{url}: {row[2]}/{row[0]} row(s) predate this run "
+                            f"({run_watermark}) - not rewritten by this run"
+                        )
     finally:
         conn.close()
 
+    # Emitted before the summary so the detail is adjacent to the count, and
+    # before the failure check so it is never swallowed by a SystemExit.
+    for warning in stale_warnings:
+        logger.warning("validate: %s", warning)
+
     logger.info(
-        "validate: checked %d documents (%d new, %d changed, %d deleted, %d unchanged)",
+        "validate: checked %d documents (%d new, %d changed, %d deleted, %d unchanged, "
+        "%d with stale rows)",
         len(touched_urls), len(changeset["new"]), len(changeset["changed"]),
         len(changeset.get("deleted", [])), len(changeset.get("unchanged", [])),
+        len(stale_warnings),
     )
     if failures:
         for failure in failures:
             logger.error("validate: %s", failure)
         raise SystemExit(f"validate: {len(failures)} document(s) failed validation")
-    logger.info("validate: all touched documents indexed successfully")
+    if stale_warnings:
+        # Deliberately still a success: see the query comment above.
+        logger.warning(
+            "validate: all touched documents have indexed rows, but %d document(s) "
+            "carry rows this run did not rewrite - the manifest still advances, so "
+            "they will NOT be reprocessed on the next run",
+            len(stale_warnings),
+        )
+    else:
+        logger.info("validate: all touched documents indexed successfully")
 
     # Only now - after every new/changed document has been confirmed to
     # actually have indexed rows above - is it safe to advance manifest.json
