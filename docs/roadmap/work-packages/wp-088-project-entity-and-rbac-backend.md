@@ -1,6 +1,6 @@
 # WP-088: The project entity, its RBAC and its context (promotes ADR-0527)
 
-- **State:** Repo work merged (2026-08-27)
+- **State:** Done (2026-08-28) - rebuilt, deployed and live-verified end to end
 - **ADRs:** ADR-0527 (Proposed -> Partially implemented after this WP; Implemented after WP-089's UI lands and a live two-persona pass runs)
 - **Depends on:** ADR-0212's conversation substrate and ADR-0515/WP-061's list structure (both Implemented). Supersedes WP-066, whose merged code this WP removes.
 - **Blocks:** WP-089 (needs these endpoints and the widened `Conversation` shape), WP-090 (needs `projects.salesforce_*` and the server-resolved `project_id` on graph state)

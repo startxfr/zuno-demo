@@ -6,6 +6,43 @@
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0213](0213-introduce-role-based-conversation-sharing.md) in full — conversation-level sharing (`conversation_memberships`, the reader/actor/cloner vocabulary, the five per-conversation membership endpoints, `ShareDialog.tsx`) is replaced by project-level sharing, not merely re-scoped. ADR-0213's single-active-writer lease is the one clause that survives, restated below. Extends [ADR-0209](0209-introduce-project-scoped-agent-memory.md) (its `project_id` stops being client-asserted) and [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) (its conversation list stops being filtered on `owner_sub` alone).
 
+## Dated progress notes
+
+### 2026-08-28 - rebuilt, and the backend verified against the live cluster
+
+All four components were rebuilt and rolled (agent-runtime, agent-bff,
+agent-frontend, rag-service). `zuno-admin-api` is provisioned by ADR-0530, so
+residual gap (1) is closed: `GET /api/colleagues` and `GET /api/groups` both
+answer 200.
+
+The backend was then exercised end to end as a real persona rather than
+inspected: create, list, read, archive, and the list back to empty. Two
+defects surfaced that no test had, because both live only in the seams
+between components.
+
+**`POST /api/projects` rejected every request it was ever given.** agent-bff's
+outbound structs lacked `omitempty`, so Go's zero values arrived as `""` -
+which Pydantic reads as present-and-invalid, not absent. `classification: ""`
+failed the `Literal["C1","C2","C3"]`, and `group_name: ""` failed
+`min_length=1` on every grant naming a user. The contract tests could not have
+caught it: they compare field *names* against the OpenAPI document, and
+`omitempty` is not a field name.
+
+**Archiving a project revoked nothing.** rag-service authorizes
+`knowledge.project` purely on a `project_memberships` row existing; it has no
+notion of `archived_at` and cannot have one, since it does not own the
+`projects` table. `archive_project_cascade` never pushed the projection, and
+`reconcile_projections` *skipped* archived projects rather than clearing them -
+so an archived project's memory stayed readable to every former member, and no
+restart repaired it. Clause 7's intent was never in doubt; the reconciliation's
+own `archived_at IS NULL` filter says so. Both paths are fixed, and the
+startup reconciliation is what healed the rows already in the database - it
+cleared three of them on the next boot, live.
+
+Residual gap: the two-persona UI pass has still not been run. Everything
+above is backend behaviour verified through agent-bff with a real Keycloak
+persona token; nobody has driven the sidebar and dialog in a browser.
+
 ## Context
 
 Three unrelated notions of "project" exist in this repository today and none of
