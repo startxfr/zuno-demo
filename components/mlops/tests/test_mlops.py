@@ -761,13 +761,35 @@ def test_cublas_workspace_is_configured_at_import_time():
     assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8", os.environ.get("CUBLAS_WORKSPACE_CONFIG")
 
 
-def test_deterministic_training_pins_every_source_of_run_to_run_drift():
+class _FakeTransformers:
+    """transformers is never installed for this suite - only set_seed is
+    needed, and only to observe that it is called."""
+
+    def __init__(self):
+        self.seeds = []
+
+    def set_seed(self, seed):
+        self.seeds.append(seed)
+
+
+def _run_determinism(config):
     torch = _FakeTorch()
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
+    transformers = _FakeTransformers()
+    with mock.patch.dict(sys.modules, {"transformers": transformers}):
+        mlops._enable_deterministic_training(torch, config)
+    return torch, transformers
 
-    mlops._enable_deterministic_training(torch, _config())
 
+def test_deterministic_training_pins_every_source_of_run_to_run_drift():
+    torch, transformers = _run_determinism(_config())
+
+    # The RNG seed is the part the first attempt at this MISSED: without
+    # it the CUDA flags are set, the log says determinism is on, and the
+    # adapter still differs between two runs because get_peft_model drew
+    # lora_A's init from an unseeded RNG.
+    assert transformers.seeds == [42], transformers.seeds
     # warn_only would defeat the purpose: the run would look reproducible
     # and would not be.
     assert torch.deterministic_calls == [True], torch.deterministic_calls
@@ -775,14 +797,26 @@ def test_deterministic_training_pins_every_source_of_run_to_run_drift():
     assert torch.backends.cudnn.benchmark is False
 
 
+def test_the_rng_is_seeded_before_anything_can_consume_randomness():
+    # An ordering regression is invisible to any behavioural test here -
+    # _run_lora_training imports torch/peft, which this suite never has.
+    # It is not hypothetical: seeding after get_peft_model is exactly the
+    # bug that made two "deterministic" runs produce different adapters.
+    src = (pathlib.Path(__file__).resolve().parent.parent / "src" / "mlops.py").read_text()
+    seeded = src.index("_enable_deterministic_training(torch, config)")
+    lora_init = src.index("model = get_peft_model(model, lora_config)")
+    trainer = src.index("trainer = Trainer(")
+    assert seeded < lora_init, "the RNG is seeded after LoRA initialisation - adapters will differ between runs"
+    assert lora_init < trainer, "unexpected ordering: LoRA init should precede Trainer construction"
+
+
 def test_determinism_can_be_disabled_but_only_explicitly():
-    torch = _FakeTorch()
     config = _config()
     object.__setattr__(config, "deterministic", False)
-
-    mlops._enable_deterministic_training(torch, config)
+    torch, transformers = _run_determinism(config)
 
     assert torch.deterministic_calls == [], torch.deterministic_calls
+    assert transformers.seeds == [], transformers.seeds
 
 
 def test_the_seed_reaches_training_arguments_explicitly():
@@ -801,6 +835,7 @@ TESTS = [
     # WP-087 / ADR-0526
     test_cublas_workspace_is_configured_at_import_time,
     test_deterministic_training_pins_every_source_of_run_to_run_drift,
+    test_the_rng_is_seeded_before_anything_can_consume_randomness,
     test_determinism_can_be_disabled_but_only_explicitly,
     test_the_seed_reaches_training_arguments_explicitly,
     test_parse_tool_calls_reads_the_qwen_XML_block_not_json,

@@ -118,6 +118,18 @@ def _enable_deterministic_training(torch, config: "MlopsConfig") -> None:
     Deliberately NOT warn_only=True: a warning here would restore exactly
     the failure mode this closes, a run that looks reproducible and is
     not.
+
+    Seeding here rather than relying on TrainingArguments(seed=...) is the
+    load-bearing part, and it is the reason the first attempt at this
+    failed. Trainer calls set_seed() in its OWN __init__ - which runs
+    AFTER get_peft_model() has already drawn lora_A's initialisation from
+    the ambient RNG. A perfectly deterministic training run that starts
+    from a random initialisation still produces a different adapter every
+    time; measured on two runs with a byte-identical dataset, the
+    adapters differed (sha256 9f6c8779... vs 175f5c00...) while the log
+    said determinism was on. Everything that consumes randomness must be
+    downstream of this call, so it stays at the very top of the training
+    path.
     """
     if not config.deterministic:
         logger.warning(
@@ -125,6 +137,10 @@ def _enable_deterministic_training(torch, config: "MlopsConfig") -> None:
             "of this config will not be comparable"
         )
         return
+
+    from transformers import set_seed
+
+    set_seed(config.seed)
 
     if os.environ.get("CUBLAS_WORKSPACE_CONFIG") != _CUBLAS_DETERMINISTIC_WORKSPACE:
         logger.warning(
