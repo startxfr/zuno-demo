@@ -1,6 +1,6 @@
 # ADR-0526: Fine-tune and serve a French urban-register model variant (`-wesh`)
 
-- **Status:** Repo work merged (2026-08-27) - all nine decisions implemented in the repository; no pipeline run, no promotion PR and no live routing verification yet
+- **Status:** Partially implemented (2026-08-28) - the pipeline runs end to end and a run reached `overall: PASS` on BOTH gate halves; the merged bf16 checkpoint serves as `qwen3.5-9b-wesh` on a different node from its base, each listing its own three ids on `/v1/models`, and a live Comage turn was answered by the variant (traced through the MaaS route). Two acceptance criteria are NOT met: no run has ever completed `push-registry`, so no model version is registered; and the fallback behaviours (Comage when the variant is unavailable, Tekos on either path) are untested. Whether the target register survives on a substantive answer is also unproven - the register gate scores held-out completions offline and passed four consecutive runs, but every live probe so far drew a context-refusal
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team
