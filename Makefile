@@ -132,7 +132,7 @@ help:
 	  '' \
 	  '  make day3|d3 test [component]        Check availability only (ADR-0057)' \
 	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
-	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after any agent.okf.md change' \
+	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after ANY change under agents/<name>/' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
@@ -437,6 +437,7 @@ if [[ -z "$$verb" ]]; then \
     '  restore      Restore from the most recent backup (fails if none exists)' \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
     '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
+    '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
     '' \
     'Components (test/stresstest/check; optional, default: all):' \
     '  $(DAY3_TEST_COMPONENTS)' \
@@ -459,7 +460,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
-    'Example: make d3 sign agents   # after regenerating any agents/*/agent.okf.md'; \
+    'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \

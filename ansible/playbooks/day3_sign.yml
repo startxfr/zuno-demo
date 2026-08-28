@@ -22,6 +22,18 @@
 # exactly one meaning: the image predates your checkout's bundles. Saying
 # so plainly is the whole point - that is the diagnosis this verb exists
 # to make cheap.
+#
+# Signing alone does not fix a running cluster, and for a long time this
+# verb stopped there. The Job writes to Vault KV, but agent-runtime reads
+# its signatures from the agent-runtime-okf-signatures Secret, which an
+# ExternalSecret refreshes only once an hour - so the verb could report a
+# green run while every agent-runtime pod kept crash-looping on the old
+# signatures. Live-confirmed 2026-08-28: commit c1fdc501 edited 21
+# agents/<agent>/tasks/*.md files - the signed digest covers every file
+# under the bundle directory (sign_okf_bundle.py's rglob), not just
+# agent.okf.md - and the rollout stayed wedged until the ExternalSecret
+# was forced and the pods deleted by hand. Those two steps, and the
+# readiness gate that proves they worked, are now part of the verb.
 - name: "Day 3: re-sign the OKF bundles"
   hosts: localhost
   gather_facts: false
@@ -57,3 +69,60 @@
               agent-runtime:latest image - whose bundles are what actually got
               signed - is older than the bundles committed here. Rebuild it first,
               then re-run this verb:  make d2 build agent  &&  make d3 sign agents
+
+    # Vault now holds the right signatures; the runtime does not yet. The
+    # ExternalSecret's refreshInterval is 1h, so without this the pods keep
+    # reading the old .sig blobs for up to an hour after a "successful" sign.
+    - name: "okf-sign | force the signatures ExternalSecret to re-read Vault"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_externalsecret_refresh.yml"
+      vars:
+        es_name: agent-runtime-okf-signatures
+        es_namespace: zuno-ai-run
+        es_wait_for_refresh: true
+
+    # Delete the pods rather than `oc rollout restart`: ArgoCD selfHeal reverts
+    # the restart annotation on this Application. The Secret is a volume mount
+    # read once at import time, so only a fresh pod picks the new bytes up.
+    - name: "okf-sign | restart agent-runtime so it reloads the refreshed signatures"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        namespace: zuno-ai-run
+        label_selectors:
+          - "app.kubernetes.io/name=agent-runtime"
+
+    # The real proof. When enforcement is on and the signatures still do not
+    # match the image's bundles, app/registry.py raises at import and the
+    # container never becomes ready - this wait is what turns a silently
+    # useless run into a red one.
+    - name: "okf-sign | wait for agent-runtime to come back with the new signatures"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: zuno-ai-run
+        name: agent-runtime
+      register: _okf_runtime_rollout
+      until: >-
+        (_okf_runtime_rollout.resources | default([]) | length) > 0 and
+        (_okf_runtime_rollout.resources[0].status.readyReplicas | default(0)) ==
+        (_okf_runtime_rollout.resources[0].spec.replicas | default(1)) and
+        (_okf_runtime_rollout.resources[0].status.updatedReplicas | default(0)) ==
+        (_okf_runtime_rollout.resources[0].spec.replicas | default(1))
+      retries: 60
+      delay: 5
+      failed_when: false
+
+    - name: "okf-sign | explain an agent-runtime that never came back"
+      ansible.builtin.fail:
+        msg: >-
+          The bundles were signed and the signatures ExternalSecret refreshed,
+          but agent-runtime in zuno-ai-run never became ready. If the pods are
+          crash-looping on "failed to load OKF bundles", the running image's
+          bundles differ from what was just signed - rebuild and re-sign:
+          make d2 build agent && make d3 sign agents. Logs:
+          oc -n zuno-ai-run logs deploy/agent-runtime -c agent-runtime --tail=40
+      when: >-
+        (_okf_runtime_rollout.resources | default([]) | length) == 0 or
+        (_okf_runtime_rollout.resources[0].status.readyReplicas | default(0)) !=
+        (_okf_runtime_rollout.resources[0].spec.replicas | default(1))
