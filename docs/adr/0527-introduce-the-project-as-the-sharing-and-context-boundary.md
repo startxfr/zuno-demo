@@ -8,6 +8,63 @@
 
 ## Dated progress notes
 
+### 2026-08-28 - project binding never reached the database, and an eligibility false positive
+
+**No conversation could ever be bound to a project.** The browser sends
+`project_id` on the first message of a tab opened from a project row's "+",
+agent-bff forwards it, and `record_turn`'s INSERT does persist it - but
+agent-frontend's `/api/chat` proxy is a decode-and-re-marshal handler whose two
+request structs had no `ProjectID` field at all. Go's decoder discarded the
+unknown key and the handler rebuilt the body from three fields, so the value
+ceased to exist one hop after the browser. Measured before the fix: 166 live
+conversations, none with a `project_id`.
+
+The tab still *looked* bound, because `Chat.tsx` falls back to the client's own
+value when the server returns an empty one; only the sidebar refresh revealed
+the truth, which is why this was reported as a display problem.
+
+Two consequences worth recording. First, binding is creation-time only by
+design - `record_turn`'s `ON CONFLICT` branch deliberately never touches
+`project_id`, so a conversation cannot change access scope mid-life, and there
+is no "move to a project" endpoint. Every conversation created while this bug
+was live is therefore permanently project-less; there is nothing to migrate
+them with, and that was accepted rather than fixed. Second, the same missing
+field made ADR-0512's two `project_required` Finage tasks refuse work the user
+had done correctly, answering "start this conversation inside a customer
+project" to someone who had.
+
+**The RBAC greying is not a defect**, and the policy is deliberately unchanged.
+It is ADR-0213's rule working as written: eligible = holds this agent's
+`agent_<name>` entitlement AND shares a business-role group with the sharer.
+Verified against the realm - of 27 users, 3 share a business role with
+`consultant-01` and 2 also hold `agent_tekos`, which is exactly what the API
+reports. No Keycloak error, and no path-vs-name mismatch: both sides normalise
+to bare names.
+
+One real defect inside it was fixed. The inline `else if` counted *any* shared
+group as a business role, including a second `agent_*` entitlement - on
+Soursage that made `sale-02` and `recrut-01` eligible to each other with
+nothing else in common, which ADR-0040 and clause 2 of this ADR both reject.
+The rule is now the testable `colleagueIsEligible`, which skips `agent_*` on
+the business-role side. This narrows eligibility: it removes false positives
+and cannot create one.
+
+**Open question, deliberately not decided here.** The eligibility rule was
+inherited from ADR-0213 - written for sharing one conversation on one agent -
+and this ADR never re-derived it for an object clause 6 declares cross-agent.
+That leaves an inconsistency inside this ADR: a **group** grant gives every
+member of `/consultant` the same access with no eligibility check at all
+(clause 2, and the runtime's `business_role_groups` applies no entitlement
+filter to grants), while a **named** grant to one of those same members is
+greyed out unless they also hold the current agent's entitlement. So the
+greying blocks nothing an admin cannot do in one click from the Groups picker
+beside it. Worse, for several persona/agent pairs the rule is unsatisfiable
+rather than merely narrow - `consultant-01` on Comage or Naveo, `ai-dev-01`,
+`ai-ops-01`, and every `*-entitlement-only-*` fixture have **no** eligible
+candidate at all, so those users cannot share a project with anyone. Whoever
+revisits this should decide the rule for projects on its own terms rather than
+inheriting it again.
+
 ### 2026-08-28 - the first real UI pass, and the two clause-9 regressions it found
 
 The user drove the rebuilt frontend and reported two things broken. Both were
