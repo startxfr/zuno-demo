@@ -37,15 +37,22 @@ decision - its own ADR and WP, not a UI change.
 
 Two consequences worth recording for whoever edits an agent bundle next:
 
-- Editing any `agents/**` bundle invalidates its signature. agent-runtime runs
-  with `ZUNO_REQUIRE_SIGNED_BUNDLES=true`, so its next pod crash-loops on
-  `failed to load OKF bundles`. `make d3 sign agents` is necessary but **not
-  sufficient**: it writes to Vault, while the pod mounts a Secret fed by an
-  ExternalSecret on a one-hour `refreshInterval`. Until that syncs, the pod
-  keeps failing behind a playbook that reported success. Force it with
-  `oc annotate externalsecret agent-runtime-okf-signatures -n zuno-ai-run
-  force-sync="$(date +%s)" --overwrite`, then let the CrashLoopBackOff retry -
-  kubelet refreshes mounted Secrets, so no pod delete is needed.
+- Editing any `agents/**` bundle invalidates its signature - the signed digest
+  covers every file under the bundle directory, not just `agent.okf.md`.
+  agent-runtime runs with `ZUNO_REQUIRE_SIGNED_BUNDLES=true`, so its next pod
+  crash-loops on `failed to load OKF bundles` until the bundles are re-signed
+  AND the new signatures reach the pod. Run `make d3 sign agents`.
+
+  That verb used to stop halfway, and this note originally prescribed the
+  manual repair. It no longer applies: `8320e71e` (2026-08-28) closed the gap
+  the same day, after the crash-loop this ADR's own work caused.
+  `ansible/playbooks/day3_sign.yml` now signs, verifies, forces the
+  `agent-runtime-okf-signatures` ExternalSecret and waits for its
+  `status.refreshTime` to advance (`ansible/tasks/force_externalsecret_refresh.yml`),
+  deletes the pods by label - never `oc rollout restart`, which ArgoCD's
+  selfHeal reverts - and gates on the rollout becoming ready. The one-hour
+  `refreshInterval` on the ExternalSecret is deliberately left alone: forcing
+  at the caller is correct, lowering the global interval is not.
 - Agent replies now render as Markdown (`chat/Markdown.tsx`, react-markdown +
   remark-gfm). Raw HTML in a reply is inert by design and `rehype-raw` must not
   be added: the text is LLM-written with the RAG corpus in context, so an
