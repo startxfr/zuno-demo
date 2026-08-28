@@ -172,3 +172,66 @@ func TestProjectGrant_GroupScopedOmitsSubject(t *testing.T) {
 		t.Errorf("group_name must survive omitempty when set, got %v", got)
 	}
 }
+
+// ADR-0213's colleague-eligibility rule, made testable by extraction. The
+// fourth case is the one that fails on the pre-2026-08-28 inline version: it
+// used `else if` over ANY shared group, so a second agent_* entitlement in
+// common counted as a shared "business role". ADR-0040 says an entitlement
+// group is not a business role, and ADR-0527 clause 2 refuses agent_* as a
+// grant target outright - measured on the live realm, that false positive made
+// sale-02 and recrut-01 eligible to each other on Soursage with nothing else
+// in common.
+func TestColleagueIsEligible(t *testing.T) {
+	callerGroups := func(names ...string) map[string]struct{} {
+		m := make(map[string]struct{}, len(names))
+		for _, n := range names {
+			m[n] = struct{}{}
+		}
+		return m
+	}
+
+	cases := []struct {
+		name       string
+		candidate  []string
+		caller     map[string]struct{}
+		entitle    string
+		wantEligib bool
+	}{
+		{
+			name:       "entitlement and a shared business role",
+			candidate:  []string{"agent_tekos", "consultant"},
+			caller:     callerGroups("agent_tekos", "consultant"),
+			entitle:    "agent_tekos",
+			wantEligib: true,
+		},
+		{
+			name:       "entitlement but no shared business role",
+			candidate:  []string{"agent_tekos", "sales"},
+			caller:     callerGroups("agent_tekos", "consultant"),
+			entitle:    "agent_tekos",
+			wantEligib: false,
+		},
+		{
+			name:       "shared business role but not entitled to this agent",
+			candidate:  []string{"agent_arkos", "consultant"},
+			caller:     callerGroups("agent_tekos", "consultant"),
+			entitle:    "agent_tekos",
+			wantEligib: false,
+		},
+		{
+			name:       "a second shared agent_* group is not a business role",
+			candidate:  []string{"agent_tekos", "agent_comage"},
+			caller:     callerGroups("agent_tekos", "agent_comage", "consultant"),
+			entitle:    "agent_tekos",
+			wantEligib: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := colleagueIsEligible(tc.candidate, tc.caller, tc.entitle); got != tc.wantEligib {
+				t.Errorf("colleagueIsEligible(%v) = %v, want %v", tc.candidate, got, tc.wantEligib)
+			}
+		})
+	}
+}

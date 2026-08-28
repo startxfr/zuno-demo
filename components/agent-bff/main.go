@@ -1255,6 +1255,43 @@ func cloneConversationHandler(verifier *jwks.Verifier, runtimeClient *runtime.Cl
 	}
 }
 
+// entitlementGroupPrefix marks an ADR-0040 agent entitlement group. Kept as a
+// named constant here because colleagueIsEligible has to reason about the
+// prefix itself, not just build one name from it.
+const entitlementGroupPrefix = "agent_"
+
+// colleagueIsEligible applies ADR-0213's rule: a candidate may be offered as a
+// share target only if they hold this agent's entitlement group AND share at
+// least one business-role group with the caller. Both slices/maps arrive as
+// bare names, leading slash already stripped on each side.
+//
+// The agent_* skip is ADR-0040's own line rather than a refinement of it: an
+// entitlement group is not a business role, so two people who share only
+// `agent_comage` share no business role at all. The previous inline version
+// used an `else if` that counted ANY shared group, so a second entitlement
+// group in common was enough - on Soursage that made sale-02 and recrut-01
+// eligible to each other on nothing else, which ADR-0527 clause 2 rejects
+// explicitly by refusing agent_* as a grant target.
+//
+// This narrows eligibility. It removes false positives; it cannot create one.
+func colleagueIsEligible(candidateGroups []string, callerGroups map[string]struct{}, entitlementGroup string) bool {
+	hasEntitlement := false
+	sharesBusinessRole := false
+	for _, g := range candidateGroups {
+		if g == entitlementGroup {
+			hasEntitlement = true
+			continue
+		}
+		if strings.HasPrefix(g, entitlementGroupPrefix) {
+			continue
+		}
+		if _, shared := callerGroups[g]; shared {
+			sharesBusinessRole = true
+		}
+	}
+	return hasEntitlement && sharesBusinessRole
+}
+
 // listColleaguesHandler handles GET /api/colleagues (ADR-0213): BFF-only,
 // never forwards to agent-runtime. Fails closed (503) when adminClient is
 // nil (the zuno-admin-api trust boundary isn't provisioned yet) or when
@@ -1301,19 +1338,10 @@ func listColleaguesHandler(verifier *jwks.Verifier, adminClient *keycloak.AdminC
 				log.Printf("agent-bff: keycloak admin group lookup failed for user %q: %v", u.ID, err)
 				continue // skip this one candidate rather than fail the whole search
 			}
-			hasEntitlement := false
-			sharesBusinessRole := false
-			for _, g := range groups {
-				if g == entitlementGroup {
-					hasEntitlement = true
-				} else if _, shared := callerGroups[g]; shared {
-					sharesBusinessRole = true
-				}
-			}
 			out = append(out, apiColleague{
 				Sub:         u.ID,
 				DisplayName: u.DisplayName(),
-				Eligible:    hasEntitlement && sharesBusinessRole,
+				Eligible:    colleagueIsEligible(groups, callerGroups, entitlementGroup),
 			})
 		}
 

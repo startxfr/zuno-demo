@@ -202,6 +202,14 @@ type chatRequest struct {
 	// send a prior response's run_id (captured from the SSE "start"
 	// event) to resume it.
 	RunID string `json:"run_id,omitempty"`
+	// ProjectID (ADR-0527) binds a BRAND-NEW conversation to a project -
+	// the browser sends it only on the first message of a tab opened from
+	// a project row's "+". Binding is creation-time only, so a field
+	// missing here is not recoverable later: the conversation is stored
+	// project-less forever. It was missing until 2026-08-28, which is why
+	// every conversation started inside a project landed in the general
+	// history instead.
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 // bffChatRequest is forwarded to the BFF's POST /api/chat (see
@@ -210,6 +218,11 @@ type bffChatRequest struct {
 	SessionID string `json:"session_id"`
 	Message   string `json:"message"`
 	RunID     string `json:"run_id,omitempty"`
+	// omitempty is load-bearing, not tidiness: agent-runtime types this as
+	// `Optional[str] = Field(default=None, min_length=1)`, so an empty
+	// string is present-and-invalid to Pydantic (422), not absent. Same
+	// trap fixed on agent-bff's own outbound structs the same day.
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 // APIHandler proxies a validated, authorized chat turn to the BFF.
@@ -261,6 +274,7 @@ func APIHandler(agent okf.Agent, bffBaseURL string, sessions *session.Manager) h
 			SessionID: req.SessionID,
 			Message:   req.Message,
 			RunID:     req.RunID,
+			ProjectID: req.ProjectID,
 		})
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
