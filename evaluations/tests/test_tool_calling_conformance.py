@@ -153,3 +153,30 @@ def test_the_shipped_probe_fixture_is_two_sided_and_uses_real_tools():
     assert len({p["id"] for p in probes}) == len(probes)
     # Only tools the model is actually offered may be expected.
     assert {p["expects_tool"] for p in positive} <= set(doc["offered_tools"])
+
+
+def test_probe_schemas_have_not_drifted_from_the_runtime():
+    """The mlops image carries evaluations/ but not
+    components/agent-runtime, so the probe fixture duplicates the two tool
+    schemas the runtime sends. Duplication without a drift check is how a
+    gate ends up confidently scoring a schema nobody sends any more."""
+    import ast
+
+    import yaml
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    src = (root / "components/agent-runtime/app/graph/nodes.py").read_text(encoding="utf-8")
+    live = {}
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            name = node.targets[0].id
+            if name in ("_GENERATE_IMAGE_TOOL_SCHEMA", "_GENERATE_DIAGRAM_TOOL_SCHEMA"):
+                schema = ast.literal_eval(node.value)
+                live[schema["function"]["name"]] = schema
+
+    doc = yaml.safe_load((root / "evaluations/comage/tool_probes.yaml").read_text(encoding="utf-8"))
+    fixture = {s["function"]["name"]: s for s in doc["tool_schemas"]}
+
+    assert set(fixture) == set(live), "probe fixture and runtime disagree on which tools exist"
+    for name, schema in fixture.items():
+        assert schema == live[name], f"{name} schema drifted from components/agent-runtime"

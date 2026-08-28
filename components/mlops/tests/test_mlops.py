@@ -136,6 +136,7 @@ def _config(**overrides) -> "mlops.MlopsConfig":
         models_s3_endpoint=None,
         lora_target_modules=None,
         evaluations_dir="/nonexistent",
+        agents_dir="/nonexistent",
         model_registry_url=None,
         model_registry_namespace="rhoai-model-registries",
         registered_model_name=None,
@@ -649,8 +650,97 @@ def test_chat_stop_ids_prefer_the_templates_end_of_turn_over_tokenizer_eos() -> 
     assert mlops._chat_stop_token_ids(_NoChatTok()) == [7]
 
 
+def test_parse_tool_calls_reads_the_qwen_XML_block_not_json() -> None:
+    """Qwen3.5 emits tool calls as XML (hence --tool-call-parser=qwen3_xml),
+    NOT as JSON. A JSON-shaped parser finds nothing on every real decode,
+    so the tool half would report 0 calls for a healthy model exactly as
+    loudly as for the broken one - the metric added to catch a silent
+    regression, itself silently wrong. Verified against the staged
+    checkpoint's own chat_template.jinja."""
+    decoded = (
+        "Je prepare le visuel.\n\n<tool_call>\n<function=generate_image>\n"
+        "<parameter=prompt>\nune equipe commerciale qui fete une signature\n</parameter>\n"
+        "</function>\n</tool_call>"
+    )
+    calls = mlops._parse_tool_calls(decoded)
+    assert len(calls) == 1
+    assert calls[0]["name"] == "generate_image"
+    assert json.loads(calls[0]["arguments"]) == {
+        "prompt": "une equipe commerciale qui fete une signature"
+    }
+    # The prose beside the call is what the narration detector reads.
+    assert "tool_call" not in mlops._strip_tool_calls(decoded)
+
+
+def test_parse_tool_calls_keeps_multiline_parameter_values() -> None:
+    """A mermaid source spans many lines; a line-oriented parser would keep
+    only the first and score a correct call as bad arguments."""
+    decoded = (
+        "<tool_call>\n<function=generate_diagram>\n<parameter=mermaid_source>\n"
+        "graph TD\n    A[Lead] --> B[Qualification]\n    B --> C[Signature]\n"
+        "</parameter>\n</function>\n</tool_call>"
+    )
+    args = json.loads(mlops._parse_tool_calls(decoded)[0]["arguments"])
+    assert "graph TD" in args["mermaid_source"]
+    assert "C[Signature]" in args["mermaid_source"]
+
+
+def test_a_truncated_tool_call_is_recorded_not_swallowed() -> None:
+    """Real truncation cuts the closing tags off with everything else.
+    Reporting 'no call' there blames the model for a harness limit - the
+    exact wrong conclusion drawn about the base model while establishing
+    the phase 1 baseline, before it was re-measured with a larger budget."""
+    unterminated = mlops._parse_tool_calls(
+        "<tool_call>\n<function=generate_diagram>\n<parameter=mermaid_source>\ngraph TD\n    A[Lead"
+    )
+    assert len(unterminated) == 1
+    assert unterminated[0]["name"] == "generate_diagram"
+    # A block with no function at all is a broken call, not an abstention.
+    empty = mlops._parse_tool_calls("<tool_call>\nrien d'exploitable\n</tool_call>")
+    assert len(empty) == 1 and empty[0]["name"] == ""
+
+
+def test_no_tool_call_block_yields_no_calls() -> None:
+    assert mlops._parse_tool_calls("generate_image c'est le bail.") == []
+
+
+def test_load_tool_probes_returns_none_when_the_agent_has_no_probe_set() -> None:
+    """None must stay a no-op: a grounding-domain run has no probe set, and
+    turning that into a failure would break every non-style pipeline."""
+    assert mlops._load_tool_probes(_config()) is None
+
+
+def test_load_tool_probes_reads_the_real_shipped_fixture() -> None:
+    """Guards the contract between the fixture and the loader - the file is
+    consumed from inside the image, where a shape change fails a live run
+    rather than a test."""
+    repo = pathlib.Path(__file__).resolve().parents[3]
+    doc = mlops._load_tool_probes(_config(evaluations_dir=str(repo / "evaluations")))
+    assert doc is not None
+    assert doc["task"] == "check-deal-status"
+    assert {s["function"]["name"] for s in doc["tool_schemas"]} == {"generate_image", "generate_diagram"}
+    assert any(p["expects_tool"] for p in doc["probes"])
+    assert any(not p["expects_tool"] for p in doc["probes"])
+
+
+def test_task_system_prompt_is_the_body_not_the_frontmatter() -> None:
+    """The probe must run under the same system message agent-runtime
+    sends. Without one the variant still calls tools correctly, so a probe
+    set that dropped it would score green and measure nothing."""
+    repo = pathlib.Path(__file__).resolve().parents[3]
+    body = mlops._task_system_prompt(_config(agents_dir=str(repo / "agents")), "check-deal-status")
+    assert body and "okf_version" not in body
+
+
 TESTS = [
     # WP-087 / ADR-0526
+    test_parse_tool_calls_reads_the_qwen_XML_block_not_json,
+    test_parse_tool_calls_keeps_multiline_parameter_values,
+    test_a_truncated_tool_call_is_recorded_not_swallowed,
+    test_no_tool_call_block_yields_no_calls,
+    test_load_tool_probes_returns_none_when_the_agent_has_no_probe_set,
+    test_load_tool_probes_reads_the_real_shipped_fixture,
+    test_task_system_prompt_is_the_body_not_the_frontmatter,
     test_extract_answer_drops_the_reasoning_block_and_a_restarted_turn,
     test_chat_stop_ids_prefer_the_templates_end_of_turn_over_tokenizer_eos,
     test_registry_session_sends_a_bearer_token_and_trusts_the_service_ca,

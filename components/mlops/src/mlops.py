@@ -197,6 +197,10 @@ class MlopsConfig:
 
     # evaluations/<agent>/quality_gate.py integration.
     evaluations_dir: str
+    # WP-087 phase 2: the tool-probe half reads the target task's own
+    # prompt body from agents/<agent>/tasks/<task>.md, which the image
+    # already carries (Containerfile COPY agents).
+    agents_dir: str
 
     # ADR-0301 point 3 / D5 (docs/adr/0301, 0302 dated progress notes):
     # the OpenShift AI Model Registry's real namespace
@@ -259,6 +263,7 @@ def load_config() -> MlopsConfig:
         models_s3_endpoint=_env("MLOPS_MODELS_S3_ENDPOINT"),
         lora_target_modules=_env("MLOPS_LORA_TARGET_MODULES"),
         evaluations_dir=_env("MLOPS_EVALUATIONS_DIR", "/opt/app-root/src/evaluations"),
+        agents_dir=_env("MLOPS_AGENTS_DIR", "/opt/app-root/src/agents"),
         model_registry_url=_env("MODEL_REGISTRY_URL"),
         model_registry_namespace=_env("MODEL_REGISTRY_NAMESPACE", "rhoai-model-registries"),
         registered_model_name=_env("MLOPS_REGISTERED_MODEL_NAME"),
@@ -705,11 +710,45 @@ def _prepare_style_dataset(config: MlopsConfig, store: ArtifactStore) -> None:
                 if len(messages) < 2 or messages[-1].get("role") != "assistant":
                     skipped += 1
                     continue
-                text = tokenizer.apply_chat_template(messages, tokenize=False)
+                # WP-087 phase 2: a corpus row may carry its own `tools`
+                # array and an assistant turn holding `tool_calls`. The
+                # staged checkpoint's chat_template.jinja handles `tools`,
+                # `tool_calls` and the `tool` role (verified against the
+                # real template), so rendering them needs no template work
+                # - only that they are passed.
+                #
+                # BOTH renders must receive the SAME tools. _make_collator
+                # masks by prompt_len, so a prefix rendered without the
+                # schemas against a full text rendered with them shifts
+                # every label by the length of the tool block: loss would
+                # land on the wrong tokens and train the model on noise,
+                # silently and with no error anywhere.
+                tools = row.get("tools") or None
+                kwargs = {"tools": tools} if tools else {}
+                text = tokenizer.apply_chat_template(messages, tokenize=False, **kwargs)
                 prompt = tokenizer.apply_chat_template(
-                    messages[:-1], tokenize=False, add_generation_prompt=True
+                    messages[:-1], tokenize=False, add_generation_prompt=True, **kwargs
                 )
-                examples.append({"text": text, "prompt": prompt, "source": f"style-corpus/{split}"})
+                # The masking contract, asserted rather than assumed: the
+                # prompt render must be a literal prefix of the full
+                # render. If a future template emits the tool block only
+                # in one of the two, this fails loudly here instead of
+                # producing a silently mistrained adapter.
+                if not text.startswith(prompt):
+                    raise SystemExit(
+                        "chat template rendered a prompt that is not a prefix of the full "
+                        f"text (row {len(examples)} of {split}, tools={bool(tools)}) - "
+                        "prompt_len masking would put the loss on the wrong tokens"
+                    )
+                examples.append({
+                    "text": text,
+                    "prompt": prompt,
+                    "source": f"style-corpus/{split}",
+                    # Recorded so a run can be audited for how much of its
+                    # corpus actually exercised tool use, without re-reading
+                    # the tarball.
+                    "has_tools": bool(tools),
+                })
         if skipped:
             logger.warning("skipped %d corpus rows without a trailing assistant turn", skipped)
         if not examples:
@@ -1012,6 +1051,14 @@ def _run_lora_training(
     stats = {"train_loss": getattr(train_result, "training_loss", None), "steps": trainer.state.global_step}
     if held_out:
         stats["register_samples"] = _generate_held_out(model, tokenizer, held_out, cpu_safe=config.cpu_safe)
+    # WP-087 phase 2: the tool-calling half, produced on the same GPU that
+    # just finished training, for the same reason the register samples are
+    # (ADR-0526 decision 8's own note): the merged model is deployed
+    # nowhere when the gate runs. Independent of held_out - a probe set
+    # exists per agent, not per corpus split.
+    probes = _load_tool_probes(config)
+    if probes:
+        stats["tool_samples"] = _generate_tool_probes(model, tokenizer, config, probes)
     return stats
 
 
@@ -1032,6 +1079,164 @@ def _run_lora_training(
 # rule-3 opening rate from 31.6% to 44.3% - the contaminated reading was
 # not merely noisy, it under-reported the failure it was meant to catch.
 _ROLE_RESTART = re.compile(r"\n\s*(assistant|user|system)\s*\n")
+
+
+def _load_tool_probes(config: MlopsConfig) -> Optional[Dict[str, Any]]:
+    """Reads evaluations/<agent>/tool_probes.yaml, or None if absent.
+
+    Absent is legitimate: only agents whose tasks bind model-facing tools
+    have a probe set, and a grounding-domain run has none at all. The file
+    carries the tool SCHEMAS as well as the probes, because the mlops image
+    ships evaluations/ and agents/ but not components/agent-runtime - a
+    drift test in evaluations/tests/ is what keeps the copy honest.
+    """
+    path = Path(config.evaluations_dir) / config.agent / "tool_probes.yaml"
+    if not path.is_file():
+        return None
+    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not doc.get("probes") or not doc.get("tool_schemas"):
+        logger.warning("%s exists but declares no probes/tool_schemas; skipping the tool half", path)
+        return None
+    return doc
+
+
+def _task_system_prompt(config: MlopsConfig, task_name: str) -> str:
+    """The task's own prompt body, the same text agent-runtime sends as the
+    system message. Load-bearing: the regression this measures does NOT
+    appear without a system prompt - probed bare, the variant still calls
+    correctly - so a probe set that omitted it would score green and prove
+    nothing."""
+    path = Path(config.agents_dir) / config.agent / "tasks" / f"{task_name}.md"
+    raw = path.read_text(encoding="utf-8")
+    parts = raw.split("---", 2)
+    if len(parts) < 3:
+        raise SystemExit(f"{path} has no YAML frontmatter; cannot recover its prompt body")
+    return parts[2].strip()
+
+
+def _generate_tool_probes(model, tokenizer, config: MlopsConfig, doc: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Replays the probe set against the freshly trained model.
+
+    Produces exactly the record shape
+    evaluations/tool_calling_conformance.score_probe consumes, so the
+    evaluate stage scores it with no reshaping. Greedy, for the same
+    reproducibility reason _generate_held_out is greedy.
+
+    max_new_tokens is deliberately generous: a mermaid argument runs to
+    ~900 characters and a tight budget truncates it mid-JSON, which scores
+    as a broken call when the model in fact behaved correctly. That
+    happened while establishing the phase 1 baseline and cost a wrong
+    conclusion about the base model until it was re-measured.
+    """
+    import torch
+
+    schemas = doc["tool_schemas"]
+    required = {
+        sch["function"]["name"]: sch["function"].get("parameters", {}).get("required", [])
+        for sch in schemas
+    }
+    offered = [sch["function"]["name"] for sch in schemas]
+    system = _task_system_prompt(config, doc["task"])
+    stop_ids = _chat_stop_token_ids(tokenizer)
+    probes = doc["probes"][:4] if config.cpu_safe else doc["probes"]
+
+    results: List[Dict[str, Any]] = []
+    model.eval()
+    with torch.no_grad():
+        for probe in probes:
+            messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"Context:\n\nQuestion: {probe['message']}"},
+            ]
+            text = tokenizer.apply_chat_template(
+                messages, tools=schemas, tokenize=False, add_generation_prompt=True
+            )
+            enc = tokenizer(text, return_tensors="pt").to(model.device)
+            out = model.generate(
+                **enc,
+                max_new_tokens=64 if config.cpu_safe else 1500,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
+                **({"eos_token_id": stop_ids} if stop_ids else {}),
+            )
+            decoded = tokenizer.decode(out[0][enc["input_ids"].shape[-1]:], skip_special_tokens=False)
+            calls = _parse_tool_calls(decoded)
+            expected = probe.get("expects_tool") or ""
+            results.append({
+                "id": probe["id"],
+                "expects_tool": bool(expected),
+                "expected_tool": expected,
+                "required_arguments": required.get(expected, []),
+                "offered_tools": offered,
+                "tool_calls": calls,
+                "content": _extract_answer(_strip_tool_calls(decoded)),
+                "raw": decoded,
+            })
+    logger.info("generated %d tool-probe responses for the tool-calling half", len(results))
+    return results
+
+
+# vLLM applies --tool-call-parser server-side; here we decode raw, so the
+# call block has to be read out of the text. Qwen3 emits it inside
+# <tool_call>...</tool_call> as a JSON object with name/arguments.
+# Qwen3.5 emits tool calls as XML, NOT as JSON - which is why the serving
+# args set --tool-call-parser=qwen3_xml. Verified against the staged
+# checkpoint's own chat_template.jinja, whose instruction block reads:
+#
+#   <tool_call>
+#   <function=example_function_name>
+#   <parameter=example_parameter_1>
+#   value_1
+#   </parameter>
+#   </function>
+#   </tool_call>
+#
+# A JSON-shaped parser finds nothing here, on every decode, for every
+# model - so the tool half would have reported "0 calls" for a healthy
+# model exactly as loudly as for the broken one, and the metric added to
+# catch a silent regression would itself have been silently wrong.
+#
+# The unterminated pattern is not padding: a mermaid parameter runs to
+# ~900 characters, and generation hitting its token budget mid-parameter
+# cuts off the closing tags with everything else. Reporting "no call" for
+# that blames the model for a harness limit.
+_TOOL_CALL_BLOCK = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.S)
+_TOOL_CALL_UNTERMINATED = re.compile(r"<tool_call>\s*((?:(?!</tool_call>).)*)\Z", re.S)
+_TOOL_FUNCTION = re.compile(r"<function=([^>\s]+)\s*>(.*?)(?:</function>|\Z)", re.S)
+_TOOL_PARAMETER = re.compile(r"<parameter=([^>\s]+)\s*>\s*(.*?)\s*(?:</parameter>|\Z)", re.S)
+
+
+def _parse_tool_calls(decoded: str) -> List[Dict[str, Any]]:
+    """Tool calls in the raw decode, normalized to {"name", "arguments"}
+    with arguments as a JSON string - the shape the OpenAI-compatible API
+    returns, so the scorer is fed identically whether a sample came from
+    here or from a served endpoint.
+
+    A block that yields no <function=...> is recorded with an empty name
+    rather than dropped: that is a broken call, and the scorer must count
+    it as one instead of as an abstention.
+    """
+    text = decoded or ""
+    blobs = list(_TOOL_CALL_BLOCK.findall(text))
+    tail = _TOOL_CALL_UNTERMINATED.search(text)
+    if tail and tail.group(1).strip():
+        blobs.append(tail.group(1))
+
+    calls: List[Dict[str, Any]] = []
+    for blob in blobs:
+        functions = _TOOL_FUNCTION.findall(blob)
+        if not functions:
+            calls.append({"name": "", "arguments": blob.strip()})
+            continue
+        for name, body in functions:
+            args = {key: value for key, value in _TOOL_PARAMETER.findall(body)}
+            calls.append({"name": name.strip(), "arguments": json.dumps(args, ensure_ascii=False)})
+    return calls
+
+
+def _strip_tool_calls(decoded: str) -> str:
+    """The prose beside any tool call - what the narration detector reads."""
+    return _TOOL_CALL_BLOCK.sub(" ", decoded or "")
 
 
 def _chat_stop_token_ids(tokenizer) -> List[int]:
@@ -1167,6 +1372,13 @@ def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
         store.put_text(
             f"{_run_prefix(config.eval_prefix, config)}/register_samples.jsonl",
             "\n".join(json.dumps(r, ensure_ascii=False) for r in register_samples),
+        )
+
+    tool_samples = train_stats.pop("tool_samples", None)
+    if tool_samples:
+        store.put_text(
+            f"{_run_prefix(config.eval_prefix, config)}/tool_samples.jsonl",
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in tool_samples),
         )
 
     train_manifest = {
@@ -1384,6 +1596,35 @@ def _install_internal_ca() -> None:
     logger.info("internal root CA appended to the trust store at %s", bundle)
 
 
+def _score_tool_calling_conformance(config: MlopsConfig, store: ArtifactStore) -> Optional[Dict[str, Any]]:
+    """Scores train-lora's tool-probe responses (WP-087 phase 1/2).
+
+    Mirrors _score_register_conformance, including its asymmetry: None is a
+    legitimate no-op when the agent has no probe set at all, but a run that
+    HAS one and produced no samples is a hard failure - it means the
+    generation step silently did nothing, and passing on the other halves
+    would reintroduce exactly the blind spot this half exists to close.
+    """
+    if _load_tool_probes(config) is None:
+        return None
+
+    raw = store.get_bytes(f"{_run_prefix(config.eval_prefix, config)}/tool_samples.jsonl")
+    if not raw:
+        raise SystemExit(
+            f"no tool_samples.jsonl for {config.agent}/{config.run_id} but "
+            f"evaluations/{config.agent}/tool_probes.yaml exists - the tool-calling "
+            f"half cannot be skipped once an agent declares a probe set"
+        )
+    samples = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
+
+    sys.path.insert(0, config.evaluations_dir)
+    import tool_calling_conformance  # noqa: E402
+    from quality_gate import load_gate_config  # noqa: E402
+
+    thresholds = tool_calling_conformance.thresholds_from_gate_config(load_gate_config(config.agent))
+    return tool_calling_conformance.score_corpus(samples, **thresholds)
+
+
 def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
     """ADR-0302 point 5: the same acceptance mechanism a base-model
     change would need, reused rather than a parallel harness -
@@ -1427,6 +1668,17 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
             result["overall"] = "FAIL"
             result["register_failure"] = register.get("failures")
 
+    # WP-087 phase 2: the third half. Same AND, same reason - the register
+    # and acceptance halves both passed on four consecutive runs while the
+    # variant stopped calling tools entirely, because neither of them looks
+    # at tool calls.
+    tool_calling = _score_tool_calling_conformance(config, store)
+    if tool_calling is not None:
+        result["tool_calling_conformance"] = tool_calling
+        if result.get("overall") == "PASS" and not tool_calling.get("passed"):
+            result["overall"] = "FAIL"
+            result["tool_calling_failure"] = tool_calling.get("failures")
+
     store.put_json(f"{_run_prefix(config.eval_prefix, config)}/gate_result.json", result)
     # A stage that fails must say what failed in its own log. Reading the
     # first end-to-end run meant fetching gate_result.json out of S3 by
@@ -1443,11 +1695,14 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
                 )
         for failure in (register or {}).get("failures", []):
             logger.warning("evaluate: register FAILED %s", failure)
+        for failure in (tool_calling or {}).get("failures", []):
+            logger.warning("evaluate: tool-calling FAILED %s", failure)
     logger.info(
-        "evaluate: %s/%s acceptance=%s register=%s -> %s",
+        "evaluate: %s/%s acceptance=%s register=%s tools=%s -> %s",
         config.agent, config.run_id,
         result.get("scenario_rate", "n/a"),
         "n/a" if register is None else ("PASS" if register.get("passed") else "FAIL"),
+        "n/a" if tool_calling is None else ("PASS" if tool_calling.get("passed") else "FAIL"),
         result.get("overall"),
     )
     if result.get("overall") != "PASS":

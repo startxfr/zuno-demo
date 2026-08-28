@@ -40,6 +40,63 @@ task: check-deal-status
 # exercises what the runtime actually sends, not a paraphrase.
 offered_tools: [generate_image, generate_diagram]
 
+# The exact schemas the runtime sends, copied verbatim from
+# components/agent-runtime/app/graph/nodes.py. They are duplicated here on
+# purpose: the mlops image carries evaluations/ and agents/ but NOT
+# components/agent-runtime, so the gate cannot import them at run time.
+# evaluations/tests/test_tool_calling_conformance.py re-extracts them from
+# nodes.py with ast.literal_eval and fails if these drift - without that
+# check the gate would keep scoring a schema the runtime no longer sends.
+tool_schemas:
+- type: function
+  function:
+    name: generate_image
+    description: Generate a photorealistic or illustrative image with stable-diffusion-xl when the user's
+      request calls for a picture, illustration or mockup - NOT for diagrams, charts, schemas or sequence/workflow
+      diagrams needing precise structure or legible text (use generate_diagram for those instead; SDXL
+      cannot render exact boxes, arrows or text reliably). Only pass the visual description itself as
+      the prompt - never paste retrieved document content, citations or conversation history into it.
+    parameters:
+      type: object
+      properties:
+        prompt:
+          type: string
+          description: A concise description of the image to generate.
+        negative_prompt:
+          type: string
+          description: 'Optional: elements or qualities to avoid in the image.'
+      required:
+      - prompt
+- type: function
+  function:
+    name: generate_diagram
+    description: Render a precise technical diagram - architecture diagrams, sequence diagrams, flowcharts,
+      entity/resource relationship diagrams - by writing valid Mermaid syntax directly as the argument.
+      Use this instead of generate_image whenever legible text, exact structure, or box/arrow relationships
+      matter; use generate_image instead for photorealistic or illustrative pictures with no precise structure.
+    parameters:
+      type: object
+      properties:
+        mermaid_source:
+          type: string
+          description: 'Valid Mermaid diagram source. Write the complete diagram definition, not a description
+            of one. Use real Mermaid syntax only - do not invent your own keywords or fields. Three examples
+            of correct syntax:
+
+            - Flowchart: ''graph TD; A-->B;''
+
+            - Sequence diagram: ''sequenceDiagram\n  Alice->>Bob: Hi''
+
+            - Pie chart: ''pie title Top Customers\n  "Client A" : 1200000\n  "Client B" : 950000''. Each
+            data line MUST be a quoted label, a colon, then a plain number - nothing else. Pie charts
+            do NOT support a ''label'' keyword and do NOT support inline per-slice colors of any kind;
+            slice colors come from the rendering theme automatically, never from the data lines.'
+        alt:
+          type: string
+          description: 'Optional: a short, human-readable caption for the diagram.'
+      required:
+      - mermaid_source
+
 probes:
   # --- an image is the right answer -------------------------------------
   - id: img-01
