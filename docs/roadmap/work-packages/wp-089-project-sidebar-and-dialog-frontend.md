@@ -1,6 +1,6 @@
 # WP-089: Projects sidebar, project dialog and read-only tabs (promotes ADR-0527)
 
-- **State:** Repo work merged (2026-08-27)
+- **State:** Repo work merged (2026-08-28) - frontend rebuilt and deployed, `zuno-admin-api` provisioned; the single remaining criterion is the live two-persona pass, which needs two browser identities and is an operator task
 - **ADRs:** ADR-0527 clause 9 (Partially implemented -> Implemented once this WP lands and the live two-persona pass runs)
 - **Depends on:** WP-088 (the `/api/projects` and `/api/groups` routes, and `Conversation`'s new `project_id`/`role` fields)
 - **Estimated files touched:** ~10
@@ -113,11 +113,38 @@ styles with `--pf-t--global--*` tokens only).
 
 ## Operator / human follow-up (not executable by the model)
 
-- Rebuild and redeploy the agent frontend, then run the live two-persona pass
-  ADR-0527's acceptance criteria describe (create, share to a user, share to a
-  group, verify all four roles in the UI **and** as 403s at the API, clone,
-  cascade delete). This requires the `zuno-admin-api` provisioning WP-088's
-  follow-up lists - without it the RBAC tab cannot add anyone.
+- ~~Rebuild and redeploy the agent frontend~~ **done** - every `*-frontend`
+  Deployment in `zuno-ai-run` runs `agent-frontend@sha256:087466ab`, built
+  2026-08-28. The `zuno-admin-api` prerequisite is also **done** (WP-091 /
+  ADR-0530): `GET /api/colleagues` and `GET /api/groups` both answer 200, so
+  the RBAC tab can add people.
+- **The one thing left: the live two-persona pass** ADR-0527's acceptance
+  criteria describe - create, share to a user, share to a group, verify all
+  four roles in the UI **and** as 403s at the API, clone, cascade delete. It
+  needs two real browser identities, so it is an operator task; nothing in the
+  repo blocks it.
+
+  Two things to know before starting, or the pass will look broken when it is
+  not:
+
+  1. **Pick the pair deliberately.** ADR-0213's inherited eligibility rule
+     (hold `agent_<name>` **and** share a business-role group with the sharer)
+     is unsatisfiable for several persona/agent pairs - `consultant-01` on
+     Comage or Naveo, `ai-dev-01`, `ai-ops-01` and every
+     `*-entitlement-only-*` fixture have **zero** eligible candidates, so the
+     picker is correctly empty and looks like a bug. Use `consultant-01` on
+     **Tekos** (2 eligible colleagues), or share through a **group** grant,
+     which carries no eligibility check at all. That asymmetry is ADR-0527's
+     own recorded open question, not a defect to fix on the way past.
+  2. **Criterion 1's binding half is already confirmed** - you do not need to
+     re-derive it. Project binding was broken until `eec08d50` (2026-08-28
+     09:09 UTC): the frontend proxy dropped `project_id` and the measurement
+     then was 0 bound out of 166 conversations. Re-measured 2026-08-29 against
+     `agent-conversations`: **3 bound conversations, created 09:24, 09:32 and
+     09:34 UTC** - all after the fix, on two different agents (tekos, comage),
+     all pointing at project `0b4daf98` (`keycloak`). What the pass still owes
+     this criterion is the *UI* half: that the conversation opened from a
+     project row's "+" is the one that lands bound.
 - This component has no frontend unit-test suite (the same gap ADR-0213's and
   ADR-0515's status lines both record), so the live pass is the only functional
   verification these components get.

@@ -551,8 +551,10 @@ async def list_conversations(
 
     This is the single most security-sensitive query in the module: it
     moved from one owner_sub predicate to a membership join, and a mistake
-    here leaks colleagues' conversations. tests/test_conversations.py
-    covers all five shapes ADR-0527's Security considerations enumerate.
+    here leaks colleagues' conversations. tests/test_conversations.py's
+    test_list_conversations_covers_every_shape_adr_0527_enumerates covers
+    all five shapes ADR-0527's Security considerations enumerate, against a
+    fixture that replays this query's own join and WHERE clauses.
 
     Each row carries project_id and the caller's effective role so the
     frontend can group the list and decide read-only mode without a second

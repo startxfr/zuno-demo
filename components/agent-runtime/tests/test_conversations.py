@@ -8,7 +8,15 @@ title-derivation/conninfo-building logic, the pool_context()
 unconfigured-degrade path, and every function's fail-closed 503 when
 handed a None pool (the meaningful security-negative proof: a caller
 that forgot to configure CONVERSATIONS_PG*, or hit it while genuinely
-down, gets a hard failure, never a silent "no restriction"). The real
+down, gets a hard failure, never a silent "no restriction").
+
+ADR-0527's two access-resolution paths - resolve_access's effective role
+and the rewritten listing's visibility - are exercised against a stub
+psycopg pool (the _StubPool/_StubCursor pair below, the same fake-cursor
+shape tests/test_projects.py already uses, plus the pool layer), never
+recomputed in a test body: the listing fixture answers the query the
+function actually emitted, so the visibility rule has exactly one
+definition and it lives in app/conversations.py. The real
 SQL/DDL against a live agent-conversations database is exercised
 separately against the actual cluster, the same "deferred to production"
 split test_checkpointing.py's own docstring documents for the checkpoint
@@ -23,8 +31,10 @@ from __future__ import annotations
 import asyncio
 import os
 import pathlib
+import re
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 
@@ -200,16 +210,363 @@ async def test_resolve_access_fails_closed_on_a_none_pool() -> None:
     await _expect_503(resolve_access(None, run_id="run-abc", subject="alice", groups=["consultant"]))
 
 
+# --------------------------------------------------------------------------
+# ADR-0527 criterion 10: the two access-resolution paths, exercised against a
+# stub psycopg pool instead of being recomputed in the test body
+# --------------------------------------------------------------------------
+
+
+class _StubCursor:
+    """The same shape as tests/test_projects.py's _FakeCursor (async context
+    manager, execute/fetchone/fetchall), except the rows come from an
+    `answer(query, params)` callable - so a test can stand in for the
+    agent-conversations database rather than for one canned reply, and can
+    see the SQL and the bound parameters the function under test actually
+    sent."""
+
+    def __init__(self, answer):
+        self._answer = answer
+        self._rows = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def execute(self, query, params=None):
+        self._rows = self._answer(query, dict(params or {}))
+
+    async def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    async def fetchall(self):
+        return list(self._rows)
+
+
+class _StubConn:
+    def __init__(self, answer):
+        self._answer = answer
+
+    def cursor(self):
+        return _StubCursor(self._answer)
+
+
+class _StubPool:
+    """The pool layer test_projects.py's fakes stop short of: pool.connection()
+    is the async context manager every function in app/conversations.py opens
+    before it touches a cursor."""
+
+    def __init__(self, answer):
+        self._answer = answer
+
+    @asynccontextmanager
+    async def connection(self):
+        yield _StubConn(self._answer)
+
+
+def _conversation_row(*, owner_sub: str, project_role):
+    """One row of resolve_access's SELECT list exactly as psycopg's dict_row
+    hands it back: a live conversation in a live project, so the only things
+    varying case to case are who owns it and what grant the caller holds."""
+    return {
+        "owner_sub": owner_sub,
+        "agent_name": "tekos",
+        "project_id": "proj-shared",
+        "archived_at": None,
+        "project_title": "Acme migration",
+        "project_context": "",
+        "project_classification": "internal",
+        "is_customer": False,
+        "salesforce_verified_at": None,
+        "project_archived_at": None,
+        "project_role": project_role,
+    }
+
+
 async def test_owner_always_outranks_a_weaker_project_role() -> None:
     """ADR-0527 clause 3: owner_sub keeps granting write on your own
     conversation whatever your project role - that is precisely what makes
     the `clone` role useful (fork and continue) rather than merely
     archival. An owner who is ALSO a project admin keeps the stronger
-    role, so they do not lose the admin-only actions by owning the row."""
-    for project_role, expected in [(None, "write"), ("read", "write"), ("clone", "write"),
-                                   ("write", "write"), ("admin", "admin")]:
-        resolved = "admin" if project_role == "admin" else "write"
-        assert resolved == expected, f"owner with project role {project_role!r} resolved {resolved!r}"
+    role, so they do not lose the admin-only actions by owning the row.
+
+    Proved by calling resolve_access itself against a stub pool, never by
+    recomputing the rule here: each project role is resolved twice off the
+    same row, once for the owner and once for a colleague. "Outranks" is a
+    claim about ownership, so the colleague's resolution (exactly the
+    project role, and a flat denial with no grant at all) is what gives the
+    owner's resolution its meaning - and a resolver that returned a
+    constant, or that guessed a default role for the no-grant case, fails
+    one half or the other."""
+    for project_role, owner_expected, colleague_expected in [
+        (None, "write", None),
+        ("read", "write", "read"),
+        ("clone", "write", "clone"),
+        ("write", "write", "write"),
+        ("admin", "admin", "admin"),
+    ]:
+        for owner_sub, expected in [("alice", owner_expected), ("bob", colleague_expected)]:
+            seen = {}
+
+            def answer(query, params, _owner=owner_sub, _role=project_role, _seen=seen):
+                _seen.update(params)
+                return [_conversation_row(owner_sub=_owner, project_role=_role)]
+
+            access = await resolve_access(
+                _StubPool(answer), run_id="run-abc", subject="alice", groups=["consultant"]
+            )
+            resolved = access["role"] if access is not None else None
+            assert resolved == expected, (
+                f"owner_sub={owner_sub!r} with project role {project_role!r} "
+                f"resolved {resolved!r}, expected {expected!r}"
+            )
+            # The check is anchored on the CALLER's identity, not on anything
+            # the client asserted: subject and groups are what the lateral
+            # grant lookup matches on, so both must reach the query.
+            assert seen["run_id"] == "run-abc", seen
+            assert seen["subject"] == "alice", seen
+            assert seen["groups"] == ["consultant"], seen
+
+
+# --------------------------------------------------------------------------
+# ADR-0527 criterion 10's security-negative for the rewritten listing.
+#
+# The listing moved from a single owner_sub predicate to a two-block
+# membership join, so the fixture below is a three-table one (conversations
+# x projects x project_grants) covering all five shapes ADR-0527's Security
+# considerations enumerate. It answers the query list_conversations actually
+# built - every join condition AND the final WHERE clause are pulled back
+# out of the emitted SQL and evaluated against the fixture - rather than
+# reimplementing ADR-0527's visibility rule, which is the failure mode this
+# whole exercise exists to remove.
+# --------------------------------------------------------------------------
+
+
+class _SqlNull:
+    """SQL NULL, deliberately not Python None: `NULL = NULL` is false in
+    Postgres while `None == None` is true in Python, and that difference IS
+    the archived-project rule. The projects LEFT JOIN leaves p.project_id
+    NULL for an archived project, so the LATERAL's `g.project_id =
+    p.project_id` matches nothing and an otherwise live grant row stops
+    counting. A fixture that used None would quietly join the archived
+    project's grants back on and hide the very leak shape 5 exists to
+    catch."""
+
+    def __eq__(self, other):
+        return False
+
+    def __ne__(self, other):
+        return True
+
+    def __hash__(self):
+        return hash(None)
+
+    def __repr__(self):
+        return "NULL"
+
+
+_NULL = _SqlNull()
+
+
+def _py(value):
+    """SQL NULL back to the None psycopg would hand app/conversations.py."""
+    return None if isinstance(value, _SqlNull) else value
+
+
+def _merge(*rows) -> dict:
+    merged: dict = {}
+    for row in rows:
+        merged.update(row)
+    return merged
+
+
+# Only the constructs ADR-0527's listing query uses. Anything else is
+# rejected below rather than quietly evaluated, so this helper can never
+# decay into the thing it replaces: an assertion that passes whatever the
+# code happens to do.
+_SQL_TO_PYTHON = [
+    (r"%\((\w+)\)s", r'P["\1"]'),
+    (r"\b([cpgs])\.(\w+)\b", r'R["\1.\2"]'),
+    # The group-membership test consumes its own `=` before the generic
+    # operator rule at the bottom would turn it into `==`.
+    (r'(R\["[cpgs]\.\w+"\])\s*=\s*ANY\(P\["(\w+)"\]::text\[\]\)', r'\1 in P["\2"]'),
+    (r"\bIS NOT NULL\b", "is not null"),
+    (r"\bIS NULL\b", "is null"),
+    (r"\bAND\b", "and"),
+    (r"\bOR\b", "or"),
+    (r"(?<![<>!=])=(?!=)", "=="),
+]
+
+
+def _sql_predicate_holds(clause: str, row: dict, params: dict) -> bool:
+    expression = " ".join(clause.split())  # one line: the clause is indented SQL
+    for pattern, replacement in _SQL_TO_PYTHON:
+        expression = re.sub(pattern, replacement, expression)
+    unsupported = re.findall(r"[A-Z]{2,}|::", expression)
+    assert not unsupported, f"unsupported SQL {unsupported} in the listing clause: {clause!r}"
+    return bool(eval(expression, {"__builtins__": {}}, {"R": row, "P": params, "null": _NULL}))  # noqa: S307
+
+
+def _clause(query: str, after: str, before: str, keyword: str) -> str:
+    """One fragment of the emitted listing query: whatever follows `keyword`
+    in the section between `after` and `before`. Asserts rather than guesses
+    if the query no longer has that shape, so a later rewrite of
+    list_conversations can never leave this fixture silently answering from
+    a join condition that is no longer in the SQL."""
+    assert after in query and before in query, f"{after!r}/{before!r} not in the listing query"
+    section = query.split(after, 1)[1].split(before, 1)[0]
+    assert keyword in section, f"{keyword!r} not in {section!r}"
+    return section.split(keyword, 1)[1]
+
+
+_UPDATED_AT = datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc)
+
+_FIXTURE_PROJECTS = [
+    {"p.project_id": "proj-shared", "p.archived_at": _NULL},
+    {"p.project_id": "proj-other", "p.archived_at": _NULL},
+    {"p.project_id": "proj-archived", "p.archived_at": _UPDATED_AT},
+]
+
+_NO_PROJECT = {"p.project_id": _NULL, "p.archived_at": _NULL}
+
+# The five shapes, in ADR-0527's own order. Every row is a live (not
+# archived) conversation of the same agent, so the only thing deciding
+# visibility is the rule under test.
+_FIXTURE_CONVERSATIONS = [
+    # 1. a private conversation - alice's own, in no project at all.
+    {"c.run_id": "run-alice-private", "c.owner_sub": "alice", "c.project_id": _NULL,
+     "c.title": "My own notes", "c.agent_name": "tekos", "c.archived_at": _NULL},
+    # 2. a project conversation - alice's own, inside a project. It reaches
+    #    her through the membership block, not the ownership block: the
+    #    first block is deliberately `project_id IS NULL` only, so a
+    #    conversation filed in a project is governed by that project.
+    {"c.run_id": "run-alice-in-project", "c.owner_sub": "alice", "c.project_id": "proj-shared",
+     "c.title": "Migration kickoff", "c.agent_name": "tekos", "c.archived_at": _NULL},
+    # 3. a colleague's conversation in a SHARED project - the whole point of
+    #    the widening, and the row that must appear only once a grant does.
+    {"c.run_id": "run-bob-shared", "c.owner_sub": "bob", "c.project_id": "proj-shared",
+     "c.title": "Bob's migration plan", "c.agent_name": "tekos", "c.archived_at": _NULL},
+    # 4. a colleague's conversation in an UNSHARED project - alice holds no
+    #    grant on proj-other in any direction of this test, so it must never
+    #    appear, not even while she is a member of another project.
+    {"c.run_id": "run-bob-unshared", "c.owner_sub": "bob", "c.project_id": "proj-other",
+     "c.title": "Someone else's account", "c.agent_name": "tekos", "c.archived_at": _NULL},
+    # 5. a conversation in an ARCHIVED project - hidden even though the
+    #    grant row below is perfectly live. ADR-0527 clause 7's revocation
+    #    happens at the project level (archive_project_cascade bumps
+    #    grants_revision and pushes an empty member set), and this is the
+    #    listing-level guard that the archive is honoured here too.
+    {"c.run_id": "run-bob-archived", "c.owner_sub": "bob", "c.project_id": "proj-archived",
+     "c.title": "Last year's engagement", "c.agent_name": "tekos", "c.archived_at": _NULL},
+]
+
+# Present in BOTH directions on purpose: shape 5 stays hidden because the
+# project is archived, never because the grant went away.
+_ARCHIVED_PROJECT_GRANT = {"g.project_id": "proj-archived", "g.subject": "alice",
+                           "g.group_name": _NULL, "g.role": "write"}
+
+
+class _FakeConversationsDatabase:
+    """Stands in for agent-conversations for the listing query alone. For
+    every fixture conversation it replays the query's own join conditions -
+    the projects ON clause, then the LATERAL's grant lookup - and finally
+    the query's own visibility WHERE clause. Change the rule in
+    app/conversations.py and this fixture's answer changes with it, which is
+    the point of driving it off the emitted SQL rather than off a copy."""
+
+    def __init__(self, grants):
+        self._grants = grants
+
+    def __call__(self, query, params):
+        projects_on = _clause(query, "LEFT JOIN projects p", "LEFT JOIN LATERAL", "ON ")
+        grants_where = _clause(query, "FROM project_grants g", "ORDER BY", "WHERE ")
+        visibility = query.rsplit("WHERE", 1)[1].split("ORDER BY")[0]
+
+        rows = []
+        for conversation in _FIXTURE_CONVERSATIONS:
+            project = next(
+                (p for p in _FIXTURE_PROJECTS
+                 if _sql_predicate_holds(projects_on, _merge(conversation, p), params)),
+                _NO_PROJECT,  # LEFT JOIN: no match leaves every p.* column NULL
+            )
+            joined = _merge(conversation, project)
+            matching = [g for g in self._grants
+                        if _sql_predicate_holds(grants_where, _merge(joined, g), params)]
+            # ORDER BY <role rank> DESC LIMIT 1. The SQL rank is
+            # _ROLE_RANK_SQL, whose Python twin the module exports as rank_of.
+            joined["g.role"] = max(
+                (g["g.role"] for g in matching), key=conversations_module.rank_of, default=_NULL
+            )
+            joined["s.run_id"] = _NULL  # nothing starred in this fixture
+            if _sql_predicate_holds(visibility, joined, params):
+                rows.append({
+                    "run_id": _py(joined["c.run_id"]),
+                    "title": _py(joined["c.title"]),
+                    "updated_at": _UPDATED_AT,
+                    "project_id": _py(joined["c.project_id"]),
+                    "starred": joined["s.run_id"] is not _NULL,
+                    "owned": joined["c.owner_sub"] == params["subject"],
+                    "project_role": _py(joined["g.role"]),
+                })
+        return rows
+
+
+async def test_list_conversations_covers_every_shape_adr_0527_enumerates() -> None:
+    """ADR-0527 criterion 10's security-negative for the rewritten listing,
+    in both directions and across all five shapes its Security
+    considerations enumerate. ADR-0212 filtered on owner_sub alone; ADR-0527
+    widened that to the two-block membership join, and the entire risk of
+    the widening is that it hands a colleague's conversation to someone
+    holding no grant on its project.
+
+    Direction 1 - alice holds no grant on the shared project, so neither
+    bob's conversation (3) nor her own conversation filed inside that
+    project (2) may appear, WHILE her project-less one (1) still does: a
+    listing that returned nothing at all would sail through a
+    negative-only assertion while being just as broken (see the
+    negative-only gate that hid a broken tool in WP-074).
+
+    Direction 2 - the identical call once a grant exists: (2) and (3)
+    appear, the colleague's row carrying the granted role so the frontend
+    renders it read-only while her own stays writable. Asserted for both
+    ways a grant can be held, directly on the subject and through a group,
+    which is also what proves the caller's groups reach the query.
+
+    Shapes 4 and 5 are invariants across both directions: the colleague's
+    conversation in an unshared project never appears, and neither does the
+    one in an archived project - the latter WITH a live grant row in the
+    fixture the whole time, because ADR-0527 clause 7's revocation is the
+    archive itself, and a listing that honoured only the grant table would
+    keep serving an archived engagement to every former member."""
+    always_hidden = {"run-bob-unshared", "run-bob-archived"}
+
+    ungranted = await list_conversations(
+        _StubPool(_FakeConversationsDatabase([_ARCHIVED_PROJECT_GRANT])),
+        agent_name="tekos", subject="alice", groups=["consultant"],
+    )
+    assert [r["run_id"] for r in ungranted] == ["run-alice-private"], ungranted
+
+    for grant, groups in [
+        ({"g.project_id": "proj-shared", "g.subject": "alice", "g.group_name": _NULL, "g.role": "read"},
+         ["consultant"]),
+        ({"g.project_id": "proj-shared", "g.subject": _NULL, "g.group_name": "sales", "g.role": "read"},
+         ["consultant", "sales"]),
+    ]:
+        granted = await list_conversations(
+            _StubPool(_FakeConversationsDatabase([grant, _ARCHIVED_PROJECT_GRANT])),
+            agent_name="tekos", subject="alice", groups=groups,
+        )
+        by_run = {r["run_id"]: r for r in granted}
+        assert set(by_run) == {"run-alice-private", "run-alice-in-project", "run-bob-shared"}, granted
+        assert not (always_hidden & set(by_run)), granted
+        assert by_run["run-bob-shared"]["role"] == "read", by_run["run-bob-shared"]
+        assert by_run["run-bob-shared"]["project_id"] == "proj-shared", by_run["run-bob-shared"]
+        # Ownership still wins on her own rows (resolve_access's rule applied
+        # to the list, so the sidebar and the conversation itself agree),
+        # inside a project as well as outside one.
+        assert by_run["run-alice-in-project"]["role"] == "write", by_run["run-alice-in-project"]
+        assert by_run["run-alice-private"]["role"] == "write", by_run["run-alice-private"]
 
 
 async def test_role_ranks_form_a_total_order() -> None:
@@ -337,6 +694,7 @@ TESTS = [
     test_hard_delete_conversation_fails_closed_on_a_none_pool,
     test_resolve_access_fails_closed_on_a_none_pool,
     test_owner_always_outranks_a_weaker_project_role,
+    test_list_conversations_covers_every_shape_adr_0527_enumerates,
     test_role_ranks_form_a_total_order,
     test_derive_clone_title_increments_rather_than_nesting,
     test_derive_clone_title_respects_the_rename_ceiling,
