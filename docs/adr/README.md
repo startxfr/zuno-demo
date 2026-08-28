@@ -208,7 +208,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) | v0.4 | Repo work merged | Fine-tune and serve a French urban-register model variant (`-wesh`) beside its base |
 | [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | v0.4 | Partially implemented | Introduce the project as the sharing and context boundary |
 | [ADR-0528](0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md) | v0.4 | Repo work merged | Re-key project binding, quota and telemetry onto the Zuno project id |
-| [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) | v0.4 | Repo work merged | Reconcile Keycloak clients instead of relying on a create-only realm import |
+| [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) | v0.4 | Implemented | Reconcile Keycloak clients instead of relying on a create-only realm import |
 
 ## version 0.5
 

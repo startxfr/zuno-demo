@@ -1,13 +1,14 @@
 # ADR-0530: Reconcile Keycloak clients instead of relying on a create-only realm import
 
-- **Status:** Repo work merged (2026-08-28) - the mechanism, the `zuno-admin-api`
-  declaration, its Vault seeding and delivery, and the agent-bff wiring across
-  the four Helm-managed agents and the two operator-managed ones are all in the
-  repository, with 8 chart tests and 3 operator tests covering them. **Not yet
-  run live**: Keycloak is shared infrastructure and the first reconcile rewrites
-  every declared client, so that run is to be agreed rather than folded into a
-  routine sync. `Implemented` needs it, plus the 200s on `GET /api/colleagues`
-  and `GET /api/groups` that ADR-0527's two-persona pass depends on
+- **Status:** Implemented (2026-08-28) - live-verified. The reconcile Job created
+  `zuno-admin-api` and merged into the ten existing clients; its service account
+  holds exactly `view-users`/`query-users`/`query-groups`; the client-credentials
+  grant succeeds against the KC_VAULT-resolved secret, reads 3 users and 19
+  groups, and is refused `POST /users` with 403. `GET /api/colleagues` now
+  answers **200** through agent-bff, ending the 503 that had stood since WP-066.
+  `GET /api/groups` still 404s, which is WP-088's pending rebuild and not this
+  ADR: the deployed agent-bff image was built 19:27Z and the commit adding that
+  route landed 20:28Z
 - **Target:** v0.4
 - **Date:** 2026-08-28
 - **Decision owners:** Zuno Demo architecture team
@@ -152,3 +153,36 @@ it to the realm file would have changed nothing and looked like it should.
   one client and change nothing else. That also means the point-in-time mirror
   `ansible/roles/mlops` keeps of each `<agent>-frontend-client-secret` does not
   go stale as a result of this change.
+
+## Dated progress notes
+
+### 2026-08-27/28 - what the first live run actually cost
+
+Three things went wrong that the repository-side work had not anticipated. All
+three are now guarded; they are recorded because each was cheap to prevent and
+expensive to diagnose at two in the morning.
+
+**`kcadm update -f` does not merge.** Caught before the run, by diffing the ten
+live clients against what the chart renders rather than trusting it. Decision 2
+carries the detail. Had it not been caught, the Job would have gone green while
+stripping the `groups` claim mappers off every client, and the failure would
+have surfaced somewhere far from its cause.
+
+**`CLIENT.DESCRIPTION` is `varchar(255)`.** The first run updated all ten
+existing clients and then failed creating `zuno-admin-api` on a 283-character
+description. The Admin API answers a bare `[unknown_error]`; the real cause -
+`value too long for type character varying(255)` - appears only in the Keycloak
+server log. The create rolled back cleanly, leaving no half-made client.
+`test_client_text_fields_fit_keycloak_s_columns` now checks every declared
+client. Note `soursage-frontend` sits at 251 characters, so the margin is thin
+by accident rather than by design.
+
+**A failing hook pins the whole sync to its revision.** After the fix was
+pushed, ArgoCD kept retrying the *old* operation - `retry.limit: 5`, each
+attempt burning the Job's own `backoffLimit` - and each retry re-applied the
+ConfigMap at the stale revision, so the fix could not land while the failure
+caused by that fix's absence was still being retried. It resolves itself once
+the retries exhaust (about 25 minutes here), but the shape is worth knowing:
+`status.sync.revision` can already show the new commit while
+`operationState.operation.sync.revision` is still the old one, and the second
+is the one that decides what gets applied.
