@@ -1,6 +1,6 @@
 # WP-090: Salesforce link, quota and telemetry on the Zuno project id (promotes ADR-0528)
 
-- **State:** Repo work merged (2026-08-27)
+- **State:** Repo work merged (2026-08-29) - the telemetry criterion is confirmed live and the `tool-policy.yaml` decision is recorded (no change); the one criterion left is the live Salesforce pass, blocked outside this repo on the WP-22/WP-33 sandbox credential gap
 
 > Sequencing note (2026-08-27): step 2 landed early, inside WP-088 Part A.
 > Removing `_bind_project_if_required` was not separable - `agent_chat`
@@ -108,10 +108,60 @@ Read also: [ADR-0512](../../adr/0512-introduce-project-bound-tasks-with-salesfor
 - A live Salesforce pass (set a real opportunity on a project, confirm the three
   failure causes) remains blocked on the standing WP-22/WP-33 sandbox credential
   gap - the same block ADR-0512 already carried.
-- A reviewed `tool-policy.yaml` decision on whether `finance` gains
-  `salesforce.opportunity.read`.
-- After redeploy, confirm `zuno.project_id` appears on a real trace and joins to
-  `zuno.run_id` across agent-bff, agent-runtime and ai-gateway.
+- ~~A reviewed `tool-policy.yaml` decision on whether `finance` gains
+  `salesforce.opportunity.read`.~~ **Decided 2026-08-29: no change.**
+  `salesforce.opportunity.read` keeps `allowed_groups: [sales, board]`
+  (`policies/tools/tool-policy.yaml`).
+
+  The grant would widen CRM reach onto a room that is empty. No Salesforce
+  credential exists anywhere in this cluster and none can: `ansible/roles/vault/
+  tasks/install.yml` seeds `zuno/salesforce/technical` only when
+  `zuno_salesforce_url`/`zuno_salesforce_access_token` differ from their
+  `xxxxxx` placeholder, which they do not - so there is no Vault path, no
+  ExternalSecret, no `salesforce-mcp` Deployment and no Argo Application, and
+  the server's own docstring concedes "no real Salesforce org is wired in this
+  demo". Granting access to a backend that does not exist buys nothing and
+  quietly widens the blast radius for the day one does.
+
+  Not free to reverse, which is the other half of the reasoning: adding
+  `finance` changes the generated authorization matrices in
+  `agents/finage/agent.okf.md` and `agents/comage/agent.okf.md`, which changes
+  those bundles' bytes, which invalidates their OKF signatures and requires
+  `make d3 sign agents` before agent-runtime will start. That is the right
+  price to pay alongside a working sandbox, and the wrong one to pay for
+  nothing.
+
+  **Revisit when WP-22/WP-33 lands a sandbox** - at which point the change is
+  one line plus a matrix regeneration. Nothing else in the repo needs touching:
+  no test asserts the current group list, and `evaluations/finage/scenarios.yaml`
+  scenario 12 stays green because its 403 comes from the agent_declaration
+  factor, not the group factor.
+- ~~After redeploy, confirm `zuno.project_id` appears on a real trace and joins
+  to `zuno.run_id` across agent-bff, agent-runtime and ai-gateway.~~
+  **Confirmed 2026-08-29 against live Tempo** (`TempoMonolithic tempo` in
+  `zuno-monitoring`, query API reached by a temporary port-forward - it has no
+  Route by design). Turn `zuno.run_id=3e33c0b1-0172-451c-aa55-76c07bd4a33b`
+  (comage, 2026-08-28 09:34:26 UTC) carries
+  `zuno.project_id=0b4daf98-dd1e-486c-bc5c-4b4716f65320` on all three:
+  `bff_request` (agent-bff), `agent_graph_run` + `api_request` (agent-runtime)
+  and `model_call` (ai-gateway). The gateway span shows a genuine call -
+  `zuno.provider=local-wesh-maas`, `zuno.model=qwen3.5-9b-wesh`, 1001/66
+  tokens - not a stub, and carries no Salesforce identifier, satisfying the
+  adjacent negative clause. Coverage is 3 of 3: the database holds exactly
+  three project-bound conversations and every one produced the full
+  three-service attribute set, on two different agents.
+
+  **Nuance worth knowing before someone opens Jaeger:** the three services do
+  not share a trace id - each roots its own trace, with no W3C context
+  propagation between them. The criterion is still met as written, because it
+  asks for joinability on `zuno.run_id`, which is exactly how
+  `gitops/charts/grafana/templates/dashboard-run-trace.yaml` queries (21
+  `zuno.run_id` references, no trace-tree traversal). But there is no single
+  waterfall to look at.
+
+  **Still missing, and not closed by this:** no test in ai-gateway or agent-bff
+  asserts the attribute. It is proven present in production and unguarded
+  against regression - a refactor could drop it and CI would stay green.
 
 ## Status updates (then re-run check_docs.py)
 

@@ -56,9 +56,11 @@
 #                              AI Gateway per ADR-0029) per rolling window.
 #   precedence:                the draw-down orders stated above, encoded so
 #                              consumers never hardcode them.
-#   project_binding.validity_window: how long an ADR-0512 Salesforce project
-#                              verification stays valid before a resumed
-#                              conversation must re-verify.
+#   project_binding.validity_window: how long a PROJECT's Salesforce link
+#                              stays trusted before re-verification
+#                              (ADR-0528, re-keying ADR-0512 clause 3 off
+#                              the conversation and onto the project - see
+#                              the block's own comment below).
 #   Windows parse as ^[0-9]+(s|m|h|d)$ (validated by
 #   platform/okf/validate_quota_policy.py, a blocking lint step).
 
