@@ -321,6 +321,62 @@ async def test_context_ceiling_matches_the_schema_and_the_ddl() -> None:
     )
 
 
+async def test_archiving_revokes_the_projection_rather_than_only_hiding() -> None:
+    """ADR-0527 clause 7. rag-service authorizes knowledge.project purely on
+    a project_memberships row existing - search.py's _check_project_membership
+    has no notion of archived_at and cannot have one, since it does not own
+    the projects table. So an archive that leaves the projection in place
+    leaves the archived project's memory readable to every former member.
+
+    Found live on 2026-08-28: three archived projects still had their
+    membership rows, and reconcile_projections skipped them rather than
+    clearing them, so nothing ever repaired it.
+    """
+    from app.clients import project_membership_client
+
+    seen = {}
+    saved = project_membership_client.replace_memberships
+
+    async def capture(project_id, revision, members):
+        seen["project_id"] = project_id
+        seen["revision"] = revision
+        seen["members"] = members
+        return {"applied": True, "revision": revision, "rows": len(members)}
+
+    project_membership_client.replace_memberships = capture
+    try:
+        await projects.revoke_projection(None, "proj-9", 12)
+    finally:
+        project_membership_client.replace_memberships = saved
+
+    assert seen["project_id"] == "proj-9"
+    assert seen["revision"] == 12
+    assert seen["members"] == [], (
+        "archiving must push an EMPTY member set - anything else leaves access behind"
+    )
+
+
+async def test_a_failed_revocation_rolls_the_archive_back() -> None:
+    """Same fail-closed contract _push_projection has, for the same reason
+    in reverse: an archive that reached `projects` but not
+    `project_memberships` is precisely the half-applied state that leaves
+    knowledge.project readable after the project is gone."""
+    from app.clients import project_membership_client
+
+    saved = project_membership_client.replace_memberships
+
+    async def failing(project_id, revision, members):
+        raise project_membership_client.ProjectMembershipSyncError("rag-service down")
+
+    project_membership_client.replace_memberships = failing
+    try:
+        await _expect_503(
+            projects.revoke_projection(None, "proj-9", 12)
+        )
+    finally:
+        project_membership_client.replace_memberships = saved
+
+
 TESTS = [
     test_entitlement_groups_never_resolve_a_grant,
     test_entitlement_groups_are_refused_as_grant_targets,
@@ -333,6 +389,8 @@ TESTS = [
     test_require_role_hides_projects_the_caller_cannot_see,
     test_a_failed_projection_push_raises_503_before_any_commit,
     test_the_projection_carries_targets_but_never_roles,
+    test_archiving_revokes_the_projection_rather_than_only_hiding,
+    test_a_failed_revocation_rolls_the_archive_back,
     test_context_ceiling_matches_the_schema_and_the_ddl,
 ]
 

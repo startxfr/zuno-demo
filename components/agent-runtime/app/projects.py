@@ -350,13 +350,51 @@ async def archive_project_cascade(
                 )
                 conversations_archived = cur.rowcount
                 await cur.execute(
-                    "UPDATE projects SET archived_at = now(), updated_at = now() "
-                    "WHERE project_id = %s AND archived_at IS NULL",
+                    "UPDATE projects SET archived_at = now(), updated_at = now(), "
+                    "grants_revision = grants_revision + 1 "
+                    "WHERE project_id = %s AND archived_at IS NULL "
+                    "RETURNING grants_revision",
                     (project_id,),
                 )
-                if cur.rowcount == 0:
+                row = await cur.fetchone()
+                if row is None:
                     raise HTTPException(status_code=404, detail="project not found")
+            # Archiving must REVOKE knowledge.project access, not merely hide
+            # the project from the sidebar. rag-service authorizes purely on a
+            # row existing in project_memberships (search.py's
+            # _check_project_membership); it has no notion of archived_at and
+            # cannot have one, since it does not own the projects table. So
+            # leaving the projection in place leaves an archived project's
+            # memory readable to everyone who was a member.
+            #
+            # Found live on 2026-08-28: three archived projects still carried
+            # their membership rows. reconcile_projections already filtered
+            # `archived_at IS NULL`, so the intent was always that archived
+            # projects are absent from the projection - but nothing removed
+            # them, and skipping them at startup meant nothing repaired it.
+            #
+            # project_grants is left intact on purpose: archiving is
+            # recoverable by an operator clearing archived_at, and the
+            # projection is rebuilt from those grants by the next
+            # reconcile_projections or any later save.
+            await revoke_projection(conn, project_id, int(row["grants_revision"]))
     return {"conversations_archived": conversations_archived}
+
+
+async def revoke_projection(conn, project_id: str, revision: int) -> None:
+    """The archive-time counterpart of _push_projection: pushes an EMPTY
+    member set, inside the caller's open transaction, with the same
+    fail-closed-and-roll-back contract. If rag-service cannot be reached the
+    archive is rolled back rather than half-applied - an archive that left
+    access behind is the exact failure this exists to prevent."""
+    try:
+        await project_membership_client.replace_memberships(project_id, revision, [])
+    except project_membership_client.ProjectMembershipSyncError as exc:
+        logger.error("project membership revocation failed for %s: %s", project_id, exc)
+        raise HTTPException(
+            status_code=503,
+            detail="the project directory is unavailable - no change was applied",
+        ) from exc
 
 
 async def set_project_star(
@@ -542,8 +580,13 @@ async def reconcile_projections(pool: Optional[AsyncConnectionPool]) -> int:
     try:
         async with pool.connection() as conn:
             async with conn.cursor() as cur:
+                # Archived projects are included on purpose and push an
+                # empty member set below: skipping them (as this did until
+                # 2026-08-28) means a projection left behind by an archive
+                # predating the revocation fix is never repaired.
                 await cur.execute(
-                    "SELECT project_id, grants_revision FROM projects WHERE archived_at IS NULL"
+                    "SELECT project_id, grants_revision, archived_at IS NOT NULL AS archived "
+                    "FROM projects"
                 )
                 projects = await cur.fetchall()
             for row in projects:
@@ -552,10 +595,14 @@ async def reconcile_projections(pool: Optional[AsyncConnectionPool]) -> int:
                         "SELECT subject, group_name FROM project_grants WHERE project_id = %s",
                         (row["project_id"],),
                     )
-                    members = [
-                        {"subject": r["subject"], "group_name": r["group_name"]}
-                        for r in await cur.fetchall()
-                    ]
+                    members = (
+                        []
+                        if row["archived"]
+                        else [
+                            {"subject": r["subject"], "group_name": r["group_name"]}
+                            for r in await cur.fetchall()
+                        ]
+                    )
                 await project_membership_client.replace_memberships(
                     row["project_id"], int(row["grants_revision"]), members
                 )
