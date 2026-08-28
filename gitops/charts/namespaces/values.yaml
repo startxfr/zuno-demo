@@ -443,9 +443,22 @@ platformNamespaces:
     # limits.cpu=2"). 3/5Gi gives the sidecar's measured ~1 core/~1Gi room
     # alongside the existing 2-core/4Gi app budget; requests already had
     # headroom (250m/576Mi used of 500m/1Gi) so left as-is.
+    # WP-087, 2026-08-28: requests raised 500m/1Gi -> 1500m/2560Mi and
+    # limits.cpu 3 -> 6. The old ceiling fit model-catalog and its Postgres
+    # and NOTHING ELSE - those two consumed all 500m of requests.cpu, so the
+    # `zuno` ModelRegistry instance and its Postgres sat in FailedCreate for
+    # hours. That reaches a caller as a bare `Connection refused` naming a
+    # host that resolves perfectly, because the Service exists and only its
+    # endpoints are empty; the registry had been provisioned without room to
+    # run and nothing surfaced it until a pipeline first tried to register a
+    # model. Sized from the FailedCreate events rather than the container
+    # specs, for the same sidecar reason the note above gives: need is
+    # 1050m/1728Mi requests and 3500m limits.cpu, and the headroom over that
+    # is one surge pod so a rolling update cannot deadlock against its own
+    # quota the way this one did.
     resourceQuota:
-      requests: { cpu: "500m", memory: "1Gi" }
-      limits: { cpu: "3", memory: "5Gi" }
+      requests: { cpu: "1500m", memory: "2560Mi" }
+      limits: { cpu: "6", memory: "5Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "1Gi" }
