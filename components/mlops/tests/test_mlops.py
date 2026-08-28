@@ -125,6 +125,8 @@ def _config(**overrides) -> "mlops.MlopsConfig":
         lora_alpha=16,
         lora_dropout=0.05,
         cpu_safe=True,
+        seed=42,
+        deterministic=True,
         # ADR-0526 (WP-087). style_corpus_s3uri defaults to None here on
         # purpose: the default fixture must keep exercising WP-34's
         # grounding-domain branch, so the style branch is opted into
@@ -732,8 +734,75 @@ def test_task_system_prompt_is_the_body_not_the_frontmatter() -> None:
     assert body and "okf_version" not in body
 
 
+# ---------------------------------------------------------------------------
+# WP-087: reproducible training
+# ---------------------------------------------------------------------------
+
+
+class _FakeTorch:
+    """Only the surface _enable_deterministic_training touches."""
+
+    class backends:
+        class cudnn:
+            deterministic = False
+            benchmark = True
+
+    def __init__(self):
+        self.deterministic_calls = []
+
+    def use_deterministic_algorithms(self, flag):
+        self.deterministic_calls.append(flag)
+
+
+def test_cublas_workspace_is_configured_at_import_time():
+    # Not merely "some value": the wrong value makes torch raise at the
+    # first matmul instead of running nondeterministically, so the exact
+    # string is the contract.
+    assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8", os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+
+
+def test_deterministic_training_pins_every_source_of_run_to_run_drift():
+    torch = _FakeTorch()
+    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.benchmark = True
+
+    mlops._enable_deterministic_training(torch, _config())
+
+    # warn_only would defeat the purpose: the run would look reproducible
+    # and would not be.
+    assert torch.deterministic_calls == [True], torch.deterministic_calls
+    assert torch.backends.cudnn.deterministic is True
+    assert torch.backends.cudnn.benchmark is False
+
+
+def test_determinism_can_be_disabled_but_only_explicitly():
+    torch = _FakeTorch()
+    config = _config()
+    object.__setattr__(config, "deterministic", False)
+
+    mlops._enable_deterministic_training(torch, config)
+
+    assert torch.deterministic_calls == [], torch.deterministic_calls
+
+
+def test_the_seed_reaches_training_arguments_explicitly():
+    # Asserted against the source rather than a call, because
+    # _run_lora_training imports torch/peft/transformers and this suite
+    # deliberately never installs them. The regression it guards is real
+    # and invisible otherwise: TrainingArguments' own default is ALSO 42,
+    # so dropping `seed=config.seed` leaves every test and every run
+    # green while making MLOPS_SEED dead config.
+    src = (pathlib.Path(__file__).resolve().parent.parent / "src" / "mlops.py").read_text()
+    assert "seed=config.seed," in src, "TrainingArguments no longer passes the configured seed"
+    assert _config().seed == 42
+
+
 TESTS = [
     # WP-087 / ADR-0526
+    test_cublas_workspace_is_configured_at_import_time,
+    test_deterministic_training_pins_every_source_of_run_to_run_drift,
+    test_determinism_can_be_disabled_but_only_explicitly,
+    test_the_seed_reaches_training_arguments_explicitly,
     test_parse_tool_calls_reads_the_qwen_XML_block_not_json,
     test_parse_tool_calls_keeps_multiline_parameter_values,
     test_a_truncated_tool_call_is_recorded_not_swallowed,

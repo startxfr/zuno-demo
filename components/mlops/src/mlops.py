@@ -64,6 +64,31 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger("mlops")
 
+# Reproducibility, set at import time because cuBLAS reads this when it
+# allocates its workspace - on the FIRST matmul, which is far inside
+# Trainer.train(). Setting it next to torch.use_deterministic_algorithms()
+# would be too late to matter, and torch then raises rather than silently
+# running nondeterministically. setdefault, so an operator debugging a
+# determinism failure can still override it from the pod env.
+#
+# Why this exists (measured, not precautionary): four runs of THIS
+# pipeline on a byte-identical corpus with identical hyperparameters
+# produced four different models. Their register scores on the same 79
+# held-out prompts:
+#
+#   run 004853  marker 0.9114  opening 0.2278  degenerate 0  PASS
+#   run 021857  marker 0.9367  opening 0.1772  degenerate 0  PASS
+#   run 084716  marker 0.9114  opening 0.2278  degenerate 0  PASS
+#   run 125359  marker 0.8861  opening 0.2405  degenerate 5  FAIL
+#
+# The seed was already fixed (TrainingArguments defaults to 42), so the
+# spread came from nondeterministic CUDA kernels compounding over 208
+# steps. That spread is wide enough to flip a gate half on its own, which
+# makes any before/after comparison across a corpus change unattributable
+# - the whole point of the tool-calling corpus work this precedes.
+_CUBLAS_DETERMINISTIC_WORKSPACE = ":4096:8"
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", _CUBLAS_DETERMINISTIC_WORKSPACE)
+
 STAGES = (
     "prepare-dataset",
     "train-lora",
@@ -79,6 +104,38 @@ STAGES = (
 # different source of truth - see components/agent-runtime/app/graph/
 # nodes.py's _escalate for the live-turn equivalent of this same rule).
 _CLASSIFICATION_ORDER = {"C1": 1, "C2": 2, "C3": 3}
+
+
+def _enable_deterministic_training(torch, config: "MlopsConfig") -> None:
+    """Makes a training run reproducible from its seed alone.
+
+    transformers' set_seed() (which TrainingArguments(seed=...) calls)
+    only seeds the RNGs. It does not stop cuDNN from benchmarking kernel
+    variants per run, and it does not stop CUDA ops from accumulating in
+    nondeterministic order - which is what actually moved the four runs
+    documented at the top of this module.
+
+    Deliberately NOT warn_only=True: a warning here would restore exactly
+    the failure mode this closes, a run that looks reproducible and is
+    not.
+    """
+    if not config.deterministic:
+        logger.warning(
+            "MLOPS_DETERMINISTIC=false - training is nondeterministic and two runs "
+            "of this config will not be comparable"
+        )
+        return
+
+    if os.environ.get("CUBLAS_WORKSPACE_CONFIG") != _CUBLAS_DETERMINISTIC_WORKSPACE:
+        logger.warning(
+            "CUBLAS_WORKSPACE_CONFIG is %r, not %r - determinism may not hold",
+            os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
+            _CUBLAS_DETERMINISTIC_WORKSPACE,
+        )
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    logger.info("deterministic training enabled (seed %d)", config.seed)
 
 
 def _escalate(current: str, candidate: str) -> str:
@@ -155,6 +212,21 @@ class MlopsConfig:
     lora_alpha: int
     lora_dropout: float
     cpu_safe: bool  # forces a tiny, real-but-trivial training run (no GPU needed)
+
+    # Reproducibility. seed is passed to TrainingArguments explicitly
+    # rather than left to its default: the default is also 42, but an
+    # implicit one is invisible at the call site and silently follows
+    # whatever the installed transformers decides tomorrow.
+    #
+    # deterministic gates torch.use_deterministic_algorithms(). It is an
+    # escape hatch, not a tuning knob: torch RAISES on any op with no
+    # deterministic kernel, and that would abort a training run that has
+    # already paid for a burst-node scale-up. If that ever happens, the
+    # honest fix is a deterministic implementation of the offending op -
+    # turning this off buys a green run at the cost of the comparison the
+    # run exists to make.
+    seed: int
+    deterministic: bool
 
     # ADR-0526 (WP-087) decision 3: a NEW data-collection surface, added
     # deliberately. This OVERRIDES ADR-0302 point 2, which restricted
@@ -256,6 +328,8 @@ def load_config() -> MlopsConfig:
         lora_alpha=_env_int("MLOPS_LORA_ALPHA", 16),
         lora_dropout=float(_env("MLOPS_LORA_DROPOUT", "0.05")),
         cpu_safe=_env_bool("MLOPS_CPU_SAFE", False),
+        seed=_env_int("MLOPS_SEED", 42),
+        deterministic=_env_bool("MLOPS_DETERMINISTIC", True),
         style_corpus_s3uri=_env("MLOPS_STYLE_CORPUS_S3URI"),
         merged_model_s3uri=_env("MLOPS_MERGED_MODEL_S3URI"),
         merged_overwrite=_env_bool("MLOPS_MERGED_OVERWRITE", False),
@@ -950,6 +1024,8 @@ def _run_lora_training(
     from peft import LoraConfig, TaskType, get_peft_model
     from transformers import AutoTokenizer, Trainer, TrainingArguments
 
+    _enable_deterministic_training(torch, config)
+
     base_ref = base_model_ref or config.base_model
     tokenizer = AutoTokenizer.from_pretrained(base_ref)
     if tokenizer.pad_token is None:
@@ -1034,6 +1110,7 @@ def _run_lora_training(
         learning_rate=2e-4,
         logging_steps=1,
         save_strategy="no",
+        seed=config.seed,
         report_to=[],
         use_cpu=config.cpu_safe or not torch.cuda.is_available(),
     )
