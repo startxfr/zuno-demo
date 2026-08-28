@@ -5,6 +5,14 @@ title: Write code
 zuno:
   allowed_tools: []
   allowed_knowledge: []
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Write an Ansible task that waits for a Deployment to finish rolling out."
+    - "Generate a Kubernetes NetworkPolicy allowing ingress only from the istio-system namespace."
+    - "Write a Go function that verifies an RS256 JWT against a JWKS endpoint."
 ---
 
 # Write code

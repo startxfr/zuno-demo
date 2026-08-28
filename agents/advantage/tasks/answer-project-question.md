@@ -13,6 +13,13 @@ zuno:
     - knowledge.adv
     - knowledge.project
     - knowledge.sxa-legacy
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "What is the current delivery status of this project?"
+    - "Who owns this bid, and which business unit is it attached to?"
 ---
 
 # Answer a project or bid question

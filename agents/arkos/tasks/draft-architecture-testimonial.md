@@ -40,6 +40,13 @@ zuno:
   prompts:
     reflect:
       classification_ceiling: C2
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Draft an architecture testimonial for a customer running OpenShift with Keycloak-backed SSO."
+    - "Write a Design and Architecture Testimonial covering a GitOps delivery chain based on Argo CD."
 ---
 
 # Draft an architecture testimonial

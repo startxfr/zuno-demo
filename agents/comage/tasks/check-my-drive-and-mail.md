@@ -6,6 +6,13 @@ zuno:
   allowed_tools:
     - list_drive_files
     - read_gmail
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "List my Drive documents and emails about the Startx account."
+    - "Which recent emails mention the renewal negotiation?"
 ---
 
 # Check my Drive and mail

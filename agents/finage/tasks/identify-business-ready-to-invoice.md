@@ -9,6 +9,13 @@ zuno:
     - knowledge.project
     - knowledge.sxa-legacy
   project_required: true
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Which business on this project has reached the billable state?"
+    - "List the quotes for this engagement that are ready to invoice."
 ---
 
 # Identify business ready to invoice

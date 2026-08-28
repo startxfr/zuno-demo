@@ -7,6 +7,14 @@ zuno:
     - search_confluence
   allowed_knowledge:
     - knowledge.tech
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Find the Confluence pages describing the satellite build architecture."
+    - "Which documentation covers OpenShift AI model serving?"
+    - "List the reference material we have on Keycloak realm configuration."
 ---
 
 # Find relevant documentation

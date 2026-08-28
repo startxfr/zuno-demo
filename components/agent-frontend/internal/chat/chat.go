@@ -100,6 +100,25 @@ type chatConfig struct {
 	// the chat empty state when the caller has no conversation history
 	// yet. Empty/nil renders no starters.
 	PromptExamples []string `json:"promptExamples"`
+	// Tasks are this agent's declared tasks that carry at least one
+	// zuno.prompt_examples entry, feeding the composer's slash menu
+	// (web/src/chat/TaskPromptMenu.tsx). PromptExamples above is the
+	// primary task's list only, which is all the empty state needs; the
+	// menu offers every task, so it needs them keyed by task.
+	//
+	// This is a writing aid and nothing more. Picking an entry drops its
+	// text into the composer for the user to edit - it does NOT select
+	// which task runs. agent-runtime takes no task from the request: the
+	// chat route always executes primary_task (ADR-0342).
+	Tasks []taskPrompts `json:"tasks"`
+}
+
+// taskPrompts is one entry of Tasks above - mirrors
+// web/src/shared/types.ts's TaskPrompts field-for-field.
+type taskPrompts struct {
+	Name     string   `json:"name"`
+	Title    string   `json:"title"`
+	Examples []string `json:"examples"`
 }
 
 // agentNavEntry is one entry of AgentNavStrip above - mirrors
@@ -152,6 +171,7 @@ func PageHandler(agent okf.Agent, agents []okf.Agent, sessions *session.Manager,
 			GroupsURL:        "/api/groups",
 			AgentNavStrip:    buildAgentNavStrip(agents, sess, clusterBaseDomain),
 			PromptExamples:   agent.PrimaryTaskPromptExamples(),
+			Tasks:            buildTaskPrompts(agent),
 		}
 		configJSON, err := json.Marshal(cfg) // HTML-escaped by default - see portal.go's comment
 		if err != nil {
@@ -192,6 +212,33 @@ func buildAgentNavStrip(agents []okf.Agent, sess *session.Session, clusterBaseDo
 		})
 	}
 	return strip
+}
+
+// buildTaskPrompts collects the agent's tasks that actually declare
+// zuno.prompt_examples, for the composer's slash menu. A task with no
+// example is skipped rather than rendered as an empty submenu.
+//
+// Both the returned slice and every Examples field are non-nil by
+// construction, and that is not cosmetic: a nil Go slice marshals to JSON
+// `null`, not `[]`, and Chat.tsx reads `.length` on both. That exact
+// mistake blanked the whole page for every agent on 2026-08-21 - see
+// okf.PrimaryTaskPromptExamples's own comment, which is the scar this
+// function is written to avoid reopening.
+func buildTaskPrompts(agent okf.Agent) []taskPrompts {
+	out := make([]taskPrompts, 0, len(agent.Tasks))
+	for _, t := range agent.Tasks {
+		if len(t.PromptExamples) == 0 {
+			continue
+		}
+		examples := make([]string, len(t.PromptExamples))
+		copy(examples, t.PromptExamples)
+		title := t.Title
+		if title == "" {
+			title = t.Name
+		}
+		out = append(out, taskPrompts{Name: t.Name, Title: title, Examples: examples})
+	}
+	return out
 }
 
 // chatRequest is what the browser JS POSTs to this frontend's /api/chat.

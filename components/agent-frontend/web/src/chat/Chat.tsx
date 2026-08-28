@@ -29,11 +29,13 @@ import {
   ToolbarGroup,
   ToolbarItem,
 } from "@patternfly/react-core";
-import { StarIcon, TimesIcon } from "@patternfly/react-icons";
+import { PaperPlaneIcon, StarIcon, TimesIcon } from "@patternfly/react-icons";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
 import { AGENT_ICONS } from "../shared/agentIcons";
 import { Markdown } from "./Markdown";
+import { TaskPromptMenu } from "./TaskPromptMenu";
+import "./composer.css";
 import { ConversationList } from "../shared/ConversationList";
 import {
   getTranscript,
@@ -159,6 +161,9 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
   const [activeTabId, setActiveTabId] = React.useState<string | null>(null);
   const abortRefs = React.useRef<Map<string, AbortController>>(new Map());
   const logRef = React.useRef<HTMLDivElement | null>(null);
+  // Lets the slash menu hand the caret back to the message box after it
+  // inserts an example (chat/TaskPromptMenu.tsx).
+  const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
   // Bumped whenever a tab's own action should be reflected in the left
   // panel (a new conversation appearing, a title changing) - the sidebar
   // has no other way to know, since this app has no shared store/context.
@@ -781,36 +786,54 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
                 void send(activeTab);
               }}
             >
-              <Flex alignItems={{ default: "alignItemsFlexEnd" }} gap={{ default: "gapSm" }}>
-                <FlexItem grow={{ default: "grow" }}>
-                  <TextArea
-                    aria-label="Ask a technical question"
-                    placeholder="Ask a technical question…"
-                    value={activeTab.input}
-                    onChange={(_e, value) => updateTab(activeTab.id, (t) => ({ ...t, input: value, busy: false }))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void send(activeTab);
-                      }
-                    }}
-                    autoResize
+              <div className="zuno-composer">
+                <TextArea
+                  ref={composerRef}
+                  aria-label="Ask a technical question"
+                  placeholder="Ask a technical question…"
+                  value={activeTab.input}
+                  onChange={(_e, value) => updateTab(activeTab.id, (t) => ({ ...t, input: value, busy: false }))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send(activeTab);
+                    }
+                  }}
+                  autoResize
+                  isDisabled={activeTab.sending || activeTab.busy}
+                  rows={1}
+                />
+                <div className="zuno-composer__actions">
+                  {/* ADR-0515: OKF-declared example prompts. Inserting one only
+                      fills the box - it never selects the task (ADR-0342). */}
+                  <TaskPromptMenu
+                    tasks={config.tasks ?? []}
                     isDisabled={activeTab.sending || activeTab.busy}
-                    rows={1}
+                    onPick={(example) => {
+                      updateTab(activeTab.id, (t) => ({ ...t, input: example, busy: false }));
+                      // Hand the caret back so the example can be edited
+                      // straight away - it is a starting point, not a
+                      // finished question.
+                      composerRef.current?.focus();
+                    }}
                   />
-                </FlexItem>
-                <FlexItem>
                   {activeTab.sending ? (
                     <Button variant="secondary" onClick={() => stop(activeTab.id)}>
                       Stop
                     </Button>
                   ) : (
-                    <Button variant="primary" type="submit" isDisabled={!activeTab.input.trim() || activeTab.busy}>
-                      Send
+                    <Button
+                      variant="plain"
+                      type="submit"
+                      aria-label="Send"
+                      title="Send"
+                      isDisabled={!activeTab.input.trim() || activeTab.busy}
+                    >
+                      <PaperPlaneIcon />
                     </Button>
                   )}
-                </FlexItem>
-              </Flex>
+                </div>
+              </div>
             </Form>
             )}
           </PageSection>

@@ -6,6 +6,13 @@ zuno:
   allowed_tools: []
   allowed_knowledge:
     - knowledge.sxa-legacy
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "How does this pipeline compare with the legacy SXA deals for the same customer?"
+    - "What were the historical revenue figures for this account before the Salesforce cutover?"
 ---
 
 # Compare historical deals

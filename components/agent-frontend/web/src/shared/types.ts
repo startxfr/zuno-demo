@@ -82,6 +82,25 @@ export interface ChatConfig {
   // ADR-0515/WP-061: this agent's primary task's declared
   // zuno.prompt_examples - clickable starters in the chat empty state.
   promptExamples: string[];
+  // ADR-0515: every task declaring at least one zuno.prompt_examples entry,
+  // feeding the composer's slash menu (chat/TaskPromptMenu.tsx). Mirrors
+  // internal/chat/chat.go's taskPrompts field-for-field - nothing enforces
+  // that mirror, so the two must be kept in step by hand.
+  //
+  // A writing aid only: picking an entry fills the message box for the user
+  // to edit, it does NOT choose which task runs. agent-runtime takes no task
+  // from the request - the chat route always executes primary_task
+  // (ADR-0342).
+  tasks: TaskPrompts[];
+}
+
+// ADR-0515: one entry of ChatConfig.tasks above.
+export interface TaskPrompts {
+  // The task slug, e.g. "answer-technical-question".
+  name: string;
+  // The task document's human-readable `title:` - what the menu shows.
+  title: string;
+  examples: string[];
 }
 
 // Shape of the JSON config Go injects for the read-only /profile page

@@ -24,6 +24,14 @@ zuno:
   allowed_knowledge:
     - knowledge.sales
     - knowledge.project
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "What is the current stage of the Startx renewal opportunity?"
+    - "Which opportunities are expected to close this quarter?"
+    - "What is the amount on the largest open deal in my pipeline?"
 ---
 
 # Check deal status

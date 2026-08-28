@@ -1,0 +1,73 @@
+/* The chat composer: one framed block holding the message box and, beneath it,
+   a row of actions (slash menu left, send right). Replaces the previous
+   textarea-plus-"Send"-button row.
+
+   Two blues, both PatternFly brand tokens rather than literals, so the frame
+   follows the theme: subtle at rest, full brand on hover AND focus-within.
+   Focus matters as much as hover here - the message box's own focus ring is
+   removed just below, so without this rule a keyboard user would have no
+   indication of where they are. */
+.zuno-composer {
+  border: var(--pf-t--global--border--width--regular, 1px) solid var(--pf-t--global--border--color--brand--subtle--default);
+  border-radius: var(--pf-t--global--border--radius--medium, 8px);
+  background: var(--pf-t--global--background--color--primary--default);
+  padding: var(--pf-t--global--spacer--sm);
+  transition: border-color 120ms ease-in-out;
+}
+
+.zuno-composer:hover,
+.zuno-composer:focus-within {
+  border-color: var(--pf-t--global--border--color--brand--default);
+}
+
+/* The message box must read as part of the frame, not as a second box inside
+   it. PatternFly draws a form control's border with TWO stacked pseudo-element
+   layers - ::before carries the resting border, ::after the hover/focus accent
+   - each driven by its own custom properties. Both have to go; neutralising
+   only ::after leaves the resting rectangle fully visible, which is exactly
+   what the first pass shipped (and what a probe reading only ::after happily
+   reported as 0px).
+
+   Setting the properties is the supported lever: overriding the ::before /
+   ::after rules directly would be a specificity fight against selectors that
+   are free to change between PatternFly releases. */
+.zuno-composer .pf-v6-c-form-control {
+  --pf-v6-c-form-control--before--BorderWidth: 0;
+  --pf-v6-c-form-control--before--BorderColor: transparent;
+  --pf-v6-c-form-control--after--BorderWidth: 0;
+  --pf-v6-c-form-control--after--BorderColor: transparent;
+  --pf-v6-c-form-control--hover--after--BorderWidth: 0;
+  --pf-v6-c-form-control--focus--after--BorderWidth: 0;
+  background: transparent;
+}
+
+/* The action row: slash menu pinned left, send pinned right. */
+.zuno-composer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pf-t--global--spacer--sm);
+  margin-block-start: var(--pf-t--global--spacer--xs);
+}
+
+/* autoResize already grows the box with the content, so the native resize
+   grip does nothing useful and reads as a stray artifact inside the frame. */
+.zuno-composer textarea {
+  resize: none;
+}
+
+/* PatternFly clips every menu item's text to a single line with an ellipsis.
+   That is right for the task titles in the first level, and wrong for the
+   second: a prompt example is a whole sentence, and each one rendered as
+   "How do I configure Keycloa…", indistinguishable from the next. Widen the
+   flyout and let it wrap - only the flyout, so the task list keeps
+   PatternFly's own behaviour. */
+.zuno-prompt-flyout {
+  --pf-v6-c-menu--Width: 26rem;
+}
+
+.zuno-prompt-flyout .pf-v6-c-menu__item-text {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}

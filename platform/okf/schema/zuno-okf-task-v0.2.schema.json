@@ -80,7 +80,7 @@
           "uniqueItems": true
         },
         "prompt_examples": {
-          "description": "ADR-0515/WP-061: example prompts shown as clickable starters in the agent frontend's empty-state (\"Create new chat\") view when this task's owning agent has no conversation history yet. UX only - purely decorative, never parsed/enforced server-side. Optional/omitted renders the empty state with no starters.",
+          "description": "ADR-0515/WP-061: editable example prompts for this task, surfaced in two places by the agent frontend - the empty-state (\"Create new chat\") view when the caller has no conversation history yet, and the composer's slash menu, which lists every task carrying at least one example and drops the chosen text into the message box for the user to edit before sending. UX only - purely decorative, never parsed/enforced server-side, and choosing one does NOT select which task runs: the chat route always executes the agent's primary_task (ADR-0342). Optional/omitted simply drops this task from the slash menu.",
           "type": "array",
           "items": {
             "type": "string",

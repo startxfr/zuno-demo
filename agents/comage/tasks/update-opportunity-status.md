@@ -5,6 +5,13 @@ title: Update opportunity status
 zuno:
   allowed_tools:
     - salesforce.opportunity.update
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Move the Startx renewal opportunity to Negotiation."
+    - "Update the close date on this opportunity to the end of next month."
 ---
 
 # Update opportunity status

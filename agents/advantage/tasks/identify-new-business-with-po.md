@@ -6,6 +6,13 @@ zuno:
   allowed_tools: []
   allowed_knowledge:
     - knowledge.adv
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Which new business received a client purchase order in the last three days?"
+    - "List the projects whose client PO arrived this week."
 ---
 
 # Identify new business with a client PO received

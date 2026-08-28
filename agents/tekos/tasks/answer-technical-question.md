@@ -33,6 +33,14 @@ zuno:
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "How do I configure Keycloak as the OIDC identity provider for an OpenShift cluster?"
+    - "What is the difference between a Route and an Ingress on OpenShift?"
+    - "How does Argo CD decide that an Application is out of sync?"
 ---
 
 # Answer a technical question

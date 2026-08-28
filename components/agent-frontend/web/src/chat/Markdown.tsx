@@ -34,8 +34,13 @@ const scrollX: React.CSSProperties = { overflowX: "auto", maxWidth: "100%" };
 const components = {
   // Every link in a reply points off this page (a citation, a Confluence
   // article): open it in a new tab, and deny it access to window.opener.
-  a: ({ ...props }: React.ComponentPropsWithoutRef<"a">) => (
-    <a {...props} target="_blank" rel="noopener noreferrer" />
+  // children is destructured and passed explicitly rather than left to the
+  // spread: jsx-a11y/anchor-has-content cannot see through {...props} and
+  // reports a contentless anchor otherwise.
+  a: ({ children, ...props }: React.ComponentPropsWithoutRef<"a">) => (
+    <a {...props} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
   ),
   table: ({ ...props }: React.ComponentPropsWithoutRef<"table">) => (
     <div style={scrollX}>

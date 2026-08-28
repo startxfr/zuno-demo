@@ -5,6 +5,13 @@ title: Structure a demo
 zuno:
   allowed_tools: []
   allowed_knowledge: []
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "Structure a 30-minute platform demo for a technical audience."
+    - "How should I sequence a demo showing GitOps from commit to running pod?"
 ---
 
 # Structure a demo

@@ -5,6 +5,13 @@ title: Check my Drive documents
 zuno:
   allowed_tools:
     - list_drive_files
+  # ADR-0515: editable starters. Shown in the chat empty state, and in the
+  # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
+  # UX only - never parsed or enforced server-side, and picking one does NOT
+  # select this task: the chat route always runs primary_task (ADR-0342).
+  prompt_examples:
+    - "List my Drive documents about the satellite run architecture."
+    - "Which of my documents mention the Keycloak migration?"
 ---
 
 # Check my Drive documents
