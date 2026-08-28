@@ -7,10 +7,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/startxfr/zuno-demo/components/agent-bff/internal/runtime"
 	"github.com/startxfr/zuno-demo/components/agent-bff/internal/telemetry"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -104,5 +106,69 @@ func TestStatusRecorderDelegatesFlush(t *testing.T) {
 	rec.Flush()
 	if underlying.flushed != 1 {
 		t.Errorf("underlying.flushed = %d, want 1", underlying.flushed)
+	}
+}
+
+// ADR-0527/WP-088: agent-runtime's request models type the optional project
+// fields as `Optional[str] = Field(default=None, min_length=1)` and
+// `Literal["C1","C2","C3"] = "C2"`. Go's zero value marshals as "", which
+// Pydantic reads as PRESENT-and-invalid rather than absent, so a request
+// carrying an empty classification or an empty group_name is rejected 422.
+//
+// Live-verified 2026-08-28 against the running cluster: every grant naming a
+// user (and therefore leaving group_name empty) failed, so POST /api/projects
+// could not create anything at all. The contract tests did not catch it -
+// they compare field NAMES against the OpenAPI spec, and omitempty is not a
+// field name. This test covers the serialized bytes instead.
+func TestCreateProjectRequest_OmitsEmptyOptionalFields(t *testing.T) {
+	body, err := json.Marshal(runtime.CreateProjectRequest{
+		Title:   "a project",
+		Context: "some context",
+		// Classification and SalesforceOpportunityID deliberately unset -
+		// the frontend does not always send them.
+		Grants: []runtime.ProjectGrant{{Subject: "some-sub", Role: "admin"}},
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	for _, key := range []string{"classification", "salesforce_opportunity_id"} {
+		if _, present := decoded[key]; present {
+			t.Errorf("%q must be omitted when empty, not sent as \"\" - agent-runtime rejects the empty string: %s", key, body)
+		}
+	}
+
+	grants, _ := decoded["grants"].([]any)
+	if len(grants) != 1 {
+		t.Fatalf("expected 1 grant, got %d", len(grants))
+	}
+	grant, _ := grants[0].(map[string]any)
+	if _, present := grant["group_name"]; present {
+		t.Errorf("group_name must be omitted for a subject-scoped grant: %s", body)
+	}
+	if got := grant["subject"]; got != "some-sub" {
+		t.Errorf("subject must survive omitempty when set, got %v", got)
+	}
+	if got := grant["role"]; got != "admin" {
+		t.Errorf("role is required and must always be sent, got %v", got)
+	}
+}
+
+// The mirror case: a group-scoped grant must omit `subject`, not send "".
+func TestProjectGrant_GroupScopedOmitsSubject(t *testing.T) {
+	body, _ := json.Marshal(runtime.ProjectGrant{GroupName: "consultant", Role: "read"})
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, present := decoded["subject"]; present {
+		t.Errorf("subject must be omitted for a group-scoped grant: %s", body)
+	}
+	if got := decoded["group_name"]; got != "consultant" {
+		t.Errorf("group_name must survive omitempty when set, got %v", got)
 	}
 }

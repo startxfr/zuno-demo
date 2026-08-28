@@ -160,11 +160,25 @@ type HardDeleteResponse struct {
 // one of Subject/GroupName is set - the XOR the runtime enforces both in
 // Pydantic and in project_grants' own CHECK constraint.
 type ProjectGrant struct {
-	Subject   string `json:"subject"`
-	GroupName string `json:"group_name"`
+	// omitempty on all four is load-bearing on the OUTBOUND path, not
+	// cosmetic. agent-runtime types subject/group_name as
+	// `Optional[str] = Field(default=None, min_length=1)` and enforces the
+	// XOR between them, so a Go zero value serialized as "" is not "absent"
+	// to Pydantic - it is a present string of length 0, and the request is
+	// rejected 422 with `string_too_short`. Live-verified 2026-08-28: every
+	// group-less grant (i.e. every grant naming a user) failed this way, so
+	// no project could be created at all.
+	//
+	// Safe for responses: this struct is only ever marshaled on the way OUT
+	// to agent-runtime; what the frontend receives is re-encoded as
+	// main.apiProjectGrant, whose shape is unchanged. omitempty has no
+	// effect on unmarshaling.
+	Subject   string `json:"subject,omitempty"`
+	GroupName string `json:"group_name,omitempty"`
 	Role      string `json:"role"`
-	GrantedBy string `json:"granted_by"`
-	CreatedAt string `json:"created_at"`
+	// Response-only, and agent-runtime's request model has no such fields.
+	GrantedBy string `json:"granted_by,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
 }
 
 // Project mirrors one entry of GET /v1/projects (ADR-0527). Deliberately
@@ -204,9 +218,13 @@ type ProjectDetail struct {
 // CreateProjectRequest is the Agent Runtime's documented request body for
 // POST /v1/projects (ADR-0527).
 type CreateProjectRequest struct {
-	Title                   string         `json:"title"`
-	Context                 string         `json:"context"`
-	Classification          string         `json:"classification"`
+	Title   string `json:"title"`
+	Context string `json:"context"`
+	// Same trap as ProjectGrant above: agent-runtime types this as
+	// `Literal["C1","C2","C3"] = "C2"`, so omitting it takes the default but
+	// sending "" is a literal_error. The Salesforce id beside it already had
+	// omitempty; this one did not.
+	Classification          string         `json:"classification,omitempty"`
 	SalesforceOpportunityID string         `json:"salesforce_opportunity_id,omitempty"`
 	Grants                  []ProjectGrant `json:"grants"`
 }
@@ -217,9 +235,13 @@ type CreateProjectRequest struct {
 // may not edit grants" and leaves them untouched; a non-nil value is the
 // full desired set, so anything absent from it is revoked.
 type SaveProjectRequest struct {
-	Title                   string         `json:"title"`
-	Context                 string         `json:"context"`
-	Classification          string         `json:"classification"`
+	Title   string `json:"title"`
+	Context string `json:"context"`
+	// Same trap as ProjectGrant above: agent-runtime types this as
+	// `Literal["C1","C2","C3"] = "C2"`, so omitting it takes the default but
+	// sending "" is a literal_error. The Salesforce id beside it already had
+	// omitempty; this one did not.
+	Classification          string         `json:"classification,omitempty"`
 	SalesforceOpportunityID string         `json:"salesforce_opportunity_id,omitempty"`
 	Grants                  []ProjectGrant `json:"grants"`
 }
