@@ -46,7 +46,20 @@ async function parseOrThrow<T>(resp: Response): Promise<T> {
 
 export async function listConversations(conversationsURL: string, starredOnly = false): Promise<Conversation[]> {
   const url = starredOnly ? `${conversationsURL}?starred=true` : conversationsURL;
-  return parseOrThrow<Conversation[]>(await fetch(url));
+  const rows = await parseOrThrow<Conversation[]>(await fetch(url));
+  // The wire format and the type above disagree, and normalizing here is what
+  // reconciles them. agent-bff's OpenAPI contract declares project_id and role
+  // as plain `string` and documents the EMPTY STRING as "no project" /
+  // "unresolved"; the interface above documents `null`. parseOrThrow casts
+  // without checking, so nothing fails at compile time - it fails in the UI.
+  //
+  // It did: ConversationList's `c.project_id === null` matched nothing, so
+  // EVERY project-less conversation was dropped from the sidebar (verified
+  // 2026-08-28 against the live API - 48 of 48 rows arrived as ""), and the
+  // CONVERSATIONS block rendered its empty state instead. Normalizing once, at
+  // the only place the data enters the app, is what keeps the next `=== null`
+  // from reproducing it.
+  return rows.map((c) => ({ ...c, project_id: c.project_id || null, role: c.role || null }));
 }
 
 export async function getTranscript(conversationsURL: string, runId: string): Promise<TranscriptTurn[]> {

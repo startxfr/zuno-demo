@@ -595,6 +595,8 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
           projectsURL={config.projectsURL}
           colleaguesURL={config.colleaguesURL}
           groupsURL={config.groupsURL}
+          subject={config.subject}
+          userDisplayName={config.userDisplayName}
           activeRunId={activeTab?.runId ?? null}
           refreshSignal={conversationsRefreshToken}
           width={sidebarWidth}

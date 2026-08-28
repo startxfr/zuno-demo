@@ -49,6 +49,14 @@ export interface ProjectDialogProps {
   groupsURL: string;
   // null opens the dialog in create mode.
   projectId: string | null;
+  // ADR-0527 clause 3: the caller's own Keycloak subject and display name, so
+  // create mode can seed the creator's admin grant. Without it the dialog
+  // cannot name the one member it is certain about - agent-bff's colleague
+  // search deliberately never returns the caller (main.go's "never offer the
+  // caller themselves as a share target"), so the creator could not be added
+  // by hand either, and the last-admin guard could never be satisfied.
+  subject: string;
+  userDisplayName: string;
 }
 
 // ADR-0527 clause 9: every change is staged locally and committed by ONE
@@ -64,6 +72,8 @@ export function ProjectDialog({
   colleaguesURL,
   groupsURL,
   projectId,
+  subject,
+  userDisplayName,
 }: ProjectDialogProps): React.ReactElement {
   const isCreate = projectId === null;
 
@@ -107,7 +117,16 @@ export function ProjectDialog({
         created_by: "",
         created_at: "",
         updated_at: "",
-        grants: [],
+        // Seeded, not empty. `saveDisabled` below refuses a project with no
+        // subject-scoped admin (ADR-0527 clause 3's last-admin guard), and
+        // with `grants: []` that made the Create button permanently grey: the
+        // creator cannot add themselves, because agent-bff's colleague search
+        // excludes the caller by design. Seeding the grant the server is
+        // going to append anyway (app/main.py merges the creator's admin
+        // grant before validating) satisfies the guard honestly and lets the
+        // RBAC tab show who will actually administer the project, instead of
+        // showing an empty list and adding an admin behind the user's back.
+        grants: [{ subject, role: "admin", display_name: userDisplayName }],
         salesforce_opportunity_id: "",
       });
       setLoading(false);
@@ -118,7 +137,7 @@ export function ProjectDialog({
       .then((detail) => setDraft({ ...detail, grants: detail.grants ?? [] }))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
-  }, [isOpen, isCreate, projectId, projectsURL]);
+  }, [isOpen, isCreate, projectId, projectsURL, subject, userDisplayName]);
 
   const isAdmin = can(draft?.role, "admin");
   const canEditDescription = can(draft?.role, "write");

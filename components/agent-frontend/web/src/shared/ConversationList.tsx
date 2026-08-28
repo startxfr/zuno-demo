@@ -33,6 +33,11 @@ export interface ConversationListProps {
   projectsURL: string;
   colleaguesURL: string;
   groupsURL: string;
+  // ADR-0527: the caller's own identity, relayed untouched to ProjectDialog
+  // so create mode can seed the creator's admin grant. This component never
+  // reads either one, same as the three URLs above.
+  subject: string;
+  userDisplayName: string;
   // The run_id of the currently active in-app tab, if any - highlighted
   // in the list.
   activeRunId: string | null;
@@ -148,6 +153,8 @@ export function ConversationList({
   projectsURL,
   colleaguesURL,
   groupsURL,
+  subject,
+  userDisplayName,
   activeRunId,
   refreshSignal,
   width,
@@ -497,6 +504,8 @@ export function ConversationList({
           colleaguesURL={colleaguesURL}
           groupsURL={groupsURL}
           projectId={dialogProjectId}
+          subject={subject}
+          userDisplayName={userDisplayName}
         />
       )}
     </PageSidebar>
