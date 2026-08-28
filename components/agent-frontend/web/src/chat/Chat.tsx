@@ -33,6 +33,7 @@ import { StarIcon, TimesIcon } from "@patternfly/react-icons";
 import logoPlaceholder from "../assets/logo-placeholder.svg";
 import type { ChatConfig } from "../shared/types";
 import { AGENT_ICONS } from "../shared/agentIcons";
+import { Markdown } from "./Markdown";
 import { ConversationList } from "../shared/ConversationList";
 import {
   getTranscript,
@@ -835,10 +836,16 @@ function MessageBubble({ message }: { message: ChatMessage }): React.ReactElemen
               ? "var(--pf-t--global--color--status--danger--100)"
               : "var(--pf-t--global--background--color--secondary--default)",
         color: message.role === "user" ? "var(--pf-t--global--text--color--inverse)" : undefined,
-        whiteSpace: "pre-wrap",
       }}
     >
-      {message.content}
+      {/* Only an agent reply is a Markdown document. A user typing "# 3" means
+          the number, not a heading, and an error is a plain string - both keep
+          the pre-wrap text rendering this bubble had before Markdown.tsx. */}
+      {message.role === "agent" ? (
+        <Markdown content={message.content} />
+      ) : (
+        <span style={{ whiteSpace: "pre-wrap" }}>{message.content}</span>
+      )}
       {message.pending && !message.content && <Spinner size="sm" isInline aria-label="Waiting for a reply" />}
       {message.images && message.images.length > 0 && (
         // ADR-0415: generated images render inline in this same bubble,

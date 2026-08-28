@@ -1,0 +1,40 @@
+/* PatternFly's Content component drives block margins from custom properties
+   (--pf-v6-c-content--MarginBlockEnd and the per-heading pair), with no
+   first/last-child reset of its own - correct for a standalone document, but
+   inside a chat bubble it reads as uneven padding above the first line and
+   below the last. The bubble supplies its own padding; the rhythm *between*
+   blocks is left untouched.
+
+   Two rules, in a file rather than an inline <style>, so Vite emits them once
+   into the chat bundle instead of repeating them in every rendered message. */
+.zuno-md > :first-child {
+  margin-block-start: 0;
+}
+
+.zuno-md > :last-child {
+  margin-block-end: 0;
+}
+
+/* GFM tables are the one construct pf-v6-c-content does NOT style: it gives
+   `table` a block margin and nothing else, because PatternFly styles tables
+   through its separate Table component (pf-v6-c-table), whose class structure
+   react-markdown's plain <table>/<th>/<td> output cannot carry without a much
+   heavier component mapping. Verified rather than assumed - the first render
+   pass produced collapsed, borderless cells ("8443emission" running together).
+
+   These rules are built only from PatternFly's own global design tokens
+   (checked present in @patternfly/react-core/dist/styles/base.css), so they
+   follow the theme rather than hard-coding a look beside it. */
+.zuno-md table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.zuno-md th,
+.zuno-md td {
+  padding-block: var(--pf-t--global--spacer--sm);
+  padding-inline: var(--pf-t--global--spacer--md);
+  border-block-end: var(--pf-t--global--border--width--divider--default) solid var(--pf-t--global--border--color--default);
+  text-align: start;
+  vertical-align: top;
+}
