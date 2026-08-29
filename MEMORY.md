@@ -833,6 +833,16 @@ not here.
   C2/C3-adapter-never-external guard is enforced inside
   `chat_model_for()` (local-vLLM-direct only, never via MaaS).
   Repo-complete, no adapters trained yet.
+  - **2026-08-29, explicit descope decision** (not a status change): WP-34,
+    the WP meant to deliver a real dynamically-loadable LoRA adapter for
+    this mechanism, never ran and was superseded by WP-087/ADR-0526,
+    which registered a real candidate (`comage-lora` v6) but deliberately
+    serves it as a separate full model via `preferences:`, not through
+    vLLM's `--lora-modules` mechanism this ADR requires. There is nothing
+    to live-verify and nothing in flight will produce one. Status stays
+    `Partially implemented` / `Operator pending` by user decision - don't
+    re-attempt closing this pair without a genuinely new
+    dynamically-loadable adapter.
 - **ADR-0305 / ADR-0304 (WP-40)**, 2026-08-29, **Implemented/Done**:
   `evaluations/benchmark.py` (LM-Eval snapshot -> versioned artifact,
   `--check-policy` enforces no-artifact-no-promotion) and
