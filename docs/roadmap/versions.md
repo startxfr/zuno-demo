@@ -26,13 +26,17 @@ Make the OpenShift AI MaaS governance plane live and route agent model calls thr
 
 ## v0.6
 
-Prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (`demo333`). New ADR: [ADR-0517](../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md).
+Vacant as of 2026-08-30. This band was created solely for ADR-0517 (prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster, `demo333`); that ADR retargeted to v0.8, deprioritized behind v0.7's release-automation work — see that band below.
 
 ## v0.7
 
 Automate the release/supply-chain pipeline using GitHub Actions (build, sign, publish, promote). Carries ADR-0115 (immutable/verifiable software supply-chain artifacts), retargeted from v0.1 on 2026-08-24 — WP-04's three-stage GitHub Actions + Quay release work. Also carries ADR-0111 (strengthen SecNumCloud-oriented security controls), retargeted from v0.1 on 2026-08-26 — its one remaining gap (immutable chart image tags) is blocked on the same WP-04 GitHub billing lock as ADR-0115.
 
 Separately, and unrelated to the GitHub-Actions release-automation goal above, this band also carries ADR-0105 (automate source-specific knowledge ingestion, retargeted from v0.1 on 2026-08-26), ADR-0206 (separate current Salesforce knowledge from legacy SXA, retargeted from v0.2 on 2026-08-26), ADR-0213 (role-based conversation sharing, retargeted from v0.2 on 2026-08-26) and ADR-0218 (drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence, retargeted from `Unscheduled (backlog)` on 2026-08-26) as a roadmap reprioritization. (ADR-0213 was subsequently superseded in full by ADR-0527 on 2026-08-27 — sharing moves from the conversation to the project; see the v0.4 band. WP-066 is abandoned with it.) For ADR-0105/0206/0213 only their `Target` moved — WP-22 remains `Done`, WP-23 remains `Operator pending`, WP-066 is unchanged, and their status fields are unchanged. ADR-0218 also changed substance on 2026-08-26: the Aramis adapter is no longer merely untracked but physically removed from the repository (code, ansible, gitops, knowledge contracts, platform bindings and the Advantage OKF prose), taking that ADR to `Implemented`. What lands in this band is the Salesforce half only — `fetch-salesforce` and its hours-scale cadence, deferred rather than dropped, with `domains.sales` still shipped `enabled: false` in the tree. `knowledge.adv` keeps its domain descriptor and `rag-adv` binding with no ingestion adapter; Comage's live Salesforce MCP-tool access is untouched.
+
+## v0.8
+
+Prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (`demo333`). Carries [ADR-0517](../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md), retargeted from v0.6 on 2026-08-30 — deprioritized behind v0.7's release-automation work.
 
 ## OKF stream
 

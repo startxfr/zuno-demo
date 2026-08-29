@@ -20,6 +20,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-26):** ADR-0105 (v0.1 -> v0.7) and ADR-0206 (v0.2 -> v0.7) move to the v0.7 band as a separate, unrelated deferred-items group - not part of WP-04's GitHub-Actions release-automation scope already there. Status unchanged for both (`Partially implemented`); only `Target` moves.
 
+**Retargeting note (2026-08-30):** ADR-0517 (v0.6 -> v0.8) - the demo333 from-scratch redeploy is deprioritized behind v0.7's release-automation work. v0.6 was created solely for this ADR and is now a vacant band; a new v0.8 band is opened to carry it (same goal text, unchanged Status/scope). Numbering is unchanged; only `Target` moves.
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -226,11 +228,7 @@ Goal: make the OpenShift AI MaaS governance plane live and route agent model cal
 
 ## version 0.6
 
-Goal: prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster.
-
-| ADR | Target | Status | Decision |
-|---|---|---|---|
-| [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | v0.6 | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
+Goal: prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster. Vacant as of 2026-08-30 - its sole ADR, ADR-0517, retargeted to v0.8 (see retargeting note below).
 
 ## version 0.7
 
@@ -250,6 +248,14 @@ Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part o
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.7 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | v0.7 | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
+
+## version 0.8
+
+Goal: prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (retargeted from v0.6, deprioritized behind v0.7's release-automation work).
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | v0.8 | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
 
 ## OKF stream
 

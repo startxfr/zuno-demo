@@ -1,7 +1,7 @@
 # ADR-0517: Redeploy the full platform from scratch on a new demo333 cluster
 
 - **Status:** Proposed
-- **Target:** v0.6
+- **Target:** v0.8
 - **Date:** 2026-08-24
 - **Decision owners:** Zuno Demo architecture team
 
