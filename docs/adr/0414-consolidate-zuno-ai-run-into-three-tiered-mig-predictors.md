@@ -1,6 +1,6 @@
 # ADR-0414: Consolidate zuno-ai-run into three tiered MIG predictors
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.4
 - **Date:** 2026-08-20
 - **Decision owners:** Zuno Demo architecture team
@@ -8,8 +8,9 @@
 - **Amends:** [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) decision 7 — ~~the unmanaged IPI workergpu machinesets no longer stay unmanaged~~ **withdrawn 2026-08-26, see below**
 
 > **Amended 2026-08-26 (WP-083): this record's claim on ADR-0351 decision 7
-> is withdrawn.** This ADR is still `Proposed` and its Card B adoption was
-> never implemented. WP-083 reached the same goal - a second
+> is withdrawn.** ~~This ADR is still `Proposed` and~~ **its Status moved to
+> `Implemented` 2026-08-29, see the WP-092 banner below** - its Card B
+> adoption was never implemented. WP-083 reached the same goal - a second
 > MIG-`all-balanced` card - by the opposite route: instead of adopting the
 > IPI `demo222-kpkqk-workergpu-eu-west-2a` machineset into
 > `gitops/charts/machines`, it scales that machineset back to 0 and stands
@@ -62,6 +63,14 @@
 > WP-086's own live finding is that even a term in place can lose to
 > scheduling order - see WP-092 for the verification that proves the
 > preference steers without ever blocking scheduling.
+>
+> **Closed 2026-08-29, Status moved to `Implemented`.** What remains of
+> this record's effective scope - gpt-oss-20b consolidated onto a managed
+> MIG card (superseding ADR-0412) and the targeted anti-affinity above -
+> is live-verified (WP-083, WP-092). The original three-tier table
+> (`Qwen3-32B`/`Qwen3-8B`/merged embeddings+chat) and the Card B adoption
+> stay obsolete/withdrawn per the banners above; ADR-0518 is the record of
+> what the model set actually became.
 
 ## Context
 

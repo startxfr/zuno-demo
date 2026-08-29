@@ -191,7 +191,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Implemented | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | v0.4 | Implemented | Consolidate Grafana dashboards into six platform views |
-| [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | v0.4 | Proposed | Consolidate zuno-ai-run into three tiered MIG predictors |
+| [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | v0.4 | Implemented | Consolidate zuno-ai-run into three tiered MIG predictors |
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
 | [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume gpt-oss-120b via OVHcloud AI Endpoints |
 | [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Implemented | Consume Codestral via the Mistral API |
