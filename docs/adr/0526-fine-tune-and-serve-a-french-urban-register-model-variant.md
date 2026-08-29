@@ -1,10 +1,59 @@
 # ADR-0526: Fine-tune and serve a French urban-register model variant (`-wesh`)
 
-- **Status:** Partially implemented (2026-08-28) - the pipeline runs end to end and a run reached `overall: PASS` on BOTH gate halves; the merged bf16 checkpoint serves as `qwen3.5-9b-wesh` on a different node from its base, each listing its own three ids on `/v1/models`, and a live Comage turn was answered by the variant (traced through the MaaS route). Two acceptance criteria are NOT met: no run has ever completed `push-registry`, so no model version is registered; and the fallback behaviours (Comage when the variant is unavailable, Tekos on either path) are untested. Whether the target register survives on a substantive answer is also unproven - the register gate scores held-out completions offline and passed four consecutive runs, but every live probe so far drew a context-refusal
+- **Status:** Implemented (2026-08-29) - one run, `wesh-20260829-145123`, went the whole way: `overall: PASS` on all THREE gate halves (acceptance 20/22, register PASS, tool-calling PASS) and `push-registry` SUCCEEDED, registering `comage-lora` version `wesh-20260829-145123` (model_version_id 6) with the merged checkpoint as its artifact. The variant serves as `qwen3.5-9b-wesh` on a different node from its base and answers Comage live. Getting there needed a second corpus revision and five `push-registry` attempts, each failing on a distinct defect in code that had never executed - the stage refuses to run without a passing gate result, and no run had ever produced one. STILL NOT TRUE: decision 5 as written (see the amendment below); the fallback behaviours (Comage when the variant is unavailable, Tekos on either path) remain untested; and the tool-calling half passes on hallucination at 7.4% against a 10% ceiling that the UNMODIFIED base model does not meet either (11.1%), so that ceiling states an intent rather than a property of this model family
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) in part (decisions 1 and 5 — the serving mechanism and the starting candidate's objective) and [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) in part (decisions 2 and 4 — dataset sourcing and the training objective). Every other decision point of both records remains in effect.
+
+
+## Amendment (2026-08-29): decision 5 was false as written, and a third gate half was added
+
+**Decision 5 said Comage is routed to the variant on all four tasks.** That
+configuration was in force from 2026-08-28 and it broke tool calling. The variant
+kept the register and lost the *decision* to call a tool: measured on the two
+served models with identical prompts and schemas, the base called
+`generate_image` and the variant narrated it (`generate_image c'est le bail.`).
+The capability was intact - under `tool_choice: "required"` the variant emitted a
+perfect call - so this was a learned prior, not damage to the weights. Cause: the
+908-conversation corpus contained **zero** examples with any tool-call structure,
+so the model learned "French user message -> French prose" without exception. It
+is the catastrophic-forgetting risk this ADR names, which decision 4's
+attention-only rank-8 mitigation reduced without removing.
+
+Corrected by adding 62 tool-calling examples (~7% of the corpus), both sides:
+tool applies and is called, and tools present in context with none applicable.
+Both halves were necessary and neither was sufficient. Measured on the same 27
+probes:
+
+| | call | narration | false-fire | hallucination |
+|---|---|---|---|---|
+| variant, no tool examples | 0% | 46.7% | 0% | 0% |
+| `qwen3.5-9b` base | 93.3% | 0% | 8.3% | 11.1% |
+| variant, first corpus | 100% | 0% | 0% | 18.5% |
+| variant, revised corpus | 100% | 0% | 8.3% | **7.4%** |
+
+The first corpus restored calling and then invented tools that were never
+offered. Its negative examples answered with an *intent to fetch* ("faut que
+j'aille chercher l'etat a jour cote Salesforce") - correct register, and exactly
+the intent a model with tool calling restored expresses as a call. Rewriting them
+to answer without announcing a lookup cut hallucination from 18.5% to 7.4%.
+
+**A third gate half now exists** (`evaluations/tool_calling_conformance.py`,
+scored beside the register half), because the register half passed four
+consecutive runs while tool calling was silently broken. It is two-sided and
+distinguishes four outcomes a single "did it call" number conflates - notably
+`hallucinated_tool` from `false_fire`, without which the first corpus's five
+misfires read as "the negative training failed" when in fact it had worked
+perfectly and the model was inventing interfaces.
+
+**What decision 5 should say:** Comage is routed to the variant on all four
+tasks, and only two tools are ever model-facing - `generate_image` and
+`generate_diagram`, both from `check-deal-status`.
+`salesforce.opportunity.read` is graph-driven via `live_read_tool` and never
+offered to the model; `web_search` is declared in task frontmatter and bound to
+nothing in the runtime. The original wording implied four tasks' worth of tool
+use that the runtime does not expose.
 
 ## Context
 
