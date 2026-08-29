@@ -205,24 +205,45 @@ zuno_admin_mainpwd: "AbcdeF_Ghi123"
 
 # --- AAP Red Hat subscription activation (ADR-0354/WP-072 follow-up) -------
 # Set true to auto-activate AAP's Red Hat subscription at the end of
-# `make d1 install aap` (the Gateway/Controller "Subscription" screen
+# `make d0 install aap` (the Gateway/Controller "Subscription" screen
 # equivalent) using a Red Hat account (access.redhat.com login, NOT an
 # activation key/manifest). On AAP 2.7 a single authenticated POST to
 # /api/controller/v2/config/ with these credentials validates the account
 # and attaches its matching entitlement directly (confirmed live
-# 2026-08-25). Hard-fails `make d1 install aap` if enabled but the
+# 2026-08-25). Hard-fails `make d0 install aap` if enabled but the
 # credentials are wrong/missing or the API is unreachable - aap precedes
-# connectivity-link/lws/jobset/kueue/openshift-ai/aiagent-operator in
-# Day 1, so this deliberately blocks the rest of the sequence until the
-# subscription is resolved.
+# aap-config in Day 0 and everything in Day 1 (ADR-0421), so this
+# deliberately blocks the rest of the sequence until the subscription is
+# resolved.
 # The username/password values are consumed via the standard ADR-0024
 # chain (seeded to Vault zuno/aap/rhn by `make d0 install vault`, then
 # read from the aap-rhn-credentials Secret by the aap role) - after
 # changing them here, re-run `make d0 install vault` before
-# `make d1 install aap`. Only the zuno_aap_enabled flag is read directly.
+# `make d0 install aap`. Only the zuno_aap_enabled flag is read directly.
 zuno_aap_enabled: false
 zuno_aap_rhn_username: "xxxxxx"
 zuno_aap_rhn_password: "xxxxxx"
+
+# --- AAP execution routing (ADR-0418 clause 6/WP-097) -----------------------
+# Controls whether `make day1|d1`/`make day2|d2 <verb>` launch the matching
+# AAP Workflow Template (WP-095) and `make day3|d3 <verb>` launches its Job
+# Template (WP-094), instead of running `ansible-playbook` directly from
+# this shell:
+#   - local  - never routes through AAP (today's behavior, unconditionally).
+#     Always safe, works with no AAP instance at all.
+#   - remote - always routes through AAP; FAILS the make invocation if the
+#     Gateway API is unreachable (no silent fallback - an explicit choice
+#     to depend on AAP for that one invocation).
+#   - auto   - probes AAP's Gateway API first (ansible/playbooks/
+#     aap_probe.yml); routes through AAP if reachable, otherwise falls back
+#     to `local` silently (one warning line) - AAP must never become a
+#     single point of failure for operators who need to run these verbs
+#     (ADR-0418 clause 1's Consequences). Default.
+# `day0`'s own verbs and `uninstall`/`reinstall` (any day) are NEVER routed
+# through AAP regardless of this setting - Day 0 installs `aap` itself
+# (chicken-and-egg, ADR-0421), and destructive verbs stay Phase-4-gated
+# (ADR-0418), unimplemented as AAP Job Templates at all.
+zuno_make_aap_mode: auto
 
 # --- OpenShift AI MaaS gateway API key (ADR-0201/WP-27) ------------------
 # Minted by MaaS itself once a MaaSSubscription/key-request flow runs on

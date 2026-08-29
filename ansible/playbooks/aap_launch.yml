@@ -1,0 +1,159 @@
+---
+# ADR-0418 clause 6/WP-097: launches a Job or Workflow Template via the
+# Controller/Gateway API and polls until terminal - the `remote` half of
+# zuno_make_aap_mode (and what `auto` falls through to once aap_probe.yml
+# confirms AAP is reachable). Same admin-password Basic-auth
+# `ansible.builtin.uri` idiom `ansible/roles/aap_config` already uses -
+# no new auth mechanism introduced.
+#
+# Required extra-vars:
+#   aap_launch_type       - job | workflow
+#   aap_launch_template   - the Job/Workflow Template's name in Controller
+#                            (Workflow Templates carry a `-workflow`
+#                            suffix, see gitops/charts/aap-config/values.yaml)
+# Optional:
+#   aap_launch_extra_vars - a JSON object string, passed verbatim as the
+#                            launch's own extra_vars (e.g.
+#                            '{"target_component": "kiali"}', or Day 3
+#                            stresstest's {"target_component": "all",
+#                            "report_format": "text", "bulk_interactions":
+#                            10, "cleanup_test_data": 1}). Defaults to {}
+#                            (the template's own default survey answers).
+- name: "AAP: launch a Job/Workflow Template and wait for it to finish"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    zuno_repo_root: "{{ playbook_dir }}/../.."
+    aap_launch_api_path: "{{ 'workflow_job_templates' if aap_launch_type == 'workflow' else 'job_templates' }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Fail fast on missing required extra-vars
+      ansible.builtin.fail:
+        msg: "aap_launch_type (job|workflow) and aap_launch_template (name) are required extra-vars."
+      when: >-
+        aap_launch_type is not defined or aap_launch_type not in ['job', 'workflow']
+        or aap_launch_template is not defined
+
+    - name: Look up the Gateway Route
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: zuno-aap
+        name: aap
+      register: _aap_launch_route
+
+    - name: Fail if the Gateway Route doesn't exist
+      ansible.builtin.fail:
+        msg: "AAP not reachable: Route 'aap' not found in zuno-aap."
+      when: (_aap_launch_route.resources | default([]) | length) == 0
+
+    - name: Read the admin password from the aap-admin Secret
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: zuno-aap
+        name: aap-admin
+      register: _aap_launch_admin_secret
+      no_log: true
+
+    - name: Resolve Gateway URL and admin credentials
+      ansible.builtin.set_fact:
+        _aap_launch_gateway_url: "https://{{ _aap_launch_route.resources[0].spec.host }}"
+        _aap_launch_admin_password: "{{ _aap_launch_admin_secret.resources[0].data.password | b64decode }}"
+      no_log: true
+
+    - name: "Look up the {{ aap_launch_type }} template"
+      ansible.builtin.uri:
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ aap_launch_api_path }}/?name={{ aap_launch_template }}"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_launch_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _aap_launch_template_lookup
+      no_log: true
+
+    - name: Fail if the template doesn't exist
+      ansible.builtin.fail:
+        msg: "{{ aap_launch_type }} template '{{ aap_launch_template }}' not found in Controller."
+      when: (_aap_launch_template_lookup.json.count | default(0) | int) == 0
+
+    - name: "Launch {{ aap_launch_template }}"
+      ansible.builtin.uri:
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ aap_launch_api_path }}/{{ _aap_launch_template_lookup.json.results[0].id }}/launch/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_launch_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          extra_vars: "{{ (aap_launch_extra_vars | default('{}')) | from_json }}"
+        status_code: 201
+      register: _aap_launch_result
+      no_log: true
+
+    - name: Report the launch
+      ansible.builtin.debug:
+        msg: >-
+          Launched {{ aap_launch_type }} '{{ aap_launch_template }}' - job id
+          {{ _aap_launch_result.json.id }}, polling for completion...
+
+    # Job Templates typically finish in minutes; Workflow Templates (a full
+    # Day 1/Day 2 sequence) can run much longer - the same generous
+    # retry/delay budget every other long-running wait in this repo uses
+    # (e.g. aap role's own operator-install waits).
+    - name: Poll until the run reaches a terminal status
+      ansible.builtin.uri:
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ 'workflow_jobs' if aap_launch_type == 'workflow' else 'jobs' }}/{{ _aap_launch_result.json.id }}/"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_launch_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _aap_launch_status
+      until: _aap_launch_status.json.status in ['successful', 'failed', 'error', 'canceled']
+      retries: 360
+      delay: 10
+      no_log: true
+
+    - name: "Fetch the job's stdout (Job Template launches only - a Workflow
+        run's own stdout is empty; inspect its nodes individually via the
+        Controller UI/API)"
+      ansible.builtin.uri:
+        url: "{{ _aap_launch_gateway_url }}/api/controller/v2/jobs/{{ _aap_launch_result.json.id }}/stdout/?format=txt"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_launch_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+        return_content: true
+      register: _aap_launch_stdout
+      when: aap_launch_type == 'job'
+      no_log: true
+
+    - name: Print the job's stdout
+      ansible.builtin.debug:
+        msg: "{{ _aap_launch_stdout.content.split('\n') }}"
+      when: aap_launch_type == 'job'
+
+    - name: "Report the final status"
+      ansible.builtin.debug:
+        msg: >-
+          {{ aap_launch_type }} '{{ aap_launch_template }}' finished:
+          {{ _aap_launch_status.json.status }} (id
+          {{ _aap_launch_result.json.id }})
+
+    - name: Fail this playbook (and therefore the make invocation) if the run didn't succeed
+      ansible.builtin.fail:
+        msg: >-
+          {{ aap_launch_type }} '{{ aap_launch_template }}' did not succeed:
+          status={{ _aap_launch_status.json.status }} - see the Controller
+          UI/API (job id {{ _aap_launch_result.json.id }}) for detail.
+      when: _aap_launch_status.json.status != 'successful'

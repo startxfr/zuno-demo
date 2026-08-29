@@ -62,11 +62,17 @@ aap_config_job_templates:
     credential: zuno-aap-installer
     survey_components: [agents]
 
+# "-workflow" suffix (WP-097 fix): a Workflow Template and its underlying
+# Job Template would otherwise share the exact same name (e.g.
+# zuno-day1-install for both) - functionally harmless (the resource
+# operator's workflow-node lookup disambiguates via `type: job_template`),
+# but confusing side by side in the Controller UI's Job Templates vs
+# Workflow Templates lists.
 aap_config_workflow_templates:
-  - name: zuno-day1-install
-  - name: zuno-day1-check
-  - name: zuno-day1-reconcile
-  - name: zuno-day1-build
-  - name: zuno-day2-install
-  - name: zuno-day2-check
-  - name: zuno-day2-build
+  - name: zuno-day1-install-workflow
+  - name: zuno-day1-check-workflow
+  - name: zuno-day1-reconcile-workflow
+  - name: zuno-day1-build-workflow
+  - name: zuno-day2-install-workflow
+  - name: zuno-day2-check-workflow
+  - name: zuno-day2-build-workflow

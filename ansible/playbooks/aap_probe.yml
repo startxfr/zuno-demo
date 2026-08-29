@@ -1,0 +1,42 @@
+---
+# ADR-0418 clause 6/WP-097: reachability probe backing
+# `zuno_make_aap_mode=auto`. Succeeds (exit 0) iff AAP's Gateway API
+# answers; fails otherwise (Route missing, Gateway unreachable, timeout).
+# The Makefile checks this playbook's own exit code rather than parsing
+# stdout - the same shell idiom every other conditional branch in this
+# repository's Makefile already uses (e.g. `credentials-check`). Never
+# used to gate `local`/`remote` modes - only `auto` calls this, and only
+# to decide whether to fall back to `local`, never to block outright
+# (ADR-0418 clause 1: "AAP must never become a single point of failure").
+- name: "AAP reachability probe (zuno_make_aap_mode=auto)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    zuno_repo_root: "{{ playbook_dir }}/../.."
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Look up the Gateway Route
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: zuno-aap
+        name: aap
+      register: _aap_probe_route
+      ignore_errors: true
+
+    - name: Fail if the Gateway Route doesn't exist (AAP not installed)
+      ansible.builtin.fail:
+        msg: "AAP not reachable: Route 'aap' not found in zuno-aap."
+      when: (_aap_probe_route.resources | default([]) | length) == 0
+
+    - name: Probe the Gateway API (short timeout, single try - a quick
+        yes/no, not a wait loop like aap-config's own bootstrap)
+      ansible.builtin.uri:
+        url: "https://{{ _aap_probe_route.resources[0].spec.host }}/api/"
+        method: GET
+        validate_certs: false
+        status_code: 200
+        timeout: 5

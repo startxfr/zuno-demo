@@ -176,8 +176,16 @@ jobTemplates:
 # each component role's own README (re-verify live before trusting any
 # single edge - this graph has not yet been exercised against a real
 # Controller, see WP-095's own Acceptance checks).
+# Naming (WP-097 fix): every workflow's own `name` carries a `-workflow`
+# suffix (e.g. `zuno-day1-install-workflow`) so it never collides with its
+# underlying Job Template's identical-looking name (`zuno-day1-install`,
+# referenced unchanged via `jobTemplate` below) - the collision was
+# functionally harmless (the resource operator's workflow-node lookup
+# disambiguates via `unified_job_template.type: job_template`), but
+# confusing side by side in the Controller UI's separate Job Templates
+# and Workflow Templates lists.
 workflowTemplates:
-  - name: zuno-day1-install
+  - name: zuno-day1-install-workflow
     jobTemplate: zuno-day1-install
     nodes: &day1ComponentDag
       # Wave 0: no dependency beyond Day 0's `machines` (unaffected by
@@ -231,14 +239,14 @@ workflowTemplates:
         successNodes: [aiagent-operator]
       - id: aiagent-operator
         successNodes: []
-  - name: zuno-day1-check
+  - name: zuno-day1-check-workflow
     jobTemplate: zuno-day1-check
     nodes: *day1ComponentDag
-  - name: zuno-day1-reconcile
+  - name: zuno-day1-reconcile-workflow
     jobTemplate: zuno-day1-reconcile
     nodes: *day1ComponentDag
 
-  - name: zuno-day1-build
+  - name: zuno-day1-build-workflow
     jobTemplate: zuno-day1-build
     nodes:
       # ai-gateway/aiagent-operator both only need supply-chain-signer
@@ -251,7 +259,7 @@ workflowTemplates:
       - id: aiagent-operator
         successNodes: []
 
-  - name: zuno-day2-install
+  - name: zuno-day2-install-workflow
     jobTemplate: zuno-day2-install
     nodes:
       - id: namespaces
@@ -277,7 +285,7 @@ workflowTemplates:
         successNodes: [lightspeed-config]
       - id: lightspeed-config
         successNodes: []
-  - name: zuno-day2-check
+  - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
     nodes:
       - id: namespaces
@@ -303,7 +311,7 @@ workflowTemplates:
       - id: supply-chain
         successNodes: []
 
-  - name: zuno-day2-build
+  - name: zuno-day2-build-workflow
     jobTemplate: zuno-day2-build
     nodes:
       # 5 independent BuildConfigs, no ordering dependency between them -

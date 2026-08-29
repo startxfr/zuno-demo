@@ -174,7 +174,15 @@ sequencing model around it.
      same underlying Job Template** (this clause's own registration, not
      a second one per component) with a different `extra_data.
      target_component` - a Workflow Template needs no credential or
-     Survey of its own. The CRD's `workflow_nodes` field carries no
+     Survey of its own. Each Workflow Template's own name carries a
+     `-workflow` suffix (`zuno-day1-install-workflow`, not
+     `zuno-day1-install`) - it would otherwise share its underlying Job
+     Template's exact name, functionally harmless (the resource
+     operator's node lookup disambiguates via `unified_job_template.type:
+     job_template`) but confusing side by side in the Controller UI's
+     separate Job Templates/Workflow Templates lists (found and fixed
+     while building WP-097's launch mechanism, before any live use of
+     either name). The CRD's `workflow_nodes` field carries no
      CRD-documented schema (`x-kubernetes-preserve-unknown-fields`); the
      shape actually rendered (`identifier`, `unified_job_template`,
      `extra_data`, `related.{success_nodes,failure_nodes,always_nodes}`,
@@ -194,18 +202,38 @@ sequencing model around it.
      flagged for live re-verification before being trusted, per
      `ansible/roles/aap_config/README.md`.
    - `make day1|d1`/`make day2|d2 <verb>` route through the matching
-     Workflow Template, and `make day3|d3 <verb>` through its Job
-     Template, when AAP is available - not decided by this clause; tracked
-     as WP-096, entirely unimplemented. A new `zuno_make_aap_mode`
-     variable (`local`/`remote`/`auto`, default `auto`, `ansible/
-     confidential.yml`) will control this: `local` never routes through
-     AAP (today's behavior, unconditionally); `remote` always routes
-     through AAP and fails if unreachable; `auto` probes AAP's Gateway API
-     and falls back to `local` silently if unreachable - preserving clause
-     1's "AAP must never become a single point of failure" consequence for
-     every mode except an operator's own explicit `remote` choice.
-     `uninstall`/`reinstall` are never routed through AAP regardless of
-     mode (Phase 4 stays gated as clause 1 describes).
+     Workflow Template when the requested component is `all` (a Workflow
+     Template's DAG always runs its full node set - there is no way to
+     scope a launch to a single node's subtree), and through the matching
+     Job Template directly (bypassing the workflow) when a specific
+     component is named instead; `make day3|d3 <verb>` always routes
+     through its Job Template (no Workflow Template exists for Day 3). A
+     new `zuno_make_aap_mode` variable (`local`/`remote`/`auto`, default
+     `auto`, `ansible/confidential.yml`) controls this: `local` never
+     routes through AAP (today's behavior, unconditionally); `remote`
+     always routes through AAP and fails if unreachable, no silent
+     fallback; `auto` probes AAP's Gateway API (`ansible/playbooks/
+     aap_probe.yml`) and falls back to `local` silently (one warning line)
+     if unreachable - preserving clause 1's "AAP must never become a
+     single point of failure" consequence for every mode except an
+     operator's own explicit `remote` choice. `uninstall`/`reinstall` are
+     never routed through AAP regardless of mode (Phase 4 stays gated as
+     clause 1 describes), and neither is any Day 0 verb (Day 0 installs
+     `aap` itself, ADR-0421's chicken-and-egg).
+     **Repo work merged 2026-08-30 (WP-097):** `ansible/playbooks/
+     aap_probe.yml` (reachability probe, succeeds iff the Gateway API
+     answers) and `aap_launch.yml` (launches a Job/Workflow Template via
+     the Controller API, polls until terminal, propagates the real
+     failure/success) implement the mechanism; the Makefile's
+     `DAY1_RECIPE`/`DAY2_RECIPE`/`DAY3_RECIPE` route every non-uninstall
+     verb through a shared `aap_route()`/`resolve_aap_mode()` shell-
+     function pair. Verified offline: `bash -n` on the generated recipe
+     text for every verb×day combination, and isolated shell-logic tests
+     confirming the local/auto-unreachable/remote-success/remote-failure
+     branches each behave correctly (fall back to local only on the two
+     "not routed" cases, never on a genuine remote failure). **Not yet
+     exercised against a real Controller** - deferred to an operator-run
+     session, per this repository's shared-cluster convention.
 
 ## Consequences
 
@@ -280,21 +308,25 @@ existing pattern (ADR-0352 clause 9: "roadmap briefs live under
 
 ## Implementation state
 
-**Partially implemented (2026-08-30, WP-094/WP-095 - repo work merged,
-live verification pending).** All 14 Job Templates (clause 1's full
-Day 1/2/3 list plus `zuno-day0-check`) and all 7 Workflow Templates
+**Partially implemented (2026-08-30, WP-094/WP-095/WP-097 - repo work
+merged, live verification pending).** All 14 Job Templates (clause 1's
+full Day 1/2/3 list plus `zuno-day0-check`) and all 7 Workflow Templates
 (clause 6) are registered by `gitops/charts/aap-config`/`ansible/roles/
 aap_config`, each Job Template with its credential tier and (where
 applicable) `target_component` Survey, each Workflow Template's DAG
 mechanically self-consistent (no broken edges, no cycles, convergence
 flagged correctly, node/Survey component sets matching exactly) -
-`helm lint`/`helm template` confirm the chart renders correctly. **Not
-yet live-applied or launched** - registering the CRs on the real cluster
-(`make d0 install aap-config`) and confirming each new Job/Workflow
-Template actually launches and reconciles successfully are deferred to
-an operator-run session, per this repository's shared-cluster convention.
-`make` routing/`zuno_make_aap_mode` (WP-096) and Phase 3/4 launch-RBAC
-remain entirely unimplemented.
+`helm lint`/`helm template` confirm the chart renders correctly. `make`
+routing (`zuno_make_aap_mode`, `aap_probe.yml`/`aap_launch.yml`,
+`aap_route()`/`resolve_aap_mode()` in the Makefile) is implemented and
+offline-verified (`bash -n` on every verb×day combination's generated
+recipe, isolated shell-logic tests of all four mode/outcome branches).
+**Not yet live-applied or exercised against a real Controller** -
+registering the CRs on the real cluster (`make d0 install aap-config`)
+and confirming a real launch/routing round-trip end to end are deferred
+to an operator-run session, per this repository's shared-cluster
+convention. Phase 3/4 launch-RBAC (who may launch which template) remains
+entirely unimplemented.
 
 ## Related ADRs
 

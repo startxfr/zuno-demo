@@ -148,7 +148,7 @@ roots, no edges - separate BuildConfigs with no ordering dependency.
   the `awx.awx.workflow_job_template`-derived `workflow_nodes` shape this
   WP assumed actually reconciles against this cluster's resource-operator
   version (flagged as unconfirmed throughout this WP's own comments).
-- Launch `zuno-day1-check` (read-only, safe) and confirm live in the
+- Launch `zuno-day1-check-workflow` (read-only, safe) and confirm live in the
   Controller UI/API that each wave's nodes start with the same/near-
   identical timestamp (proving real parallelism, not an accidental serial
   fallback) and that the workflow completes successfully end to end.

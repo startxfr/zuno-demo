@@ -103,6 +103,56 @@ DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
 DAY3_VERBS := test stresstest backup restore check sign
 
+# ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
+# recipe below sources to route mutating/read verbs through AAP when
+# zuno_make_aap_mode allows it, instead of always running ansible-playbook
+# from this shell. Defined once here (not duplicated per recipe) since
+# each DAYn_RECIPE's `define...endef` body runs as its own separate shell
+# invocation - shell functions can't be shared any other way in this file.
+# resolve_aap_mode() reads ansible/confidential.yml directly: the Makefile
+# has no other way to reach an Ansible-sourced variable before deciding
+# whether to invoke ansible-playbook at all, and this decision must happen
+# here, in the shell, before any playbook runs. Never fails even if the
+# file, PyYAML, or the key itself is missing - defaults to "auto"
+# throughout, matching this repo's existing "graceful if confidential.yml
+# is absent" convention (see ansible/roles/aap/tasks/install.yml).
+# aap_route() returns: 0 on a successful AAP launch (caller is done); 99
+# as a NOT-ROUTED sentinel (local mode, or auto mode with AAP unreachable)
+# meaning the caller must fall back to its own local ansible-playbook call;
+# any other nonzero code is a REAL launch/job failure in remote mode (or
+# auto mode once AAP was confirmed reachable) that the caller must
+# propagate as-is, never silently falling back to local for it - remote
+# mode's whole point is "no silent fallback" (ADR-0418 clause 6).
+define AAP_ROUTING_SHELL_FUNCS
+resolve_aap_mode() { \
+  local mode="auto"; \
+  if [[ -f ansible/confidential.yml ]]; then \
+    local val; \
+    val="$$(python3 -c "import yaml; d=yaml.safe_load(open('ansible/confidential.yml')) or {}; print(d.get('zuno_make_aap_mode','auto'))" 2>/dev/null)"; \
+    [[ -n "$$val" ]] && mode="$$val"; \
+  fi; \
+  case "$$mode" in \
+    local|remote|auto) ;; \
+    *) echo "Invalid zuno_make_aap_mode in ansible/confidential.yml: '$$mode' (expected local|remote|auto)" >&2; exit 2 ;; \
+  esac; \
+  echo "$$mode"; \
+}; \
+aap_route() { \
+  local kind="$$1" template="$$2" extra_vars_json="$$3" mode; \
+  mode="$$(resolve_aap_mode)"; \
+  case "$$mode" in \
+    local) return 99 ;; \
+    auto) \
+      if ! $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_probe.yml $(EXTRA_VARS) >/dev/null 2>&1; then \
+        echo "AAP not reachable - falling back to local execution (zuno_make_aap_mode=auto)" >&2; \
+        return 99; \
+      fi ;; \
+    remote) ;; \
+  esac; \
+  $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_launch.yml -e "aap_launch_type=$$kind" -e "aap_launch_template=$$template" -e "aap_launch_extra_vars=$$extra_vars_json" $(EXTRA_VARS); \
+};
+endef
+
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
@@ -307,11 +357,20 @@ if [[ -z "$$verb" ]]; then \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY1_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day1 verb: '$$verb' (expected one of: $(DAY1_VERBS))" >&2; exit 2;; esac; \
-run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
-run_build() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_build.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
-run_install() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_install.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+$(AAP_ROUTING_SHELL_FUNCS) \
+route_or_local() { \
+  local verb="$$1" workflow="$$2" ev; \
+  ev="{\"target_component\": \"$$component\"}"; \
+  if [[ "$$component" == "all" && -n "$$workflow" ]]; then aap_route workflow "$$workflow" "$$ev"; \
+  else aap_route job "zuno-day1-$$verb" "$$ev"; fi; \
+  local rc=$$?; \
+  if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_$${verb}.yml -e "target_component=$$component" $(EXTRA_VARS); else return $$rc; fi; \
+}; \
+run_check() { route_or_local check zuno-day1-check-workflow; }; \
+run_build() { route_or_local build zuno-day1-build-workflow; }; \
+run_install() { route_or_local install zuno-day1-install-workflow; }; \
+run_reconcile() { route_or_local reconcile zuno-day1-reconcile-workflow; }; \
 run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
-run_reconcile() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_reconcile.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) \
     case " $(DAY1_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day1 check component: '$$component' (expected one of: $(DAY1_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
@@ -381,9 +440,18 @@ if [[ -z "$$verb" ]]; then \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY2_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day2 verb: '$$verb' (expected one of: $(DAY2_VERBS))" >&2; exit 2;; esac; \
-run_check() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_check.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
-run_build() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_build.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
-run_install() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_install.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+$(AAP_ROUTING_SHELL_FUNCS) \
+route_or_local() { \
+  local verb="$$1" workflow="$$2" ev; \
+  ev="{\"target_component\": \"$$component\"}"; \
+  if [[ "$$component" == "all" && -n "$$workflow" ]]; then aap_route workflow "$$workflow" "$$ev"; \
+  else aap_route job "zuno-day2-$$verb" "$$ev"; fi; \
+  local rc=$$?; \
+  if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_$${verb}.yml -e "target_component=$$component" $(EXTRA_VARS); else return $$rc; fi; \
+}; \
+run_check() { route_or_local check zuno-day2-check-workflow; }; \
+run_build() { route_or_local build zuno-day2-build-workflow; }; \
+run_install() { route_or_local install zuno-day2-install-workflow; }; \
 run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) \
@@ -477,10 +545,12 @@ fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
 case " $(DAY3_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported day3 verb: '$$verb' (expected one of: $(DAY3_VERBS))" >&2; exit 2;; esac; \
 report_format="$${REPORT_FORMAT:-text}"; \
+$(AAP_ROUTING_SHELL_FUNCS) \
 case "$$verb" in \
   test) \
     case " $(DAY3_TEST_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 test component: '$$component' (expected one of: $(DAY3_TEST_COMPONENTS) or all)" >&2; exit 2;; esac; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+    aap_route job zuno-day3-test "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_test.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS); else exit $$rc; fi ;; \
   stresstest) \
     case " $(DAY3_TEST_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 stresstest component: '$$component' (expected one of: $(DAY3_TEST_COMPONENTS) or all)" >&2; exit 2;; esac; \
     bulk="$${BULK:-}"; \
@@ -501,19 +571,24 @@ case "$$verb" in \
         cleanup=1; \
       fi; \
     fi; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" $(EXTRA_VARS) ;; \
+    aap_route job zuno-day3-stresstest "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\", \"bulk_interactions\": $$bulk, \"cleanup_test_data\": $$cleanup}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" $(EXTRA_VARS); else exit $$rc; fi ;; \
   backup) \
     case " $(DAY3_BACKUP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 backup component: '$$component' (expected one of: $(DAY3_BACKUP_COMPONENTS) or all)" >&2; exit 2;; esac; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_backup.yml -e "target_component=$$component" $(EXTRA_VARS) ;; \
+    aap_route job zuno-day3-backup "{\"target_component\": \"$$component\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_backup.yml -e "target_component=$$component" $(EXTRA_VARS); else exit $$rc; fi ;; \
   restore) \
     case " $(DAY3_BACKUP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 restore component: '$$component' (expected one of: $(DAY3_BACKUP_COMPONENTS) or all)" >&2; exit 2;; esac; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_restore.yml -e "target_component=$$component" $(EXTRA_VARS) ;; \
+    aap_route job zuno-day3-restore "{\"target_component\": \"$$component\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_restore.yml -e "target_component=$$component" $(EXTRA_VARS); else exit $$rc; fi ;; \
   check) \
     case " $(DAY3_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 check component: '$$component' (expected one of: $(DAY3_COMPONENTS) or all)" >&2; exit 2;; esac; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_check.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS) ;; \
+    aap_route job zuno-day3-check "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_check.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS); else exit $$rc; fi ;; \
   sign) \
     case " $(DAY3_SIGN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 sign component: '$$component' (expected one of: $(DAY3_SIGN_COMPONENTS) or all)" >&2; exit 2;; esac; \
-    $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_sign.yml -e "target_component=$$component" $(EXTRA_VARS) ;; \
+    aap_route job zuno-day3-sign "{\"target_component\": \"$$component\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_sign.yml -e "target_component=$$component" $(EXTRA_VARS); else exit $$rc; fi ;; \
 esac
 endef
 
