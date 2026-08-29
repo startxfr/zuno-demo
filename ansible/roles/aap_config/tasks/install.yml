@@ -67,6 +67,11 @@
   retries: 60
   delay: 10
 
+# --- Remove AAP's shipped default objects (ADR-0354/WP-098) -----------------
+
+- name: "aap-config | remove AAP's shipped default Project/Job Template/Inventory"
+  ansible.builtin.include_tasks: remove_aap_defaults.yml
+
 # Organizations are GATEWAY-level resources in AAP 2.5+ (the platform
 # resource server owns them and syncs them down into Controller/Hub/EDA) -
 # a direct POST on /api/controller/v2/organizations/ is rejected with

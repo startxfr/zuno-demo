@@ -1,0 +1,51 @@
+---
+# ADR-0354/WP-098: a fresh AAP install ships "Demo Project"/"Demo Job
+# Template" (pointing at github.com/ansible/ansible-tower-samples) and, on
+# some versions, a "Demo Inventory" - all organization-less. Neither
+# JobTemplate nor AnsibleProject's CRD carries a `state` field (confirmed
+# live 2026-08-30 via `oc explain jobtemplates.tower.ansible.com.spec` /
+# `oc explain ansibleprojects.tower.ansible.com.spec`) - only
+# AnsibleInventory does - so a uniform "declare state: absent in the
+# chart" approach can't cover all three, and this is done here instead:
+# idempotently, by name, via the Controller API. Never fails if a given
+# default is already gone (a prior run already removed it, or this AAP
+# version never shipped it).
+#
+# Runs right after the Gateway API answers - independent of the `zuno`
+# organization/Project/Job Template this role registers below, so it does
+# not need to wait for any of that.
+
+- name: "aap-config | look up AAP's shipped default objects"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/{{ item.path }}/?name={{ item.name | urlencode }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_defaults_lookup
+  loop:
+    # Job Template first: the Controller API 400s deleting a Project a
+    # Job Template still references.
+    - { path: job_templates, name: "Demo Job Template" }
+    - { path: projects, name: "Demo Project" }
+    - { path: inventories, name: "Demo Inventory" }
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: "aap-config | delete AAP's shipped default objects"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/{{ item.item.path }}/{{ item.json.results[0].id }}/"
+    method: DELETE
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 204
+  loop: "{{ _aap_config_defaults_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: (item.json.count | default(0) | int) > 0
+  no_log: true
